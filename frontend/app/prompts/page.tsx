@@ -104,19 +104,22 @@ export default function PromptStudioPage() {
             <div className="rp-panel">
               <div className="rp-panel-title">Rulebooks</div>
               <ul className="rp-list">
-                {rulebooks.map((rb) => (
-                  <li key={rb.id}>
-                    <button
-                      type="button"
-                      className={rb.id === activeId ? 'subtle active' : 'subtle'}
-                      onClick={() => setActiveId(rb.id)}
-                    >
-                      <span>{rb.name}</span>
-                      <code>{rb.version}</code>
-                      <span className={`badge ${badgeFor(rb.status)}`}>{rb.status}</span>
-                    </button>
-                  </li>
-                ))}
+                {rulebooks.map((rb) => {
+                  const status = statusLabel(rb.status);
+                  return (
+                    <li key={rb.id}>
+                      <button
+                        type="button"
+                        className={rb.id === activeId ? 'subtle active' : 'subtle'}
+                        onClick={() => setActiveId(rb.id)}
+                      >
+                        <span>{rb.name}</span>
+                        <code>{rb.version}</code>
+                        <span className={`badge ${badgeFor(rb.status)}`}>{status}</span>
+                      </button>
+                    </li>
+                  );
+                })}
               </ul>
             </div>
 
@@ -146,10 +149,17 @@ export default function PromptStudioPage() {
   );
 }
 
-function badgeFor(status: string) {
-  if (status === 'approved') return 'ok';
-  if (status === 'review') return 'info';
-  if (status === 'deprecated') return 'danger';
+function statusLabel(status: Rulebook['status']): string {
+  if (typeof status === 'string') return status;
+  return ['Draft', 'In review', 'Approved', 'Deprecated'][status] ?? String(status);
+}
+
+function badgeFor(status: Rulebook['status']) {
+  if (typeof status === 'number') return ['', 'warn', 'ok', 'danger'][status] ?? 'warn';
+  const normalized = status.toLowerCase();
+  if (normalized === 'approved') return 'ok';
+  if (normalized === 'review' || normalized === 'in review') return 'info';
+  if (normalized === 'deprecated') return 'danger';
   return 'warn';
 }
 
