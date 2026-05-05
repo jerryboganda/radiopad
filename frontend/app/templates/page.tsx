@@ -22,14 +22,7 @@ type Draft = {
   sections: Section[];
 };
 
-type PreviewState = {
-  templateId: string;
-  rowId: string;
-  name: string;
-  status: string;
-  variant: string;
-  sections: Array<{ key: string; label: string; body: string }>;
-} | null;
+type PreviewState = Awaited<ReturnType<typeof api.templates.preview>> | null;
 
 type UsageState = {
   templateId: string;
@@ -123,7 +116,7 @@ export default function TemplatesPage() {
 
   async function showPreview(t: ExtTemplate) {
     setError(null);
-    try { setPreview(await api.templates.preview(t.id) as NonNullable<PreviewState>); }
+    try { setPreview(await api.templates.preview(t.id)); }
     catch (e) { setError((e as Error).message); }
   }
 
