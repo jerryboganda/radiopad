@@ -862,6 +862,7 @@ Independent reviewer audited the iter-32 fan-out claims and the closeout sweep a
 - Added `scripts/build-radiopad-desktop-windows.ps1`, a checked Windows build script that publishes the sidecar, builds `frontend/out`, installs/uses Tauri CLI, and runs `cargo tauri build --bundles msi,nsis`.
 - Added `.github/workflows/desktop-windows-test-build.yml`, a manual GitHub Actions workflow for unsigned Windows MSI/NSIS test artifacts using GitHub-hosted Windows runners and 14-day artifact retention.
 - Updated the workflow to run automatically on relevant pushes, added `docs/06-operations/desktop-cloud-build.md`, and added `scripts/prepare-desktop-cloud-build-commit.ps1` so an operator can stage/commit/push the project and trigger the cloud build with one command.
+- Fixed the first GitHub Actions run failure by changing the desktop build workflow from array splatting to hashtable splatting for PowerShell script parameters.
 - Local installer packaging is blocked on this workstation because `node`, `npm`, `pnpm`, `corepack`, `cargo`, `rustc`, `rustup`, Microsoft C++ Build Tools (`cl`/`msbuild`), and WiX are not installed/on PATH. The script syntax was validated and it fails cleanly at the missing `node` prerequisite.
 - Windows 8 install testing is not supportable for the current repo stack: RadioPad desktop is Tauri 2 + ASP.NET Core/.NET 8; current Microsoft .NET support excludes Windows 8.1/Windows 7, and the WebView2 deployment path is centered on supported Windows 10/11 clients.
 

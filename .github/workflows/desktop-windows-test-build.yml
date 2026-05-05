@@ -87,11 +87,14 @@ jobs:
       - name: Build unsigned Windows installer
         shell: pwsh
         run: |
-          $args = @('-Bundles', $env:BUNDLES, '-DisableUpdaterArtifacts')
-          if ($env:FROZEN_LOCKFILE -ne 'true') {
-            $args += '-NoFrozenLockfile'
+          $buildArgs = @{
+            Bundles = $env:BUNDLES
+            DisableUpdaterArtifacts = $true
           }
-          & .\scripts\build-radiopad-desktop-windows.ps1 @args
+          if ($env:FROZEN_LOCKFILE -ne 'true') {
+            $buildArgs.NoFrozenLockfile = $true
+          }
+          & .\scripts\build-radiopad-desktop-windows.ps1 @buildArgs
 
       - name: Write installer notes
         if: always()
