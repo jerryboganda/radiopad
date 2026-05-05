@@ -1,14 +1,4 @@
-import ReportClient from './ReportClient';
-
-export const dynamicParams = false;
-
-export function generateStaticParams(): Array<{ id: string }> {
-  return [];
-}
-
-export default function ReportPage() {
-  return <ReportClient />;
-}'use client';
+'use client';
 
 import { useEffect, useState, useCallback, useMemo } from 'react';
 import { useParams, useRouter } from 'next/navigation';

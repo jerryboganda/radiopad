@@ -1,14 +1,4 @@
-import MobileDictateClient from './MobileDictateClient';
-
-export const dynamicParams = false;
-
-export function generateStaticParams(): Array<{ reportId: string }> {
-  return [];
-}
-
-export default function MobileDictatePage() {
-  return <MobileDictateClient />;
-}'use client';
+'use client';
 
 // Iter-36 MOB — full-screen dictation page. Uses the Web Speech API
 // (`window.SpeechRecognition || window.webkitSpeechRecognition`) when

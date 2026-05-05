@@ -1,14 +1,4 @@
-import MobileEditClient from './MobileEditClient';
-
-export const dynamicParams = false;
-
-export function generateStaticParams(): Array<{ reportId: string }> {
-  return [];
-}
-
-export default function MobileEditPage() {
-  return <MobileEditClient />;
-}'use client';
+'use client';
 
 // Iter-36 MOB — touch-friendly draft editor. Each report section
 // (Indication, Technique, Comparison, Findings, Impression,

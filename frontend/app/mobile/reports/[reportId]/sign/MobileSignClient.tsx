@@ -1,14 +1,4 @@
-import MobileSignClient from './MobileSignClient';
-
-export const dynamicParams = false;
-
-export function generateStaticParams(): Array<{ reportId: string }> {
-  return [];
-}
-
-export default function MobileSignPage() {
-  return <MobileSignClient />;
-}'use client';
+'use client';
 
 // Iter-36 MOB — sign-acknowledgement screen. Renders the report
 // read-only with `.ai-mark` styling preserved, lists outstanding
