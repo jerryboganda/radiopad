@@ -3,6 +3,7 @@
 import { useEffect, useState } from 'react';
 import Link from 'next/link';
 import { api, type Report } from '@/lib/api';
+import { reportHref } from '@/lib/routes';
 
 export default function ReportsPage() {
   const [reports, setReports] = useState<Report[]>([]);
@@ -26,7 +27,7 @@ export default function ReportsPage() {
                 <td>{r.study.bodyPart}</td>
                 <td><span className="badge">{statusLabel(r.status)}</span></td>
                 <td className="muted">{new Date(r.updatedAt).toLocaleString()}</td>
-                <td><Link href={`/reports/${r.id}`}>Open →</Link></td>
+                <td><Link href={reportHref(r.id)}>Open →</Link></td>
               </tr>
             ))}
           </tbody>

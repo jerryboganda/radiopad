@@ -1,4 +1,4 @@
-// Iter-36 MOB — `/mobile/dictate/[reportId]` page test. We render with
+// Iter-36 MOB — `/mobile/dictate?reportId=...` page test. We render with
 // the Web Speech API absent to confirm the fallback message, then with
 // it present and assert the locked classes (`.rp-mic-btn`,
 // `.rp-transcript`) are used and the save button calls
@@ -8,7 +8,6 @@ import { render, fireEvent, waitFor, act } from '@testing-library/react';
 
 const pushMock = vi.fn();
 vi.mock('next/navigation', () => ({
-  useParams: () => ({ reportId: 'rpt-1' }),
   useRouter: () => ({ push: pushMock }),
 }));
 
@@ -21,12 +20,13 @@ vi.mock('@/lib/api', () => ({
   },
 }));
 
-import Page from '@/app/mobile/dictate/[reportId]/page';
+import Page from '@/app/mobile/dictate/page';
 
 describe('mobile dictate page', () => {
   beforeEach(() => {
     appendFindings.mockClear();
     pushMock.mockClear();
+    window.history.replaceState(null, '', '/mobile/dictate?reportId=rpt-1');
     window.localStorage.clear();
     delete (window as unknown as { SpeechRecognition?: unknown }).SpeechRecognition;
     delete (window as unknown as { webkitSpeechRecognition?: unknown }).webkitSpeechRecognition;

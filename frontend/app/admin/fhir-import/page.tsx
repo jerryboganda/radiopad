@@ -3,6 +3,7 @@
 import { useState } from 'react';
 import Link from 'next/link';
 import { api } from '@/lib/api';
+import { reportHref } from '@/lib/routes';
 
 type ImportSuccess = { reportId: string; status: string; warnings?: string[] };
 
@@ -52,7 +53,7 @@ export default function FhirImportPage() {
       {result && (
         <div className="banner info">
           Imported as <code>{result.status}</code> · draft{' '}
-          <Link href={`/reports/${result.reportId}`}>
+          <Link href={reportHref(result.reportId)}>
             <code>{result.reportId}</code>
           </Link>
           {result.warnings && result.warnings.length > 0 && (

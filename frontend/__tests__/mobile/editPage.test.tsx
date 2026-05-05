@@ -1,4 +1,4 @@
-// Iter-36 MOB — `/mobile/reports/[reportId]/edit` page test. Six
+// Iter-36 MOB — `/mobile/reports/edit?reportId=...` page test. Six
 // section panels render, each `<details>` opens on tap, the textarea
 // is wired to `api.reports.patch`, and AI-flagged sections wear the
 // `.ai-mark` wrapper.
@@ -6,7 +6,6 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { render, fireEvent, waitFor, act } from '@testing-library/react';
 
 vi.mock('next/navigation', () => ({
-  useParams: () => ({ reportId: 'rpt-1' }),
   useRouter: () => ({ push: vi.fn() }),
 }));
 
@@ -21,7 +20,7 @@ vi.mock('@/lib/api', () => ({
   },
 }));
 
-import Page from '@/app/mobile/reports/[reportId]/edit/page';
+import Page from '@/app/mobile/reports/edit/page';
 
 const sample = {
   id: 'rpt-1',
@@ -38,6 +37,7 @@ describe('mobile edit page', () => {
   beforeEach(() => {
     get.mockReset();
     patch.mockReset();
+    window.history.replaceState(null, '', '/mobile/reports/edit?reportId=rpt-1');
     get.mockResolvedValue(sample);
     patch.mockResolvedValue(sample);
   });

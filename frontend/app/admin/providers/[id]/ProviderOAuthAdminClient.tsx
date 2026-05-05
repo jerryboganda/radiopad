@@ -1,8 +1,8 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import { useParams } from 'next/navigation';
 import { api, type Provider } from '@/lib/api';
+import { readQueryParam } from '@/lib/browserParams';
 
 /**
  * Iter-35 PROV-007 — admin surface for the per-provider OAuth refresh-token
@@ -23,9 +23,7 @@ type Status = {
 };
 
 export default function ProviderOAuthAdminPage() {
-  const params = useParams<{ id: string }>();
-  const providerId = params?.id ?? '';
-
+  const [providerId, setProviderId] = useState<string | null>(null);
   const [provider, setProvider] = useState<Provider | null>(null);
   const [status, setStatus] = useState<Status | null>(null);
   const [token, setToken] = useState('');
@@ -34,6 +32,10 @@ export default function ProviderOAuthAdminPage() {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [info, setInfo] = useState<string | null>(null);
+
+  useEffect(() => {
+    setProviderId(readQueryParam('id'));
+  }, []);
 
   useEffect(() => {
     if (!providerId) return;
@@ -45,6 +47,7 @@ export default function ProviderOAuthAdminPage() {
   }, [providerId]);
 
   async function refresh() {
+    if (!providerId) return;
     try {
       const s = await api.providers.oauth.status(providerId);
       setStatus(s);
@@ -56,6 +59,7 @@ export default function ProviderOAuthAdminPage() {
   }
 
   async function save() {
+    if (!providerId) { setError('Missing provider id.'); return; }
     if (!token) { setError('Refresh token is required.'); return; }
     setBusy(true); setError(null); setInfo(null);
     try {
@@ -75,6 +79,7 @@ export default function ProviderOAuthAdminPage() {
   }
 
   async function remove() {
+    if (!providerId) { setError('Missing provider id.'); return; }
     if (!confirm('Delete the stored OAuth refresh token for this provider?')) return;
     setBusy(true); setError(null); setInfo(null);
     try {
@@ -91,7 +96,7 @@ export default function ProviderOAuthAdminPage() {
   return (
     <div className="rp-container">
       <h1 className="rp-page-title">
-        Provider OAuth — {provider?.name ?? providerId}
+        Provider OAuth — {provider?.name ?? providerId ?? ''}
       </h1>
       <p className="rp-page-sub">
         Per-provider OAuth refresh-token vault. Tokens are encrypted at rest
@@ -102,6 +107,7 @@ export default function ProviderOAuthAdminPage() {
       </p>
 
       {error && <div className="banner warn">{error}</div>}
+      {providerId === '' && <div className="banner warn">Missing provider id.</div>}
       {info && <div className="banner ok">{info}</div>}
 
       <div className="rp-panel">

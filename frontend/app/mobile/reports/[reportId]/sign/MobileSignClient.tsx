@@ -15,8 +15,8 @@
 // `.rp-ack-row`, `.ai-mark`, button variants.
 
 import { useCallback, useEffect, useState } from 'react';
-import { useParams } from 'next/navigation';
 import { api, type Report, type ValidationFinding } from '@/lib/api';
+import { readQueryParam } from '@/lib/browserParams';
 
 type ExportFormat = 'text' | 'json' | 'fhir' | 'pdf';
 
@@ -36,8 +36,7 @@ function severityClass(sev: ValidationFinding['severity']): 'blocker' | 'warning
 }
 
 export default function MobileSignPage() {
-  const params = useParams<{ reportId: string }>();
-  const reportId = params.reportId;
+  const [reportId, setReportId] = useState<string | null>(null);
 
   const [report, setReport] = useState<Report | null>(null);
   const [findings, setFindings] = useState<ValidationFinding[]>([]);
@@ -50,6 +49,11 @@ export default function MobileSignPage() {
   const [done, setDone] = useState<string | null>(null);
 
   useEffect(() => {
+    setReportId(readQueryParam('reportId'));
+  }, []);
+
+  useEffect(() => {
+    if (!reportId) return;
     let cancelled = false;
     (async () => {
       try {
@@ -79,6 +83,7 @@ export default function MobileSignPage() {
     !!report && blockers.length === 0 && reviewedAi && (!requireWarningAck || reviewedWarnings);
 
   const onAcknowledgeAndExport = useCallback(async () => {
+    if (!reportId) { setError('Missing report id.'); return; }
     if (!canAcknowledge) return;
     setBusy(true);
     setError(null);
@@ -117,6 +122,11 @@ export default function MobileSignPage() {
       {error && (
         <div className="banner danger" role="alert">
           {error}
+        </div>
+      )}
+      {reportId === '' && (
+        <div className="banner warn" role="alert">
+          Missing report id.
         </div>
       )}
       {done && (

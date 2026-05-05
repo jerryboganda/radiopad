@@ -1,14 +1,10 @@
-// Iter-36 MOB — `/mobile/reports/[reportId]/sign` page test. Two
+// Iter-36 MOB — `/mobile/reports/sign?reportId=...` page test. Two
 // acknowledgement checkboxes block the action button until both are
 // checked (the warning checkbox is mandatory only when warnings
 // exist). Validation findings render with the locked severity classes
 // (`.finding.blocker|warning|info`).
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { render, fireEvent, waitFor } from '@testing-library/react';
-
-vi.mock('next/navigation', () => ({
-  useParams: () => ({ reportId: 'rpt-1' }),
-}));
 
 const get = vi.fn();
 const validate = vi.fn();
@@ -28,7 +24,7 @@ vi.mock('@/lib/api', () => ({
   },
 }));
 
-import Page from '@/app/mobile/reports/[reportId]/sign/page';
+import Page from '@/app/mobile/reports/sign/page';
 
 const sampleReport = {
   id: 'rpt-1',
@@ -46,6 +42,7 @@ beforeEach(() => {
   validate.mockReset();
   acknowledge.mockReset();
   exportText.mockReset();
+  window.history.replaceState(null, '', '/mobile/reports/sign?reportId=rpt-1');
   get.mockResolvedValue(sampleReport);
   acknowledge.mockResolvedValue(sampleReport);
   exportText.mockResolvedValue('REPORT TEXT');

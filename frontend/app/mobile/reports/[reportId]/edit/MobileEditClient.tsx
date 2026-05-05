@@ -12,8 +12,10 @@
 // `.rp-mobile-body`, `.ai-mark`, `.banner.*`, button variants.
 
 import { useCallback, useEffect, useState } from 'react';
-import { useParams, useRouter } from 'next/navigation';
+import { useRouter } from 'next/navigation';
 import { api, type Report } from '@/lib/api';
+import { readQueryParam } from '@/lib/browserParams';
+import { mobileDictateHref, mobileReportSignHref } from '@/lib/routes';
 
 type SectionKey = 'indication' | 'technique' | 'comparison' | 'findings' | 'impression' | 'recommendations';
 
@@ -27,9 +29,8 @@ const SECTIONS: Array<{ key: SectionKey; label: string }> = [
 ];
 
 export default function MobileEditPage() {
-  const params = useParams<{ reportId: string }>();
   const router = useRouter();
-  const reportId = params.reportId;
+  const [reportId, setReportId] = useState<string | null>(null);
 
   const [report, setReport] = useState<Report | null>(null);
   const [draft, setDraft] = useState<Record<SectionKey, string>>({
@@ -46,6 +47,11 @@ export default function MobileEditPage() {
   const [saved, setSaved] = useState(false);
 
   useEffect(() => {
+    setReportId(readQueryParam('reportId'));
+  }, []);
+
+  useEffect(() => {
+    if (!reportId) return;
     let cancelled = false;
     api.reports
       .get(reportId)
@@ -78,6 +84,7 @@ export default function MobileEditPage() {
   }, []);
 
   const onSave = useCallback(async () => {
+    if (!reportId) { setError('Missing report id.'); return; }
     setSaving(true);
     setError(null);
     try {
@@ -106,6 +113,12 @@ export default function MobileEditPage() {
       {saved && (
         <div className="banner info" role="status">
           Saved.
+        </div>
+      )}
+
+      {reportId === '' && (
+        <div className="banner warn" role="alert">
+          Missing report id.
         </div>
       )}
 
@@ -149,14 +162,14 @@ export default function MobileEditPage() {
         })}
 
       <div className="rp-row between rp-mt-sm">
-        <button type="button" className="ghost" onClick={() => router.push(`/mobile/dictate/${reportId}`)}>
+        <button type="button" className="ghost" onClick={() => { if (reportId) router.push(mobileDictateHref(reportId)); }}>
           Dictate
         </button>
         <div className="rp-row rp-gap-sm">
           <button
             type="button"
             className="subtle"
-            onClick={() => router.push(`/mobile/reports/${reportId}/sign`)}
+            onClick={() => { if (reportId) router.push(mobileReportSignHref(reportId)); }}
             disabled={saving}
           >
             Review &amp; sign

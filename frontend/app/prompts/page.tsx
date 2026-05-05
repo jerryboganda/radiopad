@@ -3,6 +3,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import Link from 'next/link';
 import { api, type Rulebook } from '@/lib/api';
+import { rulebookHref } from '@/lib/routes';
 
 /**
  * PRD §16.4 — Prompt Studio. v1 surfaces, for each rulebook:
@@ -84,7 +85,7 @@ export default function PromptStudioPage() {
             </p>
           </div>
           {active ? (
-            <Link className="primary-ghost" href={`/rulebooks/${active.id}`}>
+            <Link className="primary-ghost" href={rulebookHref(active.id)}>
               Edit in rulebook editor
             </Link>
           ) : null}

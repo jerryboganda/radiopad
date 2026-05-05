@@ -3,6 +3,7 @@
 import Link from 'next/link';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { api, type Report } from '@/lib/api';
+import { reportHref } from '@/lib/routes';
 
 const PAGE_SIZE = 25;
 
@@ -53,7 +54,7 @@ export default function DashboardPage() {
 
   async function newReport() {
     const r = await api.reports.create({ modality: 'CT', bodyPart: 'Chest', indication: 'New report' });
-    location.href = `/reports/${r.id}`;
+    location.href = reportHref(r.id);
   }
 
   useEffect(() => {
@@ -136,7 +137,7 @@ export default function DashboardPage() {
                 <td>{r.study.bodyPart}</td>
                 <td><span className="badge">{statusLabel(r.status)}</span></td>
                 <td style={{ color: 'var(--text-muted)' }}>{new Date(r.updatedAt).toLocaleString()}</td>
-                <td><Link href={`/reports/${r.id}`}>Open →</Link></td>
+                <td><Link href={reportHref(r.id)}>Open →</Link></td>
               </tr>
             ))}
           </tbody>

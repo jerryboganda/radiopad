@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useState, useCallback, useMemo } from 'react';
-import { useParams, useRouter } from 'next/navigation';
+import { useRouter } from 'next/navigation';
 import {
   api,
   type Report,
@@ -12,6 +12,8 @@ import {
   type RewriteMode,
   type ReportSignature,
 } from '@/lib/api';
+import { readQueryParam } from '@/lib/browserParams';
+import { mobileDictateHref } from '@/lib/routes';
 import RewriteStylePanel from './RewriteStylePanel';
 import PriorComparePanel from './PriorComparePanel';
 import CopyToRisButton from './CopyToRisButton';
@@ -43,8 +45,8 @@ type RewriteState = {
 };
 
 export default function ReportPage() {
-  const { id } = useParams<{ id: string }>();
   const router = useRouter();
+  const [id, setId] = useState<string | null>(null);
   const [report, setReport] = useState<Report | null>(null);
   const [providers, setProviders] = useState<Provider[]>([]);
   const [rulebooks, setRulebooks] = useState<Rulebook[]>([]);
@@ -70,6 +72,11 @@ export default function ReportPage() {
   const [showPrior, setShowPrior] = useState(false);
 
   useEffect(() => {
+    setId(readQueryParam('id'));
+  }, []);
+
+  useEffect(() => {
+    if (!id) return;
     api.reports.get(id).then((r) => {
       setReport(r);
       try { setAiHighlights(JSON.parse(r.aiHighlightsJson || '{}')); } catch { /* noop */ }
@@ -272,7 +279,7 @@ export default function ReportPage() {
     const rewrite = () => setRewriteOpen(true);
     const dictate = () => {
       const reportId = report?.id ?? id;
-      if (reportId) router.push(`/mobile/dictate/${reportId}`);
+      if (reportId) router.push(mobileDictateHref(reportId));
     };
 
     window.addEventListener('radiopad:generate-impression', generate);
@@ -291,6 +298,8 @@ export default function ReportPage() {
   );
 
   if (error && !report) return <div className="rp-container"><div className="banner warn">{error}</div></div>;
+  if (id === null) return <div className="rp-container"><p style={{ color: 'var(--text-muted)' }}>Loading report…</p></div>;
+  if (!id) return <div className="rp-container"><div className="banner warn">Missing report id.</div></div>;
   if (!report) return <div className="rp-container"><p style={{ color: 'var(--text-muted)' }}>Loading report…</p></div>;
 
   const blockers = findings.filter((f) => f.severity === 'Blocker' || (f.severity as unknown as number) === 2).length;

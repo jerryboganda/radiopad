@@ -389,8 +389,8 @@
 
 /* ============================================================
    Iter-36 — Mobile workflows (Capacitor + responsive web).
-   Mobile pages (`/mobile/dictate/[id]`, `/mobile/reports/[id]/edit`,
-   `/mobile/reports/[id]/sign`) reuse the same `.app > .topbar +
+  Mobile pages (`/mobile/dictate?reportId=...`, `/mobile/reports/edit?reportId=...`,
+  `/mobile/reports/sign?reportId=...`) reuse the same `.app > .topbar +
    .split` shell idea, just stacked vertically below the breakpoint.
    Locked tokens only — no new colours, radii, or shadows.
    See docs/02-design/design.md §"Mobile workflows".

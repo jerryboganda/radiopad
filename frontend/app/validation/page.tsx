@@ -3,6 +3,7 @@
 import { useEffect, useState } from 'react';
 import Link from 'next/link';
 import { api, type Report, type ValidationResult } from '@/lib/api';
+import { reportHref } from '@/lib/routes';
 
 type Row = {
   report: Report;
@@ -151,7 +152,7 @@ export default function ValidationCenterPage() {
                         </>
                       )}
                   </td>
-                  <td><Link href={`/reports/${report.id}`}>Open →</Link></td>
+                  <td><Link href={reportHref(report.id)}>Open →</Link></td>
                 </tr>
               );
             })}

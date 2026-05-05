@@ -3,6 +3,7 @@
 import { useEffect, useState } from 'react';
 import Link from 'next/link';
 import { api, type Rulebook } from '@/lib/api';
+import { rulebookHref } from '@/lib/routes';
 
 export default function RulebooksPage() {
   const [items, setItems] = useState<Rulebook[]>([]);
@@ -67,7 +68,7 @@ export default function RulebooksPage() {
                   <td>{rb.version}</td>
                   <td><span className={`badge ${statusBadge(rb.status)}`}>{statusLabel(rb.status)}</span></td>
                   <td onClick={(e) => e.stopPropagation()}>
-                    <Link href={`/rulebooks/${rb.id}`}>Open →</Link>
+                    <Link href={rulebookHref(rb.id)}>Open →</Link>
                   </td>
                 </tr>
               ))}

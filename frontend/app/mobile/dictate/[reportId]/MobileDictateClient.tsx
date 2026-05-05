@@ -13,8 +13,10 @@
 // `.subtle`. No inline colour/border styles.
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { useParams, useRouter } from 'next/navigation';
+import { useRouter } from 'next/navigation';
 import { api } from '@/lib/api';
+import { readQueryParam } from '@/lib/browserParams';
+import { mobileReportEditHref } from '@/lib/routes';
 
 type SpeechRecognitionLike = {
   lang: string;
@@ -62,9 +64,8 @@ function draftKey(reportId: string): string {
 }
 
 export default function MobileDictatePage() {
-  const params = useParams<{ reportId: string }>();
   const router = useRouter();
-  const reportId = params.reportId;
+  const [reportId, setReportId] = useState<string | null>(null);
 
   const Ctor = useMemo(getSpeechRecognitionCtor, []);
   const [transcript, setTranscript] = useState('');
@@ -77,6 +78,10 @@ export default function MobileDictatePage() {
   const nativeListenerRef = useRef<{ remove?: () => Promise<void> | void } | null>(null);
 
   const supported = Ctor !== null || nativeSpeech !== null;
+
+  useEffect(() => {
+    setReportId(readQueryParam('reportId'));
+  }, []);
 
   useEffect(() => {
     let cancelled = false;
@@ -99,12 +104,14 @@ export default function MobileDictatePage() {
   // Restore offline draft so a network drop never costs a dictation.
   useEffect(() => {
     if (typeof window === 'undefined') return;
+    if (!reportId) return;
     const cached = window.localStorage.getItem(draftKey(reportId));
     if (cached) setTranscript(cached);
   }, [reportId]);
 
   useEffect(() => {
     if (typeof window === 'undefined') return;
+    if (!reportId) return;
     if (transcript) window.localStorage.setItem(draftKey(reportId), transcript);
   }, [reportId, transcript]);
 
@@ -171,6 +178,7 @@ export default function MobileDictatePage() {
   }, [nativeSpeech]);
 
   const onSave = useCallback(async () => {
+    if (!reportId) { setError('Missing report id.'); return; }
     if (!transcript.trim()) return;
     setSaving(true);
     setError(null);
@@ -208,6 +216,12 @@ export default function MobileDictatePage() {
         </div>
       )}
 
+      {reportId === '' && (
+        <div className="banner warn" role="alert">
+          Missing report id.
+        </div>
+      )}
+
       {saved && (
         <div className="banner info" role="status">
           Saved to Findings.
@@ -241,14 +255,14 @@ export default function MobileDictatePage() {
           className="subtle"
           onClick={() => {
             setTranscript('');
-            if (typeof window !== 'undefined') window.localStorage.removeItem(draftKey(reportId));
+            if (typeof window !== 'undefined' && reportId) window.localStorage.removeItem(draftKey(reportId));
           }}
           disabled={!transcript || saving}
         >
           Clear
         </button>
         <div className="rp-row rp-gap-sm">
-          <button type="button" className="ghost" onClick={() => router.push(`/mobile/reports/${reportId}/edit`)}>
+          <button type="button" className="ghost" onClick={() => { if (reportId) router.push(mobileReportEditHref(reportId)); }}>
             Open editor
           </button>
           <button

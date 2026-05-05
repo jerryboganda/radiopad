@@ -1,12 +1,14 @@
 'use client';
 
 import { useEffect, useMemo, useState } from 'react';
-import { useParams, useRouter } from 'next/navigation';
+import { useRouter } from 'next/navigation';
 import { api, type Rulebook } from '@/lib/api';
+import { readQueryParam } from '@/lib/browserParams';
+import { rulebookHref } from '@/lib/routes';
 
 export default function RulebookDetailPage() {
-  const { id } = useParams<{ id: string }>();
   const router = useRouter();
+  const [id, setId] = useState<string | null>(null);
   const [rb, setRb] = useState<(Rulebook & { sourceYaml: string }) | null>(null);
   const [yaml, setYaml] = useState('');
   const [problems, setProblems] = useState<string[] | null>(null);
@@ -15,6 +17,10 @@ export default function RulebookDetailPage() {
   const [tab, setTab] = useState<'yaml' | 'visual'>('yaml');
   const [versions, setVersions] = useState<Rulebook[]>([]);
   const [rollbackVersion, setRollbackVersion] = useState('');
+
+  useEffect(() => {
+    setId(readQueryParam('id'));
+  }, []);
 
   useEffect(() => {
     if (!id) return;
@@ -80,7 +86,7 @@ export default function RulebookDetailPage() {
       const next = await api.rulebooks.rollback(rb.id, rollbackVersion);
       // Materialised as a new approved row; navigate back to the list so the
       // user picks the rolled-back row.
-      router.push(`/rulebooks/${next.id}`);
+      router.push(rulebookHref(next.id));
     } catch (e) {
       const err = e as { body?: { error?: string }; message: string };
       setError(err.body?.error || err.message);
@@ -90,6 +96,8 @@ export default function RulebookDetailPage() {
   }
 
   if (error && !rb) return <div className="rp-container"><div className="banner warn">{error}</div></div>;
+  if (id === null) return <div className="rp-container"><p style={{ color: 'var(--text-muted)' }}>Loading rulebook…</p></div>;
+  if (!id) return <div className="rp-container"><div className="banner warn">Missing rulebook id.</div></div>;
   if (!rb) return <div className="rp-container"><p style={{ color: 'var(--text-muted)' }}>Loading rulebook…</p></div>;
 
   const status = statusLabel(rb.status);
