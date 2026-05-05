@@ -27,13 +27,13 @@ pub fn redact(input: &str) -> String {
         Regex::new(
             r"(?i)\b(?:patient|name|pt)\s*[:=]\s*[A-Z][A-Za-z'\-]+(?:\s+[A-Z][A-Za-z'\-]+)+",
         )
-        .expect("name regex"),
+        .expect("name regex")
     });
     let date_near = DATE_NEAR_NAME_RE.get_or_init(|| {
         Regex::new(
             r"(?i)\b(?:dob|name|patient)\s*[:=]?\s*\d{1,4}[\-/.]\d{1,2}[\-/.]\d{1,4}",
         )
-        .expect("date regex"),
+        .expect("date regex")
     });
     let mrn = MRN_RE.get_or_init(|| Regex::new(r"\b\d{6,12}\b").expect("mrn regex"));
 
