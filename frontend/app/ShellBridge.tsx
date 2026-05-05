@@ -7,11 +7,14 @@ import { getAuthToken, setAuthToken } from '@/lib/secureAuth';
 import { setActiveAuthToken } from '@/lib/api';
 import { isBiometricLockEnabled, unlockWithBiometric } from '@/lib/biometric';
 
+type TauriUnlisten = () => void;
+type TauriListenHandle = TauriUnlisten | { unlisten?: TauriUnlisten } | null | undefined;
+
 type TauriGlobal = {
   core?: { invoke?: (cmd: string, args?: unknown) => Promise<unknown> };
-  event?: { listen?: (event: string, handler: () => void) => Promise<unknown> | unknown };
+  event?: { listen?: (event: string, handler: () => void) => Promise<TauriListenHandle> | TauriListenHandle };
   invoke?: (cmd: string, args?: unknown) => Promise<unknown>;
-  listen?: (event: string, handler: () => void) => Promise<unknown> | unknown;
+  listen?: (event: string, handler: () => void) => Promise<TauriListenHandle> | TauriListenHandle;
 };
 
 function getTauri(): TauriGlobal | null {
@@ -61,7 +64,7 @@ export default function ShellBridge() {
           const handle = await listen(event, handler);
           const u = typeof handle === 'function'
             ? handle
-            : (handle as { unlisten?: () => void } | null)?.unlisten;
+            : handle?.unlisten;
           if (typeof u === 'function') unsub.push(u);
         };
         await reg('radiopad://new-report', () => router.push('/?new=1'));
