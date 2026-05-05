@@ -2,7 +2,7 @@
  * PRD MOB-006 — secure store for the bearer/session token used by the API
  * client when running inside the Capacitor mobile shell.
  *
- * Uses `@capacitor-community/secure-storage` when available (Keychain on iOS,
+ * Uses `capacitor-secure-storage-plugin` when available (Keychain on iOS,
  * Keystore-backed EncryptedSharedPreferences on Android). Falls back to
  * `@capacitor/preferences` and finally to `localStorage` for the web preview.
  *
@@ -27,20 +27,20 @@ async function pickBackend(): Promise<Backend> {
   // 1. Native secure storage (iOS Keychain / Android Keystore).
   try {
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      const sec: any = await import('@capacitor-community/secure-storage').catch(() => null);
-    if (sec?.SecureStorage) {
+      const sec: any = await import('capacitor-secure-storage-plugin').catch(() => null);
+    if (sec?.SecureStoragePlugin) {
       backend = {
         async get() {
           try {
-            const v = await sec.SecureStorage.get({ key: KEY });
+            const v = await sec.SecureStoragePlugin.get({ key: KEY });
             return (v?.value as string | undefined) ?? null;
           } catch { return null; }
         },
         async set(value: string) {
-          await sec.SecureStorage.set({ key: KEY, value });
+          await sec.SecureStoragePlugin.set({ key: KEY, value });
         },
         async clear() {
-          try { await sec.SecureStorage.remove({ key: KEY }); } catch { /* ignore */ }
+          try { await sec.SecureStoragePlugin.remove({ key: KEY }); } catch { /* ignore */ }
         },
         isSecure: true,
       };

@@ -10,14 +10,14 @@
     "ios": "pnpm sync && cap open ios"
   },
   "dependencies": {
-    "@capacitor-community/secure-storage": "^4.0.0",
     "@capacitor-community/speech-recognition": "^6.0.0",
     "@capacitor/android": "^6.1.2",
     "@capacitor/core": "^6.1.2",
     "@capacitor/ios": "^6.1.2",
     "@capacitor/network": "^6.0.3",
     "@capacitor/preferences": "^6.0.3",
-    "@capacitor/splash-screen": "^6.0.2"
+    "@capacitor/splash-screen": "^6.0.2",
+    "capacitor-secure-storage-plugin": "^0.10.0"
   },
   "devDependencies": {
     "@aparajita/capacitor-biometric-auth": "^7.0.0",

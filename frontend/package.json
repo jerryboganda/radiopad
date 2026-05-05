@@ -12,12 +12,12 @@
   },
   "dependencies": {
     "@aparajita/capacitor-biometric-auth": "^7.0.0",
-    "@capacitor-community/secure-storage": "^4.0.0",
     "@capacitor-community/speech-recognition": "^6.0.0",
     "@capacitor/core": "^6.1.2",
     "@capacitor/network": "^6.0.3",
     "@capacitor/preferences": "^6.0.3",
     "@capacitor/push-notifications": "^6.0.4",
+    "capacitor-secure-storage-plugin": "^0.10.0",
     "next": "^16.2.4",
     "next-intl": "^3.26.5",
     "react": "^18.3.1",
