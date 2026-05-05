@@ -79,7 +79,7 @@ export default function ProvidersPage() {
   }, []);
 
   async function toggleEnabled(p: Provider) {
-    await api.providers.save({ id: p.id, ...p, enabled: !p.enabled });
+    await api.providers.save({ ...p, enabled: !p.enabled });
     await refresh();
   }
 
