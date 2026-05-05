@@ -70,7 +70,7 @@
     "linux": {
       "deb": { "depends": [] },
       "appimage": { "bundleMediaFramework": false },
-      "rpm": { "license": "AGPL-3.0-only", "depends": [] }
+      "rpm": { "depends": [] }
     }
   },
   "plugins": {
