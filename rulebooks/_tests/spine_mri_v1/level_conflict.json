@@ -1,0 +1,12 @@
+{
+  "name": "level conflict L4-L5 vs L5-S1",
+  "report": {
+    "study": { "modality": "MRI", "bodyPart": "Lumbar Spine", "indication": "low back pain", "accessionNumber": "ACC-SP-1" },
+    "indication": "Low back pain with left L5 radiculopathy.",
+    "technique": "Multiplanar multisequence MRI of the lumbar spine without contrast.",
+    "comparison": "None.",
+    "findings": "L4-L5: mild facet arthropathy. L5-S1: left paracentral disc protrusion contacting the descending S1 nerve root.",
+    "impression": "1. L4-L5 disc protrusion with left S1 nerve root impingement."
+  },
+  "expectFlagged": ["level_consistency"]
+}

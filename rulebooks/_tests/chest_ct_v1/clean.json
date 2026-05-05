@@ -1,0 +1,12 @@
+{
+  "name": "clean chest CT",
+  "report": {
+    "study": { "modality": "CT", "bodyPart": "Chest", "indication": "Cough", "accessionNumber": "ACC-0001" },
+    "indication": "Persistent cough.",
+    "technique": "Non-contrast CT of the chest.",
+    "comparison": "None.",
+    "findings": "Lungs clear. No nodules. No effusion. Mediastinum normal.",
+    "impression": "1. No acute pulmonary findings.\n2. No mediastinal abnormality."
+  },
+  "expectFlagged": []
+}

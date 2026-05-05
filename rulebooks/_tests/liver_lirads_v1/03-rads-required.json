@@ -1,0 +1,12 @@
+{
+  "name": "liver MRI — LI-RADS category and observation size missing",
+  "report": {
+    "study": { "modality": "MRI", "bodyPart": "Liver", "indication": "HCC surveillance", "accessionNumber": "SYNTH-LMR-0003" },
+    "indication": "Cirrhosis — HCC surveillance.",
+    "technique": "Multiphase liver MRI with contrast.",
+    "comparison": "None.",
+    "findings": "Cirrhotic liver with arterial phase hyperenhancing observation in segment 8. Portal vein patent.",
+    "impression": "Segment 8 observation, suspicious for HCC."
+  },
+  "expectFlagged": ["lirads_category_required", "lirads_observation_size_required"]
+}

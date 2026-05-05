@@ -1,0 +1,12 @@
+{
+  "name": "mammography — BI-RADS category embedded instead of own line",
+  "report": {
+    "study": { "modality": "MG", "bodyPart": "Breast", "indication": "Diagnostic mammography", "accessionNumber": "SYNTH-MG-0004" },
+    "indication": "Right breast palpable lump.",
+    "technique": "Diagnostic mammography with spot compression of the right breast.",
+    "comparison": "None.",
+    "findings": "Right breast 9 mm irregular mass at 10 o'clock.",
+    "impression": "Suspicious right breast mass, BI-RADS: 4A."
+  },
+  "expectFlagged": ["birads_assessment_in_impression"]
+}

@@ -1,0 +1,12 @@
+{
+  "name": "knee MRI — laterality conflict",
+  "report": {
+    "study": { "modality": "MRI", "bodyPart": "Knee", "indication": "Knee pain", "accessionNumber": "ACC-KNE-0002" },
+    "indication": "Right knee pain after sports injury.",
+    "technique": "Right knee MRI without contrast at 3T.",
+    "comparison": "None.",
+    "findings": "Menisci: radial tear of the right medial meniscus posterior horn. Ligaments: ACL torn on the right side. PCL intact. Articular cartilage: focal full-thickness loss in the right lateral femoral compartment. Bones: bone marrow oedema in the right lateral femoral condyle.",
+    "impression": "1. Left medial meniscus radial tear and ACL tear on the left.\n2. Bone marrow oedema in the left lateral femoral condyle."
+  },
+  "expectFlagged": ["laterality_consistency"]
+}

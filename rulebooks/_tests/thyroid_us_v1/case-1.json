@@ -1,0 +1,12 @@
+{
+  "name": "clean thyroid US — TR2 nodule, right lobe",
+  "report": {
+    "study": { "modality": "US", "bodyPart": "Thyroid", "indication": "Palpable nodule", "accessionNumber": "ACC-THY-0001" },
+    "indication": "Palpable right thyroid nodule.",
+    "technique": "High-resolution greyscale and colour Doppler ultrasound of the thyroid gland and central neck.",
+    "findings": "Right lobe: 8 mm spongiform nodule, wider-than-tall, peripheral vascularity, without microcalcifications. Left lobe and isthmus: sonographically benign without focal lesion. Cervical lymph nodes are sonographically benign.",
+    "impression": "1. Right thyroid lobe 8 mm spongiform nodule, TR2 (not suspicious).\n2. No suspicious left lobe or isthmus nodule.",
+    "recommendations": "No follow-up imaging recommended per ACR TI-RADS for TR2."
+  },
+  "expectFlagged": []
+}

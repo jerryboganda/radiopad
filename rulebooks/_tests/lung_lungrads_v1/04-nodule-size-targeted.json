@@ -1,0 +1,12 @@
+{
+  "name": "lung screening CT — unrelated measurement does not satisfy nodule size",
+  "report": {
+    "study": { "modality": "CT", "bodyPart": "Chest", "indication": "Lung cancer screening", "accessionNumber": "SYNTH-LDS-0004" },
+    "indication": "Annual low-dose CT lung cancer screening.",
+    "technique": "Low-dose non-contrast CT of the chest.",
+    "comparison": "None.",
+    "findings": "Solid pulmonary nodule in the right upper lobe. Stable 12 mm right adrenal adenoma.",
+    "impression": "Right upper lobe solid pulmonary nodule. Lung-RADS: 4A."
+  },
+  "expectFlagged": ["nodule_dimensions_required"]
+}

@@ -1,0 +1,12 @@
+{
+  "name": "cardiac MRI — laterality mismatch",
+  "report": {
+    "study": { "modality": "MRI", "bodyPart": "Heart", "indication": "Suspected ARVC", "accessionNumber": "ACC-CMR-0002" },
+    "indication": "Family history of ARVC.",
+    "technique": "1.5T cardiac MRI with cine SSFP, T1/T2 mapping, post-contrast LGE.",
+    "comparison": "None.",
+    "findings": "Right ventricular dilation with focal akinesis of the RV free wall. Normal LV size and function.",
+    "impression": "1. Left ventricular dilation with akinesis of the LV free wall."
+  },
+  "expectFlagged": ["laterality_consistency"]
+}

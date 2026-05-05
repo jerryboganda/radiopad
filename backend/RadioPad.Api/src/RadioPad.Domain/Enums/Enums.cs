@@ -1,0 +1,207 @@
+namespace RadioPad.Domain.Enums;
+
+/// <summary>
+/// Compliance class assigned to an AI provider configuration. Used by the
+/// AI gateway to decide whether a given request (which may carry PHI) is
+/// allowed to leave the tenant boundary toward that provider.
+/// </summary>
+public enum ProviderComplianceClass
+{
+    /// <summary>Provider is blocked. No requests routed.</summary>
+    Blocked = 0,
+
+    /// <summary>Sandbox/demo only. Never accepts PHI.</summary>
+    Sandbox = 1,
+
+    /// <summary>De-identified payloads only. PHI must be stripped first.</summary>
+    DeIdentifiedOnly = 2,
+
+    /// <summary>Approved for PHI under a signed BAA / DPA / equivalent.</summary>
+    PhiApproved = 3,
+
+    /// <summary>Local/on-prem model — never leaves the device or VPC.</summary>
+    LocalOnly = 4,
+}
+
+public enum RulebookStatus
+{
+    Draft = 0,
+    InReview = 1,
+    Approved = 2,
+    Deprecated = 3,
+}
+
+public enum ReportStatus
+{
+    Draft = 0,
+    Validated = 1,
+    Acknowledged = 2,
+    Exported = 3,
+}
+
+public enum UserRole
+{
+    Radiologist = 0,
+    ReportingAdmin = 1,
+    MedicalDirector = 2,
+    ComplianceReviewer = 3,
+    ItAdmin = 4,
+    BillingAdmin = 5,
+}
+
+public enum AuditAction
+{
+    AiRequest = 0,
+    AiResponse = 1,
+    ReportEdited = 2,
+    ReportExported = 3,
+    ReportAcknowledged = 4,
+    ProviderBlocked = 5,
+    RulebookApproved = 6,
+    RulebookDeprecated = 7,
+    UserLogin = 8,
+    PolicyViolation = 9,
+    /// <summary>PRD INT-001..004 — inbound HL7/FHIR ingest webhook delivered an order.</summary>
+    OrderIngested = 10,
+    /// <summary>PRD DCM-001..006 — DICOMweb study-context fetch.</summary>
+    DicomContextFetched = 11,
+    /// <summary>PRD §13.3 — retention worker purged stale rows for this tenant.</summary>
+    RetentionPurge = 12,
+    /// <summary>PRD BILL-001..006 — billing/subscription state changed (Stripe webhook, manual override, suspension, etc.).</summary>
+    BillingChanged = 13,
+    /// <summary>Iter-30 — bidirectional FHIR ingest: a DiagnosticReport was imported as a Draft.</summary>
+    ReportImported = 14,
+    /// <summary>Iter-30 — multi-radiologist sign-off: a Primary / CoSigner / Addendum signature was attached to a report.</summary>
+    ReportSigned = 15,
+    /// <summary>Iter-30 — addendum body appended to an already-signed report (creates a new ReportVersion).</summary>
+    ReportAddendumAppended = 16,
+    /// <summary>PRD MOB-007 — mobile push device registered for the (tenant, user).</summary>
+    PushDeviceRegistered = 17,
+    /// <summary>PRD MOB-007 — mobile push device unregistered.</summary>
+    PushDeviceUnregistered = 18,
+    /// <summary>PRD MOB-007 — admin-issued test push notification was dispatched (or attempted) to a registered device.</summary>
+    PushDeviceTested = 19,
+    /// <summary>Iter-31 TMP-005 — a report template was approved for production use.</summary>
+    TemplateApproved = 20,
+    /// <summary>Iter-31 AUTH-006 — a user account was locked out (IsActive flipped to false by an admin).</summary>
+    UserLockedOut = 21,
+    /// <summary>Iter-31 AUTH-006 — a previously locked-out user was reinstated (IsActive flipped back to true).</summary>
+    UserUnlocked = 22,
+    /// <summary>Iter-31 STD-005/STD-006 — tenant lexicon was bulk-imported from YAML/JSON.</summary>
+    LexiconImported = 23,
+    /// <summary>Iter-31 STD-005/STD-006 — tenant lexicon was bulk-exported as YAML/JSON.</summary>
+    LexiconExported = 24,
+    /// <summary>Iter-31 SEC-011 — anomaly detector raised an alert (provider-block burst, policy-violation burst, audit-chain breakage).</summary>
+    AnomalyDetected = 25,
+    /// <summary>Iter-31 MCP-002 — admin approved an MCP tool registration.</summary>
+    McpToolApproved = 26,
+    /// <summary>Iter-31 MCP-002 — admin revoked an MCP tool registration.</summary>
+    McpToolRevoked = 27,
+    /// <summary>Iter-31 MCP-004 — an MCP tool was invoked (input/output stored as SHA-256 hashes only).</summary>
+    McpToolCalled = 28,
+    /// <summary>Iter-32 AUTH-005 — SCIM bearer token was rotated by an admin (only the new bearer is returned, exactly once).</summary>
+    ScimBearerRotated = 29,
+    /// <summary>Iter-32 AUTH-005 — SCIM Group resource was created, updated, or deleted by the IdP.</summary>
+    ScimGroupChanged = 30,
+    /// <summary>Iter-32 MCP-001 — a new MCP tool manifest was submitted to the registry.</summary>
+    McpToolRegistered = 31,
+    /// <summary>Iter-32 MCP-002 — admin blocked an MCP tool (scope violation, signature failure, manual revoke).</summary>
+    McpToolBlocked = 32,
+    /// <summary>Iter-32 AUTH-006 / SEC-008 — all active sessions / bearer tokens for a user were revoked (admin or self-service).</summary>
+    SessionsRevoked = 33, // iter-32
+    /// <summary>Iter-32 SEC-011 — anomaly detector raised a high-severity security alert (provider-block / policy-violation / login-failure burst, or AI-spike vs 24 h baseline).</summary>
+    SecurityAlert = 34, // iter-32
+    /// <summary>Iter-32 AI-009 — a tenant prompt-block override was approved by a Medical Director.</summary>
+    PromptOverrideApproved = 35,
+    /// <summary>Iter-32 TMP-005 — a report template was deprecated (any → Deprecated).</summary>
+    TemplateDeprecated = 36,
+    /// <summary>Iter-32 TMP-005 — a draft report template was submitted for review (Draft → Review).</summary>
+    TemplateSubmittedForReview = 37,
+    /// <summary>Iter-33 INT-008 — Orthanc bridge reported a stable study landing in PACS (study summary received over the bearer-protected /api/integrations/orthanc/study-stable hook).</summary>
+    StudyReceived = 38,
+    /// <summary>Iter-33 AUTH-004 — a request was rejected by an application-level rate limiter (e.g. magic-link per-email / per-IP). Audit row records the rejection scope without leaking the email.</summary>
+    RateLimited = 39,
+    /// <summary>Iter-33 PERF-004 — Alertmanager (or compatible) webhook posted an SLO burn-rate alert.</summary>
+    SystemAlert = 40,
+    /// <summary>
+    /// Iter-35 PROV-007 — an OAuth refresh token was saved, rotated, or
+    /// deleted in the per-tenant refresh-token vault. Audit details record
+    /// the action kind (<c>saved</c> / <c>rotated</c> / <c>deleted</c>) and
+    /// the provider id but never the token bytes or ciphertext.
+    /// </summary>
+    OAuthRefreshRotated = 41,
+    /// <summary>Iter-35 — clinical validation pack (rulebook golden suite) was approved by a Medical Director.</summary>
+    ValidationPackApproved = 42,
+    /// <summary>Iter-35 — clinical validation pack was deprecated.</summary>
+    ValidationPackDeprecated = 43,
+    /// <summary>Iter-35 — clinical validation pack was executed against its rulebook (records pass/fail counts).</summary>
+    ValidationPackRun = 44,
+}
+
+/// <summary>
+/// Iter-35 — lifecycle of a <see cref="Entities.ValidationPack"/>. New rows
+/// land in <see cref="Draft"/>; promotion to <see cref="Approved"/> requires
+/// a Medical Director (or ItAdmin). <see cref="Deprecated"/> is terminal;
+/// once deprecated a pack cannot be re-approved (callers must create a new
+/// pack to re-certify a rulebook).
+/// </summary>
+public enum ValidationPackStatus
+{
+    Draft = 0,
+    Approved = 1,
+    Deprecated = 2,
+}
+
+/// <summary>
+/// Iter-32 AI-009 — lifecycle of a <see cref="Entities.PromptOverride"/>.
+/// New rows are created in <c>Draft</c> and only take effect after a
+/// Medical Director marks them <c>Approved</c>; <c>EfPromptOverrideStore</c>
+/// filters loads to <c>Approved</c> only.
+/// </summary>
+public enum PromptOverrideStatus
+{
+    Draft = 0,
+    Approved = 1,
+}
+
+public enum ValidationSeverity
+{
+    Info = 0,
+    Warning = 1,
+    Blocker = 2,
+}
+
+/// <summary>PRD BILL-001/006. Plan tier governs feature flags + Stripe price ids.</summary>
+public enum TenantPlan
+{
+    Trial = 0,
+    Team = 1,
+    Enterprise = 2,
+}
+
+/// <summary>
+/// Iter-31 TMP-005 — lifecycle of a <see cref="Entities.ReportTemplate"/>.
+/// Mirrors <see cref="RulebookStatus"/> so the UI can reuse the same chips.
+/// </summary>
+public enum TemplateStatus
+{
+    Draft = 0,
+    Approved = 1,
+    Deprecated = 2,
+    /// <summary>Iter-32 TMP-005 — submitted for review by an admin; pending approval.</summary>
+    Review = 3,
+}
+
+/// <summary>
+/// Iter-31 TMP-003 — variant of a report template. The same template id may
+/// ship multiple variants (Normal/Abnormal/...) so radiologists can pick the
+/// closest starting point per case.
+/// </summary>
+public enum TemplateVariant
+{
+    Normal = 0,
+    Abnormal = 1,
+    FollowUp = 2,
+    Screening = 3,
+    Urgent = 4,
+}

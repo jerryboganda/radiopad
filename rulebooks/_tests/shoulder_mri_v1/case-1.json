@@ -1,0 +1,11 @@
+{
+  "name": "clean shoulder MRI — left shoulder, intact rotator cuff",
+  "report": {
+    "study": { "modality": "MRI", "bodyPart": "Shoulder", "indication": "Left shoulder pain", "accessionNumber": "ACC-SHL-0001" },
+    "indication": "Left shoulder pain after overhead activity.",
+    "technique": "Left shoulder MRI without contrast at 3T.",
+    "findings": "Rotator cuff: intact supraspinatus, infraspinatus, subscapularis, and teres minor tendons. No tear. Labrum: intact glenoid labrum. AC joint: mild degenerative change. Bones: no marrow oedema. Soft tissues: small subdeltoid bursal fluid.",
+    "impression": "1. Intact left rotator cuff.\n2. Mild left AC joint osteoarthritis."
+  },
+  "expectFlagged": []
+}

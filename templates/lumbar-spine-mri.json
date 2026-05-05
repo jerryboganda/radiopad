@@ -1,0 +1,14 @@
+{
+  "id": "lumbar-spine-mri",
+  "name": "Lumbar Spine MRI",
+  "modality": "MRI",
+  "bodyPart": "Lumbar Spine",
+  "rulebookId": "spine_mri_v1",
+  "sections": [
+    { "id": "indication", "label": "Indication", "placeholder": "Clinical question / referring concern." },
+    { "id": "technique",  "label": "Technique",  "placeholder": "Multiplanar multisequence MRI of the lumbar spine without contrast." },
+    { "id": "comparison", "label": "Comparison", "placeholder": "Prior lumbar MRI, if available." },
+    { "id": "findings",   "label": "Findings",   "placeholder": "Alignment: ...\nMarrow: ...\nConus / cauda equina: ...\nL1-L2: ...\nL2-L3: ...\nL3-L4: ...\nL4-L5: ...\nL5-S1: ..." },
+    { "id": "impression", "label": "Impression", "placeholder": "Concise bulleted impression grouped by level (max 5)." }
+  ]
+}

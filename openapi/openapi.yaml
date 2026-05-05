@@ -1,0 +1,2792 @@
+openapi: 3.0.3
+info:
+  title: RadioPad API
+  description: |
+    AI-assisted radiology reporting platform. Authenticated header-based dev tenancy in v0.1
+    (planned: OIDC bearer in Phase 3). Errors are RFC-7807 problem details with a stable
+    `kind` field. See docs/03-architecture/api-design.md.
+  version: "0.2.0"
+  license:
+    name: Apache-2.0
+servers:
+  - url: http://127.0.0.1:7457
+    description: Local dev
+  - url: https://app.radiopad.example
+    description: Hosted (planned)
+
+security:
+  - TenantHeader: []
+
+components:
+  securitySchemes:
+    TenantHeader:
+      type: apiKey
+      in: header
+      name: X-RadioPad-Tenant
+    UserHeader:
+      type: apiKey
+      in: header
+      name: X-RadioPad-User
+    BearerJwt:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+    ScimBearer:
+      type: http
+      scheme: bearer
+      bearerFormat: Tenant SCIM bearer secret
+
+  parameters:
+    Skip:
+      in: query
+      name: skip
+      schema: { type: integer, minimum: 0, default: 0 }
+    Take:
+      in: query
+      name: take
+      schema: { type: integer, minimum: 1, maximum: 500, default: 25 }
+    Modality:
+      in: query
+      name: modality
+      schema: { type: string }
+    StatusFilter:
+      in: query
+      name: status
+      schema: { type: integer }
+    Q:
+      in: query
+      name: q
+      schema: { type: string }
+
+  headers:
+    XTotalCount:
+      description: Total number of items matching the filter, ignoring pagination.
+      schema: { type: integer }
+    XRequestId:
+      description: Correlation id assigned to the request.
+      schema: { type: string }
+
+  responses:
+    Problem:
+      description: RFC-7807 problem details.
+      content:
+        application/problem+json:
+          schema: { $ref: "#/components/schemas/Problem" }
+    TenantSuspended:
+      description: |
+        Plan quota exceeded (`kind:"quota_exceeded"`, includes `resetAt`) or
+        tenant suspended for non-payment (`kind:"tenant_suspended"`, includes
+        `suspendedAt`). Applies to every mutating `/api/*` endpoint outside
+        `/api/billing/*` and `/api/auth/*`.
+      content:
+        application/problem+json:
+          schema: { $ref: "#/components/schemas/Problem" }
+
+  schemas:
+    RewriteRequest:
+      type: object
+      required: [mode]
+      properties:
+        mode: { type: string, enum: [concise, formal, patient_friendly, referring_summary] }
+        sections:
+          type: array
+          items: { type: string, enum: [Indication, Technique, Comparison, Findings, Impression, Recommendations] }
+        providerId: { type: string, format: uuid, nullable: true }
+    RadLexConcept:
+      type: object
+      required: [rid, preferredLabel]
+      properties:
+        rid: { type: string, description: "RadLex concept identifier (RID...). RadLex is a registered trademark of RSNA." }
+        preferredLabel: { type: string }
+        synonyms:
+          type: array
+          items: { type: string }
+        category: { type: string }
+    RadsCategory:
+      type: object
+      required: [code, shortLabel]
+      properties:
+        code: { type: string }
+        shortLabel: { type: string }
+        publicGuidanceUrl: { type: string, nullable: true }
+    RadsSystemIndex:
+      type: object
+      required: [systems]
+      properties:
+        systems:
+          type: array
+          items: { type: string }
+    RadsSystemDefinition:
+      type: object
+      required: [system, description, categories]
+      properties:
+        system: { type: string }
+        description: { type: string }
+        publicGuidanceUrl: { type: string, nullable: true }
+        categories:
+          type: array
+          items:
+            $ref: '#/components/schemas/RadsCategory'
+    ReportSignature:
+      type: object
+      required: [id, role, signedAt, hash]
+      properties:
+        id: { type: string, format: uuid }
+        userId: { type: string, format: uuid }
+        role: { type: string, enum: [Primary, CoSigner, Addendum] }
+        signedAt: { type: string, format: date-time }
+        note: { type: string, nullable: true }
+        hash: { type: string, description: "SHA-256 of (id|reportId|userId|role|signedAt|note), hex-lowercase." }
+    BulkInvoiceExport:
+      type: object
+      properties:
+        invoiceCount: { type: integer }
+        format: { type: string, enum: [csv, zip] }
+    SandboxCompareRequest:
+      type: object
+      required: [reportId, mode, providerIds]
+      properties:
+        reportId: { type: string, format: uuid }
+        mode:
+          type: string
+          enum: [impression, draft, cleanup, concise, formal, patient_friendly, referring_summary]
+        providerIds:
+          type: array
+          minItems: 1
+          maxItems: 4
+          items: { type: string, format: uuid }
+    SandboxCompareResponse:
+      type: object
+      required: [runs]
+      properties:
+        runs:
+          type: array
+          items:
+            type: object
+            required: [providerId, provider, model, latencyMs, inputTokens, outputTokens]
+            properties:
+              providerId: { type: string, format: uuid }
+              provider: { type: string }
+              model: { type: string }
+              output: { type: string, nullable: true }
+              latencyMs: { type: integer }
+              inputTokens: { type: integer }
+              outputTokens: { type: integer }
+              error: { type: string, nullable: true }
+    Problem:
+      type: object
+      required: [type, title, status]
+      properties:
+        type: { type: string, format: uri }
+        title: { type: string }
+        status: { type: integer }
+        detail: { type: string }
+        kind:
+          type: string
+          enum:
+            - validation
+            - unauthenticated
+            - forbidden
+            - not_found
+            - conflict
+            - provider_policy
+            - provider_unavailable
+            - tenant_isolation
+            - internal
+            - report_state
+            - rulebook_governance
+            - audit_chain_broken
+            - quota_exceeded
+            - tenant_suspended
+            - connect_not_ready
+            - sandbox_required
+            - providers_not_sandbox
+            - validation_blockers
+        traceId: { type: string }
+
+    ReportStatus:
+      type: integer
+      description: 0=Draft, 1=Validated, 2=Acknowledged, 3=Exported
+      enum: [0, 1, 2, 3]
+
+    ProviderComplianceClass:
+      type: integer
+      description: 0=Blocked, 1=Sandbox, 2=DeIdentifiedOnly, 3=PhiApproved, 4=LocalOnly
+      enum: [0, 1, 2, 3, 4]
+
+    AuditAction:
+      type: integer
+      description: |
+        0=AiRequest, 1=AiResponse, 2=ReportEdited, 3=ReportExported, 4=ReportAcknowledged,
+        5=ProviderBlocked, 6=RulebookApproved, 7=RulebookDeprecated, 8=UserLogin, 9=PolicyViolation,
+        10=OrderIngested, 11=DicomContextFetched, 12=RetentionPurge, 13=BillingChanged,
+        14=ReportImported, 15=ReportSigned, 16=ReportAddendumAppended, 17=PushDeviceRegistered,
+        18=PushDeviceUnregistered, 19=PushDeviceTested, 20=TemplateApproved, 21=UserLockedOut,
+        22=UserUnlocked, 23=LexiconImported, 24=LexiconExported, 25=AnomalyDetected,
+        26=McpToolApproved, 27=McpToolRevoked, 28=McpToolCalled, 29=ScimBearerRotated,
+        30=ScimGroupChanged, 31=McpToolRegistered, 32=McpToolBlocked, 33=SessionsRevoked,
+        34=SecurityAlert, 35=PromptOverrideApproved, 36=TemplateDeprecated,
+        37=TemplateSubmittedForReview, 38=StudyReceived, 39=RateLimited, 40=SystemAlert,
+        41=OAuthRefreshRotated, 42=ValidationPackApproved, 43=ValidationPackDeprecated,
+        44=ValidationPackRun
+      enum: [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24, 25, 26, 27, 28, 29, 30, 31, 32, 33, 34, 35, 36, 37, 38, 39, 40, 41, 42, 43, 44]
+
+    BillingStatus:
+      type: object
+      description: |
+        PRD BILL-002/004 — current subscription + lifecycle state. Surfaces
+        only the tenant plan/lifecycle fields needed by the admin UI. Raw
+        Stripe customer/subscription identifiers are never returned here.
+      properties:
+        plan: { type: string, enum: [Trial, Team, Enterprise] }
+        subscriptionStatus:
+          type: string
+          nullable: true
+          description: Stripe subscription status (`trialing`, `active`, `past_due`, `canceled`, …) when present.
+        trialEndsAt: { type: string, format: date-time, nullable: true }
+        currentPeriodEnd: { type: string, format: date-time, nullable: true }
+        gracePeriodUntil: { type: string, format: date-time, nullable: true, description: "Mutating endpoints continue to work until this instant after a failed payment; expired grace is treated as suspended." }
+        suspendedAt: { type: string, format: date-time, nullable: true, description: "When set, all mutating non-billing endpoints return 402 kind=tenant_suspended." }
+        customerConfigured: { type: boolean }
+
+    BillingCredits:
+      type: object
+      description: |
+        PRD BILL-002 / BILL-007 — month-to-date AI credit balance against
+        the tenant's plan limits, plus the Trial-end timestamp. Mirrors the
+        numbers `PlanQuotaService` evaluates inside the AI gateway, so the
+        admin UI shows the same totals that gate live requests.
+      required: [plan, periodStart, periodEnd, used, limits, remaining, trialEndsAt]
+      properties:
+        plan: { type: string, enum: [Trial, Team, Enterprise] }
+        periodStart: { type: string, format: date-time, description: "Start of the current billing month (UTC)." }
+        periodEnd: { type: string, format: date-time, description: "Reset instant — start of the next billing month (UTC)." }
+        used:
+          type: object
+          required: [calls, inputTokens, outputTokens]
+          properties:
+            calls: { type: integer }
+            inputTokens: { type: integer, format: int64 }
+            outputTokens: { type: integer, format: int64 }
+        limits:
+          type: object
+          required: [calls, inputTokens, outputTokens]
+          properties:
+            calls: { type: integer, description: "Per-plan monthly cap (Enterprise = `int.MaxValue`)." }
+            inputTokens: { type: integer }
+            outputTokens: { type: integer }
+        remaining:
+          type: object
+          required: [calls, inputTokens, outputTokens]
+          properties:
+            calls: { type: integer, format: int64 }
+            inputTokens: { type: integer, format: int64 }
+            outputTokens: { type: integer, format: int64 }
+        trialEndsAt: { type: string, format: date-time, nullable: true }
+
+    BillingInvoice:
+      type: object
+      description: Stripe invoice projection used by `/admin/billing`.
+      properties:
+        id: { type: string }
+        number: { type: string, nullable: true }
+        status: { type: string, description: "`draft`, `open`, `paid`, `uncollectible`, `void`." }
+        amountDue: { type: integer, description: "Smallest currency unit (e.g. cents)." }
+        amountPaid: { type: integer }
+        currency: { type: string, example: "usd" }
+        periodStart: { type: string, format: date-time, nullable: true }
+        periodEnd: { type: string, format: date-time, nullable: true }
+        hostedInvoiceUrl: { type: string, format: uri, nullable: true }
+        invoicePdf: { type: string, format: uri, nullable: true }
+
+    RefundDto:
+      type: object
+      required: [paymentIntentId]
+      properties:
+        paymentIntentId: { type: string, description: "Stripe PaymentIntent id (`pi_…`) to refund." }
+        amountCents: { type: integer, nullable: true, minimum: 1, description: "Optional partial-refund amount in the smallest currency unit. Omit for a full refund." }
+        reason:
+          type: string
+          nullable: true
+          enum: [duplicate, fraudulent, requested_by_customer]
+
+    MarketplaceConnectStatus:
+      type: object
+      description: |
+        PRD MKT-006 — Stripe Connect onboarding state for the active tenant
+        (the publisher). Buyer-side checkout is gated on `chargesEnabled`.
+      properties:
+        onboarded: { type: boolean }
+        chargesEnabled: { type: boolean }
+        payoutsEnabled: { type: boolean }
+        requirements:
+          type: array
+          nullable: true
+          items: { type: string }
+
+    MarketplaceListingSummary:
+      type: object
+      description: Public marketplace listing projection. Paid artifact bodies are never returned from public listing endpoints.
+      properties:
+        id: { type: string, format: uuid }
+        name: { type: string }
+        description: { type: string }
+        kind: { type: string }
+        priceCents: { type: integer }
+        publisher: { type: string, format: uuid }
+        reviewedAt: { type: string, format: date-time, nullable: true }
+
+    Report:
+      type: object
+      properties:
+        id: { type: string, format: uuid }
+        tenantId: { type: string, format: uuid }
+        modality: { type: string }
+        bodyPart: { type: string }
+        accessionNumber: { type: string }
+        status: { $ref: "#/components/schemas/ReportStatus" }
+        indication: { type: string }
+        technique: { type: string }
+        comparison: { type: string }
+        findings: { type: string }
+        impression: { type: string }
+        recommendations: { type: string }
+        rulebookId: { type: string, nullable: true }
+        aiHighlightsJson: { type: string, nullable: true }
+        createdAt: { type: string, format: date-time }
+        updatedAt: { type: string, format: date-time }
+
+    ReportVersion:
+      type: object
+      properties:
+        id: { type: string, format: uuid }
+        reportId: { type: string, format: uuid }
+        sequence: { type: integer }
+        authorUserId: { type: string, format: uuid }
+        action: { type: string }
+        rulebookId: { type: string, nullable: true }
+        snapshotJson: { type: string }
+        createdAt: { type: string, format: date-time }
+
+    ValidationFinding:
+      type: object
+      properties:
+        ruleId: { type: string }
+        severity:
+          type: string
+          enum: [Blocker, Warning, Info]
+        message: { type: string }
+        section: { type: string, nullable: true }
+
+    AiRequest:
+      type: object
+      required: [mode]
+      properties:
+        mode:
+          type: string
+          description: |
+            AI mode (PRD AI-001, AI-002, RPT-006, RPT-007). Unknown modes return 400 with kind=validation.
+          enum:
+            - impression
+            - cleanup
+            - draft
+            - concise
+            - formal
+            - patient_friendly
+            - referring_summary
+        containsPhi: { type: boolean, default: false }
+        providerId: { type: string, format: uuid, nullable: true }
+
+    AiResult:
+      type: object
+      properties:
+        text: { type: string }
+        provider: { type: string }
+        model: { type: string }
+        latencyMs: { type: integer }
+        promptVersion: { type: string }
+        mode: { type: string }
+        caveats:
+          type: array
+          items: { type: string }
+
+    Provider:
+      type: object
+      properties:
+        id: { type: string, format: uuid }
+        name: { type: string }
+        adapter: { type: string, enum: [mock, anthropic, openai, openai-compatible, azure-openai, aws-bedrock, google-vertex, ollama-chat, vllm, llama-cpp, github-copilot-cli, gemini-cli, codex-cli] }
+        complianceClass: { $ref: "#/components/schemas/ProviderComplianceClass" }
+        apiKeySecretRef:
+          type: string
+          pattern: "^$|^env:.+"
+          example: "env:ANTHROPIC_API_KEY"
+          description: Env-var reference only; inline secret values are rejected.
+        retentionLabel:
+          type: string
+          description: |
+            Iter-34 PROV-009 — operator-supplied free-text data-retention label
+            shown alongside `complianceClass`. Examples: `no-egress`,
+            `30d-soft-delete`, `vendor-controlled-zdr`, `baa-30d`,
+            `local-only-no-retention`. Informational only — never weakens the
+            PHI policy enforced in `AiGateway.EnforcePhiPolicy`.
+          default: ""
+          example: "baa-30d"
+
+    Rulebook:
+      type: object
+      properties:
+        id: { type: string, format: uuid }
+        rulebookId: { type: string, example: "chest_ct_v1" }
+        version: { type: string, example: "1.2.0" }
+        status: { type: string, enum: [draft, approved, deprecated] }
+        yaml: { type: string }
+
+    ReportTemplate:
+      type: object
+      properties:
+        id: { type: string, format: uuid }
+        modality: { type: string }
+        bodyPart: { type: string }
+        sectionsJson: { type: string }
+
+    AuditEvent:
+      type: object
+      properties:
+        id: { type: string, format: uuid }
+        tenantId: { type: string, format: uuid }
+        userId: { type: string, format: uuid, nullable: true }
+        action: { $ref: "#/components/schemas/AuditAction" }
+        detailsJson: { type: string }
+        createdAt: { type: string, format: date-time }
+        prevHash: { type: string }
+        integrityChain: { type: string }
+
+paths:
+  /api/health:
+    get:
+      summary: Liveness probe
+      security: []
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json: { schema: { type: object } }
+
+  /api/health/ready:
+    get:
+      summary: Readiness probe (DB-aware)
+      security: []
+      responses:
+        "200": { description: Ready }
+        "503": { description: Not ready }
+
+  /api/reports:
+    get:
+      summary: List reports (paginated, filtered)
+      parameters:
+        - $ref: "#/components/parameters/Skip"
+        - $ref: "#/components/parameters/Take"
+        - $ref: "#/components/parameters/Modality"
+        - $ref: "#/components/parameters/StatusFilter"
+        - $ref: "#/components/parameters/Q"
+      responses:
+        "200":
+          description: OK
+          headers:
+            X-Total-Count: { $ref: "#/components/headers/XTotalCount" }
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: "#/components/schemas/Report" }
+    post:
+      summary: Create a draft report (idempotent on accessionNumber)
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/Report" }
+      responses:
+        "201":
+          description: Created
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Report" }
+        "422":
+          $ref: "#/components/responses/Problem"
+
+  /api/reports/{id}:
+    get:
+      parameters: [{ in: path, name: id, required: true, schema: { type: string, format: uuid } }]
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Report" }
+        "404":
+          $ref: "#/components/responses/Problem"
+    patch:
+      parameters: [{ in: path, name: id, required: true, schema: { type: string, format: uuid } }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/Report" }
+      responses:
+        "200":
+          description: Updated; new ReportVersion written.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Report" }
+        "404":
+          $ref: "#/components/responses/Problem"
+
+  /api/reports/{id}/validate:
+    post:
+      parameters: [{ in: path, name: id, required: true, schema: { type: string, format: uuid } }]
+      responses:
+        "200":
+          description: Findings grouped by severity.
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: "#/components/schemas/ValidationFinding" }
+        "404":
+          $ref: "#/components/responses/Problem"
+
+  /api/reports/{id}/ai:
+    post:
+      summary: Generate AI draft (rate limited group 'ai' = 60 req/min/tenant)
+      parameters: [{ in: path, name: id, required: true, schema: { type: string, format: uuid } }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/AiRequest" }
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/AiResult" }
+        "402":
+          description: |
+            Plan quota exceeded (kind=quota_exceeded) or tenant suspended for
+            non-payment (kind=tenant_suspended). The body includes `resetAt`
+            for quota and `suspendedAt` for suspension.
+          content:
+            application/problem+json:
+              schema: { $ref: "#/components/schemas/Problem" }
+        "403":
+          description: PHI policy block (kind=provider_policy)
+          content:
+            application/problem+json:
+              schema: { $ref: "#/components/schemas/Problem" }
+        "409":
+          description: Rulebook governance block (kind=rulebook_governance, PRD RB-010).
+          content:
+            application/problem+json:
+              schema: { $ref: "#/components/schemas/Problem" }
+        "429":
+          description: Rate limited
+        "502":
+          description: Provider unavailable
+
+  /api/reports/{id}/acknowledge:
+    post:
+      parameters: [{ in: path, name: id, required: true, schema: { type: string, format: uuid } }]
+      responses:
+        "200":
+          description: Acknowledged (Validated → Acknowledged)
+        "409":
+          description: Conflict — not in Validated state (`kind=report_state`) or strict tenant validation still has blockers (`kind=validation_blockers`).
+          content:
+            application/problem+json:
+              schema: { $ref: "#/components/schemas/Problem" }
+
+  /api/reports/{id}/export/text:
+    get:
+      parameters:
+        - { in: path, name: id, required: true, schema: { type: string, format: uuid } }
+        - in: query
+          name: preview
+          description: When true, returns the narrative without auditing or marking the report exported.
+          schema: { type: boolean, default: false }
+      responses:
+        "200":
+          description: Plain text report
+          content:
+            text/plain:
+              schema: { type: string }
+        "409":
+          description: Conflict — report is not Acknowledged/Exported (kind=report_state). Preview text export is the only draft-safe export path.
+          content:
+            application/problem+json:
+              schema: { $ref: "#/components/schemas/Problem" }
+
+  /api/reports/{id}/export/json:
+    get:
+      parameters: [{ in: path, name: id, required: true, schema: { type: string, format: uuid } }]
+      responses:
+        "200":
+          description: Structured JSON report export
+          content:
+            application/json:
+              schema: { type: object }
+        "409":
+          description: Conflict — report is not Acknowledged/Exported (kind=report_state).
+          content:
+            application/problem+json:
+              schema: { $ref: "#/components/schemas/Problem" }
+
+  /api/reports/{id}/export/fhir:
+    get:
+      parameters: [{ in: path, name: id, required: true, schema: { type: string, format: uuid } }]
+      responses:
+        "200":
+          description: FHIR DiagnosticReport
+          content:
+            application/fhir+json:
+              schema: { type: object }
+        "409":
+          description: Conflict — report is not Acknowledged/Exported (kind=report_state).
+          content:
+            application/problem+json:
+              schema: { $ref: "#/components/schemas/Problem" }
+
+  /api/reports/{id}/versions:
+    get:
+      parameters: [{ in: path, name: id, required: true, schema: { type: string, format: uuid } }]
+      responses:
+        "200":
+          description: Newest-first version list
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: "#/components/schemas/ReportVersion" }
+
+  /api/rulebooks:
+    get:
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: "#/components/schemas/Rulebook" }
+
+  /api/rulebooks/save:
+    post:
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/Rulebook" }
+      responses:
+        "200":
+          description: Saved
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Rulebook" }
+
+  /api/rulebooks/{id}/approve:
+    post:
+      parameters: [{ in: path, name: id, required: true, schema: { type: string, format: uuid } }]
+      responses:
+        "200": { description: Approved (audit RulebookApproved) }
+        "403":
+          description: Caller role not permitted (kind=forbidden).
+          content:
+            application/problem+json:
+              schema: { $ref: "#/components/schemas/Problem" }
+
+  /api/rulebooks/{id}/deprecate:
+    post:
+      parameters: [{ in: path, name: id, required: true, schema: { type: string, format: uuid } }]
+      responses:
+        "200": { description: Deprecated (audit RulebookDeprecated) }
+        "403":
+          description: Caller role not permitted (kind=forbidden).
+          content:
+            application/problem+json:
+              schema: { $ref: "#/components/schemas/Problem" }
+
+  /api/rulebooks/{id}/rollback:
+    post:
+      summary: |
+        PRD RB-008 — roll back to a prior approved version. Materialises a
+        new approved rulebook row whose version carries a `+rollback-…`
+        suffix; existing rows are never mutated.
+      parameters: [{ in: path, name: id, required: true, schema: { type: string, format: uuid } }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [version]
+              properties:
+                version: { type: string, description: "Prior approved version to roll back to." }
+      responses:
+        "200": { description: Rolled back (audit RulebookApproved) }
+        "400":
+          description: Prior approved version not found (kind=validation).
+          content:
+            application/problem+json:
+              schema: { $ref: "#/components/schemas/Problem" }
+        "403":
+          description: Caller role not permitted (kind=forbidden).
+          content:
+            application/problem+json:
+              schema: { $ref: "#/components/schemas/Problem" }
+
+  /api/templates:
+    get:
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: "#/components/schemas/ReportTemplate" }
+
+  /api/templates/save:
+    post:
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/ReportTemplate" }
+      responses:
+        "200":
+          description: Saved
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ReportTemplate" }
+
+  /api/providers:
+    get:
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: "#/components/schemas/Provider" }
+
+  /api/providers/save:
+    post:
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/Provider" }
+      responses:
+        "200":
+          description: Saved
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Provider" }
+        "403":
+          description: Caller role not permitted (kind=forbidden).
+          content:
+            application/problem+json:
+              schema: { $ref: "#/components/schemas/Problem" }
+
+  /api/providers/{id}/health:
+    post:
+      summary: Iter-32 AI-011 — adapter-specific health probe. Targets `/api/tags` for Ollama, `/v1/models` for vLLM, `/health` for llama.cpp; other adapters return `{ok:true,note:"no-op"}`. ItAdmin / MedicalDirector only.
+      parameters: [{ in: path, name: id, required: true, schema: { type: string, format: uuid } }]
+      responses:
+        "200":
+          description: Probe completed.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  ok: { type: boolean }
+                  error: { type: string, nullable: true }
+                  note: { type: string, nullable: true }
+
+  /api/providers/{id}/oauth/refresh-token:
+    post:
+      summary: Iter-35 PROV-007 — save (or replace) the per-provider OAuth refresh token in the encrypted vault. ItAdmin / BillingAdmin only. Audited as `OAuthRefreshRotated` with `kind:"saved"`; never returns or logs ciphertext.
+      parameters: [{ in: path, name: id, required: true, schema: { type: string, format: uuid } }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [refreshToken]
+              properties:
+                refreshToken: { type: string, description: "Plaintext OAuth refresh token; encrypted server-side and never echoed back." }
+                expiresAt: { type: string, format: date-time, nullable: true }
+                rotationPolicy:
+                  type: string
+                  nullable: true
+                  enum: [never, before_expiry, every_24h]
+      responses:
+        "204": { description: Token saved. }
+        "403":
+          description: RBAC failure — caller is not ItAdmin / BillingAdmin.
+          content:
+            application/problem+json:
+              schema: { $ref: "#/components/schemas/Problem" }
+        "404": { description: Provider not found in the active tenant. }
+        "503":
+          description: KMS unavailable — tenant has no `CmkKeyRef` and `RADIOPAD_TENANT_KEK_DEFAULT` is unset.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  error: { type: string }
+                  kind: { type: string, enum: [kms_unavailable] }
+    delete:
+      summary: Iter-35 PROV-007 — delete the stored OAuth refresh token. Clears all ciphertext columns; rotation policy is preserved. ItAdmin / BillingAdmin only. Audited as `OAuthRefreshRotated` with `kind:"deleted"`.
+      parameters: [{ in: path, name: id, required: true, schema: { type: string, format: uuid } }]
+      responses:
+        "204": { description: Token deleted. }
+        "403": { description: RBAC failure. }
+        "404": { description: Provider not found. }
+
+  /api/providers/{id}/oauth/refresh-token/status:
+    get:
+      summary: Iter-35 PROV-007 — non-secret status of the refresh-token vault. NEVER returns ciphertext, IV, tag, or wrapped DEK. ItAdmin / BillingAdmin only.
+      parameters: [{ in: path, name: id, required: true, schema: { type: string, format: uuid } }]
+      responses:
+        "200":
+          description: Token status.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  hasToken: { type: boolean }
+                  updatedAt: { type: string, format: date-time, nullable: true }
+                  expiresAt: { type: string, format: date-time, nullable: true }
+                  rotationPolicy:
+                    type: string
+                    enum: [never, before_expiry, every_24h]
+        "403": { description: RBAC failure. }
+        "404": { description: Provider not found. }
+
+  /api/ai/routing/preview:
+    get:
+      summary: Iter-32 AI-010 — explain the gateway's composite routing decision for a hypothetical request without performing a real AI call. ItAdmin / MedicalDirector only.
+      parameters:
+        - in: query
+          name: phi
+          required: false
+          schema: { type: boolean, default: false }
+        - in: query
+          name: modality
+          required: false
+          schema: { type: string }
+        - in: query
+          name: input
+          required: false
+          schema: { type: integer, minimum: 0 }
+        - in: query
+          name: output
+          required: false
+          schema: { type: integer, minimum: 0 }
+      responses:
+        "200":
+          description: Routing decision + per-candidate score breakdown.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  selectedProviderId: { type: string, format: uuid, nullable: true }
+                  selectedProviderName: { type: string, nullable: true }
+                  reason: { type: string, nullable: true }
+                  weights:
+                    type: object
+                    properties:
+                      cost: { type: number }
+                      quality: { type: number }
+                      latency: { type: number }
+                  candidates:
+                    type: array
+                    items:
+                      type: object
+                      properties:
+                        providerId: { type: string, format: uuid }
+                        name: { type: string }
+                        adapter: { type: string }
+                        compliance: { type: string }
+                        eligible: { type: boolean }
+                        ineligibleReason: { type: string, nullable: true }
+                        costUsdEstimate: { type: number }
+                        costScore: { type: number }
+                        qualityScore: { type: number }
+                        latencyScore: { type: number }
+                        p95LatencyMs24h: { type: integer, nullable: true }
+                        compositeScore: { type: number }
+
+  /api/ai/sandbox/compare:
+    post:
+      summary: |
+        PRD PROV-005 (iter-34) — run the same prompt across up to four sandbox-class providers and return each output side-by-side.
+        Auth: Radiologist | MedicalDirector | ReportingAdmin | ItAdmin.
+        Refuses with `409 { kind: "sandbox_required" }` when `Tenant.AllowSandboxRulebooks` is false.
+        Refuses with `400 { kind: "providers_not_sandbox" }` when any provider is disabled, not tenant-owned, or not `ProviderComplianceClass.Sandbox`.
+        PHI policy in `AiGateway.EnforcePhiPolicy` is still enforced for every dispatch.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/SandboxCompareRequest' }
+      responses:
+        "200":
+          description: One row per provider. Failed dispatches carry `error` and zero token / latency counts.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/SandboxCompareResponse' }
+        "400": { description: Validation failed., content: { application/json: { schema: { $ref: '#/components/schemas/Problem' } } } }
+        "404": { description: Report not found., content: { application/json: { schema: { $ref: '#/components/schemas/Problem' } } } }
+        "409": { description: Tenant has not opted in to sandbox runs., content: { application/json: { schema: { $ref: '#/components/schemas/Problem' } } } }
+
+  /api/prompts/overrides:
+    get:
+      summary: Iter-31/32 AI-009 — list prompt-block overrides (Draft + Approved) for the current tenant.
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  type: object
+                  properties:
+                    id: { type: string, format: uuid }
+                    rulebookId: { type: string }
+                    blockKey: { type: string }
+                    body: { type: string }
+                    status: { type: string, enum: [Draft, Approved] }
+                    approvedByUserId: { type: string, format: uuid, nullable: true }
+                    approvedAt: { type: string, format: date-time, nullable: true }
+    post:
+      summary: Upsert a prompt override. Iter-32 AI-009 — every save lands as `Draft` and never reaches the AI runtime until approved.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [rulebookId, blockKey, body]
+              properties:
+                id: { type: string, format: uuid, nullable: true }
+                rulebookId: { type: string }
+                blockKey: { type: string }
+                body: { type: string }
+      responses:
+        "200":
+          description: Upserted as Draft.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  id: { type: string, format: uuid }
+                  status: { type: string, enum: [Draft] }
+
+  /api/prompts/overrides/{id}/approve:
+    post:
+      summary: Iter-32 AI-009 — promote a Draft override to Approved. **MedicalDirector only** (separation of duties). Audited as `PromptOverrideApproved`.
+      parameters: [{ in: path, name: id, required: true, schema: { type: string, format: uuid } }]
+      responses:
+        "200":
+          description: Approved.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  id: { type: string, format: uuid }
+                  status: { type: string, enum: [Approved] }
+                  approvedAt: { type: string, format: date-time }
+        "403":
+          description: Caller is not a MedicalDirector.
+          content:
+            application/problem+json:
+              schema: { $ref: "#/components/schemas/Problem" }
+        "404":
+          description: Override not found in tenant scope.
+          content:
+            application/problem+json:
+              schema: { $ref: "#/components/schemas/Problem" }
+
+  /api/reports/{id}/prior:
+    get:
+      summary: Most-recent prior acknowledged/exported report for the same body part (PRD RPT-009).
+      parameters: [{ in: path, name: id, required: true, schema: { type: string, format: uuid } }]
+      responses:
+        "200":
+          description: OK. `prior` is null when no comparable prior exists.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  current:
+                    type: object
+                    properties:
+                      id: { type: string, format: uuid }
+                      bodyPart: { type: string }
+                  prior:
+                    nullable: true
+                    type: object
+
+  /api/lexicon:
+    get:
+      summary: Per-tenant terminology dictionary (PRD STD-006).
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  type: object
+                  properties:
+                    id: { type: string, format: uuid }
+                    term: { type: string }
+                    forbidden: { type: boolean }
+                    replacement: { type: string }
+                    note: { type: string }
+    post:
+      summary: Create or update a lexicon entry (RBAC: MedicalDirector / ReportingAdmin / ItAdmin).
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [term, forbidden]
+              properties:
+                id: { type: string, format: uuid, nullable: true }
+                term: { type: string }
+                forbidden: { type: boolean }
+                replacement: { type: string }
+                note: { type: string }
+      responses:
+        "200": { description: Saved }
+        "400":
+          description: Validation error (kind=validation)
+          content:
+            application/problem+json:
+              schema: { $ref: "#/components/schemas/Problem" }
+        "403":
+          description: Caller role not permitted (kind=forbidden).
+          content:
+            application/problem+json:
+              schema: { $ref: "#/components/schemas/Problem" }
+
+  /api/lexicon/{id}:
+    delete:
+      summary: Delete a lexicon entry (RBAC: MedicalDirector / ReportingAdmin / ItAdmin).
+      parameters: [{ in: path, name: id, required: true, schema: { type: string, format: uuid } }]
+      responses:
+        "204": { description: Deleted }
+        "403":
+          description: Caller role not permitted (kind=forbidden).
+          content:
+            application/problem+json:
+              schema: { $ref: "#/components/schemas/Problem" }
+        "404":
+          $ref: "#/components/responses/Problem"
+
+  /api/audit:
+    get:
+      summary: Stream tenant-scoped audit events
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: "#/components/schemas/AuditEvent" }
+
+  /api/audit/verify:
+    get:
+      summary: |
+        PRD §13.2 / AUTH-006 — re-compute the SHA-256 integrity chain across
+        every audit event for the active tenant. Restricted to compliance /
+        IT roles (kind=forbidden otherwise).
+      responses:
+        "200":
+          description: Chain intact.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  intact: { type: boolean, enum: [true] }
+                  eventCount: { type: integer }
+                  lastVerifiedAt: { type: string, format: date-time, nullable: true }
+        "403":
+          description: Caller role not permitted (kind=forbidden).
+          content:
+            application/problem+json:
+              schema: { $ref: "#/components/schemas/Problem" }
+        "422":
+          description: Tampering detected (kind=audit_chain_broken).
+          content:
+            application/problem+json:
+              schema:
+                type: object
+                properties:
+                  kind: { type: string, enum: [audit_chain_broken] }
+                  eventCount: { type: integer }
+                  firstBrokenEventId: { type: string, format: uuid }
+                  lastVerifiedAt: { type: string, format: date-time, nullable: true }
+
+  /api/usage/summary:
+    get:
+      summary: Per-tenant AI usage rollup (PRD §17.2 / BILL-001..004)
+      parameters:
+        - { in: query, name: from, schema: { type: string, format: date-time } }
+        - { in: query, name: to,   schema: { type: string, format: date-time } }
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  totalRequests: { type: integer }
+                  okCount: { type: integer }
+                  blockedCount: { type: integer }
+                  errorCount: { type: integer }
+                  inputTokens: { type: integer, format: int64 }
+                  outputTokens: { type: integer, format: int64 }
+                  avgLatencyMs: { type: integer }
+                  costTotalUsd:
+                    type: number
+                    format: double
+                    description: |
+                      Iter-34 BILL-005 — total USD cost for the window, summed
+                      across `byProvider[].costTotalUsd`. Zero when no current
+                      `ProviderConfig` matches any historical `AiRequest.Provider`.
+                  byProvider:
+                    type: array
+                    items:
+                      type: object
+                      properties:
+                        provider: { type: string }
+                        adapter: { type: string }
+                        requests: { type: integer }
+                        inputTokens: { type: integer, format: int64 }
+                        outputTokens: { type: integer, format: int64 }
+                        costInputUsd:
+                          type: number
+                          format: double
+                          description: |
+                            `(inputTokens / 1000) * ProviderConfig.CostPerInputKToken`
+                            for the matching tenant provider; `0` when unpriced.
+                        costOutputUsd:
+                          type: number
+                          format: double
+                          description: |
+                            `(outputTokens / 1000) * ProviderConfig.CostPerOutputKToken`
+                            for the matching tenant provider; `0` when unpriced.
+                        costTotalUsd:
+                          type: number
+                          format: double
+                          description: Sum of `costInputUsd` + `costOutputUsd`.
+                        unpriced:
+                          type: boolean
+                          description: |
+                            `true` when no current `ProviderConfig` row matches
+                            this row's `provider` name (e.g. retired provider);
+                            cost columns stay `0`.
+
+  /api/tenant/settings:
+    get:
+      summary: |
+        PRD AI-007 + BILL-001 — read tenant-level admin settings
+        (hallucination detector, plan, feature flags). Auto-creates a default
+        row on first read.
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  id: { type: string, format: uuid }
+                  hallucinationDetectionEnabled: { type: boolean }
+                  hallucinationSeverity: { type: string, enum: [Info, Warning, Blocker] }
+                  hallucinationAllowList: { type: string }
+                  hallucinationMinSupport: { type: number, format: double, minimum: 0, maximum: 1 }
+                  plan: { type: integer, enum: [0, 1, 2], description: "0=Trial, 1=Team, 2=Enterprise" }
+                  featureFlagsJson: { type: string }
+                  stripe:
+                    type: object
+                    properties:
+                      customerId: { type: string, nullable: true }
+                      subscriptionId: { type: string, nullable: true }
+                      status: { type: string, nullable: true }
+                      currentPeriodEnd: { type: string, format: date-time, nullable: true }
+    post:
+      summary: Save tenant-level settings (RBAC MedicalDirector / ReportingAdmin / ItAdmin)
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [hallucinationDetectionEnabled, hallucinationSeverity, hallucinationAllowList, hallucinationMinSupport, plan, featureFlagsJson]
+              properties:
+                hallucinationDetectionEnabled: { type: boolean }
+                hallucinationSeverity: { type: string, enum: [Info, Warning, Blocker] }
+                hallucinationAllowList: { type: string }
+                hallucinationMinSupport: { type: number, format: double, minimum: 0, maximum: 1 }
+                plan: { type: integer, enum: [0, 1, 2] }
+                featureFlagsJson: { type: string }
+      responses:
+        "200": { description: Saved }
+        "403":
+          description: Caller role not permitted (kind=forbidden)
+          content: { application/problem+json: { schema: { $ref: "#/components/schemas/Problem" } } }
+
+  /api/reports/{id}/export/pdf:
+    get:
+      summary: PRD RPT-011 — PDF export (RPT-012 gated; requires Status>=Acknowledged)
+      parameters: [{ in: path, name: id, required: true, schema: { type: string, format: uuid } }]
+      responses:
+        "200":
+          description: OK
+          content:
+            application/pdf:
+              schema: { type: string, format: binary }
+        "409":
+          description: Report not acknowledged (kind=report_state)
+          content: { application/problem+json: { schema: { $ref: "#/components/schemas/Problem" } } }
+
+  /api/reports/{id}/export/docx:
+    get:
+      summary: PRD RPT-011 — DOCX export (RPT-012 gated; requires Status>=Acknowledged)
+      parameters: [{ in: path, name: id, required: true, schema: { type: string, format: uuid } }]
+      responses:
+        "200":
+          description: OK
+          content:
+            application/vnd.openxmlformats-officedocument.wordprocessingml.document:
+              schema: { type: string, format: binary }
+        "409":
+          description: Report not acknowledged (kind=report_state)
+          content: { application/problem+json: { schema: { $ref: "#/components/schemas/Problem" } } }
+
+  /api/billing/checkout:
+    post:
+      summary: |
+        PRD BILL-001 — start a Stripe Checkout session.
+        Returns the URL to redirect the browser to.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [priceId, successUrl, cancelUrl]
+              properties:
+                priceId: { type: string }
+                successUrl: { type: string, format: uri }
+                cancelUrl: { type: string, format: uri }
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  id: { type: string }
+                  url: { type: string, format: uri }
+        "503":
+          description: Stripe not configured (STRIPE_SECRET_KEY missing).
+
+  /api/billing/portal:
+    post:
+      summary: PRD BILL-006 — open the Stripe Billing Portal for the tenant.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [returnUrl]
+              properties:
+                returnUrl: { type: string, format: uri }
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  url: { type: string, format: uri }
+
+  /api/billing/webhook:
+    post:
+      summary: |
+        Stripe webhook receiver. Validates the `Stripe-Signature` header
+        against `RADIOPAD_STRIPE_WEBHOOK_SECRET` (legacy `STRIPE_WEBHOOK_SECRET`
+        accepted for one release) and updates `TenantSettings`. Events are
+        deduplicated against `StripeWebhookEvents` by `(Source, EventId)` so
+        retried deliveries are idempotent without colliding with marketplace
+        webhook events. UNAUTHENTICATED — security comes from signature
+        verification.
+
+        Iter-36 supported event types: `checkout.session.completed`,
+        `customer.subscription.created`, `customer.subscription.updated`,
+        `customer.subscription.deleted`, `invoice.payment_succeeded`
+        (clears `gracePeriodUntil` + `suspendedAt`, sets
+        `subscriptionStatus = "active"`), `invoice.payment_failed`
+        (opens 7-day `gracePeriodUntil`; escalates to `suspendedAt` once
+        that window has elapsed). Other event types are accepted, deduped
+        and ignored.
+      parameters:
+        - in: header
+          name: Stripe-Signature
+          required: true
+          schema: { type: string }
+          description: |
+            Stripe HMAC signature header (`t=<unix>,v1=<hmac>`). A missing
+            or malformed header is treated as a verification failure (400).
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: true
+              properties:
+                id: { type: string }
+                type: { type: string, description: "Stripe event type, e.g. invoice.payment_failed" }
+              required: [id, type]
+      responses:
+        "200":
+          description: Event accepted (or duplicate).
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  received: { type: boolean }
+                  deduped: { type: boolean }
+        "400":
+          description: Invalid / missing Stripe signature (RFC-7807 problem details).
+          content:
+            application/problem+json:
+              schema: { $ref: "#/components/schemas/Problem" }
+        "503":
+          description: Webhook not configured (`RADIOPAD_STRIPE_WEBHOOK_SECRET` missing).
+
+  /api/billing/status:
+    get:
+      summary: |
+        PRD BILL-002/004 — current plan, subscription status, trial / grace /
+        suspended timestamps, and whether the tenant has a Stripe customer.
+        Read-only; tenant-scoped.
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/BillingStatus" }
+
+  /api/billing/credits:
+    get:
+      summary: |
+        PRD BILL-002 / BILL-007 — month-to-date AI credit balance (calls +
+        input/output tokens) against the tenant's plan limits, plus the
+        Trial-end timestamp when the tenant is still on the Trial plan.
+        Reuses `PlanQuotaService` so the values shown in the admin UI
+        match the gate the AI gateway enforces. Tenant-scoped, read-only.
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/BillingCredits" }
+
+  /api/billing/invoices:
+    get:
+      summary: |
+        PRD BILL-005 — list Stripe invoices for the tenant's customer record.
+        Returns at most 20 invoices, newest first.
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: "#/components/schemas/BillingInvoice" }
+        "503":
+          description: Stripe not configured (`RADIOPAD_STRIPE_SECRET_KEY` missing).
+
+  /api/billing/refund:
+    post:
+      summary: |
+        PRD BILL-007 — issue a refund against a tenant payment. RBAC-gated
+        (`BillingAdmin` / `ItAdmin`). Validates amount/reason locally and
+        verifies the PaymentIntent belongs to the current tenant before issuing
+        the refund. Carries a deterministic `Idempotency-Key`; audited as
+        `BillingChanged` with PII hashed to `sha16:<hex>` in `DetailsJson`.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/RefundDto" }
+      responses:
+        "200":
+          description: Refund created
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  id: { type: string }
+                  status: { type: string, description: "`succeeded`, `pending`, `failed`, `canceled`." }
+                  amount: { type: integer }
+        "400":
+          description: Validation error (kind=validation)
+          content: { application/problem+json: { schema: { $ref: "#/components/schemas/Problem" } } }
+        "403":
+          description: Caller role not permitted (kind=forbidden)
+          content: { application/problem+json: { schema: { $ref: "#/components/schemas/Problem" } } }
+        "409":
+          description: Tenant has no Stripe customer to validate refund ownership.
+        "503":
+          description: Stripe not configured (`RADIOPAD_STRIPE_SECRET_KEY` missing).
+
+  /api/marketplace/webhook:
+    post:
+      summary: |
+        Stripe marketplace webhook receiver. Requires
+        `RADIOPAD_STRIPE_WEBHOOK_SECRET` outside the `Testing` environment;
+        test hosts may use unsigned fixtures. Events are deduplicated by
+        `(Source, EventId)` and checkout-session events are ignored unless the
+        session metadata identifies `radiopadFlow=marketplace`.
+      responses:
+        "200": { description: Event accepted (or duplicate). }
+        "400": { description: Invalid signature or malformed event. }
+        "503": { description: Webhook secret missing outside Testing. }
+
+  /api/marketplace/listings:
+    get:
+      summary: Public approved marketplace catalogue. Does not return artifact bodies.
+      parameters:
+        - in: query
+          name: kind
+          schema: { type: string }
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: "#/components/schemas/MarketplaceListingSummary" }
+
+  /api/marketplace/listings/{id}:
+    get:
+      summary: Public approved marketplace listing detail. Does not return artifact bodies.
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema: { type: string, format: uuid }
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/MarketplaceListingSummary" }
+        "404": { description: Listing not found or not approved. }
+
+  /api/marketplace/connect/status:
+    get:
+      summary: |
+        PRD MKT-006 — Stripe Connect onboarding state for the active tenant
+        (the publisher). When `chargesEnabled` is false, buyer checkout
+        against any of this tenant's listings returns 409
+        `kind:"connect_not_ready"`.
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/MarketplaceConnectStatus" }
+        "503":
+          description: Stripe not configured (`RADIOPAD_STRIPE_SECRET_KEY` missing).
+
+  /api/marketplace/purchases/{id}/refund:
+    post:
+      summary: |
+        PRD MKT-006 — refund a marketplace purchase. RBAC-gated
+        (`MedicalDirector` / `ItAdmin`). Reverses both the platform fee and
+        the publisher transfer. Idempotency-Key on every Stripe call;
+        audited as `BillingChanged` with PII hashed.
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema: { type: string, format: uuid }
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                reason:
+                  type: string
+                  nullable: true
+                  enum: [duplicate, fraudulent, requested_by_customer]
+      responses:
+        "200":
+          description: Refund created
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  id: { type: string }
+                  status: { type: string }
+        "403":
+          description: Caller role not permitted (kind=forbidden)
+          content: { application/problem+json: { schema: { $ref: "#/components/schemas/Problem" } } }
+        "404":
+          description: Purchase not found in this tenant.
+          content: { application/problem+json: { schema: { $ref: "#/components/schemas/Problem" } } }
+        "409":
+          description: Purchase not in a refundable state (kind=conflict).
+          content: { application/problem+json: { schema: { $ref: "#/components/schemas/Problem" } } }
+
+  /api/ingest/order:
+    post:
+      summary: |
+        PRD INT-001..004 — inbound HL7/FHIR order webhook. Authenticates with
+        `X-RadioPad-Tenant: <slug>` + `Authorization: Bearer <secret>`; the
+        bearer is compared in constant time to
+        `TenantSettings.IngestBearerSecret`. Idempotent on `accessionNumber`.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [accessionNumber, modality, bodyPart]
+              properties:
+                accessionNumber: { type: string }
+                modality: { type: string }
+                bodyPart: { type: string }
+                indication: { type: string }
+                comparison: { type: string }
+                patientRef: { type: string }
+                rulebookId: { type: string, format: uuid }
+      responses:
+        "200":
+          description: OK (id of the created or deduplicated draft).
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  id: { type: string, format: uuid }
+                  deduplicated: { type: boolean }
+        "401":
+          description: Missing/unknown tenant or invalid bearer.
+        "503":
+          description: Ingest not configured for this tenant.
+
+  /api/reports/{id}/dicom-context:
+    get:
+      summary: |
+        PRD DCM-001..006 — fetch DICOMweb study context for the report's
+        accession number using the tenant-configured PACS. Always returns 200;
+        `study` is null when DICOMweb is not configured or the study is not
+        found. Audited as `DicomContextFetched`.
+      parameters: [{ in: path, name: id, required: true, schema: { type: string, format: uuid } }]
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  configured: { type: boolean }
+                  study:
+                    nullable: true
+                    type: object
+                    properties:
+                      studyInstanceUid: { type: string }
+                      modality: { type: string }
+                      bodyPart: { type: string }
+                      studyDate: { type: string }
+                      instanceCount: { type: integer }
+                      sourceUrl: { type: string }
+
+  /api/reports/{id}/dicom-context/instance:
+    get:
+      summary: |
+        PRD STD-004 / iter-31 — WADO-RS instance metadata (DICOM JSON Model)
+        for a specific (study, series, instance) tuple. Returns 200 with
+        `configured: false` when DICOMweb is not configured. Audited as
+        `DicomContextFetched` with `details.scope = "instance"`.
+      parameters:
+        - { in: header, name: X-RadioPad-Tenant, required: true, schema: { type: string } }
+        - { in: header, name: X-RadioPad-User, required: true, schema: { type: string } }
+        - { in: path, name: id, required: true, schema: { type: string, format: uuid } }
+        - { in: query, name: studyUid, required: true, schema: { type: string } }
+        - { in: query, name: seriesUid, required: true, schema: { type: string } }
+        - { in: query, name: instanceUid, required: true, schema: { type: string } }
+      responses:
+        "200":
+          description: Either the parsed metadata array or a configured-false stub.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  configured: { type: boolean }
+                  metadata:
+                    description: DICOM JSON Model array, or null when not configured / not found.
+                    nullable: true
+                    type: array
+                    items: { type: object, additionalProperties: true }
+        "400": { description: Missing studyUid / seriesUid / instanceUid. }
+        "401": { description: Missing tenant / user header. }
+        "403": { description: Caller role is not Radiologist / MedicalDirector / ReportingAdmin. }
+        "404": { description: Report not found in tenant. }
+
+  /api/reports/{id}/compare-prior:
+    get:
+      summary: |
+        PRD RPT-009 / iter-31 — side-by-side section diff between the
+        current report and the most recent prior report for the same body
+        part within the tenant. `prior` is null when no prior exists.
+        Each `sections[i].changed` is true when the trimmed section bodies
+        differ.
+      parameters:
+        - { in: header, name: X-RadioPad-Tenant, required: true, schema: { type: string } }
+        - { in: header, name: X-RadioPad-User, required: true, schema: { type: string } }
+        - { in: path, name: id, required: true, schema: { type: string, format: uuid } }
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  current:
+                    type: object
+                    properties:
+                      id: { type: string, format: uuid }
+                      bodyPart: { type: string }
+                  prior:
+                    nullable: true
+                    type: object
+                    properties:
+                      id: { type: string, format: uuid }
+                      bodyPart: { type: string }
+                      createdAt: { type: string, format: date-time }
+                  sections:
+                    type: array
+                    items:
+                      type: object
+                      properties:
+                        section: { type: string }
+                        current: { type: string }
+                        prior: { type: string }
+                        changed: { type: boolean }
+
+  /api/ingest/fhir/servicerequest:
+    post:
+      summary: |
+        PRD INT-002 — accept a FHIR R4 `ServiceRequest` resource (or a
+        `Bundle` containing one) and translate it into the same Draft report
+        as `/api/ingest/order`. Same authentication. Accession is taken from
+        `identifier[0].value`; modality from `code.coding[0].display` or
+        `category[0].text`; body part from `bodySite[0].text` or
+        `bodySite[0].coding[0].display`. Idempotent on accession.
+      parameters:
+        - in: header
+          name: X-RadioPad-Signature
+          required: false
+          description: |
+            Iter-31 INT-005 — HMAC-SHA256 of the raw body, hex-encoded,
+            prefixed with `sha256=`. Required only when the tenant has set
+            `FhirWebhookSecret`. When set, both this signature AND the bearer
+            must validate; mismatches return 401 and audit `PolicyViolation`
+            with reason `fhir-webhook:bad_signature`.
+          schema: { type: string, pattern: "^sha256=[0-9a-f]{64}$" }
+      requestBody:
+        required: true
+        content:
+          application/fhir+json:
+            schema:
+              type: object
+              description: FHIR R4 ServiceRequest or Bundle.
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  id: { type: string, format: uuid }
+                  deduplicated: { type: boolean }
+        "400": { description: Missing accession or modality. }
+        "401": { description: Missing/unknown tenant, invalid bearer, or invalid `X-RadioPad-Signature` when `FhirWebhookSecret` is configured. }
+        "503": { description: Ingest not configured. }
+
+  /api/auth/signin:
+    post:
+      summary: |
+        PRD AUTH-001 (dev tier) — exchange a tenant slug + user email for an
+        opaque bearer token. The token is HMAC-derived from `RADIOPAD_AUTH_SECRET`
+        + tenant + user, audited as `UserLogin`, and intended for storage in
+        the OS-level secure store on native shells. Replacement OIDC pipeline
+        is tracked under ADR-0004.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [tenant, user]
+              properties:
+                tenant: { type: string }
+                user: { type: string, format: email }
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  token: { type: string }
+                  tenant: { type: string }
+                  user: { type: string, format: email }
+                  expiresAt: { type: string, format: date-time }
+        "400": { description: Missing tenant/user. }
+        "401": { description: Unknown tenant or user not a member. }
+
+  /api/usage/analytics:
+    get:
+      summary: |
+        PRD §18 — aggregated product + governance KPIs for the Analytics
+        dashboard. Tenant-scoped. Default window is the last 30 days.
+      parameters:
+        - in: query
+          name: from
+          schema: { type: string, format: date-time }
+        - in: query
+          name: to
+          schema: { type: string, format: date-time }
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  window:
+                    type: object
+                    properties:
+                      from: { type: string, format: date-time }
+                      to: { type: string, format: date-time }
+                  reports:
+                    type: object
+                    properties:
+                      total: { type: integer }
+                      validated: { type: integer }
+                      exported: { type: integer }
+                      validationPassRate: { type: number }
+                  ai:
+                    type: object
+                    description: Same shape as `/api/usage/summary`.
+                  governance:
+                    type: object
+                    properties:
+                      phiPolicyBlocks: { type: integer }
+                      policyViolations: { type: integer }
+                      rulebookApprovals: { type: integer }
+                      activeUsers: { type: integer }
+
+  /api/reports/{id}/export/hl7:
+    get:
+      summary: |
+        PRD §19.1 / Beta — HL7 v2.5 ORU^R01 export of an acknowledged report.
+        Subject to RPT-012 gating: returns 409 unless the report is at least
+        `Acknowledged`. Audits `ReportExported` with `format:"hl7"`.
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema: { type: string, format: uuid }
+      responses:
+        "200":
+          description: OK
+          content:
+            application/hl7-v2:
+              schema: { type: string }
+        "404": { description: Report not found in this tenant. }
+        "409": { description: Report not validated yet. }
+
+  /api/audit/siem:
+    get:
+      summary: |
+        PRD §19 / Beta — SIEM log export. Streams the tenant audit chain in
+        either NDJSON (`format=json`) or ArcSight CEF (`format=cef`) for
+        ingestion into Splunk / Elastic / QRadar / Sentinel. Restricted to
+        Compliance / IT / Medical Director roles. PHI minimisation: only ids,
+        action codes, timestamps, and the integrity hash are emitted.
+      parameters:
+        - in: query
+          name: from
+          schema: { type: string, format: date-time }
+        - in: query
+          name: to
+          schema: { type: string, format: date-time }
+        - in: query
+          name: format
+          schema: { type: string, enum: [json, cef], default: json }
+        - in: query
+          name: take
+          schema: { type: integer, default: 5000, minimum: 1, maximum: 50000 }
+      responses:
+        "200":
+          description: OK
+          content:
+            application/x-ndjson:
+              schema: { type: string }
+            text/plain:
+              schema: { type: string }
+        "400": { description: Invalid format. }
+        "403": { description: Caller lacks the required role. }
+
+  /api/admin/security/test-webhook:
+    post:
+      summary: |
+        Sends a synthetic, non-PHI security alert payload to the configured
+        security webhook (`RADIOPAD_SECURITY_WEBHOOK_URL`, falling back to
+        `RADIOPAD_ANOMALY_WEBHOOK_URL`). Signs with
+        `RADIOPAD_SECURITY_WEBHOOK_SECRET` when present. Restricted to IT,
+        Medical Director, or Compliance Reviewer roles.
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [sent, configured]
+                properties:
+                  sent: { type: boolean }
+                  configured: { type: boolean }
+                  statusCode: { type: integer, nullable: true }
+        "403": { description: Caller lacks the required role. }
+
+  /scim/v2/Users:
+    get:
+      security:
+        - TenantHeader: []
+          ScimBearer: []
+      summary: |
+        PRD AUTH-005 — SCIM 2.0 list users (RFC 7644). Tenant-scoped via
+        `X-RadioPad-Tenant` + `Authorization: Bearer <ScimBearerSecret>`.
+        Supports the minimal `userName eq "x"` filter used by Okta /
+        Azure AD provisioning agents.
+      parameters:
+        - in: query
+          name: startIndex
+          schema: { type: integer, default: 1, minimum: 1 }
+        - in: query
+          name: count
+          schema: { type: integer, default: 100, maximum: 500 }
+        - in: query
+          name: filter
+          schema: { type: string }
+      responses:
+        "200": { description: SCIM ListResponse. }
+        "401": { description: Missing tenant or invalid bearer. }
+        "503": { description: SCIM not configured for this tenant. }
+    post:
+      security:
+        - TenantHeader: []
+          ScimBearer: []
+      summary: SCIM 2.0 create user.
+      requestBody:
+        required: true
+        content:
+          application/scim+json:
+            schema: { type: object }
+      responses:
+        "201": { description: Created. }
+        "409": { description: User already exists. }
+
+  /scim/v2/Users/{id}:
+    parameters:
+      - in: path
+        name: id
+        required: true
+        schema: { type: string, format: uuid }
+    get:
+      security:
+        - TenantHeader: []
+          ScimBearer: []
+      summary: SCIM 2.0 get user.
+      responses:
+        "200": { description: User resource. }
+        "404": { description: Not found. }
+    put:
+      security:
+        - TenantHeader: []
+          ScimBearer: []
+      summary: SCIM 2.0 replace user.
+      responses:
+        "200": { description: Updated. }
+    patch:
+      security:
+        - TenantHeader: []
+          ScimBearer: []
+      summary: |
+        SCIM 2.0 patch user. Supports `replace` of `active`, `displayName`,
+        and `name.formatted`. Used by Okta / Azure AD on deprovision.
+      responses:
+        "200": { description: Patched. }
+    delete:
+      security:
+        - TenantHeader: []
+          ScimBearer: []
+      summary: SCIM 2.0 delete user (soft-delete — sets active=false).
+      responses:
+        "204": { description: No content. }
+
+  /scim/v2/Groups:
+    get:
+      security:
+        - TenantHeader: []
+          ScimBearer: []
+      summary: |
+        PRD AUTH-005 — SCIM 2.0 list groups (RFC 7644). Tenant-scoped via
+        `X-RadioPad-Tenant` + `Authorization: Bearer <ScimBearerSecret>`.
+        Supports the minimal `displayName eq "x"` filter used by Okta /
+        Azure AD provisioning agents.
+      parameters:
+        - in: query
+          name: startIndex
+          schema: { type: integer, default: 1, minimum: 1 }
+        - in: query
+          name: count
+          schema: { type: integer, default: 100, maximum: 500 }
+        - in: query
+          name: filter
+          schema: { type: string }
+      responses:
+        "200": { description: SCIM ListResponse. }
+        "401": { description: Missing tenant or invalid bearer. }
+        "503": { description: SCIM not configured for this tenant. }
+    post:
+      security:
+        - TenantHeader: []
+          ScimBearer: []
+      summary: SCIM 2.0 create group and optional members.
+      requestBody:
+        required: true
+        content:
+          application/scim+json:
+            schema: { type: object }
+      responses:
+        "201": { description: Created. }
+        "409": { description: Group already exists. }
+
+  /scim/v2/Groups/{id}:
+    parameters:
+      - in: path
+        name: id
+        required: true
+        schema: { type: string, format: uuid }
+    get:
+      security:
+        - TenantHeader: []
+          ScimBearer: []
+      summary: SCIM 2.0 get group.
+      responses:
+        "200": { description: Group resource. }
+        "404": { description: Not found. }
+    put:
+      security:
+        - TenantHeader: []
+          ScimBearer: []
+      summary: SCIM 2.0 replace group and members.
+      responses:
+        "200": { description: Updated. }
+    patch:
+      security:
+        - TenantHeader: []
+          ScimBearer: []
+      summary: |
+        SCIM 2.0 patch group. Supports displayName/externalId changes,
+        member add/replace/remove, and `members[value eq "<userId>"]` remove.
+        Membership changes project roles through TenantSettings.ScimGroupRoleMapJson.
+      responses:
+        "200": { description: Patched. }
+    delete:
+      security:
+        - TenantHeader: []
+          ScimBearer: []
+      summary: SCIM 2.0 delete group and memberships.
+      responses:
+        "204": { description: No content. }
+
+  /scim/v2/ServiceProviderConfig:
+    get:
+      security:
+        - TenantHeader: []
+          ScimBearer: []
+      summary: SCIM 2.0 service provider configuration discovery.
+      responses:
+        "200": { description: ServiceProviderConfig resource. }
+        "401": { description: Missing tenant or invalid bearer. }
+        "503": { description: SCIM not configured for this tenant. }
+
+  /scim/v2/ResourceTypes:
+    get:
+      security:
+        - TenantHeader: []
+          ScimBearer: []
+      summary: SCIM 2.0 resource type discovery.
+      responses:
+        "200": { description: ListResponse of resource types. }
+        "401": { description: Missing tenant or invalid bearer. }
+        "503": { description: SCIM not configured for this tenant. }
+
+  /api/tenant/settings/kms/verify:
+    post:
+      summary: |
+        PRD SEC-003 — verify the configured customer-managed key (CMK) by
+        performing a real wrap+unwrap round-trip of a 32-byte probe.
+        Stamps `cmk.lastVerifiedAt` on a successful round-trip. Restricted
+        to IT / Compliance / Medical Director roles. Schemes: `env:`,
+        `local:`, `aws:`, `azkv:`, `gcp:`.
+      responses:
+        "200":
+          description: OK — round-trip succeeded.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  ok: { type: boolean }
+                  scheme: { type: string, enum: [env, local, aws, azkv, gcp] }
+                  keyRef: { type: string }
+                  lastVerifiedAt: { type: string, format: date-time }
+        "400": { description: No CMK keyRef configured. }
+        "403": { description: Caller lacks the required role. }
+        "422":
+          description: |
+            KMS provider unavailable or wrap/unwrap round-trip mismatch.
+            `kind` is `kms_unavailable` (provider error / missing IAM /
+            malformed keyRef) or `kms_roundtrip_mismatch` (unwrap returned
+            a different value than the wrapped input).
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  kind: { type: string, enum: [kms_unavailable, kms_roundtrip_mismatch] }
+                  error: { type: string }
+
+  /api/tenant/settings/locale:
+    get:
+      summary: |
+        Iter-35 i18n — read the tenant default UI locale and the locked
+        supported set. Affects chrome only; clinical content is never
+        translated.
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  locale: { type: string, enum: [en, es, de, fr, pt, hi] }
+                  supported:
+                    type: array
+                    items: { type: string, enum: [en, es, de, fr, pt, hi] }
+    put:
+      summary: |
+        Iter-35 i18n — set the tenant default UI locale. Restricted to
+        ``ItAdmin`` and ``MedicalDirector``. Returns 400 ``kind:"validation"``
+        when the body locale is not in the supported set.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [locale]
+              properties:
+                locale: { type: string, enum: [en, es, de, fr, pt, hi] }
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  locale: { type: string, enum: [en, es, de, fr, pt, hi] }
+        "400":
+          description: Unsupported locale tag.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  error: { type: string }
+                  kind: { type: string, enum: [validation] }
+        "403": { description: Caller lacks the required role. }
+
+  /api/users/me/locale:
+    put:
+      summary: |
+        Iter-35 i18n — set or clear the per-user locale override on
+        ``User.PreferredLocale``. Any tenant member may write their own
+        override; ``null`` clears the override and the UI falls back to
+        the tenant default.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                locale:
+                  oneOf:
+                    - { type: string, enum: [en, es, de, fr, pt, hi] }
+                    - { type: "null" }
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  locale:
+                    oneOf:
+                      - { type: string, enum: [en, es, de, fr, pt, hi] }
+                      - { type: "null" }
+        "400":
+          description: Unsupported locale tag.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  error: { type: string }
+                  kind: { type: string, enum: [validation] }
+
+  /api/auth/mfa/enroll:
+    post:
+      summary: PRD AUTH-003 — begin TOTP enrollment. Returns base32 secret + otpauth URI.
+      responses:
+        "200": { description: OK }
+        "404": { description: User not found. }
+  /api/auth/mfa/verify:
+    post:
+      summary: Confirm a 6-digit TOTP code; flips `mfaEnabled = true` on the user.
+      responses:
+        "200": { description: OK }
+        "401": { description: Invalid TOTP code. }
+  /api/auth/magic-link/request:
+    post:
+      summary: PRD AUTH-004 — mail a single-use 15-minute sign-in link via SMTP. In dev (no SMTP env) returns the link in the response.
+      responses:
+        "200": { description: OK }
+  /api/auth/magic-link/consume:
+    post:
+      summary: Exchange a magic-link token for an opaque session bearer.
+      responses:
+        "200": { description: OK }
+        "401": { description: Invalid or expired link. }
+  /api/auth/device/authorize:
+    post:
+      summary: PRD AUTH-007 — RFC 8628 device authorization. Returns deviceCode + userCode.
+      responses:
+        "200": { description: OK }
+  /api/auth/device/approve:
+    post:
+      summary: Operator approves a userCode while signed in.
+      responses:
+        "200": { description: OK }
+  /api/auth/device/deny:
+    post:
+      summary: Operator denies a userCode.
+      responses:
+        "200": { description: OK }
+  /api/auth/device/token:
+    post:
+      summary: Device polls for the access token. Errors per RFC 8628 §3.5 (authorization_pending, slow_down, access_denied, expired_token).
+      responses:
+        "200": { description: OK }
+        "400": { description: Pending or rejected per RFC 8628. }
+
+  # --- PRD AUTH-001 / INT-002 — SAML 2.0 SP (iter-32) ---
+  /saml/metadata:
+    get:
+      summary: SAML 2.0 Service Provider metadata document.
+      responses:
+        "200":
+          description: SP descriptor XML (application/samlmetadata+xml).
+  /saml/acs:
+    post:
+      summary: SAML 2.0 Assertion Consumer Service. Verifies XML signature with `RADIOPAD_SAML_IDP_CERT_PEM`, maps NameID to a RadioPad user, mints a bearer, audits `UserLogin{method:"saml"}`.
+      requestBody:
+        required: true
+        content:
+          application/x-www-form-urlencoded:
+            schema:
+              type: object
+              properties:
+                SAMLResponse: { type: string, description: Base64-encoded SAML response XML. }
+                RelayState:   { type: string }
+      responses:
+        "200": { description: Bearer issued. }
+        "400": { description: Malformed assertion. }
+        "401": { description: Signature invalid or tenant/user not found. }
+
+  # --- PRD AUTH-001 — WebAuthn / passkeys (iter-32) ---
+  /api/auth/webauthn/register-options:
+    post:
+      summary: Begin WebAuthn registration; returns PublicKeyCredentialCreationOptions.
+      responses:
+        "200": { description: OK }
+  /api/auth/webauthn/register:
+    post:
+      summary: Complete WebAuthn registration; persists the credential under the current (tenant, user).
+      responses:
+        "200": { description: OK }
+        "400": { description: Attestation invalid or duplicate credential. }
+  /api/auth/webauthn/signin-options:
+    post:
+      summary: Begin WebAuthn assertion; returns PublicKeyCredentialRequestOptions.
+      responses:
+        "200": { description: OK }
+  /api/auth/webauthn/signin:
+    post:
+      summary: Complete WebAuthn assertion; on success mints a bearer and audits `UserLogin{method:"webauthn"}`.
+      responses:
+        "200": { description: OK }
+        "401": { description: Assertion invalid. }
+
+  # --- PRD AUTH-006 — emergency lockout / session revocation (iter-32) ---
+  /api/users/{id}/unlock:
+    post:
+      summary: Compliance / IT-Admin clears `LockedUntil` and resets the failure counter; audits `UserUnlocked`.
+      parameters:
+        - { in: path, name: id, required: true, schema: { type: string, format: uuid } }
+      responses:
+        "204": { description: Unlocked. }
+  /api/users/{id}/revoke-sessions:
+    post:
+      summary: Compliance / IT-Admin increments `User.SessionEpoch`; all outstanding bearers immediately fail HMAC validation. Audits `SessionsRevoked`.
+      parameters:
+        - { in: path, name: id, required: true, schema: { type: string, format: uuid } }
+      responses:
+        "204": { description: Sessions revoked. }
+
+  # --- PRD MOB-007 — mobile push device registration ---
+  /api/push/devices:
+    post:
+      summary: Register an APNs (iOS) / FCM (Android) device token for the current (tenant, user). Idempotent on (tenant, user, token).
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [token, platform]
+              properties:
+                token:
+                  type: string
+                  description: Native push token from the OS (APNs device token or FCM registration token).
+                platform:
+                  type: string
+                  enum: [ios, android, web]
+      responses:
+        "200":
+          description: Device registered.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  id: { type: string, format: uuid }
+                  platform: { type: string }
+        "400": { description: Invalid platform or missing token. }
+  /api/push/devices/{token}:
+    delete:
+      summary: Unregister a previously-registered push token for the current (tenant, user).
+      parameters:
+        - in: path
+          name: token
+          required: true
+          schema: { type: string }
+      responses:
+        "204": { description: Removed. }
+        "404": { description: No such device for this user. }
+  /api/push/test:
+    post:
+      summary: Admin-only — send a generic "RadioPad / You have a new notification" test push to the calling user's most-recent registered device.
+      responses:
+        "200":
+          description: Push enqueued.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  sent: { type: boolean }
+                  deviceId: { type: string, format: uuid }
+                  platform: { type: string }
+        "403": { description: Caller lacks an admin role. }
+        "404": { description: No registered device for this user. }
+        "503":
+          description: Push provider not configured.
+          content:
+            application/problem+json:
+              schema:
+                type: object
+                properties:
+                  type: { type: string }
+                  title: { type: string }
+                  status: { type: integer }
+                  detail: { type: string }
+                  kind:
+                    type: string
+                    enum: [push_not_configured]
+
+  # --- Reusable error response ---
+components_responses_anchor: {}
+
+  # --- Iter-30 — Report rewrite (RPT-007) ---
+  /api/reports/{id}/rewrite:
+    post:
+      summary: Rewrite a report in one of four modes — concise, formal, patient_friendly, referring_summary. Audited as AiRequest. PHI policy enforced inside the gateway.
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema: { type: string, format: uuid }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/RewriteRequest'
+      responses:
+        '200':
+          description: Rewritten text.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  text: { type: string }
+                  provider: { type: string }
+                  model: { type: string }
+                  latencyMs: { type: integer }
+                  promptVersion: { type: string }
+                  mode: { type: string }
+        '400': { description: Unknown mode. }
+        '403': { description: Provider policy blocked the request (e.g. PHI to non-PHI provider). }
+        '404': { description: Report not found in the calling tenant. }
+        '503': { description: No enabled AI provider available. }
+
+  # --- Iter-30 — Multi-radiologist sign-off + addendum ---
+  /api/reports/{id}/sign:
+    post:
+      summary: Append a signature. First signature must be Primary; CoSigner / Addendum are only allowed after a Primary signature exists.
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema: { type: string, format: uuid }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [role]
+              properties:
+                role: { type: string, enum: [Primary, CoSigner, Addendum] }
+                note: { type: string, nullable: true }
+      responses:
+        '200':
+          description: Signature created.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ReportSignature'
+        '404': { description: Report not found. }
+        '409': { description: Sign-off ordering violated (e.g. CoSigner before Primary, or duplicate Primary). }
+  /api/reports/{id}/addendum:
+    post:
+      summary: Append an addendum body to an already-Primary-signed report. Creates a new ReportVersion with isAddendum=true.
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema: { type: string, format: uuid }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [body]
+              properties:
+                body: { type: string }
+      responses:
+        '200':
+          description: Addendum appended.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  id: { type: string, format: uuid }
+                  sequence: { type: integer }
+                  isAddendum: { type: boolean }
+        '400': { description: Body required. }
+        '404': { description: Report not found. }
+        '409': { description: Report is not yet Primary-signed. }
+  /api/reports/{id}/signatures:
+    get:
+      summary: List signatures attached to a report, oldest first.
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema: { type: string, format: uuid }
+      responses:
+        '200':
+          description: Signature list.
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/ReportSignature'
+        '404': { description: Report not found. }
+
+  # --- Iter-30 — Standards / Terminology (STD-001 RadLex, STD-002 RADS) ---
+  /api/terminology/radlex/search:
+    get:
+      summary: STD-001 — RadLex prefix search across the curated subset bundled with RadioPad. RadLex is a registered trademark of RSNA.
+      parameters:
+        - in: query
+          name: q
+          required: true
+          schema: { type: string }
+        - in: query
+          name: take
+          schema: { type: integer, default: 20, maximum: 100 }
+      responses:
+        '200':
+          description: Matching concepts.
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/RadLexConcept'
+        '400': { description: q is required. }
+  /api/terminology/radlex/CodeSystem:
+    get:
+      summary: STD-001 — minimal FHIR R4 CodeSystem fragment for the bundled RadLex subset.
+      responses:
+        '200':
+          description: FHIR CodeSystem JSON (content=fragment).
+          content:
+            application/fhir+json:
+              schema:
+                type: object
+  /api/terminology/rads:
+    get:
+      summary: STD-002 — ACR RADS lookup. Without ?system, returns a list of supported systems; with ?system=bi_rads etc. returns the category list. Codes + short labels only — no copyrighted prose.
+      parameters:
+        - in: query
+          name: system
+          schema: { type: string, enum: [bi_rads, li_rads, pi_rads, lung_rads, tirads, c_rads] }
+      responses:
+        '200':
+          description: Categories or system index.
+          content:
+            application/json:
+              schema:
+                oneOf:
+                  - $ref: '#/components/schemas/RadsSystemIndex'
+                  - $ref: '#/components/schemas/RadsSystemDefinition'
+        '404': { description: Unknown RADS system. }
+
+  # --- Iter-30 — Bidirectional FHIR ingest ---
+  /api/ingest/fhir/diagnosticreport:
+    post:
+      summary: Iter-30 — accept a FHIR R4 DiagnosticReport (or Bundle containing one) and create a draft Report keyed by tenant. basedOn[0].reference is captured as serviceRequestRef. Audited as ReportImported.
+      requestBody:
+        required: true
+        content:
+          application/fhir+json:
+            schema:
+              type: object
+              description: FHIR R4 DiagnosticReport.
+      responses:
+        '200':
+          description: Created or deduplicated draft.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  id: { type: string, format: uuid }
+                  deduplicated: { type: boolean }
+        '400': { description: Missing accession or unparseable JSON / not a DiagnosticReport. }
+        '401': { description: Bad / missing tenant or bearer. }
+        '503': { description: Tenant has no ingest secret configured. }
+
+  # --- Iter-30 — Enterprise invoice bulk export (BILL-003) ---
+  /api/billing/invoices/export:
+    get:
+      summary: Iter-30 — bulk export invoices as CSV (default) or ZIP (CSV + per-invoice PDFs + manifest.txt with SHA-256 hashes). RBAC BillingAdmin/ItAdmin/MedicalDirector. Audited as BillingChanged action=bulk_export.
+      parameters:
+        - in: query
+          name: from
+          schema: { type: string, format: date }
+        - in: query
+          name: to
+          schema: { type: string, format: date }
+        - in: query
+          name: format
+          schema: { type: string, enum: [csv, zip], default: csv }
+      responses:
+        '200':
+          description: Export file (text/csv or application/zip).
+          content:
+            text/csv: { schema: { type: string } }
+            application/zip: { schema: { type: string, format: binary } }
+        '403': { description: RBAC denied. }
+        '503': { description: Stripe not configured or tenant missing customer. }
+
+  # --- Iter-35 — PERF-004 synthetic availability monitor ---
+  /api/admin/observability/availability:
+    get:
+      summary: Iter-35 PERF-004 — last computed snapshot of the in-process synthetic availability monitor (5-minute rolling window). RBAC ItAdmin / ComplianceReviewer. Burn-rate breaches against `RADIOPAD_AVAILABILITY_BURN_RATE_THRESHOLD` are recorded as append-only `SystemAlert` audit rows with `kind="availability_burn_rate"`.
+      responses:
+        '200':
+          description: Current rolling snapshot.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  windowSec: { type: integer }
+                  totalProbes: { type: integer }
+                  errorCount: { type: integer }
+                  errorRate: { type: number, format: double, minimum: 0, maximum: 1 }
+                  lastCheckedAt: { type: string, format: date-time, nullable: true }
+                  targets:
+                    type: array
+                    items: { type: string }
+        '403': { description: RBAC denied (not ItAdmin / ComplianceReviewer). }
+
+  # --- Iter-35 � Versioned clinical validation packs (rulebook golden suites) ---
+  /api/validation-packs:
+    get:
+      summary: |
+        Iter-35 � list validation packs for the current tenant. Optionally
+        filtered by `rulebookId`. Any tenant member may read.
+      parameters:
+        - in: query
+          name: rulebookId
+          schema: { type: string }
+      responses:
+        '200':
+          description: Validation pack list.
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  type: object
+                  properties:
+                    id: { type: string, format: uuid }
+                    rulebookId: { type: string }
+                    version: { type: string }
+                    name: { type: string }
+                    status: { type: string, enum: [Draft, Approved, Deprecated] }
+                    approvedAt: { type: string, format: date-time, nullable: true }
+                    approvedBy: { type: string, format: uuid, nullable: true }
+                    createdAt: { type: string, format: date-time }
+                    createdBy: { type: string, format: uuid }
+                    caseCount: { type: integer }
+    post:
+      summary: |
+        Iter-35 � create a new pack from an in-memory payload. RBAC
+        MedicalDirector / ItAdmin. Returns 409 with `kind:"validation_packs"`
+        when (rulebookId, version) already exists for the tenant.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [rulebookId, version, goldenCases]
+              properties:
+                rulebookId: { type: string, description: Snake_case rulebook id (e.g. chest_ct_v1). }
+                version: { type: string, description: Pack version (semver). }
+                name: { type: string, nullable: true }
+                goldenCases:
+                  type: array
+                  items:
+                    type: object
+                    properties:
+                      name: { type: string }
+                      report: { type: object }
+                      expectFlagged:
+                        type: array
+                        items: { type: string }
+      responses:
+        '200': { description: Created (status=Draft). }
+        '400': { description: Missing rulebookId / version (kind=validation_packs). }
+        '403': { description: RBAC denied (kind=forbidden). }
+        '409':
+          description: Duplicate pack version for rulebook (kind=validation_packs).
+          content:
+            application/problem+json:
+              schema: { $ref: '#/components/schemas/Problem' }
+  /api/validation-packs/{id}/approve:
+    post:
+      summary: |
+        Iter-35 � promote Draft ? Approved. RBAC MedicalDirector / ItAdmin.
+        Re-approving a Deprecated pack returns 409 with
+        `kind:"validation_packs"`. Audits `ValidationPackApproved`.
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema: { type: string, format: uuid }
+      responses:
+        '200': { description: Approved. }
+        '403': { description: RBAC denied. }
+        '404': { description: Pack not found in this tenant. }
+        '409': { description: Cannot re-approve a Deprecated pack. }
+  /api/validation-packs/{id}/deprecate:
+    post:
+      summary: |
+        Iter-35 � mark a pack as Deprecated. RBAC MedicalDirector / ItAdmin.
+        Terminal � a deprecated pack cannot be re-approved. Audits
+        `ValidationPackDeprecated`.
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema: { type: string, format: uuid }
+      responses:
+        '200': { description: Deprecated. }
+        '403': { description: RBAC denied. }
+        '404': { description: Pack not found in this tenant. }
+  /api/validation-packs/{id}/run:
+    post:
+      summary: |
+        Iter-35 � execute the pack's golden cases against the latest
+        rulebook with the matching `rulebookId` in this tenant. Returns
+        `{passed, failed, totalCases, failures}`. Audits
+        `ValidationPackRun` with pass/fail counts. RBAC Radiologist+.
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema: { type: string, format: uuid }
+      responses:
+        '200':
+          description: Run summary.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  passed: { type: integer }
+                  failed: { type: integer }
+                  totalCases: { type: integer }
+                  failures:
+                    type: array
+                    items:
+                      type: object
+                      properties:
+                        caseId: { type: string }
+                        missing: { type: array, items: { type: string } }
+                        unexpected: { type: array, items: { type: string } }
+        '403': { description: RBAC denied. }
+        '404': { description: Pack not found in this tenant. }
+  /api/validation-packs/{id}/export:
+    get:
+      summary: |
+        Iter-35 � export the pack body (metadata + canonical golden cases).
+        RBAC MedicalDirector / ItAdmin.
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema: { type: string, format: uuid }
+      responses:
+        '200':
+          description: Pack export body.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  id: { type: string, format: uuid }
+                  rulebookId: { type: string }
+                  version: { type: string }
+                  name: { type: string }
+                  status: { type: string }
+                  createdAt: { type: string, format: date-time }
+                  approvedAt: { type: string, format: date-time, nullable: true }
+                  cases: { type: array, items: { type: object } }
+        '404': { description: Pack not found in this tenant. }

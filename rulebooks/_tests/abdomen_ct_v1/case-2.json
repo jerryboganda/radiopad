@@ -1,0 +1,12 @@
+{
+  "name": "abdomen/pelvis CT — negation conflict (Findings deny appendicitis, Impression asserts it)",
+  "report": {
+    "study": { "modality": "CT", "bodyPart": "Abdomen", "indication": "Right lower quadrant pain", "accessionNumber": "ACC-ABD-0002" },
+    "indication": "Right lower quadrant pain.",
+    "technique": "Contrast-enhanced CT of the abdomen and pelvis, portal-venous phase.",
+    "comparison": "None.",
+    "findings": "Liver: normal. Gallbladder: normal. Pancreas: normal. Spleen: normal. Kidneys: normal. Bowel: appendix is normal calibre with no wall thickening or periappendiceal fat stranding; no appendicitis. Vasculature: aorta normal. Bones: no aggressive lesion.",
+    "impression": "1. Acute appendicitis.\n2. No other acute intra-abdominal process."
+  },
+  "expectFlagged": ["negation_conflict"]
+}

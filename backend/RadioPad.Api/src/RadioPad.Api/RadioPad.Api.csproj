@@ -1,0 +1,40 @@
+<Project Sdk="Microsoft.NET.Sdk.Web">
+  <PropertyGroup>
+    <RootNamespace>RadioPad.Api</RootNamespace>
+    <AssemblyName>RadioPad.Api</AssemblyName>
+    <UserSecretsId>radiopad-api-dev</UserSecretsId>
+  </PropertyGroup>
+  <ItemGroup>
+    <InternalsVisibleTo Include="RadioPad.Api.Tests" />
+  </ItemGroup>
+  <ItemGroup>
+    <ProjectReference Include="..\RadioPad.Domain\RadioPad.Domain.csproj" />
+    <ProjectReference Include="..\RadioPad.Application\RadioPad.Application.csproj" />
+    <ProjectReference Include="..\RadioPad.Validation\RadioPad.Validation.csproj" />
+    <ProjectReference Include="..\RadioPad.Infrastructure\RadioPad.Infrastructure.csproj" />
+    <PackageReference Include="Swashbuckle.AspNetCore" Version="6.7.0" />
+    <PackageReference Include="Microsoft.AspNetCore.Authentication.JwtBearer" Version="8.0.10" />
+    <PackageReference Include="Microsoft.EntityFrameworkCore.Sqlite" Version="8.0.10" />
+    <!-- EF Core tooling for migrations (`dotnet ef migrations add ...`). -->
+    <PackageReference Include="Microsoft.EntityFrameworkCore.Design" Version="8.0.10">
+      <PrivateAssets>all</PrivateAssets>
+      <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
+    </PackageReference>
+    <!-- PDF / DOCX rendering for /export/pdf, /export/docx (PRD RPT-011). -->
+    <PackageReference Include="QuestPDF" Version="2024.7.3" />
+    <PackageReference Include="DocumentFormat.OpenXml" Version="3.1.0" />
+    <!-- Stripe billing (PRD BILL-001/006). -->
+    <PackageReference Include="Stripe.net" Version="46.2.0" />
+    <!-- SMTP for magic-link sign-in (PRD AUTH-004). -->
+    <PackageReference Include="MailKit" Version="4.8.0" />
+    <!-- JWT validation for external IdP OIDC (PRD AUTH-002). -->
+    <PackageReference Include="Microsoft.IdentityModel.Protocols.OpenIdConnect" Version="8.1.2" />
+    <!-- Iter-33 PERF-004 — OpenTelemetry metrics for continuous P95 budgets.
+         Iter-35 (combined hardening): bumped to 1.15.3 to clear
+         GHSA-4625-4j76-fww9. The advisory range was extended past 1.10.x /
+         1.12.x; 1.15.3 is the first stable net8.0 release outside the
+         affected window per `dotnet package search` against nuget.org. -->
+    <PackageReference Include="OpenTelemetry.Extensions.Hosting" Version="1.15.3" />
+    <PackageReference Include="OpenTelemetry.Exporter.OpenTelemetryProtocol" Version="1.15.3" />
+  </ItemGroup>
+</Project>

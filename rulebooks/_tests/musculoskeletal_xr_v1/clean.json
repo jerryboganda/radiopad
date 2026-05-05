@@ -1,0 +1,12 @@
+{
+  "name": "clean knee XR",
+  "report": {
+    "study": { "modality": "XR", "bodyPart": "Knee", "indication": "left knee pain", "accessionNumber": "ACC-MSK-2" },
+    "indication": "Left knee pain.",
+    "technique": "AP, lateral, sunrise views of the left knee.",
+    "comparison": "None.",
+    "findings": "Bones intact. Joint spaces preserved. No effusion. Soft tissues normal.",
+    "impression": "1. No acute osseous abnormality of the left knee."
+  },
+  "expectFlagged": []
+}

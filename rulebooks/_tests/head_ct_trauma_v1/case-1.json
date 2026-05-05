@@ -1,0 +1,12 @@
+{
+  "name": "clean head CT trauma — no acute intracranial finding",
+  "report": {
+    "study": { "modality": "CT", "bodyPart": "Head", "indication": "Trauma", "accessionNumber": "ACC-HCT-0001" },
+    "indication": "Mechanical fall from standing height. GCS 15.",
+    "technique": "Non-contrast CT of the head, 2.5 mm axial reconstructions.",
+    "findings": "Intracranial: no acute intracranial haemorrhage. No mass effect or midline shift. Extra-axial: no subdural or epidural collection. Skull: no fracture. Soft tissues: small left frontal scalp haematoma.",
+    "impression": "1. No acute intracranial haemorrhage or fracture.\n2. Small left frontal scalp haematoma.",
+    "recommendations": "Clinical correlation; return precautions advised."
+  },
+  "expectFlagged": []
+}

@@ -1,0 +1,66 @@
+rulebook_id: chest_ct_v1
+name: Chest CT Reporting Rulebook
+version: 1.0.0
+owner: Thoracic Imaging Committee
+status: approved
+applies_to:
+  modalities:
+    - CT
+  body_parts:
+    - Chest
+  report_types:
+    - diagnostic
+    - follow_up
+style:
+  tone: concise_clinical
+  impression_max_bullets: 5
+  avoid_terms:
+    - unremarkable
+    - cannot rule out
+  approved_followups:
+    - Recommend clinical correlation.
+    - Recommend follow-up imaging as clinically indicated.
+    - Recommend specialty consult if clinically warranted.
+required_sections:
+  - Indication
+  - Technique
+  - Comparison
+  - Findings
+  - Impression
+rules:
+  - id: laterality_consistency
+    severity: blocker
+    description: Left/right findings must match impression.
+  - id: measurement_consistency
+    severity: warning
+    description: Nodule measurements must match across sections.
+  - id: negation_conflict
+    severity: blocker
+    description: Findings denials must not be asserted in impression.
+  - id: modality_mismatch
+    severity: warning
+    description: Avoid CT/MRI/US cross-talk in a CT report.
+  - id: impression_bullet_count
+    severity: warning
+    description: Impression should not exceed style.impression_max_bullets bullets.
+  - id: critical_result_language
+    severity: blocker
+    description: Critical findings require approved communication/escalation language.  - id: unauthorized_followup
+    severity: warning
+    description: Recommendation phrases must come from style.approved_followups.
+
+prompt_blocks:
+  system: >
+    You are assisting a board-certified radiologist drafting a structured Chest CT report.
+    Never invent findings. Always preserve laterality and measurements exactly as dictated.
+    Use concise clinical phrasing. Avoid the terms in style.avoid_terms.
+  findings_to_impression: >
+    Generate a concise impression (max 5 bullets) faithful to the Findings section.
+    Do not introduce new clinical claims that are not present in the Findings.
+  cleanup: >
+    Improve grammar and structure without changing clinical meaning.
+
+  dictation_cleanup: >
+    Rewrite this dictation into clean grammatical prose for each report section.
+    Do not invent findings the radiologist did not dictate. Preserve every measurement,
+    laterality, and negation exactly. If a section was not dictated, return an empty string for it.

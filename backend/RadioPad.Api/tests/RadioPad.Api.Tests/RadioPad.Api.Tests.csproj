@@ -1,0 +1,22 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <TargetFramework>net8.0</TargetFramework>
+    <IsPackable>false</IsPackable>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+  </PropertyGroup>
+  <ItemGroup>
+    <ProjectReference Include="..\..\src\RadioPad.Domain\RadioPad.Domain.csproj" />
+    <ProjectReference Include="..\..\src\RadioPad.Application\RadioPad.Application.csproj" />
+    <ProjectReference Include="..\..\src\RadioPad.Validation\RadioPad.Validation.csproj" />
+    <ProjectReference Include="..\..\src\RadioPad.Infrastructure\RadioPad.Infrastructure.csproj" />
+    <ProjectReference Include="..\..\src\RadioPad.Api\RadioPad.Api.csproj" />
+    <!-- Iter-31 G — exercise CLI helpers (audit-sync watermark, provider-register payload). -->
+    <ProjectReference Include="..\..\..\..\cli\RadioPad.Cli\RadioPad.Cli.csproj" />
+    <PackageReference Include="Microsoft.NET.Test.Sdk" Version="17.11.1" />
+    <PackageReference Include="Microsoft.AspNetCore.Mvc.Testing" Version="8.0.10" />
+    <PackageReference Include="Microsoft.EntityFrameworkCore.Sqlite" Version="8.0.10" />
+    <PackageReference Include="xunit" Version="2.9.2" />
+    <PackageReference Include="xunit.runner.visualstudio" Version="2.8.2" />
+  </ItemGroup>
+</Project>

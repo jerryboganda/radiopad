@@ -1,0 +1,11 @@
+{
+  "name": "clean pelvis MRI — uterine fibroid, benign",
+  "report": {
+    "study": { "modality": "MRI", "bodyPart": "Pelvis", "indication": "Pelvic pain", "accessionNumber": "ACC-PMR-0001" },
+    "indication": "Pelvic pain, suspected fibroid.",
+    "technique": "Pelvic MRI at 3T including T2W, T1W, DWI, and dynamic contrast-enhanced sequences.",
+    "findings": "Uterus: 35 mm intramural fibroid in the anterior body, low T2 signal, without degeneration. Cervix: normal. Right adnexa: normal. Left adnexa: normal. Bladder: distended, normal wall. Bowel: normal. Bones: no aggressive lesion.",
+    "impression": "1. 35 mm anterior intramural uterine fibroid, benign features.\n2. Normal adnexa bilaterally."
+  },
+  "expectFlagged": []
+}

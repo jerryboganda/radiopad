@@ -1,0 +1,77 @@
+{
+  "nav": {
+    "reports": "Reports",
+    "rulebooks": "Rulebooks",
+    "templates": "Templates",
+    "providers": "Providers",
+    "prompts": "Prompts",
+    "marketplace": "Marketplace",
+    "validation": "Validation",
+    "governance": "Governance",
+    "modelEval": "Model eval",
+    "audit": "Audit",
+    "analytics": "Analytics",
+    "terminology": "Terminology",
+    "offline": "Offline",
+    "settings": "Settings",
+    "billing": "Billing",
+    "usage": "Usage",
+    "featureFlags": "Feature flags",
+    "fhirImport": "FHIR import",
+    "pacs": "PACS",
+    "security": "Security",
+    "signIn": "Sign in"
+  },
+  "buttons": {
+    "primary": {
+      "save": "Save",
+      "submit": "Submit",
+      "approve": "Approve",
+      "sign": "Sign",
+      "export": "Export",
+      "create": "Create",
+      "confirm": "Confirm"
+    },
+    "ghost": {
+      "cancel": "Cancel",
+      "back": "Back",
+      "discard": "Discard"
+    },
+    "subtle": {
+      "more": "More",
+      "details": "Details",
+      "language": "Language"
+    }
+  },
+  "validation": {
+    "severity": {
+      "blocker": "Blocker",
+      "warning": "Warning",
+      "info": "Info"
+    }
+  },
+  "banner": {
+    "warn": "Heads up",
+    "info": "Notice",
+    "danger": "Action required"
+  },
+  "admin": {
+    "headings": {
+      "settings": "Tenant settings",
+      "billing": "Billing",
+      "usage": "Usage",
+      "security": "Security",
+      "featureFlags": "Feature flags",
+      "language": "Language"
+    },
+    "language": {
+      "tenantDefault": "Tenant default",
+      "yourLocale": "Your locale",
+      "clinicalNote": "Clinical content (rulebooks, finding text, validation messages) is always shown in English."
+    }
+  },
+  "topbar": {
+    "title": "RadioPad",
+    "tagline": "AI radiology reporting · v0.1"
+  }
+}

@@ -1,0 +1,74 @@
+rulebook_id: abdomen_ct_v1
+name: Abdomen / Pelvis CT with Contrast Reporting Rulebook
+version: 1.0.0
+owner: Abdominal Imaging Committee
+status: approved
+applies_to:
+  modalities:
+    - CT
+  body_parts:
+    - Abdomen
+    - Pelvis
+  report_types:
+    - diagnostic
+    - follow_up
+    - oncologic
+style:
+  tone: concise_clinical
+  impression_max_bullets: 6
+  avoid_terms:
+    - unremarkable
+    - cannot rule out
+  approved_followups:
+    - Recommend clinical correlation.
+    - Recommend follow-up CT in 3 months.
+    - Recommend gastroenterology consult.
+required_sections:
+  - Indication
+  - Technique
+  - Comparison
+  - Findings
+  - Impression
+rules:
+  - id: measurement_consistency
+    severity: warning
+    description: Lesion / lymph-node measurements (mm) must match between Findings and Impression.
+  - id: negation_conflict
+    severity: blocker
+    description: A finding denied in Findings must not be asserted in Impression.
+  - id: modality_mismatch
+    severity: warning
+    description: Avoid MRI / US cross-talk in a CT report.
+  - id: impression_bullet_count
+    severity: warning
+    description: Impression should not exceed style.impression_max_bullets bullets.
+  - id: critical_result_language
+    severity: blocker
+    description: Acute findings (free air, bowel ischaemia, AAA, active bleed, appendicitis with perforation) require documented communication / escalation language.
+  - id: contrast_phase_documented
+    severity: info
+    description: The contrast phase (arterial / portal-venous / delayed / non-contrast) should be documented in Technique.
+  - id: incidental_findings_listed
+    severity: info
+    description: Incidental findings should be summarised explicitly in the Impression with appropriate follow-up recommendations.  - id: unauthorized_followup
+    severity: warning
+    description: Recommendation phrases must come from style.approved_followups.
+
+prompt_blocks:
+  system: >
+    You are assisting a board-certified abdominal radiologist drafting a
+    structured abdomen / pelvis CT report. Preserve organ-specific findings,
+    millimetre-level measurements, contrast phase, and approved critical-
+    result language exactly as dictated.
+  findings_to_impression: >
+    Generate a concise impression (max 6 bullets) faithful to the Findings.
+    Group findings by organ. Always carry forward measurements and any
+    critical-result communication language.
+  cleanup: >
+    Improve grammar and structure without changing measurements, organ
+    designations, or critical-result phrasing.
+
+  dictation_cleanup: >
+    Rewrite this dictation into clean grammatical prose for each report section.
+    Do not invent findings the radiologist did not dictate. Preserve every measurement,
+    laterality, and negation exactly. If a section was not dictated, return an empty string for it.

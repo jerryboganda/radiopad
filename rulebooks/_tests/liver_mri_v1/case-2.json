@@ -1,0 +1,12 @@
+{
+  "name": "liver MRI — negation conflict",
+  "report": {
+    "study": { "modality": "MRI", "bodyPart": "Liver", "indication": "HCC surveillance", "accessionNumber": "ACC-LMR-0002" },
+    "indication": "Cirrhosis — HCC surveillance.",
+    "technique": "Multiphase liver MRI with extracellular gadolinium contrast.",
+    "comparison": "MRI from 12 months prior.",
+    "findings": "Cirrhotic liver. No arterially hyperenhancing observation in segment 5. No washout.",
+    "impression": "1. New 18 mm arterially hyperenhancing observation in segment 5 with washout, LR-5.\n2. Recommend multidisciplinary review."
+  },
+  "expectFlagged": ["negation_conflict", "measurement_consistency"]
+}

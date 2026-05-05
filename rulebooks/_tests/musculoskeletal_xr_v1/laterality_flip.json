@@ -1,0 +1,12 @@
+{
+  "name": "laterality flip on knee",
+  "report": {
+    "study": { "modality": "XR", "bodyPart": "Knee", "indication": "right knee pain", "accessionNumber": "ACC-MSK-1" },
+    "indication": "Right knee pain after fall.",
+    "technique": "AP, lateral, sunrise views of the knee.",
+    "comparison": "None.",
+    "findings": "Right knee: no acute fracture. Joint spaces preserved. Soft tissues normal.",
+    "impression": "1. No acute fracture of the left knee."
+  },
+  "expectFlagged": ["laterality_consistency"]
+}

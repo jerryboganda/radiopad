@@ -1,0 +1,14 @@
+{
+  "id": "knee-xray",
+  "name": "Knee Radiograph",
+  "modality": "XR",
+  "bodyPart": "Knee",
+  "rulebookId": "musculoskeletal_xr_v1",
+  "sections": [
+    { "id": "indication", "label": "Indication", "placeholder": "Trauma / pain / follow-up." },
+    { "id": "technique",  "label": "Technique",  "placeholder": "AP, lateral, sunrise views of the knee." },
+    { "id": "comparison", "label": "Comparison", "placeholder": "Prior knee radiographs, if available." },
+    { "id": "findings",   "label": "Findings",   "placeholder": "Bones: ...\nJoints: ...\nSoft tissues: ...\nEffusion: ..." },
+    { "id": "impression", "label": "Impression", "placeholder": "Concise bulleted impression (max 3)." }
+  ]
+}

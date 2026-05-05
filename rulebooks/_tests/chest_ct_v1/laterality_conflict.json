@@ -1,0 +1,12 @@
+{
+  "name": "laterality conflict",
+  "report": {
+    "study": { "modality": "CT", "bodyPart": "Chest", "indication": "Cough", "accessionNumber": "ACC-LAT-1" },
+    "indication": "Right-sided chest pain.",
+    "technique": "Non-contrast CT of the chest.",
+    "comparison": "None.",
+    "findings": "Right lower lobe consolidation. No left-sided abnormality.",
+    "impression": "1. Left lower lobe consolidation."
+  },
+  "expectFlagged": ["laterality_consistency"]
+}

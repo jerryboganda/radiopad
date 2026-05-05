@@ -1,0 +1,12 @@
+{
+  "name": "mammography — BI-RADS 4B with size discrepancy",
+  "report": {
+    "study": { "modality": "MG", "bodyPart": "Breast", "indication": "Diagnostic — palpable lump", "accessionNumber": "SYNTH-MG-0002" },
+    "indication": "Right breast palpable lump at 10 o'clock.",
+    "technique": "Diagnostic mammography with spot compression of the right breast.",
+    "comparison": "Screening mammogram from prior year, no prior abnormality at this site.",
+    "findings": "Right breast: spiculated mass at the 10 o'clock position, 5 cm from the nipple. Bilateral remaining breast tissue is heterogeneously dense.",
+    "impression": "1. 12 mm spiculated right breast mass, suspicious for malignancy.\n2. BI-RADS 4B."
+  },
+  "expectFlagged": ["measurement_consistency"]
+}

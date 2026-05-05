@@ -1,0 +1,12 @@
+{
+  "name": "thyroid US — laterality conflict between Findings and Impression",
+  "report": {
+    "study": { "modality": "US", "bodyPart": "Thyroid", "indication": "Palpable nodule", "accessionNumber": "ACC-THY-0002" },
+    "indication": "Palpable thyroid nodule.",
+    "technique": "High-resolution greyscale and colour Doppler ultrasound of the thyroid gland.",
+    "findings": "Right lobe: 12 mm hypoechoic solid nodule with punctate echogenic foci, taller-than-wide; peripheral microcalcifications. The contralateral lobe and the isthmus are sonographically benign.",
+    "impression": "1. Left thyroid lobe 12 mm hypoechoic nodule, TR5 (highly suspicious).",
+    "recommendations": "FNA recommended."
+  },
+  "expectFlagged": ["laterality_consistency"]
+}

@@ -1,0 +1,12 @@
+{
+  "name": "clean liver MRI — LR-1 surveillance",
+  "report": {
+    "study": { "modality": "MRI", "bodyPart": "Liver", "indication": "HCC surveillance", "accessionNumber": "ACC-LMR-0001" },
+    "indication": "Cirrhosis — HCC surveillance.",
+    "technique": "Multiphase liver MRI with extracellular gadolinium contrast.",
+    "comparison": "MRI from 6 months prior — no observation.",
+    "findings": "Cirrhotic liver morphology with mild splenomegaly. No discrete arterially hyperenhancing mass. No washout. No LI-RADS observation. Patent main portal vein and hepatic veins.",
+    "impression": "1. No new LI-RADS observation. LR-1.\n2. Recommend continued LI-RADS surveillance MRI in 6 months."
+  },
+  "expectFlagged": []
+}

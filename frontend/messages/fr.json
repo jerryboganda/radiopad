@@ -1,0 +1,77 @@
+{
+  "nav": {
+    "reports": "Comptes rendus",
+    "rulebooks": "Référentiels",
+    "templates": "Modèles",
+    "providers": "Fournisseurs",
+    "prompts": "Invites",
+    "marketplace": "Place de marché",
+    "validation": "Validation",
+    "governance": "Gouvernance",
+    "modelEval": "Évaluation modèle",
+    "audit": "Audit",
+    "analytics": "Analyse",
+    "terminology": "Terminologie",
+    "offline": "Hors ligne",
+    "settings": "Paramètres",
+    "billing": "Facturation",
+    "usage": "Utilisation",
+    "featureFlags": "Drapeaux de fonctionnalité",
+    "fhirImport": "Import FHIR",
+    "pacs": "PACS",
+    "security": "Sécurité",
+    "signIn": "Se connecter"
+  },
+  "buttons": {
+    "primary": {
+      "save": "Enregistrer",
+      "submit": "Soumettre",
+      "approve": "Approuver",
+      "sign": "Signer",
+      "export": "Exporter",
+      "create": "Créer",
+      "confirm": "Confirmer"
+    },
+    "ghost": {
+      "cancel": "Annuler",
+      "back": "Retour",
+      "discard": "Abandonner"
+    },
+    "subtle": {
+      "more": "Plus",
+      "details": "Détails",
+      "language": "Langue"
+    }
+  },
+  "validation": {
+    "severity": {
+      "blocker": "Bloquant",
+      "warning": "Avertissement",
+      "info": "Info"
+    }
+  },
+  "banner": {
+    "warn": "Attention",
+    "info": "Information",
+    "danger": "Action requise"
+  },
+  "admin": {
+    "headings": {
+      "settings": "Paramètres du locataire",
+      "billing": "Facturation",
+      "usage": "Utilisation",
+      "security": "Sécurité",
+      "featureFlags": "Drapeaux de fonctionnalité",
+      "language": "Langue"
+    },
+    "language": {
+      "tenantDefault": "Langue par défaut du locataire",
+      "yourLocale": "Votre langue",
+      "clinicalNote": "Le contenu clinique (référentiels, textes de constatations, messages de validation) est toujours affiché en anglais."
+    }
+  },
+  "topbar": {
+    "title": "RadioPad",
+    "tagline": "Comptes rendus assistés par IA · v0.1"
+  }
+}

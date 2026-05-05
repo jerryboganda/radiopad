@@ -1,0 +1,16 @@
+{
+  "id": "sectra-pacs",
+  "name": "Sectra IDS7 workstation bridge",
+  "vendor": "Sectra",
+  "version": "0.1.0",
+  "description": "Detects the Sectra IDS7 foreground window, grabs the active accession number, and pastes the finalised RadioPad report body back into the viewer.",
+  "homepage": "https://www.sectra.com",
+  "sha256": "0000000000000000000000000000000000000000000000000000000000000000",
+  "capabilities": ["window-detect", "accession-grab", "paste-back"],
+  "enabled": false,
+  "minDesktopVersion": "0.1.0",
+  "compliance": {
+    "phi": "metadata-only",
+    "auditTopics": ["sectra-window-detected", "sectra-accession-grabbed", "sectra-paste-back"]
+  }
+}

@@ -1,0 +1,84 @@
+# ACR Reporting and Data Systems (RADS) — public category codes only.
+# This file contains ONLY the numeric category codes and short labels published
+# by the American College of Radiology and freely usable in summaries. It does
+# NOT reproduce ACR's proprietary descriptive prose. Each entry has a
+# `publicGuidanceUrl` linking to the freely accessible ACR resource page where
+# the full guidance lives.
+#
+# Adapter contract:
+#   system:        snake_case identifier (bi_rads, li_rads, pi_rads, ...).
+#   description:   one-sentence summary of the system's clinical scope.
+#   publicGuidanceUrl: top-level ACR landing page for the system.
+#   categories:    list of { code, shortLabel, publicGuidanceUrl? }.
+
+systems:
+
+  bi_rads:
+    description: "Breast Imaging Reporting and Data System — categorical assessment for mammography, breast US, and breast MRI."
+    publicGuidanceUrl: "https://www.acr.org/Clinical-Resources/Reporting-and-Data-Systems/Bi-Rads"
+    categories:
+      - { code: "0", shortLabel: "BI-RADS 0: Incomplete — additional imaging needed" }
+      - { code: "1", shortLabel: "BI-RADS 1: Negative" }
+      - { code: "2", shortLabel: "BI-RADS 2: Benign" }
+      - { code: "3", shortLabel: "BI-RADS 3: Probably benign" }
+      - { code: "4", shortLabel: "BI-RADS 4: Suspicious" }
+      - { code: "4A", shortLabel: "BI-RADS 4A: Low suspicion for malignancy" }
+      - { code: "4B", shortLabel: "BI-RADS 4B: Moderate suspicion for malignancy" }
+      - { code: "4C", shortLabel: "BI-RADS 4C: High suspicion for malignancy" }
+      - { code: "5", shortLabel: "BI-RADS 5: Highly suggestive of malignancy" }
+      - { code: "6", shortLabel: "BI-RADS 6: Known biopsy-proven malignancy" }
+
+  li_rads:
+    description: "Liver Imaging Reporting and Data System — categorical assessment for HCC surveillance / diagnosis on CT, MRI, CEUS."
+    publicGuidanceUrl: "https://www.acr.org/Clinical-Resources/Reporting-and-Data-Systems/LI-RADS"
+    categories:
+      - { code: "LR-1",   shortLabel: "LR-1: Definitely benign" }
+      - { code: "LR-2",   shortLabel: "LR-2: Probably benign" }
+      - { code: "LR-3",   shortLabel: "LR-3: Intermediate probability of HCC" }
+      - { code: "LR-4",   shortLabel: "LR-4: Probably HCC" }
+      - { code: "LR-5",   shortLabel: "LR-5: Definitely HCC" }
+      - { code: "LR-M",   shortLabel: "LR-M: Probably/definitely malignant, not HCC-specific" }
+      - { code: "LR-TIV", shortLabel: "LR-TIV: Definite tumor in vein" }
+      - { code: "LR-NC",  shortLabel: "LR-NC: Not categorizable due to image degradation/omission" }
+
+  pi_rads:
+    description: "Prostate Imaging Reporting and Data System — multiparametric MRI assessment of prostate cancer."
+    publicGuidanceUrl: "https://www.acr.org/Clinical-Resources/Reporting-and-Data-Systems/PI-RADS"
+    categories:
+      - { code: "1", shortLabel: "PI-RADS 1: Very low — clinically significant cancer highly unlikely" }
+      - { code: "2", shortLabel: "PI-RADS 2: Low — clinically significant cancer unlikely" }
+      - { code: "3", shortLabel: "PI-RADS 3: Intermediate — equivocal" }
+      - { code: "4", shortLabel: "PI-RADS 4: High — clinically significant cancer likely" }
+      - { code: "5", shortLabel: "PI-RADS 5: Very high — clinically significant cancer highly likely" }
+
+  lung_rads:
+    description: "Lung CT Screening Reporting and Data System — categorical assessment for low-dose CT lung cancer screening."
+    publicGuidanceUrl: "https://www.acr.org/Clinical-Resources/Reporting-and-Data-Systems/Lung-Rads"
+    categories:
+      - { code: "0",  shortLabel: "Lung-RADS 0: Incomplete" }
+      - { code: "1",  shortLabel: "Lung-RADS 1: Negative — no nodules / definitely benign" }
+      - { code: "2",  shortLabel: "Lung-RADS 2: Benign appearance or behavior" }
+      - { code: "3",  shortLabel: "Lung-RADS 3: Probably benign" }
+      - { code: "4A", shortLabel: "Lung-RADS 4A: Suspicious" }
+      - { code: "4B", shortLabel: "Lung-RADS 4B: Very suspicious" }
+      - { code: "4X", shortLabel: "Lung-RADS 4X: Suspicious with additional features" }
+
+  tirads:
+    description: "Thyroid Imaging Reporting and Data System (ACR TI-RADS) — sonographic risk stratification of thyroid nodules."
+    publicGuidanceUrl: "https://www.acr.org/Clinical-Resources/Reporting-and-Data-Systems/TI-RADS"
+    categories:
+      - { code: "TR1", shortLabel: "TR1: Benign" }
+      - { code: "TR2", shortLabel: "TR2: Not suspicious" }
+      - { code: "TR3", shortLabel: "TR3: Mildly suspicious" }
+      - { code: "TR4", shortLabel: "TR4: Moderately suspicious" }
+      - { code: "TR5", shortLabel: "TR5: Highly suspicious" }
+
+  c_rads:
+    description: "CT Colonography Reporting and Data System — categorical assessment for screening / diagnostic CT colonography."
+    publicGuidanceUrl: "https://www.acr.org/Clinical-Resources/Reporting-and-Data-Systems/C-Rads"
+    categories:
+      - { code: "C0", shortLabel: "C-RADS C0: Inadequate study" }
+      - { code: "C1", shortLabel: "C-RADS C1: Normal colon or benign lesion" }
+      - { code: "C2", shortLabel: "C-RADS C2: Intermediate polyp or indeterminate finding" }
+      - { code: "C3", shortLabel: "C-RADS C3: Polyp possibly advanced adenoma" }
+      - { code: "C4", shortLabel: "C-RADS C4: Colonic mass, likely malignant" }

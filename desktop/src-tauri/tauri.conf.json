@@ -1,0 +1,89 @@
+{
+  "$schema": "https://schema.tauri.app/config/2.0",
+  "productName": "RadioPad",
+  "version": "0.1.0",
+  "identifier": "com.radiopad.desktop",
+  "build": {
+    "frontendDist": "../../frontend/out",
+    "devUrl": "http://localhost:3000",
+    "beforeDevCommand": "pnpm --filter @radiopad/frontend dev",
+    "beforeBuildCommand": "pnpm --filter @radiopad/frontend build"
+  },
+  "app": {
+    "withGlobalTauri": true,
+    "windows": [
+      {
+        "title": "RadioPad",
+        "width": 1280,
+        "height": 820,
+        "minWidth": 980,
+        "minHeight": 640,
+        "decorations": true,
+        "resizable": true,
+        "fullscreen": false
+      }
+    ],
+    "security": {
+      "csp": "default-src 'self'; connect-src 'self' http://127.0.0.1:7457 ipc: tauri:; img-src 'self' data:; style-src 'self' 'unsafe-inline'; font-src 'self' data:"
+    }
+  },
+  "bundle": {
+    "active": true,
+    "targets": ["msi", "dmg", "deb", "appimage", "rpm"],
+    "icon": ["icons/icon.png"],
+    "category": "Productivity",
+    "shortDescription": "RadioPad — radiology reporting workspace",
+    "longDescription": "Local-first AI radiology reporting platform with rulebooks, validation, and tamper-evident audit.",
+    "externalBin": ["binaries/radiopad-api"],
+    "resources": {
+      "../../rulebooks": "rulebooks",
+      "../../templates": "templates"
+    },
+    "createUpdaterArtifacts": "v1Compatible",
+    "windows": {
+      "certificateThumbprint": null,
+      "digestAlgorithm": "sha256",
+      "timestampUrl": "http://timestamp.digicert.com",
+      "tsp": false,
+      "wix": {
+        "language": ["en-US"],
+        "fragmentPaths": [],
+        "componentRefs": [],
+        "dialogImagePath": null
+      },
+      "nsis": {
+        "installerIcon": "icons/icon.ico",
+        "installMode": "perMachine",
+        "languages": ["English"]
+      }
+    },
+    "macOS": {
+      "frameworks": [],
+      "minimumSystemVersion": "11.0",
+      "exceptionDomain": "",
+      "signingIdentity": null,
+      "providerShortName": null,
+      "entitlements": "entitlements.plist",
+      "hardenedRuntime": true,
+      "files": {}
+    },
+    "linux": {
+      "deb": { "depends": [] },
+      "appimage": { "bundleMediaFramework": false },
+      "rpm": { "license": "AGPL-3.0-only", "depends": [] }
+    }
+  },
+  "plugins": {
+    "shell": { "open": true },
+    "dialog": {},
+    "clipboard-manager": {},
+    "store": {},
+    "updater": {
+      "endpoints": [
+        "https://updates.radiopad.local/{{target}}/{{arch}}/{{current_version}}"
+      ],
+      "pubkey": "",
+      "dialog": false
+    }
+  }
+}

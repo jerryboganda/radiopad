@@ -1,0 +1,12 @@
+{
+  "name": "clean knee MRI — right knee, intact menisci and ligaments",
+  "report": {
+    "study": { "modality": "MRI", "bodyPart": "Knee", "indication": "Right knee pain", "accessionNumber": "ACC-KNE-0001" },
+    "indication": "Right knee pain after twisting injury.",
+    "technique": "Right knee MRI without contrast at 3T including PD, T2 fat-saturated, and T1 sequences.",
+    "comparison": "None.",
+    "findings": "Menisci: intact medial and lateral menisci, no tear. Ligaments: ACL, PCL, MCL, LCL intact. Articular cartilage: intact. Bones: no marrow oedema or fracture. Soft tissues: small joint effusion.",
+    "impression": "1. No internal derangement of the right knee.\n2. Small right knee joint effusion."
+  },
+  "expectFlagged": []
+}

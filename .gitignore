@@ -2,6 +2,13 @@ node_modules/
 dist/
 out/
 .next/
+publish/
+desktop/src-tauri/binaries/
+desktop/src-tauri/target/
+bin/
+obj/
+**/bin/
+**/obj/
 .DS_Store
 *.log
 .vite

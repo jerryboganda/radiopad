@@ -1,0 +1,50 @@
+using System.Diagnostics;
+using RadioPad.Api.Services;
+
+namespace RadioPad.Api.Middleware;
+
+/// <summary>
+/// Iter-33 PERF-004 — records per-route HTTP request duration on the
+/// <c>radiopad.api.request.duration_ms</c> histogram. Tags:
+/// <c>route</c> (route template, falls back to <c>path</c> when no
+/// route was matched), <c>tenant</c> (the <c>X-RadioPad-Tenant</c>
+/// header or <c>(none)</c>), <c>status</c> (HTTP status code as string).
+/// </summary>
+public sealed class PerfBudgetMiddleware
+{
+    private readonly RequestDelegate _next;
+
+    public PerfBudgetMiddleware(RequestDelegate next)
+    {
+        _next = next;
+    }
+
+    public async Task InvokeAsync(HttpContext ctx)
+    {
+        var sw = Stopwatch.StartNew();
+        try
+        {
+            await _next(ctx);
+        }
+        finally
+        {
+            sw.Stop();
+            var route = ctx.GetEndpoint()?.Metadata
+                .GetMetadata<Microsoft.AspNetCore.Routing.RouteNameMetadata>()?.RouteName;
+            if (string.IsNullOrEmpty(route))
+            {
+                route = (ctx.GetRouteData().Values["controller"] is string c
+                    && ctx.GetRouteData().Values["action"] is string a)
+                    ? $"{c}/{a}"
+                    : ctx.Request.Path.Value ?? "(unknown)";
+            }
+            var tenant = ctx.Request.Headers["X-RadioPad-Tenant"].ToString();
+            if (string.IsNullOrEmpty(tenant)) tenant = "(none)";
+            PerfBudgets.ApiRequestDurationMs.Record(
+                sw.Elapsed.TotalMilliseconds,
+                new KeyValuePair<string, object?>("route", route),
+                new KeyValuePair<string, object?>("tenant", tenant),
+                new KeyValuePair<string, object?>("status", ctx.Response.StatusCode.ToString()));
+        }
+    }
+}

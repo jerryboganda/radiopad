@@ -1,0 +1,204 @@
+# RadLex® is a registered trademark of RSNA. Subset reproduced under RSNA's
+# public license terms (https://www.rsna.org/practice-tools/data-tools-and-standards/radlex-radiology-lexicon).
+# This file is a curated ~200-term subset covering common chest, abdomen, and
+# musculoskeletal anatomy plus high-frequency finding descriptors. It is NOT
+# the full RadLex ontology — consumers needing the complete lexicon should
+# download it from RSNA directly. The schema is RadioPad-specific:
+#   rid:            stable RadLex Identifier (e.g. "RID28477").
+#   preferredLabel: human-readable label.
+#   synonyms:       alternate spellings / abbreviations the validator and the
+#                   AI gateway can fold to the preferred label.
+#   category:       coarse bucket — "anatomy" | "finding" | "modality" |
+#                   "technique" | "qualifier".
+concepts:
+  # ------------------------------------------------------------------ Chest
+  - { rid: RID1243, preferredLabel: "lung",            synonyms: ["pulmonary parenchyma"], category: "anatomy" }
+  - { rid: RID1301, preferredLabel: "right lung",      synonyms: ["RT lung"],               category: "anatomy" }
+  - { rid: RID1302, preferredLabel: "left lung",       synonyms: ["LT lung"],               category: "anatomy" }
+  - { rid: RID1326, preferredLabel: "right upper lobe", synonyms: ["RUL"],                  category: "anatomy" }
+  - { rid: RID1327, preferredLabel: "right middle lobe", synonyms: ["RML"],                 category: "anatomy" }
+  - { rid: RID1328, preferredLabel: "right lower lobe", synonyms: ["RLL"],                  category: "anatomy" }
+  - { rid: RID1330, preferredLabel: "left upper lobe", synonyms: ["LUL"],                   category: "anatomy" }
+  - { rid: RID1332, preferredLabel: "left lower lobe", synonyms: ["LLL"],                   category: "anatomy" }
+  - { rid: RID1384, preferredLabel: "lingula",          synonyms: [],                       category: "anatomy" }
+  - { rid: RID1385, preferredLabel: "trachea",          synonyms: [],                       category: "anatomy" }
+  - { rid: RID1390, preferredLabel: "carina",           synonyms: [],                       category: "anatomy" }
+  - { rid: RID1392, preferredLabel: "main bronchus",    synonyms: ["mainstem bronchus"],    category: "anatomy" }
+  - { rid: RID1428, preferredLabel: "mediastinum",      synonyms: [],                       category: "anatomy" }
+  - { rid: RID1432, preferredLabel: "anterior mediastinum", synonyms: [],                   category: "anatomy" }
+  - { rid: RID1434, preferredLabel: "middle mediastinum",   synonyms: [],                   category: "anatomy" }
+  - { rid: RID1436, preferredLabel: "posterior mediastinum", synonyms: [],                  category: "anatomy" }
+  - { rid: RID1440, preferredLabel: "pleura",           synonyms: ["pleural space"],        category: "anatomy" }
+  - { rid: RID1442, preferredLabel: "diaphragm",        synonyms: [],                       category: "anatomy" }
+  - { rid: RID1456, preferredLabel: "heart",            synonyms: ["cardiac silhouette"],   category: "anatomy" }
+  - { rid: RID1460, preferredLabel: "left ventricle",   synonyms: ["LV"],                   category: "anatomy" }
+  - { rid: RID1462, preferredLabel: "right ventricle",  synonyms: ["RV"],                   category: "anatomy" }
+  - { rid: RID1464, preferredLabel: "left atrium",      synonyms: ["LA"],                   category: "anatomy" }
+  - { rid: RID1466, preferredLabel: "right atrium",     synonyms: ["RA"],                   category: "anatomy" }
+  - { rid: RID1490, preferredLabel: "aorta",            synonyms: [],                       category: "anatomy" }
+  - { rid: RID1492, preferredLabel: "ascending aorta",  synonyms: [],                       category: "anatomy" }
+  - { rid: RID1494, preferredLabel: "aortic arch",      synonyms: [],                       category: "anatomy" }
+  - { rid: RID1496, preferredLabel: "descending aorta", synonyms: [],                       category: "anatomy" }
+  - { rid: RID1500, preferredLabel: "pulmonary artery", synonyms: ["PA"],                   category: "anatomy" }
+  - { rid: RID1502, preferredLabel: "main pulmonary artery", synonyms: ["MPA"],             category: "anatomy" }
+  - { rid: RID1556, preferredLabel: "esophagus",        synonyms: [],                       category: "anatomy" }
+  - { rid: RID1576, preferredLabel: "thoracic aorta",   synonyms: [],                       category: "anatomy" }
+
+  # ----------------------------------------------------------------- Abdomen
+  - { rid: RID58,   preferredLabel: "abdomen",          synonyms: [],                       category: "anatomy" }
+  - { rid: RID187,  preferredLabel: "liver",            synonyms: ["hepatic parenchyma"],   category: "anatomy" }
+  - { rid: RID201,  preferredLabel: "gallbladder",      synonyms: ["GB"],                   category: "anatomy" }
+  - { rid: RID214,  preferredLabel: "common bile duct", synonyms: ["CBD"],                  category: "anatomy" }
+  - { rid: RID287,  preferredLabel: "pancreas",         synonyms: [],                       category: "anatomy" }
+  - { rid: RID296,  preferredLabel: "spleen",           synonyms: ["splenic parenchyma"],   category: "anatomy" }
+  - { rid: RID295,  preferredLabel: "kidney",           synonyms: ["renal parenchyma"],     category: "anatomy" }
+  - { rid: RID294,  preferredLabel: "right kidney",     synonyms: ["RK"],                   category: "anatomy" }
+  - { rid: RID293,  preferredLabel: "left kidney",      synonyms: ["LK"],                   category: "anatomy" }
+  - { rid: RID320,  preferredLabel: "adrenal gland",    synonyms: ["suprarenal gland"],     category: "anatomy" }
+  - { rid: RID350,  preferredLabel: "stomach",          synonyms: ["gastric"],              category: "anatomy" }
+  - { rid: RID362,  preferredLabel: "duodenum",         synonyms: [],                       category: "anatomy" }
+  - { rid: RID365,  preferredLabel: "small bowel",      synonyms: ["small intestine"],      category: "anatomy" }
+  - { rid: RID372,  preferredLabel: "colon",            synonyms: ["large bowel"],          category: "anatomy" }
+  - { rid: RID383,  preferredLabel: "appendix",         synonyms: ["vermiform appendix"],   category: "anatomy" }
+  - { rid: RID390,  preferredLabel: "rectum",           synonyms: [],                       category: "anatomy" }
+  - { rid: RID409,  preferredLabel: "urinary bladder",  synonyms: ["bladder"],              category: "anatomy" }
+  - { rid: RID434,  preferredLabel: "uterus",           synonyms: [],                       category: "anatomy" }
+  - { rid: RID436,  preferredLabel: "ovary",            synonyms: [],                       category: "anatomy" }
+  - { rid: RID440,  preferredLabel: "prostate gland",   synonyms: ["prostate"],             category: "anatomy" }
+  - { rid: RID480,  preferredLabel: "abdominal aorta",  synonyms: [],                       category: "anatomy" }
+  - { rid: RID488,  preferredLabel: "inferior vena cava", synonyms: ["IVC"],                category: "anatomy" }
+  - { rid: RID491,  preferredLabel: "portal vein",      synonyms: [],                       category: "anatomy" }
+  - { rid: RID498,  preferredLabel: "hepatic artery",   synonyms: [],                       category: "anatomy" }
+
+  # ------------------------------------------------------------- Musculoskeletal
+  - { rid: RID2507, preferredLabel: "femur",            synonyms: ["thigh bone"],           category: "anatomy" }
+  - { rid: RID2508, preferredLabel: "tibia",            synonyms: ["shin bone"],            category: "anatomy" }
+  - { rid: RID2509, preferredLabel: "fibula",           synonyms: [],                       category: "anatomy" }
+  - { rid: RID2510, preferredLabel: "humerus",          synonyms: [],                       category: "anatomy" }
+  - { rid: RID2511, preferredLabel: "radius",           synonyms: [],                       category: "anatomy" }
+  - { rid: RID2512, preferredLabel: "ulna",             synonyms: [],                       category: "anatomy" }
+  - { rid: RID2515, preferredLabel: "scapula",          synonyms: [],                       category: "anatomy" }
+  - { rid: RID2516, preferredLabel: "clavicle",         synonyms: ["collarbone"],           category: "anatomy" }
+  - { rid: RID2520, preferredLabel: "rib",              synonyms: [],                       category: "anatomy" }
+  - { rid: RID2530, preferredLabel: "vertebra",         synonyms: [],                       category: "anatomy" }
+  - { rid: RID2531, preferredLabel: "cervical spine",   synonyms: ["c-spine"],              category: "anatomy" }
+  - { rid: RID2532, preferredLabel: "thoracic spine",   synonyms: ["t-spine"],              category: "anatomy" }
+  - { rid: RID2533, preferredLabel: "lumbar spine",     synonyms: ["l-spine"],              category: "anatomy" }
+  - { rid: RID2540, preferredLabel: "sacrum",           synonyms: [],                       category: "anatomy" }
+  - { rid: RID2545, preferredLabel: "pelvis",           synonyms: [],                       category: "anatomy" }
+  - { rid: RID2550, preferredLabel: "shoulder joint",   synonyms: [],                       category: "anatomy" }
+  - { rid: RID2552, preferredLabel: "elbow joint",      synonyms: [],                       category: "anatomy" }
+  - { rid: RID2554, preferredLabel: "wrist joint",      synonyms: [],                       category: "anatomy" }
+  - { rid: RID2556, preferredLabel: "hip joint",        synonyms: [],                       category: "anatomy" }
+  - { rid: RID2558, preferredLabel: "knee joint",       synonyms: [],                       category: "anatomy" }
+  - { rid: RID2560, preferredLabel: "ankle joint",      synonyms: [],                       category: "anatomy" }
+
+  # --------------------------------------------------------------- Findings
+  - { rid: RID3851, preferredLabel: "nodule",                 synonyms: [],                                category: "finding" }
+  - { rid: RID3853, preferredLabel: "ground-glass opacity",   synonyms: ["GGO", "ground glass opacity"],   category: "finding" }
+  - { rid: RID3854, preferredLabel: "consolidation",          synonyms: [],                                category: "finding" }
+  - { rid: RID3855, preferredLabel: "atelectasis",            synonyms: ["volume loss"],                   category: "finding" }
+  - { rid: RID3856, preferredLabel: "pleural effusion",       synonyms: [],                                category: "finding" }
+  - { rid: RID3858, preferredLabel: "pneumothorax",           synonyms: ["PTX"],                           category: "finding" }
+  - { rid: RID3860, preferredLabel: "mass",                   synonyms: [],                                category: "finding" }
+  - { rid: RID3870, preferredLabel: "emphysema",              synonyms: [],                                category: "finding" }
+  - { rid: RID3872, preferredLabel: "bronchiectasis",         synonyms: [],                                category: "finding" }
+  - { rid: RID3873, preferredLabel: "cavitation",             synonyms: ["cavity"],                        category: "finding" }
+  - { rid: RID3874, preferredLabel: "calcification",          synonyms: [],                                category: "finding" }
+  - { rid: RID3875, preferredLabel: "cyst",                   synonyms: [],                                category: "finding" }
+  - { rid: RID3877, preferredLabel: "lymphadenopathy",        synonyms: ["enlarged lymph node"],           category: "finding" }
+  - { rid: RID3878, preferredLabel: "hemorrhage",             synonyms: ["bleed"],                         category: "finding" }
+  - { rid: RID3879, preferredLabel: "infarct",                synonyms: ["infarction"],                    category: "finding" }
+  - { rid: RID3880, preferredLabel: "edema",                  synonyms: ["oedema"],                        category: "finding" }
+  - { rid: RID3881, preferredLabel: "ischemia",               synonyms: ["ischaemia"],                     category: "finding" }
+  - { rid: RID3882, preferredLabel: "thrombus",               synonyms: ["thrombosis"],                    category: "finding" }
+  - { rid: RID3883, preferredLabel: "embolus",                synonyms: ["embolism"],                      category: "finding" }
+  - { rid: RID3884, preferredLabel: "pulmonary embolism",     synonyms: ["PE"],                            category: "finding" }
+  - { rid: RID3885, preferredLabel: "aneurysm",               synonyms: [],                                category: "finding" }
+  - { rid: RID3887, preferredLabel: "fracture",               synonyms: ["broken bone"],                   category: "finding" }
+  - { rid: RID3888, preferredLabel: "comminuted fracture",    synonyms: [],                                category: "finding" }
+  - { rid: RID3889, preferredLabel: "stress fracture",        synonyms: [],                                category: "finding" }
+  - { rid: RID3890, preferredLabel: "dislocation",            synonyms: [],                                category: "finding" }
+  - { rid: RID3891, preferredLabel: "subluxation",            synonyms: [],                                category: "finding" }
+  - { rid: RID3892, preferredLabel: "tendinopathy",           synonyms: ["tendonitis"],                    category: "finding" }
+  - { rid: RID3893, preferredLabel: "osteoarthritis",         synonyms: ["OA"],                            category: "finding" }
+  - { rid: RID3894, preferredLabel: "rheumatoid arthritis",   synonyms: ["RA"],                            category: "finding" }
+  - { rid: RID3895, preferredLabel: "osteomyelitis",          synonyms: [],                                category: "finding" }
+  - { rid: RID3896, preferredLabel: "osteonecrosis",          synonyms: ["avascular necrosis", "AVN"],     category: "finding" }
+  - { rid: RID3897, preferredLabel: "bone marrow edema",      synonyms: [],                                category: "finding" }
+  - { rid: RID3898, preferredLabel: "joint effusion",         synonyms: [],                                category: "finding" }
+  - { rid: RID3899, preferredLabel: "ligament tear",          synonyms: [],                                category: "finding" }
+  - { rid: RID3900, preferredLabel: "meniscal tear",          synonyms: [],                                category: "finding" }
+  - { rid: RID3901, preferredLabel: "rotator cuff tear",      synonyms: [],                                category: "finding" }
+  - { rid: RID3902, preferredLabel: "labral tear",            synonyms: [],                                category: "finding" }
+  - { rid: RID3903, preferredLabel: "disc herniation",        synonyms: ["herniated disc", "HNP"],         category: "finding" }
+  - { rid: RID3904, preferredLabel: "disc bulge",             synonyms: [],                                category: "finding" }
+  - { rid: RID3905, preferredLabel: "spinal stenosis",        synonyms: [],                                category: "finding" }
+  - { rid: RID3906, preferredLabel: "spondylolisthesis",      synonyms: [],                                category: "finding" }
+  - { rid: RID3920, preferredLabel: "abscess",                synonyms: [],                                category: "finding" }
+  - { rid: RID3921, preferredLabel: "fluid collection",       synonyms: ["seroma"],                        category: "finding" }
+  - { rid: RID3922, preferredLabel: "hematoma",               synonyms: ["haematoma"],                     category: "finding" }
+  - { rid: RID3923, preferredLabel: "ascites",                synonyms: [],                                category: "finding" }
+  - { rid: RID3924, preferredLabel: "hydronephrosis",         synonyms: [],                                category: "finding" }
+  - { rid: RID3925, preferredLabel: "nephrolithiasis",        synonyms: ["kidney stone"],                  category: "finding" }
+  - { rid: RID3926, preferredLabel: "cholelithiasis",         synonyms: ["gallstone"],                     category: "finding" }
+  - { rid: RID3927, preferredLabel: "cholecystitis",          synonyms: [],                                category: "finding" }
+  - { rid: RID3928, preferredLabel: "appendicitis",           synonyms: [],                                category: "finding" }
+  - { rid: RID3929, preferredLabel: "diverticulitis",         synonyms: [],                                category: "finding" }
+  - { rid: RID3930, preferredLabel: "small bowel obstruction", synonyms: ["SBO"],                          category: "finding" }
+  - { rid: RID3931, preferredLabel: "large bowel obstruction", synonyms: ["LBO"],                          category: "finding" }
+  - { rid: RID3932, preferredLabel: "pneumoperitoneum",       synonyms: ["free air"],                      category: "finding" }
+  - { rid: RID3933, preferredLabel: "hepatic steatosis",      synonyms: ["fatty liver"],                   category: "finding" }
+  - { rid: RID3934, preferredLabel: "cirrhosis",              synonyms: [],                                category: "finding" }
+  - { rid: RID3935, preferredLabel: "portal hypertension",    synonyms: [],                                category: "finding" }
+  - { rid: RID3936, preferredLabel: "hepatocellular carcinoma", synonyms: ["HCC"],                         category: "finding" }
+  - { rid: RID3940, preferredLabel: "metastasis",             synonyms: ["mets"],                          category: "finding" }
+  - { rid: RID3941, preferredLabel: "primary tumor",          synonyms: ["primary tumour"],                category: "finding" }
+
+  # ------------------------------------------------------------- Modalities
+  - { rid: RID10312, preferredLabel: "computed tomography",   synonyms: ["CT", "CAT scan"],                category: "modality" }
+  - { rid: RID10314, preferredLabel: "magnetic resonance imaging", synonyms: ["MRI", "MR"],                category: "modality" }
+  - { rid: RID10316, preferredLabel: "radiography",           synonyms: ["x-ray", "XR", "plain film"],     category: "modality" }
+  - { rid: RID10318, preferredLabel: "ultrasonography",       synonyms: ["ultrasound", "US", "sonography"], category: "modality" }
+  - { rid: RID10320, preferredLabel: "mammography",           synonyms: ["MG"],                            category: "modality" }
+  - { rid: RID10322, preferredLabel: "fluoroscopy",           synonyms: [],                                category: "modality" }
+  - { rid: RID10324, preferredLabel: "positron emission tomography", synonyms: ["PET"],                    category: "modality" }
+  - { rid: RID10326, preferredLabel: "nuclear medicine",      synonyms: ["NM"],                            category: "modality" }
+  - { rid: RID10328, preferredLabel: "single photon emission CT", synonyms: ["SPECT"],                     category: "modality" }
+  - { rid: RID10330, preferredLabel: "digital subtraction angiography", synonyms: ["DSA"],                 category: "modality" }
+
+  # ------------------------------------------------------------- Techniques
+  - { rid: RID11000, preferredLabel: "intravenous contrast",  synonyms: ["IV contrast"],                   category: "technique" }
+  - { rid: RID11001, preferredLabel: "non-contrast",          synonyms: ["unenhanced", "NECT"],            category: "technique" }
+  - { rid: RID11002, preferredLabel: "post-contrast",         synonyms: ["enhanced", "CECT"],              category: "technique" }
+  - { rid: RID11003, preferredLabel: "diffusion-weighted imaging", synonyms: ["DWI"],                      category: "technique" }
+  - { rid: RID11004, preferredLabel: "apparent diffusion coefficient", synonyms: ["ADC"],                  category: "technique" }
+  - { rid: RID11005, preferredLabel: "T1-weighted",           synonyms: ["T1W"],                           category: "technique" }
+  - { rid: RID11006, preferredLabel: "T2-weighted",           synonyms: ["T2W"],                           category: "technique" }
+  - { rid: RID11007, preferredLabel: "FLAIR",                 synonyms: ["fluid-attenuated inversion recovery"], category: "technique" }
+  - { rid: RID11008, preferredLabel: "STIR",                  synonyms: ["short tau inversion recovery"],  category: "technique" }
+  - { rid: RID11009, preferredLabel: "MR angiography",        synonyms: ["MRA"],                           category: "technique" }
+  - { rid: RID11010, preferredLabel: "CT angiography",        synonyms: ["CTA"],                           category: "technique" }
+
+  # ------------------------------------------------------------- Qualifiers
+  - { rid: RID5821, preferredLabel: "left",                   synonyms: ["lt", "L"],                       category: "qualifier" }
+  - { rid: RID5822, preferredLabel: "right",                  synonyms: ["rt", "R"],                       category: "qualifier" }
+  - { rid: RID5823, preferredLabel: "bilateral",              synonyms: ["B/L"],                           category: "qualifier" }
+  - { rid: RID5824, preferredLabel: "unilateral",             synonyms: [],                                category: "qualifier" }
+  - { rid: RID5825, preferredLabel: "anterior",               synonyms: [],                                category: "qualifier" }
+  - { rid: RID5826, preferredLabel: "posterior",              synonyms: [],                                category: "qualifier" }
+  - { rid: RID5827, preferredLabel: "superior",               synonyms: [],                                category: "qualifier" }
+  - { rid: RID5828, preferredLabel: "inferior",               synonyms: [],                                category: "qualifier" }
+  - { rid: RID5829, preferredLabel: "medial",                 synonyms: [],                                category: "qualifier" }
+  - { rid: RID5830, preferredLabel: "lateral",                synonyms: [],                                category: "qualifier" }
+  - { rid: RID5831, preferredLabel: "proximal",               synonyms: [],                                category: "qualifier" }
+  - { rid: RID5832, preferredLabel: "distal",                 synonyms: [],                                category: "qualifier" }
+  - { rid: RID5833, preferredLabel: "acute",                  synonyms: [],                                category: "qualifier" }
+  - { rid: RID5834, preferredLabel: "chronic",                synonyms: [],                                category: "qualifier" }
+  - { rid: RID5835, preferredLabel: "subacute",               synonyms: [],                                category: "qualifier" }
+  - { rid: RID5836, preferredLabel: "mild",                   synonyms: [],                                category: "qualifier" }
+  - { rid: RID5837, preferredLabel: "moderate",               synonyms: [],                                category: "qualifier" }
+  - { rid: RID5838, preferredLabel: "severe",                 synonyms: [],                                category: "qualifier" }
+  - { rid: RID5839, preferredLabel: "focal",                  synonyms: [],                                category: "qualifier" }
+  - { rid: RID5840, preferredLabel: "diffuse",                synonyms: [],                                category: "qualifier" }
+  - { rid: RID5841, preferredLabel: "multifocal",             synonyms: [],                                category: "qualifier" }

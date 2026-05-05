@@ -1,0 +1,12 @@
+{
+  "name": "clean adult chest x-ray — no acute process",
+  "report": {
+    "study": { "modality": "XR", "bodyPart": "Chest", "indication": "Cough", "accessionNumber": "SYNTH-CXR-0001" },
+    "indication": "Cough, rule out pneumonia.",
+    "technique": "Frontal and lateral views of the chest.",
+    "comparison": "None.",
+    "findings": "Lungs are clear. No focal consolidation. No pneumothorax or pleural effusion. Cardiomediastinal silhouette is normal. Bony thorax is intact.",
+    "impression": "1. No acute cardiopulmonary process."
+  },
+  "expectFlagged": []
+}

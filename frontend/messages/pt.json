@@ -1,0 +1,77 @@
+{
+  "nav": {
+    "reports": "Laudos",
+    "rulebooks": "Regulamentos",
+    "templates": "Modelos",
+    "providers": "Provedores",
+    "prompts": "Prompts",
+    "marketplace": "Mercado",
+    "validation": "Validação",
+    "governance": "Governança",
+    "modelEval": "Avaliação de modelo",
+    "audit": "Auditoria",
+    "analytics": "Análises",
+    "terminology": "Terminologia",
+    "offline": "Offline",
+    "settings": "Configurações",
+    "billing": "Faturamento",
+    "usage": "Uso",
+    "featureFlags": "Flags de recursos",
+    "fhirImport": "Importar FHIR",
+    "pacs": "PACS",
+    "security": "Segurança",
+    "signIn": "Entrar"
+  },
+  "buttons": {
+    "primary": {
+      "save": "Salvar",
+      "submit": "Enviar",
+      "approve": "Aprovar",
+      "sign": "Assinar",
+      "export": "Exportar",
+      "create": "Criar",
+      "confirm": "Confirmar"
+    },
+    "ghost": {
+      "cancel": "Cancelar",
+      "back": "Voltar",
+      "discard": "Descartar"
+    },
+    "subtle": {
+      "more": "Mais",
+      "details": "Detalhes",
+      "language": "Idioma"
+    }
+  },
+  "validation": {
+    "severity": {
+      "blocker": "Bloqueante",
+      "warning": "Aviso",
+      "info": "Informação"
+    }
+  },
+  "banner": {
+    "warn": "Atenção",
+    "info": "Aviso",
+    "danger": "Ação necessária"
+  },
+  "admin": {
+    "headings": {
+      "settings": "Configurações do locatário",
+      "billing": "Faturamento",
+      "usage": "Uso",
+      "security": "Segurança",
+      "featureFlags": "Flags de recursos",
+      "language": "Idioma"
+    },
+    "language": {
+      "tenantDefault": "Idioma padrão do locatário",
+      "yourLocale": "Seu idioma",
+      "clinicalNote": "O conteúdo clínico (regulamentos, achados, mensagens de validação) é sempre exibido em inglês."
+    }
+  },
+  "topbar": {
+    "title": "RadioPad",
+    "tagline": "Laudos radiológicos com IA · v0.1"
+  }
+}

@@ -1,0 +1,12 @@
+{
+  "name": "adult chest x-ray — critical finding without communication language",
+  "report": {
+    "study": { "modality": "XR", "bodyPart": "Chest", "indication": "Acute dyspnea", "accessionNumber": "SYNTH-CXR-0003" },
+    "indication": "Acute dyspnea.",
+    "technique": "Portable frontal chest radiograph.",
+    "comparison": "None.",
+    "findings": "Large left tension pneumothorax. Heart size is not enlarged.",
+    "impression": "Large left tension pneumothorax."
+  },
+  "expectFlagged": ["critical_result_language"]
+}

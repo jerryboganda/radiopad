@@ -1,0 +1,12 @@
+{
+  "name": "clean brain MRI",
+  "report": {
+    "study": { "modality": "MRI", "bodyPart": "Brain", "indication": "headache", "accessionNumber": "ACC-BR-1" },
+    "indication": "Headache.",
+    "technique": "Multiplanar multisequence MRI of the brain without and with contrast.",
+    "comparison": "None.",
+    "findings": "No acute infarct, hemorrhage, or mass effect. Ventricles and sulci appropriate for age. No abnormal enhancement.",
+    "impression": "1. No acute intracranial abnormality."
+  },
+  "expectFlagged": []
+}

@@ -1,0 +1,12 @@
+{
+  "name": "adult chest x-ray — modality cross-talk in impression",
+  "report": {
+    "study": { "modality": "XR", "bodyPart": "Chest", "indication": "Productive cough", "accessionNumber": "SYNTH-CXR-0002" },
+    "indication": "Productive cough and fever.",
+    "technique": "Frontal and lateral views of the chest.",
+    "comparison": "None.",
+    "findings": "Patchy right lower lobe airspace opacity. No pneumothorax. No pleural effusion. Heart size normal.",
+    "impression": "1. Right lower lobe pneumonia.\n2. CT recommended for further evaluation."
+  },
+  "expectFlagged": ["modality_mismatch"]
+}

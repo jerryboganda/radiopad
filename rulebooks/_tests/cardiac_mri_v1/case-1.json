@@ -1,0 +1,12 @@
+{
+  "name": "clean cardiac MRI — normal LV function",
+  "report": {
+    "study": { "modality": "MRI", "bodyPart": "Heart", "indication": "Suspected cardiomyopathy", "accessionNumber": "ACC-CMR-0001" },
+    "indication": "Evaluation for suspected cardiomyopathy.",
+    "technique": "1.5T cardiac MRI with cine SSFP, T1/T2 mapping, and post-contrast late gadolinium enhancement.",
+    "comparison": "None.",
+    "findings": "Normal LV size and systolic function with LVEF 60%. Normal RV size and function. No regional wall motion abnormality. No late gadolinium enhancement. No pericardial effusion.",
+    "impression": "1. Normal biventricular size and systolic function (LVEF 60%).\n2. No evidence of myocardial fibrosis on late gadolinium enhancement."
+  },
+  "expectFlagged": []
+}

@@ -1,0 +1,12 @@
+{
+  "name": "missing impression",
+  "report": {
+    "study": { "modality": "CT", "bodyPart": "Chest", "indication": "Cough", "accessionNumber": "ACC-0002" },
+    "indication": "Persistent cough.",
+    "technique": "Non-contrast CT of the chest.",
+    "comparison": "None.",
+    "findings": "Lungs clear.",
+    "impression": ""
+  },
+  "expectFlagged": ["required_section:impression"]
+}

@@ -1,0 +1,12 @@
+{
+  "name": "liver MRI — LR-5 with negation conflict and orphan measurement",
+  "report": {
+    "study": { "modality": "MRI", "bodyPart": "Liver", "indication": "HCC surveillance", "accessionNumber": "SYNTH-LMR-0002" },
+    "indication": "Cirrhosis — HCC surveillance, rising AFP.",
+    "technique": "Multiphase liver MRI with extracellular gadolinium contrast.",
+    "comparison": "Liver MRI 12 months ago.",
+    "findings": "Cirrhotic liver. No arterially hyperenhancing observation in segment 5. Patent portal vein.",
+    "impression": "1. New 18 mm arterially hyperenhancing observation in segment 5 with washout, LR-5."
+  },
+  "expectFlagged": ["negation_conflict", "measurement_consistency", "critical_result_language"]
+}

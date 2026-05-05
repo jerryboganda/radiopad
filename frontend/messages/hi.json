@@ -1,0 +1,77 @@
+{
+  "nav": {
+    "reports": "रिपोर्ट",
+    "rulebooks": "नियमावली",
+    "templates": "टेम्पलेट",
+    "providers": "प्रदाता",
+    "prompts": "प्रॉम्प्ट",
+    "marketplace": "मार्केटप्लेस",
+    "validation": "सत्यापन",
+    "governance": "अनुशासन",
+    "modelEval": "Model eval",
+    "audit": "ऑडिट",
+    "analytics": "विश्लेषण",
+    "terminology": "शब्दावली",
+    "offline": "ऑफ़लाइन",
+    "settings": "सेटिंग्स",
+    "billing": "बिलिंग",
+    "usage": "उपयोग",
+    "featureFlags": "फीचर फ़्लैग",
+    "fhirImport": "FHIR आयात",
+    "pacs": "PACS",
+    "security": "सुरक्षा",
+    "signIn": "साइन इन"
+  },
+  "buttons": {
+    "primary": {
+      "save": "सहेजें",
+      "submit": "जमा करें",
+      "approve": "अनुमोदित करें",
+      "sign": "हस्ताक्षर",
+      "export": "निर्यात",
+      "create": "बनाएँ",
+      "confirm": "पुष्टि करें"
+    },
+    "ghost": {
+      "cancel": "रद्द करें",
+      "back": "वापस",
+      "discard": "छोड़ें"
+    },
+    "subtle": {
+      "more": "और",
+      "details": "विवरण",
+      "language": "भाषा"
+    }
+  },
+  "validation": {
+    "severity": {
+      "blocker": "अवरोधक",
+      "warning": "चेतावनी",
+      "info": "सूचना"
+    }
+  },
+  "banner": {
+    "warn": "ध्यान दें",
+    "info": "सूचना",
+    "danger": "कार्रवाई आवश्यक"
+  },
+  "admin": {
+    "headings": {
+      "settings": "टेनेंट सेटिंग्स",
+      "billing": "बिलिंग",
+      "usage": "उपयोग",
+      "security": "सुरक्षा",
+      "featureFlags": "फीचर फ़्लैग",
+      "language": "भाषा"
+    },
+    "language": {
+      "tenantDefault": "टेनेंट का डिफ़ॉल्ट",
+      "yourLocale": "आपकी भाषा",
+      "clinicalNote": "नैदानिक सामग्री (नियमावली, निष्कर्ष पाठ, सत्यापन संदेश) हमेशा अंग्रेज़ी में दिखाई जाती है।"
+    }
+  },
+  "topbar": {
+    "title": "RadioPad",
+    "tagline": "एआई रेडियोलॉजी रिपोर्टिंग · v0.1"
+  }
+}

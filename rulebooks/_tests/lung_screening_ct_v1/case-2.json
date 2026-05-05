@@ -1,0 +1,12 @@
+{
+  "name": "lung screening CT — Comparison section omitted",
+  "report": {
+    "study": { "modality": "CT", "bodyPart": "Chest", "indication": "Lung cancer screening", "accessionNumber": "ACC-LDS-0002" },
+    "indication": "Annual low-dose CT lung cancer screening.",
+    "technique": "Low-dose non-contrast CT of the chest with 1 mm reconstructions.",
+    "comparison": "",
+    "findings": "Lungs: 6 mm solid nodule in the right upper lobe, stable visually. No new nodules. No adenopathy. No pleural effusion.",
+    "impression": "1. Stable 6 mm right upper lobe solid nodule.\n2. Lung-RADS 2."
+  },
+  "expectFlagged": ["required_section:comparison"]
+}

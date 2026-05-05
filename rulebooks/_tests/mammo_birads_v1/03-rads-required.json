@@ -1,0 +1,12 @@
+{
+  "name": "mammography — BI-RADS category missing from impression",
+  "report": {
+    "study": { "modality": "MG", "bodyPart": "Breast", "indication": "Diagnostic mammography", "accessionNumber": "SYNTH-MG-0003" },
+    "indication": "Left breast palpable lump.",
+    "technique": "Diagnostic mammography of the left breast.",
+    "comparison": "None.",
+    "findings": "Left breast 8 mm irregular mass. Workstation assessment BI-RADS 4A.",
+    "impression": "Suspicious left breast mass."
+  },
+  "expectFlagged": ["birads_category_required"]
+}

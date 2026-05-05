@@ -1,0 +1,12 @@
+{
+  "name": "clean paediatric chest XR — normal",
+  "report": {
+    "study": { "modality": "XR", "bodyPart": "Chest", "indication": "Cough — 4 year old", "accessionNumber": "ACC-PCXR-0001" },
+    "indication": "Cough in a 4-year-old child, no fever.",
+    "technique": "Single AP view of the chest.",
+    "comparison": "None.",
+    "findings": "Lungs are clear bilaterally. No focal consolidation, effusion, or pneumothorax. Cardiothymic silhouette is normal for age. Bony thorax is intact.",
+    "impression": "1. Normal paediatric chest radiograph.\n2. No evidence of pneumonia."
+  },
+  "expectFlagged": []
+}

@@ -1,0 +1,75 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  RadioPad — Windows Defender Application Control (WDAC) policy template.
+
+  This is a STUB. The production policy is generated post-build from the
+  signed RadioPad binary's Authenticode hash + publisher CN by:
+
+      New-CIPolicy -FilePath RadioPad.xml -Level FilePublisher \
+                   -ScanPath .\target\release
+      ConvertFrom-CIPolicy -XmlFilePath RadioPad.xml \
+                           -BinaryFilePath RadioPad.cip
+
+  The publisher CN below MUST match the Subject CN of the EV code-signing
+  certificate pinned via bundle.windows.certificateThumbprint in
+  tauri.conf.json. Replace TBD-AT-RELEASE values from the signed artifact.
+
+  Spec: https://learn.microsoft.com/en-us/windows/security/application-security/application-control/windows-defender-application-control/design/wdac-create-policy
+-->
+<SiPolicy xmlns="urn:schemas-microsoft-com:sipolicy" PolicyType="Base Policy">
+  <VersionEx>10.0.0.0</VersionEx>
+  <PolicyID>{a1b2c3d4-0000-0000-0000-000000000000}</PolicyID>
+  <BasePolicyID>{a1b2c3d4-0000-0000-0000-000000000000}</BasePolicyID>
+  <PlatformID>{2E07F7E4-194C-4D20-B7C9-6F44A6C5A234}</PlatformID>
+
+  <Rules>
+    <Rule><Option>Enabled:Unsigned System Integrity Policy</Option></Rule>
+    <Rule><Option>Enabled:Audit Mode</Option></Rule>
+    <Rule><Option>Required:Enforce Store Applications</Option></Rule>
+    <Rule><Option>Enabled:UMCI</Option></Rule>
+    <Rule><Option>Required:WHQL</Option></Rule>
+    <Rule><Option>Enabled:Update Policy No Reboot</Option></Rule>
+  </Rules>
+
+  <EKUs />
+
+  <FileRules>
+    <!-- Production policy populates these from `signtool verify /pa` of the released binary. -->
+    <Allow ID="ID_ALLOW_RADIOPAD_PUBLISHER" FriendlyName="RadioPad signed binaries" />
+  </FileRules>
+
+  <Signers>
+    <Signer ID="ID_SIGNER_RADIOPAD" Name="RadioPad EV publisher">
+      <!-- TBD-AT-RELEASE: replace Value with the certificate's TBS hash from the production EV cert. -->
+      <CertRoot Type="TBS" Value="0000000000000000000000000000000000000000000000000000000000000000" />
+      <CertPublisher Value="CN=RadioPad, Inc., O=RadioPad, Inc., L=San Francisco, S=California, C=US" />
+    </Signer>
+  </Signers>
+
+  <SigningScenarios>
+    <SigningScenario Value="131" ID="ID_SIGNINGSCENARIO_DRIVERS" FriendlyName="Driver Signing Scenarios">
+      <ProductSigners />
+    </SigningScenario>
+    <SigningScenario Value="12" ID="ID_SIGNINGSCENARIO_USER_MODE" FriendlyName="User-mode Signing Scenarios">
+      <ProductSigners>
+        <AllowedSigners>
+          <AllowedSigner SignerId="ID_SIGNER_RADIOPAD" />
+        </AllowedSigners>
+      </ProductSigners>
+    </SigningScenario>
+  </SigningScenarios>
+
+  <UpdatePolicySigners />
+  <CiSigners>
+    <CiSigner SignerId="ID_SIGNER_RADIOPAD" />
+  </CiSigners>
+  <HvciOptions>0</HvciOptions>
+  <Settings>
+    <Setting Provider="PolicyInfo" Key="Information" ValueName="Name">
+      <Value><String>RadioPad WDAC Base Policy</String></Value>
+    </Setting>
+    <Setting Provider="PolicyInfo" Key="Information" ValueName="Id">
+      <Value><String>RadioPad-001</String></Value>
+    </Setting>
+  </Settings>
+</SiPolicy>

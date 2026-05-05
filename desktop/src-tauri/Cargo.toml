@@ -1,0 +1,45 @@
+[package]
+name = "radiopad-desktop"
+version = "0.1.0"
+description = "RadioPad desktop shell"
+authors = ["RadioPad"]
+edition = "2021"
+
+[build-dependencies]
+tauri-build = { version = "2.0", features = [] }
+
+[dependencies]
+serde = { version = "1.0", features = ["derive"] }
+serde_json = "1.0"
+tokio = { version = "1", features = ["time", "macros", "rt"] }
+tauri = { version = "2.0", features = [] }
+tauri-plugin-shell = "2.0"
+tauri-plugin-dialog = "2.0"
+tauri-plugin-clipboard-manager = "2.0"
+tauri-plugin-global-shortcut = "2.0"
+# DESK-006 — encrypted offline-draft / cache backing store.
+tauri-plugin-store = "2.0"
+# DESK-001 — Tauri auto-updater (ed25519 signed; channel-aware endpoints).
+tauri-plugin-updater = "2"
+# DESK-009 — local plugin / model sandbox (sha256 + ed25519 verification).
+sha2 = "0.10"
+ed25519-dalek = { version = "2", default-features = false }
+# DESK-005 / DESK-006 — AES-256-GCM at-rest encryption for offline drafts and
+# the encrypted local cache. Key material is held only in the OS keyring.
+aes-gcm = "0.10"
+rand = "0.8"
+base64 = "0.22"
+# DESK-005 / DESK-006 / DESK-008 — OS credential store wrapper.
+keyring = "2"
+# DESK-008 — stable per-install device fingerprint source.
+machine-uid = "0.5"
+# DESK-010 — PHI redaction layer over the global tracing subscriber.
+regex = "1"
+tracing = "0.1"
+tracing-subscriber = { version = "0.3", default-features = false, features = [
+    "fmt",
+    "registry",
+] }
+
+[features]
+custom-protocol = ["tauri/custom-protocol"]

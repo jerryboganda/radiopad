@@ -1,0 +1,24 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <RootNamespace>RadioPad.Application</RootNamespace>
+    <AssemblyName>RadioPad.Application</AssemblyName>
+  </PropertyGroup>
+  <ItemGroup>
+    <ProjectReference Include="..\RadioPad.Domain\RadioPad.Domain.csproj" />
+    <ProjectReference Include="..\RadioPad.Validation\RadioPad.Validation.csproj" />
+    <PackageReference Include="Microsoft.Extensions.Logging.Abstractions" Version="8.0.2" />
+    <PackageReference Include="Microsoft.Extensions.Options" Version="8.0.2" />
+    <PackageReference Include="Microsoft.Extensions.DependencyInjection.Abstractions" Version="8.0.2" />
+    <PackageReference Include="Microsoft.Extensions.Http" Version="8.0.1" />
+    <PackageReference Include="YamlDotNet" Version="15.1.6" />
+    <!-- Iter-32 MCP-007: Ed25519 detached-signature verification of MCP tool manifests. -->
+    <PackageReference Include="BouncyCastle.Cryptography" Version="2.4.0" />
+  </ItemGroup>
+  <ItemGroup>
+    <!-- Iter-35 AUTH-001: FIDO MDS3 trusted-root list, copied next to the
+         consuming assembly so EmbeddedFidoMdsMetadataSource can resolve it. -->
+    <None Include="Auth\fido-mds3-roots.json">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </None>
+  </ItemGroup>
+</Project>

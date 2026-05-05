@@ -1,0 +1,77 @@
+rulebook_id: thyroid_us_v1
+name: Thyroid Ultrasound Reporting Rulebook (ACR TI-RADS)
+version: 1.0.0
+owner: Head & Neck Imaging Committee
+status: approved
+applies_to:
+  modalities:
+    - US
+    - Ultrasound
+  body_parts:
+    - Thyroid
+    - Neck
+  report_types:
+    - diagnostic
+    - follow_up
+style:
+  tone: concise_clinical
+  impression_max_bullets: 5
+  avoid_terms:
+    - unremarkable
+    - cannot rule out
+  approved_followups:
+    - Recommend clinical correlation.
+    - Recommend follow-up imaging as clinically indicated.
+    - Recommend specialty consult if clinically warranted.
+required_sections:
+  - Indication
+  - Technique
+  - Findings
+  - Impression
+  - Recommendations
+terminology_refs:
+  - system: tirads
+    description: ACR TI-RADS (TR1..TR5) categorical assessment is required for each described nodule.
+rules:
+  - id: laterality_consistency
+    severity: blocker
+    description: Right / left lobe and isthmus findings must remain consistent between Findings and Impression.
+  - id: measurement_consistency
+    severity: warning
+    description: Nodule measurements (mm) must match across Findings and Impression.
+  - id: negation_conflict
+    severity: blocker
+    description: A finding denied in Findings must not be asserted in Impression.
+  - id: impression_bullet_count
+    severity: warning
+    description: Impression should not exceed style.impression_max_bullets bullets.
+  - id: tirads_category_mandatory
+    severity: info
+    description: Each described nodule should carry a TI-RADS category (TR1..TR5) in the Impression.
+  - id: nodule_size_required
+    severity: info
+    description: Each TR3+ nodule should report a maximum dimension in millimetres.
+  - id: follow_up_language_approved
+    severity: info
+    description: Follow-up recommendations should use ACR TI-RADS approved phrasing (FNA / follow-up US / no follow-up).  - id: unauthorized_followup
+    severity: warning
+    description: Recommendation phrases must come from style.approved_followups.
+
+prompt_blocks:
+  system: >
+    You are assisting a board-certified radiologist drafting a structured thyroid
+    ultrasound report. Preserve laterality (right lobe / left lobe / isthmus),
+    nodule dimensions in millimetres, and the ACR TI-RADS category exactly as
+    dictated. Never invent findings.
+  findings_to_impression: >
+    Generate a concise impression (max 5 bullets) faithful to the Findings.
+    Always carry forward the TI-RADS category and nodule size. Use ACR TI-RADS
+    follow-up phrasing.
+  cleanup: >
+    Improve grammar and structure without changing laterality, nodule size, or
+    TI-RADS code.
+
+  dictation_cleanup: >
+    Rewrite this dictation into clean grammatical prose for each report section.
+    Do not invent findings the radiologist did not dictate. Preserve every measurement,
+    laterality, and negation exactly. If a section was not dictated, return an empty string for it.

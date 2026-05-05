@@ -1,0 +1,12 @@
+{
+  "name": "clean abdomen US",
+  "report": {
+    "study": { "modality": "US", "bodyPart": "Abdomen", "indication": "RUQ pain", "accessionNumber": "ACC-ABD-1" },
+    "indication": "Right upper quadrant pain.",
+    "technique": "Greyscale and Doppler ultrasound of the abdomen.",
+    "comparison": "None.",
+    "findings": "Liver normal echogenicity. Gallbladder distended without stones. CBD 4 mm. Pancreas obscured by bowel gas. Right kidney 10.2 cm without hydronephrosis. Left kidney 10.0 cm without hydronephrosis. Spleen normal. Aorta normal caliber. Bladder partially distended.",
+    "impression": "1. No acute biliary or renal abnormality."
+  },
+  "expectFlagged": []
+}

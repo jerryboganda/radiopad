@@ -1,0 +1,12 @@
+{
+  "name": "lung screening CT — Lung-RADS category and nodule size missing",
+  "report": {
+    "study": { "modality": "CT", "bodyPart": "Chest", "indication": "Lung cancer screening", "accessionNumber": "SYNTH-LDS-0003" },
+    "indication": "Annual low-dose CT lung cancer screening.",
+    "technique": "Low-dose non-contrast CT of the chest.",
+    "comparison": "Prior screening CT 12 months ago.",
+    "findings": "Solid pulmonary nodule in the left upper lobe. No adenopathy. No pleural effusion.",
+    "impression": "New left upper lobe pulmonary nodule."
+  },
+  "expectFlagged": ["lungrads_category_required", "nodule_dimensions_required"]
+}

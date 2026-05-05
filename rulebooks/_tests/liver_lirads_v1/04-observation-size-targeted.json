@@ -1,0 +1,12 @@
+{
+  "name": "liver MRI — unrelated measurement does not satisfy observation size",
+  "report": {
+    "study": { "modality": "MRI", "bodyPart": "Liver", "indication": "HCC surveillance", "accessionNumber": "SYNTH-LMR-0004" },
+    "indication": "Cirrhosis — HCC surveillance.",
+    "technique": "Multiphase liver MRI with contrast.",
+    "comparison": "None.",
+    "findings": "Arterially hyperenhancing observation in segment 7 with washout. Mild splenomegaly measuring 14 cm.",
+    "impression": "Segment 7 observation, LI-RADS category 4."
+  },
+  "expectFlagged": ["lirads_observation_size_required"]
+}

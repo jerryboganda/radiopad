@@ -1,0 +1,12 @@
+{
+  "name": "clean prostate MRI — PI-RADS 2",
+  "report": {
+    "study": { "modality": "MRI", "bodyPart": "Prostate", "indication": "Elevated PSA", "accessionNumber": "ACC-PRO-0001" },
+    "indication": "Elevated PSA, no prior biopsy.",
+    "technique": "Multiparametric prostate MRI at 3T including T2W, DWI (b=50/800/1400), and dynamic contrast-enhanced sequences.",
+    "comparison": "None.",
+    "findings": "Peripheral zone: diffusely low T2 signal without focal lesion. No restricted diffusion. Transition zone: benign nodular hyperplasia, encapsulated. Seminal vesicles: symmetric, no invasion. Lymph nodes: no enlarged pelvic nodes. Bones: no suspicious marrow lesion.",
+    "impression": "1. No focal PI-RADS 3 or higher lesion.\n2. Overall PI-RADS 2."
+  },
+  "expectFlagged": []
+}

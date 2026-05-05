@@ -1,0 +1,27 @@
+{
+  "$schema": "https://schema.tauri.app/config/2.0/capability",
+  "identifier": "default",
+  "description": "Default capabilities for the RadioPad desktop main window.",
+  "windows": ["main"],
+  "permissions": [
+    "core:default",
+    {
+      "identifier": "shell:allow-spawn",
+      "allow": [{ "name": "radiopad-api", "sidecar": true }]
+    },
+    "dialog:default",
+    "dialog:allow-open",
+    "dialog:allow-save",
+    "clipboard-manager:default",
+    "clipboard-manager:allow-write-text",
+    "clipboard-manager:allow-read-text",
+    "global-shortcut:default",
+    "store:default",
+    "store:allow-get",
+    "store:allow-set",
+    "store:allow-delete",
+    "store:allow-clear",
+    "store:allow-keys",
+    "store:allow-save"
+  ]
+}

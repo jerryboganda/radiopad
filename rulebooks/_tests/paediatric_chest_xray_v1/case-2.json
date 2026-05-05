@@ -1,0 +1,12 @@
+{
+  "name": "paediatric chest XR — laterality mismatch",
+  "report": {
+    "study": { "modality": "XR", "bodyPart": "Chest", "indication": "Respiratory distress — 2 year old", "accessionNumber": "ACC-PCXR-0002" },
+    "indication": "Respiratory distress in a 2-year-old.",
+    "technique": "Single AP view of the chest.",
+    "comparison": "None.",
+    "findings": "Right lower lobe consolidation. No pneumothorax. ETT tip 1 cm above the carina. NG tube tip in the gastric body.",
+    "impression": "1. Left lower lobe consolidation, consistent with pneumonia.\n2. ETT and NG tube in appropriate position."
+  },
+  "expectFlagged": ["laterality_consistency"]
+}

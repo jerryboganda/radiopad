@@ -1,0 +1,128 @@
+name: desktop-windows-test-build
+
+# Automatic/manual unsigned Windows desktop build for test artifacts. This is
+# the closest repo-native equivalent to an EAS-style cloud build: push a branch,
+# then download the MSI/NSIS artifacts from GitHub Actions.
+# Production signing/release remains in desktop-bundle.yml / desktop-release.yml.
+
+on:
+  push:
+    branches:
+      - main
+      - 'desktop-cloud-build/**'
+    paths:
+      - '.github/workflows/desktop-windows-test-build.yml'
+      - 'backend/**'
+      - 'desktop/**'
+      - 'frontend/**'
+      - 'mobile/**'
+      - 'openapi/**'
+      - 'rulebooks/**'
+      - 'templates/**'
+      - 'package.json'
+      - 'pnpm-lock.yaml'
+      - 'pnpm-workspace.yaml'
+      - 'scripts/build-radiopad-desktop-windows.ps1'
+  workflow_dispatch:
+    inputs:
+      bundles:
+        description: Windows bundle target(s)
+        type: choice
+        required: true
+        default: msi,nsis
+        options:
+          - msi
+          - nsis
+          - msi,nsis
+      frozen-lockfile:
+        description: Use pnpm --frozen-lockfile (release-like; requires committed lockfile sync)
+        type: boolean
+        required: true
+        default: false
+
+permissions:
+  contents: read
+
+concurrency:
+  group: desktop-windows-test-build-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build-windows:
+    name: unsigned Windows desktop installer
+    runs-on: windows-latest
+    timeout-minutes: 90
+    env:
+      BUNDLES: ${{ github.event_name == 'workflow_dispatch' && inputs.bundles || 'msi,nsis' }}
+      FROZEN_LOCKFILE: ${{ github.event_name == 'workflow_dispatch' && inputs['frozen-lockfile'] || 'false' }}
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v3
+        with:
+          version: 9.15.9
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: pnpm
+
+      - name: Setup .NET
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '8.0.x'
+
+      - name: Setup Rust
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Cache Cargo
+        uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: desktop/src-tauri
+
+      - name: Build unsigned Windows installer
+        shell: pwsh
+        run: |
+          $args = @('-Bundles', $env:BUNDLES, '-DisableUpdaterArtifacts')
+          if ($env:FROZEN_LOCKFILE -ne 'true') {
+            $args += '-NoFrozenLockfile'
+          }
+          & .\scripts\build-radiopad-desktop-windows.ps1 @args
+
+      - name: Write installer notes
+        if: always()
+        shell: pwsh
+        run: |
+          New-Item -ItemType Directory -Force dist | Out-Null
+          @'
+          RadioPad Windows Desktop Test Build
+
+          This is an unsigned test installer artifact produced by GitHub Actions.
+          Use it for internal testing only.
+
+          Supported test OS: Windows 10 or Windows 11.
+          Windows 8 / 8.1 is not supported by the current RadioPad desktop stack
+          because the app bundles ASP.NET Core/.NET 8 and uses Tauri/WebView2.
+
+          Install steps:
+          1. Download this GitHub Actions artifact zip.
+          2. Extract the zip.
+          3. Run the .msi or setup .exe installer.
+          4. If Windows SmartScreen warns because the test build is unsigned,
+             choose More info -> Run anyway only on machines you control.
+          '@ | Set-Content dist\README-WINDOWS-DESKTOP-TEST-BUILD.txt
+
+      - name: Upload Windows desktop artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: radiopad-windows-unsigned-${{ github.run_number }}
+          path: |
+            desktop/src-tauri/target/release/bundle/**/*.msi
+            desktop/src-tauri/target/release/bundle/**/*.exe
+            dist/README-WINDOWS-DESKTOP-TEST-BUILD.txt
+          if-no-files-found: error
+          retention-days: 14

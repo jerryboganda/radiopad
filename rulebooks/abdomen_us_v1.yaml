@@ -1,0 +1,70 @@
+rulebook_id: abdomen_us_v1
+name: Abdomen Ultrasound Reporting Rulebook
+version: 1.0.0
+owner: Body Imaging Committee
+status: approved
+applies_to:
+  modalities:
+    - US
+  body_parts:
+    - Abdomen
+  report_types:
+    - diagnostic
+    - follow_up
+style:
+  tone: concise_clinical
+  impression_max_bullets: 4
+  avoid_terms:
+    - unremarkable
+    - cannot rule out
+    - grossly normal
+  approved_followups:
+    - Recommend clinical correlation.
+    - Recommend follow-up ultrasound in 6 months.
+    - Recommend cross-sectional imaging if clinically warranted.
+required_sections:
+  - Indication
+  - Technique
+  - Comparison
+  - Findings
+  - Impression
+rules:
+  - id: laterality_consistency
+    severity: blocker
+    description: Kidney findings must preserve left/right laterality across sections.
+  - id: measurement_consistency
+    severity: warning
+    description: Organ and lesion measurements (cm/mm) must match between Findings and Impression.
+  - id: negation_conflict
+    severity: blocker
+    description: A finding denied in Findings must not be asserted in Impression.
+  - id: modality_mismatch
+    severity: warning
+    description: Avoid CT/MRI cross-talk in an ultrasound report.
+  - id: impression_bullet_count
+    severity: warning
+    description: Impression should not exceed style.impression_max_bullets bullets.
+  - id: required_organ_coverage
+    severity: warning
+    description: Findings should address liver, gallbladder, biliary tree, pancreas, kidneys, spleen, aorta, and bladder when applicable.
+  - id: critical_result_language
+    severity: blocker
+    description: Critical findings (e.g., free fluid with hemodynamic instability, ruptured AAA) require documented communication.  - id: unauthorized_followup
+    severity: warning
+    description: Recommendation phrases must come from style.approved_followups.
+
+prompt_blocks:
+  system: >
+    You are assisting a board-certified radiologist drafting a structured Abdomen Ultrasound report.
+    Preserve laterality and measurements exactly as dictated. Never invent findings.
+    Use concise clinical phrasing. Avoid the terms in style.avoid_terms.
+  findings_to_impression: >
+    Generate a concise impression (max 4 bullets) faithful to the Findings.
+    Do not introduce new clinical claims that are not present in the Findings.
+  cleanup: >
+    Improve grammar and structure without changing clinical meaning.
+
+  dictation_cleanup: >
+    Rewrite this dictation into clean grammatical prose for each report section.
+    Do not invent findings the radiologist did not dictate. Preserve every measurement,
+    laterality, and negation exactly. If a section was not dictated, return an empty string for it.

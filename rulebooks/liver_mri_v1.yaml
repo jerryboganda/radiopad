@@ -1,0 +1,69 @@
+rulebook_id: liver_mri_v1
+name: Liver MRI Reporting Rulebook (LI-RADS)
+version: 1.0.0
+owner: Abdominal Imaging Committee
+status: approved
+applies_to:
+  modalities:
+    - MRI
+  body_parts:
+    - Liver
+    - Abdomen
+  report_types:
+    - diagnostic
+    - follow_up
+style:
+  tone: concise_clinical
+  impression_max_bullets: 5
+  avoid_terms:
+    - unremarkable
+    - cannot rule out
+  approved_followups:
+    - Recommend clinical correlation.
+    - Recommend follow-up imaging as clinically indicated.
+    - Recommend specialty consult if clinically warranted.
+required_sections:
+  - Indication
+  - Technique
+  - Comparison
+  - Findings
+  - Impression
+terminology_refs:
+  - system: li_rads
+    description: LI-RADS categorical assessment is required for HCC-surveillance / diagnostic studies.
+rules:
+  - id: measurement_consistency
+    severity: warning
+    description: Lesion size (mm) and segment must match across Findings and Impression.
+  - id: negation_conflict
+    severity: blocker
+    description: Findings denials must not be asserted in impression.
+  - id: lirads_category_required
+    severity: warning
+    description: When the indication is HCC surveillance, an LI-RADS category must be present in the impression.
+  - id: impression_bullet_count
+    severity: warning
+    description: Impression should not exceed style.impression_max_bullets bullets.
+  - id: critical_result_language
+    severity: blocker
+    description: LR-5 and LR-TIV findings require approved communication/escalation language.  - id: unauthorized_followup
+    severity: warning
+    description: Recommendation phrases must come from style.approved_followups.
+
+prompt_blocks:
+  system: >
+    You are assisting a board-certified abdominal radiologist drafting a structured liver
+    MRI report. Never invent findings. Preserve segment, lesion size, and LI-RADS
+    assessment exactly as dictated. Use concise clinical phrasing.
+  findings_to_impression: >
+    Generate a concise impression (max 5 bullets) faithful to the Findings section. When the
+    indication is HCC surveillance, include the LI-RADS category. Do not introduce new
+    clinical claims that are not present in the Findings.
+  cleanup: >
+    Improve grammar and structure without changing clinical meaning, segment, lesion size,
+    or LI-RADS code.
+
+  dictation_cleanup: >
+    Rewrite this dictation into clean grammatical prose for each report section.
+    Do not invent findings the radiologist did not dictate. Preserve every measurement,
+    laterality, and negation exactly. If a section was not dictated, return an empty string for it.

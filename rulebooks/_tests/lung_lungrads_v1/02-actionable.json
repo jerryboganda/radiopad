@@ -1,0 +1,12 @@
+{
+  "name": "lung screening CT — Lung-RADS 4A with new nodule, size discrepancy",
+  "report": {
+    "study": { "modality": "CT", "bodyPart": "Chest", "indication": "Lung cancer screening", "accessionNumber": "SYNTH-LDS-0002" },
+    "indication": "Annual low-dose CT lung cancer screening.",
+    "technique": "Low-dose non-contrast CT of the chest with 1 mm reconstructions.",
+    "comparison": "Prior screening CT 12 months ago.",
+    "findings": "Lungs: 8 mm solid nodule in the right upper lobe, new since prior. No additional nodules. No adenopathy. No pleural effusion.",
+    "impression": "1. New 12 mm right upper lobe solid nodule.\n2. Lung-RADS 4A."
+  },
+  "expectFlagged": ["measurement_consistency"]
+}

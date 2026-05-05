@@ -1,0 +1,274 @@
+// RadioPad desktop shell — Tauri 2.0 bootstrap.
+//
+// Responsibilities:
+//   * Load the static export of the Next.js frontend.
+//   * Register the documented global hotkeys (PRD DESK-003).
+//   * Expose a secure-clipboard command that wipes the clipboard after N ms,
+//     with optional clear-on-blur (PRD DESK-004).
+//   * Encrypted offline-draft store (PRD DESK-006) + general local cache
+//     (PRD DESK-005), keyed off an OS-keyring-backed master key.
+//   * Per-install device pairing flow (PRD DESK-008).
+//   * PHI redaction layer over the global tracing subscriber (PRD DESK-010).
+//   * Spawn the bundled `radiopad-api` sidecar (PRD DESK-015).
+
+#![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
+
+mod crypto_keyring;
+mod device_pairing;
+mod local_cache;
+mod log_redactor;
+mod offline_drafts;
+mod pacs_plugins;
+mod sandbox;
+
+use std::path::PathBuf;
+use std::sync::{Mutex, OnceLock};
+
+use tauri::Emitter;
+use tauri::Manager;
+use tauri_plugin_clipboard_manager::ClipboardExt;
+use tauri_plugin_global_shortcut::{Code, GlobalShortcutExt, Modifiers, Shortcut, ShortcutState};
+use tauri_plugin_shell::process::CommandEvent;
+use tauri_plugin_shell::ShellExt;
+use tauri_plugin_store::StoreExt;
+
+const SETTINGS_FILE: &str = "radiopad-settings.json";
+const SETTING_CLEAR_ON_BLUR: &str = "secureClipboard.clearOnBlur";
+static SECURE_CLIPBOARD_TEXT: OnceLock<Mutex<Option<String>>> = OnceLock::new();
+
+fn secure_clipboard_text() -> &'static Mutex<Option<String>> {
+    SECURE_CLIPBOARD_TEXT.get_or_init(|| Mutex::new(None))
+}
+
+fn remember_secure_clipboard_text(text: &str) {
+    if let Ok(mut current) = secure_clipboard_text().lock() {
+        *current = Some(text.to_string());
+    }
+}
+
+fn forget_secure_clipboard_text(expected: &str) {
+    if let Ok(mut current) = secure_clipboard_text().lock() {
+        if current.as_deref() == Some(expected) {
+            *current = None;
+        }
+    }
+}
+
+fn clear_secure_clipboard_if_owned(app: &tauri::AppHandle) -> bool {
+    let expected = secure_clipboard_text()
+        .lock()
+        .ok()
+        .and_then(|current| current.clone());
+    let Some(expected) = expected else {
+        return false;
+    };
+
+    let still_ours = app
+        .clipboard()
+        .read_text()
+        .map(|current| current == expected)
+        .unwrap_or(false);
+    if !still_ours {
+        forget_secure_clipboard_text(&expected);
+        return false;
+    }
+
+    if app.clipboard().write_text(String::new()).is_ok() {
+        forget_secure_clipboard_text(&expected);
+        return true;
+    }
+    false
+}
+
+#[tauri::command]
+fn get_backend_url() -> String {
+    std::env::var("RADIOPAD_BACKEND").unwrap_or_else(|_| "http://127.0.0.1:7457".to_string())
+}
+
+/// Copy `text` to the OS clipboard and clear it after `ttl_ms` milliseconds.
+/// Use this for any value that may contain PHI (accession numbers, MRNs).
+///
+/// Falls back gracefully when the clipboard plugin is unavailable: returns
+/// `Err` instead of panicking, so the frontend can degrade to a manual
+/// copy-paste fallback.
+#[tauri::command]
+async fn secure_copy(app: tauri::AppHandle, text: String, ttl_ms: u64) -> Result<(), String> {
+    let clipboard = app.clipboard();
+    clipboard
+        .write_text(text.clone())
+        .map_err(|e| format!("clipboard unavailable: {e}"))?;
+    remember_secure_clipboard_text(&text);
+    let app2 = app.clone();
+    tauri::async_runtime::spawn(async move {
+        tokio::time::sleep(std::time::Duration::from_millis(ttl_ms)).await;
+        if clear_secure_clipboard_if_owned(&app2) {
+            let _ = app2.emit("radiopad://clipboard-cleared", ());
+        }
+    });
+    Ok(())
+}
+
+/// PRD DESK-009 — verify a plugin or model artifact before the desktop loads
+/// it. Returns `Ok(())` on success or a string describing the failure.
+#[tauri::command]
+fn verify_plugin(
+    path: String,
+    expected_sha256: String,
+    expected_signature: Option<String>,
+) -> Result<(), String> {
+    let p = PathBuf::from(&path);
+    sandbox::verify_plugin(&p, &expected_sha256, expected_signature.as_deref())
+        .map_err(|e| e.to_string())
+}
+
+/// Read the `secureClipboard.clearOnBlur` setting from the persisted
+/// settings store. Defaults to `false` (preserve existing UX) when the store
+/// can't be opened or the key is unset.
+fn clear_on_blur_enabled<R: tauri::Runtime>(app: &tauri::AppHandle<R>) -> bool {
+    let Ok(store) = app.store(SETTINGS_FILE) else {
+        return false;
+    };
+    store
+        .get(SETTING_CLEAR_ON_BLUR)
+        .and_then(|v| v.as_bool())
+        .unwrap_or(false)
+}
+
+fn main() {
+    // PRD DESK-010 — install the redacting tracing subscriber before any
+    // other code can produce log lines.
+    log_redactor::init();
+
+    tauri::Builder::default()
+        .plugin(tauri_plugin_shell::init())
+        .plugin(tauri_plugin_dialog::init())
+        .plugin(tauri_plugin_clipboard_manager::init())
+        .plugin(tauri_plugin_store::Builder::new().build())
+        .plugin(
+            tauri_plugin_global_shortcut::Builder::new()
+                .with_handler(|app, shortcut, event| {
+                    if event.state != ShortcutState::Pressed {
+                        return;
+                    }
+                    let mods = shortcut.mods;
+                    let primary = mods.contains(Modifiers::SHIFT)
+                        && (mods.contains(Modifiers::CONTROL)
+                            || mods.contains(Modifiers::SUPER));
+                    if !primary {
+                        return;
+                    }
+                    match shortcut.key {
+                        // Ctrl/Cmd+Shift+R — focus / restore window.
+                        Code::KeyR => {
+                            if let Some(win) = app.get_webview_window("main") {
+                                let _ = win.show();
+                                let _ = win.set_focus();
+                            }
+                        }
+                        // Ctrl/Cmd+Shift+N — start a new report.
+                        Code::KeyN => {
+                            let _ = app.emit("radiopad://new-report", ());
+                        }
+                        // Ctrl/Cmd+Shift+I — generate impression.
+                        Code::KeyI => {
+                            let _ = app.emit("radiopad://generate-impression", ());
+                        }
+                        // Ctrl/Cmd+Shift+W — open rewrite-mode picker.
+                        Code::KeyW => {
+                            let _ = app.emit("radiopad://rewrite", ());
+                        }
+                        // Ctrl/Cmd+Shift+D — start dictation.
+                        Code::KeyD => {
+                            let _ = app.emit("radiopad://dictate", ());
+                        }
+                        // Ctrl/Cmd+Shift+C — secure-copy the focused section.
+                        // The frontend resolves the section text, then calls
+                        // `secure_copy` with an appropriate TTL.
+                        Code::KeyC => {
+                            let _ = app.emit("radiopad://secure-copy-section", ());
+                        }
+                        _ => {}
+                    }
+                })
+                .build(),
+        )
+        .invoke_handler(tauri::generate_handler![
+            get_backend_url,
+            secure_copy,
+            verify_plugin,
+            offline_drafts::offline_drafts_list,
+            offline_drafts::offline_drafts_save,
+            offline_drafts::offline_drafts_get,
+            offline_drafts::offline_drafts_delete,
+            local_cache::local_cache_get,
+            local_cache::local_cache_put,
+            local_cache::local_cache_clear,
+            device_pairing::device_fingerprint,
+            device_pairing::device_pairing_token_set,
+            device_pairing::device_pairing_token_get,
+            pacs_plugins::pacs_plugins_list,
+            pacs_plugins::pacs_plugins_verify,
+            pacs_plugins::pacs_plugins_set_enabled,
+        ])
+        .setup(|app| {
+            let shortcuts = [
+                Shortcut::new(Some(Modifiers::CONTROL | Modifiers::SHIFT), Code::KeyR),
+                Shortcut::new(Some(Modifiers::CONTROL | Modifiers::SHIFT), Code::KeyN),
+                Shortcut::new(Some(Modifiers::CONTROL | Modifiers::SHIFT), Code::KeyI),
+                Shortcut::new(Some(Modifiers::CONTROL | Modifiers::SHIFT), Code::KeyW),
+                Shortcut::new(Some(Modifiers::CONTROL | Modifiers::SHIFT), Code::KeyD),
+                Shortcut::new(Some(Modifiers::CONTROL | Modifiers::SHIFT), Code::KeyC),
+                Shortcut::new(Some(Modifiers::SUPER | Modifiers::SHIFT), Code::KeyR),
+                Shortcut::new(Some(Modifiers::SUPER | Modifiers::SHIFT), Code::KeyN),
+                Shortcut::new(Some(Modifiers::SUPER | Modifiers::SHIFT), Code::KeyI),
+                Shortcut::new(Some(Modifiers::SUPER | Modifiers::SHIFT), Code::KeyW),
+                Shortcut::new(Some(Modifiers::SUPER | Modifiers::SHIFT), Code::KeyD),
+                Shortcut::new(Some(Modifiers::SUPER | Modifiers::SHIFT), Code::KeyC),
+            ];
+            for sc in shortcuts {
+                if let Err(e) = app.global_shortcut().register(sc) {
+                    tracing::warn!("global shortcut registration failed: {e}");
+                }
+            }
+
+            // PRD DESK-004 — clear the clipboard on focus loss when the
+            // tenant has opted in via `secureClipboard.clearOnBlur`.
+            if let Some(window) = app.get_webview_window("main") {
+                let app_handle = app.handle().clone();
+                window.on_window_event(move |event| {
+                    if let tauri::WindowEvent::Focused(false) = event {
+                        if clear_on_blur_enabled(&app_handle)
+                            && clear_secure_clipboard_if_owned(&app_handle)
+                        {
+                            let _ = app_handle.emit("radiopad://clipboard-cleared", ());
+                        }
+                    }
+                });
+            }
+
+            // PRD DESK-015 — spawn the bundled backend sidecar.
+            if std::env::var("RADIOPAD_NO_SIDECAR").ok().as_deref() != Some("1") {
+                if let Ok(sidecar) = app.shell().sidecar("radiopad-api") {
+                    let (mut rx, _child) = sidecar
+                        .env("RADIOPAD_BIND", "http://127.0.0.1:7457")
+                        .spawn()
+                        .expect("failed to spawn radiopad-api sidecar");
+                    tauri::async_runtime::spawn(async move {
+                        while let Some(event) = rx.recv().await {
+                            if let CommandEvent::Stderr(line) = event {
+                                // The redacting tracing writer scrubs PHI
+                                // before this reaches the terminal / log file.
+                                tracing::info!(
+                                    "radiopad-api: {}",
+                                    String::from_utf8_lossy(&line)
+                                );
+                            }
+                        }
+                    });
+                }
+            }
+            Ok(())
+        })
+        .run(tauri::generate_context!())
+        .expect("error while running RadioPad desktop");
+}

@@ -1,0 +1,24 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <RootNamespace>RadioPad.Infrastructure</RootNamespace>
+    <AssemblyName>RadioPad.Infrastructure</AssemblyName>
+  </PropertyGroup>
+  <ItemGroup>
+    <ProjectReference Include="..\RadioPad.Domain\RadioPad.Domain.csproj" />
+    <ProjectReference Include="..\RadioPad.Application\RadioPad.Application.csproj" />
+    <PackageReference Include="Microsoft.EntityFrameworkCore" Version="8.0.10" />
+    <PackageReference Include="Microsoft.EntityFrameworkCore.Sqlite" Version="8.0.10" />
+    <PackageReference Include="Npgsql.EntityFrameworkCore.PostgreSQL" Version="8.0.8" />
+    <PackageReference Include="Microsoft.EntityFrameworkCore.Design" Version="8.0.10">
+      <PrivateAssets>all</PrivateAssets>
+    </PackageReference>
+    <!-- Iter-31 INT-006 — BackgroundService for the HL7 v2 MLLP listener. -->
+    <PackageReference Include="Microsoft.Extensions.Hosting.Abstractions" Version="8.0.0" />
+    <PackageReference Include="Microsoft.Extensions.Logging.Abstractions" Version="8.0.2" />
+    <!-- Iter-32 SEC-003 — real cloud KMS adapters (AWS / Azure KV / GCP). -->
+    <PackageReference Include="AWSSDK.KeyManagementService" Version="3.7.401" />
+    <PackageReference Include="Azure.Identity" Version="1.13.1" />
+    <PackageReference Include="Azure.Security.KeyVault.Keys" Version="4.6.0" />
+    <PackageReference Include="Google.Cloud.Kms.V1" Version="3.18.0" />
+  </ItemGroup>
+</Project>

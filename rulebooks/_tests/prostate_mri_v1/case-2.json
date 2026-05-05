@@ -1,0 +1,12 @@
+{
+  "name": "prostate MRI — measurement in Impression not in Findings",
+  "report": {
+    "study": { "modality": "MRI", "bodyPart": "Prostate", "indication": "Elevated PSA", "accessionNumber": "ACC-PRO-0002" },
+    "indication": "Rising PSA.",
+    "technique": "Multiparametric prostate MRI at 3T.",
+    "comparison": "None.",
+    "findings": "Peripheral zone: focal lesion in the right posterolateral mid gland (sector 7) with restricted diffusion and early enhancement. Transition zone: BPH. Seminal vesicles: no invasion. Lymph nodes: no adenopathy. Bones: no suspicious lesion.",
+    "impression": "1. 14 mm right posterolateral peripheral zone lesion, PI-RADS 5.\n2. No seminal vesicle invasion."
+  },
+  "expectFlagged": ["measurement_consistency"]
+}

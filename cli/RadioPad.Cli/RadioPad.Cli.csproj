@@ -1,0 +1,27 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <TargetFramework>net8.0</TargetFramework>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <RootNamespace>RadioPad.Cli</RootNamespace>
+    <AssemblyName>radiopad</AssemblyName>
+    <PackAsTool>true</PackAsTool>
+    <ToolCommandName>radiopad</ToolCommandName>
+    <PackageId>RadioPad.Cli</PackageId>
+    <Version>0.1.0</Version>
+  </PropertyGroup>
+  <ItemGroup>
+    <ProjectReference Include="..\..\backend\RadioPad.Api\src\RadioPad.Domain\RadioPad.Domain.csproj" />
+    <ProjectReference Include="..\..\backend\RadioPad.Api\src\RadioPad.Validation\RadioPad.Validation.csproj" />
+    <ProjectReference Include="..\..\backend\RadioPad.Api\src\RadioPad.Application\RadioPad.Application.csproj" />
+    <PackageReference Include="System.CommandLine" Version="2.0.0-beta4.22272.1" />
+    <!-- DESK-009 / CLI-PLUGIN — Ed25519 verification for `radiopad plugin verify`. -->
+    <PackageReference Include="BouncyCastle.Cryptography" Version="2.4.0" />
+    <!-- CLI-006 — YAML parsing for `radiopad templates import/export`. -->
+    <PackageReference Include="YamlDotNet" Version="15.1.6" />
+  </ItemGroup>
+  <ItemGroup>
+    <InternalsVisibleTo Include="RadioPad.Api.Tests" />
+  </ItemGroup>
+</Project>

@@ -1,0 +1,11 @@
+{
+  "name": "shoulder MRI — laterality conflict",
+  "report": {
+    "study": { "modality": "MRI", "bodyPart": "Shoulder", "indication": "Shoulder pain", "accessionNumber": "ACC-SHL-0002" },
+    "indication": "Right shoulder pain after fall.",
+    "technique": "Right shoulder MRI without contrast at 3T.",
+    "findings": "Rotator cuff: full-thickness tear of the right supraspinatus tendon, retracted to the level of the glenoid. Right infraspinatus and subscapularis tendons intact. Labrum: anterior labral tear on the right. Right AC joint: degenerative change. Bones: no fracture.",
+    "impression": "1. Full-thickness left supraspinatus tear with anterior labral tear on the left.\n2. Left AC joint degenerative change."
+  },
+  "expectFlagged": ["laterality_consistency"]
+}

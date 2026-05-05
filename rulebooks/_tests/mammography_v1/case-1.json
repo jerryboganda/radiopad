@@ -1,0 +1,12 @@
+{
+  "name": "clean mammography — BI-RADS 1",
+  "report": {
+    "study": { "modality": "MG", "bodyPart": "Breast", "indication": "Screening", "accessionNumber": "ACC-MG-0001" },
+    "indication": "Screening mammography, no symptoms.",
+    "technique": "Standard 4-view digital mammography of both breasts.",
+    "comparison": "None available.",
+    "findings": "Bilateral breast tissue is heterogeneously dense. No suspicious mass, calcification, or architectural distortion bilaterally.",
+    "impression": "1. No mammographic evidence of malignancy bilaterally. BI-RADS 1.\n2. Recommend routine screening mammography in 12 months."
+  },
+  "expectFlagged": []
+}

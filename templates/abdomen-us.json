@@ -1,0 +1,14 @@
+{
+  "id": "abdomen-us",
+  "name": "Abdomen Ultrasound",
+  "modality": "US",
+  "bodyPart": "Abdomen",
+  "rulebookId": "abdomen_us_v1",
+  "sections": [
+    { "id": "indication",   "label": "Indication",   "placeholder": "Clinical question / referring concern." },
+    { "id": "technique",    "label": "Technique",    "placeholder": "Greyscale and Doppler ultrasound of the abdomen." },
+    { "id": "comparison",   "label": "Comparison",   "placeholder": "Prior abdominal imaging, if available." },
+    { "id": "findings",     "label": "Findings",     "placeholder": "Liver: ...\nGallbladder / biliary: ...\nPancreas: ...\nKidneys: ...\nSpleen: ...\nAorta / IVC: ...\nBladder: ..." },
+    { "id": "impression",   "label": "Impression",   "placeholder": "Concise bulleted impression (max 4)." }
+  ]
+}

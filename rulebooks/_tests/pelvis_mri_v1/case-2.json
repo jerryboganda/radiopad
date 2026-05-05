@@ -1,0 +1,11 @@
+{
+  "name": "pelvis MRI — adnexal laterality conflict",
+  "report": {
+    "study": { "modality": "MRI", "bodyPart": "Pelvis", "indication": "Adnexal mass", "accessionNumber": "ACC-PMR-0002" },
+    "indication": "Adnexal mass on prior ultrasound.",
+    "technique": "Pelvic MRI at 3T including T2W, T1W, DWI, and dynamic contrast-enhanced sequences.",
+    "findings": "Uterus: normal. Cervix: normal. Right adnexa: 45 mm complex cystic-solid lesion with enhancing mural nodule on the right. Bladder: normal. Bowel: normal. Bones: no aggressive lesion.",
+    "impression": "1. 45 mm left adnexal complex cystic-solid lesion with enhancing mural nodule, suspicious.\n2. Multidisciplinary review recommended."
+  },
+  "expectFlagged": ["laterality_consistency"]
+}

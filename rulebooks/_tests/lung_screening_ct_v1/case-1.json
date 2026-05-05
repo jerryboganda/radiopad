@@ -1,0 +1,12 @@
+{
+  "name": "clean lung screening CT — Lung-RADS 1, baseline",
+  "report": {
+    "study": { "modality": "CT", "bodyPart": "Chest", "indication": "Lung cancer screening", "accessionNumber": "ACC-LDS-0001" },
+    "indication": "Baseline low-dose CT lung cancer screening, asymptomatic.",
+    "technique": "Low-dose non-contrast CT of the chest with 1 mm reconstructions.",
+    "comparison": "None — baseline screening exam.",
+    "findings": "Lungs: no solid, part-solid, or non-solid nodule. No consolidation. No mediastinal or hilar adenopathy. Heart size normal. No pleural effusion. Visualised upper abdomen: no acute finding.",
+    "impression": "1. Negative low-dose CT lung cancer screening.\n2. Lung-RADS 1.\n3. Continue annual screening per current guidelines."
+  },
+  "expectFlagged": []
+}

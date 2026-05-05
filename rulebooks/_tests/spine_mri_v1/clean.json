@@ -1,0 +1,12 @@
+{
+  "name": "clean lumbar MRI",
+  "report": {
+    "study": { "modality": "MRI", "bodyPart": "Lumbar Spine", "indication": "low back pain", "accessionNumber": "ACC-SP-2" },
+    "indication": "Low back pain.",
+    "technique": "Multiplanar multisequence MRI of the lumbar spine without contrast.",
+    "comparison": "None.",
+    "findings": "Alignment normal. Marrow signal normal. Conus terminates at L1. L1-L2 through L5-S1: no disc herniation, central canal stenosis, or foraminal narrowing.",
+    "impression": "1. No acute lumbar spine abnormality."
+  },
+  "expectFlagged": []
+}

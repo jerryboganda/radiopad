@@ -1,0 +1,12 @@
+{
+  "name": "mammography — laterality mismatch with BI-RADS",
+  "report": {
+    "study": { "modality": "MG", "bodyPart": "Breast", "indication": "Diagnostic — palpable lump", "accessionNumber": "ACC-MG-0002" },
+    "indication": "Palpable lump in right breast at 10 o'clock.",
+    "technique": "Standard 4-view digital mammography with spot compression of the right breast.",
+    "comparison": "Mammogram from prior year, no prior lesions.",
+    "findings": "Right breast: 12 mm spiculated mass at 10 o'clock, 5 cm from the nipple. Left breast: no suspicious lesion.",
+    "impression": "1. Left breast spiculated mass, suspicious for malignancy. BI-RADS 4B.\n2. Recommend ultrasound-guided biopsy of left breast lesion."
+  },
+  "expectFlagged": ["laterality_consistency"]
+}

@@ -1,0 +1,77 @@
+{
+  "nav": {
+    "reports": "Befunde",
+    "rulebooks": "Regelwerke",
+    "templates": "Vorlagen",
+    "providers": "Anbieter",
+    "prompts": "Prompts",
+    "marketplace": "Marktplatz",
+    "validation": "Validierung",
+    "governance": "Governance",
+    "modelEval": "Model-Eval",
+    "audit": "Audit",
+    "analytics": "Analytik",
+    "terminology": "Terminologie",
+    "offline": "Offline",
+    "settings": "Einstellungen",
+    "billing": "Abrechnung",
+    "usage": "Nutzung",
+    "featureFlags": "Funktionsflags",
+    "fhirImport": "FHIR-Import",
+    "pacs": "PACS",
+    "security": "Sicherheit",
+    "signIn": "Anmelden"
+  },
+  "buttons": {
+    "primary": {
+      "save": "Speichern",
+      "submit": "Absenden",
+      "approve": "Freigeben",
+      "sign": "Signieren",
+      "export": "Exportieren",
+      "create": "Erstellen",
+      "confirm": "Bestätigen"
+    },
+    "ghost": {
+      "cancel": "Abbrechen",
+      "back": "Zurück",
+      "discard": "Verwerfen"
+    },
+    "subtle": {
+      "more": "Mehr",
+      "details": "Details",
+      "language": "Sprache"
+    }
+  },
+  "validation": {
+    "severity": {
+      "blocker": "Blocker",
+      "warning": "Warnung",
+      "info": "Hinweis"
+    }
+  },
+  "banner": {
+    "warn": "Achtung",
+    "info": "Hinweis",
+    "danger": "Aktion erforderlich"
+  },
+  "admin": {
+    "headings": {
+      "settings": "Mandanteneinstellungen",
+      "billing": "Abrechnung",
+      "usage": "Nutzung",
+      "security": "Sicherheit",
+      "featureFlags": "Funktionsflags",
+      "language": "Sprache"
+    },
+    "language": {
+      "tenantDefault": "Standardsprache des Mandanten",
+      "yourLocale": "Deine Sprache",
+      "clinicalNote": "Klinische Inhalte (Regelwerke, Befundtexte, Validierungsmeldungen) werden stets auf Englisch angezeigt."
+    }
+  },
+  "topbar": {
+    "title": "RadioPad",
+    "tagline": "KI-gestützte Befundung · v0.1"
+  }
+}

@@ -1,0 +1,61 @@
+rulebook_id: brain_mri_v1
+name: Brain MRI Reporting Rulebook
+version: 1.0.0
+owner: Neuroradiology Committee
+status: approved
+applies_to:
+  modalities:
+    - MR
+    - MRI
+  body_parts:
+    - Brain
+    - Head
+style:
+  tone: concise_clinical
+  impression_max_bullets: 4
+  avoid_terms:
+    - unremarkable
+  approved_followups:
+    - Recommend clinical correlation.
+    - Recommend neurology consult if clinically warranted.
+    - Recommend follow-up MRI in 6 months.
+required_sections:
+  - Indication
+  - Technique
+  - Findings
+  - Impression
+rules:
+  - id: laterality_consistency
+    severity: blocker
+    description: Left/right findings must match impression.
+  - id: measurement_consistency
+    severity: warning
+    description: Lesion measurements must match across sections.
+  - id: negation_conflict
+    severity: blocker
+    description: Findings denials must not be asserted in impression.
+  - id: modality_mismatch
+    severity: warning
+    description: Avoid CT/US phrasing in an MRI report.
+  - id: impression_bullet_count
+    severity: warning
+    description: Impression should not exceed 4 bullets.
+  - id: critical_result_language
+    severity: blocker
+    description: Critical findings require approved communication/escalation language.  - id: unauthorized_followup
+    severity: warning
+    description: Recommendation phrases must come from style.approved_followups.
+
+prompt_blocks:
+  system: >
+    You are assisting a board-certified neuroradiologist drafting a structured Brain MRI report.
+    Preserve laterality, sequence-specific signal characteristics, and any measurements exactly.
+  findings_to_impression: >
+    Produce a concise impression (max 4 bullets), faithful to the Findings.
+  cleanup: >
+    Improve grammar without changing clinical meaning.
+
+  dictation_cleanup: >
+    Rewrite this dictation into clean grammatical prose for each report section.
+    Do not invent findings the radiologist did not dictate. Preserve every measurement,
+    laterality, and negation exactly. If a section was not dictated, return an empty string for it.

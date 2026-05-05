@@ -1,0 +1,12 @@
+{
+  "name": "mammography — BI-RADS 5 without communication language",
+  "report": {
+    "study": { "modality": "MG", "bodyPart": "Breast", "indication": "Diagnostic mammography", "accessionNumber": "SYNTH-MG-0005" },
+    "indication": "Left breast palpable lump.",
+    "technique": "Diagnostic mammography and targeted ultrasound of the left breast.",
+    "comparison": "None.",
+    "findings": "Left breast 22 mm spiculated mass at 2 o'clock.",
+    "impression": "1. 22 mm left breast mass, highly suggestive of malignancy.\n2. BI-RADS 5."
+  },
+  "expectFlagged": ["critical_result_language"]
+}

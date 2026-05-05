@@ -1,0 +1,15 @@
+{
+  "templateId": "brain-mri",
+  "name": "Brain MRI (default)",
+  "modality": "MR",
+  "bodyPart": "Brain",
+  "subspecialty": "Neuro",
+  "sections": [
+    { "key": "Indication", "required": true },
+    { "key": "Technique", "required": true, "default": "Multiplanar, multisequence MRI of the brain without IV contrast." },
+    { "key": "Comparison", "required": false },
+    { "key": "Findings", "required": true, "structured": ["Parenchyma", "Ventricles", "Vessels", "Skull base", "Sinuses"] },
+    { "key": "Impression", "required": true, "format": "bullets", "maxBullets": 4 },
+    { "key": "Recommendations", "required": false }
+  ]
+}

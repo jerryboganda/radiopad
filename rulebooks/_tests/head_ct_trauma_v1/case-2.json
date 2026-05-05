@@ -1,0 +1,12 @@
+{
+  "name": "head CT trauma — critical finding lacks communication language",
+  "report": {
+    "study": { "modality": "CT", "bodyPart": "Head", "indication": "Trauma", "accessionNumber": "ACC-HCT-0002" },
+    "indication": "High-speed motor vehicle collision. GCS 9.",
+    "technique": "Non-contrast CT of the head.",
+    "findings": "Intracranial: 9 mm right frontal acute subdural haematoma. Mass effect with 5 mm leftward midline shift. No herniation. Extra-axial: as above. Skull: non-displaced right frontal fracture. Soft tissues: overlying scalp swelling.",
+    "impression": "1. Critical right frontal acute subdural haematoma with 5 mm midline shift.\n2. Non-displaced right frontal skull fracture.",
+    "recommendations": "Neurosurgery consult."
+  },
+  "expectFlagged": ["critical_result_language"]
+}
