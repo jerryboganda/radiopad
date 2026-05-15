@@ -64,6 +64,43 @@ artifacts reach a workstation.
 | Stolen workstation | private key never lives on workstations; pubkey only |
 | Dev shortcut leaking to prod | release builds refuse unsigned plugins regardless of env |
 
+## macOS sandbox — `sandbox-exec` profile (A3)
+
+On macOS the desktop wraps plugin launches with
+`/usr/bin/sandbox-exec -f <resolved-profile> <plugin_binary>`.
+
+The sandbox profile template lives at
+[`src-tauri/macos-plugin-sandbox.sb`](src-tauri/macos-plugin-sandbox.sb)
+and is resolved at runtime (bundled app ➜ `Contents/Resources/`, dev ➜
+source tree). Three variables are substituted before launch:
+
+| Variable | Meaning |
+| --- | --- |
+| `PLUGIN_DIR` | Directory containing the plugin binary (read-only access). |
+| `PLUGIN_BINARY` | Absolute path to the plugin executable (exec allowed). |
+| `PLUGIN_WORKDIR` | Per-plugin writable scratch directory under `$TMPDIR/radiopad-plugin-<id>`. |
+
+### Profile policy summary
+
+| Category | Rule |
+| --- | --- |
+| Default | `(deny default)` — everything blocked unless explicitly allowed. |
+| Network | `(deny network*)` — no sockets, no DNS, no HTTP. |
+| FS reads | Plugin dir, `/usr/lib`, `/System/Library`, dyld cache. |
+| FS writes | **Only** `PLUGIN_WORKDIR`. Hard-deny `/System`, `/Library`, `/usr`. |
+| Process | Only the plugin binary may exec. `(deny process-fork)`. |
+| IPC | `(allow mach-lookup)` — required by libSystem. |
+| Sysctl | Read-only (`hw.ncpu`, `kern.osversion`, etc.). |
+| Logging | `(debug deny)` — violations routed to syslog for diagnostics. |
+
+### Fallback
+
+If `/usr/bin/sandbox-exec` is not present (rare, but possible on
+stripped CI images), the launch falls back to a noop sandbox and sets
+`RADIOPAD_PLUGIN_SANDBOX=noop`. Operators should monitor for this tag.
+
+---
+
 ## Audit
 
 Every successful or failed `verify_plugin` invocation that originates from

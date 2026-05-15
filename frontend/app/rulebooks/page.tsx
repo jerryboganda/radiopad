@@ -67,7 +67,7 @@ export default function RulebooksPage() {
             </thead>
             <tbody>
               {items.map((rb) => (
-                <tr key={rb.id} onClick={() => loadOne(rb.id)} style={{ cursor: 'pointer' }}>
+                <tr key={rb.id} onClick={() => loadOne(rb.id)} tabIndex={0} role="button" onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') loadOne(rb.id); }} style={{ cursor: 'pointer' }}>
                   <td><code>{rb.rulebookId}</code><div style={{ color: 'var(--text-muted)', fontSize: 12 }}>{rb.name}</div></td>
                   <td>{rb.version}</td>
                   <td><span className={`badge ${statusBadge(rb.status)}`}>{statusLabel(rb.status)}</span></td>

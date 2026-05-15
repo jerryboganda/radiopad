@@ -74,7 +74,7 @@
     }
   },
   "plugins": {
-    "shell": { "open": true },
+    "shell": { "open": false },
     "dialog": {},
     "clipboard-manager": {},
     "store": {},

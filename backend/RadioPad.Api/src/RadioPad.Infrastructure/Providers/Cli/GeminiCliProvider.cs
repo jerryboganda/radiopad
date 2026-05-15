@@ -43,7 +43,11 @@ public sealed class GeminiCliProvider : IAiProviderAdapter
             CliProviderRunner.Sanitise(AdapterId, request.SystemPrompt),
             CliProviderRunner.Sanitise(AdapterId, request.UserPrompt));
 
-        var args = new List<string> { "--prompt-stdin" };
+        // D1 — Updated 2025-06: gemini CLI uses `prompt` sub-command with
+        // `--stdin` to read from stdin in non-interactive mode, and `--json`
+        // for machine-readable output.
+        // TODO: Update when vendor publishes stable non-interactive flags
+        var args = new List<string> { "prompt", "--stdin", "--json" };
         if (!string.IsNullOrWhiteSpace(p.Model))
         {
             args.Add("--model");

@@ -68,6 +68,13 @@ export default function AnalyticsPage() {
         PRD §18 — Product &amp; Governance KPIs. Tenant-scoped.
       </p>
 
+      {/* ── Quality Trends link ─────────────────────────────────── */}
+      <div style={{ marginBottom: 16 }}>
+        <a href="/analytics/quality" className="ghost active" style={{ textDecoration: 'none' }}>
+          Quality Trends →
+        </a>
+      </div>
+
       {/* ── Date range picker ───────────────────────────────────── */}
       <div className="rp-panel" style={{ marginBottom: 24 }}>
         <div className="rp-panel-title">Time Window</div>
@@ -290,11 +297,11 @@ function Kpi({
   severity?: 'ok' | 'warn' | 'info';
 }) {
   return (
-    <div className="panel" style={{ padding: 16 }}>
+    <div className="rp-panel" style={{ padding: 16 }}>
       <div className="rp-page-sub" style={{ marginBottom: 4 }}>
         {label}
       </div>
-      <div style={{ fontSize: 28, fontFamily: 'var(--serif)' }}>
+      <div className="rp-kpi-value">
         {value}{' '}
         {severity && <span className={`badge ${severity}`}>{severity}</span>}
       </div>

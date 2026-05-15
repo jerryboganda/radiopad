@@ -157,22 +157,7 @@ export default function RulebookEditorClient() {
         {/* Right pane — live YAML preview */}
         <section className="pane">
           <div className="rp-panel-title">YAML Preview</div>
-          <pre
-            style={{
-              fontFamily: 'var(--mono)',
-              fontSize: 12,
-              lineHeight: 1.5,
-              background: 'var(--bg-subtle)',
-              border: '1px solid var(--border)',
-              borderRadius: 'var(--radius-sm)',
-              padding: 14,
-              overflow: 'auto',
-              maxHeight: 'calc(100vh - 200px)',
-              whiteSpace: 'pre-wrap',
-              wordBreak: 'break-word',
-              margin: 0,
-            }}
-          >
+          <pre className="rp-yaml-preview">
             {yaml()}
           </pre>
         </section>

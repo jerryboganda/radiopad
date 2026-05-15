@@ -1010,6 +1010,129 @@ public class AnalyticsController : TenantedController
         var summary = await _analytics.ComputeAsync(tenant.Id, f, t, raw, aiUsage, ct);
         return Ok(summary);
     }
+
+    /// <summary>
+    /// C7 — Quality score trend data for the Quality Dashboard. Computes
+    /// per-period averages from report heuristic scoring, grouped by day or
+    /// week, with breakdowns by radiologist and rulebook.
+    /// </summary>
+    [HttpGet("quality-trends")]
+    public async Task<IActionResult> QualityTrends(
+        [FromQuery] DateTimeOffset? from,
+        [FromQuery] DateTimeOffset? to,
+        [FromQuery] string? groupBy,
+        CancellationToken ct = default)
+    {
+        var (tenant, _) = await ResolveContextAsync(_db, ct);
+        var t2 = to ?? DateTimeOffset.UtcNow;
+        var f2 = from ?? t2.AddDays(-30);
+        var byWeek = string.Equals(groupBy, "week", StringComparison.OrdinalIgnoreCase);
+
+        // ── Load reports in window ──────────────────────────────────
+        var reports = await _db.Reports
+            .Where(r => r.TenantId == tenant.Id && r.CreatedAt >= f2 && r.CreatedAt <= t2)
+            .Select(r => new
+            {
+                r.Id,
+                r.CreatedAt,
+                r.CreatedByUserId,
+                r.RulebookId,
+                r.Status,
+                HasIndication = !string.IsNullOrWhiteSpace(r.Study.Indication) || !string.IsNullOrWhiteSpace(r.Indication),
+                HasComparison = !string.IsNullOrWhiteSpace(r.Study.Comparison) || !string.IsNullOrWhiteSpace(r.Comparison),
+                EmptySections =
+                    (string.IsNullOrWhiteSpace(r.Indication) ? 1 : 0) +
+                    (string.IsNullOrWhiteSpace(r.Technique) ? 1 : 0) +
+                    (string.IsNullOrWhiteSpace(r.Comparison) ? 1 : 0) +
+                    (string.IsNullOrWhiteSpace(r.Findings) ? 1 : 0) +
+                    (string.IsNullOrWhiteSpace(r.Impression) ? 1 : 0) +
+                    (string.IsNullOrWhiteSpace(r.Recommendations) ? 1 : 0),
+                IsValidated = (int)r.Status >= (int)ReportStatus.Validated,
+            })
+            .ToListAsync(ct);
+
+        // ── Heuristic quality score (mirrors GET /api/reports/{id}/quality) ─
+        static int HeuristicScore(bool hasIndication, bool hasComparison, int emptySections, bool isValidated)
+        {
+            int score = 100;
+            if (!hasIndication) score -= 10;
+            if (!hasComparison) score -= 5;
+            score -= (int)(20.0 * emptySections / 6);
+            if (!isValidated) score -= 15;
+            return Math.Clamp(score, 0, 100);
+        }
+
+        var scored = reports.Select(r => new
+        {
+            r.Id,
+            r.CreatedAt,
+            r.CreatedByUserId,
+            r.RulebookId,
+            Score = HeuristicScore(r.HasIndication, r.HasComparison, r.EmptySections, r.IsValidated),
+            IsBlocker = !r.IsValidated && r.EmptySections >= 4,
+        }).ToList();
+
+        // ── Trends by period ────────────────────────────────────────
+        string PeriodKey(DateTimeOffset d)
+        {
+            if (!byWeek) return d.UtcDateTime.ToString("yyyy-MM-dd");
+            var cal = System.Globalization.CultureInfo.InvariantCulture.Calendar;
+            var weekNum = cal.GetWeekOfYear(d.UtcDateTime, System.Globalization.CalendarWeekRule.FirstFourDayWeek, DayOfWeek.Monday);
+            return $"{d.Year}-W{weekNum:D2}";
+        }
+
+        var trends = scored
+            .GroupBy(r => PeriodKey(r.CreatedAt))
+            .OrderBy(g => g.Key)
+            .Select(g => new
+            {
+                period = g.Key,
+                avgScore = (int)Math.Round(g.Average(r => r.Score)),
+                reportCount = g.Count(),
+                blockerCount = g.Count(r => r.IsBlocker),
+            })
+            .ToList();
+
+        // ── By radiologist ──────────────────────────────────────────
+        var userIds = scored.Select(r => r.CreatedByUserId).Distinct().ToList();
+        var userMap = await _db.Users
+            .Where(u => u.TenantId == tenant.Id && userIds.Contains(u.Id))
+            .Select(u => new { u.Id, u.Email })
+            .ToDictionaryAsync(u => u.Id, u => u.Email, ct);
+
+        var byRadiologist = scored
+            .GroupBy(r => r.CreatedByUserId)
+            .Select(g => new
+            {
+                userId = g.Key.ToString(),
+                email = userMap.GetValueOrDefault(g.Key, "unknown"),
+                avgScore = (int)Math.Round(g.Average(r => r.Score)),
+                reportCount = g.Count(),
+            })
+            .OrderBy(r => r.avgScore)
+            .ToList();
+
+        // ── By rulebook ─────────────────────────────────────────────
+        var rulebookIds = scored.Where(r => r.RulebookId.HasValue).Select(r => r.RulebookId!.Value).Distinct().ToList();
+        var rulebookMap = await _db.Rulebooks
+            .Where(rb => rb.TenantId == tenant.Id && rulebookIds.Contains(rb.Id))
+            .Select(rb => new { rb.Id, rb.RulebookId })
+            .ToDictionaryAsync(rb => rb.Id, rb => rb.RulebookId, ct);
+
+        var byRulebook = scored
+            .Where(r => r.RulebookId.HasValue)
+            .GroupBy(r => r.RulebookId!.Value)
+            .Select(g => new
+            {
+                rulebookId = rulebookMap.GetValueOrDefault(g.Key, g.Key.ToString()),
+                avgScore = (int)Math.Round(g.Average(r => r.Score)),
+                reportCount = g.Count(),
+            })
+            .OrderBy(r => r.avgScore)
+            .ToList();
+
+        return Ok(new { trends, byRadiologist, byRulebook });
+    }
 }
 
 

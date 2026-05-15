@@ -235,8 +235,8 @@ export default function TemplatesPage() {
       )}
 
       {draft && (
-        <div className="rp-modal-backdrop" onClick={() => setDraft(null)}>
-          <div className="rp-panel rp-modal" onClick={(e) => e.stopPropagation()} style={{ width: 'min(720px, 100%)' }}>
+        <div className="rp-modal-backdrop" onClick={() => setDraft(null)} onKeyDown={(e) => { if (e.key === 'Escape') setDraft(null); }}>
+          <div className="rp-panel rp-modal" role="dialog" aria-modal="true" aria-label={draft.id ? 'Edit template' : 'New template'} onClick={(e) => e.stopPropagation()} style={{ width: 'min(720px, 100%)' }}>
             <div className="rp-panel-title">{draft.id ? 'Edit template' : 'New template'}</div>
 
             <label className="rp-field">

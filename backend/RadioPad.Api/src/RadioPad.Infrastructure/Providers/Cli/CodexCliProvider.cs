@@ -42,7 +42,12 @@ public sealed class CodexCliProvider : IAiProviderAdapter
             CliProviderRunner.Sanitise(AdapterId, request.SystemPrompt),
             CliProviderRunner.Sanitise(AdapterId, request.UserPrompt));
 
-        var args = new List<string> { "exec", "--stdin", "--quiet" };
+        // D1 — Updated 2025-06: codex CLI uses `--quiet` to suppress
+        // interactive UI and `--full-auto` for non-interactive execution.
+        // `--stdin` is not a published flag; prompt is piped via stdin
+        // naturally. Wrapping mode defaults to full-auto for headless use.
+        // TODO: Update when vendor publishes stable non-interactive flags
+        var args = new List<string> { "--quiet", "--full-auto" };
         if (!string.IsNullOrWhiteSpace(p.Model))
         {
             args.Add("--model");

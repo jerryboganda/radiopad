@@ -185,3 +185,49 @@ on any leg blocks the release from being marked `published: true`.
 | `RADIOPAD_APPIMAGE_ED25519`    | AppImage updater manifest |
 
 None of these are stored in the repository.
+
+---
+
+## 6. Tauri permissions audit (D4)
+
+**Date:** 2026-05-06  **Reviewer:** Desktop / Security
+
+### `capabilities/default.json`
+
+The capability grant list was reviewed and hardened. Removals:
+
+| Removed | Rationale |
+| ------- | --------- |
+| `dialog:default` | Replaced by explicit `dialog:allow-open` and `dialog:allow-save` — the `default` bundle includes `dialog:allow-message` and `dialog:allow-ask` which are not used and could enable UI spoofing. |
+| `clipboard-manager:default` | Replaced by explicit read/write text — the default bundle includes `allow-read-image` / `allow-write-image` which are not needed and expand the IPC surface. |
+| `global-shortcut:default` | RadioPad does not register global shortcuts; granting this creates an unnecessary privilege-escalation path (a compromised frontend could register system-wide hotkeys). |
+| `store:default` | Replaced by explicit verb grants (`get`, `set`, `delete`, `keys`, `save`). |
+| `store:allow-clear` | Wiping the entire store is destructive and only needed by a factory-reset flow that does not exist today. |
+
+### Retained permissions
+
+| Permission | Justification |
+| ---------- | ------------- |
+| `core:default` | Required by Tauri runtime (IPC plumbing, window events). |
+| `shell:allow-spawn` (sidecar `radiopad-api` only) | Launches the .NET backend sidecar. Scoped to the exact sidecar name. |
+| `dialog:allow-open` | File-open picker for importing DICOM/rulebooks. |
+| `dialog:allow-save` | File-save picker for exporting reports. |
+| `clipboard-manager:allow-write-text` | Copy-to-clipboard for report text. |
+| `clipboard-manager:allow-read-text` | Paste-from-clipboard for editing. |
+| `store:allow-get/set/delete/keys/save` | Encrypted local cache and offline drafts (DESK-006). |
+
+### `tauri.conf.json`
+
+| Setting | Value | Note |
+| ------- | ----- | ---- |
+| `plugins.shell.open` | `false` | Previously `true` — allowed the frontend to open arbitrary URLs in the default browser. Disabled per iter-37 hardening guidance. |
+| `app.security.csp` | `default-src 'self'; connect-src 'self' http://127.0.0.1:7457 ipc: tauri:; img-src 'self' data:; style-src 'self' 'unsafe-inline'; font-src 'self' data:` | Tight CSP; `connect-src` allows only localhost API + Tauri IPC. No `script-src 'unsafe-eval'`. |
+| `app.withGlobalTauri` | `true` | Exposes `window.__TAURI__` only to the main window (capability-gated). Acceptable because the CSP prevents third-party script injection. |
+| `bundle.externalBin` | `["binaries/radiopad-api"]` | Only the sidecar; no other external binaries bundled. |
+| `bundle.resources` | `rulebooks`, `templates` | Read-only data; no executable resources. |
+| `bundle.macOS.hardenedRuntime` | `true` | Required for notarization; entitlements are minimal (see `entitlements.plist`). |
+
+### Risk notes
+
+- `style-src 'unsafe-inline'` is present in the CSP. This is common for frameworks that inject scoped styles (e.g. CSS-in-JS). It does **not** enable script injection. Accepted.
+- The updater plugin is configured but `pubkey` is empty (`""`). This must be populated before production release or the updater must be removed. Tracked separately.

@@ -658,7 +658,7 @@ export default function ReportPage() {
                   </div>
                   {(['blocker', 'warning', 'info'] as const).map((sev) => groups[sev].length > 0 && (
                     <div key={sev} style={{ marginTop: 8 }}>
-                      <div style={{ font: '500 11px var(--sans)', textTransform: 'uppercase', color: 'var(--text-muted)', marginBottom: 4 }}>
+                      <div className="rp-severity-label">
                         {sev}
                       </div>
                       {groups[sev].map((f, i) =>

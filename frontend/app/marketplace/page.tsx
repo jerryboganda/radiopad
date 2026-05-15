@@ -30,9 +30,9 @@ function statusBadgeClass(status: string): string {
     case 'approved':
       return 'badge ok';
     case 'rejected':
-      return 'badge';
+      return 'badge danger';
     case 'deprecated':
-      return 'badge';
+      return 'badge warn';
     default:
       return 'badge info';
   }
@@ -158,8 +158,8 @@ export default function MarketplacePage() {
   const ownSubmissions = submissions;
 
   return (
-    <div className="pane">
-      <div className="panel">
+    <div className="rp-container">
+      <div className="rp-panel">
         <div className="panel-header">
           <div>
             <h1 className="rp-page-title">Marketplace</h1>

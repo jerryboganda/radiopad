@@ -7,15 +7,26 @@ import { reportHref } from '@/lib/routes';
 
 export default function ReportsPage() {
   const [reports, setReports] = useState<Report[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
 
-  useEffect(() => { api.reports.list().then(setReports).catch(() => setReports([])); }, []);
+  useEffect(() => {
+    api.reports.list()
+      .then(setReports)
+      .catch((e) => setError(e?.message || 'Failed to load'))
+      .finally(() => setLoading(false));
+  }, []);
 
   return (
     <>
-      <h1 className="page-title">Reports</h1>
-      <p className="page-sub">All reports for the active tenant.</p>
-      <div className="panel">
-        <table>
+      <h1 className="rp-page-title">Reports</h1>
+      <p className="rp-page-sub">All reports for the active tenant.</p>
+      {error && <div className="banner warn">{error}</div>}
+      {loading ? (
+        <div className="rp-page-sub">Loading…</div>
+      ) : (
+      <div className="rp-panel">
+        <table className="rp-table">
           <thead>
             <tr><th>Accession</th><th>Modality</th><th>Body part</th><th>Status</th><th>Updated</th><th></th></tr>
           </thead>
@@ -33,6 +44,7 @@ export default function ReportsPage() {
           </tbody>
         </table>
       </div>
+      )}
     </>
   );
 }

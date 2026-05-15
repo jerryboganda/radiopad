@@ -207,6 +207,32 @@ export type ValidationFinding = {
 
 export type ValidationResult = { blockerPresent: boolean; findings: ValidationFinding[]; qualityScore: number };
 
+export type QualityTrendPeriod = {
+  period: string;
+  avgScore: number;
+  reportCount: number;
+  blockerCount: number;
+};
+
+export type QualityByRadiologist = {
+  userId: string;
+  email: string;
+  avgScore: number;
+  reportCount: number;
+};
+
+export type QualityByRulebook = {
+  rulebookId: string;
+  avgScore: number;
+  reportCount: number;
+};
+
+export type QualityTrendsResponse = {
+  trends: QualityTrendPeriod[];
+  byRadiologist: QualityByRadiologist[];
+  byRulebook: QualityByRulebook[];
+};
+
 export type RewriteMode =
   | 'concise'
   | 'formal'
@@ -1254,6 +1280,14 @@ export const api = {
           }>;
         };
       }>(`/api/analytics/summary${qs ? `?${qs}` : ''}`);
+    },
+    qualityTrends: (params?: { from?: string; to?: string; groupBy?: 'day' | 'week' }) => {
+      const q = new URLSearchParams();
+      if (params?.from) q.set('from', params.from);
+      if (params?.to) q.set('to', params.to);
+      if (params?.groupBy) q.set('groupBy', params.groupBy);
+      const qs = q.toString();
+      return request<QualityTrendsResponse>(`/api/analytics/quality-trends${qs ? `?${qs}` : ''}`);
     },
   },
   terminology: {

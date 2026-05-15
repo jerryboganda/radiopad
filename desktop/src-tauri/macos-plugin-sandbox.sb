@@ -1,0 +1,61 @@
+;; RadioPad macOS plugin sandbox profile (DESK-009 / A3)
+;;
+;; Applied via `sandbox-exec -f <this-file> <plugin_binary>`.
+;; Variables substituted at runtime by sandbox.rs:
+;;   PLUGIN_DIR     — directory containing the plugin binary
+;;   PLUGIN_BINARY  — absolute path to the plugin executable
+;;   PLUGIN_WORKDIR — per-plugin writable scratch directory
+;;
+;; Policy: deny-by-default, then allowlist the minimum surface.
+
+(version 1)
+(deny default)
+
+;; ── Logging ──────────────────────────────────────────────────────────
+;; Route all denial messages to syslog so operators can diagnose policy
+;; violations without disabling the sandbox.
+(debug deny)
+
+;; ── Process execution ────────────────────────────────────────────────
+;; Allow the plugin binary itself to execute; deny fork/exec of anything
+;; else.  sandbox-exec needs to exec the child, so we also allow it.
+(allow process-exec (literal (param "PLUGIN_BINARY")))
+(allow process-exec (literal "/usr/bin/sandbox-exec"))
+
+;; Deny forking child processes — plugins run single-process.
+(deny process-fork)
+
+;; ── File-system reads ────────────────────────────────────────────────
+;; Plugin's own directory (binaries, bundled assets).
+(allow file-read* (subpath (param "PLUGIN_DIR")))
+
+;; System shared libraries required by most binaries.
+(allow file-read-data (subpath "/usr/lib"))
+(allow file-read-data (subpath "/System/Library"))
+
+;; dyld shared cache and related metadata.
+(allow file-read-data (subpath "/private/var/db/dyld"))
+
+;; ── File-system writes ───────────────────────────────────────────────
+;; Only the per-plugin work directory is writable.
+(allow file-write* (subpath (param "PLUGIN_WORKDIR")))
+(allow file-read*  (subpath (param "PLUGIN_WORKDIR")))
+
+;; Hard-deny writes to system/library/framework paths.
+(deny file-write* (subpath "/System"))
+(deny file-write* (subpath "/Library"))
+(deny file-write* (subpath "/usr"))
+
+;; ── Network ──────────────────────────────────────────────────────────
+(deny network*)
+
+;; ── IPC / Mach ───────────────────────────────────────────────────────
+;; Allow basic Mach lookups needed by libSystem / Foundation.
+(allow mach-lookup)
+
+;; ── Sysctl ───────────────────────────────────────────────────────────
+;; hw.ncpu, kern.osversion, etc. — read-only, safe.
+(allow sysctl-read)
+
+;; ── Signals ──────────────────────────────────────────────────────────
+(allow signal (target self))

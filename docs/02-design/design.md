@@ -389,6 +389,27 @@ New locked helpers in `frontend/app/radiopad.css`:
 These helpers only compose locked tokens; they do not introduce new
 colours, radii, or shadow semantics.
 
+### 4.14 Audit-fix additions (`.rp-yaml-preview`, `.rp-kpi-value`, `.rp-severity-label`, `.banner.ok`)
+
+Added in the UI/UX audit fix pass, these helpers extract inline styles
+into named classes that compose locked tokens only:
+
+- `.rp-yaml-preview` — styled `<pre>` for the live YAML preview in the
+  rulebook visual editor. Composes `--mono`, `--bg-subtle`, `--border`,
+  `--radius-sm`. Replaces inline `fontFamily`/`fontSize`/`background`/
+  `border`/`borderRadius` that violated the design lock.
+- `.rp-kpi-value` — large serif stat value used by the analytics
+  dashboard `Kpi` component. `font: 600 28px/1.2 var(--serif)`.
+  Replaces inline `fontSize`/`fontFamily`.
+- `.rp-severity-label` — uppercase severity heading (blocker / warning /
+  info) used by the report findings panel. `font: 500 11px var(--sans);
+  text-transform: uppercase; color: var(--text-muted)`. Replaces
+  inline `font`/`textTransform`/`color`.
+- `.banner.ok` — success variant of the inline banner, mirroring
+  `.banner.warn` / `.banner.info` / `.banner.danger`. Composes
+  `--green-bg`, `--green`, `--green-soft`. Used by admin/settings
+  and admin/security pages.
+
 ---
 
 ## 5. Iconography
