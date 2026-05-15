@@ -67,9 +67,9 @@ export default function UsageDashboardPage() {
               return {
                 month: m,
                 ai,
-                reportsTotal: analytics.reports.total,
-                reportsExported: analytics.reports.exported,
-                activeUsers: analytics.governance.activeUsers,
+                reportsTotal: 0, // full KPIs available on main analytics page
+                reportsExported: 0,
+                activeUsers: analytics.product.activeRadiologists,
                 error: null,
               };
             } catch (e) {
@@ -109,9 +109,9 @@ export default function UsageDashboardPage() {
         <div className="rp-panel">
           <div className="rp-panel-title">Last 30 days · summary</div>
           <div className="rp-grid-3">
-            <Stat label="Active users" value={windowed.governance.activeUsers} />
-            <Stat label="Reports created" value={windowed.reports.total} />
-            <Stat label="Reports exported" value={windowed.reports.exported} />
+            <Stat label="Active radiologists" value={windowed.product.activeRadiologists} />
+            <Stat label="Validation pass rate" value={`${(windowed.product.validationPassRate * 100).toFixed(1)}%`} />
+            <Stat label="Rulebook adoption" value={`${(windowed.product.rulebookAdoption * 100).toFixed(1)}%`} />
             <Stat label="AI requests" value={windowed.ai.totalRequests} />
             <Stat label="AI tokens (in/out)" value={fmtTokens(windowed.ai.inputTokens, windowed.ai.outputTokens)} />
             <Stat label="Avg latency" value={`${windowed.ai.avgLatencyMs} ms`} />

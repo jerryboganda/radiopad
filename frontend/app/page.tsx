@@ -96,15 +96,16 @@ export default function DashboardPage() {
             value={search}
             onChange={(e) => setSearch(e.target.value)}
             style={{ minWidth: 280 }}
+            aria-label="Search reports"
           />
-          <select className="rp-input" value={statusFilter} onChange={(e) => setStatusFilter(e.target.value)}>
+          <select className="rp-input" value={statusFilter} onChange={(e) => setStatusFilter(e.target.value)} aria-label="Filter by status">
             <option value="all">All statuses</option>
             <option value="draft">Draft</option>
             <option value="validated">Validated</option>
             <option value="acknowledged">Acknowledged</option>
             <option value="exported">Exported</option>
           </select>
-          <select className="rp-input" value={modalityFilter} onChange={(e) => setModalityFilter(e.target.value)}>
+          <select className="rp-input" value={modalityFilter} onChange={(e) => setModalityFilter(e.target.value)} aria-label="Filter by modality">
             <option value="all">All modalities</option>
             {modalities.map((m) => <option key={m} value={m}>{m}</option>)}
             {/* fallback common modalities */}

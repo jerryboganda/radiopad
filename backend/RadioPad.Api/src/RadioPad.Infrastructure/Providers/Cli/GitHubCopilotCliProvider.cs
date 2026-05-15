@@ -47,9 +47,12 @@ public sealed class GitHubCopilotCliProvider : IAiProviderAdapter
             CliProviderRunner.Sanitise(AdapterId, request.SystemPrompt),
             CliProviderRunner.Sanitise(AdapterId, request.UserPrompt));
 
+        // D1 — Updated 2025-06: `gh copilot suggest -t explain` is the closest
+        // non-interactive sub-command as of gh-copilot extension v1.x.
+        // TODO: Update when vendor publishes stable non-interactive flags
         var spec = new ProcessLaunchSpec(
             FileName: bin,
-            Arguments: new[] { "copilot", "explain", "--shell-out" },
+            Arguments: new[] { "copilot", "suggest", "--type", "explain" },
             StandardInput: prompt,
             TimeoutMs: CliProviderRunner.ResolveTimeoutMs());
 

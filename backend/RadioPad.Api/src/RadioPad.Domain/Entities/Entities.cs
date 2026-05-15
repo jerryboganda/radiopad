@@ -605,6 +605,16 @@ public class MarketplaceListing : Entity
     public string? StripePriceId { get; set; }
     /// <summary>Revenue share to publisher in basis points (e.g. 7000 = 70%).</summary>
     public int RevenueShareBps { get; set; } = 7000;
+    /// <summary>PRD Enterprise GA #13 — source rulebook id when category is "rulebook".</summary>
+    public string? SourceRulebookId { get; set; }
+    /// <summary>PRD Enterprise GA #13 — source template id when category is "template".</summary>
+    public string? SourceTemplateId { get; set; }
+    /// <summary>PRD Enterprise GA #13 — semver of the published content.</summary>
+    public string Version { get; set; } = "1.0.0";
+    /// <summary>PRD Enterprise GA #13 — number of tenant installs.</summary>
+    public int InstallCount { get; set; }
+    /// <summary>PRD Enterprise GA #13 — reviewer feedback (approval or rejection notes).</summary>
+    public string? ReviewNotes { get; set; }
 }
 
 /// <summary>
@@ -835,4 +845,22 @@ public class ValidationPack : Entity
     public Guid CreatedBy { get; set; }
     /// <summary>JSON array of <c>{name, report, expectFlagged}</c> objects.</summary>
     public string GoldenCasesJson { get; set; } = "[]";
+}
+
+/// <summary>
+/// PRD §18.2 — last known-good golden-case regression result for a
+/// (tenant, provider, rulebook) triple. Updated by
+/// <c>ModelDriftDetectionService</c> whenever a check produces a passing
+/// (no-drift) result. The stored quality score and finding-rule snapshot
+/// serve as the comparison baseline for the next scheduled run.
+/// </summary>
+public class DriftBaseline : Entity
+{
+    public Guid TenantId { get; set; }
+    public string ProviderId { get; set; } = "";
+    public string RulebookId { get; set; } = "";
+    public int QualityScore { get; set; }
+    /// <summary>JSON array of rule IDs that fired in the baseline run.</summary>
+    public string FindingRuleIdsJson { get; set; } = "[]";
+    public DateTimeOffset CheckedAt { get; set; }
 }

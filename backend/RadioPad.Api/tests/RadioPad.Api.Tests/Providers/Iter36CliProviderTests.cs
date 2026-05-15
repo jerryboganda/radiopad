@@ -1,5 +1,6 @@
 using System.Net;
 using Microsoft.Extensions.Logging.Abstractions;
+using RadioPad.Api.Tests.Infrastructure;
 using RadioPad.Application.Abstractions;
 using RadioPad.Application.Services;
 using RadioPad.Domain.Entities;
@@ -263,20 +264,10 @@ public class Iter36CliProviderTests
         Assert.Contains("api_key_missing", ex.Message);
     }
 
-    private sealed class EnvVarScope : IDisposable
+    private sealed class StubHttpClientFactory : IHttpClientFactory
     {
-        private readonly string _name;
-        private readonly string? _previous;
-
-        private EnvVarScope(string name, string? value)
-        {
-            _name = name;
-            _previous = Environment.GetEnvironmentVariable(name);
-            Environment.SetEnvironmentVariable(name, value);
-        }
-
-        public static EnvVarScope Set(string name, string? value) => new(name, value);
-
-        public void Dispose() => Environment.SetEnvironmentVariable(_name, _previous);
+        private readonly HttpMessageHandler _handler;
+        public StubHttpClientFactory(HttpMessageHandler handler) => _handler = handler;
+        public HttpClient CreateClient(string name) => new(_handler, disposeHandler: false);
     }
 }

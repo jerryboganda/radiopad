@@ -2790,3 +2790,1020 @@ components_responses_anchor: {}
                   approvedAt: { type: string, format: date-time, nullable: true }
                   cases: { type: array, items: { type: object } }
         '404': { description: Pack not found in this tenant. }
+
+  # --- Iter-31 TMP-005..008 — template lifecycle + analytics ---
+  /api/templates/{id}/approve:
+    post:
+      summary: Iter-31 TMP-005 — approve a template for production use. RBAC MedicalDirector / ReportingAdmin / ItAdmin. Audited as `TemplateApproved`.
+      parameters:
+        - { in: path, name: id, required: true, schema: { type: string, format: uuid } }
+      responses:
+        '200':
+          description: Approved.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ReportTemplate' }
+        '403': { description: Caller role not permitted. }
+        '404': { description: Template not found in this tenant. }
+
+  /api/templates/{id}/submit-review:
+    post:
+      summary: Iter-32 TMP-005 — submit a draft template for review. Any role may submit; Deprecated templates are rejected.
+      parameters:
+        - { in: path, name: id, required: true, schema: { type: string, format: uuid } }
+      responses:
+        '200':
+          description: Submitted for review.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ReportTemplate' }
+        '400': { description: Cannot submit a deprecated template (kind=validation). }
+        '404': { description: Template not found. }
+
+  /api/templates/{id}/deprecate:
+    post:
+      summary: Iter-32 TMP-005 — deprecate a template. RBAC MedicalDirector / ReportingAdmin / ItAdmin. Audited as `TemplateDeprecated`.
+      parameters:
+        - { in: path, name: id, required: true, schema: { type: string, format: uuid } }
+      responses:
+        '200':
+          description: Deprecated.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ReportTemplate' }
+        '403': { description: Caller role not permitted. }
+        '404': { description: Template not found. }
+
+  /api/templates/{id}/usage:
+    get:
+      summary: Iter-32 TMP-006 — template usage analytics. Returns request counts for the last 7 / 30 / 90 days, broken down by user and modality.
+      parameters:
+        - { in: path, name: id, required: true, schema: { type: string, format: uuid } }
+      responses:
+        '200':
+          description: Usage analytics.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  templateId: { type: string }
+                  rowId: { type: string, format: uuid }
+                  window:
+                    type: object
+                    properties:
+                      from: { type: string, format: date-time }
+                      to: { type: string, format: date-time }
+                  counts:
+                    type: object
+                    properties:
+                      last7d: { type: integer }
+                      last30d: { type: integer }
+                      last90d: { type: integer }
+                  byUser:
+                    type: array
+                    items:
+                      type: object
+                      properties:
+                        userId: { type: string, format: uuid }
+                        count: { type: integer }
+                  byModality:
+                    type: array
+                    items:
+                      type: object
+                      properties:
+                        modality: { type: string }
+                        count: { type: integer }
+        '404': { description: Template not found. }
+
+  /api/templates/{id}/preview:
+    get:
+      summary: Iter-31 TMP-008 — render a preview of the template sections, optionally merged with a specific report.
+      parameters:
+        - { in: path, name: id, required: true, schema: { type: string, format: uuid } }
+        - in: query
+          name: reportId
+          schema: { type: string, format: uuid }
+      responses:
+        '200':
+          description: Preview sections.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  templateId: { type: string }
+                  variant: { type: string }
+                  status: { type: string }
+                  sections:
+                    type: array
+                    items:
+                      type: object
+                      properties:
+                        key: { type: string }
+                        label: { type: string }
+                        content: { type: string }
+        '404': { description: Template not found. }
+
+  # --- Users / devices admin ---
+  /api/users:
+    get:
+      summary: List tenant users. Tenant-scoped.
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  type: object
+                  properties:
+                    id: { type: string, format: uuid }
+                    email: { type: string }
+                    displayName: { type: string }
+                    role: { type: string }
+                    isActive: { type: boolean }
+
+  /api/users/{id}/lockout:
+    post:
+      summary: Iter-31 AUTH-006 — soft-lock a user (sets active=false). RBAC MedicalDirector / ItAdmin. Audited as `UserLockedOut`.
+      parameters:
+        - { in: path, name: id, required: true, schema: { type: string, format: uuid } }
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  id: { type: string, format: uuid }
+                  isActive: { type: boolean }
+                  changed: { type: boolean }
+        '400': { description: Cannot lock yourself (kind=validation). }
+        '403': { description: RBAC denied. }
+        '404': { description: User not found. }
+
+  /api/devices:
+    get:
+      summary: Iter-31 AUTH-007 — list device-auth pairings (approved/consumed/denied) for the tenant. RBAC ItAdmin / MedicalDirector.
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  type: object
+                  properties:
+                    id: { type: string, format: uuid }
+                    userCode: { type: string }
+                    status: { type: string }
+                    userId: { type: string, format: uuid, nullable: true }
+                    expiresAt: { type: string, format: date-time }
+                    lastPolledAt: { type: string, format: date-time, nullable: true }
+                    deviceFingerprint: { type: string, nullable: true }
+                    updatedAt: { type: string, format: date-time }
+        '403': { description: RBAC denied. }
+
+  /api/devices/{id}:
+    delete:
+      summary: Revoke a device authorization. RBAC ItAdmin / MedicalDirector.
+      parameters:
+        - { in: path, name: id, required: true, schema: { type: string, format: uuid } }
+      responses:
+        '204': { description: Revoked. }
+        '403': { description: RBAC denied. }
+        '404': { description: Device auth not found. }
+
+  # --- Prompt overrides — delete ---
+  /api/prompts/overrides/{id}:
+    delete:
+      summary: Delete a prompt override. RBAC MedicalDirector / ReportingAdmin.
+      parameters:
+        - { in: path, name: id, required: true, schema: { type: string, format: uuid } }
+      responses:
+        '204': { description: Deleted. }
+        '403': { description: RBAC denied. }
+        '404': { description: Override not found. }
+
+  # --- Audit search ---
+  /api/audit/search:
+    get:
+      summary: PRD §19.2 — advanced audit search with filters on action, user, report, and substring.
+      parameters:
+        - { in: query, name: action, schema: { type: string } }
+        - { in: query, name: userId, schema: { type: string, format: uuid } }
+        - { in: query, name: reportId, schema: { type: string, format: uuid } }
+        - { in: query, name: q, schema: { type: string } }
+        - { in: query, name: from, schema: { type: string, format: date-time } }
+        - { in: query, name: to, schema: { type: string, format: date-time } }
+        - { in: query, name: take, schema: { type: integer, default: 200, maximum: 1000 } }
+      responses:
+        '200':
+          description: OK
+          headers:
+            X-Total-Count: { $ref: '#/components/headers/XTotalCount' }
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: '#/components/schemas/AuditEvent' }
+
+  # --- Tenant context ---
+  /api/tenant/me:
+    get:
+      summary: Returns the resolved tenant + user context for the current session.
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  tenant:
+                    type: object
+                    properties:
+                      id: { type: string, format: uuid }
+                      slug: { type: string }
+                      displayName: { type: string }
+                      requirePhiApprovedProvider: { type: boolean }
+                  user:
+                    type: object
+                    properties:
+                      id: { type: string, format: uuid }
+                      email: { type: string }
+                      displayName: { type: string }
+                      role: { type: string }
+
+  # --- Lexicon bulk import/export ---
+  /api/lexicon/export:
+    get:
+      summary: Iter-31 STD-005/STD-006 — bulk export of the tenant lexicon as JSON (default) or YAML. Audited as `LexiconExported`. RBAC MedicalDirector / ReportingAdmin.
+      parameters:
+        - in: query
+          name: format
+          schema: { type: string, enum: [json, yaml], default: json }
+      responses:
+        '200':
+          description: Exported file.
+          content:
+            application/json: { schema: { type: string } }
+            application/yaml: { schema: { type: string } }
+        '400': { description: Invalid format. }
+        '403': { description: RBAC denied. }
+
+  /api/lexicon/import:
+    post:
+      summary: Iter-31 STD-005/STD-006 — bulk upsert of lexicon entries. Audited as `LexiconImported`. RBAC MedicalDirector / ReportingAdmin.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [entries, replaceAll]
+              properties:
+                entries:
+                  type: array
+                  items:
+                    type: object
+                    properties:
+                      term: { type: string }
+                      forbidden: { type: boolean }
+                      replacement: { type: string }
+                      note: { type: string }
+                replaceAll: { type: boolean }
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  upserts: { type: integer }
+                  removed: { type: integer }
+        '400': { description: entries is required (kind=validation). }
+        '403': { description: RBAC denied. }
+
+  /api/lexicon/import-csv:
+    post:
+      summary: Iter-32 STD-006 — bulk import from CSV (header `term,forbidden,replacement,note`). RBAC MedicalDirector / ReportingAdmin. Audited as `LexiconImported`.
+      parameters:
+        - in: query
+          name: replaceAll
+          schema: { type: boolean, default: false }
+      requestBody:
+        required: true
+        content:
+          text/csv:
+            schema: { type: string }
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  upserts: { type: integer }
+                  removed: { type: integer }
+        '400': { description: CSV body is empty or unparseable (kind=validation). }
+        '403': { description: RBAC denied. }
+
+  # --- Billing features ---
+  /api/billing/features:
+    get:
+      summary: PRD §11.4 — declarative plan-feature flags. Frontend gates UI surfaces on these flags so a Trial tenant cannot walk into an enterprise-only flow.
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  plan: { type: string, enum: [Trial, Team, Enterprise] }
+                  features:
+                    type: object
+                    additionalProperties: { type: boolean }
+
+  # --- Rulebook detail + validation + test ---
+  /api/rulebooks/{id}:
+    get:
+      summary: Get a single rulebook by EF row id.
+      parameters:
+        - { in: path, name: id, required: true, schema: { type: string, format: uuid } }
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Rulebook' }
+        '404': { description: Not found in tenant. }
+
+  /api/rulebooks/validate:
+    post:
+      summary: Validate a rulebook YAML without persisting. Returns parsed spec + problems list.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [yaml]
+              properties:
+                yaml: { type: string }
+      responses:
+        '200':
+          description: Validation result.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  ok: { type: boolean }
+                  problems:
+                    type: array
+                    items: { type: string }
+                  spec: { type: object }
+
+  /api/rulebooks/test:
+    post:
+      summary: Run golden-case tests against a rulebook YAML in-memory (no persistence).
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [yaml, cases]
+              properties:
+                yaml: { type: string }
+                cases:
+                  type: array
+                  items:
+                    type: object
+                    properties:
+                      name: { type: string }
+                      report: { type: object }
+                      expectFlagged:
+                        type: array
+                        items: { type: string }
+      responses:
+        '200':
+          description: Test results.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  passed: { type: integer }
+                  failed: { type: integer }
+                  results:
+                    type: array
+                    items:
+                      type: object
+                      properties:
+                        name: { type: string }
+                        pass: { type: boolean }
+                        missing: { type: array, items: { type: string } }
+                        unexpected: { type: array, items: { type: string } }
+
+  # --- Report additional endpoints ---
+  /api/reports/{id}/quality:
+    get:
+      summary: PRD §18.4 — heuristic report quality score in [0..100]. Read-only; never persisted nor gating export.
+      parameters:
+        - { in: path, name: id, required: true, schema: { type: string, format: uuid } }
+      responses:
+        '200':
+          description: Quality score.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  score: { type: integer, minimum: 0, maximum: 100 }
+                  reasons:
+                    type: array
+                    items: { type: string }
+                  validationFindings: { type: integer }
+        '404': { description: Report not found. }
+
+  /api/reports/{id}/dictation/cleanup:
+    post:
+      summary: Iter-31 AI-001 — runs the dictation cleanup pipeline. Routes through AiGateway so PHI + audit apply. RBAC Radiologist / MedicalDirector.
+      parameters:
+        - { in: path, name: id, required: true, schema: { type: string, format: uuid } }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [rawDictation]
+              properties:
+                rawDictation: { type: string }
+      responses:
+        '200':
+          description: Cleaned sections.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  cleanedSections:
+                    type: object
+                    properties:
+                      indication: { type: string }
+                      technique: { type: string }
+                      findings: { type: string }
+                      impression: { type: string }
+                      recommendations: { type: string }
+                  provider: { type: string }
+                  model: { type: string }
+                  latencyMs: { type: integer }
+                  promptVersion: { type: string }
+        '400': { description: rawDictation is required (kind=validation). }
+        '403': { description: PHI policy blocked (kind=provider_policy). }
+        '404': { description: Report not found. }
+
+  /api/reports/{id}/followup-suggestions:
+    get:
+      summary: Iter-31 AI-008 — up to three suggested follow-up phrases for a report's recommendations section.
+      parameters:
+        - { in: path, name: id, required: true, schema: { type: string, format: uuid } }
+      responses:
+        '200':
+          description: Suggestions.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  suggestions:
+                    type: array
+                    items: { type: string }
+        '403': { description: Provider policy blocked. }
+        '404': { description: Report not found. }
+
+  /api/reports/{id}/measurements:
+    get:
+      summary: PRD Beta #7 — extract structured measurements from report text.
+      parameters:
+        - { in: path, name: id, required: true, schema: { type: string, format: uuid } }
+      responses:
+        '200':
+          description: Extracted measurements.
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  type: object
+                  properties:
+                    section: { type: string }
+                    value: { type: number }
+                    unit: { type: string }
+                    structure: { type: string }
+                    context: { type: string }
+        '404': { description: Report not found. }
+
+  /api/reports/import/fhir:
+    post:
+      summary: Iter-30 — session-authenticated FHIR DiagnosticReport import. RBAC Radiologist / MedicalDirector / ReportingAdmin / ItAdmin. Audited as `ReportImported`.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { type: object }
+          application/fhir+json:
+            schema: { type: object }
+      responses:
+        '200':
+          description: Created or deduplicated.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  reportId: { type: string, format: uuid }
+                  status: { type: string }
+                  deduplicated: { type: boolean }
+        '400': { description: Missing accession or unparseable payload (kind=validation). }
+        '403': { description: RBAC denied. }
+
+  # --- PACS bridge proxy ---
+  /api/pacs/studies:
+    get:
+      summary: Iter-32 DESK-007 — QIDO-RS study search proxy. Forwards accession / patientId / studyDate / modality queries through the tenant DICOMweb base URL.
+      parameters:
+        - { in: query, name: accession, schema: { type: string } }
+        - { in: query, name: patientId, schema: { type: string } }
+        - { in: query, name: studyDate, schema: { type: string } }
+        - { in: query, name: modality, schema: { type: string } }
+        - { in: query, name: limit, schema: { type: integer, maximum: 200 } }
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  configured: { type: boolean }
+                  upstreamStatus: { type: integer, nullable: true }
+                  studies: { type: array, items: { type: object } }
+        '403': { description: RBAC denied. }
+    post:
+      summary: Iter-32 — STOW-RS store proxy. Body must be DICOM bytes (multipart/related). RBAC Radiologist / MedicalDirector / ItAdmin.
+      requestBody:
+        required: true
+        content:
+          multipart/related:
+            schema: { type: string, format: binary }
+          application/dicom:
+            schema: { type: string, format: binary }
+      responses:
+        '200':
+          description: Upstream response.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  upstreamStatus: { type: integer }
+                  response: { type: object, nullable: true }
+        '403': { description: RBAC denied. }
+        '502': { description: Upstream DICOMweb unreachable. }
+        '503': { description: DICOMweb not configured for this tenant. }
+
+  /api/pacs/health:
+    get:
+      summary: Iter-32 — PACS + Orthanc health probe. Returns reachability for the tenant's DICOMweb base URL and optional bundled Orthanc.
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  dicomWeb:
+                    type: object
+                    properties:
+                      configured: { type: boolean }
+                      reachable: { type: boolean }
+                  orthanc:
+                    type: object
+                    properties:
+                      configured: { type: boolean }
+                      reachable: { type: boolean }
+                      url: { type: string, nullable: true }
+
+  # --- MCP tool registry ---
+  /api/mcp/tools:
+    get:
+      summary: Iter-31/32 MCP-001 — list registered MCP tools for the current tenant.
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  type: object
+                  properties:
+                    id: { type: string, format: uuid }
+                    name: { type: string }
+                    version: { type: string }
+                    kind: { type: string, enum: [BuiltIn, Custom] }
+                    isBuiltIn: { type: boolean }
+                    scope: { type: string, enum: [ReadOnly, ReadWrite, External] }
+                    scopeString: { type: string }
+                    status: { type: string, enum: [Submitted, Approved, Blocked] }
+                    approved: { type: boolean }
+                    approvedBy: { type: string, format: uuid, nullable: true }
+                    approvedAt: { type: string, format: date-time, nullable: true }
+                    manifestSha256: { type: string }
+                    manifestSigned: { type: boolean }
+                    allowedConnectorPaths:
+                      type: array
+                      items: { type: string }
+                    createdAt: { type: string, format: date-time }
+    post:
+      summary: Iter-31/32 MCP-001 — register a new MCP tool. RBAC ReportingAdmin / MedicalDirector / ItAdmin. Audited as `McpToolRegistered`.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [name]
+              properties:
+                name: { type: string }
+                version: { type: string }
+                kind: { type: string, enum: [BuiltIn, Custom] }
+                scope: { type: string, enum: [ReadOnly, ReadWrite, External] }
+                scopeString: { type: string }
+                isBuiltIn: { type: boolean }
+                manifestJson: { type: string }
+                manifestSig: { type: string }
+                allowedConnectorPaths:
+                  type: array
+                  items: { type: string }
+      responses:
+        '200': { description: Registered. }
+        '400': { description: name is required (kind=validation). }
+        '403': { description: RBAC denied. }
+        '409': { description: Tool name already registered (kind=conflict). }
+
+  /api/mcp/tools/{id}:
+    get:
+      summary: Get a single MCP tool registration by id.
+      parameters:
+        - { in: path, name: id, required: true, schema: { type: string, format: uuid } }
+      responses:
+        '200': { description: OK }
+        '404': { description: Not found. }
+    delete:
+      summary: Delete an MCP tool. RBAC MedicalDirector / ItAdmin. Audited as `McpToolBlocked` with reason=deleted.
+      parameters:
+        - { in: path, name: id, required: true, schema: { type: string, format: uuid } }
+      responses:
+        '204': { description: Deleted. }
+        '403': { description: RBAC denied. }
+        '404': { description: Not found. }
+
+  /api/mcp/tools/{id}/approve:
+    post:
+      summary: Iter-31 MCP-002 — approve a tool (Submitted→Approved). RBAC MedicalDirector / ItAdmin. Audited as `McpToolApproved`.
+      parameters:
+        - { in: path, name: id, required: true, schema: { type: string, format: uuid } }
+      responses:
+        '200': { description: Approved. }
+        '403': { description: RBAC denied. }
+        '404': { description: Not found. }
+
+  /api/mcp/tools/{id}/block:
+    post:
+      summary: Iter-32 MCP-002 — block a tool (any→Blocked). RBAC MedicalDirector / ItAdmin. Audited as `McpToolBlocked`.
+      parameters:
+        - { in: path, name: id, required: true, schema: { type: string, format: uuid } }
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                reason: { type: string, nullable: true }
+      responses:
+        '200': { description: Blocked. }
+        '403': { description: RBAC denied. }
+        '404': { description: Not found. }
+
+  /api/mcp/tools/{id}/revoke:
+    post:
+      summary: Back-compat alias for /block. Audits `McpToolRevoked` instead. RBAC ReportingAdmin / MedicalDirector / ItAdmin.
+      parameters:
+        - { in: path, name: id, required: true, schema: { type: string, format: uuid } }
+      responses:
+        '200': { description: Revoked (blocked). }
+        '403': { description: RBAC denied. }
+        '404': { description: Not found. }
+
+  /api/mcp/tools/{id}/invoke:
+    post:
+      summary: Iter-31 MCP-004 — invoke an approved MCP tool. Subject to scope policy, lifecycle gate, and external-mcp gate. Audited in the invocation ledger.
+      parameters:
+        - { in: path, name: id, required: true, schema: { type: string, format: uuid } }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [inputJson]
+              properties:
+                inputJson: { type: string }
+                outputJson: { type: string, nullable: true }
+                reportId: { type: string, format: uuid, nullable: true }
+      responses:
+        '200':
+          description: Invocation result.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  status: { type: string, enum: [ok, blocked, error, timeout] }
+                  inputHash: { type: string }
+                  outputHash: { type: string }
+                  latencyMs: { type: integer }
+        '403': { description: Scope blocked (kind=mcp_scope_blocked) or tool not approved (kind=mcp_blocked) or external denied (kind=mcp_blocked). }
+        '404': { description: Tool not found. }
+        '504': { description: Sandbox timeout (kind=mcp_timeout). }
+
+  /api/mcp/tools/{id}/test:
+    post:
+      summary: Iter-32 MCP-006 — sandboxed test-run for an admin. 5s wall-clock, 256 MiB soft cap, BelowNormal priority. RBAC MedicalDirector / ItAdmin / ReportingAdmin.
+      parameters:
+        - { in: path, name: id, required: true, schema: { type: string, format: uuid } }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [inputJson]
+              properties:
+                inputJson: { type: string }
+                outputJson: { type: string, nullable: true }
+                reportId: { type: string, format: uuid, nullable: true }
+      responses:
+        '200':
+          description: Test result.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  status: { type: string, enum: [ok, timeout, error, memory_exceeded] }
+                  output: { type: string }
+                  latencyMs: { type: integer }
+                  memoryBytes: { type: integer, format: int64 }
+        '403': { description: RBAC denied or scope blocked. }
+        '404': { description: Tool not found. }
+
+  # --- SIEM status ---
+  /api/siem/status:
+    get:
+      summary: Iter-32 INT-010 — surfaces the in-process status of each configured SIEM push sink. RBAC ItAdmin / MedicalDirector / ComplianceReviewer.
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  sinks:
+                    type: array
+                    items:
+                      type: object
+                      properties:
+                        name: { type: string }
+                        configured: { type: boolean }
+                        lastPushAt: { type: string, format: date-time, nullable: true }
+                        lastError: { type: string, nullable: true }
+                        totalPushed: { type: integer }
+                        totalErrors: { type: integer }
+        '403': { description: RBAC denied. }
+
+  # --- Observability: SLO alerts ---
+  /api/admin/observability/slo-alerts:
+    post:
+      summary: Iter-33 — ingest an Alertmanager-format SLO alert payload. Audited as `SystemAlert`. RBAC ItAdmin / MedicalDirector / ComplianceReviewer.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { type: object, additionalProperties: true }
+      responses:
+        '200':
+          description: Accepted.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  accepted: { type: boolean }
+                  alertCount: { type: integer }
+        '403': { description: RBAC denied. }
+
+  # --- Orthanc bridge ---
+  /api/integrations/orthanc/study-stable:
+    post:
+      summary: Iter-33 — Orthanc Lua `OnStableStudy` callback. Bearer-authenticated via `RADIOPAD_BRIDGE_TOKEN`. Audited as `StudyReceived`.
+      security:
+        - BearerJwt: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                patientId: { type: string, nullable: true }
+                accessionNumber: { type: string, nullable: true }
+                studyInstanceUid: { type: string, nullable: true }
+                modality: { type: string, nullable: true }
+                studyDate: { type: string, nullable: true }
+      responses:
+        '200': { description: Accepted. }
+        '401': { description: Invalid bearer. }
+        '503': { description: Bridge tenant unknown. }
+
+  /api/integrations/orthanc/sr-stored:
+    post:
+      summary: Iter-33 — Orthanc Lua `OnStoredInstance` callback for structured reports (SR). Converts DICOM SR JSON to a RadioPad report. Bearer-authenticated.
+      security:
+        - BearerJwt: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { type: object, additionalProperties: true }
+      responses:
+        '200': { description: Accepted. }
+        '400': { description: Malformed SR JSON (kind=validation). }
+        '401': { description: Invalid bearer. }
+        '503': { description: Bridge tenant unknown. }
+
+  # --- Marketplace additional endpoints ---
+  /api/marketplace/listings/create:
+    post:
+      summary: Create a new draft marketplace listing. Returns listing id + status.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [name, artifactBody]
+              properties:
+                name: { type: string }
+                description: { type: string }
+                kind: { type: string, enum: [rulebook, template, prompt_pack] }
+                artifactBody: { type: string }
+                priceCents: { type: integer, minimum: 0 }
+      responses:
+        '200':
+          description: Created.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  id: { type: string, format: uuid }
+                  status: { type: string, enum: [draft] }
+        '400': { description: name and artifact body required (kind=validation). }
+
+  /api/marketplace/listings/{id}/submit:
+    post:
+      summary: Submit a draft listing for review (draft→submitted).
+      parameters:
+        - { in: path, name: id, required: true, schema: { type: string, format: uuid } }
+      responses:
+        '200': { description: Submitted. }
+        '400': { description: Cannot submit non-draft listing (kind=validation). }
+        '404': { description: Listing not found. }
+
+  /api/marketplace/listings/{id}/approve:
+    post:
+      summary: Approve a submitted listing (submitted→approved). RBAC MedicalDirector / ItAdmin. Creates a Stripe Price for paid items. Audited as `RulebookApproved`.
+      parameters:
+        - { in: path, name: id, required: true, schema: { type: string, format: uuid } }
+      responses:
+        '200':
+          description: Approved.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  status: { type: string, enum: [approved] }
+                  stripePriceId: { type: string, nullable: true }
+        '400': { description: Only submitted listings can be approved. }
+        '403': { description: RBAC denied. }
+        '404': { description: Listing not found. }
+
+  /api/marketplace/listings/{id}/reject:
+    post:
+      summary: Reject a listing (submitted→rejected). RBAC MedicalDirector / ItAdmin.
+      parameters:
+        - { in: path, name: id, required: true, schema: { type: string, format: uuid } }
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                reason: { type: string, nullable: true }
+      responses:
+        '200': { description: Rejected. }
+        '403': { description: RBAC denied. }
+        '404': { description: Listing not found. }
+
+  /api/marketplace/listings/{id}/checkout:
+    post:
+      summary: Start a Stripe Checkout session for a marketplace listing purchase. Requires the listing publisher to have `chargesEnabled`.
+      parameters:
+        - { in: path, name: id, required: true, schema: { type: string, format: uuid } }
+        - { in: query, name: returnUrl, required: true, schema: { type: string, format: uri } }
+      responses:
+        '200':
+          description: Checkout URL.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  url: { type: string, format: uri }
+                  purchaseId: { type: string, format: uuid }
+        '404': { description: Listing not found or not approved. }
+        '409': { description: Publisher Connect account not ready (kind=connect_not_ready). }
+        '503': { description: Stripe not configured. }
+
+  /api/marketplace/connect/onboarding:
+    post:
+      summary: PRD MKT-006 — start Stripe Connect Express onboarding for the active tenant (publisher). RBAC BillingAdmin / ItAdmin.
+      parameters:
+        - { in: query, name: returnUrl, required: true, schema: { type: string, format: uri } }
+      responses:
+        '200':
+          description: Onboarding link.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  url: { type: string, format: uri }
+        '403': { description: RBAC denied. }
+        '503': { description: Stripe not configured. }
+
+  # --- WebAuthn additional endpoints ---
+  /api/auth/webauthn/credentials:
+    get:
+      summary: Iter-32 AUTH-001 — list WebAuthn credentials for the current (tenant, user).
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  type: object
+                  properties:
+                    id: { type: string, format: uuid }
+                    label: { type: string }
+                    attestationFormat: { type: string }
+                    signCount: { type: integer }
+                    lastUsedAt: { type: string, format: date-time, nullable: true }
+                    createdAt: { type: string, format: date-time }
+
+  /api/auth/webauthn/credentials/{id}:
+    delete:
+      summary: Iter-32 AUTH-001 — delete a WebAuthn credential.
+      parameters:
+        - { in: path, name: id, required: true, schema: { type: string, format: uuid } }
+      responses:
+        '204': { description: Deleted. }
+        '404': { description: Credential not found. }

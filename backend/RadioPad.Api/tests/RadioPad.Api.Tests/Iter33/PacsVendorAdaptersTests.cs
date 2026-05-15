@@ -3,6 +3,7 @@ using System.Net.Http.Headers;
 using System.Text;
 using System.Text.Json;
 using Microsoft.Extensions.Logging.Abstractions;
+using RadioPad.Api.Tests.Infrastructure;
 using RadioPad.Application.Services.Pacs;
 using RadioPad.Infrastructure.Pacs;
 using Xunit;
@@ -129,8 +130,8 @@ public class PacsVendorAdaptersTests
                 ]}}
                 """,
         };
-        Environment.SetEnvironmentVariable("RADIOPAD_PACS_VISAGE_BASE", "https://visage.test");
-        Environment.SetEnvironmentVariable("RADIOPAD_PACS_VISAGE_TOKEN", "tok-visage");
+        using var envBase = EnvVarScope.Set("RADIOPAD_PACS_VISAGE_BASE", "https://visage.test");
+        using var envToken = EnvVarScope.Set("RADIOPAD_PACS_VISAGE_TOKEN", "tok-visage");
         var a = new Visage7Adapter(new StubFactory(handler), NullLogger<Visage7Adapter>.Instance);
 
         var rows = await a.FetchWorklistAsync(new PacsWorklistQuery(Guid.NewGuid()), CancellationToken.None);
@@ -147,8 +148,8 @@ public class PacsVendorAdaptersTests
     public async Task Visage_SendReport_Posts_GraphQL_Mutation_And_Parses_Ok()
     {
         var handler = new StubHandler { Response = "{\"data\":{\"reportSend\":{\"ok\":true}}}" };
-        Environment.SetEnvironmentVariable("RADIOPAD_PACS_VISAGE_BASE", "https://visage.test");
-        Environment.SetEnvironmentVariable("RADIOPAD_PACS_VISAGE_TOKEN", "tok-visage");
+        using var envBase = EnvVarScope.Set("RADIOPAD_PACS_VISAGE_BASE", "https://visage.test");
+        using var envToken = EnvVarScope.Set("RADIOPAD_PACS_VISAGE_TOKEN", "tok-visage");
         var a = new Visage7Adapter(new StubFactory(handler), NullLogger<Visage7Adapter>.Instance);
 
         var ok = await a.SendReportAsync(
@@ -162,7 +163,7 @@ public class PacsVendorAdaptersTests
     [Fact]
     public async Task Visage_Probe_Maps_Status_To_Health()
     {
-        Environment.SetEnvironmentVariable("RADIOPAD_PACS_VISAGE_BASE", "https://visage.test");
+        using var envBase = EnvVarScope.Set("RADIOPAD_PACS_VISAGE_BASE", "https://visage.test");
         var handler = new StubHandler { StatusCode = HttpStatusCode.OK, Response = "{\"data\":{\"ping\":\"pong\"}}" };
         var a = new Visage7Adapter(new StubFactory(handler), NullLogger<Visage7Adapter>.Instance);
         Assert.Equal(PacsAdapterHealthStatus.Healthy, (await a.ProbeAsync(CancellationToken.None)).Status);
@@ -185,8 +186,8 @@ public class PacsVendorAdaptersTests
                 [{"accessionNumber":"ACC-C1","patientId":"PC","studyInstanceUid":"1.2.5","modality":"CR","status":"scheduled","description":"CR"}]
                 """,
         };
-        Environment.SetEnvironmentVariable("RADIOPAD_PACS_CARESTREAM_BASE", "https://vue.test");
-        Environment.SetEnvironmentVariable("RADIOPAD_PACS_CARESTREAM_TOKEN", "tok-vue");
+        using var envBase = EnvVarScope.Set("RADIOPAD_PACS_CARESTREAM_BASE", "https://vue.test");
+        using var envToken = EnvVarScope.Set("RADIOPAD_PACS_CARESTREAM_TOKEN", "tok-vue");
         var a = new CarestreamVueAdapter(new StubFactory(handler), NullLogger<CarestreamVueAdapter>.Instance);
 
         var rows = await a.FetchWorklistAsync(new PacsWorklistQuery(Guid.NewGuid(), Modality: "CR"), CancellationToken.None);
@@ -202,8 +203,8 @@ public class PacsVendorAdaptersTests
     public async Task Carestream_SendReport_Posts_To_Reports_Endpoint()
     {
         var handler = new StubHandler { StatusCode = HttpStatusCode.OK };
-        Environment.SetEnvironmentVariable("RADIOPAD_PACS_CARESTREAM_BASE", "https://vue.test");
-        Environment.SetEnvironmentVariable("RADIOPAD_PACS_CARESTREAM_TOKEN", "tok-vue");
+        using var envBase = EnvVarScope.Set("RADIOPAD_PACS_CARESTREAM_BASE", "https://vue.test");
+        using var envToken = EnvVarScope.Set("RADIOPAD_PACS_CARESTREAM_TOKEN", "tok-vue");
         var a = new CarestreamVueAdapter(new StubFactory(handler), NullLogger<CarestreamVueAdapter>.Instance);
 
         var ok = await a.SendReportAsync(
@@ -218,7 +219,7 @@ public class PacsVendorAdaptersTests
     [Fact]
     public async Task Carestream_Probe_Maps_Status_To_Health()
     {
-        Environment.SetEnvironmentVariable("RADIOPAD_PACS_CARESTREAM_BASE", "https://vue.test");
+        using var envBase = EnvVarScope.Set("RADIOPAD_PACS_CARESTREAM_BASE", "https://vue.test");
         var handler = new StubHandler { StatusCode = HttpStatusCode.OK };
         var a = new CarestreamVueAdapter(new StubFactory(handler), NullLogger<CarestreamVueAdapter>.Instance);
         Assert.Equal(PacsAdapterHealthStatus.Healthy, (await a.ProbeAsync(CancellationToken.None)).Status);

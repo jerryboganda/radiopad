@@ -76,7 +76,7 @@ const SAMPLE_USAGE = {
 const SAMPLE_ANALYTICS = {
   reports: { total: 1, validated: 1, exported: 0, validationPassRate: 1 },
   ai: { totalRequests: 42, totalCostUsd: 0.5678 },
-  governance: { phiPolicyBlocks: 3 },
+  governance: { phiViolationsBlocked: 3 },
 };
 
 function seedHappyPath(role = 2 /* MedicalDirector */) {

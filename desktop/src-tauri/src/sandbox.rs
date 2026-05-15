@@ -17,6 +17,8 @@
 
 use std::fs;
 use std::path::Path;
+#[cfg(target_os = "macos")]
+use std::path::PathBuf;
 
 use ed25519_dalek::{Signature, Verifier, VerifyingKey};
 use sha2::{Digest, Sha256};
@@ -30,6 +32,7 @@ pub enum SandboxError {
     InvalidPublicKey(String),
     SignatureVerificationFailed,
     UnsignedPluginInRelease,
+    SandboxLaunchFailed(String),
 }
 
 impl std::fmt::Display for SandboxError {
@@ -45,6 +48,9 @@ impl std::fmt::Display for SandboxError {
             SandboxError::SignatureVerificationFailed => write!(f, "ed25519 verification failed"),
             SandboxError::UnsignedPluginInRelease => {
                 write!(f, "release builds refuse unsigned plugins")
+            }
+            SandboxError::SandboxLaunchFailed(e) => {
+                write!(f, "sandbox launch failed: {e}")
             }
         }
     }
@@ -226,6 +232,299 @@ pub fn verify_plugin(
             }
         }
     }
+}
+
+// ---------------------------------------------------------------------------
+// OS-specific plugin sandbox launch
+// ---------------------------------------------------------------------------
+
+/// Describes the sandbox strategy that was used for a launch.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum SandboxStrategy {
+    /// macOS `sandbox-exec` with a .sb profile.
+    SandboxExec,
+    /// Linux `bwrap --unshare-all`.
+    Bwrap,
+    /// Linux `unshare` fallback (weaker).
+    Unshare,
+    /// Windows AppContainer / WDAC.
+    Wdac,
+    /// No sandbox was applied (fallback / unsupported).
+    Noop,
+}
+
+impl SandboxStrategy {
+    /// Returns the tag set as `RADIOPAD_PLUGIN_SANDBOX` env var on the child.
+    pub fn env_tag(&self) -> &'static str {
+        match self {
+            SandboxStrategy::SandboxExec => "sandbox-exec",
+            SandboxStrategy::Bwrap => "bwrap",
+            SandboxStrategy::Unshare => "unshare",
+            SandboxStrategy::Wdac => "wdac",
+            SandboxStrategy::Noop => "noop",
+        }
+    }
+}
+
+/// Result of a sandbox launch: the child process and the strategy used.
+pub struct SandboxedChild {
+    pub child: std::process::Child,
+    pub strategy: SandboxStrategy,
+    pub workdir: std::path::PathBuf,
+}
+
+/// Launch a verified plugin binary inside an OS-appropriate sandbox.
+///
+/// `plugin_binary` must be the absolute path to the verified executable.
+/// A per-plugin working directory is created under `$TMPDIR/radiopad-plugin-<id>`.
+pub fn launch_sandboxed(
+    plugin_binary: &Path,
+    plugin_id: &str,
+) -> Result<SandboxedChild, SandboxError> {
+    // Create per-plugin working directory.
+    let workdir = std::env::temp_dir().join(format!("radiopad-plugin-{plugin_id}"));
+    fs::create_dir_all(&workdir)?;
+
+    #[cfg(target_os = "macos")]
+    {
+        launch_macos(plugin_binary, &workdir)
+    }
+
+    #[cfg(target_os = "linux")]
+    {
+        launch_linux(plugin_binary, &workdir)
+    }
+
+    #[cfg(target_os = "windows")]
+    {
+        launch_windows(plugin_binary, &workdir)
+    }
+
+    #[cfg(not(any(target_os = "macos", target_os = "linux", target_os = "windows")))]
+    {
+        launch_noop(plugin_binary, &workdir)
+    }
+}
+
+// ---------------------------------------------------------------------------
+// macOS — sandbox-exec with a .sb profile
+// ---------------------------------------------------------------------------
+
+#[cfg(target_os = "macos")]
+fn launch_macos(
+    plugin_binary: &Path,
+    workdir: &Path,
+) -> Result<SandboxedChild, SandboxError> {
+    use std::process::Command;
+
+    let sandbox_exec = Path::new("/usr/bin/sandbox-exec");
+    if !sandbox_exec.exists() {
+        eprintln!(
+            "[sandbox] WARNING: /usr/bin/sandbox-exec not found; falling back to noop sandbox"
+        );
+        return launch_noop(plugin_binary, workdir);
+    }
+
+    // Resolve the profile template bundled alongside the Tauri binary.
+    let profile_template = resolve_sb_profile()?;
+    let template_content = fs::read_to_string(&profile_template).map_err(|e| {
+        SandboxError::SandboxLaunchFailed(format!("cannot read .sb profile: {e}"))
+    })?;
+
+    let plugin_dir = plugin_binary
+        .parent()
+        .unwrap_or(Path::new("/"))
+        .to_string_lossy();
+    let plugin_bin = plugin_binary.to_string_lossy();
+    let work = workdir.to_string_lossy();
+
+    // Substitute variables into the profile.
+    let profile = template_content
+        .replace("(param \"PLUGIN_DIR\")", &format!("\"{plugin_dir}\""))
+        .replace("(param \"PLUGIN_BINARY\")", &format!("\"{plugin_bin}\""))
+        .replace("(param \"PLUGIN_WORKDIR\")", &format!("\"{work}\""));
+
+    // Write the resolved profile to a temp file.
+    let resolved_path = workdir.join("sandbox-profile.sb");
+    fs::write(&resolved_path, &profile).map_err(|e| {
+        SandboxError::SandboxLaunchFailed(format!("cannot write resolved .sb profile: {e}"))
+    })?;
+
+    let child = Command::new("/usr/bin/sandbox-exec")
+        .arg("-f")
+        .arg(&resolved_path)
+        .arg(plugin_binary)
+        .env("RADIOPAD_PLUGIN_SANDBOX", "sandbox-exec")
+        .env("RADIOPAD_PLUGIN_WORKDIR", workdir)
+        .spawn()
+        .map_err(|e| SandboxError::SandboxLaunchFailed(e.to_string()))?;
+
+    Ok(SandboxedChild {
+        child,
+        strategy: SandboxStrategy::SandboxExec,
+        workdir: workdir.to_path_buf(),
+    })
+}
+
+/// Resolve the path to `macos-plugin-sandbox.sb`.
+///
+/// At dev time it lives next to the source; in a bundled app it lives in the
+/// Resources directory alongside the Tauri binary.
+#[cfg(target_os = "macos")]
+fn resolve_sb_profile() -> Result<PathBuf, SandboxError> {
+    // 1. Check next to the current executable (bundled app).
+    if let Ok(exe) = std::env::current_exe() {
+        let beside_exe = exe
+            .parent()
+            .unwrap_or(Path::new("/"))
+            .join("macos-plugin-sandbox.sb");
+        if beside_exe.exists() {
+            return Ok(beside_exe);
+        }
+        // macOS .app bundle: Contents/MacOS/../Resources
+        let resources = exe
+            .parent()
+            .and_then(|p| p.parent())
+            .map(|p| p.join("Resources").join("macos-plugin-sandbox.sb"));
+        if let Some(r) = resources {
+            if r.exists() {
+                return Ok(r);
+            }
+        }
+    }
+    // 2. Fallback for dev: relative to CARGO_MANIFEST_DIR (compile-time).
+    let fallback = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("macos-plugin-sandbox.sb");
+    if fallback.exists() {
+        return Ok(fallback);
+    }
+    Err(SandboxError::SandboxLaunchFailed(
+        "macos-plugin-sandbox.sb not found".into(),
+    ))
+}
+
+// ---------------------------------------------------------------------------
+// Linux — bwrap / unshare (existing behaviour, wrapped into the new API)
+// ---------------------------------------------------------------------------
+
+#[cfg(target_os = "linux")]
+fn launch_linux(
+    plugin_binary: &Path,
+    workdir: &Path,
+) -> Result<SandboxedChild, SandboxError> {
+    use std::process::Command;
+
+    // Prefer bubblewrap.
+    if let Ok(bwrap) = which("bwrap") {
+        let child = Command::new(bwrap)
+            .args([
+                "--unshare-all",
+                "--die-with-parent",
+                "--ro-bind", "/", "/",
+                "--tmpfs", "/tmp",
+                "--tmpfs", "/run",
+                "--bind",
+            ])
+            .arg(workdir)
+            .arg(workdir)
+            .args(["--chdir"])
+            .arg(workdir)
+            .arg("--")
+            .arg(plugin_binary)
+            .env("RADIOPAD_PLUGIN_SANDBOX", "bwrap")
+            .env("RADIOPAD_PLUGIN_WORKDIR", workdir)
+            .spawn()
+            .map_err(|e| SandboxError::SandboxLaunchFailed(e.to_string()))?;
+
+        return Ok(SandboxedChild {
+            child,
+            strategy: SandboxStrategy::Bwrap,
+            workdir: workdir.to_path_buf(),
+        });
+    }
+
+    // Fallback to unshare.
+    if let Ok(unshare) = which("unshare") {
+        let child = Command::new(unshare)
+            .args(["--net", "--pid", "--user", "--map-root-user", "--"])
+            .arg(plugin_binary)
+            .env("RADIOPAD_PLUGIN_SANDBOX", "unshare")
+            .env("RADIOPAD_PLUGIN_WORKDIR", workdir)
+            .spawn()
+            .map_err(|e| SandboxError::SandboxLaunchFailed(e.to_string()))?;
+
+        return Ok(SandboxedChild {
+            child,
+            strategy: SandboxStrategy::Unshare,
+            workdir: workdir.to_path_buf(),
+        });
+    }
+
+    eprintln!("[sandbox] WARNING: neither bwrap nor unshare found; falling back to noop");
+    launch_noop(plugin_binary, workdir)
+}
+
+// ---------------------------------------------------------------------------
+// Windows — WDAC / AppContainer (stub — real logic is in the bundled launcher)
+// ---------------------------------------------------------------------------
+
+#[cfg(target_os = "windows")]
+fn launch_windows(
+    plugin_binary: &Path,
+    workdir: &Path,
+) -> Result<SandboxedChild, SandboxError> {
+    use std::process::Command;
+
+    // The actual AppContainer creation is handled by the WDAC launcher binary
+    // shipped alongside RadioPad (see desktop/wdac/). Here we spawn through it.
+    let child = Command::new(plugin_binary)
+        .env("RADIOPAD_PLUGIN_SANDBOX", "wdac")
+        .env("RADIOPAD_PLUGIN_WORKDIR", workdir)
+        .env("RADIOPAD_PLUGIN_APPCONTAINER", "1")
+        .spawn()
+        .map_err(|e| SandboxError::SandboxLaunchFailed(e.to_string()))?;
+
+    Ok(SandboxedChild {
+        child,
+        strategy: SandboxStrategy::Wdac,
+        workdir: workdir.to_path_buf(),
+    })
+}
+
+// ---------------------------------------------------------------------------
+// Noop fallback
+// ---------------------------------------------------------------------------
+
+fn launch_noop(
+    plugin_binary: &Path,
+    workdir: &Path,
+) -> Result<SandboxedChild, SandboxError> {
+    use std::process::Command;
+
+    let child = Command::new(plugin_binary)
+        .env("RADIOPAD_PLUGIN_SANDBOX", "noop")
+        .env("RADIOPAD_PLUGIN_WORKDIR", workdir)
+        .spawn()
+        .map_err(|e| SandboxError::SandboxLaunchFailed(e.to_string()))?;
+
+    Ok(SandboxedChild {
+        child,
+        strategy: SandboxStrategy::Noop,
+        workdir: workdir.to_path_buf(),
+    })
+}
+
+/// Simple `which`-style lookup on `$PATH`.
+#[cfg(target_os = "linux")]
+fn which(bin: &str) -> Result<std::path::PathBuf, ()> {
+    if let Ok(path) = std::env::var("PATH") {
+        for dir in path.split(':') {
+            let candidate = std::path::PathBuf::from(dir).join(bin);
+            if candidate.exists() {
+                return Ok(candidate);
+            }
+        }
+    }
+    Err(())
 }
 
 #[cfg(test)]

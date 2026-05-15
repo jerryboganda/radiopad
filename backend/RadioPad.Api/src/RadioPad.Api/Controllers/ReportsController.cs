@@ -774,4 +774,20 @@ public class ReportsController : TenantedController
             return StatusCode(StatusCodes.Status403Forbidden, new { error = pex.Message, kind = "provider_policy" });
         }
     }
+
+    /// <summary>PRD Beta #7 — extract structured measurements from report text.</summary>
+    [HttpGet("{id:guid}/measurements")]
+    public async Task<IActionResult> Measurements(
+        Guid id,
+        [FromServices] MeasurementExtractionService extraction,
+        CancellationToken ct)
+    {
+        var (tenant, _) = await ResolveContextAsync(_db, ct);
+        var report = await _db.Reports.FirstOrDefaultAsync(r => r.Id == id && r.TenantId == tenant.Id, ct);
+        if (report is null) return NotFound();
+
+        var bySection = extraction.ExtractFromReport(report);
+        var flat = bySection.Values.SelectMany(v => v).ToList();
+        return Ok(flat);
+    }
 }
