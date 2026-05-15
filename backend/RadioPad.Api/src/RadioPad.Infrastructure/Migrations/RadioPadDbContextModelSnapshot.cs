@@ -980,6 +980,42 @@ namespace RadioPad.Infrastructure.Migrations
                     b.ToTable("StripeWebhookEvents");
                 });
 
+            modelBuilder.Entity("RadioPad.Domain.Entities.TrustedPluginPublisher", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("TEXT");
+
+                    b.Property<long>("CreatedAt")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<string>("Ed25519PublicKeyBase64")
+                        .IsRequired()
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("PublisherName")
+                        .IsRequired()
+                        .HasColumnType("TEXT");
+
+                    b.Property<long?>("RevokedAt")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<Guid>("TenantId")
+                        .HasColumnType("TEXT");
+
+                    b.Property<long>("UpdatedAt")
+                        .HasColumnType("INTEGER");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("TenantId", "Ed25519PublicKeyBase64")
+                        .IsUnique();
+
+                    b.HasIndex("TenantId", "PublisherName");
+
+                    b.ToTable("TrustedPluginPublishers");
+                });
+
             modelBuilder.Entity("RadioPad.Domain.Entities.Tenant", b =>
                 {
                     b.Property<Guid>("Id")
@@ -1137,6 +1173,9 @@ namespace RadioPad.Infrastructure.Migrations
 
                     b.Property<string>("Locale")
                         .IsRequired()
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("PacsVendor")
                         .HasColumnType("TEXT");
 
                     b.Property<bool>("PayoutsEnabled")

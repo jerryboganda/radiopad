@@ -87,7 +87,10 @@ builder.Services.AddSingleton<ReportValidator>();
 builder.Services.AddScoped<ReportingService>();
 // Iter-35 — versioned clinical validation packs.
 builder.Services.AddScoped<RadioPad.Api.Services.ValidationPackService>();
+// PRD §18 — advanced analytics dashboard service.
+builder.Services.AddScoped<RadioPad.Application.Services.AnalyticsService>();
 builder.Services.AddSingleton<RadioPad.Application.Services.HallucinationDetector>();
+builder.Services.AddSingleton<RadioPad.Application.Services.MeasurementExtractionService>();
 builder.Services.AddScoped<RadioPad.Application.Services.ITerminologyAdapter, RadioPad.Application.Services.NoOpTerminologyAdapter>();
 // Iter-31 AI-009 / AI-001 — per-tenant prompt overrides + dictation cleanup.
 builder.Services.AddScoped<IPromptOverrideStore, EfPromptOverrideStore>();
@@ -141,6 +144,13 @@ builder.Services.AddSingleton<RadioPad.Application.Services.Pacs.IPacsVendorRout
     RadioPad.Infrastructure.Pacs.PacsVendorRouter>();
 
 builder.Services.AddHostedService<RadioPad.Api.Services.RetentionWorker>();
+
+// PRD §18.2 — model drift detection background service. Periodically runs
+// golden-case regression against sandbox AI providers and raises SystemAlert
+// audit events when quality degrades beyond the configured threshold.
+builder.Services.AddSingleton<RadioPad.Api.Services.ModelDriftDetectionService>();
+builder.Services.AddHostedService(sp =>
+    sp.GetRequiredService<RadioPad.Api.Services.ModelDriftDetectionService>());
 
 // Iter-35 PERF-004 — synthetic availability monitor. Runs an in-process
 // HTTP probe loop against a configurable list of relative paths (default

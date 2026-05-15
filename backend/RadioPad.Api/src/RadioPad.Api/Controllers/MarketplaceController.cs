@@ -69,6 +69,8 @@ public class MarketplaceController : TenantedController
     public record ListingDto(string Name, string Description, string Kind, string ArtifactBody, int PriceCents);
     public record RejectDto(string Reason);
     public record MarketplaceRefundDto(string? Reason);
+    public record SubmissionDto(string Category, string SourceId, string Version, string? Description);
+    public record SubmissionRejectDto(string? ReviewNotes);
 
     [HttpGet("listings")]
     public async Task<IActionResult> List([FromQuery] string? kind, CancellationToken ct)
@@ -470,5 +472,261 @@ public class MarketplaceController : TenantedController
         await _billingAudit.AppendAsync(tenant.Id, user.Id, "marketplace.refund",
             new { purchaseId = purchase.Id, listingId = purchase.ListingId, paymentIntentId = purchase.StripePaymentIntentId, amountCents = purchase.AmountCents, refundId = refund.Id }, ct);
         return Ok(new { id = refund.Id, status = refund.Status, amount = refund.Amount });
+    }
+
+    // ─── PRD Enterprise GA #13: Marketplace Submission & Approval Workflow ───
+
+    /// <summary>
+    /// Submit a rulebook or template for marketplace review. Copies the
+    /// current content into a new MarketplaceListing with status PendingReview.
+    /// </summary>
+    [HttpPost("submissions")]
+    public async Task<IActionResult> SubmitForReview([FromBody] SubmissionDto dto, CancellationToken ct)
+    {
+        var (tenant, user) = await ResolveContextAsync(_db, ct);
+        if (string.IsNullOrWhiteSpace(dto.Category) || string.IsNullOrWhiteSpace(dto.SourceId))
+            return BadRequest(new { error = "category and sourceId are required.", kind = "validation" });
+
+        string artifactBody;
+        string name;
+        string? sourceRulebookId = null;
+        string? sourceTemplateId = null;
+
+        if (dto.Category == "rulebook")
+        {
+            var rb = await _db.Rulebooks.FirstOrDefaultAsync(r => r.TenantId == tenant.Id && r.RulebookId == dto.SourceId, ct);
+            if (rb is null) return NotFound(new { error = "source rulebook not found.", kind = "not_found" });
+            artifactBody = rb.SourceYaml;
+            name = rb.Name;
+            sourceRulebookId = rb.RulebookId;
+        }
+        else if (dto.Category == "template")
+        {
+            var tmpl = await _db.Templates.FirstOrDefaultAsync(t => t.TenantId == tenant.Id && t.TemplateId == dto.SourceId, ct);
+            if (tmpl is null) return NotFound(new { error = "source template not found.", kind = "not_found" });
+            artifactBody = tmpl.SectionsJson;
+            name = tmpl.Name;
+            sourceTemplateId = tmpl.TemplateId;
+        }
+        else if (dto.Category == "prompt_pack")
+        {
+            artifactBody = dto.SourceId; // prompt packs: sourceId is treated as the content identifier
+            name = $"Prompt Pack {dto.SourceId}";
+        }
+        else
+        {
+            return BadRequest(new { error = "category must be rulebook, template, or prompt_pack.", kind = "validation" });
+        }
+
+        var listing = new MarketplaceListing
+        {
+            PublisherTenantId = tenant.Id,
+            PublisherUserId = user.Id,
+            Name = name,
+            Description = dto.Description ?? "",
+            Kind = dto.Category,
+            ArtifactBody = artifactBody,
+            PriceCents = 0,
+            Status = "pending_review",
+            SubmittedAt = DateTimeOffset.UtcNow,
+            SourceRulebookId = sourceRulebookId,
+            SourceTemplateId = sourceTemplateId,
+            Version = string.IsNullOrWhiteSpace(dto.Version) ? "1.0.0" : dto.Version,
+        };
+        _db.MarketplaceListings.Add(listing);
+        await _db.SaveChangesAsync(ct);
+
+        await _audit.AppendAsync(new AuditEvent
+        {
+            TenantId = tenant.Id,
+            UserId = user.Id,
+            Action = AuditAction.MarketplaceSubmission,
+            DetailsJson = JsonSerializer.Serialize(new { listingId = listing.Id, category = dto.Category, sourceId = dto.SourceId, version = listing.Version }),
+        }, ct);
+
+        return Ok(new { listing.Id, listing.Status });
+    }
+
+    /// <summary>
+    /// List submissions. Reviewers (Admin/MedicalDirector) see all pending
+    /// submissions; regular users see only their own.
+    /// </summary>
+    [HttpGet("submissions")]
+    public async Task<IActionResult> ListSubmissions(CancellationToken ct)
+    {
+        var (tenant, user) = await ResolveContextAsync(_db, ct);
+        var isReviewer = user.Role == UserRole.MedicalDirector || user.Role == UserRole.ItAdmin;
+
+        IQueryable<MarketplaceListing> q;
+        if (isReviewer)
+        {
+            // Reviewers see all pending submissions + their own
+            q = _db.MarketplaceListings.Where(l =>
+                l.Status == "pending_review" ||
+                l.PublisherTenantId == tenant.Id);
+        }
+        else
+        {
+            q = _db.MarketplaceListings.Where(l => l.PublisherTenantId == tenant.Id && l.PublisherUserId == user.Id);
+        }
+
+        var list = await q
+            .OrderByDescending(l => l.SubmittedAt ?? l.CreatedAt)
+            .Select(l => new
+            {
+                l.Id,
+                l.Name,
+                l.Description,
+                l.Kind,
+                l.Status,
+                l.Version,
+                l.InstallCount,
+                l.SubmittedAt,
+                l.ReviewedAt,
+                l.ReviewNotes,
+                l.RejectionReason,
+                publisher = l.PublisherTenantId,
+                publisherUser = l.PublisherUserId,
+            })
+            .ToListAsync(ct);
+
+        return Ok(list);
+    }
+
+    /// <summary>
+    /// Approve a marketplace submission. Admin/MedicalDirector only.
+    /// Sets status to approved and makes the listing visible in the catalogue.
+    /// </summary>
+    [HttpPost("submissions/{id:guid}/approve")]
+    public async Task<IActionResult> ApproveSubmission(Guid id, CancellationToken ct)
+    {
+        var (tenant, user) = await ResolveContextAsync(_db, ct);
+        var forbid = RequireRole(user, UserRole.MedicalDirector, UserRole.ItAdmin);
+        if (forbid is not null) return forbid;
+
+        var row = await _db.MarketplaceListings.FirstOrDefaultAsync(l => l.Id == id, ct);
+        if (row is null) return NotFound(new { error = "submission", kind = "not_found" });
+        if (row.Status != "pending_review")
+            return BadRequest(new { error = "Only pending_review submissions can be approved.", kind = "validation" });
+
+        row.Status = "approved";
+        row.ReviewedAt = DateTimeOffset.UtcNow;
+        row.ReviewerUserId = user.Id;
+        await _db.SaveChangesAsync(ct);
+
+        await _audit.AppendAsync(new AuditEvent
+        {
+            TenantId = tenant.Id,
+            UserId = user.Id,
+            Action = AuditAction.MarketplaceApproved,
+            DetailsJson = JsonSerializer.Serialize(new { listingId = row.Id, kind = row.Kind }),
+        }, ct);
+
+        return Ok(new { row.Status });
+    }
+
+    /// <summary>
+    /// Reject a marketplace submission. Admin/MedicalDirector only.
+    /// Sets status to rejected with reviewer notes.
+    /// </summary>
+    [HttpPost("submissions/{id:guid}/reject")]
+    public async Task<IActionResult> RejectSubmission(Guid id, [FromBody] SubmissionRejectDto dto, CancellationToken ct)
+    {
+        var (tenant, user) = await ResolveContextAsync(_db, ct);
+        var forbid = RequireRole(user, UserRole.MedicalDirector, UserRole.ItAdmin);
+        if (forbid is not null) return forbid;
+
+        var row = await _db.MarketplaceListings.FirstOrDefaultAsync(l => l.Id == id, ct);
+        if (row is null) return NotFound(new { error = "submission", kind = "not_found" });
+        if (row.Status != "pending_review")
+            return BadRequest(new { error = "Only pending_review submissions can be rejected.", kind = "validation" });
+
+        row.Status = "rejected";
+        row.ReviewedAt = DateTimeOffset.UtcNow;
+        row.ReviewerUserId = user.Id;
+        row.ReviewNotes = dto.ReviewNotes;
+        row.RejectionReason = dto.ReviewNotes;
+        await _db.SaveChangesAsync(ct);
+
+        await _audit.AppendAsync(new AuditEvent
+        {
+            TenantId = tenant.Id,
+            UserId = user.Id,
+            Action = AuditAction.MarketplaceRejected,
+            DetailsJson = JsonSerializer.Serialize(new { listingId = row.Id, kind = row.Kind, reviewNotes = dto.ReviewNotes }),
+        }, ct);
+
+        return Ok(new { row.Status, row.ReviewNotes });
+    }
+
+    /// <summary>
+    /// Install an approved marketplace listing into the current tenant.
+    /// Copies the content as a new rulebook/template in Draft status.
+    /// Increments the listing's InstallCount.
+    /// </summary>
+    [HttpPost("listings/{id:guid}/install")]
+    public async Task<IActionResult> Install(Guid id, CancellationToken ct)
+    {
+        var (tenant, user) = await ResolveContextAsync(_db, ct);
+        var row = await _db.MarketplaceListings.FirstOrDefaultAsync(l => l.Id == id && l.Status == "approved", ct);
+        if (row is null) return NotFound(new { error = "listing", kind = "not_found" });
+
+        Guid? installedId = null;
+
+        if (row.Kind == "rulebook")
+        {
+            var rulebookId = row.SourceRulebookId ?? $"mp-{row.Id:N}";
+            var existing = await _db.Rulebooks.FirstOrDefaultAsync(r => r.TenantId == tenant.Id && r.RulebookId == rulebookId && r.Version == row.Version, ct);
+            if (existing is not null)
+                return BadRequest(new { error = "This rulebook version is already installed.", kind = "duplicate" });
+
+            var rb = new Rulebook
+            {
+                TenantId = tenant.Id,
+                RulebookId = rulebookId,
+                Name = $"[Marketplace] {row.Name}",
+                Version = row.Version,
+                Owner = user.Email,
+                Status = RulebookStatus.Draft,
+                SourceYaml = row.ArtifactBody,
+            };
+            _db.Rulebooks.Add(rb);
+            installedId = rb.Id;
+        }
+        else if (row.Kind == "template")
+        {
+            var templateId = row.SourceTemplateId ?? $"mp-{row.Id:N}";
+            var existing = await _db.Templates.FirstOrDefaultAsync(t => t.TenantId == tenant.Id && t.TemplateId == templateId, ct);
+            if (existing is not null)
+                return BadRequest(new { error = "This template is already installed.", kind = "duplicate" });
+
+            var tmpl = new ReportTemplate
+            {
+                TenantId = tenant.Id,
+                TemplateId = templateId,
+                Name = $"[Marketplace] {row.Name}",
+                SectionsJson = row.ArtifactBody,
+                Status = TemplateStatus.Draft,
+            };
+            _db.Templates.Add(tmpl);
+            installedId = tmpl.Id;
+        }
+        else
+        {
+            // prompt_pack or other: no local entity to create, just record the install
+        }
+
+        row.InstallCount++;
+        await _db.SaveChangesAsync(ct);
+
+        await _audit.AppendAsync(new AuditEvent
+        {
+            TenantId = tenant.Id,
+            UserId = user.Id,
+            Action = AuditAction.MarketplaceInstalled,
+            DetailsJson = JsonSerializer.Serialize(new { listingId = row.Id, kind = row.Kind, installedId, installCount = row.InstallCount }),
+        }, ct);
+
+        return Ok(new { installed = true, installedId, installCount = row.InstallCount });
     }
 }

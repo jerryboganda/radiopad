@@ -14,6 +14,7 @@ import {
 } from '@/lib/api';
 import { readQueryParam } from '@/lib/browserParams';
 import { mobileDictateHref } from '@/lib/routes';
+import { detectCommand, stripCommand, type VoiceCommand, type CommandMatch } from '@/lib/voiceCommands';
 import RewriteStylePanel from './RewriteStylePanel';
 import PriorComparePanel from './PriorComparePanel';
 import CopyToRisButton from './CopyToRisButton';
@@ -52,6 +53,7 @@ export default function ReportPage() {
   const [rulebooks, setRulebooks] = useState<Rulebook[]>([]);
   const [templates, setTemplates] = useState<ReportTemplate[]>([]);
   const [findings, setFindings] = useState<ValidationFinding[]>([]);
+  const [qualityScore, setQualityScore] = useState<number | null>(null);
   const [aiBusy, setAiBusy] = useState(false);
   const [aiHighlights, setAiHighlights] = useState<Record<string, boolean>>({});
   const [providerId, setProviderId] = useState<string>('');
@@ -70,6 +72,9 @@ export default function ReportPage() {
   const [styleSection, setStyleSection] =
     useState<'findings' | 'impression' | 'recommendations'>('impression');
   const [showPrior, setShowPrior] = useState(false);
+  const [voiceCommandMode, setVoiceCommandMode] = useState(false);
+  const [voiceCommandPills, setVoiceCommandPills] = useState<Array<{ id: number; command: VoiceCommand }>>([]);
+  const voicePillIdRef = { current: 0 };
 
   useEffect(() => {
     setId(readQueryParam('id'));
@@ -158,6 +163,7 @@ export default function ReportPage() {
     if (!report) return;
     const v = await api.reports.validate(report.id);
     setFindings(v.findings);
+    setQualityScore(v.qualityScore);
   }
 
   async function applyTemplate(templatePk: string) {
@@ -192,6 +198,61 @@ export default function ReportPage() {
     setAiHighlights({});
     await update({ aiHighlightsJson: '{}' });
     setReport(next);
+  }
+
+  /**
+   * PRD Beta #5 — Voice Command Mode. When enabled, incoming dictation
+   * transcript is checked for command phrases before appending.
+   */
+  function handleVoiceCommandTranscript(transcript: string): string {
+    if (!voiceCommandMode || !report) return transcript;
+    const match = detectCommand(transcript);
+    if (!match) return transcript;
+
+    // Show auto-dismiss badge pill
+    const pillId = ++voicePillIdRef.current;
+    setVoiceCommandPills((prev) => [...prev, { id: pillId, command: match.command }]);
+    setTimeout(() => {
+      setVoiceCommandPills((prev) => prev.filter((p) => p.id !== pillId));
+    }, 3000);
+
+    // Execute command
+    void executeDesktopCommand(match.command);
+    return stripCommand(transcript, match);
+  }
+
+  async function executeDesktopCommand(command: VoiceCommand) {
+    if (!report) return;
+    setAiBusy(true);
+    setError(null);
+    try {
+      switch (command) {
+        case 'generate_impression':
+          await runAi('impression');
+          return; // runAi handles setAiBusy
+        case 'make_concise':
+          await runRewrite('concise');
+          break;
+        case 'make_formal':
+          await runRewrite('formal');
+          break;
+        case 'patient_friendly':
+          await runRewrite('patient_friendly');
+          break;
+        case 'validate_report':
+          await validate();
+          break;
+        case 'cleanup_dictation': {
+          const current = await api.reports.get(report.id);
+          await api.reports.cleanupDictation(report.id, current.findings || '');
+          break;
+        }
+      }
+    } catch (e) {
+      setError((e as Error).message);
+    } finally {
+      setAiBusy(false);
+    }
   }
 
   async function signAsPrimary() {
@@ -303,6 +364,8 @@ export default function ReportPage() {
   if (!report) return <div className="rp-container"><p style={{ color: 'var(--text-muted)' }}>Loading report…</p></div>;
 
   const blockers = findings.filter((f) => f.severity === 'Blocker' || (f.severity as unknown as number) === 2).length;
+  const exportAllowed = statusLabel(report.status) === 'Acknowledged' || statusLabel(report.status) === 'Exported';
+  const exportTitle = exportAllowed ? undefined : 'Acknowledge report before exporting';
 
   return (
     <div className="rp-container">
@@ -426,12 +489,25 @@ export default function ReportPage() {
               {showPrior ? 'Hide prior' : 'Compare prior'}
             </button>
             <button className="ghost" onClick={validate}>Validate</button>
+            <button
+              className="ghost"
+              onClick={() => setVoiceCommandMode((v) => !v)}
+              aria-pressed={voiceCommandMode}
+              data-testid="voice-command-toggle"
+            >
+              {voiceCommandMode ? '🎙 Voice Cmds On' : '🎙 Voice Cmds'}
+            </button>
+            {voiceCommandPills.map((pill) => (
+              <span key={pill.id} className="badge" data-testid="voice-command-pill">
+                {pill.command}
+              </span>
+            ))}
             <CopyToRisButton reportId={report.id} />
-            <button className="ghost" onClick={exportText}>Export text</button>
-            <button className="ghost" onClick={exportJson}>Export JSON</button>
-            <button className="ghost" onClick={exportFhir}>Export FHIR</button>
-            <button className="ghost" onClick={exportPdf}>Export PDF</button>
-            <button className="ghost" onClick={exportDocx}>Export DOCX</button>
+            <button className="ghost" disabled={!exportAllowed} title={exportTitle} onClick={exportText}>Export text</button>
+            <button className="ghost" disabled={!exportAllowed} title={exportTitle} onClick={exportJson}>Export JSON</button>
+            <button className="ghost" disabled={!exportAllowed} title={exportTitle} onClick={exportFhir}>Export FHIR</button>
+            <button className="ghost" disabled={!exportAllowed} title={exportTitle} onClick={exportPdf}>Export PDF</button>
+            <button className="ghost" disabled={!exportAllowed} title={exportTitle} onClick={exportDocx}>Export DOCX</button>
             <button className="primary-ghost" disabled={blockers > 0} onClick={acknowledge}>
               Acknowledge & lock
             </button>
@@ -561,7 +637,14 @@ export default function ReportPage() {
           )}
 
           <div className="rp-panel">
-            <div className="rp-panel-title">Validation</div>
+            <div className="rp-panel-title">
+              Validation
+              {qualityScore !== null && (
+                <span className={`badge ${qualityScore >= 80 ? 'ok' : qualityScore >= 50 ? 'warn' : 'danger'}`}>
+                  Quality: {qualityScore}/100
+                </span>
+              )}
+            </div>
             {findings.length === 0 && <p style={{ color: 'var(--text-muted)' }}>Click <em>Validate</em> to run rulebook checks.</p>}
             {findings.length > 0 && (() => {
               const groups = groupBySeverity(findings);

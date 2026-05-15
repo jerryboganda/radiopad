@@ -138,7 +138,7 @@ export default function AdminGovernancePage() {
   }
 
   // -- Panel 4: PHI routing --------------------------------------------------
-  const phiBlocks = analytics?.governance.phiPolicyBlocks ?? 0;
+  const phiBlocks = analytics?.governance.phiViolationsBlocked ?? 0;
   const aiRequests = analytics?.ai.totalRequests ?? usage?.totalRequests ?? 0;
   const providerBlockedAuditCount = auditEvents.filter(
     (e) => normaliseAction(e.action) === ACTION_PROVIDER_BLOCKED,

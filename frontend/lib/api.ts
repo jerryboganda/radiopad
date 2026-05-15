@@ -205,7 +205,7 @@ export type ValidationFinding = {
   snippet?: string | null;
 };
 
-export type ValidationResult = { blockerPresent: boolean; findings: ValidationFinding[] };
+export type ValidationResult = { blockerPresent: boolean; findings: ValidationFinding[]; qualityScore: number };
 
 export type RewriteMode =
   | 'concise'
@@ -378,6 +378,37 @@ export type McpToolRow = {
   createdAt: string;
 };
 
+/** PRD Beta #7 — structured measurement extracted from report text. */
+export type ExtractedMeasurement = {
+  value: number;
+  unit: string;
+  secondValue: string | null;
+  thirdValue: string | null;
+  anatomicalLocation: string | null;
+  finding: string | null;
+  laterality: string | null;
+  section: string;
+  startIndex: number;
+  endIndex: number;
+};
+
+/** PRD Enterprise GA #13 — Marketplace submission shape returned by GET /api/marketplace/submissions. */
+export type MarketplaceSubmission = {
+  id: string;
+  name: string;
+  description: string;
+  kind: string;
+  status: string;
+  version: string;
+  installCount: number;
+  submittedAt: string | null;
+  reviewedAt: string | null;
+  reviewNotes: string | null;
+  rejectionReason: string | null;
+  publisher: string;
+  publisherUser: string;
+};
+
 export const api = {
   health: () => request<{ status: string }>('/api/health'),
   me: () => request<{ tenant: { slug: string; displayName: string }; user: { email: string; role: number } }>('/api/tenant/me'),
@@ -496,6 +527,7 @@ export const api = {
         method: 'POST',
         body: JSON.stringify({ body, note }),
       }),
+    measurements: (id: string) => request<ExtractedMeasurement[]>(`/api/reports/${id}/measurements`),
   },
   rulebooks: {
     list: () => request<Rulebook[]>('/api/rulebooks'),
@@ -626,6 +658,22 @@ export const api = {
       ),
     delete: (id: string) =>
       request<void>(`/api/prompts/overrides/${id}`, { method: 'DELETE' }),
+    /** PRD §16.4 — list all versions of a prompt override. */
+    listVersions: (id: string) =>
+      request<PromptOverrideVersion[]>(`/api/prompts/overrides/${id}/versions`),
+    /** PRD §16.4 — text diff between two versions of a prompt override. */
+    diffVersions: (id: string, v1: number, v2: number) =>
+      request<PromptVersionDiff>(
+        `/api/prompts/overrides/${id}/diff?v1=${v1}&v2=${v2}`,
+      ),
+  },
+  /** PRD §16.4 — Prompt Studio: run golden cases against a prompt override. */
+  promptStudio: {
+    testGolden: (body: { rulebookId: string; promptOverrideId?: string | null }) =>
+      request<GoldenCaseResult[]>('/api/prompts/test-golden', {
+        method: 'POST',
+        body: JSON.stringify(body),
+      }),
   },
   templates: {
     list: () => request<ReportTemplate[]>('/api/templates'),
@@ -1035,6 +1083,24 @@ export const api = {
         `/api/marketplace/purchases/${id}/refund`,
         { method: 'POST', body: JSON.stringify(body) },
       ),
+    // ─── PRD Enterprise GA #13: Submission & Approval Workflow ───
+    submitForReview: (body: { category: string; sourceId: string; version: string; description?: string }) =>
+      request<{ id: string; status: string }>('/api/marketplace/submissions', {
+        method: 'POST', body: JSON.stringify(body),
+      }),
+    listSubmissions: () =>
+      request<Array<MarketplaceSubmission>>('/api/marketplace/submissions'),
+    approveSubmission: (id: string) =>
+      request<{ status: string }>(`/api/marketplace/submissions/${id}/approve`, { method: 'POST' }),
+    rejectSubmission: (id: string, reviewNotes?: string) =>
+      request<{ status: string; reviewNotes?: string }>(`/api/marketplace/submissions/${id}/reject`, {
+        method: 'POST', body: JSON.stringify({ reviewNotes }),
+      }),
+    install: (id: string) =>
+      request<{ installed: boolean; installedId?: string; installCount: number }>(
+        `/api/marketplace/listings/${id}/install`,
+        { method: 'POST' },
+      ),
   },
   push: {
     registerDevice: (token: string, platform: 'ios' | 'android' | 'web') =>
@@ -1138,14 +1204,34 @@ export const api = {
     },
   },
   analytics: {
-    summary: (params?: { from?: string; to?: string }) => {
+    summary: (params?: { from?: string; to?: string; period?: string }) => {
       const q = new URLSearchParams();
       if (params?.from) q.set('from', params.from);
       if (params?.to) q.set('to', params.to);
+      if (params?.period) q.set('period', params.period);
       const qs = q.toString();
       return request<{
         window: { from: string; to: string };
-        reports: { total: number; validated: number; exported: number; validationPassRate: number };
+        product: {
+          draftAcceptanceRate: number;
+          impressionAcceptanceRate: number;
+          timeSavedPerReport: number;
+          validationPassRate: number;
+          contradictionDetectionRate: number;
+          editDistance: number;
+          activeRadiologists: number;
+          rulebookAdoption: number;
+          providerCostPerReport: number;
+          turnaroundTimeImpact: number;
+          avgQualityScore: number | null;
+        };
+        governance: {
+          unapprovedPromptUsage: number;
+          phiViolationsBlocked: number;
+          rulebookRegressionFailures: number;
+          modelDriftAlerts: number;
+          auditCompleteness: number;
+        };
         ai: {
           totalRequests: number;
           okCount: number;
@@ -1167,13 +1253,7 @@ export const api = {
             unpriced: boolean;
           }>;
         };
-        governance: {
-          phiPolicyBlocks: number;
-          policyViolations: number;
-          rulebookApprovals: number;
-          activeUsers: number;
-        };
-      }>(`/api/usage/analytics${qs ? `?${qs}` : ''}`);
+      }>(`/api/analytics/summary${qs ? `?${qs}` : ''}`);
     },
   },
   terminology: {
@@ -1243,6 +1323,30 @@ export const api = {
         { method: 'POST', body: JSON.stringify({ inputJson }) },
       ),
   },
+};
+
+/** PRD §16.4 — Prompt Studio types. */
+export type GoldenCaseResult = {
+  caseName: string;
+  passed: boolean;
+  expectedRules: string[];
+  actualRules: string[];
+  qualityScore: number;
+};
+
+export type PromptOverrideVersion = {
+  version: number;
+  body: string;
+  status: 'Draft' | 'Approved';
+  updatedAt: string;
+  updatedBy: string | null;
+};
+
+export type PromptVersionDiff = {
+  v1: number;
+  v2: number;
+  oldBody: string;
+  newBody: string;
 };
 
 export const PLAN_LABELS: Record<number, string> = {

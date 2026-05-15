@@ -364,6 +364,31 @@ below 720 px:
 This breakpoint is shared with the rest of the design system; do not
 add additional values.
 
+### 4.13 Rulebook visual editor (`.rp-drag-handle`, `.rp-drag-active`, `.rp-editor-block`)
+
+The visual rulebook editor (`/rulebooks/editor`) enables drag-and-drop
+composition of rulebook YAML without raw text editing. It uses the
+locked `.split` / `.pane` shell with a visual editor on the left and a
+live YAML preview on the right.
+
+New locked helpers in `frontend/app/radiopad.css`:
+
+- `.rp-drag-handle` — grab cursor indicator for draggable list items.
+  Renders in `--text-faint`; switches to `cursor: grabbing` on
+  `:active`. Used on section and rule rows.
+- `.rp-drag-active` — highlight applied to the element being dragged or
+  the drop-target row during `dragover`. Composes `--accent-tint`
+  background and `--accent-soft` border — no new tokens.
+- `.rp-editor-block` — visual block container wrapping each editor
+  section (metadata, style, sections, rules, prompt blocks). Composes
+  `--bg-panel`, `--border`, `--radius`, `--shadow-xs` — identical to
+  the `.rp-panel` surface but with tighter padding for nested blocks.
+- `.rp-editor-block.collapsed` — collapsed state for collapsible
+  prompt block cards; tightens bottom padding.
+
+These helpers only compose locked tokens; they do not introduce new
+colours, radii, or shadow semantics.
+
 ---
 
 ## 5. Iconography

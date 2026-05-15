@@ -25,3 +25,8 @@ export function mobileReportEditHref(reportId: string): string {
 export function mobileReportSignHref(reportId: string): string {
   return withParam('/mobile/reports/sign', 'reportId', reportId);
 }
+
+export function rulebookEditorHref(id?: string): string {
+  if (id) return withParam('/rulebooks/editor', 'id', id);
+  return '/rulebooks/editor';
+}

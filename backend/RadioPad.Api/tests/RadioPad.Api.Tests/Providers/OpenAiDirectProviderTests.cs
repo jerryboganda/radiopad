@@ -1,5 +1,6 @@
 using System.Net;
 using Microsoft.Extensions.Logging.Abstractions;
+using RadioPad.Api.Tests.Infrastructure;
 using RadioPad.Application.Abstractions;
 using RadioPad.Application.Services;
 using RadioPad.Domain.Entities;
@@ -86,22 +87,5 @@ public class OpenAiDirectProviderTests
         var r = await sut.CompleteAsync(Request(), CancellationToken.None);
         Assert.Equal("hi", r.Text);
         Assert.Equal(0, r.InputTokens + r.OutputTokens);
-    }
-
-    private sealed class EnvVarScope : IDisposable
-    {
-        private readonly string _name;
-        private readonly string? _previous;
-
-        private EnvVarScope(string name, string? value)
-        {
-            _name = name;
-            _previous = Environment.GetEnvironmentVariable(name);
-            Environment.SetEnvironmentVariable(name, value);
-        }
-
-        public static EnvVarScope Set(string name, string? value) => new(name, value);
-
-        public void Dispose() => Environment.SetEnvironmentVariable(_name, _previous);
     }
 }

@@ -24,6 +24,12 @@ public class ReportValidator
     private static readonly Regex LiRadsCategoryRe = new(@"\bLI[-\s]?RADS\b\s*:?\s*(?:category\s*:?\s*)?(?:LR[-\s]?)?(1|2|3|4|5|M|TIV|NC)\b|\bLR[-\s]?(1|2|3|4|5|M|TIV|NC)\b", RegexOptions.IgnoreCase | RegexOptions.Compiled);
     private static readonly Regex PiRadsCategoryRe = new(@"\bPI[-\s]?RADS\b\s*:?\s*(?:category\s*:?\s*)?([1-5])\b", RegexOptions.IgnoreCase | RegexOptions.Compiled);
     private static readonly Regex BiRadsCategoryLineRe = new(@"(?m)^\s*(?:\d+\.|[-*])?\s*BI[-\s]?RADS\b\s*:?\s*(?:category\s*:?\s*)?(0|1|2|3|4A|4B|4C|4|5|6)\b", RegexOptions.IgnoreCase | RegexOptions.Compiled);
+    private static readonly Regex TiRadsCategoryRe = new(@"\bTI[-\s]?RADS\b\s*:?\s*(?:category\s*:?\s*)?(?:TR)?[1-5]\b", RegexOptions.IgnoreCase | RegexOptions.Compiled);
+    private static readonly Regex ContrastPhaseRe = new(@"\b(portal\s+venous|arterial|delayed|non[-\s]?contrast|with\s+contrast)\b", RegexOptions.IgnoreCase | RegexOptions.Compiled);
+    private static readonly Regex GcsRe = new(@"\bGCS\s*:?\s*\d{1,2}\b", RegexOptions.IgnoreCase | RegexOptions.Compiled);
+    private static readonly Regex BiaxialMeasurementRe = new(@"\d+(?:\.\d+)?\s*[x×]\s*\d+(?:\.\d+)?\s*(?:mm|cm)\b", RegexOptions.IgnoreCase | RegexOptions.Compiled);
+    private static readonly Regex FigoStageRe = new(@"\bFIGO\s+stage\b|\bStage\s+(?:I{1,3}V?|IV)\b", RegexOptions.IgnoreCase | RegexOptions.Compiled);
+    private static readonly Regex FollowUpApprovedRe = new(@"\b(FNA|fine\s+needle\s+aspiration|follow[-\s]?up|no\s+follow[-\s]?up\s+needed)\b", RegexOptions.IgnoreCase | RegexOptions.Compiled);
 
     public ValidationResult Validate(Report report, RulebookSpec rulebook)
         => Validate(report, rulebook, lexicon: null);
@@ -156,13 +162,76 @@ public class ReportValidator
                 case "unauthorized_followup":
                     findings.AddRange(CheckUnauthorizedFollowup(report, rulebook, rule));
                     break;
+                case "contrast_phase_documented":
+                    findings.AddRange(RequirePattern(sectionMap.GetValueOrDefault("Technique") ?? string.Empty, ContrastPhaseRe, rule, "Technique", "Document the contrast phase in the Technique section."));
+                    break;
+                case "incidental_findings_listed":
+                    findings.AddRange(CheckIncidentalFindings(report, rule));
+                    break;
+                case "required_organ_coverage":
+                    findings.AddRange(CheckRequiredOrganCoverage(report, rule));
+                    break;
+                case "critical_finding_language":
+                    findings.AddRange(CheckCriticalLanguage(report, rule));
+                    break;
+                case "midline_shift_measured":
+                    findings.AddRange(CheckMidlineShiftMeasured(report, rule));
+                    break;
+                case "gcs_documented":
+                    findings.AddRange(RequirePattern(report.Indication, GcsRe, rule, "Indication", "Document the GCS score in the Indication or clinical context."));
+                    break;
+                case "meniscus_tear_pattern_described":
+                    findings.AddRange(CheckMeniscusTearPattern(report, rule));
+                    break;
+                case "acl_pcl_status_documented":
+                    findings.AddRange(CheckAclPclStatus(report, rule));
+                    break;
+                case "lungrads_category_mandatory":
+                    findings.AddRange(RequireAssertedPattern(report.Impression, LungRadsCategoryRe, rule, "Impression", "Add the Lung-RADS assessment category to the impression."));
+                    break;
+                case "prior_comparison_required":
+                    findings.AddRange(CheckPriorComparison(report, rule));
+                    break;
+                case "nodule_measurement_3d":
+                    findings.AddRange(CheckNoduleBiaxialMeasurement(report, rule));
+                    break;
+                case "fracture_acuity":
+                    findings.AddRange(CheckFractureAcuity(report, rule));
+                    break;
+                case "figo_staging_when_oncologic":
+                    findings.AddRange(CheckFigoStaging(report, rule));
+                    break;
+                case "pirads_category_mandatory":
+                    findings.AddRange(RequireAssertedPattern(report.Impression, PiRadsCategoryRe, rule, "Impression", "Add the PI-RADS assessment category to the impression."));
+                    break;
+                case "rotator_cuff_thickness_described":
+                    findings.AddRange(CheckRotatorCuffThickness(report, rule));
+                    break;
+                case "labrum_described":
+                    findings.AddRange(CheckLabrumDescribed(report, rule));
+                    break;
+                case "tirads_category_mandatory":
+                    findings.AddRange(RequireAssertedPattern(report.Impression, TiRadsCategoryRe, rule, "Impression", "Add the TI-RADS assessment category to the impression."));
+                    break;
+                case "nodule_size_required":
+                    findings.AddRange(CheckNoduleDimensions(report, rule));
+                    break;
+                case "follow_up_language_approved":
+                    findings.AddRange(CheckFollowUpLanguageApproved(report, rule));
+                    break;
                 default:
                     break;
             }
         }
 
         var blocker = findings.Any(f => string.Equals(f.Severity, nameof(ValidationSeverity.Blocker), StringComparison.OrdinalIgnoreCase));
-        return new ValidationResult(blocker, findings);
+
+        var blockerCount = findings.Count(f => string.Equals(f.Severity, nameof(ValidationSeverity.Blocker), StringComparison.OrdinalIgnoreCase));
+        var warningCount = findings.Count(f => string.Equals(f.Severity, nameof(ValidationSeverity.Warning), StringComparison.OrdinalIgnoreCase));
+        var infoCount = findings.Count(f => string.Equals(f.Severity, nameof(ValidationSeverity.Info), StringComparison.OrdinalIgnoreCase));
+        var qualityScore = Math.Max(0, 100 - (blockerCount * 25) - (warningCount * 5) - (infoCount * 1));
+
+        return new ValidationResult(blocker, findings, qualityScore);
     }
 
     private static Dictionary<string, string> SectionMap(Report r) => new(StringComparer.OrdinalIgnoreCase)
@@ -567,5 +636,203 @@ public class ReportValidator
                     Snippet: stripped.Length > 120 ? stripped[..120] + "…" : stripped);
             }
         }
+    }
+
+    private static IEnumerable<ValidationFinding> CheckIncidentalFindings(Report r, RulebookSpec.RuleSpec rule)
+    {
+        if (!Regex.IsMatch(r.Findings ?? string.Empty, @"\bincidental\b", RegexOptions.IgnoreCase))
+            yield break;
+        if (Regex.IsMatch(r.Impression ?? string.Empty, @"\bincidental\b", RegexOptions.IgnoreCase))
+            yield break;
+        yield return new ValidationFinding(
+            RuleId: rule.Id,
+            Severity: rule.Severity,
+            Message: "Incidental findings mentioned in Findings but not addressed in Impression.",
+            Section: "Impression");
+    }
+
+    private static IEnumerable<ValidationFinding> CheckRequiredOrganCoverage(Report r, RulebookSpec.RuleSpec rule)
+    {
+        var organs = new[] { "liver", "gallbladder", "kidney", "pancreas", "spleen", "aorta" };
+        var findings = r.Findings ?? string.Empty;
+        foreach (var organ in organs)
+        {
+            // "kidneys" should match "kidney" etc.
+            if (Regex.IsMatch(findings, $@"\b{Regex.Escape(organ)}s?\b", RegexOptions.IgnoreCase))
+                continue;
+            yield return new ValidationFinding(
+                RuleId: rule.Id,
+                Severity: rule.Severity,
+                Message: $"Required organ '{organ}' is not mentioned in Findings.",
+                Section: "Findings",
+                Snippet: organ);
+        }
+    }
+
+    private static IEnumerable<ValidationFinding> CheckMidlineShiftMeasured(Report r, RulebookSpec.RuleSpec rule)
+    {
+        var clauses = Regex.Split(r.Findings ?? string.Empty, @"(?<=[.;\n])\s+|\n+");
+        foreach (var clause in clauses)
+        {
+            if (!Regex.IsMatch(clause, @"\bmidline\s+shift\b", RegexOptions.IgnoreCase))
+                continue;
+            if (MeasurementRe.IsMatch(clause))
+                continue;
+            yield return new ValidationFinding(
+                RuleId: rule.Id,
+                Severity: rule.Severity,
+                Message: "Midline shift is mentioned without a measurement.",
+                Section: "Findings",
+                Snippet: "midline shift");
+            yield break;
+        }
+    }
+
+    private static IEnumerable<ValidationFinding> CheckMeniscusTearPattern(Report r, RulebookSpec.RuleSpec rule)
+    {
+        var findings = r.Findings ?? string.Empty;
+        if (!Regex.IsMatch(findings, @"\bmenisc(?:us|al)\s+tear\b", RegexOptions.IgnoreCase))
+            yield break;
+        if (Regex.IsMatch(findings, @"\b(horizontal|vertical|complex|radial|bucket[-\s]?handle|flap|root)\b", RegexOptions.IgnoreCase))
+            yield break;
+        yield return new ValidationFinding(
+            RuleId: rule.Id,
+            Severity: rule.Severity,
+            Message: "Describe the meniscus tear pattern (e.g., horizontal, vertical, complex, radial, bucket-handle, flap, root).",
+            Section: "Findings");
+    }
+
+    private static IEnumerable<ValidationFinding> CheckAclPclStatus(Report r, RulebookSpec.RuleSpec rule)
+    {
+        var findings = r.Findings ?? string.Empty;
+        var hasAcl = Regex.IsMatch(findings, @"\b(ACL|anterior\s+cruciate\s+ligament)\b", RegexOptions.IgnoreCase);
+        var hasPcl = Regex.IsMatch(findings, @"\b(PCL|posterior\s+cruciate\s+ligament)\b", RegexOptions.IgnoreCase);
+        if (hasAcl && hasPcl)
+            yield break;
+        if (!hasAcl)
+        {
+            yield return new ValidationFinding(
+                RuleId: rule.Id,
+                Severity: rule.Severity,
+                Message: "ACL (anterior cruciate ligament) status is not documented in Findings.",
+                Section: "Findings");
+        }
+        if (!hasPcl)
+        {
+            yield return new ValidationFinding(
+                RuleId: rule.Id,
+                Severity: rule.Severity,
+                Message: "PCL (posterior cruciate ligament) status is not documented in Findings.",
+                Section: "Findings");
+        }
+    }
+
+    private static IEnumerable<ValidationFinding> CheckPriorComparison(Report r, RulebookSpec.RuleSpec rule)
+    {
+        if (!string.IsNullOrWhiteSpace(r.Comparison))
+            yield break;
+        yield return new ValidationFinding(
+            RuleId: rule.Id,
+            Severity: rule.Severity,
+            Message: "Comparison section is empty; prior comparison is required for screening exams.",
+            Section: "Comparison");
+    }
+
+    private static IEnumerable<ValidationFinding> CheckNoduleBiaxialMeasurement(Report r, RulebookSpec.RuleSpec rule)
+    {
+        var text = r.Findings + "\n" + r.Impression;
+        if (!HasAssertedTerm(text, @"nodules?"))
+            yield break;
+        var clauses = Regex.Split(text, @"(?<=[.;\n])\s+|\n+");
+        foreach (var clause in clauses)
+        {
+            if (!Regex.IsMatch(clause, @"\bnodules?\b", RegexOptions.IgnoreCase))
+                continue;
+            if (BiaxialMeasurementRe.IsMatch(clause))
+                continue;
+            yield return new ValidationFinding(
+                RuleId: rule.Id,
+                Severity: rule.Severity,
+                Message: "Provide biaxial (2D) nodule measurements (e.g., 5 x 3 mm).",
+                Section: "Findings");
+            yield break;
+        }
+    }
+
+    private static IEnumerable<ValidationFinding> CheckFractureAcuity(Report r, RulebookSpec.RuleSpec rule)
+    {
+        var findings = r.Findings ?? string.Empty;
+        if (!HasAssertedTerm(findings, @"fracture"))
+            yield break;
+        if (Regex.IsMatch(findings, @"\b(acute|chronic|healing|old|recent|subacute)\b", RegexOptions.IgnoreCase))
+            yield break;
+        yield return new ValidationFinding(
+            RuleId: rule.Id,
+            Severity: rule.Severity,
+            Message: "Describe fracture acuity (e.g., acute, chronic, healing, old, recent, subacute).",
+            Section: "Findings");
+    }
+
+    private static IEnumerable<ValidationFinding> CheckFigoStaging(Report r, RulebookSpec.RuleSpec rule)
+    {
+        var indication = r.Indication ?? string.Empty;
+        if (!Regex.IsMatch(indication, @"\b(cancer|malignancy|staging|carcinoma|neoplasm)\b", RegexOptions.IgnoreCase))
+            yield break;
+        if (FigoStageRe.IsMatch(r.Impression ?? string.Empty))
+            yield break;
+        yield return new ValidationFinding(
+            RuleId: rule.Id,
+            Severity: rule.Severity,
+            Message: "Oncologic indication present but FIGO staging is not documented in Impression.",
+            Section: "Impression");
+    }
+
+    private static IEnumerable<ValidationFinding> CheckRotatorCuffThickness(Report r, RulebookSpec.RuleSpec rule)
+    {
+        var findings = r.Findings ?? string.Empty;
+        if (!Regex.IsMatch(findings, @"\brotator\s+cuff\b", RegexOptions.IgnoreCase))
+            yield break;
+        if (!Regex.IsMatch(findings, @"\btear\b", RegexOptions.IgnoreCase))
+            yield break;
+        if (Regex.IsMatch(findings, @"\b(partial|full[-\s]?thickness|intrasubstance|bursal|articular)\b", RegexOptions.IgnoreCase))
+            yield break;
+        yield return new ValidationFinding(
+            RuleId: rule.Id,
+            Severity: rule.Severity,
+            Message: "Describe the rotator cuff tear type (e.g., partial, full-thickness, intrasubstance, bursal, articular).",
+            Section: "Findings");
+    }
+
+    private static IEnumerable<ValidationFinding> CheckLabrumDescribed(Report r, RulebookSpec.RuleSpec rule)
+    {
+        var findings = r.Findings ?? string.Empty;
+        if (Regex.IsMatch(findings, @"\b(labrum|labral)\b", RegexOptions.IgnoreCase))
+            yield break;
+        yield return new ValidationFinding(
+            RuleId: rule.Id,
+            Severity: rule.Severity,
+            Message: "The glenoid labrum should be explicitly addressed in Findings.",
+            Section: "Findings");
+    }
+
+    private static IEnumerable<ValidationFinding> CheckFollowUpLanguageApproved(Report r, RulebookSpec.RuleSpec rule)
+    {
+        var impression = r.Impression ?? string.Empty;
+        var recommendations = r.Recommendations ?? string.Empty;
+
+        // Only fire when TI-RADS >= 3
+        var tiRadsMatch = Regex.Match(impression, @"\bTI[-\s]?RADS\b\s*:?\s*(?:category\s*:?\s*)?(?:TR)?([1-5])\b", RegexOptions.IgnoreCase);
+        if (!tiRadsMatch.Success)
+            yield break;
+        if (int.TryParse(tiRadsMatch.Groups[1].Value, out var category) && category < 3)
+            yield break;
+
+        if (FollowUpApprovedRe.IsMatch(recommendations))
+            yield break;
+        yield return new ValidationFinding(
+            RuleId: rule.Id,
+            Severity: rule.Severity,
+            Message: "TI-RADS >= 3 requires approved follow-up language in Recommendations (e.g., FNA, fine needle aspiration, follow-up).",
+            Section: "Recommendations");
     }
 }

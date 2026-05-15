@@ -11,11 +11,11 @@ vi.mock('next/navigation', () => ({
   useRouter: () => ({ push: pushMock }),
 }));
 
-const appendFindings = vi.fn(async () => ({ id: 'rpt-1' }));
+const appendFindings = vi.fn(async (_id: string, _transcript: string) => ({ id: 'rpt-1' }));
 vi.mock('@/lib/api', () => ({
   api: {
     reports: {
-      appendFindings: (...args: unknown[]) => appendFindings(...args),
+      appendFindings: (id: string, transcript: string) => appendFindings(id, transcript),
     },
   },
 }));

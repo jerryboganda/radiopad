@@ -539,3 +539,42 @@
   letter-spacing: 0.18em;
   color: var(--text);
 }
+
+/* ============================================================
+   Iter-RB-002 — Rulebook visual editor drag-and-drop helpers.
+   Locked tokens only — no new colours, radii, or shadows.
+   See docs/02-design/design.md §4.13 "Rulebook visual editor".
+   ============================================================ */
+
+/* Drag handle — subtle grip indicator. */
+.rp-drag-handle {
+  cursor: grab;
+  color: var(--text-faint);
+  font-size: 14px;
+  user-select: none;
+  line-height: 1;
+}
+.rp-drag-handle:active { cursor: grabbing; }
+
+/* Active drag highlight — applied to the element being dragged or
+   the drop-target row that is currently hovered. */
+.rp-drag-active {
+  background: var(--accent-tint);
+  border-color: var(--accent-soft);
+  transition: background 120ms ease, border-color 120ms ease;
+}
+
+/* Visual block container — wraps each editor section (metadata,
+   style, sections, rules, prompt blocks). */
+.rp-editor-block {
+  background: var(--bg-panel);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 14px 16px;
+  margin-bottom: 12px;
+}
+
+/* Collapsed state for collapsible blocks (prompt cards). */
+.rp-editor-block.collapsed {
+  padding-bottom: 8px;
+}

@@ -17,6 +17,7 @@ import { useRouter } from 'next/navigation';
 import { api } from '@/lib/api';
 import { readQueryParam } from '@/lib/browserParams';
 import { mobileReportEditHref } from '@/lib/routes';
+import { detectCommand, stripCommand, type VoiceCommand } from '@/lib/voiceCommands';
 
 type SpeechRecognitionLike = {
   lang: string;
@@ -74,10 +75,70 @@ export default function MobileDictatePage() {
   const [saving, setSaving] = useState(false);
   const [saved, setSaved] = useState(false);
   const [nativeSpeech, setNativeSpeech] = useState<NativeSpeechApi | null>(null);
+  const [commandBanner, setCommandBanner] = useState<string | null>(null);
+  const [activeCommand, setActiveCommand] = useState<VoiceCommand | null>(null);
   const recognitionRef = useRef<SpeechRecognitionLike | null>(null);
   const nativeListenerRef = useRef<{ remove?: () => Promise<void> | void } | null>(null);
 
   const supported = Ctor !== null || nativeSpeech !== null;
+
+  const COMMAND_LABELS: Record<VoiceCommand, string> = {
+    generate_impression: 'Generating impression…',
+    make_concise: 'Rewriting concise…',
+    make_formal: 'Rewriting formal…',
+    patient_friendly: 'Rewriting patient-friendly…',
+    validate_report: 'Validating report…',
+    cleanup_dictation: 'Cleaning up dictation…',
+  };
+
+  const executeVoiceCommand = useCallback(async (command: VoiceCommand, rid: string) => {
+    setActiveCommand(command);
+    setCommandBanner(COMMAND_LABELS[command]);
+    try {
+      switch (command) {
+        case 'generate_impression':
+          await api.reports.runAi(rid, { mode: 'impression', providerId: '' });
+          break;
+        case 'make_concise':
+          await api.reports.rewrite(rid, { mode: 'concise' });
+          break;
+        case 'make_formal':
+          await api.reports.rewrite(rid, { mode: 'formal' });
+          break;
+        case 'patient_friendly':
+          await api.reports.rewrite(rid, { mode: 'patient_friendly' });
+          break;
+        case 'validate_report':
+          await api.reports.validate(rid);
+          break;
+        case 'cleanup_dictation': {
+          const current = await api.reports.get(rid);
+          await api.reports.cleanupDictation(rid, current.findings || '');
+          break;
+        }
+      }
+    } catch (e) {
+      setError(e instanceof Error ? e.message : 'Command failed');
+    } finally {
+      setActiveCommand(null);
+      setTimeout(() => setCommandBanner(null), 3000);
+    }
+  }, []);
+
+  /** Process a new speech chunk: detect commands or append to transcript. */
+  const processChunk = useCallback((chunk: string) => {
+    if (!chunk) return;
+    setTranscript((prev) => {
+      const full = prev ? `${prev} ${chunk}` : chunk;
+      const match = detectCommand(full);
+      if (match && reportId) {
+        const stripped = stripCommand(full, match);
+        void executeVoiceCommand(match.command, reportId);
+        return stripped;
+      }
+      return full;
+    });
+  }, [reportId, executeVoiceCommand]);
 
   useEffect(() => {
     setReportId(readQueryParam('reportId'));
@@ -130,7 +191,7 @@ export default function MobileDictatePage() {
           const r = event.results[i];
           if (r && r[0]) chunk += r[0].transcript;
         }
-        if (chunk) setTranscript((prev) => (prev ? `${prev} ${chunk}` : chunk));
+        if (chunk) processChunk(chunk);
       };
       rec.onerror = (e) => {
         setError(e.error ? `Speech error: ${e.error}` : 'Speech error');
@@ -159,7 +220,7 @@ export default function MobileDictatePage() {
         prompt: 'Dictate findings',
       });
       const chunk = result?.matches?.filter(Boolean).join(' ').trim();
-      if (chunk) setTranscript((prev) => (prev ? `${prev} ${chunk}` : chunk));
+      if (chunk) processChunk(chunk);
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Could not start recording');
     } finally {
@@ -167,7 +228,7 @@ export default function MobileDictatePage() {
       await nativeListenerRef.current?.remove?.();
       nativeListenerRef.current = null;
     }
-  }, [Ctor, nativeSpeech]);
+  }, [Ctor, nativeSpeech, processChunk]);
 
   const stop = useCallback(async () => {
     recognitionRef.current?.stop();
@@ -225,6 +286,16 @@ export default function MobileDictatePage() {
       {saved && (
         <div className="banner info" role="status">
           Saved to Findings.
+        </div>
+      )}
+
+      {activeCommand && (
+        <span className="badge" data-testid="voice-command-badge">{activeCommand}</span>
+      )}
+
+      {commandBanner && (
+        <div className="banner ok" role="status" data-testid="voice-command-banner">
+          Command detected: {commandBanner}
         </div>
       )}
 

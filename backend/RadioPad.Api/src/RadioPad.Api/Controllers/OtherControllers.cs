@@ -815,6 +815,205 @@ public class UsageController : TenantedController
 
 
 /// <summary>
+/// PRD §18.1/§18.2 — advanced analytics dashboard endpoint. Computes all
+/// product + governance KPIs via <see cref="RadioPad.Application.Services.AnalyticsService"/>.
+/// </summary>
+[ApiController]
+[Route("api/analytics")]
+public class AnalyticsController : TenantedController
+{
+    private readonly RadioPadDbContext _db;
+    private readonly IAiUsageStore _usage;
+    private readonly RadioPad.Application.Services.AnalyticsService _analytics;
+
+    public AnalyticsController(
+        RadioPadDbContext db,
+        IAiUsageStore usage,
+        RadioPad.Application.Services.AnalyticsService analytics)
+    {
+        _db = db;
+        _usage = usage;
+        _analytics = analytics;
+    }
+
+    /// <summary>
+    /// Full analytics summary — all PRD §18 KPIs for the given time window.
+    /// </summary>
+    [HttpGet("summary")]
+    public async Task<IActionResult> Summary(
+        [FromQuery] DateTimeOffset? from,
+        [FromQuery] DateTimeOffset? to,
+        [FromQuery] string? period,
+        CancellationToken ct = default)
+    {
+        var (tenant, _) = await ResolveContextAsync(_db, ct);
+        var t = to ?? DateTimeOffset.UtcNow;
+        var f = from ?? (period switch
+        {
+            "7d" => t.AddDays(-7),
+            "90d" => t.AddDays(-90),
+            _ => t.AddDays(-30),
+        });
+
+        var aiUsage = await _usage.SummariseAsync(tenant.Id, f, t, ct);
+
+        // ── Product KPI raw counts ──────────────────────────────────
+
+        var totalReports = await _db.Reports
+            .Where(r => r.TenantId == tenant.Id && r.CreatedAt >= f && r.CreatedAt <= t)
+            .CountAsync(ct);
+
+        var validatedReports = await _db.Reports
+            .Where(r => r.TenantId == tenant.Id
+                && r.CreatedAt >= f && r.CreatedAt <= t
+                && (int)r.Status >= (int)ReportStatus.Validated)
+            .CountAsync(ct);
+
+        var completedReports = await _db.Reports
+            .Where(r => r.TenantId == tenant.Id
+                && r.CreatedAt >= f && r.CreatedAt <= t
+                && (int)r.Status >= (int)ReportStatus.Acknowledged)
+            .CountAsync(ct);
+
+        // AI-generated reports: those with at least one AiRequest row
+        var aiReportIds = await _db.AiRequests
+            .Where(a => a.TenantId == tenant.Id && a.CreatedAt >= f && a.CreatedAt <= t && a.ReportId != null)
+            .Select(a => a.ReportId!.Value)
+            .Distinct()
+            .ToListAsync(ct);
+        var totalAiGeneratedReports = aiReportIds.Count;
+
+        // AI drafts that reached Acknowledged
+        var aiDraftsAcknowledged = totalAiGeneratedReports == 0 ? 0 : await _db.Reports
+            .Where(r => r.TenantId == tenant.Id
+                && aiReportIds.Contains(r.Id)
+                && (int)r.Status >= (int)ReportStatus.Acknowledged)
+            .CountAsync(ct);
+
+        // Impressions lightly edited — proxy: AI reports that were acknowledged (assumed < 20% edit)
+        var impressionsLightlyEdited = aiDraftsAcknowledged;
+
+        // Time-to-acknowledge for acknowledged reports
+        var acknowledgedReports = await _db.Reports
+            .Where(r => r.TenantId == tenant.Id
+                && r.CreatedAt >= f && r.CreatedAt <= t
+                && (int)r.Status >= (int)ReportStatus.Acknowledged)
+            .Select(r => new { r.CreatedAt, r.UpdatedAt })
+            .ToListAsync(ct);
+
+        var totalSecondsToAck = acknowledgedReports
+            .Sum(r => (r.UpdatedAt - r.CreatedAt).TotalSeconds);
+        var medianSecondsToAck = 0.0;
+        if (acknowledgedReports.Count > 0)
+        {
+            var sorted = acknowledgedReports
+                .Select(r => (r.UpdatedAt - r.CreatedAt).TotalSeconds)
+                .OrderBy(s => s)
+                .ToList();
+            var mid = sorted.Count / 2;
+            medianSecondsToAck = sorted.Count % 2 == 0
+                ? (sorted[mid - 1] + sorted[mid]) / 2.0
+                : sorted[mid];
+        }
+
+        // Contradiction findings — count AuditEvents that contain negation or laterality keywords
+        var contradictionFindings = await _db.AuditEvents
+            .Where(a => a.TenantId == tenant.Id
+                && a.CreatedAt >= f && a.CreatedAt <= t
+                && a.Action == AuditAction.AiResponse
+                && (a.DetailsJson.Contains("negation_conflict") || a.DetailsJson.Contains("laterality_consistency")))
+            .CountAsync(ct);
+
+        // Active radiologists — distinct users with role=Radiologist who have AiRequests or report edits
+        var activeRadiologists = await _db.Users
+            .Where(u => u.TenantId == tenant.Id && u.Role == UserRole.Radiologist)
+            .Where(u => _db.AiRequests.Any(a => a.TenantId == tenant.Id && a.UserId == u.Id && a.CreatedAt >= f && a.CreatedAt <= t)
+                     || _db.Reports.Any(r => r.TenantId == tenant.Id && r.CreatedByUserId == u.Id && r.CreatedAt >= f && r.CreatedAt <= t))
+            .CountAsync(ct);
+
+        // Rulebook adoption — reports with a non-null RulebookId
+        var reportsWithRulebook = await _db.Reports
+            .Where(r => r.TenantId == tenant.Id
+                && r.CreatedAt >= f && r.CreatedAt <= t
+                && r.RulebookId != null)
+            .CountAsync(ct);
+
+        // ── Governance KPI raw counts ───────────────────────────────
+
+        var unapprovedPromptUsage = await _db.AuditEvents
+            .Where(a => a.TenantId == tenant.Id
+                && a.CreatedAt >= f && a.CreatedAt <= t
+                && a.Action == AuditAction.PolicyViolation
+                && a.DetailsJson.Contains("unapproved"))
+            .CountAsync(ct);
+
+        var phiViolationsBlocked = await _db.AuditEvents
+            .Where(a => a.TenantId == tenant.Id
+                && a.CreatedAt >= f && a.CreatedAt <= t
+                && a.Action == AuditAction.ProviderBlocked)
+            .CountAsync(ct);
+
+        // Rulebook regression failures — validation pack runs with failures
+        var rulebookRegressionFailures = await _db.AuditEvents
+            .Where(a => a.TenantId == tenant.Id
+                && a.CreatedAt >= f && a.CreatedAt <= t
+                && a.Action == AuditAction.ValidationPackRun
+                && a.DetailsJson.Contains("\"failed\""))
+            .CountAsync(ct);
+
+        var modelDriftAlerts = await _db.AuditEvents
+            .Where(a => a.TenantId == tenant.Id
+                && a.CreatedAt >= f && a.CreatedAt <= t
+                && a.Action == AuditAction.SystemAlert
+                && a.DetailsJson.Contains("model_drift"))
+            .CountAsync(ct);
+
+        // Audit completeness — AiRequests with all required trace fields populated
+        var totalAiRequests = await _db.AiRequests
+            .Where(a => a.TenantId == tenant.Id && a.CreatedAt >= f && a.CreatedAt <= t)
+            .CountAsync(ct);
+        var aiRequestsWithFullTrace = await _db.AiRequests
+            .Where(a => a.TenantId == tenant.Id && a.CreatedAt >= f && a.CreatedAt <= t
+                && a.PromptVersion != ""
+                && a.Provider != ""
+                && a.Model != ""
+                && a.InputHash != ""
+                && a.OutputHash != "")
+            .CountAsync(ct);
+
+        var raw = new RadioPad.Application.Services.AnalyticsRawData
+        {
+            TotalReports = totalReports,
+            ValidatedReports = validatedReports,
+            CompletedReports = completedReports,
+            TotalAiGeneratedReports = totalAiGeneratedReports,
+            AiDraftsAcknowledged = aiDraftsAcknowledged,
+            ImpressionsLightlyEdited = impressionsLightlyEdited,
+            AcknowledgedReportCount = acknowledgedReports.Count,
+            TotalSecondsToAcknowledge = totalSecondsToAck,
+            MedianSecondsToAcknowledge = medianSecondsToAck,
+            ContradictionFindings = contradictionFindings,
+            EditDistanceSum = 0, // edit-distance tracking requires version diff; future iteration
+            EditDistanceSampleCount = 0,
+            ActiveRadiologists = activeRadiologists,
+            ReportsWithRulebook = reportsWithRulebook,
+            QualityScoreSum = 0,
+            QualityScoreCount = 0,
+            UnapprovedPromptUsageCount = unapprovedPromptUsage,
+            PhiViolationsBlocked = phiViolationsBlocked,
+            RulebookRegressionFailures = rulebookRegressionFailures,
+            ModelDriftAlerts = modelDriftAlerts,
+            TotalAiRequests = totalAiRequests,
+            AiRequestsWithFullTrace = aiRequestsWithFullTrace,
+        };
+
+        var summary = await _analytics.ComputeAsync(tenant.Id, f, t, raw, aiUsage, ct);
+        return Ok(summary);
+    }
+}
+
+
+/// <summary>
 /// Per-tenant terminology dictionary (PRD STD-006).
 /// Reads/writes <see cref="TenantLexicon"/> rows used by <c>ReportValidator</c>
 /// to flag forbidden terms with a Warning-level finding.

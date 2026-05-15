@@ -45,6 +45,9 @@ public class RadioPadDbContext : DbContext
     /// <summary>Iter-35 — versioned clinical validation packs (rulebook golden suites).</summary>
     public DbSet<ValidationPack> ValidationPacks => Set<ValidationPack>();
 
+    /// <summary>PRD §18.2 — drift detection baselines per (tenant, provider, rulebook).</summary>
+    public DbSet<DriftBaseline> DriftBaselines => Set<DriftBaseline>();
+
     protected override void OnModelCreating(ModelBuilder b)
     {
         b.Entity<Tenant>().HasIndex(x => x.Slug).IsUnique();
@@ -85,6 +88,10 @@ public class RadioPadDbContext : DbContext
             .HasIndex(x => new { x.TenantId, x.RulebookId, x.Version }).IsUnique();
         b.Entity<ValidationPack>()
             .HasIndex(x => new { x.TenantId, x.RulebookId });
+
+        // PRD §18.2 — drift baselines are unique per (tenant, provider, rulebook).
+        b.Entity<DriftBaseline>()
+            .HasIndex(x => new { x.TenantId, x.ProviderId, x.RulebookId }).IsUnique();
 
         b.Entity<Report>().OwnsOne(x => x.Study);
         b.Entity<Report>().HasMany(x => x.Versions).WithOne().HasForeignKey(v => v.ReportId);

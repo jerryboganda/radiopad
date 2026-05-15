@@ -235,7 +235,11 @@ public class ReportingService
                 Snippet: c.Sentence));
         }
         var blocker = extra.Any(f => string.Equals(f.Severity, nameof(Domain.Enums.ValidationSeverity.Blocker), StringComparison.OrdinalIgnoreCase));
-        return ApplyStrictness(new ValidationResult(blocker, extra), settings);
+        var blockerCount = extra.Count(f => string.Equals(f.Severity, nameof(Domain.Enums.ValidationSeverity.Blocker), StringComparison.OrdinalIgnoreCase));
+        var warningCount = extra.Count(f => string.Equals(f.Severity, nameof(Domain.Enums.ValidationSeverity.Warning), StringComparison.OrdinalIgnoreCase));
+        var infoCount = extra.Count(f => string.Equals(f.Severity, nameof(Domain.Enums.ValidationSeverity.Info), StringComparison.OrdinalIgnoreCase));
+        var qualityScore = Math.Max(0, 100 - (blockerCount * 25) - (warningCount * 5) - (infoCount * 1));
+        return ApplyStrictness(new ValidationResult(blocker, extra, qualityScore), settings);
     }
 
     /// <summary>
@@ -256,7 +260,11 @@ public class ReportingService
                 : f);
         }
         var blocker = promoted.Any(f => string.Equals(f.Severity, nameof(Domain.Enums.ValidationSeverity.Blocker), StringComparison.OrdinalIgnoreCase));
-        return new ValidationResult(blocker, promoted);
+        var blockerCount = promoted.Count(f => string.Equals(f.Severity, nameof(Domain.Enums.ValidationSeverity.Blocker), StringComparison.OrdinalIgnoreCase));
+        var warningCount = promoted.Count(f => string.Equals(f.Severity, nameof(Domain.Enums.ValidationSeverity.Warning), StringComparison.OrdinalIgnoreCase));
+        var infoCount = promoted.Count(f => string.Equals(f.Severity, nameof(Domain.Enums.ValidationSeverity.Info), StringComparison.OrdinalIgnoreCase));
+        var qualityScore = Math.Max(0, 100 - (blockerCount * 25) - (warningCount * 5) - (infoCount * 1));
+        return new ValidationResult(blocker, promoted, qualityScore);
     }
 
     /// <summary>

@@ -136,6 +136,14 @@ public enum AuditAction
     ValidationPackDeprecated = 43,
     /// <summary>Iter-35 — clinical validation pack was executed against its rulebook (records pass/fail counts).</summary>
     ValidationPackRun = 44,
+    /// <summary>PRD Enterprise GA #13 — a rulebook/template was submitted to the marketplace for review.</summary>
+    MarketplaceSubmission = 45,
+    /// <summary>PRD Enterprise GA #13 — a marketplace submission was approved by an admin/MedicalDirector.</summary>
+    MarketplaceApproved = 46,
+    /// <summary>PRD Enterprise GA #13 — a marketplace submission was rejected by an admin/MedicalDirector.</summary>
+    MarketplaceRejected = 47,
+    /// <summary>PRD Enterprise GA #13 — a marketplace listing was installed into a tenant.</summary>
+    MarketplaceInstalled = 48,
 }
 
 /// <summary>
@@ -162,6 +170,19 @@ public enum PromptOverrideStatus
 {
     Draft = 0,
     Approved = 1,
+}
+
+/// <summary>
+/// PRD Enterprise GA #13 — lifecycle of a marketplace submission.
+/// Draft → PendingReview → Approved / Rejected. Deprecated is terminal.
+/// </summary>
+public enum MarketplaceSubmissionStatus
+{
+    Draft = 0,
+    PendingReview = 1,
+    Approved = 2,
+    Rejected = 3,
+    Deprecated = 4,
 }
 
 public enum ValidationSeverity

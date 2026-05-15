@@ -3,7 +3,7 @@
 import { useEffect, useState } from 'react';
 import Link from 'next/link';
 import { api, type Rulebook } from '@/lib/api';
-import { rulebookHref } from '@/lib/routes';
+import { rulebookHref, rulebookEditorHref } from '@/lib/routes';
 
 export default function RulebooksPage() {
   const [items, setItems] = useState<Rulebook[]>([]);
@@ -52,6 +52,10 @@ export default function RulebooksPage() {
       <h1 className="rp-page-title">Rulebooks</h1>
       <p className="rp-page-sub">Versioned, testable, institution-approved configuration packages that govern AI generation and validation.</p>
 
+      <div className="rp-row rp-gap-sm rp-mb-md">
+        <Link href={rulebookEditorHref()} className="primary-ghost" style={{ textDecoration: 'none' }}>+ Create New (Visual)</Link>
+      </div>
+
       {error && <div className="banner warn">{error}</div>}
 
       <div className="rp-workspace" style={{ gridTemplateColumns: 'minmax(280px, 360px) 1fr' }}>
@@ -69,6 +73,8 @@ export default function RulebooksPage() {
                   <td><span className={`badge ${statusBadge(rb.status)}`}>{statusLabel(rb.status)}</span></td>
                   <td onClick={(e) => e.stopPropagation()}>
                     <Link href={rulebookHref(rb.id)}>Open →</Link>
+                    {' '}
+                    <Link href={rulebookEditorHref(rb.id)} className="primary-ghost" style={{ textDecoration: 'none', fontSize: 12, padding: '2px 8px' }}>Visual Editor</Link>
                   </td>
                 </tr>
               ))}
