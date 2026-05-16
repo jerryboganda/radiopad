@@ -1,6 +1,6 @@
 # QA Checklist
 
-**Status:** Current  ·  **Owner:** QA  ·  **Last Updated:** 2026-05-04
+**Status:** Current  ·  **Owner:** QA  ·  **Last Updated:** 2026-05-16
 
 ## Per-PR checklist
 
@@ -26,6 +26,20 @@
 - [ ] Release notes link to documentation.
 - [ ] Migration plan documented if the release adds DB migrations.
 - [ ] Customer comms drafted for breaking changes.
+
+## Per-desktop-release checklist
+
+- [ ] Tauri updater public key is populated for the target channel or updater artifacts are disabled for an internal unsigned test build.
+- [ ] Windows, macOS, and Linux bundles were produced or blockers are documented in the release notes.
+- [ ] Signed artifacts pass platform verification (Authenticode, Gatekeeper/notary, GPG/AppImage signature as applicable).
+- [ ] App launches and reaches backend `ready` state.
+- [ ] Missing sidecar does not crash the app; desktop status banner appears.
+- [ ] Sidecar exit triggers controlled restart or final failed state.
+- [ ] Pairing flow stores the bearer through the Tauri keyring path.
+- [ ] Secure clipboard clears after TTL and does not clear unrelated clipboard content.
+- [ ] Offline draft save/read uses encrypted Tauri storage.
+- [ ] Idle CPU/GPU remains effectively near zero after readiness.
+- [ ] No PHI or secrets appear in desktop logs, installer notes, or workflow output.
 
 ## Per-incident checklist (SEV-1 / SEV-2)
 

@@ -1,6 +1,6 @@
 # Performance Test Plan
 
-**Status:** Draft  ·  **Owner:** Engineering + Ops  ·  **Last Updated:** 2026-05-04
+**Status:** Draft  ·  **Owner:** Engineering + Ops  ·  **Last Updated:** 2026-05-16
 
 ## Goals
 
@@ -43,3 +43,23 @@ Verify the platform meets the latency / throughput targets in [non-functional re
 
 - Nightly performance run (planned) emits a JSON file with p50/p95/p99 per scenario.
 - Regression > 20% on a target metric blocks the release.
+
+## Desktop measurements
+
+Run these on a representative Windows 11, macOS, and Linux workstation before a
+desktop release:
+
+| Measurement | Method | Target |
+| --- | --- | --- |
+| Cold start | Launch from a stopped state; measure first usable dashboard paint. | Record baseline; no regression > 20%. |
+| Warm start | Relaunch after one successful run with app data present. | Faster than cold start. |
+| Sidecar readiness | Time from app launch to `/api/health/ready` 200 and hidden desktop status banner. | Record baseline; failures block release. |
+| Idle CPU/GPU | Leave app on dashboard for 5 minutes after ready; use Task Manager / Activity Monitor / `top`. | Effectively near zero. |
+| Idle memory | Same 5-minute idle window. | Stable; no unbounded growth. |
+| Navigation latency | Dashboard -> report editor -> validation -> audit. | Instant-feeling; investigate visible stalls. |
+| Secure clipboard overhead | Copy a section and wait for TTL clear. | No persistent CPU usage after clear. |
+| Bundle size | Inspect installer and `frontend/out` sizes. | Record baseline; investigate large jumps. |
+
+The desktop sidecar health check runs every 5 seconds with a sub-second timeout.
+Do not add faster polling, permanent animation loops, or repeated renderer work
+without documenting the performance reason here.

@@ -3,6 +3,7 @@ import './radiopad.css';
 import type { ReactNode } from 'react';
 import ShellBridge from './ShellBridge';
 import BillingStatusBanner from '@/components/BillingStatusBanner';
+import DesktopStatusBanner from '@/components/DesktopStatusBanner';
 import IntlBoundary from '@/components/IntlBoundary';
 import Topbar from '@/components/Topbar';
 
@@ -19,6 +20,7 @@ export default function RootLayout({ children }: { children: ReactNode }) {
           <div className="app">
             <BillingStatusBanner />
             <Topbar />
+            <DesktopStatusBanner />
             <main className="rp-main">{children}</main>
           </div>
           <ShellBridge />

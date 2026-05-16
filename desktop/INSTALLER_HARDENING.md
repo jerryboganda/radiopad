@@ -200,7 +200,7 @@ The capability grant list was reviewed and hardened. Removals:
 | ------- | --------- |
 | `dialog:default` | Replaced by explicit `dialog:allow-open` and `dialog:allow-save` — the `default` bundle includes `dialog:allow-message` and `dialog:allow-ask` which are not used and could enable UI spoofing. |
 | `clipboard-manager:default` | Replaced by explicit read/write text — the default bundle includes `allow-read-image` / `allow-write-image` which are not needed and expand the IPC surface. |
-| `global-shortcut:default` | RadioPad does not register global shortcuts; granting this creates an unnecessary privilege-escalation path (a compromised frontend could register system-wide hotkeys). |
+| `global-shortcut:default` | RadioPad registers its fixed shortcut set in Rust, not from renderer IPC. The frontend never needs permission to register arbitrary system-wide hotkeys. |
 | `store:default` | Replaced by explicit verb grants (`get`, `set`, `delete`, `keys`, `save`). |
 | `store:allow-clear` | Wiping the entire store is destructive and only needed by a factory-reset flow that does not exist today. |
 
@@ -230,4 +230,4 @@ The capability grant list was reviewed and hardened. Removals:
 ### Risk notes
 
 - `style-src 'unsafe-inline'` is present in the CSP. This is common for frameworks that inject scoped styles (e.g. CSS-in-JS). It does **not** enable script injection. Accepted.
-- The updater plugin is configured but `pubkey` is empty (`""`). This must be populated before production release or the updater must be removed. Tracked separately.
+- The updater plugin is configured but the checked-in `pubkey` is empty (`""`) because the real channel key is operator-supplied. `desktop-release.yml` injects `TAURI_SIGNING_PUBLIC_KEY` for production builds and fails if it is missing; unsigned dry-run builds disable updater artifacts.

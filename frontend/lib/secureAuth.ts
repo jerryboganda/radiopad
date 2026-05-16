@@ -1,13 +1,14 @@
 /**
- * PRD MOB-006 — secure store for the bearer/session token used by the API
- * client when running inside the Capacitor mobile shell.
+ * PRD DESK-008 / MOB-006 — secure store for the bearer/session token used by
+ * the API client when running inside the Tauri desktop or Capacitor mobile shell.
  *
- * Uses `capacitor-secure-storage-plugin` when available (Keychain on iOS,
- * Keystore-backed EncryptedSharedPreferences on Android). Falls back to
- * `@capacitor/preferences` and finally to `localStorage` for the web preview.
+ * Uses the Tauri keyring bridge on desktop, `capacitor-secure-storage-plugin`
+ * when available on mobile (Keychain on iOS, Keystore-backed
+ * EncryptedSharedPreferences on Android), then `@capacitor/preferences`, and
+ * finally `localStorage` for the web preview.
  *
  * The web fallback is **not** secure storage — it is only for the dev
- * preview. Production mobile builds must include the secure-storage plugin.
+ * preview. Production desktop/mobile builds must use the native secure paths.
  */
 
 const KEY = 'radiopad.auth.token.v1';
@@ -21,10 +22,41 @@ type Backend = {
 
 let backend: Backend | null = null;
 
+function tauriInvoke(): undefined | ((cmd: string, args?: unknown) => Promise<unknown>) {
+  if (typeof window === 'undefined') return undefined;
+  const tauri = (window as typeof window & {
+    __TAURI__?: {
+      core?: { invoke?: (cmd: string, args?: unknown) => Promise<unknown> };
+      invoke?: (cmd: string, args?: unknown) => Promise<unknown>;
+    };
+  }).__TAURI__;
+  return tauri?.core?.invoke ?? tauri?.invoke;
+}
+
 async function pickBackend(): Promise<Backend> {
   if (backend) return backend;
 
-  // 1. Native secure storage (iOS Keychain / Android Keystore).
+  // 1. Desktop secure storage (Windows Credential Manager / macOS Keychain /
+  // Linux Secret Service), exposed through narrow Tauri commands.
+  const invoke = tauriInvoke();
+  if (invoke) {
+    backend = {
+      async get() {
+        const value = await invoke('device_pairing_token_get');
+        return typeof value === 'string' && value.length > 0 ? value : null;
+      },
+      async set(value: string) {
+        await invoke('device_pairing_token_set', { token: value });
+      },
+      async clear() {
+        await invoke('device_pairing_token_clear');
+      },
+      isSecure: true,
+    };
+    return backend;
+  }
+
+  // 2. Native mobile secure storage (iOS Keychain / Android Keystore).
   try {
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
       const sec: any = await import('capacitor-secure-storage-plugin').catch(() => null);
@@ -48,7 +80,7 @@ async function pickBackend(): Promise<Backend> {
     }
   } catch { /* fall through */ }
 
-  // 2. Capacitor Preferences (encrypted-at-rest on iOS, plain on Android).
+  // 3. Capacitor Preferences (encrypted-at-rest on iOS, plain on Android).
   try {
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
       const mod: any = await import('@capacitor/preferences').catch(() => null);
@@ -70,7 +102,7 @@ async function pickBackend(): Promise<Backend> {
     }
   } catch { /* fall through */ }
 
-  // 3. Last-resort web fallback. Not for production.
+  // 4. Last-resort web fallback. Not for production.
   backend = {
     async get() {
       if (typeof localStorage === 'undefined') return null;
