@@ -4,6 +4,35 @@
 
 ---
 
+## Iteration 42 — VPS production deployment + GitHub sync
+
+- **Date:** 2026-05-16
+- **Scope:** SSH deploy to production VPS (185.252.233.186), update running containers to latest main, add VPS-specific deploy infrastructure to GitHub.
+
+### Delivered
+
+- **VPS updated** from old source (`fa19c8c2`) to latest main (`d346a048`) via GitHub clone + rsync.
+- **Fixed Docker build**: pinned `pnpm@9.15.9` via `corepack prepare` in `web.Dockerfile` to prevent `ERR_PNPM_IGNORED_BUILDS` error from pnpm 10 (which blocks `esbuild` and `sharp` build scripts by default).
+- **Rebuilt containers** (`--no-cache`): `radiopad-api` (ASP.NET Core 8) and `radiopad-web` (Next.js 40-page static export + nginx) — both healthy.
+- **PR #6 merged**: Added `deploy/vps/` to the GitHub repo with the VPS-specific Dockerfiles, nginx config, and docker-compose manifest for NPM-based deployments.
+- **Sidebar shell live in production** on port 8093 at `185.252.233.186`.
+
+### Validation
+
+- `curl http://127.0.0.1:8093/api/health` → `{"status":"ok","service":"radiopad-api"}` ✅
+- `curl http://127.0.0.1:8093/` → RadioPad sidebar HTML (40 static pages) ✅
+- `docker ps | grep radio` → both containers `Up` ✅
+- PR #6 CI green (`mergeStateStatus: CLEAN`) — merged ✅
+
+### Notes
+
+- VPS runs Nginx Proxy Manager for all TLS — Caddy from `deploy/docker-compose.prod.yml` is NOT used on this VPS. `deploy/vps/` is the correct manifests to use here.
+- `radiopad-web` exposes port `8093` directly; NPM can proxy a domain to `http://127.0.0.1:8093` for TLS.
+- Container SQLite data persisted at `/opt/radiopad/data/radiopad.db`.
+- Secrets in `/opt/radiopad/.secrets.env` (mode 600).
+
+---
+
 ## Iteration 41 — GitHub sync + deploy infrastructure
 
 - **Date:** 2026-05-16
