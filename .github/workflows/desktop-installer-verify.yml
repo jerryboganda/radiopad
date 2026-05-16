@@ -1,0 +1,122 @@
+name: desktop-installer-verify
+
+# DESK-002: post-release verification of per-OS installer signing/notarization.
+# Runs on every successful completion of `desktop-release.yml`, downloads the
+# published installer artifacts, and re-validates the signatures on a matching
+# OS runner. Any non-zero exit fails the workflow and blocks promotion.
+
+on:
+  workflow_run:
+    workflows: ["desktop-release"]
+    types: [completed]
+
+permissions:
+  contents: read
+  actions: read
+
+jobs:
+  verify-windows:
+    if: ${{ github.event.workflow_run.conclusion == 'success' }}
+    runs-on: windows-latest
+    steps:
+      - name: Download Windows installers
+        uses: actions/download-artifact@v4
+        with:
+          name: desktop-windows
+          path: artifacts
+          run-id: ${{ github.event.workflow_run.id }}
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: signtool verify MSI
+        shell: pwsh
+        run: |
+          $msi = Get-ChildItem artifacts -Recurse -Filter '*.msi' | Select-Object -First 1
+          if (-not $msi) { throw 'No MSI artifact found' }
+          & "${env:ProgramFiles(x86)}\Windows Kits\10\bin\x64\signtool.exe" verify /pa /v $msi.FullName
+
+      - name: signtool verify NSIS setup
+        shell: pwsh
+        run: |
+          $exe = Get-ChildItem artifacts -Recurse -Filter '*-setup.exe' | Select-Object -First 1
+          if ($exe) {
+            & "${env:ProgramFiles(x86)}\Windows Kits\10\bin\x64\signtool.exe" verify /pa /v $exe.FullName
+          } else {
+            Write-Host 'No NSIS setup.exe found — skipping.'
+          }
+
+  verify-macos:
+    if: ${{ github.event.workflow_run.conclusion == 'success' }}
+    runs-on: macos-latest
+    steps:
+      - name: Download macOS installers
+        uses: actions/download-artifact@v4
+        with:
+          name: desktop-macos
+          path: artifacts
+          run-id: ${{ github.event.workflow_run.id }}
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Mount DMG and locate .app
+        run: |
+          set -euo pipefail
+          DMG=$(find artifacts -name '*.dmg' | head -n1)
+          test -n "$DMG" || (echo 'No DMG artifact' && exit 1)
+          MNT=$(mktemp -d)
+          hdiutil attach "$DMG" -mountpoint "$MNT" -nobrowse -quiet
+          APP=$(find "$MNT" -maxdepth 2 -name '*.app' | head -n1)
+          echo "APP_PATH=$APP" >> "$GITHUB_ENV"
+          echo "DMG_MNT=$MNT" >> "$GITHUB_ENV"
+
+      - name: codesign --verify --deep --strict
+        run: codesign --verify --deep --strict --verbose=2 "$APP_PATH"
+
+      - name: spctl assess (Gatekeeper)
+        run: spctl -a -t exec -vv "$APP_PATH"
+
+      - name: Detach DMG
+        if: always()
+        run: hdiutil detach "$DMG_MNT" -quiet || true
+
+  verify-linux:
+    if: ${{ github.event.workflow_run.conclusion == 'success' }}
+    runs-on: ubuntu-latest
+    steps:
+      - name: Install verification tooling
+        run: sudo apt-get update && sudo apt-get install -y dpkg-sig gnupg
+
+      - name: Download Linux installers
+        uses: actions/download-artifact@v4
+        with:
+          name: desktop-linux
+          path: artifacts
+          run-id: ${{ github.event.workflow_run.id }}
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Import RadioPad release public key
+        run: echo "${{ secrets.RADIOPAD_GPG_PUBLIC_KEY }}" | gpg --import
+
+      - name: dpkg-sig --verify .deb
+        run: |
+          set -euo pipefail
+          DEB=$(find artifacts -name '*.deb' | head -n1)
+          test -n "$DEB" || (echo 'No .deb artifact' && exit 1)
+          dpkg-sig --verify "$DEB"
+
+      - name: gpg --verify AppImage signature
+        run: |
+          set -euo pipefail
+          APPIMG=$(find artifacts -name '*.AppImage' | head -n1)
+          SIG=$(find artifacts -name '*.AppImage.sig' | head -n1)
+          test -n "$APPIMG" -a -n "$SIG" || (echo 'AppImage or .sig missing' && exit 1)
+          gpg --verify "$SIG" "$APPIMG"
+
+      - name: rpm --checksig (if RPM published)
+        run: |
+          set -euo pipefail
+          RPM=$(find artifacts -name '*.rpm' | head -n1 || true)
+          if [ -n "$RPM" ]; then
+            sudo apt-get install -y rpm
+            rpm --checksig "$RPM"
+          else
+            echo 'No RPM artifact — skipping rpm --checksig.'
+          fi

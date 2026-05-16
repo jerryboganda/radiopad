@@ -1,0 +1,112 @@
+name: tauri-updater
+
+# PRD DESK-014 — sign the Tauri 2 updater manifest (`latest.json`) with the
+# Ed25519 updater key. No-op when TAURI_PRIVATE_KEY is not configured so PRs
+# from forks and dev branches still pass.
+#
+# Required repository secrets:
+#   TAURI_PRIVATE_KEY     Tauri 2 updater private key (raw or base64).
+#   TAURI_KEY_PASSWORD    Optional passphrase for the private key.
+#
+# Triggered after a tag push that produces a desktop bundle, or manually.
+
+on:
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: 'Release tag (e.g. v0.3.0)'
+        required: true
+      manifest_url:
+        description: 'Public URL where latest.json should advertise the bundles'
+        required: false
+        default: ''
+  workflow_run:
+    workflows: ['desktop-bundle']
+    types: [completed]
+
+permissions:
+  contents: write
+
+jobs:
+  sign-manifest:
+    if: ${{ github.event_name == 'workflow_dispatch' || github.event.workflow_run.conclusion == 'success' }}
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Skip when secrets absent
+        id: gate
+        run: |
+          if [ -z "${{ secrets.TAURI_PRIVATE_KEY }}" ]; then
+            echo "secrets_present=0" >> "$GITHUB_OUTPUT"
+            echo "::warning::TAURI_PRIVATE_KEY is unset — manifest will not be signed (no-op)."
+          else
+            echo "secrets_present=1" >> "$GITHUB_OUTPUT"
+          fi
+
+      - uses: actions/setup-node@v4
+        if: steps.gate.outputs.secrets_present == '1'
+        with: { node-version: '20' }
+
+      - name: Install Tauri CLI
+        if: steps.gate.outputs.secrets_present == '1'
+        run: npm i -g @tauri-apps/cli@^2
+
+      - name: Resolve tag + assets
+        if: steps.gate.outputs.secrets_present == '1'
+        id: meta
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set -euo pipefail
+          TAG="${{ github.event.inputs.tag }}"
+          if [ -z "$TAG" ]; then
+            TAG=$(gh release list --limit 1 --json tagName -q '.[0].tagName')
+          fi
+          echo "tag=$TAG" >> "$GITHUB_OUTPUT"
+          mkdir -p dist
+          gh release download "$TAG" --dir dist --pattern '*.msi' --pattern '*.exe' \
+            --pattern '*.dmg' --pattern '*.AppImage' --pattern '*.deb' || true
+
+      - name: Sign updater manifest
+        if: steps.gate.outputs.secrets_present == '1'
+        env:
+          TAURI_PRIVATE_KEY: ${{ secrets.TAURI_PRIVATE_KEY }}
+          TAURI_KEY_PASSWORD: ${{ secrets.TAURI_KEY_PASSWORD }}
+          TAG: ${{ steps.meta.outputs.tag }}
+          MANIFEST_URL: ${{ github.event.inputs.manifest_url }}
+        run: |
+          set -euo pipefail
+          shopt -s nullglob
+          declare -A platforms=( \
+            [windows-x86_64]='*.msi' \
+            [darwin-aarch64]='*.dmg' \
+            [linux-x86_64]='*.AppImage' \
+          )
+          MANIFEST=dist/latest.json
+          echo "{\"version\":\"${TAG#v}\",\"notes\":\"RadioPad ${TAG}\",\"pub_date\":\"$(date -u +%Y-%m-%dT%H:%M:%SZ)\",\"platforms\":{}}" > "$MANIFEST"
+          for plat in "${!platforms[@]}"; do
+            for f in dist/${platforms[$plat]}; do
+              SIG=$(npx --yes @tauri-apps/cli signer sign --no-confirm \
+                --private-key "$TAURI_PRIVATE_KEY" \
+                --password "${TAURI_KEY_PASSWORD:-}" "$f" | tail -n1)
+              URL="${MANIFEST_URL%/}/$(basename "$f")"
+              jq --arg p "$plat" --arg s "$SIG" --arg u "$URL" \
+                '.platforms[$p] = {signature:$s,url:$u}' "$MANIFEST" > "$MANIFEST.tmp"
+              mv "$MANIFEST.tmp" "$MANIFEST"
+            done
+          done
+          cat "$MANIFEST"
+
+      - name: Upload signed manifest
+        if: steps.gate.outputs.secrets_present == '1'
+        uses: actions/upload-artifact@v4
+        with:
+          name: tauri-updater-manifest
+          path: dist/latest.json
+
+      - name: Attach manifest to release
+        if: steps.gate.outputs.secrets_present == '1' && steps.meta.outputs.tag != ''
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: gh release upload "${{ steps.meta.outputs.tag }}" dist/latest.json --clobber

@@ -84,6 +84,23 @@ const promptFileBootstrap = (fp) =>
   'Follow every instruction in that file exactly. ' +
   'Do not begin your response until you have read the entire file.';
 
+function resolveNodeShim(resolvedBin) {
+  if (process.platform !== 'win32' || !CMD_BAT_RE.test(resolvedBin || '')) return null;
+  try {
+    const shim = fs.readFileSync(resolvedBin, 'utf8');
+    const match = shim.match(/"%dp0%\\([^"\r\n]+?\.js)"/i);
+    if (!match?.[1]) return null;
+    const script = path.resolve(
+      path.dirname(resolvedBin),
+      match[1].replace(/\\/g, path.sep),
+    );
+    if (!fs.existsSync(script)) return null;
+    return { bin: process.execPath, argsPrefix: [script] };
+  } catch {
+    return null;
+  }
+}
+
 const UPLOAD_DIR = path.join(os.tmpdir(), 'od-uploads');
 fs.mkdirSync(UPLOAD_DIR, { recursive: true });
 fs.mkdirSync(ARTIFACTS_DIR, { recursive: true });
@@ -990,11 +1007,12 @@ export async function startServer({ port = 7456, returnServer = false } = {}) {
     // prompt to a temp file in the project directory and pass a short
     // bootstrap message that tells the agent to Read it before responding.
     const resolvedBin = resolveAgentBin(agentId);
-    const isWinShell = process.platform === 'win32' && resolvedBin && CMD_BAT_RE.test(resolvedBin);
-    // Thresholds account for escaping overhead (~1.1-1.3x for cmd.exe shell)
-    // plus other args (~500 chars).  6500 chars for shell:true, 30000 for
-    // direct CreateProcess.
-    const promptLimit = isWinShell ? 6500 : 30000;
+    const isWinCmdShim = process.platform === 'win32' && resolvedBin && CMD_BAT_RE.test(resolvedBin);
+    // Keep a conservative threshold for Windows npm shims: even when we
+    // resolve them to node scripts below, the original binary is still a
+    // prompt-bearing CLI that may receive other long flags. Agents that can
+    // read stdin opt out of this path via `promptViaStdin`.
+    const promptLimit = isWinCmdShim ? 6500 : 30000;
     const needsFilePrompt =
       !def.promptViaStdin &&
       process.platform === 'win32' &&
@@ -1003,7 +1021,7 @@ export async function startServer({ port = 7456, returnServer = false } = {}) {
     if (process.platform === 'win32') {
       console.log(
         `[od] prompt-delivery: agent=${agentId} promptLen=${composed.length} ` +
-        `shell=${isWinShell} limit=${promptLimit} file=${!!needsFilePrompt} ` +
+        `cmdShim=${isWinCmdShim} limit=${promptLimit} file=${!!needsFilePrompt} ` +
         `bin=${resolvedBin ? path.basename(resolvedBin) : 'null'}`,
       );
     }
@@ -1019,7 +1037,7 @@ export async function startServer({ port = 7456, returnServer = false } = {}) {
     // ^^^ idempotency: promptFileCleaned is set synchronously BEFORE the
     // async fs.unlink callback, so a second call never races past the guard.
     if (needsFilePrompt) {
-      promptFilePath = path.join(cwd, PROMPT_TEMP_FILE);
+      promptFilePath = path.join(cwd, PROMPT_TEMP_FILE());
       try {
         fs.writeFileSync(promptFilePath, composed, 'utf8');
         effectivePrompt = promptFileBootstrap(promptFilePath);
@@ -1057,32 +1075,11 @@ export async function startServer({ port = 7456, returnServer = false } = {}) {
       });
       return res.end();
     }
-    // npm shims on Windows are .cmd/.bat files; Node ≥21 refuses to spawn
-    // those without `shell: true` (CVE-2024-27980). When `shell: true` is set
-    // on Windows, Node escapes argv items for the cmd.exe shell — that
-    // escape is what currently keeps user-controlled prompt text in `args`
-    // (composed via `def.buildArgs(prompt, ...)` above) from being
-    // interpreted as shell metacharacters. Two caveats this leaves on the
-    // table for a future contributor to be aware of:
-    //   1. Defensibility relies on Node's escaper staying correct. The
-    //      stronger fix is to keep user text out of argv entirely by piping
-    //      the composed prompt through child stdin instead of passing it
-    //      as a `-p $prompt`-style flag. Do NOT add a new prompt-bearing
-    //      flag in `buildArgs` thinking shell:true makes it safe — route
-    //      it through stdin instead.
-    //   2. cmd.exe caps the full command line at ~8191 chars (well below
-    //      Node's direct-spawn argv cap), so long prompts can fail with an
-    //      ENAMETOOLONG-class error here. Same mitigation: stdin.
-    //
-    // We only flip shell:true for `.cmd`/`.bat` because those are the only
-    // PATHEXT entries that strictly require cmd.exe to launch. `.exe`/`.com`
-    // launch directly (no shell needed); `.ps1`/`.vbs` etc. would need a
-    // different host (powershell / wscript) — `shell: true` (which uses
-    // cmd.exe) wouldn't actually help those, so we don't pretend it would.
-    // In practice npm-installed CLIs ship as `.cmd` shims, which is the
-    // case this branch covers.
-    const useShell =
-      process.platform === 'win32' && CMD_BAT_RE.test(resolvedBin);
+    // npm shims on Windows are .cmd/.bat files. Rather than going through
+    // cmd.exe (fragile quoting with paths like `C:\Users\Dr Faisal...`) or
+    // Node's deprecated shell:true path, resolve standard npm shims to their
+    // underlying JS entry point and spawn the current Node executable directly.
+    const nodeShim = resolveNodeShim(resolvedBin);
 
     send('start', {
       agentId,
@@ -1102,11 +1099,13 @@ export async function startServer({ port = 7456, returnServer = false } = {}) {
       // OS command-line length limit (Windows CreateProcess caps at ~32 KB)
       // which causes `spawn ENAMETOOLONG` for any non-trivial prompt.
       const stdinMode = def.promptViaStdin || def.streamFormat === 'acp-json-rpc' ? 'pipe' : 'ignore';
-      child = spawn(resolvedBin, args, {
+      const spawnBin = nodeShim?.bin || resolvedBin;
+      const spawnArgs = nodeShim ? [...nodeShim.argsPrefix, ...args] : args;
+      child = spawn(spawnBin, spawnArgs, {
         env: { ...process.env },
         stdio: [stdinMode, 'pipe', 'pipe'],
         cwd: cwd || undefined,
-        shell: useShell,
+        shell: false,
       });
       if (def.promptViaStdin && child.stdin) {
         // EPIPE from a fast-exiting CLI (bad auth, missing model, exit on
@@ -1128,6 +1127,46 @@ export async function startServer({ port = 7456, returnServer = false } = {}) {
 
     child.stdout.setEncoding('utf8');
     child.stderr.setEncoding('utf8');
+
+    // No-output watchdog: many CLIs (notably gemini-cli on a 429 from
+    // Google's preview-model capacity pool) silently retry with internal
+    // backoff and never write a byte to stdout/stderr. Without this the
+    // request hangs in the UI for hours. We give the child OD_AGENT_IDLE_MS
+    // (default 90s) to produce ANY output; first byte resets to a longer
+    // grace period (OD_AGENT_STREAM_IDLE_MS, default 5min) so a slow
+    // long-running agent that's actually streaming isn't killed mid-thought.
+    const FIRST_OUTPUT_MS = Number(process.env.OD_AGENT_IDLE_MS) || 90_000;
+    const STREAM_IDLE_MS = Number(process.env.OD_AGENT_STREAM_IDLE_MS) || 300_000;
+    let firstByteSeen = false;
+    let watchdog = null;
+    const armWatchdog = (ms, reason) => {
+      if (watchdog) clearTimeout(watchdog);
+      watchdog = setTimeout(() => {
+        if (!child || child.killed) return;
+        send('error', {
+          message:
+            `Agent "${def.name}" produced no output for ${Math.round(ms / 1000)}s — ` +
+            (reason === 'first'
+              ? 'this usually means the selected model is unavailable on your current auth tier ' +
+                '(Google\'s preview models often return 429 "No capacity available" silently). ' +
+                'Try gemini-2.5-pro or gemini-2.5-flash, or use a Gemini API key (set GEMINI_API_KEY).'
+              : 'the model stopped streaming. Killing the request.'),
+        });
+        try { child.kill('SIGTERM'); } catch { /* ignore */ }
+      }, ms);
+      watchdog.unref?.();
+    };
+    const noteOutput = () => {
+      if (!firstByteSeen) {
+        firstByteSeen = true;
+        armWatchdog(STREAM_IDLE_MS, 'stream');
+      } else {
+        armWatchdog(STREAM_IDLE_MS, 'stream');
+      }
+    };
+    armWatchdog(FIRST_OUTPUT_MS, 'first');
+    child.stdout.on('data', noteOutput);
+    child.stderr.on('data', noteOutput);
 
     // Structured streams (Claude Code) go through a line-delimited JSON
     // parser that turns stream_event objects into UI-friendly events. For
@@ -1172,6 +1211,7 @@ export async function startServer({ port = 7456, returnServer = false } = {}) {
       res.end();
     });
     child.on('close', (code, signal) => {
+      if (watchdog) clearTimeout(watchdog);
       if (acpSession?.hasFatalError()) {
         return res.end();
       }

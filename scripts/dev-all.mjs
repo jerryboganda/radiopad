@@ -71,10 +71,26 @@ const env = {
 // round-tripping through npm scripts. Keep the port numeric before it reaches
 // the command string, and avoid shell interpretation on POSIX; Windows needs
 // shell mode so the local `.cmd` shim can resolve.
+// On Windows we run via the shell (so `concurrently.cmd` resolves), but
+// `spawn` with `shell: true` joins the args array with spaces without
+// quoting — that breaks any arg containing spaces (e.g. `next dev -p 3000`
+// would get split by concurrently into 3 separate commands). Quote
+// space-bearing args ourselves on Windows.
+const isWin = process.platform === 'win32';
+const quote = (s) => (isWin && /\s/.test(s) ? `"${s.replace(/"/g, '\\"')}"` : s);
+const concurrentlyArgs = [
+  '-k',
+  '-n',
+  'daemon,web',
+  '-c',
+  'cyan,magenta',
+  'npm:daemon',
+  `next dev -p ${nextPort}`,
+];
 const child = spawn(
   'concurrently',
-  ['-k', '-n', 'daemon,web', '-c', 'cyan,magenta', 'npm:daemon', `next dev -p ${nextPort}`],
-  { env, stdio: 'inherit', shell: process.platform === 'win32' },
+  isWin ? concurrentlyArgs.map(quote) : concurrentlyArgs,
+  { env, stdio: 'inherit', shell: isWin },
 );
 
 child.on('exit', (code, signal) => {

@@ -1,0 +1,18 @@
+# Bundled Orthanc DICOMweb proxy for RadioPad.
+#
+# Extends the upstream image so we can bake in the Lua bridge scripts and
+# pin the DICOMweb plugin. The image is opt-in via the Compose `pacs`
+# profile (see deploy/docker-compose.yml).
+FROM jodogne/orthanc-plugins:latest
+
+# Lua bridge scripts — HL7 ↔ DICOM correlation hooks.
+COPY lua/ /etc/orthanc/lua/
+
+# Bundled config (binds 127.0.0.1; DICOMweb plugin enabled).
+COPY orthanc.json /etc/orthanc/orthanc.json
+
+# Orthanc REST + DICOMweb. We deliberately do NOT expose 4242 (DIMSE) by
+# default — the operator opts in via Compose port mapping.
+EXPOSE 8042
+
+CMD ["Orthanc", "/etc/orthanc/orthanc.json"]

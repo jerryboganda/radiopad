@@ -1,0 +1,81 @@
+name: ci
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  backend:
+    name: backend (dotnet build + test)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '8.0.x'
+      - name: Restore
+        working-directory: backend/RadioPad.Api
+        run: dotnet restore
+      - name: Build
+        working-directory: backend/RadioPad.Api
+        run: dotnet build --configuration Release --no-restore
+      - name: Test
+        working-directory: backend/RadioPad.Api
+        run: dotnet test --configuration Release --no-build --logger "trx;LogFileName=test-results.trx"
+      - name: Upload test results
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: backend-test-results
+          path: backend/RadioPad.Api/**/TestResults/*.trx
+
+  cli:
+    name: cli (dotnet build)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '8.0.x'
+      - name: Build CLI
+        working-directory: cli/RadioPad.Cli
+        run: dotnet build --configuration Release
+      - name: Validate seed rulebooks
+        run: |
+          for rulebook in rulebooks/*.yaml; do
+            dotnet run --project cli/RadioPad.Cli -c Release -- rulebook validate "$rulebook"
+          done
+      - name: Run golden cases
+        run: |
+          for cases in rulebooks/_tests/*; do
+            [ -d "$cases" ] || continue
+            id="$(basename "$cases")"
+            dotnet run --project cli/RadioPad.Cli -c Release -- rulebook test "rulebooks/$id.yaml" --cases "$cases"
+          done
+
+  frontend:
+    name: frontend (typecheck + build)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 9
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: pnpm
+      - name: Install
+        run: pnpm install --frozen-lockfile=false
+      - name: Typecheck
+        working-directory: frontend
+        run: pnpm typecheck
+      - name: Build (static export)
+        working-directory: frontend
+        run: pnpm build

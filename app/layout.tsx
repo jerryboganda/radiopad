@@ -20,8 +20,8 @@ export const viewport: Viewport = {
 
 export default function RootLayout({ children }: { children: ReactNode }) {
   return (
-    <html lang='en'>
-      <body>
+    <html lang='en' suppressHydrationWarning>
+      <body suppressHydrationWarning>
         <I18nProvider>{children}</I18nProvider>
       </body>
     </html>

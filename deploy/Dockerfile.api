@@ -1,0 +1,28 @@
+# Multi-stage build for the RadioPad ASP.NET Core API.
+FROM mcr.microsoft.com/dotnet/sdk:8.0 AS build
+WORKDIR /src
+
+# Copy solution + project files first for cached restore.
+COPY backend/RadioPad.Api/RadioPad.Api.sln ./backend/RadioPad.Api/
+COPY backend/RadioPad.Api/Directory.Build.props ./backend/RadioPad.Api/
+COPY backend/RadioPad.Api/src ./backend/RadioPad.Api/src
+COPY backend/RadioPad.Api/tests ./backend/RadioPad.Api/tests
+
+# Validation engine reads YAML rulebooks from disk — bring them in for tests.
+COPY rulebooks ./rulebooks
+COPY templates ./templates
+
+WORKDIR /src/backend/RadioPad.Api
+RUN dotnet restore RadioPad.Api.sln
+RUN dotnet publish src/RadioPad.Api/RadioPad.Api.csproj -c Release -o /app/publish --no-restore
+
+FROM mcr.microsoft.com/dotnet/aspnet:8.0 AS runtime
+WORKDIR /app
+COPY --from=build /app/publish ./
+COPY --from=build /src/rulebooks /rulebooks
+COPY --from=build /src/templates /templates
+
+ENV RADIOPAD_BIND=http://0.0.0.0:7457
+EXPOSE 7457
+
+ENTRYPOINT ["dotnet", "RadioPad.Api.dll"]

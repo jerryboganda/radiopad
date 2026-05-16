@@ -1,0 +1,241 @@
+name: desktop-bundle
+
+# PRD DESK-010..014 — Tauri 2 desktop bundle pipeline. Triggered on tag push
+# (v*.*.*) or manually. Builds the Next.js export, then `cargo tauri build`
+# on Windows / macOS / Linux. Signing is gated on the appropriate secrets
+# being present so PRs from forks still build (unsigned).
+#
+# Required repository secrets (optional — bundle is unsigned without them):
+#   TAURI_PRIVATE_KEY              Tauri 2 updater signing key (Ed25519).
+#   TAURI_KEY_PASSWORD             Password for the updater key.
+#   WINDOWS_CERTIFICATE_PFX_BASE64 Authenticode .pfx (base64, code-signing).
+#   WINDOWS_CERTIFICATE_PASSWORD   Password for the Authenticode .pfx.
+#   APPLE_CERTIFICATE_P12_BASE64   Apple Developer ID .p12 (base64).
+#   APPLE_CERTIFICATE_PASSWORD     Password for the Apple .p12.
+#   APPLE_NOTARIZE_APPLE_ID        Apple ID used for notarytool.
+#   APPLE_NOTARIZE_TEAM_ID         Apple Developer team id.
+#   APPLE_NOTARIZE_PASSWORD        App-specific password for notarytool.
+
+on:
+  push:
+    tags: ['v*.*.*']
+  workflow_dispatch:
+
+jobs:
+  bundle:
+    name: bundle ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [windows-latest, macos-latest, ubuntu-22.04]
+    runs-on: ${{ matrix.os }}
+    permissions:
+      contents: write
+    env:
+      # Mirror secret presence into job env so step-level `if:` can read it
+      # without referencing the `secrets` context.
+      APPLE_CERTIFICATE_P12_BASE64: ${{ secrets.APPLE_CERTIFICATE_P12_BASE64 }}
+      GPG_PRIVATE_KEY_BASE64: ${{ secrets.GPG_PRIVATE_KEY_BASE64 }}
+      WINDOWS_CERTIFICATE_PFX_BASE64: ${{ secrets.WINDOWS_CERTIFICATE_PFX_BASE64 }}
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Node + pnpm
+        uses: pnpm/action-setup@v3
+        with:
+          version: 9
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'pnpm'
+
+      - uses: dtolnay/rust-toolchain@stable
+
+      - name: Cache cargo
+        uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: desktop/src-tauri
+
+      - name: Setup .NET
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '8.0.x'
+
+      - name: Install Linux deps
+        if: matrix.os == 'ubuntu-22.04'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libwebkit2gtk-4.1-dev libssl-dev libgtk-3-dev libayatana-appindicator3-dev librsvg2-dev
+
+      - name: Resolve sidecar target triple
+        id: triple
+        shell: bash
+        run: |
+          case "${{ matrix.os }}" in
+            windows-latest) echo "rid=win-x64" >> $GITHUB_OUTPUT; echo "triple=x86_64-pc-windows-msvc" >> $GITHUB_OUTPUT ;;
+            macos-latest)   echo "rid=osx-arm64" >> $GITHUB_OUTPUT; echo "triple=aarch64-apple-darwin" >> $GITHUB_OUTPUT ;;
+            *)              echo "rid=linux-x64" >> $GITHUB_OUTPUT; echo "triple=x86_64-unknown-linux-gnu" >> $GITHUB_OUTPUT ;;
+          esac
+
+      - name: Publish .NET backend sidecar
+        shell: bash
+        run: |
+          dotnet publish backend/RadioPad.Api/src/RadioPad.Api/RadioPad.Api.csproj \
+            -c Release -r ${{ steps.triple.outputs.rid }} --self-contained true \
+            -p:PublishSingleFile=true -p:IncludeNativeLibrariesForSelfExtract=true \
+            -o publish/sidecar
+          mkdir -p desktop/src-tauri/binaries
+          if [ "${{ matrix.os }}" = "windows-latest" ]; then
+            cp publish/sidecar/RadioPad.Api.exe "desktop/src-tauri/binaries/radiopad-api-${{ steps.triple.outputs.triple }}.exe"
+          else
+            cp publish/sidecar/RadioPad.Api "desktop/src-tauri/binaries/radiopad-api-${{ steps.triple.outputs.triple }}"
+            chmod +x "desktop/src-tauri/binaries/radiopad-api-${{ steps.triple.outputs.triple }}"
+          fi
+
+      - name: Install frontend deps
+        working-directory: frontend
+        run: pnpm install --frozen-lockfile
+
+      - name: Build frontend (static export)
+        working-directory: frontend
+        run: pnpm build
+
+      # --- Windows Authenticode signing (if cert present) -----------------
+      - name: Decode Windows certificate
+        if: matrix.os == 'windows-latest' && env.WINDOWS_CERTIFICATE_PFX_BASE64 != ''
+        env:
+          WINDOWS_CERTIFICATE_PFX_BASE64: ${{ secrets.WINDOWS_CERTIFICATE_PFX_BASE64 }}
+        shell: pwsh
+        run: |
+          $bytes = [Convert]::FromBase64String($env:WINDOWS_CERTIFICATE_PFX_BASE64)
+          [IO.File]::WriteAllBytes("$env:RUNNER_TEMP/codesign.pfx", $bytes)
+          echo "WINDOWS_CERTIFICATE_PATH=$env:RUNNER_TEMP/codesign.pfx" >> $env:GITHUB_ENV
+
+      # --- macOS Developer ID signing (if cert present) -------------------
+      - name: Import Apple certificate
+        if: matrix.os == 'macos-latest' && env.APPLE_CERTIFICATE_P12_BASE64 != ''
+        env:
+          APPLE_CERTIFICATE_P12_BASE64: ${{ secrets.APPLE_CERTIFICATE_P12_BASE64 }}
+          APPLE_CERTIFICATE_PASSWORD: ${{ secrets.APPLE_CERTIFICATE_PASSWORD }}
+        run: |
+          KEYCHAIN_PATH="$RUNNER_TEMP/build.keychain"
+          KEYCHAIN_PASSWORD=$(openssl rand -hex 16)
+          security create-keychain -p "$KEYCHAIN_PASSWORD" "$KEYCHAIN_PATH"
+          security set-keychain-settings -lut 21600 "$KEYCHAIN_PATH"
+          security unlock-keychain -p "$KEYCHAIN_PASSWORD" "$KEYCHAIN_PATH"
+          echo "$APPLE_CERTIFICATE_P12_BASE64" | base64 --decode > "$RUNNER_TEMP/cert.p12"
+          security import "$RUNNER_TEMP/cert.p12" -k "$KEYCHAIN_PATH" -P "$APPLE_CERTIFICATE_PASSWORD" -T /usr/bin/codesign
+          security list-keychains -d user -s "$KEYCHAIN_PATH" $(security list-keychains -d user | tr -d '"')
+          security set-key-partition-list -S apple-tool:,apple: -s -k "$KEYCHAIN_PASSWORD" "$KEYCHAIN_PATH"
+          rm "$RUNNER_TEMP/cert.p12"
+
+      - name: Build Tauri bundle
+        working-directory: desktop
+        env:
+          TAURI_PRIVATE_KEY: ${{ secrets.TAURI_PRIVATE_KEY }}
+          TAURI_KEY_PASSWORD: ${{ secrets.TAURI_KEY_PASSWORD }}
+          # Windows
+          WINDOWS_CERTIFICATE: ${{ runner.temp }}\codesign.pfx
+          WINDOWS_CERTIFICATE_PASSWORD: ${{ secrets.WINDOWS_CERTIFICATE_PASSWORD }}
+          # macOS notarisation
+          APPLE_ID: ${{ secrets.APPLE_NOTARIZE_APPLE_ID }}
+          APPLE_PASSWORD: ${{ secrets.APPLE_NOTARIZE_PASSWORD }}
+          APPLE_TEAM_ID: ${{ secrets.APPLE_NOTARIZE_TEAM_ID }}
+        run: cargo tauri build
+
+      - name: Upload artefacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: radiopad-${{ matrix.os }}
+          path: |
+            desktop/src-tauri/target/release/bundle/**/*
+          if-no-files-found: warn
+
+      # --- Windows Authenticode post-sign (defensive) ----------------------
+      # `cargo tauri build` already invokes signtool when WINDOWS_CERTIFICATE
+      # env vars are present. This step explicitly re-signs the produced
+      # .exe / .msi as a belt-and-braces measure and adds an RFC-3161
+      # timestamp so signatures keep verifying after the cert expires.
+      - name: Authenticode sign (Windows)
+        if: matrix.os == 'windows-latest' && env.WINDOWS_CERTIFICATE_PATH != ''
+        env:
+          WINDOWS_CERTIFICATE_PATH: ${{ env.WINDOWS_CERTIFICATE_PATH }}
+          WINDOWS_CERTIFICATE_PASSWORD: ${{ secrets.WINDOWS_CERTIFICATE_PASSWORD }}
+        shell: pwsh
+        run: |
+          $signtool = (Get-ChildItem "C:\Program Files (x86)\Windows Kits\10\bin" -Recurse -Filter signtool.exe |
+            Where-Object { $_.FullName -match 'x64' } |
+            Select-Object -First 1).FullName
+          if (-not $signtool) {
+            Write-Warning "signtool.exe not found; skipping post-sign"
+            exit 0
+          }
+          Get-ChildItem desktop/src-tauri/target/release/bundle -Recurse -Include *.exe,*.msi |
+            ForEach-Object {
+              & $signtool sign /fd sha256 /tr http://timestamp.digicert.com /td sha256 `
+                /f $env:WINDOWS_CERTIFICATE_PATH /p $env:WINDOWS_CERTIFICATE_PASSWORD $_.FullName
+            }
+
+      # --- macOS notarisation (post-build) --------------------------------
+      - name: Notarise (macOS)
+        if: matrix.os == 'macos-latest' && env.APPLE_CERTIFICATE_P12_BASE64 != ''
+        env:
+          APPLE_ID: ${{ secrets.APPLE_NOTARIZE_APPLE_ID }}
+          APPLE_PASSWORD: ${{ secrets.APPLE_NOTARIZE_PASSWORD }}
+          APPLE_TEAM_ID: ${{ secrets.APPLE_NOTARIZE_TEAM_ID }}
+        run: |
+          set -euo pipefail
+          shopt -s nullglob
+          for dmg in desktop/src-tauri/target/release/bundle/dmg/*.dmg; do
+            echo "Notarising $dmg"
+            xcrun notarytool submit "$dmg" \
+              --apple-id "$APPLE_ID" \
+              --password "$APPLE_PASSWORD" \
+              --team-id "$APPLE_TEAM_ID" \
+              --wait
+            xcrun stapler staple "$dmg" || true
+          done
+
+      # --- Linux GPG detached signature (if key present) ------------------
+      - name: GPG sign (Linux)
+        if: matrix.os == 'ubuntu-22.04' && env.GPG_PRIVATE_KEY_BASE64 != ''
+        env:
+          GPG_PRIVATE_KEY_BASE64: ${{ secrets.GPG_PRIVATE_KEY_BASE64 }}
+          GPG_PASSPHRASE: ${{ secrets.GPG_PASSPHRASE }}
+        run: |
+          set -euo pipefail
+          shopt -s nullglob
+          echo "$GPG_PRIVATE_KEY_BASE64" | base64 -d | gpg --batch --import
+          KEYID=$(gpg --list-secret-keys --with-colons | awk -F: '/^sec:/ {print $5; exit}')
+          for f in desktop/src-tauri/target/release/bundle/**/*.AppImage \
+                   desktop/src-tauri/target/release/bundle/**/*.deb; do
+            echo "Signing $f"
+            gpg --batch --yes --pinentry-mode loopback \
+              --passphrase "${GPG_PASSPHRASE:-}" \
+              --local-user "$KEYID" \
+              --detach-sign --armor "$f"
+          done
+
+      - name: Upload signed artefacts
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: radiopad-${{ matrix.os }}-signed
+          path: |
+            desktop/src-tauri/target/release/bundle/**/*.asc
+          if-no-files-found: ignore
+
+      - name: Attach to release
+        if: startsWith(github.ref, 'refs/tags/')
+        uses: softprops/action-gh-release@v2
+        with:
+          files: |
+            desktop/src-tauri/target/release/bundle/**/*.msi
+            desktop/src-tauri/target/release/bundle/**/*.exe
+            desktop/src-tauri/target/release/bundle/**/*.dmg
+            desktop/src-tauri/target/release/bundle/**/*.AppImage
+            desktop/src-tauri/target/release/bundle/**/*.deb
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

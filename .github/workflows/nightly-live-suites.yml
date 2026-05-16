@@ -1,0 +1,165 @@
+name: nightly-live-suites
+
+# Iter-35 nightly auditable run of the live KMS / SIEM smoke suites.
+# Default unit tests already cover the mocked code paths on every PR; this
+# workflow exercises the real cloud endpoints once per day so secrets,
+# tokens and network reachability stay healthy.
+#
+# All credentials come from `secrets.*`. Sub-jobs no-op (and the summary
+# records "skipped — secret missing") when the gating secret is absent,
+# so a fork or a pre-secret environment cannot fail the build.
+
+on:
+  schedule:
+    # 06:00 UTC every day.
+    - cron: '0 6 * * *'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: nightly-live-suites
+  cancel-in-progress: true
+
+jobs:
+  precheck:
+    # GitHub does not allow `secrets.*` in job-level `if:` conditionals,
+    # so we materialise presence flags as job outputs first.
+    name: Check secret presence
+    runs-on: ubuntu-22.04
+    outputs:
+      has_aws_kms: ${{ steps.check.outputs.has_aws_kms }}
+      has_siem: ${{ steps.check.outputs.has_siem }}
+    steps:
+      - id: check
+        env:
+          AWS_KMS: ${{ secrets.RADIOPAD_AWS_KMS_KEY_ARN }}
+          SIEM_SPLUNK: ${{ secrets.RADIOPAD_SIEM_SPLUNK_URL }}
+          SIEM_SENTINEL: ${{ secrets.RADIOPAD_SIEM_SENTINEL_WORKSPACE_ID }}
+          SIEM_ELASTIC: ${{ secrets.RADIOPAD_SIEM_ELASTIC_URL }}
+          SIEM_SYSLOG: ${{ secrets.RADIOPAD_SIEM_SYSLOG_HOST }}
+        run: |
+          if [ -n "$AWS_KMS" ]; then
+            echo "has_aws_kms=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "has_aws_kms=false" >> "$GITHUB_OUTPUT"
+          fi
+          if [ -n "$SIEM_SPLUNK" ] || [ -n "$SIEM_SENTINEL" ] || [ -n "$SIEM_ELASTIC" ] || [ -n "$SIEM_SYSLOG" ]; then
+            echo "has_siem=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "has_siem=false" >> "$GITHUB_OUTPUT"
+          fi
+
+  aws-kms-live:
+    name: AWS KMS live round-trip
+    runs-on: ubuntu-22.04
+    needs: precheck
+    if: ${{ needs.precheck.outputs.has_aws_kms == 'true' }}
+    env:
+      RADIOPAD_RUN_AWS_KMS_LIVE: '1'
+      RADIOPAD_AWS_KMS_KEY_ARN: ${{ secrets.RADIOPAD_AWS_KMS_KEY_ARN }}
+      AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
+      AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+      AWS_REGION: ${{ secrets.AWS_REGION }}
+    outputs:
+      result: ${{ steps.run.outcome }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '8.0.x'
+      - name: Restore
+        run: dotnet restore backend/RadioPad.Api/RadioPad.Api.sln
+      - name: Run live KMS round-trip
+        id: run
+        run: >
+          dotnet test backend/RadioPad.Api/RadioPad.Api.sln
+          --no-restore
+          --configuration Release
+          --filter "FullyQualifiedName~Live_Round_Trip_Against_Real_Aws_Kms"
+          --logger "trx;LogFileName=aws-kms-live.trx"
+      - name: Upload test results
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: aws-kms-live-trx
+          path: '**/TestResults/aws-kms-live.trx'
+          if-no-files-found: ignore
+
+  siem-live:
+    name: SIEM live smoke
+    runs-on: ubuntu-22.04
+    needs: precheck
+    # The job runs whenever ANY sink is provisioned. Per-sink gating is
+    # handled inside the test class itself (see
+    # docs/04-security/siem-runbook.md §2 — sinks whose env vars are
+    # absent silently no-op).
+    if: ${{ needs.precheck.outputs.has_siem == 'true' }}
+    env:
+      RADIOPAD_RUN_SIEM_LIVE: '1'
+      # Splunk
+      RADIOPAD_SIEM_SPLUNK_URL: ${{ secrets.RADIOPAD_SIEM_SPLUNK_URL }}
+      RADIOPAD_SIEM_SPLUNK_TOKEN: ${{ secrets.RADIOPAD_SIEM_SPLUNK_TOKEN }}
+      # Sentinel
+      RADIOPAD_SIEM_SENTINEL_WORKSPACE_ID: ${{ secrets.RADIOPAD_SIEM_SENTINEL_WORKSPACE_ID }}
+      RADIOPAD_SIEM_SENTINEL_SHARED_KEY: ${{ secrets.RADIOPAD_SIEM_SENTINEL_SHARED_KEY }}
+      RADIOPAD_SIEM_SENTINEL_LOG_TYPE: ${{ secrets.RADIOPAD_SIEM_SENTINEL_LOG_TYPE }}
+      # Elastic
+      RADIOPAD_SIEM_ELASTIC_URL: ${{ secrets.RADIOPAD_SIEM_ELASTIC_URL }}
+      RADIOPAD_SIEM_ELASTIC_INDEX: ${{ secrets.RADIOPAD_SIEM_ELASTIC_INDEX }}
+      RADIOPAD_SIEM_ELASTIC_BEARER: ${{ secrets.RADIOPAD_SIEM_ELASTIC_BEARER }}
+      RADIOPAD_SIEM_ELASTIC_BASIC: ${{ secrets.RADIOPAD_SIEM_ELASTIC_BASIC }}
+      # Syslog
+      RADIOPAD_SIEM_SYSLOG_HOST: ${{ secrets.RADIOPAD_SIEM_SYSLOG_HOST }}
+      RADIOPAD_SIEM_SYSLOG_PORT: ${{ secrets.RADIOPAD_SIEM_SYSLOG_PORT }}
+    outputs:
+      result: ${{ steps.run.outcome }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '8.0.x'
+      - name: Restore
+        run: dotnet restore backend/RadioPad.Api/RadioPad.Api.sln
+      - name: Run SIEM live smoke
+        id: run
+        run: >
+          dotnet test backend/RadioPad.Api/RadioPad.Api.sln
+          --no-restore
+          --configuration Release
+          --filter "FullyQualifiedName~Iter33.SiemLiveSmokeTests"
+          --logger "trx;LogFileName=siem-live.trx"
+      - name: Upload test results
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: siem-live-trx
+          path: '**/TestResults/siem-live.trx'
+          if-no-files-found: ignore
+
+  report-summary:
+    name: Nightly summary
+    runs-on: ubuntu-22.04
+    needs: [precheck, aws-kms-live, siem-live]
+    # Always emit a summary, even when the gated jobs were skipped, so
+    # the nightly run is auditable end-to-end.
+    if: always()
+    steps:
+      - name: Compose summary
+        env:
+          AWS_KMS_RESULT: ${{ needs.aws-kms-live.result }}
+          SIEM_RESULT: ${{ needs.siem-live.result }}
+          HAS_AWS_KMS: ${{ needs.precheck.outputs.has_aws_kms }}
+          HAS_SIEM: ${{ needs.precheck.outputs.has_siem }}
+        run: |
+          {
+            echo "# Nightly live-suites — $(date -u +%Y-%m-%dT%H:%M:%SZ)"
+            echo
+            echo "| Suite             | Configured | Result   |"
+            echo "| ----------------- | ---------- | -------- |"
+            echo "| AWS KMS live      | ${HAS_AWS_KMS} | ${AWS_KMS_RESULT:-skipped} |"
+            echo "| SIEM live smoke   | ${HAS_SIEM}    | ${SIEM_RESULT:-skipped} |"
+            echo
+            echo "_\`skipped\` means the gating secret is not configured in this repo. See [docs/04-security/siem-runbook.md](../../docs/04-security/siem-runbook.md) for the live-smoke contract._"
+          } >> "$GITHUB_STEP_SUMMARY"

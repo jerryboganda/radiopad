@@ -1,0 +1,44 @@
+{
+  "hooks": {
+    "SessionStart": [
+      {
+        "type": "command",
+        "command": "node hooks/session-start.mjs",
+        "windows": "powershell -NoProfile -ExecutionPolicy Bypass -File hooks/session-start.ps1",
+        "timeout": 5
+      }
+    ],
+    "PreToolUse": [
+      {
+        "type": "command",
+        "command": "node hooks/pretooluse.mjs",
+        "windows": "powershell -NoProfile -ExecutionPolicy Bypass -File hooks/pretooluse.ps1",
+        "timeout": 10
+      }
+    ],
+    "PostToolUse": [
+      {
+        "type": "command",
+        "command": "node hooks/posttooluse.mjs",
+        "windows": "powershell -NoProfile -ExecutionPolicy Bypass -File hooks/posttooluse.ps1",
+        "timeout": 10
+      }
+    ],
+    "SubagentStop": [
+      {
+        "type": "command",
+        "command": "node hooks/subagent-stop.mjs",
+        "windows": "powershell -NoProfile -ExecutionPolicy Bypass -File hooks/subagent-stop.ps1",
+        "timeout": 5
+      }
+    ],
+    "Stop": [
+      {
+        "type": "command",
+        "command": "node hooks/stop.mjs",
+        "windows": "powershell -NoProfile -ExecutionPolicy Bypass -File hooks/stop.ps1",
+        "timeout": 5
+      }
+    ]
+  }
+}
