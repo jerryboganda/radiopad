@@ -4,6 +4,55 @@
 
 ---
 
+## Iteration 43 — End-to-end UI/UX audit (read-only, no production code changes)
+
+- **Date:** 2026-05-17
+- **Branch:** `manwara575-star/ui-ux-audit`
+- **Scope:** Comprehensive A-to-Z UI/UX audit of the Next.js 16 frontend against the locked Open Design system. Static analysis only — no edits to `frontend/` production files.
+
+### Delivered (14 files under `docs/ui-ux-audit/`)
+
+- `01-project-intake.md` — framework, styling, components, scripts, blockers
+- `02-run-and-validation-log.md` — install/typecheck/build attempts (tsc passes cleanly; documented pnpm wrapper bug)
+- `03-route-inventory.md` — 37-route table with sidebar linkage and discoverability
+- `04-component-inventory.md` — 20 shared components + missing-primitive gap analysis
+- `05-page-by-page-audit.md` — per-page records for all 37 routes
+- `06-responsive-audit.md` — breakpoint scan + 10 findings
+- `07-accessibility-audit.md` — WCAG 2.1 AA static review with 13 findings
+- `08-interaction-flow-audit.md` — 9 critical user journeys + IA gaps
+- `09-frontend-structure-audit.md` — CSS architecture, duplicate selectors, missing tokens
+- `10-copy-microcopy-audit.md` — voice, jargon, silent successes, i18n bypasses
+- `11-screenshot-index.md` — capture protocol (live captures blocked — backend not running in audit env)
+- `UI-UX-GAP-REPORT.md` — master report with executive summary + phased roadmap
+- `ui-ux-findings.json` — 91 machine-readable findings (16 critical / 47 high / 26 medium / 2 low)
+- `ui-ux-fix-backlog.md` — 11-phase, dependency-sequenced engineering backlog
+
+### Headline findings
+
+- **5 / 37 pages use `<Container>` + `<PageHeader>`** — single biggest design-lock gap.
+- **3 duplicate CSS selectors** between `shell.css` and `radiopad.css` (`.rp-container`, `.rp-page-title`, `.rp-page-sub`).
+- **5 destructive flows use `window.confirm()`/`window.prompt()`** (report signing, MCP, validation packs, provider OAuth credential rotation, prompt naming).
+- **18 of 37 routes are not in the sidebar** — including security-critical `/admin/sso`.
+- **31 page files contain ~187 inline `style={{…}}` violations** (forbidden by design lock; unenforced by tooling).
+- **No `<Modal>`, `<Tabs>`, `<Toast>`, `<ConfirmDialog>`, `<FormField>` primitives** — root cause of many a11y and consistency issues.
+- **No skip link** in Topbar; **focus traps missing** on ProfileMenu and mobile drawer; `EmptyState` lacks `aria-live`; `BillingStatusBanner` has inconsistent role semantics.
+- **`DictateButton` hard-codes `lang='en-US'`** regardless of locale; `LocalePicker` does full page reload; `ErrorState` defaults bypass next-intl.
+- **Missing token scales**: no spacing / typography / breakpoint / z-index tokens; media queries use ad-hoc values.
+- **pnpm wrapper bug** — `pnpm typecheck`/`pnpm build` fail at root because `runDepsStatusCheck` re-runs install which exits 1 on benign `ERR_PNPM_IGNORED_BUILDS`. Workaround documented (call `tsc` / `next` directly).
+
+### Validation
+
+- `frontend\node_modules\.bin\tsc.cmd --noEmit` → exit 0 (typecheck clean) ✅
+- No production source code modified; only files under `docs/ui-ux-audit/` created.
+- JSON validates and parses (`node -e 'require(...)'` → 91 findings).
+
+### Notes
+
+- Live screenshots not captured because the audit environment has no running backend; `11-screenshot-index.md` documents the capture protocol for a follow-up session.
+- Recommended next step: ship Phase 0 quick wins (deletion of duplicate selectors, skip link, EmptyState aria-live, BillingStatusBanner role) in a single PR — all are < 1 day each and unblock the rest of the roadmap.
+
+---
+
 ## Iteration 42 — VPS production deployment + GitHub sync
 
 - **Date:** 2026-05-16
