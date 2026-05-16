@@ -1,0 +1,44 @@
+# Caddyfile for RadioPad production deployment
+# Replace {$RADIOPAD_DOMAIN} with your actual domain, e.g. radiopad.example.com
+# Or set the RADIOPAD_DOMAIN environment variable before starting Caddy.
+
+{$RADIOPAD_DOMAIN:radiopad.localhost} {
+    # Serve the static Next.js export
+    root * /srv/frontend
+    file_server
+
+    # Proxy /api/* → backend API
+    reverse_proxy /api/* api:7457 {
+        header_up Host {upstream_hostport}
+        header_up X-Real-IP {remote_host}
+        header_up X-Forwarded-For {remote_host}
+        # Strip inbound X-RadioPad-* headers; the proxy sets them below.
+        header_up -X-RadioPad-Tenant
+        header_up -X-RadioPad-User
+        header_up -X-RadioPad-RequestId
+        # Set trusted headers — replace these with your actual auth values.
+        # In a real deployment these should come from your auth middleware.
+        header_up X-RadioPad-Tenant {$RADIOPAD_DEFAULT_TENANT:-default}
+        header_up X-RadioPad-RequestId {http.request.uuid}
+    }
+
+    # Security headers
+    header {
+        Strict-Transport-Security "max-age=31536000; includeSubDomains; preload"
+        X-Content-Type-Options "nosniff"
+        X-Frame-Options "SAMEORIGIN"
+        Referrer-Policy "strict-origin-when-cross-origin"
+        -Server
+    }
+
+    # SPA fallback — serve index.html for unknown paths
+    handle_errors {
+        rewrite * /index.html
+        file_server
+    }
+
+    log {
+        output stderr
+        format json
+    }
+}

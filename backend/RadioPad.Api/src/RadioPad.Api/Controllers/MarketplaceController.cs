@@ -695,15 +695,17 @@ public class MarketplaceController : TenantedController
         }
         else if (row.Kind == "template")
         {
-            var templateId = row.SourceTemplateId ?? $"mp-{row.Id:N}";
-            var existing = await _db.Templates.FirstOrDefaultAsync(t => t.TenantId == tenant.Id && t.TemplateId == templateId, ct);
+            // Installed copies always use a marketplace-scoped ID so the original
+            // source template is never confused with the installed draft copy.
+            var installedTemplateId = $"mp-{row.Id:N}";
+            var existing = await _db.Templates.FirstOrDefaultAsync(t => t.TenantId == tenant.Id && t.TemplateId == installedTemplateId, ct);
             if (existing is not null)
                 return BadRequest(new { error = "This template is already installed.", kind = "duplicate" });
 
             var tmpl = new ReportTemplate
             {
                 TenantId = tenant.Id,
-                TemplateId = templateId,
+                TemplateId = installedTemplateId,
                 Name = $"[Marketplace] {row.Name}",
                 SectionsJson = row.ArtifactBody,
                 Status = TemplateStatus.Draft,
