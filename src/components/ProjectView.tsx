@@ -454,11 +454,14 @@ export function ProjectView({
       const controller = new AbortController();
       abortRef.current = controller;
       const systemPrompt = await composedSystemPrompt();
+      let terminalCallbackSeen = false;
 
       const handlers = {
         onDelta: appendContent,
         onAgentEvent: pushEvent,
         onDone: () => {
+          if (terminalCallbackSeen) return;
+          terminalCallbackSeen = true;
           for (const ev of parser.flush()) {
             if (ev.type === 'artifact:end') {
               setArtifact((prev) => (prev ? { ...prev, html: ev.fullContent } : null));
@@ -496,6 +499,8 @@ export function ProjectView({
           onProjectsRefresh();
         },
         onError: (err: Error) => {
+          if (terminalCallbackSeen) return;
+          terminalCallbackSeen = true;
           setError(err.message);
           updateAssistant((prev) => ({ ...prev, endedAt: Date.now() }));
           setStreaming(false);
@@ -525,6 +530,10 @@ export function ProjectView({
           attachments: attachments.map((a) => a.path),
           model: choice?.model ?? null,
           reasoning: choice?.reasoning ?? null,
+        }).finally(() => {
+          if (!terminalCallbackSeen && !controller.signal.aborted) {
+            handlers.onDone();
+          }
         });
       } else {
         pushEvent({ kind: 'status', label: 'requesting', detail: config.model });
@@ -535,6 +544,10 @@ export function ProjectView({
           },
           onDone: handlers.onDone,
           onError: handlers.onError,
+        }).finally(() => {
+          if (!terminalCallbackSeen && !controller.signal.aborted) {
+            handlers.onDone();
+          }
         });
       }
     },

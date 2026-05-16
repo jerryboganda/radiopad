@@ -1,0 +1,156 @@
+{
+  "title": "RadioPad — PERF-004 SLO budgets",
+  "uid": "radiopad-perf-004",
+  "schemaVersion": 39,
+  "version": 1,
+  "tags": ["radiopad", "slo", "perf-004"],
+  "timezone": "browser",
+  "time": { "from": "now-6h", "to": "now" },
+  "refresh": "30s",
+  "templating": {
+    "list": [
+      {
+        "name": "DS_PROMETHEUS",
+        "label": "Prometheus",
+        "type": "datasource",
+        "query": "prometheus",
+        "current": { "text": "Prometheus", "value": "Prometheus" }
+      }
+    ]
+  },
+  "panels": [
+    {
+      "id": 1,
+      "type": "stat",
+      "title": "Validate P95 (target < 250 ms)",
+      "datasource": "${DS_PROMETHEUS}",
+      "gridPos": { "h": 4, "w": 6, "x": 0, "y": 0 },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "ms",
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              { "color": "green", "value": null },
+              { "color": "yellow", "value": 200 },
+              { "color": "red", "value": 250 }
+            ]
+          }
+        }
+      },
+      "targets": [
+        { "expr": "radiopad:validate_duration_ms:p95_5m", "refId": "A", "datasource": "${DS_PROMETHEUS}" }
+      ]
+    },
+    {
+      "id": 2,
+      "type": "stat",
+      "title": "Sign P95 (target < 500 ms)",
+      "datasource": "${DS_PROMETHEUS}",
+      "gridPos": { "h": 4, "w": 6, "x": 6, "y": 0 },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "ms",
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              { "color": "green", "value": null },
+              { "color": "yellow", "value": 400 },
+              { "color": "red", "value": 500 }
+            ]
+          }
+        }
+      },
+      "targets": [
+        { "expr": "radiopad:sign_duration_ms:p95_5m", "refId": "A", "datasource": "${DS_PROMETHEUS}" }
+      ]
+    },
+    {
+      "id": 3,
+      "type": "stat",
+      "title": "AI draft P95 (target < 4 s)",
+      "datasource": "${DS_PROMETHEUS}",
+      "gridPos": { "h": 4, "w": 6, "x": 12, "y": 0 },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "ms",
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              { "color": "green", "value": null },
+              { "color": "yellow", "value": 3000 },
+              { "color": "red", "value": 4000 }
+            ]
+          }
+        }
+      },
+      "targets": [
+        { "expr": "radiopad:ai_draft_duration_ms:p95_5m", "refId": "A", "datasource": "${DS_PROMETHEUS}" }
+      ]
+    },
+    {
+      "id": 4,
+      "type": "stat",
+      "title": "DICOM QIDO P95 (target < 600 ms)",
+      "datasource": "${DS_PROMETHEUS}",
+      "gridPos": { "h": 4, "w": 6, "x": 18, "y": 0 },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "ms",
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              { "color": "green", "value": null },
+              { "color": "yellow", "value": 500 },
+              { "color": "red", "value": 600 }
+            ]
+          }
+        }
+      },
+      "targets": [
+        { "expr": "radiopad:dicom_qido_duration_ms:p95_5m", "refId": "A", "datasource": "${DS_PROMETHEUS}" }
+      ]
+    },
+    {
+      "id": 5,
+      "type": "stat",
+      "title": "API P95 (per route, top)",
+      "datasource": "${DS_PROMETHEUS}",
+      "gridPos": { "h": 4, "w": 24, "x": 0, "y": 4 },
+      "fieldConfig": {
+        "defaults": { "unit": "ms" }
+      },
+      "targets": [
+        { "expr": "topk(5, radiopad:api_request_duration_ms:p95_5m)", "refId": "A", "datasource": "${DS_PROMETHEUS}", "legendFormat": "{{route}}" }
+      ]
+    },
+    {
+      "id": 6,
+      "type": "timeseries",
+      "title": "Burn rate — 5m (fast)",
+      "datasource": "${DS_PROMETHEUS}",
+      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 8 },
+      "fieldConfig": { "defaults": { "unit": "percentunit" } },
+      "targets": [
+        { "expr": "radiopad_slo_burn_rate_5m:validate", "refId": "A", "datasource": "${DS_PROMETHEUS}", "legendFormat": "validate" },
+        { "expr": "radiopad_slo_burn_rate_5m:sign", "refId": "B", "datasource": "${DS_PROMETHEUS}", "legendFormat": "sign" },
+        { "expr": "radiopad_slo_burn_rate_5m:ai_draft", "refId": "C", "datasource": "${DS_PROMETHEUS}", "legendFormat": "ai_draft" },
+        { "expr": "radiopad_slo_burn_rate_5m:dicom_qido", "refId": "D", "datasource": "${DS_PROMETHEUS}", "legendFormat": "dicom_qido" }
+      ]
+    },
+    {
+      "id": 7,
+      "type": "timeseries",
+      "title": "Burn rate — 30m (slow)",
+      "datasource": "${DS_PROMETHEUS}",
+      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 8 },
+      "fieldConfig": { "defaults": { "unit": "percentunit" } },
+      "targets": [
+        { "expr": "radiopad_slo_burn_rate_30m:validate", "refId": "A", "datasource": "${DS_PROMETHEUS}", "legendFormat": "validate" },
+        { "expr": "radiopad_slo_burn_rate_30m:sign", "refId": "B", "datasource": "${DS_PROMETHEUS}", "legendFormat": "sign" },
+        { "expr": "radiopad_slo_burn_rate_30m:ai_draft", "refId": "C", "datasource": "${DS_PROMETHEUS}", "legendFormat": "ai_draft" },
+        { "expr": "radiopad_slo_burn_rate_30m:dicom_qido", "refId": "D", "datasource": "${DS_PROMETHEUS}", "legendFormat": "dicom_qido" }
+      ]
+    }
+  ]
+}

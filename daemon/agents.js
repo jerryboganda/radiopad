@@ -148,17 +148,20 @@ export const AGENT_DEFS = [
     // as a hint. Users can supply other ids via the custom-model input.
     fallbackModels: [
       DEFAULT_MODEL_OPTION,
+      { id: 'gpt-5.5', label: 'gpt-5.5' },
+      { id: 'gpt-5.4', label: 'gpt-5.4' },
+      { id: 'gpt-5.4-mini', label: 'gpt-5.4-mini' },
       { id: 'gpt-5-codex', label: 'gpt-5-codex' },
       { id: 'gpt-5', label: 'gpt-5' },
       { id: 'o3', label: 'o3' },
       { id: 'o4-mini', label: 'o4-mini' },
     ],
     reasoningOptions: [
+      { id: 'high', label: 'High (maximum)' },
       { id: 'default', label: 'Default' },
       { id: 'minimal', label: 'Minimal' },
       { id: 'low', label: 'Low' },
       { id: 'medium', label: 'Medium' },
-      { id: 'high', label: 'High' },
     ],
     // Prompt delivered via stdin (`codex exec -`) to avoid Windows
     // `spawn ENAMETOOLONG` while keeping Codex on its structured JSON stream.
@@ -170,11 +173,13 @@ export const AGENT_DEFS = [
       if (options.model && options.model !== 'default') {
         args.push('--model', options.model);
       }
-      if (options.reasoning && options.reasoning !== 'default') {
-        // Codex accepts `-c key=value` config overrides; reasoning effort
-        // is exposed as `model_reasoning_effort`.
-        args.push('-c', `model_reasoning_effort="${options.reasoning}"`);
-      }
+      // Default to maximum reasoning effort ("high"). Codex accepts
+      // `-c key=value` config overrides; reasoning effort is exposed as
+      // `model_reasoning_effort`. Users can override via the Settings dialog.
+      const reasoning = (options.reasoning && options.reasoning !== 'default')
+        ? options.reasoning
+        : 'high';
+      args.push('-c', `model_reasoning_effort="${reasoning}"`);
       args.push('-');
       return args;
     },
@@ -189,6 +194,9 @@ export const AGENT_DEFS = [
     versionArgs: ['--version'],
     fallbackModels: [
       DEFAULT_MODEL_OPTION,
+      { id: 'gemini-3.1-pro-preview', label: 'gemini-3.1-pro-preview' },
+      { id: 'gemini-3.1-flash-lite-preview', label: 'gemini-3.1-flash-lite-preview' },
+      { id: 'gemini-3-flash-preview', label: 'gemini-3-flash-preview' },
       { id: 'gemini-2.5-pro', label: 'gemini-2.5-pro' },
       { id: 'gemini-2.5-flash', label: 'gemini-2.5-flash' },
     ],
@@ -369,13 +377,44 @@ export const AGENT_DEFS = [
     // project cwd.
     //
     // No `models` subcommand; the CLI accepts whatever the user's Copilot
-    // subscription exposes. Ship a small evidence-based hint list — the
-    // default we observed in the JSON stream and the example from
-    // `copilot --help`. Users can paste any other id via Settings.
+    // subscription / org policy exposes. The list below covers the model
+    // ids GitHub documents for `copilot --model <id>` (Copilot CLI 1.x).
+    // Actual availability depends on the user's plan + org/enterprise
+    // policy; unsupported ids return a clear error from the CLI itself.
+    // Users with custom or newer models can paste any id via Settings → Custom.
     fallbackModels: [
       DEFAULT_MODEL_OPTION,
+      // Anthropic — newest first
+      { id: 'claude-opus-4.7', label: 'Claude Opus 4.7' },
+      { id: 'claude-opus-4.5', label: 'Claude Opus 4.5' },
       { id: 'claude-sonnet-4.6', label: 'Claude Sonnet 4.6' },
+      { id: 'claude-haiku-4.5', label: 'Claude Haiku 4.5' },
+      // OpenAI — newest first
+      { id: 'gpt-5.5', label: 'GPT-5.5' },
+      { id: 'gpt-5.4', label: 'GPT-5.4' },
+      { id: 'gpt-5.4-mini', label: 'GPT-5.4 mini' },
       { id: 'gpt-5.2', label: 'GPT-5.2' },
+      { id: 'gpt-5', label: 'GPT-5' },
+      { id: 'gpt-5-mini', label: 'GPT-5 mini' },
+      { id: 'o3', label: 'OpenAI o3' },
+      { id: 'o3-mini', label: 'OpenAI o3-mini' },
+      // Google — newest first
+      { id: 'gemini-3.1-pro', label: 'Gemini 3.1 Pro' },
+      { id: 'gemini-3-pro', label: 'Gemini 3 Pro' },
+      { id: 'gemini-3-flash', label: 'Gemini 3 Flash' },
+      { id: 'gemini-2.5-pro', label: 'Gemini 2.5 Pro' },
+    ],
+    // Copilot CLI 1.x exposes `--effort low|medium|high|xhigh`. We pin
+    // `xhigh` (the maximum) by default so reasoning-capable models always
+    // run at full power. `--enable-reasoning-summaries` surfaces the
+    // OpenAI reasoning-summary stream so the UI can render it.
+    // Users can override by picking a different reasoning preset in the
+    // Settings dialog (carried through `options.reasoning`).
+    reasoningOptions: [
+      { id: 'xhigh', label: 'xhigh (maximum)' },
+      { id: 'high', label: 'High' },
+      { id: 'medium', label: 'Medium' },
+      { id: 'low', label: 'Low' },
     ],
     buildArgs: (prompt, _imagePaths, extraAllowedDirs = [], options = {}) => {
       const args = [
@@ -388,6 +427,12 @@ export const AGENT_DEFS = [
       if (options.model && options.model !== 'default') {
         args.push('--model', options.model);
       }
+      // Default to maximum reasoning effort. The CLI silently ignores the
+      // flag for models that don't support reasoning (e.g. Haiku), so it's
+      // safe to always pass it.
+      const effort = options.reasoning || 'xhigh';
+      args.push('--effort', effort);
+      args.push('--enable-reasoning-summaries');
       const dirs = (extraAllowedDirs || []).filter(
         (d) => typeof d === 'string' && d.length > 0,
       );

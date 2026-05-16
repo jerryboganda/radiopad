@@ -1,0 +1,57 @@
+{
+    "Name": "RadioPad-Orthanc",
+    "StorageDirectory": "/var/lib/orthanc/db",
+    "IndexDirectory": "/var/lib/orthanc/db",
+    "TemporaryDirectory": "/tmp/orthanc",
+    "StorageCompression": false,
+
+    "// HTTP server — bound 127.0.0.1 by default":  "operator opts into remote exposure via reverse proxy",
+    "HttpServerEnabled": true,
+    "HttpPort": 8042,
+    "HttpDescribeErrors": false,
+
+    "// DIMSE (C-STORE/C-FIND) — disabled by default; flip to true to bridge classic PACS": "",
+    "DicomServerEnabled": false,
+    "DicomAet": "RADIOPAD",
+    "DicomPort": 4242,
+
+    "// Authentication — passwords sourced from env in compose": "",
+    "AuthenticationEnabled": true,
+    "RegisteredUsers": {
+        "${RADIOPAD_ORTHANC_USERNAME}": "${RADIOPAD_ORTHANC_PASSWORD}"
+    },
+
+    "RemoteAccessAllowed": false,
+    "SslEnabled": false,
+    "VerboseStartup": false,
+
+    "// PHI minimisation in logs":                "",
+    "LogExportedResources": false,
+    "KeepAlive": true,
+
+    "// Plugins":                                 "",
+    "Plugins": [
+        "/usr/local/share/orthanc/plugins"
+    ],
+
+    "// DICOMweb plugin config — mount at /dicom-web for QIDO/WADO/STOW": "",
+    "DicomWeb": {
+        "Enable": true,
+        "Root": "/dicom-web/",
+        "EnableWado": true,
+        "WadoRoot": "/wado",
+        "Host": "localhost",
+        "Ssl": false,
+        "QidoCaseSensitive": false,
+        "StudiesMetadata": "Full",
+        "SeriesMetadata": "Full",
+        "Servers": {}
+    },
+
+    "// Lua hooks — HL7 ↔ DICOM bridging":         "",
+    "LuaScripts": [
+        "/etc/orthanc/lua/orm-bridge.lua",
+        "/etc/orthanc/lua/radiopad-bridge.lua",
+        "/etc/orthanc/lua/radiopad-sr-store.lua"
+    ]
+}

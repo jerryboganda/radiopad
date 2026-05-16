@@ -1,0 +1,16 @@
+{
+  "name": "fhir-servicerequest",
+  "version": "1.0.0",
+  "description": "Read a FHIR ServiceRequest from the tenant's configured FHIR server (read-only).",
+  "scope": "net:fhir-read",
+  "isBuiltIn": true,
+  "input": {
+    "type": "object",
+    "properties": {
+      "serviceRequestId": { "type": "string" }
+    },
+    "required": ["serviceRequestId"]
+  },
+  "binding": "RadioPad.Application.Services.Mcp.Connectors.FhirServiceRequest",
+  "minRadiopadVersion": "0.1.0"
+}

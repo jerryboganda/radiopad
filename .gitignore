@@ -34,3 +34,11 @@ tsconfig.tsbuildinfo
 
 # Commander task scratchpad; keep local task notes out of git by default.
 .task/
+
+# Secret keys — never commit private signing material
+mcp-connectors/_signing/release.sec
+
+# Test output logs
+iter32_test.tail.txt
+iter36_test.full.txt
+iter36_test.tail.txt

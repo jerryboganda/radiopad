@@ -1,0 +1,60 @@
+# RadioPad — local Postgres + backend stack for testing the Postgres path.
+# Default dev still uses SQLite (no compose required).
+#
+# Usage:
+#   docker compose -f deploy/docker-compose.yml up --build
+#
+# Then point the frontend at http://127.0.0.1:7457 as usual.
+
+services:
+  postgres:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_USER: radiopad
+      POSTGRES_PASSWORD: radiopad-dev
+      POSTGRES_DB: radiopad
+    ports:
+      - "5433:5432"
+    volumes:
+      - radiopad-pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U radiopad -d radiopad"]
+      interval: 5s
+      timeout: 3s
+      retries: 12
+
+  api:
+    build:
+      context: ..
+      dockerfile: deploy/Dockerfile.api
+    depends_on:
+      postgres:
+        condition: service_healthy
+    environment:
+      RADIOPAD_BIND: http://0.0.0.0:7457
+      ConnectionStrings__RadioPad: "Host=postgres;Port=5432;Database=radiopad;Username=radiopad;Password=radiopad-dev"
+      ASPNETCORE_ENVIRONMENT: Development
+    ports:
+      - "7457:7457"
+
+  # Iter-32 DESK-007 / INT-007 — bundled Orthanc DICOMweb proxy.
+  # Opt-in: only starts when the `pacs` profile is selected:
+  #   docker compose --profile pacs up -d orthanc
+  # See deploy/orthanc/README.md for HL7 ↔ DICOM bridging notes.
+  orthanc:
+    profiles: ["pacs"]
+    build:
+      context: ./orthanc
+      dockerfile: Dockerfile.orthanc
+    environment:
+      RADIOPAD_ORTHANC_USERNAME: ${RADIOPAD_ORTHANC_USERNAME:-radiopad}
+      RADIOPAD_ORTHANC_PASSWORD: ${RADIOPAD_ORTHANC_PASSWORD:-radiopad-dev}
+    ports:
+      # Bind 127.0.0.1 by default — match the rest of the stack.
+      - "127.0.0.1:8042:8042"
+    volumes:
+      - radiopad-orthanc-db:/var/lib/orthanc/db
+
+volumes:
+  radiopad-pgdata: {}
+  radiopad-orthanc-db: {}

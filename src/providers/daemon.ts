@@ -85,60 +85,80 @@ export async function streamViaDaemon({
     const reader = resp.body.getReader();
     const decoder = new TextDecoder();
     let buf = '';
+    let sawEnd = false;
 
-    while (true) {
-      const { value, done } = await reader.read();
-      if (done) break;
-      buf += decoder.decode(value, { stream: true });
+    const handleFrame = (frame: string): boolean => {
+      const parsed = parseFrame(frame);
+      if (!parsed) return true;
+
+      if (parsed.event === 'stdout') {
+        const chunk = String(parsed.data.chunk ?? '');
+        acc += chunk;
+        handlers.onDelta(chunk);
+        handlers.onAgentEvent({ kind: 'text', text: chunk });
+        return true;
+      }
+
+      if (parsed.event === 'stderr') {
+        stderrBuf += parsed.data.chunk ?? '';
+        return true;
+      }
+
+      if (parsed.event === 'agent') {
+        const translated = translateAgentEvent(parsed.data);
+        if (!translated) return true;
+        if (translated.kind === 'text') {
+          acc += translated.text;
+          handlers.onDelta(translated.text);
+        }
+        handlers.onAgentEvent(translated);
+        return true;
+      }
+
+      if (parsed.event === 'start') {
+        handlers.onAgentEvent({
+          kind: 'status',
+          label: 'starting',
+          detail: typeof parsed.data.bin === 'string' ? parsed.data.bin : undefined,
+        });
+        return true;
+      }
+
+      if (parsed.event === 'error') {
+        handlers.onError(new Error(String(parsed.data.message ?? 'daemon error')));
+        return false;
+      }
+
+      if (parsed.event === 'end') {
+        sawEnd = true;
+        exitCode = typeof parsed.data.code === 'number' ? parsed.data.code : null;
+        return true;
+      }
+
+      return true;
+    };
+
+    const drainFrames = (): boolean => {
       let idx: number;
       while ((idx = buf.indexOf('\n\n')) !== -1) {
         const frame = buf.slice(0, idx);
         buf = buf.slice(idx + 2);
-        const parsed = parseFrame(frame);
-        if (!parsed) continue;
-
-        if (parsed.event === 'stdout') {
-          const chunk = String(parsed.data.chunk ?? '');
-          acc += chunk;
-          handlers.onDelta(chunk);
-          handlers.onAgentEvent({ kind: 'text', text: chunk });
-          continue;
-        }
-
-        if (parsed.event === 'stderr') {
-          stderrBuf += parsed.data.chunk ?? '';
-          continue;
-        }
-
-        if (parsed.event === 'agent') {
-          const translated = translateAgentEvent(parsed.data);
-          if (!translated) continue;
-          if (translated.kind === 'text') {
-            acc += translated.text;
-            handlers.onDelta(translated.text);
-          }
-          handlers.onAgentEvent(translated);
-          continue;
-        }
-
-        if (parsed.event === 'start') {
-          handlers.onAgentEvent({
-            kind: 'status',
-            label: 'starting',
-            detail: typeof parsed.data.bin === 'string' ? parsed.data.bin : undefined,
-          });
-          continue;
-        }
-
-        if (parsed.event === 'error') {
-          handlers.onError(new Error(String(parsed.data.message ?? 'daemon error')));
-          return;
-        }
-
-        if (parsed.event === 'end') {
-          exitCode = typeof parsed.data.code === 'number' ? parsed.data.code : null;
-        }
+        if (!handleFrame(frame)) return false;
       }
+      return true;
+    };
+
+    while (true) {
+      const { value, done } = await reader.read();
+      if (done) break;
+      buf += decoder.decode(value, { stream: true }).replace(/\r\n/g, '\n');
+      if (!drainFrames()) return;
+    }
+
+    buf += decoder.decode().replace(/\r\n/g, '\n');
+    if (buf.trim().length > 0) {
+      if (!handleFrame(buf)) return;
+      buf = '';
     }
 
     if (exitCode !== null && exitCode !== 0) {
@@ -147,6 +167,13 @@ export async function streamViaDaemon({
         new Error(`agent exited with code ${exitCode}${tail ? `\n${tail}` : ''}`),
       );
       return;
+    }
+    if (!sawEnd) {
+      handlers.onAgentEvent({
+        kind: 'status',
+        label: 'stream closed',
+        detail: 'daemon ended the response without an explicit end frame',
+      });
     }
     handlers.onDone(acc);
   } catch (err) {

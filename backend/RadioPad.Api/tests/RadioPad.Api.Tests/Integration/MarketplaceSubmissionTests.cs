@@ -210,11 +210,14 @@ public class MarketplaceSubmissionTests : IClassFixture<RadioPadAppFactory>
         var installRes = await client.PostAsync($"/api/marketplace/listings/{listingId}/install", null);
         Assert.Equal(HttpStatusCode.OK, installRes.StatusCode);
 
+        // The installed copy gets a marketplace-scoped ID ("mp-<listingId>") so
+        // it is distinct from the original source template.
+        var installedTemplateId = $"mp-{listingId.Replace("-", "")}";
         using var scope = _factory.Services.CreateScope();
         var db = scope.ServiceProvider.GetRequiredService<RadioPadDbContext>();
         var installed = await db.Templates.FirstOrDefaultAsync(t =>
             t.TenantId == _factory.SeedTenant.Id &&
-            t.TemplateId == tmplId);
+            t.TemplateId == installedTemplateId);
         Assert.NotNull(installed);
         Assert.Equal(TemplateStatus.Draft, installed!.Status);
     }

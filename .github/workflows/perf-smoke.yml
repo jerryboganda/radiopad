@@ -1,0 +1,109 @@
+name: perf-smoke
+
+# PRD PERF-004 — k6 smoke run for the four SLO endpoints. Manual trigger
+# only (free runners can't sustain perf load on every push). Spins up the
+# backend with the Mock AI provider + sqlite, seeds the integration tenant,
+# and runs each scenario at 3 VUs / 30s. Fails the workflow if any
+# threshold (P95/P99) is violated.
+
+on:
+  workflow_dispatch:
+    inputs:
+      vus:
+        description: 'VUs per scenario'
+        required: false
+        default: '3'
+      duration:
+        description: 'Duration per scenario'
+        required: false
+        default: '30s'
+
+permissions:
+  contents: read
+
+jobs:
+  smoke:
+    runs-on: ubuntu-latest
+    env:
+      RADIOPAD_BIND: 'http://127.0.0.1:7457'
+      RADIOPAD_AI_PROVIDER: 'Mock'
+      RADIOPAD_DB: 'Data Source=perf.db'
+      ASPNETCORE_ENVIRONMENT: 'Testing'
+      RADIOPAD_BASE_URL: 'http://127.0.0.1:7457'
+      RADIOPAD_TENANT: 'it'
+      RADIOPAD_USER: 'it-radiologist@radiopad.local'
+      RADIOPAD_SEED_INTEGRATION: '1'
+      K6_VUS: ${{ github.event.inputs.vus || '3' }}
+      K6_DURATION: ${{ github.event.inputs.duration || '30s' }}
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '8.0.x'
+
+      - name: Build backend
+        working-directory: backend/RadioPad.Api
+        run: |
+          dotnet restore
+          dotnet build --configuration Release --no-restore
+
+      - name: Start backend
+        working-directory: backend/RadioPad.Api
+        run: |
+          nohup dotnet run --project src/RadioPad.Api --configuration Release --no-build \
+            > "$RUNNER_TEMP/backend.log" 2>&1 &
+          echo "BACKEND_PID=$!" >> "$GITHUB_ENV"
+
+      - name: Wait for /api/health
+        run: |
+          for i in $(seq 1 60); do
+            if curl -fs http://127.0.0.1:7457/api/health >/dev/null; then
+              echo "backend up"; exit 0
+            fi
+            sleep 2
+          done
+          echo "backend never became healthy"; tail -n 200 "$RUNNER_TEMP/backend.log"; exit 1
+
+      - name: Seed integration tenant + draft
+        run: |
+          curl -fs -X POST http://127.0.0.1:7457/api/auth/signin \
+            -H 'Content-Type: application/json' \
+            -d '{"tenant":"'"$RADIOPAD_TENANT"'","user":"'"$RADIOPAD_USER"'"}' | tee /tmp/signin.json
+          # The k6 setup() phase will create the per-script draft.
+
+      - name: Run ai-draft scenario
+        uses: grafana/k6-action@v0.3.1
+        with:
+          filename: perf/k6/scripts/ai-draft.js
+
+      - name: Run impression scenario
+        uses: grafana/k6-action@v0.3.1
+        with:
+          filename: perf/k6/scripts/impression.js
+
+      - name: Run validate scenario
+        uses: grafana/k6-action@v0.3.1
+        with:
+          filename: perf/k6/scripts/validate.js
+
+      - name: Run audit-write scenario
+        uses: grafana/k6-action@v0.3.1
+        with:
+          filename: perf/k6/scripts/audit-write.js
+
+      - name: Stop backend
+        if: always()
+        run: |
+          if [ -n "${BACKEND_PID:-}" ]; then
+            kill "$BACKEND_PID" 2>/dev/null || true
+          fi
+
+      - name: Upload backend log
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: perf-backend-log
+          path: ${{ runner.temp }}/backend.log
+          if-no-files-found: ignore

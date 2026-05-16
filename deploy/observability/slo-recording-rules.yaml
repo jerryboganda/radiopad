@@ -1,0 +1,204 @@
+# RadioPad — PERF-004 SLO recording rules (Prometheus)
+# ----------------------------------------------------
+# Source histograms (radiopad.* Meter, OTLP HTTP exporter, Prometheus
+# remote-write or OTLP receiver):
+#   radiopad_report_validate_duration_ms_bucket
+#   radiopad_report_sign_duration_ms_bucket
+#   radiopad_ai_draft_duration_ms_bucket
+#   radiopad_dicom_qido_duration_ms_bucket
+#   radiopad_api_request_duration_ms_bucket
+#
+# PRD §18.1 latency targets (P95):
+#   validate < 250 ms · sign < 500 ms · AI draft < 4 s · QIDO < 600 ms
+#
+# Burn rates are computed against a 30-day budget per Google SRE
+# multi-window / multi-burn-rate methodology. The 5m / 30m / 1h windows
+# below feed the alert rules.
+
+groups:
+  - name: radiopad-slo-quantiles
+    interval: 30s
+    rules:
+      # ---- validate ----
+      - record: radiopad:validate_duration_ms:p50_5m
+        expr: histogram_quantile(0.50, sum by (le) (rate(radiopad_report_validate_duration_ms_bucket[5m])))
+      - record: radiopad:validate_duration_ms:p95_5m
+        expr: histogram_quantile(0.95, sum by (le) (rate(radiopad_report_validate_duration_ms_bucket[5m])))
+      - record: radiopad:validate_duration_ms:p99_5m
+        expr: histogram_quantile(0.99, sum by (le) (rate(radiopad_report_validate_duration_ms_bucket[5m])))
+      - record: radiopad:validate_duration_ms:p95_30m
+        expr: histogram_quantile(0.95, sum by (le) (rate(radiopad_report_validate_duration_ms_bucket[30m])))
+      - record: radiopad:validate_duration_ms:p95_1h
+        expr: histogram_quantile(0.95, sum by (le) (rate(radiopad_report_validate_duration_ms_bucket[1h])))
+
+      # ---- sign ----
+      - record: radiopad:sign_duration_ms:p50_5m
+        expr: histogram_quantile(0.50, sum by (le) (rate(radiopad_report_sign_duration_ms_bucket[5m])))
+      - record: radiopad:sign_duration_ms:p95_5m
+        expr: histogram_quantile(0.95, sum by (le) (rate(radiopad_report_sign_duration_ms_bucket[5m])))
+      - record: radiopad:sign_duration_ms:p99_5m
+        expr: histogram_quantile(0.99, sum by (le) (rate(radiopad_report_sign_duration_ms_bucket[5m])))
+      - record: radiopad:sign_duration_ms:p95_30m
+        expr: histogram_quantile(0.95, sum by (le) (rate(radiopad_report_sign_duration_ms_bucket[30m])))
+      - record: radiopad:sign_duration_ms:p95_1h
+        expr: histogram_quantile(0.95, sum by (le) (rate(radiopad_report_sign_duration_ms_bucket[1h])))
+
+      # ---- AI draft ----
+      - record: radiopad:ai_draft_duration_ms:p50_5m
+        expr: histogram_quantile(0.50, sum by (le) (rate(radiopad_ai_draft_duration_ms_bucket[5m])))
+      - record: radiopad:ai_draft_duration_ms:p95_5m
+        expr: histogram_quantile(0.95, sum by (le) (rate(radiopad_ai_draft_duration_ms_bucket[5m])))
+      - record: radiopad:ai_draft_duration_ms:p99_5m
+        expr: histogram_quantile(0.99, sum by (le) (rate(radiopad_ai_draft_duration_ms_bucket[5m])))
+      - record: radiopad:ai_draft_duration_ms:p95_30m
+        expr: histogram_quantile(0.95, sum by (le) (rate(radiopad_ai_draft_duration_ms_bucket[30m])))
+      - record: radiopad:ai_draft_duration_ms:p95_1h
+        expr: histogram_quantile(0.95, sum by (le) (rate(radiopad_ai_draft_duration_ms_bucket[1h])))
+
+      # ---- DICOM QIDO ----
+      - record: radiopad:dicom_qido_duration_ms:p50_5m
+        expr: histogram_quantile(0.50, sum by (le) (rate(radiopad_dicom_qido_duration_ms_bucket[5m])))
+      - record: radiopad:dicom_qido_duration_ms:p95_5m
+        expr: histogram_quantile(0.95, sum by (le) (rate(radiopad_dicom_qido_duration_ms_bucket[5m])))
+      - record: radiopad:dicom_qido_duration_ms:p99_5m
+        expr: histogram_quantile(0.99, sum by (le) (rate(radiopad_dicom_qido_duration_ms_bucket[5m])))
+      - record: radiopad:dicom_qido_duration_ms:p95_30m
+        expr: histogram_quantile(0.95, sum by (le) (rate(radiopad_dicom_qido_duration_ms_bucket[30m])))
+      - record: radiopad:dicom_qido_duration_ms:p95_1h
+        expr: histogram_quantile(0.95, sum by (le) (rate(radiopad_dicom_qido_duration_ms_bucket[1h])))
+
+      # ---- per-route HTTP ----
+      - record: radiopad:api_request_duration_ms:p95_5m
+        expr: histogram_quantile(0.95, sum by (le, route) (rate(radiopad_api_request_duration_ms_bucket[5m])))
+      - record: radiopad:api_request_duration_ms:p99_5m
+        expr: histogram_quantile(0.99, sum by (le, route) (rate(radiopad_api_request_duration_ms_bucket[5m])))
+
+  - name: radiopad-slo-burn-rates
+    interval: 30s
+    rules:
+      # Budget consumption = fraction of samples breaching the P95 target.
+      # validate target: 250 ms
+      - record: radiopad_slo_burn_rate_5m:validate
+        expr: |
+          (
+            sum(rate(radiopad_report_validate_duration_ms_bucket{le="+Inf"}[5m]))
+            -
+            sum(rate(radiopad_report_validate_duration_ms_bucket{le="250"}[5m]))
+          )
+          /
+          clamp_min(sum(rate(radiopad_report_validate_duration_ms_count[5m])), 1)
+      - record: radiopad_slo_burn_rate_30m:validate
+        expr: |
+          (
+            sum(rate(radiopad_report_validate_duration_ms_bucket{le="+Inf"}[30m]))
+            -
+            sum(rate(radiopad_report_validate_duration_ms_bucket{le="250"}[30m]))
+          )
+          /
+          clamp_min(sum(rate(radiopad_report_validate_duration_ms_count[30m])), 1)
+
+      # sign target: 500 ms
+      - record: radiopad_slo_burn_rate_5m:sign
+        expr: |
+          (
+            sum(rate(radiopad_report_sign_duration_ms_bucket{le="+Inf"}[5m]))
+            -
+            sum(rate(radiopad_report_sign_duration_ms_bucket{le="500"}[5m]))
+          )
+          /
+          clamp_min(sum(rate(radiopad_report_sign_duration_ms_count[5m])), 1)
+      - record: radiopad_slo_burn_rate_30m:sign
+        expr: |
+          (
+            sum(rate(radiopad_report_sign_duration_ms_bucket{le="+Inf"}[30m]))
+            -
+            sum(rate(radiopad_report_sign_duration_ms_bucket{le="500"}[30m]))
+          )
+          /
+          clamp_min(sum(rate(radiopad_report_sign_duration_ms_count[30m])), 1)
+
+      # AI draft target: 4000 ms
+      - record: radiopad_slo_burn_rate_5m:ai_draft
+        expr: |
+          (
+            sum(rate(radiopad_ai_draft_duration_ms_bucket{le="+Inf"}[5m]))
+            -
+            sum(rate(radiopad_ai_draft_duration_ms_bucket{le="4000"}[5m]))
+          )
+          /
+          clamp_min(sum(rate(radiopad_ai_draft_duration_ms_count[5m])), 1)
+      - record: radiopad_slo_burn_rate_30m:ai_draft
+        expr: |
+          (
+            sum(rate(radiopad_ai_draft_duration_ms_bucket{le="+Inf"}[30m]))
+            -
+            sum(rate(radiopad_ai_draft_duration_ms_bucket{le="4000"}[30m]))
+          )
+          /
+          clamp_min(sum(rate(radiopad_ai_draft_duration_ms_count[30m])), 1)
+
+      # QIDO target: 600 ms
+      - record: radiopad_slo_burn_rate_5m:dicom_qido
+        expr: |
+          (
+            sum(rate(radiopad_dicom_qido_duration_ms_bucket{le="+Inf"}[5m]))
+            -
+            sum(rate(radiopad_dicom_qido_duration_ms_bucket{le="600"}[5m]))
+          )
+          /
+          clamp_min(sum(rate(radiopad_dicom_qido_duration_ms_count[5m])), 1)
+      - record: radiopad_slo_burn_rate_30m:dicom_qido
+        expr: |
+          (
+            sum(rate(radiopad_dicom_qido_duration_ms_bucket{le="+Inf"}[30m]))
+            -
+            sum(rate(radiopad_dicom_qido_duration_ms_bucket{le="600"}[30m]))
+          )
+          /
+          clamp_min(sum(rate(radiopad_dicom_qido_duration_ms_count[30m])), 1)
+
+  # Alertmanager rules — multi-burn-rate (fast 2% / slow 5% windows).
+  # Fires page when burn-rate consumes 2% of the 30-day budget in 5m
+  # AND ≥0.2% in 30m (eliminates flap on transient spikes).
+  - name: radiopad-slo-alerts
+    interval: 30s
+    rules:
+      - alert: RadioPadValidateP95BudgetBurn
+        expr: radiopad_slo_burn_rate_5m:validate > 0.02 and radiopad_slo_burn_rate_30m:validate > 0.002
+        for: 2m
+        labels:
+          severity: page
+          slo: validate_p95_250ms
+        annotations:
+          summary: "Validate P95 budget burning fast (>2% in 5m)"
+          description: "POST /api/reports/{id}/validate is exceeding the 250 ms P95 budget. Consult observability runbook §validate."
+
+      - alert: RadioPadSignP95BudgetBurn
+        expr: radiopad_slo_burn_rate_5m:sign > 0.02 and radiopad_slo_burn_rate_30m:sign > 0.002
+        for: 2m
+        labels:
+          severity: page
+          slo: sign_p95_500ms
+        annotations:
+          summary: "Sign P95 budget burning fast (>2% in 5m)"
+          description: "POST /api/reports/{id}/sign is exceeding the 500 ms P95 budget. Consult observability runbook §sign."
+
+      - alert: RadioPadAiDraftP95BudgetBurn
+        expr: radiopad_slo_burn_rate_5m:ai_draft > 0.05 and radiopad_slo_burn_rate_30m:ai_draft > 0.005
+        for: 5m
+        labels:
+          severity: page
+          slo: ai_draft_p95_4s
+        annotations:
+          summary: "AI draft P95 budget burning fast (>5% in 5m)"
+          description: "AI draft latency is exceeding the 4 s P95 budget. Consult observability runbook §ai-draft."
+
+      - alert: RadioPadDicomQidoP95BudgetBurn
+        expr: radiopad_slo_burn_rate_5m:dicom_qido > 0.05 and radiopad_slo_burn_rate_30m:dicom_qido > 0.005
+        for: 5m
+        labels:
+          severity: page
+          slo: dicom_qido_p95_600ms
+        annotations:
+          summary: "DICOM QIDO P95 budget burning fast (>5% in 5m)"
+          description: "DICOMweb QIDO-RS search is exceeding the 600 ms P95 budget. Consult observability runbook §dicom-qido."

@@ -1,0 +1,16 @@
+{
+  "name": "dicomweb-qido",
+  "version": "1.0.0",
+  "description": "Read-only QIDO-RS lookup of a DICOM study by accession number. Returns the matching study list as JSON.",
+  "scope": "net:dicomweb",
+  "isBuiltIn": true,
+  "input": {
+    "type": "object",
+    "properties": {
+      "accessionNumber": { "type": "string" }
+    },
+    "required": ["accessionNumber"]
+  },
+  "binding": "RadioPad.Application.Services.Mcp.Connectors.DicomWebQido",
+  "minRadiopadVersion": "0.1.0"
+}

@@ -1,0 +1,17 @@
+{
+  "name": "pacs-recent-studies",
+  "version": "1.0.0",
+  "description": "Return up to 20 of the most recent DICOM studies for a patient reference. Read-only QIDO-RS query bounded by a day window.",
+  "scope": "net:dicomweb",
+  "isBuiltIn": true,
+  "input": {
+    "type": "object",
+    "properties": {
+      "patientRef": { "type": "string" },
+      "days": { "type": "integer", "minimum": 1, "maximum": 365 }
+    },
+    "required": ["patientRef"]
+  },
+  "binding": "RadioPad.Application.Services.Mcp.Connectors.PacsRecentStudies",
+  "minRadiopadVersion": "0.1.0"
+}

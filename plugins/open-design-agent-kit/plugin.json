@@ -1,0 +1,83 @@
+{
+  "name": "open-design-agent-kit",
+  "version": "0.1.0",
+  "description": "Tracked five-layer agent development kit for the Open Design project.",
+  "publisher": "open-design",
+  "license": "Apache-2.0",
+  "layers": {
+    "memory": {
+      "description": "Always-loaded project constitution and repo memory.",
+      "files": [
+        ".github/copilot-instructions.md",
+        "CLAUDE.md"
+      ]
+    },
+    "skills": {
+      "description": "Committed SKILL.md capability folders and authoring guide.",
+      "files": ["skills/README.md"],
+      "globs": ["skills/*/SKILL.md"]
+    },
+    "hooks": {
+      "description": "Deterministic lifecycle automation for agent sessions.",
+      "files": [
+        ".github/hooks/open-design-agent-kit.json",
+        "hooks/README.md",
+        "hooks/lib.mjs",
+        "hooks/lib.ps1",
+        "hooks/session-start.mjs",
+        "hooks/session-start.ps1",
+        "hooks/pretooluse.mjs",
+        "hooks/pretooluse.ps1",
+        "hooks/posttooluse.mjs",
+        "hooks/posttooluse.ps1",
+        "hooks/subagent-stop.mjs",
+        "hooks/subagent-stop.ps1",
+        "hooks/stop.ps1",
+        "hooks/PreToolUse.sh",
+        "hooks/PostToolUse.sh",
+        "hooks/SessionStart.sh",
+        "hooks/SubagentStop.sh",
+        "hooks/Stop.sh",
+        "hooks/stop.mjs"
+      ]
+    },
+    "subagents": {
+      "description": "Focused context-isolated helper roles for exploration, review, testing, and implementation.",
+      "files": [
+        "subagents/README.md",
+        "subagents/explorer.md",
+        "subagents/code-reviewer.md",
+        "subagents/test-runner.md",
+        "subagents/feature-dev.md",
+        ".github/agents/open-design-explorer.agent.md",
+        ".github/agents/open-design-code-reviewer.agent.md",
+        ".github/agents/open-design-test-runner.agent.md",
+        ".github/agents/open-design-feature-dev.agent.md"
+      ]
+    },
+    "plugins": {
+      "description": "Distribution manifest and install notes for this kit.",
+      "files": [
+        "plugins/README.md",
+        "plugins/open-design-agent-kit/plugin.json",
+        "plugins/open-design-agent-kit/README.md"
+      ]
+    }
+  },
+  "install": {
+    "trackedFilesOnly": true,
+    "localMirrors": [".claude/", ".agents/", ".opencode/", ".codex/"],
+    "localMirrorsAreIgnored": true
+  },
+  "security": {
+    "secretsAllowed": false,
+    "runtimeStateAllowed": false,
+    "hookPolicy": "Hooks may ask for confirmation before destructive tools but must not mutate source files.",
+    "reviewRequiredForExecutableChanges": true
+  },
+  "compatibility": {
+    "openDesign": ">=0.1.0",
+    "node": ">=20.9.0",
+    "packageManager": "pnpm@9.15.9"
+  }
+}

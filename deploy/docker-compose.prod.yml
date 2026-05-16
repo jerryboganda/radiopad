@@ -1,0 +1,105 @@
+# RadioPad — Production stack
+#
+# Prerequisites on the VPS:
+#   - Docker Engine 24+ and Docker Compose v2
+#   - .env.prod file (copy .env.example and fill secrets)
+#   - TLS certs or a Caddy-managed cert via ACME
+#
+# Usage:
+#   docker compose -f deploy/docker-compose.prod.yml --env-file .env.prod up -d
+#
+# To rebuild after a code change:
+#   docker compose -f deploy/docker-compose.prod.yml --env-file .env.prod up -d --build --no-deps api
+#
+# Health check:
+#   curl -f http://localhost:7457/api/health
+
+services:
+  postgres:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-radiopad}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?POSTGRES_PASSWORD is required}
+      POSTGRES_DB: ${POSTGRES_DB:-radiopad}
+    volumes:
+      - radiopad-pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-radiopad} -d ${POSTGRES_DB:-radiopad}"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+    networks:
+      - internal
+
+  api:
+    build:
+      context: ..
+      dockerfile: deploy/Dockerfile.api
+    image: radiopad/api:${IMAGE_TAG:-latest}
+    restart: unless-stopped
+    depends_on:
+      postgres:
+        condition: service_healthy
+    environment:
+      RADIOPAD_BIND: http://0.0.0.0:7457
+      ConnectionStrings__RadioPad: "Host=postgres;Port=5432;Database=${POSTGRES_DB:-radiopad};Username=${POSTGRES_USER:-radiopad};Password=${POSTGRES_PASSWORD}"
+      ASPNETCORE_ENVIRONMENT: Production
+      RADIOPAD_RUN_MIGRATIONS: "true"
+      # Provider API keys — referenced as env:VAR_NAME in provider config rows
+      ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY:-}
+      OPENAI_API_KEY: ${OPENAI_API_KEY:-}
+    networks:
+      - internal
+      - proxy
+    healthcheck:
+      test: ["CMD-SHELL", "curl -sf http://localhost:7457/api/health || exit 1"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 20s
+
+  # Static frontend served by Caddy (TLS termination + reverse proxy to API)
+  caddy:
+    image: caddy:2-alpine
+    restart: unless-stopped
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./Caddyfile.prod:/etc/caddy/Caddyfile:ro
+      - ../frontend/out:/srv/frontend:ro
+      - radiopad-caddy-data:/data
+      - radiopad-caddy-config:/config
+    depends_on:
+      - api
+    networks:
+      - proxy
+
+  orthanc:
+    profiles: ["pacs"]
+    build:
+      context: ./orthanc
+      dockerfile: Dockerfile.orthanc
+    restart: unless-stopped
+    environment:
+      RADIOPAD_ORTHANC_USERNAME: ${RADIOPAD_ORTHANC_USERNAME:-radiopad}
+      RADIOPAD_ORTHANC_PASSWORD: ${RADIOPAD_ORTHANC_PASSWORD:?RADIOPAD_ORTHANC_PASSWORD is required when pacs profile is active}
+    volumes:
+      - radiopad-orthanc-db:/var/lib/orthanc/db
+    ports:
+      - "127.0.0.1:8042:8042"
+    networks:
+      - internal
+
+volumes:
+  radiopad-pgdata: {}
+  radiopad-caddy-data: {}
+  radiopad-caddy-config: {}
+  radiopad-orthanc-db: {}
+
+networks:
+  internal:
+    driver: bridge
+  proxy:
+    driver: bridge
