@@ -1,13 +1,19 @@
-# RadioPad — Design System (LOCKED)
+# RadioPad — Design System (LOCKED tokens, EXTENDED shell)
 
-**Status:** Locked  **Owner:** Product Design  **Last Updated:** 2026-05-16
+**Status:** Tokens locked · Shell modernized (sidebar)  **Owner:** Product Design  **Last Updated:** 2026-05-16
 
-> **MISSION-CRITICAL RULE.** RadioPad's visual language is the Open Design /
-> Claude.ai-inspired system. **No agent — human or AI — is permitted to
-> deviate from these tokens, components, or interaction patterns.** New UI
-> work must reuse this spec verbatim. When extending the UI, copy patterns
-> from the canonical stylesheet (`frontend/app/globals.css`, derived from
-> `src/index.css`) instead of inventing new ones.
+> **MISSION-CRITICAL RULE.** RadioPad's **visual tokens** (palette,
+> typography, accent `#c96442`, semantic families, radii, shadows,
+> `.ai-mark`, serif-for-prose / sans-for-chrome) are LOCKED. New UI work
+> must reuse them verbatim — never invent a new colour, typeface, or
+> dark-mode variant.
+>
+> The **app shell** has been modernized from the original Open Design
+> topbar+split layout into an enterprise-SaaS **left-sidebar shell**
+> (sidebar + slim contextual topbar + page header). The sidebar shell is
+> now canonical and is documented in §3.1 below. The two-pane `.split`
+> primitive is preserved as an *in-page* editor primitive (used inside
+> `/reports/view` and `/rulebooks/editor`) but is no longer the app shell.
 
 This document is the source of truth referenced by:
 - `AGENTS.md`
@@ -122,31 +128,78 @@ Reports and AI prose render in `--serif`.
 
 The canonical stylesheet ships these classes. Reuse them; do not redefine.
 
-### 3.1 App shell
+### 3.1 App shell (sidebar — canonical)
+
+RadioPad uses a fixed left sidebar + slim contextual topbar + page header
+shell. The sidebar carries primary navigation; the topbar is contextual
+only (page actions, profile, locale).
 
 ```html
-<div class="app">
-  <header class="topbar">
-    <div class="topbar-left">
-      <span class="brand-mark"><img class="brand-mark-img" src="/brand.svg" /></span>
-      <div class="topbar-title">
-        <span class="title">RadioPad</span>
-        <span class="meta">{tenant} · {role}</span>
+<div class="rp-shell">
+  <aside class="rp-sidebar" aria-label="Primary">
+    <a class="rp-sidebar-brand" href="/">
+      <span class="brand-mark"><span class="brand-mark-letter">R</span></span>
+      <span class="rp-sidebar-brand-text">
+        <span class="rp-sidebar-brand-title">RadioPad</span>
+        <span class="rp-sidebar-brand-meta">AI radiology reporting · v0.1</span>
+      </span>
+    </a>
+    <nav class="rp-sidebar-nav">
+      <div class="rp-sidebar-group">
+        <div class="rp-sidebar-group-label">Workspace</div>
+        <a class="rp-sidebar-item active" href="/">Reports</a>
+        <a class="rp-sidebar-item" href="/validation">Validation</a>
+        …
       </div>
+      … more groups …
+    </nav>
+    <div class="rp-sidebar-footer">
+      <button class="rp-profile-trigger">…profile…</button>
     </div>
-    <div class="topbar-right">…</div>
-  </header>
-  <div class="split">
-    <section class="pane">…left pane…</section>
-    <section class="pane">…right pane…</section>
+  </aside>
+  <div class="rp-shell-main">
+    <header class="rp-topbar">
+      <button class="rp-topbar-menu" aria-label="Open menu">≡</button>
+      <nav class="rp-breadcrumbs">…</nav>
+      <div class="rp-topbar-actions">…locale, profile, page action slot…</div>
+    </header>
+    <main class="rp-shell-content">
+      <header class="rp-page-header">
+        <h1 class="rp-page-title">Reports</h1>
+        <p class="rp-page-sub">RadioPad Dev Tenant — signed in as …</p>
+      </header>
+      … page content …
+    </main>
   </div>
 </div>
 ```
 
-`.split` defaults to `grid-template-columns: minmax(380px, 460px) 1fr`.
-For three-pane reporting workspaces (study context · editor · validation)
-extend with a third column at `320px` and keep the first column at the
-canonical width.
+**IA grouping (canonical 4 sections):**
+- **Workspace** — Reports, Validation, Audit, Analytics
+- **Library** — Rulebooks, Templates, Prompts, Marketplace, Terminology
+- **Integrations** — Providers, PACS, FHIR import, Offline
+- **Admin** — Governance, Model eval, Security, Feature flags, Billing, Usage, Settings
+
+Sidebar is collapsible to icon-only on desktop (state persisted in
+`localStorage`). On viewports `≤900px` the sidebar becomes a left
+slide-out drawer triggered by the topbar hamburger; the drawer traps
+focus, closes on `Escape` / backdrop click, and respects
+`prefers-reduced-motion`.
+
+#### 3.1.1 In-page two-pane primitive (`.split`)
+
+`.split` defaults to `grid-template-columns: minmax(380px, 460px) 1fr`
+and is preserved for **in-page** editor surfaces (study context · editor
+in `/reports/view`; rulebook tree · YAML in `/rulebooks/editor`). It is
+no longer the app shell. Pages that use `.split` should opt out of the
+default `<PageHeader>` and request a full-bleed `<Container fluid>`.
+
+#### 3.1.2 Legacy `.topbar` / `.app` classes
+
+The original Open Design `.topbar` and `.app` classes still exist in
+`globals.css` as **per-pane chrome** primitives (used inside the
+two-pane editor surfaces above). They must not be used as the
+application root layout — the `.rp-shell` sidebar shell is canonical.
 
 ### 3.2 Buttons
 
@@ -469,8 +522,9 @@ The following are **forbidden**:
 2. Introducing dark-mode tokens.
 3. Adding new accent colours.
 4. Using emoji as functional icons.
-5. Replacing the topbar / split / chat-log skeleton with a different
-   shell.
+5. Using a primary navigation pattern other than the canonical
+   left-sidebar shell described in §3.1 (no header-heavy nav, no
+   bottom-tab nav, no command-palette-only nav).
 6. Adding heavy dropshadows that imply elevation > the existing
    `--shadow-md`.
 7. Using rounded-full pills for things that aren't status.
@@ -481,14 +535,21 @@ The following are **forbidden**:
 
 When you build a new RadioPad surface:
 
-1. Wrap it in `.app > .topbar + .split`.
-2. Inside each pane use `.panel` for grouped content.
-3. Use `.section-block` (label + control) for every form field.
-4. Primary action uses `.primary`; everything else uses `.ghost` /
-   `.subtle`.
-5. Status lives in semantic pills, not standalone colours.
-6. AI-generated content always wears `.ai-mark`.
-7. Reports render in serif; chrome and forms in sans.
+1. The page renders inside `<AppShell>`; do not re-implement chrome.
+2. Use `<Container>` + `<PageHeader title description primaryAction />`
+   for the top of every page.
+3. Inside the page, use `.rp-panel` for grouped content and
+   `.section-block` (label + control) for every form field.
+4. For data-driven pages, render `<Skeleton />` while loading,
+   `<EmptyState />` for zero rows, and `<ErrorState onRetry />` on
+   fetch failure.
+5. Primary action uses `.primary` (one per surface); everything else
+   uses `.ghost` / `.subtle`.
+6. Status lives in semantic pills, not standalone colours.
+7. AI-generated content always wears `.ai-mark`.
+8. Reports render in serif; chrome and forms in sans.
+9. Two-pane editor surfaces opt into `<Container fluid>` and use the
+   in-page `.split` primitive (§3.1.1).
 
 If a new pattern doesn't fit any of the above, stop and propose a token
 or class addition in a PR before shipping it. Do not improvise.

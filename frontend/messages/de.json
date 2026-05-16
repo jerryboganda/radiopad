@@ -20,7 +20,13 @@
     "fhirImport": "FHIR-Import",
     "pacs": "PACS",
     "security": "Sicherheit",
-    "signIn": "Anmelden"
+    "signIn": "Anmelden",
+    "groups": {
+      "workspace": "Arbeitsbereich",
+      "library": "Bibliothek",
+      "integrations": "Integrationen",
+      "admin": "Verwaltung"
+    }
   },
   "buttons": {
     "primary": {
@@ -72,6 +78,16 @@
   },
   "topbar": {
     "title": "RadioPad",
-    "tagline": "KI-gestützte Befundung · v0.1"
+    "tagline": "KI-gestützte Befundung · v0.1",
+    "openMenu": "Menü öffnen",
+    "primaryNav": "Hauptnavigation",
+    "collapseSidebar": "Seitenleiste einklappen",
+    "expandSidebar": "Seitenleiste ausklappen"
+  },
+  "profile": {
+    "account": "Konto",
+    "language": "Sprache",
+    "signOut": "Abmelden",
+    "signedOut": "Abgemeldet"
   }
 }
