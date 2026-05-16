@@ -1,117 +1,129 @@
-**Status:** Audit deliverable  **Owner:** UI/UX Audit  **Last Updated:** 2026-05-17
+# 01 — Project Intake
 
-# Project Intake
+**Audit target:** `frontend/` (RadioPad web client)
+**Audit date:** 2026-05-16
+**Audit scope:** All routes in `frontend/app/**/page.tsx`, all shared
+components in `frontend/components/**`, plus the canonical stylesheets
+(`globals.css`, `shell.css`, `radiopad.css`).
+**Audit boundary:** Audit-only — no production UI files were modified.
 
 ## Framework
 
-RadioPad's frontend is a Next.js 16 App Router application under `frontend/`, using React 18 and TypeScript. It is configured as a static export so the same bundle can ship into Tauri desktop and Capacitor mobile shells.
+- **Next.js 16.2.4** with the App Router (file-system routing under
+  `frontend/app/**`).
+- **React 18.3.1** with TypeScript 5.9.3 (strict, `noEmit` build).
+- **Static export:** `next.config.ts` sets `output: 'export'` and
+  `trailingSlash: true` so the same bundle ships into Tauri (desktop) and
+  Capacitor (mobile). **Implication for this audit:** the production
+  artifact has no Node server; route handlers / middleware are dev-only.
+- **Internationalization:** `next-intl@3.26.5` with locale negotiation in
+  `frontend/middleware.ts` and client fallback in `frontend/lib/i18n.ts`.
 
-Evidence:
-- `frontend/package.json` uses `next: ^16.2.4`, `react: ^18.3.1`, and `typescript: ^5.6.3`.
-- `frontend/next.config.ts` sets `output: 'export'`, `trailingSlash: true`, and unoptimized images.
+## Styling system
 
-## Styling System
+- **Hand-rolled CSS, no utility framework.** Three stylesheets are imported
+  by `frontend/app/layout.tsx` in this order:
+  1. `frontend/app/globals.css` (~116 KB) — token layer + component classes
+     (`.panel`, `.section-block`, `.composer`, `.msg`, `.finding`,
+     `.ai-mark`, `.primary`, `.ghost`, …).
+  2. `frontend/app/radiopad.css` (~19 KB) — page-specific helpers.
+  3. `frontend/app/shell.css` (~13 KB) — sidebar/topbar/page-header shell.
+- **Locked design tokens:** warm cream `--bg #faf9f7`, accent
+  `--accent #c96442`, semantic families (green/blue/purple/red/amber),
+  radii (6/10/14/pill), shadows (xs/sm/md/lg), serif/sans/mono.
+- **No Tailwind, no MUI, no Ant, no Chakra, no Bootstrap.** No dark mode.
 
-The UI uses the locked RadioPad/Open Design CSS token system:
+## Component library
 
-- Token layer: `frontend/app/globals.css`
-- Domain patterns: `frontend/app/radiopad.css`
-- Sidebar shell/chrome: `frontend/app/shell.css`
-- Canonical design documentation: `docs/02-design/design.md`
+- **App shell** (`frontend/components/shell/`):
+  `AppShell`, `Sidebar`, `Topbar`, `PageHeader`, `Breadcrumbs`,
+  `Container`, `ProfileMenu`, `MobileDrawerBackdrop`, `PageActionsSlot`,
+  `ShellContext`, `nav.config`.
+- **UI primitives** (`frontend/components/ui/`):
+  `StatusBadge`, `Skeleton` (+ `TableSkeleton`), `EmptyState`,
+  `ErrorState`.
+- **Feature components** (`frontend/components/`):
+  `LocalePicker`, `IntlBoundary`, `DictateButton`,
+  `DesktopStatusBanner`, `BillingStatusBanner`.
 
-Key locked tokens include `--bg`, `--accent`, `--text`, `--border`, semantic green/blue/purple/red/amber families, `--serif`, `--sans`, and `--mono`.
+There is no generic `<Button>`, `<Input>`, `<Card>`, `<Modal>`, `<Table>`
+or `<Tabs>` primitive — pages compose the locked CSS classes directly.
 
-## Component Library
+## Routing system
 
-No external UI component framework was identified. Shared UI is custom React + CSS:
+File-system App Router; **37 pages** discovered (see
+`03-route-inventory.md`):
 
-- Shell: `frontend/components/shell/*`
-- UI states: `frontend/components/ui/EmptyState.tsx`, `ErrorState.tsx`, `Skeleton.tsx`, `StatusBadge.tsx`
-- Page-local components: report editor, rulebook editor panels, mobile report clients, provider OAuth admin client
+| Group | Count |
+|---|---|
+| Top-level / public | 12 |
+| Reports | 2 |
+| Rulebooks | 3 |
+| Audit | 2 |
+| Analytics | 2 |
+| Mobile | 3 |
+| Admin | 14 |
 
-## Routing System
+There is a single `app/layout.tsx`; **no per-group `layout.tsx` files**.
+There are **no dynamic route segments** (`[id]`); detail pages take their
+ids via query strings (e.g. `/reports/view?id=...`). There is no `not-found.tsx`,
+`error.tsx`, `loading.tsx`, or `global-error.tsx` at the app root.
 
-Routing is file-system based through `frontend/app/**/page.tsx`. Several detail pages are query-param wrappers around client components stored in dynamic-looking folders.
+## State management
 
-Examples:
-- `/reports/view?id=...` -> `frontend/app/reports/view/page.tsx` -> `frontend/app/reports/[id]/ReportClient.tsx`
-- `/rulebooks/view?id=...` -> `frontend/app/rulebooks/view/page.tsx` -> `frontend/app/rulebooks/[id]/RulebookDetailClient.tsx`
-- `/mobile/reports/edit?reportId=...` -> `frontend/app/mobile/reports/edit/page.tsx`
-
-Route helpers live in `frontend/lib/routes.ts`.
-
-## State Management
-
-State is local React component state plus typed API calls. No global state library was identified. Cross-cutting state and native shell state include:
-
-- `ShellContext` for sidebar collapse/drawer behavior
-- `PageActionsProvider` for topbar/page actions
-- `ShellBridge` for Tauri events, biometric token hydration, and offline sync
-- Local storage for tenant/user headers and fallback auth/offline state
+- React local state + `next-intl` translations.
+- Shell state via `ShellContext` (sidebar collapsed + mobile drawer).
+- Topbar action slot via `PageActionsSlot` context.
+- All data flows through the typed `api` client in `frontend/lib/api.ts`
+  (CLAUDE.md mandate: no direct `fetch` from pages).
 
 ## Forms
 
-Forms are mostly page-local controlled inputs using base `input`, `textarea`, and `select` styles from `globals.css` and `.section-block` from `radiopad.css`. Several forms use visible labels without `htmlFor`/`id` association; see `07-accessibility-audit.md`.
+No forms library. Forms are hand-rolled with the locked `input`,
+`textarea`, `select` styles in `globals.css` (lines 138-156).
 
-## Testing Tools
+## Build & validation scripts
 
-Configured tools:
-
-- Vitest
-- jsdom
-- React Testing Library
-- TypeScript build mode via `tsc -b --noEmit`
-
-No Playwright, axe, browser screenshot, or visual regression tooling is configured in `frontend/package.json`.
-
-## Build Scripts
-
-Root scripts:
+`frontend/package.json`:
 
 | Script | Command |
 |---|---|
-| `dev` | `pnpm --filter @radiopad/frontend dev` |
-| `build` | `pnpm --filter @radiopad/frontend build` |
-| `lint` | `pnpm --filter @radiopad/frontend lint` |
-| `typecheck` | `pnpm --filter @radiopad/frontend typecheck` |
-| `test` | `pnpm --filter @radiopad/frontend test` |
+| `pnpm dev` | `next dev -p 3000` |
+| `pnpm build` | `next build` |
+| `pnpm start` | `next start` |
+| `pnpm lint` | `next lint` |
+| `pnpm typecheck` | `tsc -b --noEmit` |
+| `pnpm test` | `vitest run` |
 
-Frontend scripts:
+## Environment
 
-| Script | Command |
-|---|---|
-| `dev` | `next dev -p 3000` |
-| `build` | `next build` |
-| `start` | `next start` |
-| `lint` | `next lint` |
-| `typecheck` | `tsc -b --noEmit` |
-| `test` | `vitest run` |
+- Backend expected at `http://127.0.0.1:7457` (proxied via
+  `next.config.ts#rewrites` during `next dev`; static export uses
+  `NEXT_PUBLIC_API_BASE`).
+- No `.env.example` shipped in `frontend/`; the only env var the static
+  bundle reads is `NEXT_PUBLIC_API_BASE`.
 
-## Run Instructions
-
-Expected local frontend run path:
+## Run instructions (this audit)
 
 ```powershell
-pnpm --filter @radiopad/frontend dev
+cd frontend
+pnpm install   # 304 packages added; benign "ignored build scripts" warning
+.\node_modules\.bin\tsc -b --noEmit  # passes clean
 ```
 
-Expected backend for API-backed UI:
-
-```powershell
-dotnet run --project backend\RadioPad.Api\src\RadioPad.Api
-```
-
-Desktop shell uses `desktop/src-tauri/tauri.conf.json` with `beforeDevCommand: pnpm --filter @radiopad/frontend dev`.
-
-Mobile shell uses `mobile/capacitor.config.ts` with `webDir: ../frontend/out`.
+See `02-run-and-validation-log.md` for full output.
 
 ## Blockers
 
-Rendered browser inspection and screenshots were not available in this CLI environment. Existing pnpm script attempts were blocked before script execution by pnpm's ignored-builds policy:
-
-```text
-[ERR_PNPM_IGNORED_BUILDS] Ignored build scripts: esbuild@0.21.5, sharp@0.34.5
-Run "pnpm approve-builds" to pick which dependencies should be allowed to run scripts.
-```
-
-The audit therefore combines source-level review, configuration review, route/component discovery, and evidence-backed risk assessment. Screenshot evidence could not be captured.
+- **None** for static evidence. Every page file was readable.
+- `pnpm typecheck` and `pnpm build` (run from the workspace root) fail
+  because `pnpm` runs an automatic `runDepsStatusCheck` that re-installs and
+  exits non-zero on the `ERR_PNPM_IGNORED_BUILDS` warning. Calling the
+  underlying `tsc` / `next build` binaries directly works. This is a
+  workspace-config issue, not a code defect (filed as finding
+  `UIUX-STR-???` for triage).
+- No live screenshots were captured: the static-export bundle requires a
+  running ASP.NET backend for `api.me()`, `api.reports()`, etc. — every
+  page is data-driven and would render its `ErrorState` or hang on
+  `Skeleton` without it. Screenshot capture is deferred to a follow-up
+  iteration; see `11-screenshot-index.md`.

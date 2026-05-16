@@ -1,75 +1,308 @@
-**Status:** Audit deliverable  **Owner:** UI/UX Audit  **Last Updated:** 2026-05-17
+# 05 — Page-by-Page Audit
 
-# Page-by-Page Audit
+**Scope:** All 37 `page.tsx` files under `frontend/app/`. Each row is
+evaluated against the locked Open Design system (`docs/02-design/design.md`,
+`frontend/app/globals.css`, `frontend/app/shell.css`).
 
-## Coverage Summary
+> Page numbering matches `03-route-inventory.md`. Detail client components
+> (`reports/[id]/ReportClient.tsx`, `rulebooks/[id]/RulebookDetailClient.tsx`,
+> `admin/providers/[id]/ProviderOAuthAdminClient.tsx`) are audited together
+> with the page that imports them.
 
-This was a source-level page audit. Rendered browser screenshots were blocked; see `02-run-and-validation-log.md` and `11-screenshot-index.md`.
+## Methodology
 
-| Route | Page Purpose | Main Audit Notes | Audit Status |
-|---|---|---|---|
-| `/` | Reports dashboard | Good use of canonical state primitives; mobile table/filter overflow risk. | Audited |
-| `/login` | Sign-in/dev identity | Wrapped in full app shell; developer-oriented copy. | Audited |
-| `/pair` | Device pairing | Pair code overflow risk; copy references route not found. | Audited |
-| `/reports` | Legacy report list | Duplicates dashboard concept; raw table and missing states. | Audited |
-| `/reports/view` | Report editor | Dense clinical toolbar, tablet collapse, modal/popover/a11y issues. | Audited |
-| `/validation` | Validation center | Table overflow and technical design copy. | Audited |
-| `/audit` | Audit log | Dense table, plain empty row, no search/filter. | Audited |
-| `/audit/verify` | Audit verifier | Hash table overflow risk. | Audited |
-| `/analytics` | Analytics dashboard | Active states may not style; copy uses implementation language. | Audited |
-| `/analytics/quality` | Quality dashboard | Uses undefined/generic `panel` class. | Audited |
-| `/rulebooks` | Rulebook library | Inline grid columns can defeat mobile stacking. | Audited |
-| `/rulebooks/view` | Rulebook detail | Rollback toolbar may wrap poorly. | Audited |
-| `/rulebooks/editor` | Rulebook editor | Fixed split layout likely overflows mobile/tablet widths. | Audited |
-| `/templates` | Template admin | Table and modal form rows need responsive/accessibility work. | Audited |
-| `/prompts` | Prompt Studio | Uses generic pane/panel classes and browser prompt. | Audited |
-| `/marketplace` | Marketplace | Tab semantics and form grouping need improvement. | Audited |
-| `/terminology` | Terminology browser | Result rows likely cramped on phones. | Audited |
-| `/providers` | Provider admin | Eight-column table and modal ergonomics risks. | Audited |
-| `/offline` | Offline drafts | Draft rows and discard flow need mobile/confirmation work. | Audited |
-| `/copilot` | Copilot user page | API-driven user page; included in route/component coverage. | Audited |
-| `/governance` | Legacy governance | Duplicate governance surface with admin route. | Audited |
-| `/mobile/dictate` | Mobile dictation | Permission fallback and command banner state need polish. | Audited |
-| `/mobile/reports/edit` | Mobile report edit | Final action row crowding risk. | Audited |
-| `/mobile/reports/sign` | Mobile sign/export | CTA row and post-export next steps need work. | Audited |
-| `/admin/*` | Admin surfaces | Several dense tables, orphaned routes, role-gating inconsistencies. | Audited |
+For every page we checked five criteria:
 
-## Page Visual Findings
+1. **Chrome** — does the page render its content inside `<Container>` +
+   `<PageHeader>`? `<AppShell>` is supplied universally by `app/layout.tsx`,
+   so the question is only about the canonical page chrome wrappers.
+2. **States** — Skeleton / EmptyState / ErrorState used where data is
+   fetched? Loading and empty states are required by the design lock.
+3. **Inline styles** — how many `style={{ … }}` attributes (forbidden by
+   the design lock; design tokens or named classes must be used instead).
+4. **Browser dialogs** — any `window.confirm()`, `window.prompt()`, or
+   `window.alert()`? All three are anti-patterns.
+5. **Discoverability** — is the page linked from the sidebar
+   (`nav.config.tsx`) or only reachable by direct URL / in-page link?
 
-| Issue ID | Route | Viewport | Component/Area | Severity | Category | Problem | Recommendation |
-|---|---|---:|---|---|---|---|---|
-| UI-001 | `/login` | All | App shell | HIGH | NAVIGATION | Login renders inside sidebar/topbar shell before authentication. | Add route group/layout exception or reduced auth shell. |
-| UI-002 | `/reports` | 320-768 | Reports table | HIGH | RESPONSIVE | Raw table has no loading/error/empty primitives and likely overflows phones. | Use dashboard pattern or responsive table wrapper/cards. |
-| UI-003 | `/` | 320-430 | Filters/table | MEDIUM | RESPONSIVE | Search `minWidth:280` and six-column table compress at phone widths. | Make filters full-width and provide mobile report cards or table scroll. |
-| UI-004 | `/reports/view` | 768-1024 | Three-pane editor | HIGH | LAYOUT | Clinical workflow collapses to one long column below 1100px. | Add tablet two-column/sticky validation/action rail. |
-| UI-005 | `/reports/view` | All | Toolbar/CTAs | HIGH | BUTTONS | Too many equal-weight actions dilute primary clinical path. | Group draft/validate/export actions and reserve one primary next step. |
-| UI-006 | `/reports/view` | All | Rewrite popover | MEDIUM | MODALS | Popover z-index can sit below sticky topbar. | Use managed overlay layer above topbar. |
-| UI-007 | `/reports/view` | 320-430 | Signatures list | MEDIUM | RESPONSIVE | Email/date flex rows can crowd on phones. | Stack rows with labels on mobile. |
-| UI-008 | `/validation` | 320-430 | Validation table | HIGH | RESPONSIVE | Five-column table has no overflow/card fallback. | Add responsive wrapper or cards. |
-| UI-009 | `/audit` | 320-430 | Audit table | HIGH | TABLES | Hash/detail log table is too dense for mobile. | Use responsive log cards and expandable details. |
-| UI-010 | `/audit/verify` | 320-430 | Hash verifier | MEDIUM | TABLES | Expected/computed hash table lacks responsive wrapper. | Wrap horizontally or stack comparisons. |
-| UI-011 | `/analytics/quality` | All | Panels | HIGH | DESIGN_SYSTEM | Uses `panel` class not defined in locked CSS. | Replace with `rp-panel`. |
-| UI-012 | `/analytics` | All | Date tabs/buttons | MEDIUM | DESIGN_SYSTEM | `ghost active` state has no matching CSS rule found. | Use `.rp-tabs` or add documented active style. |
-| UI-013 | `/rulebooks` | 320-430 | Split grid | HIGH | RESPONSIVE | Inline grid columns can override mobile stacking. | Move to responsive class. |
-| UI-014 | `/rulebooks/editor` | 320-768 | `.split` editor | HIGH | RESPONSIVE | Fixed `minmax(380px,460px) 1fr` split lacks media query. | Add responsive stacking. |
-| UI-015 | `/rulebooks/editor` | All | Nested scroll panes | MEDIUM | INTERACTION | Multiple viewport-height scroll regions can hide context/actions. | Add sticky actions or simplify scroll containment. |
-| UI-016 | `/rulebooks/view` | 320-430 | Rollback controls | MEDIUM | SPACING | `marginLeft:auto` toolbar item can detach when wrapped. | Use separate responsive toolbar row. |
-| UI-017 | `/templates` | 320-430 | Template table | HIGH | RESPONSIVE | Six-column table plus action buttons has no mobile pattern. | Add responsive wrapper/cards/action menu. |
-| UI-018 | `/templates` | 320-430 | Modal section rows | HIGH | FORMS | Fixed 140/180px fields in one row likely overflow phones. | Stack fields or use responsive grid. |
-| UI-019 | `/prompts` | All | Prompt Studio shell | HIGH | DESIGN_SYSTEM | Uses `pane`, `panel`, and `panel-header` rather than canonical page shell/panels. | Rebuild with `Container`, `PageHeader`, and `rp-panel`. |
-| UI-020 | `/prompts` | 320-430 | Split/tables | HIGH | RESPONSIVE | Golden-case tables need mobile overflow. | Wrap tables and keep stacked layout. |
-| UI-021 | `/marketplace` | All | Tabs | MEDIUM | ACCESSIBILITY | Buttons behave like tabs without tab semantics. | Use ARIA tabs and `.rp-tabs`. |
-| UI-022 | `/marketplace` | 320-430 | Submit form | MEDIUM | FORMS | Form labels sit in list structure, not field pattern. | Use `.section-block`/field grouping. |
-| UI-023 | `/terminology` | 320-430 | Result rows | MEDIUM | RESPONSIVE | Three-column flex rows likely cramped. | Stack Code/Term/Synonyms on mobile. |
-| UI-024 | `/providers` | 320-768 | Provider table | HIGH | RESPONSIVE | Eight-column table with badges/buttons has no mobile wrapper. | Responsive table/cards. |
-| UI-025 | `/providers` | 320-430 | Provider modal | MEDIUM | MODALS | Backdrop padding leaves cramped modal width on phones. | Use mobile sheet/full-height dialog. |
-| UI-026 | `/admin/security` | 320-768 | Security tables | HIGH | TABLES | Multi-column tables with JSON details can overflow. | Add overflow wrapper and expandable JSON. |
-| UI-027 | `/admin/billing` | 320-430 | Usage/invoice rows | MEDIUM | RESPONSIVE | Flex pseudo-table rows compress numeric columns. | Stack as mobile cards. |
-| UI-028 | `/admin/mcp` | All | Success banner | MEDIUM | COLOR | `.banner.ok` references undefined `--green-soft`. | Use `--green-border`. |
-| UI-029 | `/mobile/dictate` | 320-430 | Command banner | MEDIUM | COLOR | Same `.banner.ok` token problem. | Use fixed success token. |
-| UI-030 | `/mobile/reports/edit` | 320-430 | Bottom actions | MEDIUM | BUTTONS | Action row can crowd at phone width. | Stack full-width buttons or sticky primary action. |
-| UI-031 | `/mobile/reports/sign` | 320-430 | Format/export row | MEDIUM | BUTTONS | Select and long CTA share one row. | Stack select and primary button. |
-| UI-032 | `/offline` | 320-430 | Draft rows | MEDIUM | RESPONSIVE | Metadata/actions can crowd in flex rows. | Stack metadata and actions. |
-| UI-033 | `/pair` | 320 | Pair code | MEDIUM | TYPOGRAPHY | 32px monospace code with wide letter spacing can overflow. | Reduce/wrap code at <=360px. |
-| UI-034 | Links as buttons | All | Anchor CTAs | HIGH | DESIGN_SYSTEM | CSS targets `button.primary-ghost`; anchors may render as plain links. | Add documented anchor button classes or `ButtonLink`. |
-| UI-035 | Tables app-wide | 320-768 | `.rp-table` | HIGH | RESPONSIVE | Shared table has no built-in responsive behavior. | Introduce canonical `ResponsiveTable`/`TableFrame`. |
+Findings use the ID prefix `UIUX-PAGE-<route-slug>-NNN` and resolve in
+`ui-ux-findings.json`.
+
+## Summary table
+
+Legend: **Chrome** = `<Container>` + `<PageHeader>`. **States** = at least
+one of Skeleton/Empty/Error. **Inline** = count of `style={{` occurrences
+in the page file (excluding imported client components). **Dialog** =
+`window.confirm/prompt/alert` usage. **Discov** = sidebar-linked.
+
+| # | Route | Chrome | States | Inline | Dialog | Discov | Severity | Key findings |
+|--:|---|:--:|:--:|--:|:--:|:--:|---|---|
+| 1 | `/` | ✅ | ✅ | 4 | — | ✅ | Medium | Inline styles in cards (`UIUX-PAGE-HOME-001`); no `<PageHeader>` on `/reports` so `/` is the only chrome reference. |
+| 2 | `/login` | ❌ | N/A | 1 | — | ❌ | High | Hand-rolled centered layout; wordy token explanation; no PageHeader. |
+| 3 | `/offline` | ❌ | partial | 6 | — | ✅ | High | Heavy inline styles; no ErrorState fallback. |
+| 4 | `/copilot` | ❌ | ❌ | 0 | — | ❌ | High | No chrome, no IA entry, no data-state components. |
+| 5 | `/pair` | ❌ | ❌ | 0 | — | ❌ | High | Pairing flow shown bare without PageHeader; OAuth-like state changes silent. |
+| 6 | `/marketplace` | ❌ | partial | 1 | — | ✅ | High | List page, no Skeleton, no EmptyState. |
+| 7 | `/governance` | ❌ | ❌ | 6 | — | ❌ | High | Multiple inline-style violations; route name collision with `/admin/governance` causes IA confusion. |
+| 8 | `/prompts` | ❌ | partial | 0 | ✅ `prompt()` | ✅ | Critical | Uses `window.prompt()` for create flow. Tab-style pattern duplicates `/terminology`. |
+| 9 | `/providers` | ✅ | partial | 12 | — | ✅ | High | Container/PageHeader present but 12 inline styles inside list. |
+| 10 | `/terminology` | ❌ | partial | 0 | — | ✅ | Medium | Tab pattern inconsistent with `/prompts`; no canonical `<Tabs>` primitive. |
+| 11 | `/templates` | ✅ | partial | 20 | — | ✅ | High | Heaviest inline-style offender (`UIUX-PAGE-TEMPLATES-001..020`). |
+| 12 | `/validation` | ✅ | ✅ | 8 | — | ✅ | High | Chrome OK; inline styles in finding rows. |
+| 13 | `/reports` | ❌ | partial | 0 | — | indirect | Medium | Duplicates `/` semantically; uses `<div>Loading…</div>` instead of `<Skeleton/>`. |
+| 14 | `/reports/view` | ❌ | partial | 9 | ✅ `confirm()` | ❌ | Critical | `ReportClient.tsx` uses `confirm()` for sign action; deep view with no PageHeader. |
+| 15 | `/rulebooks` | ✅ | partial | 10 | — | ✅ | High | Chrome OK; 10 inline styles in list. |
+| 16 | `/rulebooks/view` | ❌ | partial | 15 | — | ❌ | High | `RulebookDetailClient.tsx` 15 inline styles. |
+| 17 | `/rulebooks/editor` | ❌ | partial | 5 (+34 across panels) | — | ❌ | High | Editor split panels (`MetadataPanel`, `RulesPanel`, etc.) all use inline styles. |
+| 18 | `/audit` | ❌ | partial | 4 | — | ✅ | High | Table without `<caption>` / `<th scope>`; no Skeleton. |
+| 19 | `/audit/verify` | ❌ | ❌ | 3 | — | ❌ | High | Verifier page with no chrome, no IA entry, no Skeleton. |
+| 20 | `/analytics` | ❌ | partial | 8 | — | ✅ | High | Charts use inline width/height styles; no `<Skeleton/>`. |
+| 21 | `/analytics/quality` | ❌ | partial | 22 | — | ❌ | High | Heaviest analytics page (`UIUX-PAGE-QUALITY-001..022`); IA gap. |
+| 22 | `/mobile/dictate` | ❌ | ❌ | 0 | — | ❌ | High | No mobile-tailored chrome; DictateButton hard-coded `lang='en-US'`. |
+| 23 | `/mobile/reports/edit` | ❌ | partial | 0 | — | ❌ | High | No PageHeader; mobile breakpoint chrome unverified. |
+| 24 | `/mobile/reports/sign` | ❌ | partial | 0 | — | ❌ | Critical | Signing is irreversible — no `<ConfirmDialog>`; no audit trail surfaced. |
+| 25 | `/admin/billing` | ❌ | partial | 0 | — | ✅ | High | BillingStatusBanner inconsistency (status vs alert); long table without scope. |
+| 26 | `/admin/copilot` | ❌ | partial | 0 | — | ❌ | High | Admin page hidden from IA. |
+| 27 | `/admin/feature-flags` | ❌ | partial | 0 | — | ✅ | Medium | Toggles without optimistic UI; success silent. |
+| 28 | `/admin/fhir-import` | ❌ | partial | 0 | — | ✅ | High | File upload without progress affordance; error states ad-hoc. |
+| 29 | `/admin/governance` | ❌ | partial | 0 | — | ✅ | High | Confusion with `/governance` route. |
+| 30 | `/admin/mcp` | ❌ | partial | 7 | ✅ `confirm()`+`prompt()` | ❌ | Critical | Browser dialogs for connector add/remove; 7 inline styles. |
+| 31 | `/admin/model-eval` | ❌ | partial | 0 | — | ✅ | High | Long-running job UX uses polling-on-mount with no Skeleton. |
+| 32 | `/admin/pacs` | ❌ | partial | 0 | — | ✅ | High | Connectivity test result rendered inline without role="status". |
+| 33 | `/admin/providers/oauth` | ❌ | partial | 0 | — | ❌ | System | OAuth callback target — minimal chrome acceptable, but currently no success/error surface beyond raw banner. |
+| 34 | `/admin/security` | ❌ | partial | 4 | — | ✅ | High | Token rotation surfaces backend enum names (`rotationPolicy`, `before_expiry`). |
+| 35 | `/admin/settings` | ❌ | partial | 5 | — | ✅ | High | Tenant settings form lacks explicit labels on several inputs. |
+| 36 | `/admin/sso` | ❌ | partial | 0 | — | ❌ | Critical | Security-critical page invisible from IA (`UIUX-NAV-001`). |
+| 37 | `/admin/usage` | ❌ | partial | 0 | — | ✅ | High | Usage table without horizontal scroll wrapper for narrow viewports. |
+
+Totals:
+
+- Chrome (Container+PageHeader): **5 / 37** (page 1, 9, 11, 12, 15)
+- Browser dialogs: **5 routes** (#8, #14, #30 — and the in-page client
+  components for `ProviderOAuthAdminClient` reached via #33, plus
+  `ReportClient` used by #14)
+- Inline-style violations: **31 page files** totaling ~187 occurrences
+- Sidebar-linked: **20 / 37** (54%)
+
+## Per-page records
+
+### Public surfaces
+
+#### `/login` — `frontend/app/login/page.tsx`
+- **What it does**: collects email, requests a magic-link token, then exchanges it for a session.
+- **Gaps**:
+  - `UIUX-PAGE-LOGIN-001` (High) No `<PageHeader>`; layout hand-rolled.
+  - `UIUX-PAGE-LOGIN-002` (Medium) Wordy technical explanation of token mechanics — see `10-copy-microcopy-audit.md`.
+  - `UIUX-PAGE-LOGIN-003` (Medium) `?return=` query param not consistently honoured.
+  - `UIUX-PAGE-LOGIN-004` (Low) Brand mark falls back to `?` when email is empty.
+- **Severity**: High (entry surface — chrome inconsistency sets a bad tone).
+
+#### `/offline` — `frontend/app/offline/page.tsx`
+- **What it does**: shows offline draft queue with retry actions.
+- **Gaps**: missing chrome, 6 inline styles, no ErrorState when API is unreachable (ironic, since this *is* the offline surface).
+- **Severity**: High.
+
+#### `/marketplace` — `frontend/app/marketplace/page.tsx`
+- Public-facing list page. No `<Skeleton/>` while loading rulebooks/templates; no `<EmptyState/>` when zero items.
+- **Severity**: High.
+
+#### `/governance` — `frontend/app/governance/page.tsx`
+- 6 inline styles; route name collides with `/admin/governance` (one is read-only public summary, the other is the admin panel) — see `UIUX-NAV-002` in `08-interaction-flow-audit.md`.
+- **Severity**: High.
+
+### Workspace surfaces
+
+#### `/` and `/reports` — `frontend/app/page.tsx`, `frontend/app/reports/page.tsx`
+- `/` is the canonical reports list, properly wrapped in `<Container>` + `<PageHeader>`; uses 4 inline styles in card rendering.
+- `/reports` exists as a duplicate landing — it does **not** use `<PageHeader>` and renders `<div>Loading…</div>` for its loading state instead of `<Skeleton/>`.
+- **Recommendation**: either delete `/reports` or make it the canonical and remove `/`. Pick one source of truth.
+- **Severity**: Medium (functional but confusing).
+
+#### `/reports/view` — `frontend/app/reports/view/page.tsx`
+- Imports `reports/[id]/ReportClient.tsx` (a non-routable client component) and passes `?id=`.
+- `ReportClient.tsx` uses `window.confirm()` for the sign action (`UIUX-DEST-001`) and contains 9 inline styles across the report shell and side panels (`PriorComparePanel.tsx`, `RewriteStylePanel.tsx`).
+- **Severity**: Critical — signing is an irreversible action and must use a designed `<ConfirmDialog>`.
+
+#### `/validation` — `frontend/app/validation/page.tsx`
+- Chrome OK; uses `<Skeleton/>`. Findings list uses 8 inline styles to colour the severity strip — should be replaced with semantic `.finding--blocker/.warning/.info` modifiers.
+- **Severity**: High.
+
+#### `/audit` — `frontend/app/audit/page.tsx`
+- Workspace-level audit log. Table is missing `<caption>` and `<th scope="col">`. No `<Skeleton/>` placeholder.
+- **Severity**: High (a11y).
+
+#### `/audit/verify` — `frontend/app/audit/verify/page.tsx`
+- Hash-chain verifier surfaced as a developer page. Not in the sidebar, no chrome, raw textarea output.
+- **Severity**: High (IA gap and lack of polish for a compliance-relevant page).
+
+#### `/analytics` and `/analytics/quality`
+- Charts rendered with inline width/height styles (8 and 22 inline-style violations respectively).
+- `/analytics/quality` is the single heaviest offender in the codebase; also hidden from the sidebar.
+- **Severity**: High.
+
+### Library surfaces
+
+#### `/rulebooks`, `/rulebooks/view`, `/rulebooks/editor`
+- `/rulebooks` has `<Container>` + `<PageHeader>` but 10 inline styles.
+- `/rulebooks/view` imports `RulebookDetailClient.tsx` (15 inline styles).
+- `/rulebooks/editor` imports six side panels (`MetadataPanel`, `SectionsPanel`, `RulesPanel`, `PromptBlocksPanel`, `StylePanel`, plus the orchestrating client) — collectively the editor is the single largest cluster of inline styles in the app.
+- **Severity**: High across the family; the editor needs a focused refactor pass with token-driven panel chrome.
+
+#### `/templates` — `frontend/app/templates/page.tsx`
+- Chrome OK, but 20 inline styles in the list/preview pane (`UIUX-PAGE-TEMPLATES-001..020`).
+- **Severity**: High.
+
+#### `/prompts` — `frontend/app/prompts/page.tsx`
+- Uses `window.prompt()` for "New prompt name" creation flow.
+- Tab pattern hand-rolled, inconsistent with the (different) hand-rolled tabs in `/terminology`.
+- **Severity**: Critical (browser dialog) / High (tab pattern).
+
+#### `/terminology` — `frontend/app/terminology/page.tsx`
+- Hand-rolled tab pattern; no shared `<Tabs>` primitive.
+- **Severity**: Medium.
+
+#### `/providers` — `frontend/app/providers/page.tsx`
+- Chrome OK; 12 inline styles in card grid.
+- **Severity**: High.
+
+### Mobile surfaces
+
+#### `/mobile/dictate`
+- Renders `<DictateButton/>` which hard-codes `lang='en-US'` — bypasses locale negotiation.
+- No mobile-specific chrome; relies on default sidebar drawer.
+- **Severity**: High (clinical correctness depends on language).
+
+#### `/mobile/reports/edit`
+- Mobile edit surface. No `<PageHeader>`; the mobile drawer breakpoint is not aligned with the PageHeader stacking breakpoint.
+- **Severity**: High.
+
+#### `/mobile/reports/sign`
+- **Signing is irreversible.** Currently lacks a designed confirmation step (no `<ConfirmDialog>`). The signing surface itself is minimal and offers no inline audit trail.
+- **Severity**: Critical.
+
+### Admin surfaces
+
+#### `/admin/billing` — `frontend/app/admin/billing/page.tsx`
+- Uses `BillingStatusBanner.tsx` which inconsistently sets `role='alert'` (suspended) vs `role='status'` (grace) — see `07-accessibility-audit.md` finding `UIUX-A11Y-006`.
+- Plan/invoice table has no `<caption>` or `<th scope>`.
+- **Severity**: High.
+
+#### `/admin/copilot`
+- Admin page not linked from the sidebar despite being a core admin surface.
+- **Severity**: High.
+
+#### `/admin/feature-flags`
+- Toggles fire and forget; no optimistic UI; success state is silent.
+- **Severity**: Medium.
+
+#### `/admin/fhir-import`
+- File upload pattern without progress bar or designed upload affordance. Errors surface as raw JSON snippets.
+- **Severity**: High.
+
+#### `/admin/governance` vs `/governance`
+- Two routes, similar names, different audiences. **IA collision** — see `08-interaction-flow-audit.md`.
+- **Severity**: High.
+
+#### `/admin/mcp` — `frontend/app/admin/mcp/page.tsx`
+- Uses **both** `window.confirm()` (for connector removal) and `window.prompt()` (for connector configuration). 7 inline styles.
+- Not in the sidebar.
+- **Severity**: Critical.
+
+#### `/admin/model-eval`
+- Long-running evaluation jobs surfaced via polling. No `<Skeleton/>`, no progress affordance, no cancel button.
+- **Severity**: High.
+
+#### `/admin/pacs`
+- DICOM/HL7 connectivity test results rendered inline without `role='status'` so screen-reader users miss success/failure announcements.
+- **Severity**: High.
+
+#### `/admin/providers/oauth` and `ProviderOAuthAdminClient.tsx`
+- OAuth callback target. The non-routable client component used by `/providers/[id]` uses `window.confirm()` for credential rotation. 5 inline styles in the OAuth admin panel.
+- **Severity**: Critical (security operation behind a browser dialog).
+
+#### `/admin/security` — `frontend/app/admin/security/page.tsx`
+- Surfaces backend enum names directly (e.g., `rotationPolicy`, `before_expiry`, `ProviderComplianceClass`). 4 inline styles.
+- See `10-copy-microcopy-audit.md` `UIUX-COPY-JARGON-*`.
+- **Severity**: High.
+
+#### `/admin/settings`
+- Tenant settings form — several inputs lack explicit `<label htmlFor>` associations (date inputs especially).
+- **Severity**: High (a11y).
+
+#### `/admin/sso` — `frontend/app/admin/sso/page.tsx`
+- **Security-critical configuration page is invisible from the sidebar.** Reachable only by typing the URL.
+- **Severity**: Critical (IA + discoverability gap on a compliance surface).
+
+#### `/admin/usage`
+- Long usage table without horizontal scroll wrapper for narrow viewports.
+- **Severity**: High.
+
+## Cross-cutting patterns
+
+### (a) Missing chrome wrappers
+
+Only **5 of 37 pages** (14%) use both `<Container>` and `<PageHeader>`.
+The other 32 hand-roll wrappers — sometimes a bare `<div>`, sometimes
+`<main className="rp-container">` inlined, sometimes nothing at all.
+This is the single largest design-lock violation in the app and the
+root cause of most spacing, alignment, and breakpoint inconsistencies
+flagged in `06-responsive-audit.md`. Recommended remediation is in
+**Phase 1** of `ui-ux-fix-backlog.md`.
+
+### (b) Ad-hoc data-state handling
+
+`<Skeleton/>`, `<EmptyState/>`, and `<ErrorState onRetry/>` primitives
+exist (`frontend/components/ui/`), but only the same 5 pages with proper
+chrome also use them. Many pages render `<div>Loading…</div>` or simply
+nothing while data is in flight, and zero-row states are blank panels
+instead of designed empty states. Empty-state copy is also missing from
+the design system (`10-copy-microcopy-audit.md`).
+
+### (c) Inline styles (design-lock violation)
+
+31 page files contain `style={{ … }}` attributes — totalling ~187
+occurrences. Worst offenders:
+
+| Page | `style={{` count |
+|---|--:|
+| `app/analytics/quality/page.tsx` | 22 |
+| `app/templates/page.tsx` | 20 |
+| `app/rulebooks/[id]/RulebookDetailClient.tsx` | 15 |
+| `app/providers/page.tsx` | 12 |
+| `app/rulebooks/page.tsx` | 10 |
+| `app/reports/[id]/ReportClient.tsx` | 9 |
+| `app/validation/page.tsx` | 8 |
+| `app/analytics/page.tsx` | 8 |
+| `app/admin/mcp/page.tsx` | 7 |
+| `app/governance/page.tsx` | 6 |
+| `app/offline/page.tsx` | 6 |
+
+The design lock requires named classes + tokens. Recommended fix:
+introduce an ESLint rule (`react/forbid-dom-props` for `style`) and a
+small "what to use instead" guide in `docs/02-design/design.md`.
+
+### (d) Browser dialogs
+
+`window.confirm()` and `window.prompt()` appear in five places:
+
+| File | Calls | Action |
+|---|---|---|
+| `app/admin/mcp/page.tsx` | `confirm`, `prompt` | add/remove MCP connector |
+| `app/admin/validation-packs/page.tsx` | `confirm`, `prompt` | install / delete validation pack |
+| `app/admin/providers/[id]/ProviderOAuthAdminClient.tsx` | `confirm` | rotate provider credentials |
+| `app/prompts/page.tsx` | `prompt` | name new prompt |
+| `app/reports/[id]/ReportClient.tsx` | `confirm` | sign report |
+
+All five are **destructive or security-relevant** actions and the
+browser dialogs are inconsistent with the design system, are not
+themable, are difficult for screen readers, and steal focus from the
+page. A shared `<ConfirmDialog>` (and a `<Prompt>` for naming actions)
+must land in **Phase 3** of `ui-ux-fix-backlog.md`.
+
+### (e) Missing primitives drive most other gaps
+
+A great many of the per-page findings collapse into "we don't have a
+component for that yet". The library is missing: `<Modal>`, `<Tabs>`,
+`<Toast>`, `<ConfirmDialog>`, `<FormField>`. See
+`04-component-inventory.md` for the gap analysis and
+`09-frontend-structure-audit.md` for the proposed primitive set.
