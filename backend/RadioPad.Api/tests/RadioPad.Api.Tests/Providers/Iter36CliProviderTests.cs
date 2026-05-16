@@ -165,7 +165,10 @@ public class Iter36CliProviderTests
         Assert.Equal("codex says hi", r.Text);
         var spec = stub.Captured[0];
         Assert.Equal("codex", spec.FileName);
-        Assert.Contains("--stdin", spec.Arguments);
+        // codex CLI uses --quiet + --full-auto for headless execution;
+        // --stdin is not a published flag — prompt is piped via StandardInput.
+        Assert.Contains("--quiet", spec.Arguments);
+        Assert.Contains("--full-auto", spec.Arguments);
         Assert.Contains("summarise this CT chest", spec.StandardInput!);
     }
 
