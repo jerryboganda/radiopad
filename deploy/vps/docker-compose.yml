@@ -1,0 +1,38 @@
+services:
+  radiopad-api:
+    build:
+      context: ../..
+      dockerfile: deploy/vps/api.Dockerfile
+    container_name: radiopad-api
+    restart: unless-stopped
+    env_file:
+      - ../../.secrets.env
+    environment:
+      ASPNETCORE_ENVIRONMENT: Production
+      RADIOPAD_BIND: http://0.0.0.0:7457
+      # SQLite database — change to a Postgres connection string for production scale
+      ConnectionStrings__RadioPad: Data Source=/data/radiopad.db
+      RADIOPAD_COLUMN_KEY_REF: env:RADIOPAD_COLUMN_KEK
+      RADIOPAD_RATE_LIMIT_IP_PER_MIN: "600"
+      RADIOPAD_RATE_LIMIT_TENANT_PER_MIN: "5000"
+    volumes:
+      - ../../data:/data
+    networks:
+      - radiopad
+
+  radiopad-web:
+    build:
+      context: ../..
+      dockerfile: deploy/vps/web.Dockerfile
+    container_name: radiopad-web
+    restart: unless-stopped
+    depends_on:
+      - radiopad-api
+    ports:
+      - "8093:80"
+    networks:
+      - radiopad
+
+networks:
+  radiopad:
+    name: radiopad_network
