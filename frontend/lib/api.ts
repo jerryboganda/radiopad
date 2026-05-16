@@ -197,6 +197,136 @@ export type Provider = {
   retentionLabel?: string;
 };
 
+export type CopilotSettings = {
+  enabled: boolean;
+  emergencyDisabled: boolean;
+  defaultMode: string;
+  allowedModes: string[];
+  gitHubEnterpriseSlug: string;
+  gitHubOrganization: string;
+  gitHubHost: string;
+  sdkRuntimeEnabled: boolean;
+  cliRuntimeEnabled: boolean;
+  allowByoAccounts: boolean;
+  allowEnvironmentTokenAuth: boolean;
+  requireOsKeychainForCli: boolean;
+  promptLoggingEnabled: boolean;
+  contextLoggingEnabled: boolean;
+  retentionPolicy: string;
+  policyJson: string;
+  gitHubAppId: string;
+  gitHubAppInstallationId: string;
+  oAuthClientId: string;
+  gitHubAppPrivateKeyConfigured: boolean;
+  oAuthClientSecretConfigured: boolean;
+  gitHubAppPrivateKeySecretRef?: string | null;
+  oAuthClientSecretRef?: string | null;
+};
+
+export type CopilotStatus = {
+  enabled: boolean;
+  emergencyDisabled: boolean;
+  defaultMode: string;
+  runtimeStatus: string;
+  kind: string;
+  message: string;
+  allowedModes: string[];
+  phiBlocked: boolean;
+  promptLoggingEnabled: boolean;
+  contextLoggingEnabled: boolean;
+  gitHubHost: string;
+  gitHubOrganization: string;
+  unsupportedFeatures: string[];
+};
+
+export type CopilotAccount = {
+  mode: string;
+  gitHubLogin: string;
+  tokenStatus: string;
+  ssoStatus: string;
+  seatStatus: string;
+  denialReason: string;
+  lastAuthenticatedAt: string | null;
+  revokedAt: string | null;
+  entitlementAllowed: boolean;
+  entitlementSource: string;
+};
+
+export type CopilotChatError = {
+  kind: string;
+  message: string;
+  runtimeStatus: string;
+  requestId: string;
+};
+
+export type CopilotEntitlement = {
+  allowed: boolean;
+  mode: string;
+  source: string;
+  gitHubLogin: string;
+  ssoStatus: string;
+  seatStatus: string;
+  denialReason: string;
+  checkedAt: string;
+  expiresAt: string | null;
+};
+
+export type CopilotAuthStart = {
+  mode: string;
+  kind: string;
+  message: string;
+  authorizationUrl: string | null;
+  desktopCommand: string | null;
+  state: string;
+};
+
+export type CopilotContextItem = {
+  kind: string;
+  label: string;
+  text: string;
+};
+
+export type CopilotContextPreview = {
+  messageHash: string;
+  containsPhi: boolean;
+  included: CopilotContextItem[];
+  removed: { label: string; reason: string }[];
+  contextHash: string;
+};
+
+export type CopilotSession = {
+  sessionId: string;
+  status: string;
+  mode: string;
+  runtime: string;
+  message: string;
+  output: string | null;
+  errorKind: string | null;
+  context: CopilotContextPreview;
+  latencyMs: number;
+};
+
+export type CopilotQuotaPolicy = {
+  id?: string | null;
+  scopeType: string;
+  scopeKey: string;
+  feature: string;
+  windowSeconds: number;
+  maxRequests: number;
+  maxConcurrent: number;
+  enabled: boolean;
+};
+
+export type CopilotUsageSummary = {
+  total: number;
+  completed: number;
+  blocked: number;
+  failed: number;
+  cancelled: number;
+  running: number;
+  byStatus: { status: string; count: number }[];
+};
+
 export type ValidationFinding = {
   ruleId: string;
   severity: 'Info' | 'Warning' | 'Blocker';
@@ -603,6 +733,65 @@ export const api = {
         }),
       delete: (id: string) =>
         request<void>(`/api/providers/${id}/oauth/refresh-token`, { method: 'DELETE' }),
+    },
+  },
+  copilot: {
+    status: () => request<CopilotStatus>('/api/copilot/status'),
+    account: () => request<CopilotAccount>('/api/copilot/account'),
+    entitlement: () => request<CopilotEntitlement>('/api/copilot/entitlement'),
+    beginAuth: (body: { mode?: string | null; redirectUri?: string | null }) =>
+      request<CopilotAuthStart>('/api/copilot/account/auth/start', {
+        method: 'POST',
+        body: JSON.stringify(body),
+      }),
+    linkLocalCli: (body: { gitHubLogin?: string | null; gitHubUserId?: number | null; host?: string | null; ssoStatus?: string | null; seatStatus?: string | null }) =>
+      request<CopilotAccount>('/api/copilot/account/local-cli', {
+        method: 'POST',
+        body: JSON.stringify(body),
+      }),
+    revokeAccount: () => request<void>('/api/copilot/account', { method: 'DELETE' }),
+    previewContext: (body: { message?: string | null; contextKind?: string | null; items?: CopilotContextItem[] | null }) =>
+      request<CopilotContextPreview>('/api/copilot/context/preview', {
+        method: 'POST',
+        body: JSON.stringify(body),
+      }),
+    startSession: (body: { message?: string | null; mode?: string | null; contextKind?: string | null; context?: CopilotContextItem[] | null }) =>
+      request<CopilotSession>('/api/copilot/sessions', {
+        method: 'POST',
+        body: JSON.stringify(body),
+      }),
+    cancelSession: (sessionId: string) =>
+      request<CopilotSession>(`/api/copilot/sessions/${encodeURIComponent(sessionId)}/cancel`, { method: 'POST' }),
+    chat: (body: { message: string; sessionId?: string | null; mode?: string | null; contextKind?: string | null }) =>
+      request<CopilotSession | CopilotChatError>('/api/copilot/chat', {
+        method: 'POST',
+        body: JSON.stringify(body),
+      }),
+    admin: {
+      settings: () => request<CopilotSettings>('/api/copilot/admin/settings'),
+      saveSettings: (body: CopilotSettings) =>
+        request<CopilotSettings>('/api/copilot/admin/settings', {
+          method: 'POST',
+          body: JSON.stringify(body),
+        }),
+      status: () => request<CopilotStatus>('/api/copilot/admin/status'),
+      diagnostics: () =>
+        request<{ runId: string; status: CopilotStatus; results: unknown }>(
+          '/api/copilot/admin/diagnostics',
+          { method: 'POST' },
+        ),
+      toggleFeature: (featureKey: string, body: { featureKey: string; enabled: boolean; requiredRole?: string; policyJson?: string }) =>
+        request<{ featureKey: string; enabled: boolean; requiredRole: string; policyJson: string }>(
+          `/api/copilot/admin/features/${encodeURIComponent(featureKey)}`,
+          { method: 'POST', body: JSON.stringify(body) },
+        ),
+      quotas: () => request<CopilotQuotaPolicy[]>('/api/copilot/admin/quotas'),
+      saveQuotas: (body: CopilotQuotaPolicy[]) =>
+        request<CopilotQuotaPolicy[]>('/api/copilot/admin/quotas', {
+          method: 'POST',
+          body: JSON.stringify(body),
+        }),
+      usage: () => request<CopilotUsageSummary>('/api/copilot/admin/usage'),
     },
   },
   ai: {

@@ -12,6 +12,15 @@ public class RadioPadDbContext : DbContext
     public DbSet<Tenant> Tenants => Set<Tenant>();
     public DbSet<User> Users => Set<User>();
     public DbSet<ProviderConfig> Providers => Set<ProviderConfig>();
+    public DbSet<CopilotIntegrationSettings> CopilotIntegrationSettings => Set<CopilotIntegrationSettings>();
+    public DbSet<CopilotFeatureFlag> CopilotFeatureFlags => Set<CopilotFeatureFlag>();
+    public DbSet<CopilotUserAccount> CopilotUserAccounts => Set<CopilotUserAccount>();
+    public DbSet<CopilotEntitlement> CopilotEntitlements => Set<CopilotEntitlement>();
+    public DbSet<CopilotQuotaPolicy> CopilotQuotaPolicies => Set<CopilotQuotaPolicy>();
+    public DbSet<CopilotSession> CopilotSessions => Set<CopilotSession>();
+    public DbSet<CopilotMessage> CopilotMessages => Set<CopilotMessage>();
+    public DbSet<CopilotUsageEvent> CopilotUsageEvents => Set<CopilotUsageEvent>();
+    public DbSet<CopilotDiagnosticRun> CopilotDiagnosticRuns => Set<CopilotDiagnosticRun>();
     public DbSet<Rulebook> Rulebooks => Set<Rulebook>();
     public DbSet<ReportTemplate> Templates => Set<ReportTemplate>();
     public DbSet<Report> Reports => Set<Report>();
@@ -55,6 +64,17 @@ public class RadioPadDbContext : DbContext
         b.Entity<Rulebook>().HasIndex(x => new { x.TenantId, x.RulebookId, x.Version }).IsUnique();
         b.Entity<ReportTemplate>().HasIndex(x => new { x.TenantId, x.TemplateId }).IsUnique();
         b.Entity<ProviderConfig>().HasIndex(x => new { x.TenantId, x.Name }).IsUnique();
+        b.Entity<CopilotIntegrationSettings>().HasIndex(x => x.TenantId).IsUnique();
+        b.Entity<CopilotFeatureFlag>().HasIndex(x => new { x.TenantId, x.FeatureKey }).IsUnique();
+        b.Entity<CopilotUserAccount>().HasIndex(x => new { x.TenantId, x.UserId }).IsUnique();
+        b.Entity<CopilotEntitlement>().HasIndex(x => new { x.TenantId, x.UserId, x.Mode }).IsUnique();
+        b.Entity<CopilotQuotaPolicy>().HasIndex(x => new { x.TenantId, x.ScopeType, x.ScopeKey, x.Feature }).IsUnique();
+        b.Entity<CopilotSession>().HasIndex(x => new { x.TenantId, x.UserId, x.CreatedAt });
+        b.Entity<CopilotSession>().HasIndex(x => new { x.TenantId, x.Status, x.CreatedAt });
+        b.Entity<CopilotMessage>().HasIndex(x => new { x.TenantId, x.SessionId, x.Sequence }).IsUnique();
+        b.Entity<CopilotUsageEvent>().HasIndex(x => new { x.TenantId, x.CreatedAt });
+        b.Entity<CopilotUsageEvent>().HasIndex(x => new { x.TenantId, x.UserId, x.CreatedAt });
+        b.Entity<CopilotDiagnosticRun>().HasIndex(x => new { x.TenantId, x.CreatedAt });
         b.Entity<TenantLexicon>().HasIndex(x => new { x.TenantId, x.Term }).IsUnique();
         b.Entity<TenantSettings>().HasIndex(x => x.TenantId).IsUnique();
         b.Entity<StripeWebhookEvent>().HasIndex(e => new { e.Source, e.EventId }).IsUnique();
@@ -117,6 +137,9 @@ public class RadioPadDbContext : DbContext
         // hash columns store one-way digests; encryption-at-rest converter omitted to keep equality lookups working.
         b.Entity<TenantSettings>().Property(s => s.IngestBearerSecret).HasConversion(enc);
         b.Entity<TenantSettings>().Property(s => s.DicomWebBearerSecret).HasConversion(enc);
+        b.Entity<CopilotIntegrationSettings>().Property(s => s.GitHubAppPrivateKeySecretRef).HasConversion(enc);
+        b.Entity<CopilotIntegrationSettings>().Property(s => s.OAuthClientSecretRef).HasConversion(enc);
+        b.Entity<CopilotUserAccount>().Property(a => a.TokenSecretRef).HasConversion(enc);
 
         ConfigureSqliteDateTimeOffsetConverters(b);
     }

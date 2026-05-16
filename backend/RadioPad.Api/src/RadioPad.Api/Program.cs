@@ -87,6 +87,9 @@ builder.Services.AddSingleton<ReportValidator>();
 builder.Services.AddScoped<ReportingService>();
 // Iter-35 — versioned clinical validation packs.
 builder.Services.AddScoped<RadioPad.Api.Services.ValidationPackService>();
+// Enterprise Copilot broker foundation. Defaults fail closed; no SDK/CLI
+// runtime is invoked until an official backend-safe transport is enabled.
+builder.Services.AddScoped<RadioPad.Api.Services.CopilotService>();
 // PRD §18 — advanced analytics dashboard service.
 builder.Services.AddScoped<RadioPad.Application.Services.AnalyticsService>();
 builder.Services.AddSingleton<RadioPad.Application.Services.HallucinationDetector>();

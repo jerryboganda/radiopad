@@ -1,10 +1,28 @@
-**Status:** Active  **Owner:** Desktop  **Last Updated:** 2026-06-05
+**Status:** Active  **Owner:** Desktop  **Last Updated:** 2026-05-16
 
 # Desktop runbook
 
 The RadioPad desktop shell is a Tauri 2 app at `desktop/src-tauri/`. It bundles
 the Next.js static export from `frontend/out/` and spawns the ASP.NET Core
 backend (`radiopad-api`) as a sidecar.
+
+## Sidecar lifecycle
+
+The shell supervises `radiopad-api` in `desktop/src-tauri/src/sidecar_manager.rs`.
+Startup no longer panics when the sidecar is missing or fails to spawn. Instead,
+the shell emits `radiopad://backend-status` events:
+
+| State | Meaning | UI |
+| --- | --- | --- |
+| `starting` | Sidecar process is being launched. | Info banner |
+| `ready` | `/api/health/ready` returned 200. | Hidden |
+| `degraded` | Sidecar is running but readiness failed. | Warning banner |
+| `restarting` | Sidecar exited and the supervisor is backing off before restart. | Warning banner |
+| `failed` | Sidecar could not start or exceeded restart budget. | Danger banner |
+| `disabled` | `RADIOPAD_NO_SIDECAR=1` is set. | Hidden |
+
+The health check is intentionally low frequency (5 seconds) and uses a short
+timeout so the app remains near-idle when healthy.
 
 ## Per-install pairing
 
@@ -22,7 +40,7 @@ launches.
 | ID | Requirement | Status | Notes |
 | --- | --- | --- | --- |
 | DESK-001 | Windows + macOS desktop apps build green | OK (code) | `tauri.conf.json` declares `msi`, `dmg`, `deb`, `appimage`, `rpm` targets and the v1-compatible updater. Authenticode / Apple Developer signing is operator-supplied (out of scope for code verification). |
-| DESK-002 | Auto-start the local RadioPad daemon | OK | `main.rs::main` registers the `radiopad-api` sidecar via `app.shell().sidecar(...)`; gated by `RADIOPAD_NO_SIDECAR=1`. |
+| DESK-002 | Auto-start / manage the local RadioPad daemon | OK | `sidecar_manager.rs` supervises the `radiopad-api` sidecar, emits health events, avoids panic-on-missing-binary, and is gated by `RADIOPAD_NO_SIDECAR=1`. |
 | DESK-003 | Global hotkeys for the reporting workflow | OK | Six shortcuts registered (`Ctrl/Cmd+Shift+{R,N,I,W,D,C}`). Iter-36 closed the frontend gap: `ShellBridge.tsx` now translates every `radiopad://*` event into a navigation or a `radiopad:*` `CustomEvent` so feature pages can react. |
 | DESK-004 | Secure clipboard with timeout | OK | `secure_copy` Tauri command writes the value, then a `tokio::time::sleep` task clears the clipboard and emits `radiopad://clipboard-cleared`. Per-tenant `secureClipboard.clearOnBlur` toggles a focus-loss clear. |
 | DESK-005 | Local encrypted cache | OK | `local_cache.rs` — AES-256-GCM, key from the OS keyring (`crypto_keyring.rs`), per-scope file in the app data dir, lazy TTL eviction. |
@@ -48,6 +66,7 @@ launches.
 ## Files of interest
 
 - `desktop/src-tauri/src/main.rs` — bootstrap, sidecar, hotkeys, secure clipboard.
+- `desktop/src-tauri/src/{sidecar_manager,backend_health}.rs` — backend sidecar supervision and readiness checks.
 - `desktop/src-tauri/src/{offline_drafts,local_cache,crypto_keyring}.rs` — DESK-005 / DESK-006.
 - `desktop/src-tauri/src/{device_pairing,sandbox,pacs_plugins,log_redactor}.rs` — DESK-007..010.
 - `frontend/app/ShellBridge.tsx` — translates Tauri events to React-app actions.

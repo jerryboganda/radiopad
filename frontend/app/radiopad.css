@@ -197,6 +197,19 @@
 .banner.info { background: var(--blue-bg); border-color: var(--blue-border); color: var(--blue); }
 .banner.ai   { background: var(--purple-bg); border-color: var(--purple-border); color: var(--purple); }
 .banner.danger { background: var(--red-bg); border-color: var(--red-border); color: var(--red); }
+.rp-desktop-status {
+  border-left: 0;
+  border-right: 0;
+  border-top: 0;
+  border-radius: 0;
+  margin: 0;
+}
+.rp-desktop-status-meta {
+  display: inline-block;
+  margin-left: 8px;
+  font-family: var(--mono);
+  font-size: 11px;
+}
 
 /* ----------- /admin/billing dashboard helpers (locked tokens only) ------ */
 .rp-grid-3 { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px; }

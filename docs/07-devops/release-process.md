@@ -1,6 +1,6 @@
 # Release Process
 
-**Status:** Current  ·  **Owner:** Engineering + Ops  ·  **Last Updated:** 2026-05-04
+**Status:** Current  ·  **Owner:** Engineering + Ops  ·  **Last Updated:** 2026-05-16
 
 ## Cadence
 
@@ -15,7 +15,7 @@
 3. **CHANGELOG** — promote `[Unreleased]` to `[X.Y.Z] — YYYY-MM-DD`.
 4. **Verify** — full test suite, rulebook goldens, prompt evals (safety 100%).
 5. **Tag** — `git tag -s vX.Y.Z`; push.
-6. **Build** — release workflow (planned) builds and pushes container images, NuGet tools, desktop installers.
+6. **Build** — release workflow builds and pushes container images, NuGet tools, and desktop installers. Desktop production builds must inject a non-empty Tauri updater public key and operator-supplied signing identities; unsigned internal desktop builds must disable updater artifacts.
 7. **Notes** — release notes summarise changes, link CHANGELOG, list breaking changes.
 8. **Communicate** — email customers (hosted), advisory on the status page; on-prem customers receive the upgrade runbook.
 9. **Deploy staging** — verify with smoke + audit verify.
@@ -45,3 +45,4 @@
 - [ ] Release notes drafted.
 - [ ] Migration plan documented (if applicable).
 - [ ] On-call schedule confirmed for the release window.
+- [ ] Desktop updater key, sidecar smoke, and installer-signing status confirmed when a desktop artifact is included.

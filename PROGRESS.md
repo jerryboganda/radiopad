@@ -4,6 +4,105 @@
 
 ---
 
+## Iteration 39 — Copilot red-item completion
+
+- **Date:** 2026-05-16
+- **Scope:** complete the remaining red Copilot work items from the progress tree: user GitHub auth, Copilot sessions, observability/quotas, and Tauri CLI bridge.
+
+### Delivered
+
+- Implemented token-free LocalCli account linking and entitlement snapshots. Users can start the official GitHub CLI auth path, link local CLI status metadata, revoke the RadioPad link, and see actionable denial reasons without exposing token bytes.
+- Added Copilot session metadata, message metadata, entitlement, and quota-policy tables/indexes in the existing Copilot migration and EF snapshot.
+- Implemented context preview/filtering before session execution: empty/binary/lock/media/generated paths, secret-bearing text, and clinical/PHI-like context are removed or blocked.
+- Implemented backend LocalCli session execution through fixed `gh copilot suggest --type explain` arguments with prompt text on stdin, cancellation propagation, metadata-only hashes, lifecycle usage rows, and append-only audit events.
+- Added request/concurrency quotas with safe defaults plus admin quota CRUD and seven-day usage summaries.
+- Added fixed Tauri Copilot CLI commands for status, login, logout, and session run. Commands return status/output only, never credentials, and warn on environment-token overrides.
+- Updated the locked-design user/admin Copilot pages for account linking, entitlement state, context preview, AI output marked with `.ai-mark`, quotas, and usage.
+- Updated Copilot architecture, threat model, admin runbook, and session plan notes to describe the implemented LocalCli path and remaining SDK/OAuth boundary.
+
+### Validation
+
+- `dotnet build backend/RadioPad.Api/src/RadioPad.Api/RadioPad.Api.csproj --no-restore -m:1 -nr:false /p:UseSharedCompilation=false /v:minimal` passed with the pre-existing MailKit NU1902 warning.
+- `dotnet build backend/RadioPad.Api/tests/RadioPad.Api.Tests/RadioPad.Api.Tests.csproj --no-restore -m:1 -nr:false /p:UseSharedCompilation=false /v:minimal` passed with the pre-existing MailKit NU1902 warning.
+- `dotnet test backend/RadioPad.Api/tests/RadioPad.Api.Tests/RadioPad.Api.Tests.csproj --no-build --filter FullyQualifiedName~CopilotFoundationTests -m:1 -nr:false --logger "console;verbosity=normal"` passed (7 tests).
+- `pnpm --filter @radiopad/frontend typecheck` passed.
+- `pnpm --filter @radiopad/frontend test -- copilotPages` passed (2 tests).
+- Rust/Tauri validation remains blocked in this workstation because `cargo` is not on PATH.
+
+### Notes
+
+- Prompt execution is complete for the official local GitHub CLI path only. SDK/OAuth enterprise-managed and BYO modes remain policy/configuration surfaces until a backend-safe official SDK transport and token vault are reviewed.
+- No token-returning API, localStorage/sessionStorage token path, broad shell command, or arbitrary Tauri command-line execution was added.
+- Focused review found and the implementation now fixes a quota-write RBAC gap: quota changes are restricted to `ItAdmin`/`BillingAdmin`, with a regression test covering `ReportingAdmin` denial.
+
+---
+
+## Iteration 38 — Enterprise GitHub Copilot foundation
+
+- **Date:** 2026-05-16
+- **Scope:** initial production slice for RadioPad's GitHub Copilot platform, constrained to official GitHub/Tauri-supported surfaces and fail-closed runtime behavior.
+
+### Delivered
+
+- Added official capability, threat-model, and admin-runbook docs for Copilot SDK public preview, CLI/keychain auth, REST preview limits, unsupported features, and RadioPad's selected fail-closed stance.
+- Added tenant-scoped Copilot backend model: integration settings, feature flags, user account snapshots, metadata-only usage events, and diagnostic runs.
+- Added `/api/copilot/admin/*` endpoints for settings/status/diagnostics/feature toggles with `TenantedController.ResolveContextAsync`, RBAC, masked/write-only secret refs, and append-only audit actions.
+- Added `/api/copilot/*` user status/account/chat endpoints. Chat intentionally returns structured `kind` failures and records hash-only metadata until an official runtime is configured.
+- Added locked-design admin and user Copilot pages plus typed frontend API methods. No new design system, component library, frontend token storage, IPC token exposure, or broad Tauri permissions.
+- Added backend integration tests for RBAC/defaults, secret-ref masking/audit, secret-reference encryption at rest, and fail-closed chat metadata.
+
+### Validation
+
+- `dotnet build backend/RadioPad.Api/src/RadioPad.Infrastructure/RadioPad.Infrastructure.csproj --no-restore -m:1 -nr:false /p:UseSharedCompilation=false` passed.
+- `dotnet build backend/RadioPad.Api/src/RadioPad.Api/RadioPad.Api.csproj --no-restore -m:1 -nr:false /p:UseSharedCompilation=false` passed with the pre-existing MailKit NU1902 warning.
+- `dotnet build backend/RadioPad.Api/tests/RadioPad.Api.Tests/RadioPad.Api.Tests.csproj --no-restore -m:1 -nr:false /p:UseSharedCompilation=false` passed with the pre-existing MailKit NU1902 warning.
+- `pnpm --filter @radiopad/frontend typecheck` passed.
+- `dotnet test backend/RadioPad.Api/tests/RadioPad.Api.Tests/RadioPad.Api.Tests.csproj --no-restore --filter FullyQualifiedName~CopilotFoundationTests -m:1 -nr:false /p:UseSharedCompilation=false --logger "console;verbosity=normal"` passed (4 tests) with pre-existing MailKit/nullable/test-field warnings.
+- `pnpm --filter @radiopad/frontend test -- copilotPages` passed (2 tests).
+
+### Notes
+
+- No legacy `src/` or `daemon/` paths modified.
+- Copilot runtime wiring remains intentionally blocked; SDK/CLI transport implementation requires a future reviewed capability gate.
+- An initial WebApplicationFactory-based Copilot test harness was replaced with controller/service tests over in-memory SQLite because the hosted-app test run hung in this workstation before producing test results.
+- Focused review found and the implementation now fixes a defense-in-depth gap: Copilot secret-reference columns use the existing at-rest encryption converter.
+
+---
+
+## Iteration 37 — Desktop production hardening
+
+- **Date:** 2026-05-16
+- **Scope:** production hardening pass for the existing Tauri 2 desktop shell. This is not a visual redesign or framework change; it preserves the locked Open Design frontend and tightens native lifecycle, storage, and release-readiness gaps.
+
+### Delivered
+
+- Replaced panic-prone one-shot sidecar startup with `desktop/src-tauri/src/sidecar_manager.rs` and `backend_health.rs`.
+  - Emits `radiopad://backend-status` events for `starting`, `ready`, `degraded`, `restarting`, `failed`, and `disabled`.
+  - Uses a conservative 5-second readiness check against `/api/health/ready`.
+  - Avoids crashing the app when the sidecar is missing or cannot spawn.
+- Added `DesktopStatusBanner` to the frontend shell.
+  - Uses locked `.banner.info|warn|danger` plus new documented `.rp-desktop-status` helpers.
+  - Hidden for healthy/disabled states; no animation or idle GPU work.
+- Updated secure auth storage so desktop runtime prefers the Tauri keyring commands before Capacitor or web-preview fallbacks.
+  - Added `device_pairing_token_clear` and keyring delete support.
+- Moved PACS plugin enable/disable state out of signed `manifest.json` into `.enabled`, preserving manifest signature integrity.
+- Added frontend tests for desktop status UI and Tauri-first secure auth storage.
+- Updated desktop architecture, runbook, design, QA, definition-of-done, release, and performance docs.
+
+### Validation
+
+- `pnpm --filter @radiopad/frontend typecheck` passed.
+- `pnpm --filter @radiopad/frontend test -- desktopStatusBanner secureAuthDesktop` passed (4 tests).
+- `pnpm --filter @radiopad/frontend build` passed; Next.js emitted the existing static-export rewrite/middleware warnings.
+- Full `pnpm --filter @radiopad/frontend test` did not complete in this workspace before it was stopped; targeted desktop suites above passed.
+- NuGet restore passed with the pre-existing MailKit NU1902 warning.
+- Rust checks could not be run in this workspace because `cargo` is not on PATH.
+
+### Notes
+
+- `desktop/src-tauri/tauri.conf.json` still has an empty updater public key because production signing material is operator-supplied and must not be committed. Production release remains blocked until the release pipeline injects a real channel key or disables updater artifacts for unsigned internal builds.
+- No PHI policy, audit append-only semantics, backend bind default, clinical rulebooks, or tenant-scoped controller behavior changed.
+
 ## Iteration 36 — Close-out (parallel six-subagent wave)
 
 - **Date:** 2026-05-04

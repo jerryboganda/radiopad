@@ -11,7 +11,7 @@ use rand::RngCore;
 use sha2::{Digest, Sha256};
 
 use crate::crypto_keyring::{
-    keyring_get, keyring_set, KEY_DEVICE_FINGERPRINT, KEY_DEVICE_PAIRING_TOKEN,
+    keyring_delete, keyring_get, keyring_set, KEY_DEVICE_FINGERPRINT, KEY_DEVICE_PAIRING_TOKEN,
 };
 
 fn hex_encode(bytes: &[u8]) -> String {
@@ -66,4 +66,9 @@ pub async fn device_pairing_token_set(token: String) -> Result<(), String> {
 #[tauri::command]
 pub async fn device_pairing_token_get() -> Result<Option<String>, String> {
     keyring_get(KEY_DEVICE_PAIRING_TOKEN)
+}
+
+#[tauri::command]
+pub async fn device_pairing_token_clear() -> Result<(), String> {
+    keyring_delete(KEY_DEVICE_PAIRING_TOKEN)
 }

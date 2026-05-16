@@ -14,12 +14,15 @@
 #![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
 
 mod crypto_keyring;
+mod backend_health;
+mod copilot_cli;
 mod device_pairing;
 mod local_cache;
 mod log_redactor;
 mod offline_drafts;
 mod pacs_plugins;
 mod sandbox;
+mod sidecar_manager;
 
 use std::path::PathBuf;
 use std::sync::{Mutex, OnceLock};
@@ -28,8 +31,6 @@ use tauri::Emitter;
 use tauri::Manager;
 use tauri_plugin_clipboard_manager::ClipboardExt;
 use tauri_plugin_global_shortcut::{Code, GlobalShortcutExt, Modifiers, Shortcut, ShortcutState};
-use tauri_plugin_shell::process::CommandEvent;
-use tauri_plugin_shell::ShellExt;
 use tauri_plugin_store::StoreExt;
 
 const SETTINGS_FILE: &str = "radiopad-settings.json";
@@ -203,9 +204,14 @@ fn main() {
             local_cache::local_cache_get,
             local_cache::local_cache_put,
             local_cache::local_cache_clear,
+            copilot_cli::copilot_cli_status,
+            copilot_cli::copilot_cli_login_begin,
+            copilot_cli::copilot_cli_logout,
+            copilot_cli::copilot_cli_session_run,
             device_pairing::device_fingerprint,
             device_pairing::device_pairing_token_set,
             device_pairing::device_pairing_token_get,
+            device_pairing::device_pairing_token_clear,
             pacs_plugins::pacs_plugins_list,
             pacs_plugins::pacs_plugins_verify,
             pacs_plugins::pacs_plugins_set_enabled,
@@ -246,27 +252,9 @@ fn main() {
                 });
             }
 
-            // PRD DESK-015 — spawn the bundled backend sidecar.
-            if std::env::var("RADIOPAD_NO_SIDECAR").ok().as_deref() != Some("1") {
-                if let Ok(sidecar) = app.shell().sidecar("radiopad-api") {
-                    let (mut rx, _child) = sidecar
-                        .env("RADIOPAD_BIND", "http://127.0.0.1:7457")
-                        .spawn()
-                        .expect("failed to spawn radiopad-api sidecar");
-                    tauri::async_runtime::spawn(async move {
-                        while let Some(event) = rx.recv().await {
-                            if let CommandEvent::Stderr(line) = event {
-                                // The redacting tracing writer scrubs PHI
-                                // before this reaches the terminal / log file.
-                                tracing::info!(
-                                    "radiopad-api: {}",
-                                    String::from_utf8_lossy(&line)
-                                );
-                            }
-                        }
-                    });
-                }
-            }
+            // PRD DESK-015 — supervise the bundled backend sidecar without
+            // panicking when the binary is missing or exits unexpectedly.
+            sidecar_manager::start(app.handle().clone());
             Ok(())
         })
         .run(tauri::generate_context!())

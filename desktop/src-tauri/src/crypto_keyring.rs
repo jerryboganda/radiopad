@@ -75,3 +75,11 @@ pub fn keyring_set(slot: &str, value: &str) -> Result<(), String> {
     let entry = Entry::new(SERVICE, slot).map_err(|e| e.to_string())?;
     entry.set_password(value).map_err(|e| e.to_string())
 }
+
+pub fn keyring_delete(slot: &str) -> Result<(), String> {
+    let entry = Entry::new(SERVICE, slot).map_err(|e| e.to_string())?;
+    match entry.delete_password() {
+        Ok(()) | Err(keyring::Error::NoEntry) => Ok(()),
+        Err(e) => Err(e.to_string()),
+    }
+}

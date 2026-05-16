@@ -3,7 +3,7 @@
 import { useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { startAutoSync } from '@/lib/offlineDrafts';
-import { getAuthToken, setAuthToken } from '@/lib/secureAuth';
+import { getAuthToken } from '@/lib/secureAuth';
 import { setActiveAuthToken } from '@/lib/api';
 import { isBiometricLockEnabled, unlockWithBiometric } from '@/lib/biometric';
 
@@ -11,22 +11,13 @@ type TauriUnlisten = () => void;
 type TauriListenHandle = TauriUnlisten | { unlisten?: TauriUnlisten } | null | undefined;
 
 type TauriGlobal = {
-  core?: { invoke?: (cmd: string, args?: unknown) => Promise<unknown> };
-  event?: { listen?: (event: string, handler: () => void) => Promise<TauriListenHandle> | TauriListenHandle };
-  invoke?: (cmd: string, args?: unknown) => Promise<unknown>;
-  listen?: (event: string, handler: () => void) => Promise<TauriListenHandle> | TauriListenHandle;
+  event?: { listen?: (event: string, handler: (event?: { payload?: unknown }) => void) => Promise<TauriListenHandle> | TauriListenHandle };
+  listen?: (event: string, handler: (event?: { payload?: unknown }) => void) => Promise<TauriListenHandle> | TauriListenHandle;
 };
 
 function getTauri(): TauriGlobal | null {
   if (typeof window === 'undefined') return null;
   return (window as typeof window & { __TAURI__?: TauriGlobal }).__TAURI__ ?? null;
-}
-
-async function invokeTauri(cmd: string, args?: unknown): Promise<unknown> {
-  const tauri = getTauri();
-  const invoke = tauri?.core?.invoke ?? tauri?.invoke;
-  if (!invoke) return null;
-  return invoke(cmd, args);
 }
 
 /**
@@ -60,7 +51,11 @@ export default function ShellBridge() {
           if (typeof window === 'undefined') return;
           window.dispatchEvent(new CustomEvent(`radiopad:${name}`));
         };
-        const reg = async (event: string, handler: () => void) => {
+        const dispatchPayload = (name: string, payload: unknown) => {
+          if (typeof window === 'undefined') return;
+          window.dispatchEvent(new CustomEvent(`radiopad:${name}`, { detail: payload }));
+        };
+        const reg = async (event: string, handler: (event?: { payload?: unknown }) => void) => {
           const handle = await listen(event, handler);
           const u = typeof handle === 'function'
             ? handle
@@ -79,14 +74,17 @@ export default function ShellBridge() {
         await reg('radiopad://clipboard-cleared', () =>
           dispatchAction('clipboard-cleared'),
         );
+        await reg('radiopad://backend-status', (event) =>
+          dispatchPayload('backend-status', event?.payload ?? null),
+        );
       } catch {
         /* not running under Tauri — no-op */
       }
     })();
     // Mobile/desktop offline-draft auto sync.
     startAutoSync().catch(() => { /* best effort */ });
-    // Hydrate the bearer from the OS-level secure store (Keychain /
-    // Keystore on native; Preferences/localStorage in the dev preview).
+    // Hydrate the bearer from native secure storage (Tauri keyring on desktop,
+    // Keychain / Keystore on mobile; Preferences/localStorage in dev preview).
     // PRD MOB-008 — when the user has enabled biometric lock, gate the token
     // release on a Face ID / Touch ID / Android biometric prompt.
     (async () => {
@@ -95,14 +93,7 @@ export default function ShellBridge() {
           const ok = await unlockWithBiometric('Unlock RadioPad to continue');
           if (!ok) { setActiveAuthToken(null); return; }
         }
-        let tok = await getAuthToken();
-        if (!tok) {
-          const desktopToken = await invokeTauri('device_pairing_token_get');
-          if (typeof desktopToken === 'string' && desktopToken.length > 0) {
-            tok = desktopToken;
-            await setAuthToken(desktopToken);
-          }
-        }
+        const tok = await getAuthToken();
         if (!cancelled) setActiveAuthToken(tok ?? null);
       } catch {
         /* best effort */

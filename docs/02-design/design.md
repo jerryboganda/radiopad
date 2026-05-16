@@ -1,6 +1,6 @@
 # RadioPad — Design System (LOCKED)
 
-**Status:** Locked  **Owner:** Product Design  **Last Updated:** 2026-05-05
+**Status:** Locked  **Owner:** Product Design  **Last Updated:** 2026-05-16
 
 > **MISSION-CRITICAL RULE.** RadioPad's visual language is the Open Design /
 > Claude.ai-inspired system. **No agent — human or AI — is permitted to
@@ -408,7 +408,29 @@ into named classes that compose locked tokens only:
 - `.banner.ok` — success variant of the inline banner, mirroring
   `.banner.warn` / `.banner.info` / `.banner.danger`. Composes
   `--green-bg`, `--green`, `--green-soft`. Used by admin/settings
-  and admin/security pages.
+   and admin/security pages.
+
+### 4.15 Desktop backend status banner (`.rp-desktop-status`)
+
+The Tauri shell emits backend-sidecar health events to the renderer. The
+frontend renders those events as a single inline `.banner` immediately below
+the topbar:
+
+- `.rp-desktop-status` — full-width banner modifier that removes side radii
+  and side borders so the message reads as part of the app chrome. It must be
+  combined with `.banner.info`, `.banner.warn`, or `.banner.danger`; it does
+  not introduce new colours.
+- `.rp-desktop-status-meta` — optional mono metadata chip for restart attempt
+  counts. Composes `--mono` and existing text sizing only.
+
+Use cases:
+
+- `starting` -> `.banner.info`
+- `restarting` or `degraded` -> `.banner.warn`
+- `failed` -> `.banner.danger`
+
+The banner is hidden for `ready` and `disabled` states. No animation is used,
+so the desktop app does not spend idle GPU/CPU on status chrome.
 
 ---
 

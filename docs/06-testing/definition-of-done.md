@@ -1,6 +1,6 @@
 # Definition of Done
 
-**Status:** Current  ·  **Owner:** Engineering  ·  **Last Updated:** 2026-05-04
+**Status:** Current  ·  **Owner:** Engineering  ·  **Last Updated:** 2026-05-16
 
 A change is **done** when **all** of the following are true. Anything less is "in progress".
 
@@ -18,6 +18,8 @@ A change is **done** when **all** of the following are true. Anything less is "i
 - [ ] If feature flag: documented default and how to flip it.
 - [ ] `dotnet build` and `dotnet test` green for backend.
 - [ ] `pnpm typecheck` green for frontend.
+- [ ] Desktop changes include Tauri/Rust checks where the toolchain is available, plus frontend desktop bridge tests when renderer behavior changes.
+- [ ] Desktop releases verify sidecar lifecycle, updater key state, and installer signing status.
 - [ ] Audit log behaviour preserved (append-only; no UPDATE/DELETE on `AuditEvents`).
 - [ ] PHI policy preserved (no provider compliance class downgrade without an ADR).
 - [ ] UI uses only locked tokens & component classes.
