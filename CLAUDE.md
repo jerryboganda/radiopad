@@ -1,18 +1,21 @@
 # CLAUDE.md — RadioPad project memory for Claude Code
 
-## ⚠️ MISSION-CRITICAL: UI/UX is LOCKED to Open Design
+# CLAUDE.md — RadioPad project memory for Claude Code
 
-The RadioPad frontend MUST use the Open Design (Claude.ai-inspired) visual language. **You are not authorised to introduce a different design system, palette, or component library.** Read [docs/02-design/design.md](docs/02-design/design.md) before touching any UI; the canonical stylesheet is [frontend/app/globals.css](frontend/app/globals.css).
+## ⚠️ MISSION-CRITICAL: Tokens LOCKED, shell modernized to sidebar
+
+RadioPad's visual **tokens** (palette, typography, accent `#c96442`, `.ai-mark`, semantic families) are LOCKED. The **app shell** has been modernized from the original Open Design topbar+split layout into a left-sidebar SaaS shell — that sidebar shell is now canonical. Read [docs/02-design/design.md](docs/02-design/design.md) before touching any UI; the canonical stylesheets are [frontend/app/globals.css](frontend/app/globals.css) (tokens) + [frontend/app/shell.css](frontend/app/shell.css) (sidebar shell + page chrome).
 
 Hard rules:
 
-1. Use the documented design tokens only (`--bg: #faf9f7`, `--accent: #c96442`, semantic families: green/blue/purple/red/amber).
-2. Use the documented component classes only (`.app`, `.topbar`, `.split`, `.pane`, `.panel`, `.section-block`, `.composer`, `.msg`, `.finding`, `.ai-mark`, `.brand-mark`, `.badge`, button variants `.primary` / `.primary-ghost` / `.ghost` / `.subtle`).
+1. Use the documented design tokens only (`--bg: #faf9f7`, `--accent: #c96442`, semantic families: green/blue/purple/red/amber). Do not invent new tokens or add a dark mode.
+2. Render every page inside `<AppShell>` (`frontend/components/shell/AppShell.tsx`). Use `<Container>` + `<PageHeader>` for the top of every page. Use the documented component classes only (`.rp-shell`, `.rp-sidebar`, `.rp-topbar`, `.rp-page-header`, `.rp-panel`, `.section-block`, `.composer`, `.msg`, `.finding`, `.ai-mark`, `.brand-mark`, `.badge`, button variants `.primary` / `.primary-ghost` / `.ghost` / `.subtle`). The legacy `.app` / `.topbar` classes are reserved for in-page editor chrome inside `.split` two-pane surfaces and must not be the application root.
 3. AI-generated text wears `.ai-mark` (purple family) until acknowledged.
 4. Validation severities map: Blocker→red, Warning→amber, Info→blue.
-5. **Forbidden:** Tailwind utility-only styling, MUI/Ant/Chakra/Bootstrap, dark mode, emoji as icons, additional accent colours, replacing the topbar+split shell.
+5. Data-driven pages use `<Skeleton />` / `<EmptyState />` / `<ErrorState onRetry />` for loading / empty / error states.
+6. **Forbidden:** Tailwind utility-only styling, MUI/Ant/Chakra/Bootstrap, dark mode, emoji as icons, additional accent colours, primary navigation patterns other than the canonical left-sidebar shell.
 
-If a token or component doesn't exist for what you need, extend `globals.css` and `docs/02-design/design.md` in the same change — never inline.
+If a token or component doesn't exist for what you need, extend `globals.css` (tokens) or `shell.css` (shell/chrome) and `docs/02-design/design.md` in the same change — never inline.
 
 ## Project mission
 

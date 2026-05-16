@@ -20,7 +20,13 @@
     "fhirImport": "FHIR आयात",
     "pacs": "PACS",
     "security": "सुरक्षा",
-    "signIn": "साइन इन"
+    "signIn": "साइन इन",
+    "groups": {
+      "workspace": "कार्यक्षेत्र",
+      "library": "पुस्तकालय",
+      "integrations": "एकीकरण",
+      "admin": "व्यवस्थापन"
+    }
   },
   "buttons": {
     "primary": {
@@ -72,6 +78,16 @@
   },
   "topbar": {
     "title": "RadioPad",
-    "tagline": "एआई रेडियोलॉजी रिपोर्टिंग · v0.1"
+    "tagline": "एआई रेडियोलॉजी रिपोर्टिंग · v0.1",
+    "openMenu": "मेनू खोलें",
+    "primaryNav": "मुख्य नेविगेशन",
+    "collapseSidebar": "साइडबार छिपाएँ",
+    "expandSidebar": "साइडबार दिखाएँ"
+  },
+  "profile": {
+    "account": "खाता",
+    "language": "भाषा",
+    "signOut": "साइन आउट",
+    "signedOut": "साइन आउट किया"
   }
 }

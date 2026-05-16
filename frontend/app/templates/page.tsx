@@ -2,6 +2,8 @@
 
 import { useEffect, useState } from 'react';
 import { api, type ReportTemplate } from '@/lib/api';
+import Container from '@/components/shell/Container';
+import PageHeader from '@/components/shell/PageHeader';
 
 type Section = { id: string; label: string; placeholder?: string; required?: boolean };
 
@@ -127,20 +129,17 @@ export default function TemplatesPage() {
   }
 
   return (
-    <div className="rp-container">
-      <h1 className="rp-page-title">Templates</h1>
-      <p className="rp-page-sub">
-        Structured report templates per modality / body part / subspecialty. Templates loaded from{' '}
-        <code>templates/</code> at startup; tenant-local edits saved here override them.
-      </p>
+    <Container>
+      <PageHeader
+        title="Templates"
+        description={<>Structured report templates per modality / body part / subspecialty. Templates loaded from <code>templates/</code> at startup; tenant-local edits saved here override them.</>}
+        primaryAction={<button className="primary" onClick={newTemplate}>+ New template</button>}
+      />
 
       {error && <div className="banner warn">{error}</div>}
 
       <div className="rp-panel">
-        <div className="rp-row between" style={{ marginBottom: 12 }}>
-          <div className="rp-panel-title" style={{ marginBottom: 0 }}>Tenant templates</div>
-          <button className="primary" onClick={newTemplate}>+ New template</button>
-        </div>
+        <div className="rp-panel-title">Tenant templates</div>
         <table className="rp-table">
           <thead>
             <tr>
@@ -333,7 +332,7 @@ export default function TemplatesPage() {
           </div>
         </div>
       )}
-    </div>
+    </Container>
   );
 }
 

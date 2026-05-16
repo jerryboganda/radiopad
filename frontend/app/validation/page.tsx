@@ -4,6 +4,8 @@ import { useEffect, useState } from 'react';
 import Link from 'next/link';
 import { api, type Report, type ValidationResult } from '@/lib/api';
 import { reportHref } from '@/lib/routes';
+import Container from '@/components/shell/Container';
+import PageHeader from '@/components/shell/PageHeader';
 
 type Row = {
   report: Report;
@@ -69,14 +71,11 @@ export default function ValidationCenterPage() {
   );
 
   return (
-    <div className="rp-container">
-      <h1 className="rp-page-title">Validation Center</h1>
-      <p className="rp-page-sub">
-        Re-runs the validation engine over every non-exported draft. Severities
-        map to the locked semantic families: <span className="badge danger">blocker → red</span>{' '}
-        <span className="badge warn">warning → amber</span>{' '}
-        <span className="badge info">info → blue</span>.
-      </p>
+    <Container>
+      <PageHeader
+        title="Validation center"
+        description={<>Re-runs the validation engine over every non-exported draft. Severities map to the locked semantic families: <span className="badge danger">blocker → red</span> <span className="badge warn">warning → amber</span> <span className="badge info">info → blue</span>.</>}
+      />
 
       {err && <div className="banner warn">{err}</div>}
 
@@ -159,6 +158,6 @@ export default function ValidationCenterPage() {
           </tbody>
         </table>
       </div>
-    </div>
+    </Container>
   );
 }

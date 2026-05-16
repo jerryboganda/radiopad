@@ -124,6 +124,193 @@ namespace RadioPad.Infrastructure.Migrations
                     b.ToTable("AuditEvents");
                 });
 
+            modelBuilder.Entity("RadioPad.Domain.Entities.CopilotDiagnosticRun", b =>
+                {
+                    b.Property<Guid>("Id").ValueGeneratedOnAdd().HasColumnType("TEXT");
+                    b.Property<long>("CreatedAt").HasColumnType("INTEGER");
+                    b.Property<string>("ResultsJson").IsRequired().HasColumnType("TEXT");
+                    b.Property<string>("Status").IsRequired().HasColumnType("TEXT");
+                    b.Property<Guid>("TenantId").HasColumnType("TEXT");
+                    b.Property<long>("UpdatedAt").HasColumnType("INTEGER");
+                    b.Property<Guid>("UserId").HasColumnType("TEXT");
+                    b.HasKey("Id");
+                    b.HasIndex("TenantId", "CreatedAt");
+                    b.ToTable("CopilotDiagnosticRuns");
+                });
+
+            modelBuilder.Entity("RadioPad.Domain.Entities.CopilotFeatureFlag", b =>
+                {
+                    b.Property<Guid>("Id").ValueGeneratedOnAdd().HasColumnType("TEXT");
+                    b.Property<long>("CreatedAt").HasColumnType("INTEGER");
+                    b.Property<bool>("Enabled").HasColumnType("INTEGER");
+                    b.Property<string>("FeatureKey").IsRequired().HasColumnType("TEXT");
+                    b.Property<string>("PolicyJson").IsRequired().HasColumnType("TEXT");
+                    b.Property<string>("RequiredRole").IsRequired().HasColumnType("TEXT");
+                    b.Property<Guid>("TenantId").HasColumnType("TEXT");
+                    b.Property<long>("UpdatedAt").HasColumnType("INTEGER");
+                    b.HasKey("Id");
+                    b.HasIndex("TenantId", "FeatureKey").IsUnique();
+                    b.ToTable("CopilotFeatureFlags");
+                });
+
+            modelBuilder.Entity("RadioPad.Domain.Entities.CopilotIntegrationSettings", b =>
+                {
+                    b.Property<Guid>("Id").ValueGeneratedOnAdd().HasColumnType("TEXT");
+                    b.Property<bool>("AllowByoAccounts").HasColumnType("INTEGER");
+                    b.Property<bool>("AllowEnvironmentTokenAuth").HasColumnType("INTEGER");
+                    b.Property<string>("AllowedModes").IsRequired().HasColumnType("TEXT");
+                    b.Property<bool>("CliRuntimeEnabled").HasColumnType("INTEGER");
+                    b.Property<bool>("ContextLoggingEnabled").HasColumnType("INTEGER");
+                    b.Property<long>("CreatedAt").HasColumnType("INTEGER");
+                    b.Property<int>("DefaultMode").HasColumnType("INTEGER");
+                    b.Property<bool>("EmergencyDisabled").HasColumnType("INTEGER");
+                    b.Property<bool>("Enabled").HasColumnType("INTEGER");
+                    b.Property<string>("GitHubAppId").IsRequired().HasColumnType("TEXT");
+                    b.Property<string>("GitHubAppInstallationId").IsRequired().HasColumnType("TEXT");
+                    b.Property<string>("GitHubAppPrivateKeySecretRef").IsRequired().HasColumnType("TEXT");
+                    b.Property<string>("GitHubEnterpriseSlug").IsRequired().HasColumnType("TEXT");
+                    b.Property<string>("GitHubHost").IsRequired().HasColumnType("TEXT");
+                    b.Property<string>("GitHubOrganization").IsRequired().HasColumnType("TEXT");
+                    b.Property<string>("OAuthClientId").IsRequired().HasColumnType("TEXT");
+                    b.Property<string>("OAuthClientSecretRef").IsRequired().HasColumnType("TEXT");
+                    b.Property<string>("PolicyJson").IsRequired().HasColumnType("TEXT");
+                    b.Property<bool>("PromptLoggingEnabled").HasColumnType("INTEGER");
+                    b.Property<bool>("RequireOsKeychainForCli").HasColumnType("INTEGER");
+                    b.Property<string>("RetentionPolicy").IsRequired().HasColumnType("TEXT");
+                    b.Property<long?>("SecretsUpdatedAt").HasColumnType("INTEGER");
+                    b.Property<bool>("SdkRuntimeEnabled").HasColumnType("INTEGER");
+                    b.Property<Guid>("TenantId").HasColumnType("TEXT");
+                    b.Property<long>("UpdatedAt").HasColumnType("INTEGER");
+                    b.HasKey("Id");
+                    b.HasIndex("TenantId").IsUnique();
+                    b.ToTable("CopilotIntegrationSettings");
+                });
+
+            modelBuilder.Entity("RadioPad.Domain.Entities.CopilotUsageEvent", b =>
+                {
+                    b.Property<Guid>("Id").ValueGeneratedOnAdd().HasColumnType("TEXT");
+                    b.Property<string>("BlockKind").IsRequired().HasColumnType("TEXT");
+                    b.Property<long>("CreatedAt").HasColumnType("INTEGER");
+                    b.Property<string>("Feature").IsRequired().HasColumnType("TEXT");
+                    b.Property<string>("InputHash").IsRequired().HasColumnType("TEXT");
+                    b.Property<int>("LatencyMs").HasColumnType("INTEGER");
+                    b.Property<string>("Mode").IsRequired().HasColumnType("TEXT");
+                    b.Property<string>("OutputHash").IsRequired().HasColumnType("TEXT");
+                    b.Property<string>("RequestId").IsRequired().HasColumnType("TEXT");
+                    b.Property<string>("Status").IsRequired().HasColumnType("TEXT");
+                    b.Property<Guid>("TenantId").HasColumnType("TEXT");
+                    b.Property<long>("UpdatedAt").HasColumnType("INTEGER");
+                    b.Property<Guid>("UserId").HasColumnType("TEXT");
+                    b.HasKey("Id");
+                    b.HasIndex("TenantId", "CreatedAt");
+                    b.HasIndex("TenantId", "UserId", "CreatedAt");
+                    b.ToTable("CopilotUsageEvents");
+                });
+
+            modelBuilder.Entity("RadioPad.Domain.Entities.CopilotUserAccount", b =>
+                {
+                    b.Property<Guid>("Id").ValueGeneratedOnAdd().HasColumnType("TEXT");
+                    b.Property<long>("CreatedAt").HasColumnType("INTEGER");
+                    b.Property<string>("DenialReason").IsRequired().HasColumnType("TEXT");
+                    b.Property<string>("GitHubLogin").IsRequired().HasColumnType("TEXT");
+                    b.Property<long?>("GitHubUserId").HasColumnType("INTEGER");
+                    b.Property<long?>("LastAuthenticatedAt").HasColumnType("INTEGER");
+                    b.Property<int>("Mode").HasColumnType("INTEGER");
+                    b.Property<long?>("RevokedAt").HasColumnType("INTEGER");
+                    b.Property<string>("SeatStatus").IsRequired().HasColumnType("TEXT");
+                    b.Property<string>("SsoStatus").IsRequired().HasColumnType("TEXT");
+                    b.Property<Guid>("TenantId").HasColumnType("TEXT");
+                    b.Property<string>("TokenSecretRef").IsRequired().HasColumnType("TEXT");
+                    b.Property<string>("TokenStatus").IsRequired().HasColumnType("TEXT");
+                    b.Property<long>("UpdatedAt").HasColumnType("INTEGER");
+                    b.Property<Guid>("UserId").HasColumnType("TEXT");
+                    b.HasKey("Id");
+                    b.HasIndex("TenantId", "UserId").IsUnique();
+                    b.ToTable("CopilotUserAccounts");
+                });
+
+            modelBuilder.Entity("RadioPad.Domain.Entities.CopilotEntitlement", b =>
+                {
+                    b.Property<Guid>("Id").ValueGeneratedOnAdd().HasColumnType("TEXT");
+                    b.Property<bool>("Allowed").HasColumnType("INTEGER");
+                    b.Property<long>("CheckedAt").HasColumnType("INTEGER");
+                    b.Property<long>("CreatedAt").HasColumnType("INTEGER");
+                    b.Property<string>("DenialReason").IsRequired().HasColumnType("TEXT");
+                    b.Property<long?>("ExpiresAt").HasColumnType("INTEGER");
+                    b.Property<string>("GitHubLogin").IsRequired().HasColumnType("TEXT");
+                    b.Property<int>("Mode").HasColumnType("INTEGER");
+                    b.Property<string>("SeatStatus").IsRequired().HasColumnType("TEXT");
+                    b.Property<string>("Source").IsRequired().HasColumnType("TEXT");
+                    b.Property<string>("SsoStatus").IsRequired().HasColumnType("TEXT");
+                    b.Property<Guid>("TenantId").HasColumnType("TEXT");
+                    b.Property<long>("UpdatedAt").HasColumnType("INTEGER");
+                    b.Property<Guid>("UserId").HasColumnType("TEXT");
+                    b.HasKey("Id");
+                    b.HasIndex("TenantId", "UserId", "Mode").IsUnique();
+                    b.ToTable("CopilotEntitlements");
+                });
+
+            modelBuilder.Entity("RadioPad.Domain.Entities.CopilotQuotaPolicy", b =>
+                {
+                    b.Property<Guid>("Id").ValueGeneratedOnAdd().HasColumnType("TEXT");
+                    b.Property<long>("CreatedAt").HasColumnType("INTEGER");
+                    b.Property<bool>("Enabled").HasColumnType("INTEGER");
+                    b.Property<string>("Feature").IsRequired().HasColumnType("TEXT");
+                    b.Property<int>("MaxConcurrent").HasColumnType("INTEGER");
+                    b.Property<int>("MaxRequests").HasColumnType("INTEGER");
+                    b.Property<string>("ScopeKey").IsRequired().HasColumnType("TEXT");
+                    b.Property<string>("ScopeType").IsRequired().HasColumnType("TEXT");
+                    b.Property<Guid>("TenantId").HasColumnType("TEXT");
+                    b.Property<long>("UpdatedAt").HasColumnType("INTEGER");
+                    b.Property<int>("WindowSeconds").HasColumnType("INTEGER");
+                    b.HasKey("Id");
+                    b.HasIndex("TenantId", "ScopeType", "ScopeKey", "Feature").IsUnique();
+                    b.ToTable("CopilotQuotaPolicies");
+                });
+
+            modelBuilder.Entity("RadioPad.Domain.Entities.CopilotSession", b =>
+                {
+                    b.Property<Guid>("Id").ValueGeneratedOnAdd().HasColumnType("TEXT");
+                    b.Property<long?>("CancelledAt").HasColumnType("INTEGER");
+                    b.Property<long?>("CompletedAt").HasColumnType("INTEGER");
+                    b.Property<string>("ContextHash").IsRequired().HasColumnType("TEXT");
+                    b.Property<string>("ContextKind").IsRequired().HasColumnType("TEXT");
+                    b.Property<long>("CreatedAt").HasColumnType("INTEGER");
+                    b.Property<string>("Feature").IsRequired().HasColumnType("TEXT");
+                    b.Property<string>("LastErrorKind").IsRequired().HasColumnType("TEXT");
+                    b.Property<int>("Mode").HasColumnType("INTEGER");
+                    b.Property<string>("Runtime").IsRequired().HasColumnType("TEXT");
+                    b.Property<long>("StartedAt").HasColumnType("INTEGER");
+                    b.Property<string>("Status").IsRequired().HasColumnType("TEXT");
+                    b.Property<Guid>("TenantId").HasColumnType("TEXT");
+                    b.Property<long>("UpdatedAt").HasColumnType("INTEGER");
+                    b.Property<Guid>("UserId").HasColumnType("TEXT");
+                    b.HasKey("Id");
+                    b.HasIndex("TenantId", "Status", "CreatedAt");
+                    b.HasIndex("TenantId", "UserId", "CreatedAt");
+                    b.ToTable("CopilotSessions");
+                });
+
+            modelBuilder.Entity("RadioPad.Domain.Entities.CopilotMessage", b =>
+                {
+                    b.Property<Guid>("Id").ValueGeneratedOnAdd().HasColumnType("TEXT");
+                    b.Property<long>("CreatedAt").HasColumnType("INTEGER");
+                    b.Property<string>("InputHash").IsRequired().HasColumnType("TEXT");
+                    b.Property<int>("LatencyMs").HasColumnType("INTEGER");
+                    b.Property<string>("Model").IsRequired().HasColumnType("TEXT");
+                    b.Property<string>("OutputHash").IsRequired().HasColumnType("TEXT");
+                    b.Property<string>("Role").IsRequired().HasColumnType("TEXT");
+                    b.Property<int>("Sequence").HasColumnType("INTEGER");
+                    b.Property<Guid>("SessionId").HasColumnType("TEXT");
+                    b.Property<string>("Status").IsRequired().HasColumnType("TEXT");
+                    b.Property<Guid>("TenantId").HasColumnType("TEXT");
+                    b.Property<long>("UpdatedAt").HasColumnType("INTEGER");
+                    b.Property<Guid>("UserId").HasColumnType("TEXT");
+                    b.HasKey("Id");
+                    b.HasIndex("TenantId", "SessionId", "Sequence").IsUnique();
+                    b.ToTable("CopilotMessages");
+                });
+
             modelBuilder.Entity("RadioPad.Domain.Entities.DeviceAuthRequest", b =>
                 {
                     b.Property<Guid>("Id")

@@ -2,6 +2,8 @@
 
 import { useEffect, useMemo, useState } from 'react';
 import { api, COMPLIANCE_LABELS, type Provider, type Report } from '@/lib/api';
+import Container from '@/components/shell/Container';
+import PageHeader from '@/components/shell/PageHeader';
 
 const SANDBOX_COMPLIANCE = 1;
 const SANDBOX_MODES = ['impression', 'draft', 'concise', 'formal', 'patient_friendly', 'referring_summary'] as const;
@@ -117,20 +119,17 @@ export default function ProvidersPage() {
   }
 
   return (
-    <div className="rp-container">
-      <h1 className="rp-page-title">AI providers</h1>
-      <p className="rp-page-sub">
-        Tenant provider registry. PHI requests are blocked unless the destination provider's compliance class is{' '}
-        <span className="badge ok">PHI-approved</span> or <span className="badge ai">Local-only</span>.
-      </p>
+    <Container>
+      <PageHeader
+        title="AI providers"
+        description={<>Tenant provider registry. PHI requests are blocked unless the destination provider's compliance class is <span className="badge ok">PHI-approved</span> or <span className="badge ai">Local-only</span>.</>}
+        primaryAction={<button className="primary" onClick={newProvider}>+ New provider</button>}
+      />
 
       {error && <div className="banner warn">{error}</div>}
 
       <div className="rp-panel">
-        <div className="rp-row between" style={{ marginBottom: 12 }}>
-          <div className="rp-panel-title" style={{ marginBottom: 0 }}>Configured providers</div>
-          <button className="primary" onClick={newProvider}>+ New provider</button>
-        </div>
+        <div className="rp-panel-title">Configured providers</div>
         <table className="rp-table">
           <thead>
             <tr>
@@ -307,7 +306,7 @@ export default function ProvidersPage() {
           </div>
         </div>
       )}
-    </div>
+    </Container>
   );
 }
 

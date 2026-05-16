@@ -4,7 +4,11 @@
 // ~/Library/Application Support/RadioPad/plugins (macOS), or
 // ~/.local/share/RadioPad/plugins (Linux). Verification reuses the iter-30
 // SHA-256 + Ed25519 verifier in `sandbox.rs` — manifests that fail
-// verification are NEVER returned to the frontend.
+// verification are returned as unverified records so the UI can show an
+// operator-visible warning without loading the plugin.
+//
+// Local enable/disable state is intentionally stored outside `manifest.json`
+// in `.enabled` so toggling a plugin does not mutate the signed manifest.
 
 use std::fs;
 use std::path::{Path, PathBuf};
@@ -71,6 +75,19 @@ fn read_sig_b64(dir: &Path) -> Option<String> {
         .map(|s| s.trim().to_string())
 }
 
+fn enabled_override(dir: &Path) -> Option<bool> {
+    let raw = fs::read_to_string(dir.join(".enabled")).ok()?;
+    match raw.trim() {
+        "1" | "true" | "enabled" => Some(true),
+        "0" | "false" | "disabled" => Some(false),
+        _ => None,
+    }
+}
+
+fn effective_enabled(dir: &Path, manifest: &PluginManifest) -> bool {
+    enabled_override(dir).unwrap_or(manifest.enabled)
+}
+
 fn verify_manifest(dir: &Path, m: &PluginManifest) -> Result<(), String> {
     let manifest_file = dir.join("manifest.json");
     let sig = read_sig_b64(dir);
@@ -113,13 +130,14 @@ pub fn pacs_plugins_list() -> Result<Vec<PluginRecord>, String> {
             }
         };
         let verified = verify_manifest(&p, &m);
+        let enabled = effective_enabled(&p, &m);
         out.push(PluginRecord {
             id: m.id.clone(),
             name: m.name.clone(),
             vendor: m.vendor.clone(),
             version: m.version.clone(),
             capabilities: m.capabilities.clone(),
-            enabled: m.enabled,
+            enabled,
             verified: verified.is_ok(),
             error: verified.err(),
         });
@@ -139,9 +157,7 @@ pub fn pacs_plugins_verify(path: String) -> Result<bool, String> {
     verify_manifest(dir, &m).map(|_| true)
 }
 
-/// Toggle the `enabled` flag in a plugin manifest. Re-verifies the signature
-/// after writing — a successful enable/disable means the manifest still
-/// matches the signed digest (no drift).
+/// Toggle the local enabled flag without mutating the signed manifest.
 #[tauri::command]
 pub fn pacs_plugins_set_enabled(plugin_id: String, enabled: bool) -> Result<bool, String> {
     let dir = plugins_dir()
@@ -150,14 +166,8 @@ pub fn pacs_plugins_set_enabled(plugin_id: String, enabled: bool) -> Result<bool
     if !dir.exists() {
         return Err(format!("plugin '{plugin_id}' not installed"));
     }
-    let (mut m, manifest_path) = read_manifest(&dir)?;
-    m.enabled = enabled;
-    let body = serde_json::to_vec_pretty(&m).map_err(|e| e.to_string())?;
-    fs::write(&manifest_path, body).map_err(|e| e.to_string())?;
-    // Note: enabling/disabling drifts the manifest hash on purpose — the
-    // operator is expected to re-sign or to keep `enabled` outside the
-    // signed surface. Here we treat enable/disable as a local override and
-    // re-sign happens out-of-band; we surface the verification state to the
-    // UI without blocking the flag flip.
+    let (m, _) = read_manifest(&dir)?;
+    fs::write(dir.join(".enabled"), if enabled { "true\n" } else { "false\n" })
+        .map_err(|e| e.to_string())?;
     Ok(verify_manifest(&dir, &m).is_ok())
 }
