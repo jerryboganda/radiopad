@@ -4,7 +4,6 @@
   "private": true,
   "description": "RadioPad — AI-assisted radiology reporting platform (web · desktop · mobile · CLI). Strict stack: Next.js + ASP.NET Core + Tauri + Capacitor.",
   "license": "Apache-2.0",
-  "packageManager": "pnpm@9.15.9",
   "scripts": {
     "dev": "pnpm --filter @radiopad/frontend dev",
     "build": "pnpm --filter @radiopad/frontend build",
@@ -16,6 +15,7 @@
     "cli": "dotnet run --project cli/RadioPad.Cli --"
   },
   "engines": {
-    "node": ">=20.9.0"
+    "node": ">=20.9.0",
+    "pnpm": ">=9.0.0"
   }
 }
