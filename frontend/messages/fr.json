@@ -20,7 +20,13 @@
     "fhirImport": "Import FHIR",
     "pacs": "PACS",
     "security": "Sécurité",
-    "signIn": "Se connecter"
+    "signIn": "Se connecter",
+    "groups": {
+      "workspace": "Espace de travail",
+      "library": "Bibliothèque",
+      "integrations": "Intégrations",
+      "admin": "Administration"
+    }
   },
   "buttons": {
     "primary": {
@@ -72,6 +78,16 @@
   },
   "topbar": {
     "title": "RadioPad",
-    "tagline": "Comptes rendus assistés par IA · v0.1"
+    "tagline": "Comptes rendus assistés par IA · v0.1",
+    "openMenu": "Ouvrir le menu",
+    "primaryNav": "Navigation principale",
+    "collapseSidebar": "Réduire la barre latérale",
+    "expandSidebar": "Développer la barre latérale"
+  },
+  "profile": {
+    "account": "Compte",
+    "language": "Langue",
+    "signOut": "Se déconnecter",
+    "signedOut": "Déconnecté"
   }
 }

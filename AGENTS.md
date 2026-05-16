@@ -6,20 +6,22 @@ This file is the entry point for every AI coding agent (Copilot, Claude Code, Co
 
 ## 0. MISSION-CRITICAL UI/UX RULE (read first)
 
-> **The RadioPad UI/UX is LOCKED to the Open Design (Claude.ai-inspired) visual language. You MUST NOT introduce a different design system, colour palette, component library, or layout shell.**
+> **RadioPad's visual TOKENS (palette, typography, accent `#c96442`, semantic families, `.ai-mark`, radii, shadows) are LOCKED. The APP SHELL has been modernized to a left-sidebar SaaS layout — the sidebar shell is now canonical.** You MUST NOT introduce a different design system, colour palette, dark-mode variant, or component library (Tailwind / MUI / Ant / Chakra / Bootstrap).
 
-The full spec lives in [docs/02-design/design.md](docs/02-design/design.md). The canonical stylesheet is [frontend/app/globals.css](frontend/app/globals.css), which is a verbatim copy of the original Open Design `src/index.css`. When in doubt, read the design doc and copy the existing pattern.
+The full spec lives in [docs/02-design/design.md](docs/02-design/design.md). The canonical stylesheet is [frontend/app/globals.css](frontend/app/globals.css) (token layer) plus [frontend/app/shell.css](frontend/app/shell.css) (sidebar shell + page chrome). When in doubt, read the design doc and copy the existing pattern.
 
 Concretely:
 
 - Use the documented design tokens (`--bg`, `--accent: #c96442`, `--text`, etc.). **Do not invent new ones.**
-- Use the documented component classes (`.app`, `.topbar`, `.split`, `.pane`, `.panel`, `.section-block`, `.composer`, `.primary`, `.ghost`, `.subtle`, etc.).
+- Render every page inside `<AppShell>` (`frontend/components/shell/AppShell.tsx`). Use `<Container>` + `<PageHeader>` for the top of every page; do not re-implement chrome.
+- Use the documented component classes (`.rp-shell`, `.rp-sidebar`, `.rp-topbar`, `.rp-page-header`, `.rp-panel`, `.section-block`, `.composer`, `.primary`, `.ghost`, `.subtle`, etc.). The legacy `.app` / `.topbar` classes survive only as in-page editor chrome inside `.split` two-pane surfaces — they must not be used as the application root.
 - Reports / AI prose render in the serif stack (`var(--serif)`); chrome in sans; codes in mono.
 - Validation severities map to the semantic families: blocker → red, warning → amber, info → blue.
 - AI-generated text **must** be wrapped in `.ai-mark` (purple family) until reviewed.
-- **Forbidden:** Tailwind utility-only styling, Material UI / Ant / Chakra / Bootstrap, dark-mode variants, emoji-as-icons, generic dark-grey "developer-tool" palettes, additional accent colours.
+- Data-driven pages render `<Skeleton />` while loading, `<EmptyState />` for zero rows, and `<ErrorState onRetry />` on fetch failure.
+- **Forbidden:** Tailwind utility-only styling, Material UI / Ant / Chakra / Bootstrap, dark-mode variants, emoji-as-icons, generic dark-grey "developer-tool" palettes, additional accent colours, primary navigation patterns other than the canonical left-sidebar shell.
 
-If a UI requirement cannot be met with the existing tokens/components, stop and add the new token to `globals.css` + `docs/02-design/design.md` in the same PR — never ship a one-off style.
+If a UI requirement cannot be met with the existing tokens/components, stop and add the new token/class to `globals.css` (or `shell.css`) + `docs/02-design/design.md` in the same PR — never ship a one-off style.
 
 ---
 

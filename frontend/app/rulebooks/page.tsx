@@ -4,6 +4,8 @@ import { useEffect, useState } from 'react';
 import Link from 'next/link';
 import { api, type Rulebook } from '@/lib/api';
 import { rulebookHref, rulebookEditorHref } from '@/lib/routes';
+import Container from '@/components/shell/Container';
+import PageHeader from '@/components/shell/PageHeader';
 
 export default function RulebooksPage() {
   const [items, setItems] = useState<Rulebook[]>([]);
@@ -48,13 +50,14 @@ export default function RulebooksPage() {
   }
 
   return (
-    <div className="rp-container">
-      <h1 className="rp-page-title">Rulebooks</h1>
-      <p className="rp-page-sub">Versioned, testable, institution-approved configuration packages that govern AI generation and validation.</p>
-
-      <div className="rp-row rp-gap-sm rp-mb-md">
-        <Link href={rulebookEditorHref()} className="primary-ghost" style={{ textDecoration: 'none' }}>+ Create New (Visual)</Link>
-      </div>
+    <Container>
+      <PageHeader
+        title="Rulebooks"
+        description="Versioned, testable, institution-approved configuration packages that govern AI generation and validation."
+        primaryAction={
+          <Link href={rulebookEditorHref()} className="primary-ghost" style={{ textDecoration: 'none' }}>+ Create new (visual)</Link>
+        }
+      />
 
       {error && <div className="banner warn">{error}</div>}
 
@@ -63,7 +66,7 @@ export default function RulebooksPage() {
           <div className="rp-panel-title">Library</div>
           <table className="rp-table">
             <thead>
-              <tr><th>Id</th><th>Version</th><th>Status</th><th></th></tr>
+              <tr><th>Id</th><th>Version</th><th>Status</th><th aria-label="Actions" /></tr>
             </thead>
             <tbody>
               {items.map((rb) => (
@@ -110,7 +113,7 @@ status: draft
           )}
         </div>
       </div>
-    </div>
+    </Container>
   );
 }
 

@@ -1,11 +1,10 @@
 import './globals.css';
 import './radiopad.css';
+import './shell.css';
 import type { ReactNode } from 'react';
 import ShellBridge from './ShellBridge';
-import BillingStatusBanner from '@/components/BillingStatusBanner';
-import DesktopStatusBanner from '@/components/DesktopStatusBanner';
 import IntlBoundary from '@/components/IntlBoundary';
-import Topbar from '@/components/Topbar';
+import AppShell from '@/components/shell/AppShell';
 
 export const metadata = {
   title: 'RadioPad — AI radiology reporting',
@@ -17,12 +16,7 @@ export default function RootLayout({ children }: { children: ReactNode }) {
     <html lang="en">
       <body>
         <IntlBoundary>
-          <div className="app">
-            <BillingStatusBanner />
-            <Topbar />
-            <DesktopStatusBanner />
-            <main className="rp-main">{children}</main>
-          </div>
+          <AppShell>{children}</AppShell>
           <ShellBridge />
         </IntlBoundary>
       </body>

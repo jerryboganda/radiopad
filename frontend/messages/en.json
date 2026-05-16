@@ -20,7 +20,13 @@
     "fhirImport": "FHIR import",
     "pacs": "PACS",
     "security": "Security",
-    "signIn": "Sign in"
+    "signIn": "Sign in",
+    "groups": {
+      "workspace": "Workspace",
+      "library": "Library",
+      "integrations": "Integrations",
+      "admin": "Admin"
+    }
   },
   "buttons": {
     "primary": {
@@ -72,6 +78,16 @@
   },
   "topbar": {
     "title": "RadioPad",
-    "tagline": "AI radiology reporting · v0.1"
+    "tagline": "AI radiology reporting · v0.1",
+    "openMenu": "Open menu",
+    "primaryNav": "Primary navigation",
+    "collapseSidebar": "Collapse sidebar",
+    "expandSidebar": "Expand sidebar"
+  },
+  "profile": {
+    "account": "Account",
+    "language": "Language",
+    "signOut": "Sign out",
+    "signedOut": "Signed out"
   }
 }

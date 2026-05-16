@@ -1,9 +1,15 @@
 'use client';
 
 import Link from 'next/link';
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { api, type Report } from '@/lib/api';
 import { reportHref } from '@/lib/routes';
+import Container from '@/components/shell/Container';
+import PageHeader from '@/components/shell/PageHeader';
+import EmptyState from '@/components/ui/EmptyState';
+import ErrorState from '@/components/ui/ErrorState';
+import { TableSkeleton } from '@/components/ui/Skeleton';
+import StatusBadge, { reportStatusTone } from '@/components/ui/StatusBadge';
 
 const PAGE_SIZE = 25;
 
@@ -21,6 +27,7 @@ export default function DashboardPage() {
   const [total, setTotal] = useState(0);
   const [me, setMe] = useState<{ tenant: { displayName: string }; user: { email: string } } | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [loading, setLoading] = useState(true);
   const [statusFilter, setStatusFilter] = useState<string>('all');
   const [modalityFilter, setModalityFilter] = useState<string>('all');
   const [search, setSearch] = useState<string>('');
@@ -30,32 +37,37 @@ export default function DashboardPage() {
     api.me().then(setMe).catch((e: Error) => setError(e.message));
   }, []);
 
+  const fetchReports = useCallback(() => {
+    setLoading(true);
+    setError(null);
+    return api.reports
+      .listPaged({
+        modality: modalityFilter === 'all' ? undefined : modalityFilter,
+        status: STATUS_TO_INT[statusFilter],
+        q: search.trim() || undefined,
+        skip: page * PAGE_SIZE,
+        take: PAGE_SIZE,
+      })
+      .then(({ items, total }) => {
+        setReports(items);
+        setTotal(total);
+      })
+      .catch((e: Error) => setError(e.message))
+      .finally(() => setLoading(false));
+  }, [modalityFilter, statusFilter, search, page]);
+
   useEffect(() => {
-    const handle = setTimeout(() => {
-      api.reports
-        .listPaged({
-          modality: modalityFilter === 'all' ? undefined : modalityFilter,
-          status: STATUS_TO_INT[statusFilter],
-          q: search.trim() || undefined,
-          skip: page * PAGE_SIZE,
-          take: PAGE_SIZE,
-        })
-        .then(({ items, total }) => {
-          setReports(items);
-          setTotal(total);
-        })
-        .catch((e: Error) => setError(e.message));
-    }, 200);
+    const handle = setTimeout(() => { void fetchReports(); }, 200);
     return () => clearTimeout(handle);
-  }, [statusFilter, modalityFilter, search, page]);
+  }, [fetchReports]);
 
   // Reset to page 0 whenever filters change.
   useEffect(() => { setPage(0); }, [statusFilter, modalityFilter, search]);
 
-  async function newReport() {
+  const newReport = useCallback(async () => {
     const r = await api.reports.create({ modality: 'CT', bodyPart: 'Chest', indication: 'New report' });
     location.href = reportHref(r.id);
-  }
+  }, []);
 
   useEffect(() => {
     if (typeof window === 'undefined') return;
@@ -63,7 +75,7 @@ export default function DashboardPage() {
     if (params.get('new') !== '1' || handledNewReport.current) return;
     handledNewReport.current = true;
     void newReport();
-  }, []);
+  }, [newReport]);
 
   const modalities = useMemo(
     () => Array.from(new Set(reports.map((r) => r.study.modality))).sort(),
@@ -71,31 +83,26 @@ export default function DashboardPage() {
   );
 
   const totalPages = Math.max(1, Math.ceil(total / PAGE_SIZE));
+  const filtersActive = statusFilter !== 'all' || modalityFilter !== 'all' || search.trim() !== '';
 
   return (
-    <div className="rp-container">
-      <h1 className="rp-page-title">Reports</h1>
-      <p className="rp-page-sub">{me ? `${me.tenant.displayName} — signed in as ${me.user.email}` : 'Loading…'}</p>
-
-      {error && (
-        <div className="banner warn">
-          Backend not reachable: {error}. Start the API with <code>dotnet run --project backend/RadioPad.Api/src/RadioPad.Api</code>.
-        </div>
-      )}
-
-      <div className="rp-panel">
-        <div className="rp-row between" style={{ marginBottom: 12 }}>
-          <div className="rp-panel-title" style={{ marginBottom: 0 }}>Recent reports</div>
+    <Container>
+      <PageHeader
+        title="Reports"
+        description={me ? `${me.tenant.displayName} — signed in as ${me.user.email}` : 'Loading workspace…'}
+        primaryAction={
           <button className="primary" onClick={newReport}>+ New report</button>
-        </div>
+        }
+      />
 
-        <div className="rp-toolbar" style={{ marginBottom: 12 }}>
+      <section className="rp-panel">
+        <div className="rp-toolbar" style={{ marginBottom: 16 }}>
           <input
             className="rp-input"
             placeholder="Search accession / body part / indication"
             value={search}
             onChange={(e) => setSearch(e.target.value)}
-            style={{ minWidth: 280 }}
+            style={{ minWidth: 280, flex: '1 1 280px' }}
             aria-label="Search reports"
           />
           <select className="rp-input" value={statusFilter} onChange={(e) => setStatusFilter(e.target.value)} aria-label="Filter by status">
@@ -108,51 +115,69 @@ export default function DashboardPage() {
           <select className="rp-input" value={modalityFilter} onChange={(e) => setModalityFilter(e.target.value)} aria-label="Filter by modality">
             <option value="all">All modalities</option>
             {modalities.map((m) => <option key={m} value={m}>{m}</option>)}
-            {/* fallback common modalities */}
             {modalities.length === 0 && ['CT', 'MRI', 'XR', 'US'].map((m) => <option key={m} value={m}>{m}</option>)}
           </select>
-          <span className="badge info">{total} total</span>
+          <StatusBadge tone="info">{total} total</StatusBadge>
         </div>
 
-        <table className="rp-table">
-          <thead>
-            <tr>
-              <th>Accession</th>
-              <th>Modality</th>
-              <th>Body part</th>
-              <th>Status</th>
-              <th>Updated</th>
-              <th></th>
-            </tr>
-          </thead>
-          <tbody>
-            {reports.length === 0 && (
-              <tr><td colSpan={6} style={{ color: 'var(--text-muted)' }}>
-                {total === 0 ? 'No reports yet. Create one to begin.' : 'No reports match the current filters.'}
-              </td></tr>
-            )}
-            {reports.map((r) => (
-              <tr key={r.id}>
-                <td><code>{r.study.accessionNumber}</code></td>
-                <td>{r.study.modality}</td>
-                <td>{r.study.bodyPart}</td>
-                <td><span className="badge">{statusLabel(r.status)}</span></td>
-                <td style={{ color: 'var(--text-muted)' }}>{new Date(r.updatedAt).toLocaleString()}</td>
-                <td><Link href={reportHref(r.id)}>Open →</Link></td>
+        {loading && reports.length === 0 ? (
+          <TableSkeleton rows={6} cols={5} />
+        ) : error ? (
+          <ErrorState
+            title="Couldn't load reports"
+            message={`Backend not reachable: ${error}. Start the API with dotnet run --project backend/RadioPad.Api/src/RadioPad.Api`}
+            onRetry={() => { void fetchReports(); }}
+          />
+        ) : reports.length === 0 ? (
+          <EmptyState
+            title={filtersActive ? 'No reports match your filters' : 'No reports yet'}
+            description={filtersActive ? 'Try clearing filters or broadening your search.' : 'Create your first report to get started.'}
+            action={
+              filtersActive ? (
+                <button className="ghost" onClick={() => { setStatusFilter('all'); setModalityFilter('all'); setSearch(''); }}>
+                  Clear filters
+                </button>
+              ) : (
+                <button className="primary" onClick={newReport}>+ New report</button>
+              )
+            }
+          />
+        ) : (
+          <table className="rp-table">
+            <thead>
+              <tr>
+                <th>Accession</th>
+                <th>Modality</th>
+                <th>Body part</th>
+                <th>Status</th>
+                <th>Updated</th>
+                <th aria-label="Actions" />
               </tr>
-            ))}
-          </tbody>
-        </table>
+            </thead>
+            <tbody>
+              {reports.map((r) => (
+                <tr key={r.id}>
+                  <td><code>{r.study.accessionNumber}</code></td>
+                  <td>{r.study.modality}</td>
+                  <td>{r.study.bodyPart}</td>
+                  <td><StatusBadge tone={reportStatusTone(r.status)}>{statusLabel(r.status)}</StatusBadge></td>
+                  <td style={{ color: 'var(--text-muted)' }}>{new Date(r.updatedAt).toLocaleString()}</td>
+                  <td><Link href={reportHref(r.id)}>Open →</Link></td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        )}
 
-        {total > PAGE_SIZE && (
-          <div className="rp-row" style={{ justifyContent: 'flex-end', gap: 8, marginTop: 12 }}>
+        {!loading && !error && reports.length > 0 && total > PAGE_SIZE && (
+          <div className="rp-row" style={{ justifyContent: 'flex-end', gap: 8, marginTop: 16 }}>
             <button className="ghost" disabled={page === 0} onClick={() => setPage((p) => Math.max(0, p - 1))}>← Prev</button>
-            <span className="badge" style={{ alignSelf: 'center' }}>{page + 1} / {totalPages}</span>
+            <StatusBadge tone="neutral">{page + 1} / {totalPages}</StatusBadge>
             <button className="ghost" disabled={page + 1 >= totalPages} onClick={() => setPage((p) => p + 1)}>Next →</button>
           </div>
         )}
-      </div>
-    </div>
+      </section>
+    </Container>
   );
 }
 

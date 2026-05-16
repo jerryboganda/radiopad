@@ -20,7 +20,13 @@
     "fhirImport": "Importar FHIR",
     "pacs": "PACS",
     "security": "Segurança",
-    "signIn": "Entrar"
+    "signIn": "Entrar",
+    "groups": {
+      "workspace": "Área de trabalho",
+      "library": "Biblioteca",
+      "integrations": "Integrações",
+      "admin": "Administração"
+    }
   },
   "buttons": {
     "primary": {
@@ -72,6 +78,16 @@
   },
   "topbar": {
     "title": "RadioPad",
-    "tagline": "Laudos radiológicos com IA · v0.1"
+    "tagline": "Laudos radiológicos com IA · v0.1",
+    "openMenu": "Abrir menu",
+    "primaryNav": "Navegação principal",
+    "collapseSidebar": "Recolher barra lateral",
+    "expandSidebar": "Expandir barra lateral"
+  },
+  "profile": {
+    "account": "Conta",
+    "language": "Idioma",
+    "signOut": "Sair",
+    "signedOut": "Desconectado"
   }
 }

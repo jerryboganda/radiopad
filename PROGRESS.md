@@ -4,6 +4,36 @@
 
 ---
 
+## Iteration 40 — Frontend shell modernization (sidebar + page chrome)
+
+- **Date:** 2026-05-17
+- **Scope:** lift the topbar+split design-lock, replace the 21-link horizontal topbar with a fixed left sidebar + slim contextual topbar, introduce reusable page chrome (Container, PageHeader, Breadcrumbs, EmptyState, ErrorState, Skeleton, StatusBadge), and migrate the reference pages.
+
+### Delivered
+
+- Updated design-lock docs (`AGENTS.md` §0, `CLAUDE.md`, `docs/02-design/design.md`): tokens still locked, but the canonical app shell is now the left-sidebar + slim-topbar pattern; alternative nav patterns explicitly forbidden.
+- New `frontend/app/shell.css` extends `globals.css` tokens (no token redefinition) with sidebar/topbar/page-header/drawer/skeleton/empty/error/status-badge styles.
+- New shell components under `frontend/components/shell/`: `AppShell`, `Sidebar` (4 IA groups, 20 inline-SVG icons, no icon-pack dep), `Topbar` (slim, contextual), `ProfileMenu`, `Breadcrumbs`, `Container`, `PageHeader`, `MobileDrawerBackdrop`, `PageActionsSlot`, `ShellContext` (collapsed in `localStorage` + drawer + Escape).
+- New UI primitives under `frontend/components/ui/`: `EmptyState`, `ErrorState`, `Skeleton` (+ `TableSkeleton`), `StatusBadge` (+ `reportStatusTone`).
+- `app/layout.tsx` rewired to `<AppShell>`; legacy `components/Topbar.tsx` removed.
+- i18n keys added across all 6 locales (`nav.groups.*`, `topbar.*`, `profile.*`).
+- Migrated reference pages to the PageHeader pattern: Reports list (`app/page.tsx` — full skeleton + empty + error + retry implementation), `rulebooks/`, `templates/`, `providers/`, `validation/`. All other pages render unchanged through the new shell because legacy `.rp-container` / `.rp-page-title` classes are preserved (additive shell).
+- Tests: replaced `topbar.test.tsx` with `sidebar.test.tsx` (asserts the locked 4-group IA + every primary route in its documented group + `isActive()` semantics + icon render smoke); added `pageHeader.test.tsx`.
+
+### Validation
+
+- `pnpm typecheck` — clean
+- `pnpm test` — 113 / 113 passing across 21 test files
+- `pnpm build` — all 40 routes statically exported
+
+### Notes
+
+- Mobile breakpoint `≤900px` switches sidebar to a fixed drawer with backdrop click + Escape close + `prefers-reduced-motion` respect. Focus-trap is a follow-up.
+- `PageActions` portal-via-context is wired but not yet consumed; pages currently use `<PageHeader primaryAction={…}>`.
+- Pages using the in-page two-pane `.split` editor (`/reports/view`, `/rulebooks/editor`) still render correctly inside the new shell; opting them into `<Container fluid>` and suppressing PageHeader is a future polish item.
+
+---
+
 ## Iteration 39 — Copilot red-item completion
 
 - **Date:** 2026-05-16
