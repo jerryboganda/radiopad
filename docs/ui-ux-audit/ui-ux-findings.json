@@ -1,0 +1,255 @@
+[
+  {
+    "id": "UI-001",
+    "severity": "HIGH",
+    "priority": "P1",
+    "category": "NAVIGATION",
+    "route": "/login",
+    "component": "AppShell/LoginPage",
+    "file": "frontend/app/layout.tsx",
+    "viewport": "all",
+    "problem": "The login page is rendered inside the full sidebar/topbar app shell before authentication.",
+    "impact": "Users see primary navigation and app chrome before sign-in, which crowds the auth experience and weakens IA clarity.",
+    "recommendation": "Add an auth route group/layout exception or conditionally omit sidebar/topbar on auth routes.",
+    "acceptanceCriteria": [
+      "The login route displays an auth-focused shell.",
+      "Primary app navigation is not shown before sign-in.",
+      "The auth shell still uses locked RadioPad tokens."
+    ],
+    "evidence": {
+      "screenshot": null,
+      "notes": "Root layout wraps all children in AppShell; login renders a form within rp-container."
+    },
+    "estimatedEffort": "Medium"
+  },
+  {
+    "id": "UI-035",
+    "severity": "HIGH",
+    "priority": "P1",
+    "category": "RESPONSIVE",
+    "route": "multiple",
+    "component": "rp-table",
+    "file": "frontend/app/radiopad.css",
+    "viewport": "320px-768px",
+    "problem": "Shared tables have no built-in responsive behavior and many pages render dense tables directly.",
+    "impact": "Mobile and tablet users are likely to encounter horizontal overflow or unreadable compressed columns.",
+    "recommendation": "Introduce a canonical ResponsiveTable/TableFrame component using locked tokens.",
+    "acceptanceCriteria": [
+      "No page-level horizontal overflow at 320px, 360px, 390px, 430px, or 768px.",
+      "Tables expose accessible headers and actions.",
+      "Dense rows have a mobile card or horizontal-scroll fallback."
+    ],
+    "evidence": {
+      "screenshot": null,
+      "notes": "Examples include /validation, /audit, /templates, /providers, /admin/security."
+    },
+    "estimatedEffort": "Large"
+  },
+  {
+    "id": "A11Y-02",
+    "severity": "HIGH",
+    "priority": "P1",
+    "category": "ACCESSIBILITY",
+    "route": "all",
+    "component": "Mobile sidebar drawer",
+    "file": "frontend/components/shell/Sidebar.tsx",
+    "viewport": "mobile",
+    "problem": "Closed mobile sidebar appears to be moved off-screen rather than made inert, and no focus trap/return behavior was found.",
+    "impact": "Keyboard and assistive-technology users may tab into hidden navigation or lose focus context.",
+    "recommendation": "Implement accessible drawer behavior: inert when closed, focus on open, focus trap, Escape close, focus return.",
+    "acceptanceCriteria": [
+      "Closed drawer has no focusable descendants.",
+      "Opening the drawer moves focus into it.",
+      "Escape closes the drawer and returns focus to the menu button."
+    ],
+    "evidence": {
+      "screenshot": null,
+      "notes": "AppShell/Sidebar/shell.css source review."
+    },
+    "estimatedEffort": "Medium"
+  },
+  {
+    "id": "A11Y-04",
+    "severity": "HIGH",
+    "priority": "P1",
+    "category": "MODALS",
+    "route": "/providers, /templates",
+    "component": "Local modal implementations",
+    "file": "frontend/app/providers/page.tsx",
+    "viewport": "all",
+    "problem": "Provider and template modals do not consistently implement dialog semantics, initial focus, focus trap, Escape close, and focus return.",
+    "impact": "Keyboard users may be unable to reliably complete or exit modal workflows.",
+    "recommendation": "Create and use a shared accessible Dialog primitive.",
+    "acceptanceCriteria": [
+      "Dialogs have accessible names and aria-modal semantics.",
+      "Focus is trapped while open.",
+      "Focus returns to the opener on close."
+    ],
+    "evidence": {
+      "screenshot": null,
+      "notes": "Provider modal lacks role=dialog/aria-modal; template modal is partial."
+    },
+    "estimatedEffort": "Large"
+  },
+  {
+    "id": "A11Y-01",
+    "severity": "HIGH",
+    "priority": "P1",
+    "category": "FORMS",
+    "route": "multiple",
+    "component": "Labels and controls",
+    "file": "frontend/app/reports/[id]/ReportClient.tsx",
+    "viewport": "all",
+    "problem": "Many visible labels are not programmatically associated with controls.",
+    "impact": "Screen-reader users may not know what inputs, selects, and textareas represent.",
+    "recommendation": "Add stable id/htmlFor pairs or wrap controls inside labels.",
+    "acceptanceCriteria": [
+      "Every form control has a programmatic label.",
+      "Automated accessibility checks do not report unlabeled controls.",
+      "Label text remains visually consistent with locked CSS."
+    ],
+    "evidence": {
+      "screenshot": null,
+      "notes": "Examples found in login and report editor section-block patterns."
+    },
+    "estimatedEffort": "Large"
+  },
+  {
+    "id": "UI-005",
+    "severity": "HIGH",
+    "priority": "P1",
+    "category": "BUTTONS",
+    "route": "/reports/view",
+    "component": "Report editor toolbar",
+    "file": "frontend/app/reports/[id]/ReportClient.tsx",
+    "viewport": "all",
+    "problem": "Report editor toolbar presents many equal-weight actions for AI generation, rewrite, validation, export, copy, and acknowledgement.",
+    "impact": "The primary clinical workflow is visually diluted and harder to learn.",
+    "recommendation": "Group actions by workflow stage and reserve primary styling for the next safe step.",
+    "acceptanceCriteria": [
+      "Only one primary action is visible per workflow surface.",
+      "Exports are grouped behind a menu or secondary panel.",
+      "Disabled actions explain why they are disabled."
+    ],
+    "evidence": {
+      "screenshot": null,
+      "notes": "Toolbar actions span ReportClient source around the report editing surface."
+    },
+    "estimatedEffort": "Large"
+  },
+  {
+    "id": "UI-014",
+    "severity": "HIGH",
+    "priority": "P1",
+    "category": "RESPONSIVE",
+    "route": "/rulebooks/editor",
+    "component": "split editor layout",
+    "file": "frontend/app/globals.css",
+    "viewport": "320px-768px",
+    "problem": "The editor uses a fixed split layout with a 380px-460px first column and no mobile media query.",
+    "impact": "The editor can overflow or become unusable on mobile/tablet widths.",
+    "recommendation": "Add responsive stacking for split editor layouts.",
+    "acceptanceCriteria": [
+      "No horizontal overflow at 320px and 768px.",
+      "YAML preview and visual editor remain reachable.",
+      "Primary save/validate actions remain visible."
+    ],
+    "evidence": {
+      "screenshot": null,
+      "notes": "Source-level CSS and RulebookEditorClient review."
+    },
+    "estimatedEffort": "Medium"
+  },
+  {
+    "id": "UI-019",
+    "severity": "HIGH",
+    "priority": "P1",
+    "category": "DESIGN_SYSTEM",
+    "route": "/prompts",
+    "component": "Prompt Studio",
+    "file": "frontend/app/prompts/page.tsx",
+    "viewport": "all",
+    "problem": "Prompt Studio uses generic pane/panel classes outside the canonical Container/PageHeader/rp-panel system.",
+    "impact": "Visual styling can drift or be missing, and the page does not follow the locked shell pattern.",
+    "recommendation": "Rebuild the page structure with Container, PageHeader, rp-panel, and documented tab patterns.",
+    "acceptanceCriteria": [
+      "No undefined panel/panel-header classes are used.",
+      "The page uses canonical shell/page primitives.",
+      "Tabs are accessible and visually consistent."
+    ],
+    "evidence": {
+      "screenshot": null,
+      "notes": "Source review found panel/panel-header/pane usage."
+    },
+    "estimatedEffort": "Large"
+  },
+  {
+    "id": "COPY-01",
+    "severity": "HIGH",
+    "priority": "P1",
+    "category": "COPY",
+    "route": "/login",
+    "component": "LoginPage",
+    "file": "frontend/app/login/page.tsx",
+    "viewport": "all",
+    "problem": "Sign-in copy exposes developer/internal implementation details.",
+    "impact": "Production users see confusing and low-trust technical language.",
+    "recommendation": "Use user-facing identity copy and move diagnostics to a dev/admin help area.",
+    "acceptanceCriteria": [
+      "Login copy does not mention headers, reverse proxies, or token storage.",
+      "Dev details are hidden behind explicit diagnostics/help.",
+      "Copy remains localizable."
+    ],
+    "evidence": {
+      "screenshot": null,
+      "notes": "Source copy references dev identity and infrastructure details."
+    },
+    "estimatedEffort": "Small"
+  },
+  {
+    "id": "NS-003",
+    "severity": "HIGH",
+    "priority": "P1",
+    "category": "SECURITY_UX",
+    "route": "/offline",
+    "component": "offlineDrafts",
+    "file": "frontend/lib/offlineDrafts.ts",
+    "viewport": "mobile",
+    "problem": "Mobile offline drafts can fall back to Capacitor Preferences/localStorage for report content.",
+    "impact": "PHI-bearing draft storage may not match user expectations for secure native offline storage.",
+    "recommendation": "Require encrypted mobile draft storage or document/gate platform security controls with clear UI state.",
+    "acceptanceCriteria": [
+      "Mobile offline draft storage is encrypted or explicitly disabled/gated.",
+      "Users can see whether local drafts are protected.",
+      "Unsupported storage paths show clear error/recovery copy."
+    ],
+    "evidence": {
+      "screenshot": null,
+      "notes": "Native shell audit reviewed offlineDrafts and mobile fallback behavior."
+    },
+    "estimatedEffort": "Large"
+  },
+  {
+    "id": "NS-002",
+    "severity": "HIGH",
+    "priority": "P1",
+    "category": "NATIVE_SHELL",
+    "route": "mobile shell",
+    "component": "apiBase",
+    "file": "frontend/lib/api.ts",
+    "viewport": "mobile",
+    "problem": "Mobile backend URL handoff is not defined at runtime unless NEXT_PUBLIC_API_BASE is baked into the export.",
+    "impact": "Capacitor users can land in unclear offline/API failure states.",
+    "recommendation": "Define a mobile backend base URL strategy for dev, staging, production, offline, and invalid certificates.",
+    "acceptanceCriteria": [
+      "Mobile app can resolve backend URL in each target environment.",
+      "Invalid or unreachable backend states show actionable UI.",
+      "No PHI is exposed in failure copy."
+    ],
+    "evidence": {
+      "screenshot": null,
+      "notes": "api.ts falls back to Tauri bridge or empty base; Capacitor config only documents production assumption."
+    },
+    "estimatedEffort": "Medium"
+  }
+]
