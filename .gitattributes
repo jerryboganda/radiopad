@@ -1,0 +1,24 @@
+# RadioPad — line ending normalization
+# Store all text files with LF in the repository regardless of OS.
+
+* text=auto eol=lf
+
+# Explicitly binary — never transform
+*.png binary
+*.jpg binary
+*.ico binary
+*.wasm binary
+*.db binary
+*.sig binary
+*.pub binary
+
+# Ensure source files are always LF in the working tree
+*.cs text eol=lf
+*.ts text eol=lf
+*.tsx text eol=lf
+*.json text eol=lf
+*.yaml text eol=lf
+*.yml text eol=lf
+*.md text eol=lf
+*.css text eol=lf
+*.sh text eol=lf
