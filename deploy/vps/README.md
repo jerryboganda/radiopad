@@ -43,7 +43,8 @@ RADIOPAD_COLUMN_KEK=<generate-with: openssl rand -base64 32>
 EOF
 chmod 600 .secrets.env
 
-# Build and start
+# Build and start. The compose file keeps secrets and data outside the
+# fresh-synced source tree at /opt/radiopad/.secrets.env and /opt/radiopad/data.
 cd src
 docker compose -f deploy/vps/docker-compose.yml --env-file ../.secrets.env up -d --build
 ```

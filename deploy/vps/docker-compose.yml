@@ -6,7 +6,7 @@ services:
     container_name: radiopad-api
     restart: unless-stopped
     env_file:
-      - ../../.secrets.env
+      - ../../../.secrets.env
     environment:
       ASPNETCORE_ENVIRONMENT: Production
       RADIOPAD_BIND: http://0.0.0.0:7457
@@ -16,7 +16,7 @@ services:
       RADIOPAD_RATE_LIMIT_IP_PER_MIN: "600"
       RADIOPAD_RATE_LIMIT_TENANT_PER_MIN: "5000"
     volumes:
-      - ../../data:/data
+      - ../../../data:/data
     networks:
       - radiopad
 
