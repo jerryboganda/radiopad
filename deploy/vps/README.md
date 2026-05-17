@@ -120,15 +120,24 @@ Use this only when moving an existing VPS from the legacy SQLite layout
    ```
 
 3. Load the SQLite database into PostgreSQL from the compose network. Replace
-   placeholders with the values from `/opt/radiopad/.secrets.env`.
+   placeholders with the values from `/opt/radiopad/.secrets.env`. The mount is
+   intentionally writable because pgloader's SQLite driver opens the source DB
+   read-write even during a cold import.
 
    ```bash
    docker run --rm --network radiopad_network \
-     -v /opt/radiopad/data:/legacy:ro \
+     -v /opt/radiopad/data:/legacy \
      dimitri/pgloader:latest \
-     pgloader /legacy/radiopad.db \
+     pgloader sqlite:////legacy/radiopad.db \
        postgresql://radiopad:<POSTGRES_PASSWORD>@radiopad-postgres:5432/radiopad
    ```
+
+   After pgloader completes, normalize SQLite affinity columns to the EF/Npgsql
+   native types before starting the API: GUID columns must be `uuid`, timestamps
+   must be `timestamptz`, booleans must be `boolean`, and enum/int columns must
+   be `integer`. Do this against a cold backup first and keep the original
+   SQLite file until API readiness, tenant sign-in, report creation, and audit
+   verification pass.
 
 4. Start the API and web services, then run readiness checks.
 

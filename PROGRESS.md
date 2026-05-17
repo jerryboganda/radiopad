@@ -4,6 +4,45 @@
 
 ---
 
+## Iteration 50 - Fresh GitHub to VPS production deploy
+
+- **Date:** 2026-05-17
+- **Branch:** `manwara575-star/ultrawork-planning`
+- **Scope:** Push the production Auth/RBAC hardening work to GitHub `main`, refresh the VPS directly from GitHub, migrate the legacy SQLite data to PostgreSQL, rebuild fresh containers, and verify production health.
+
+### Delivered
+
+- Pushed commit `18f41588` (`Harden production auth and RBAC`) to both `origin/manwara575-star/ultrawork-planning` and fast-forwarded `origin/main` without force-pushing or overwriting remote work.
+- Refreshed `/opt/radiopad/src` on the VPS from GitHub `main` at commit `18f4158`.
+- Backed up the existing VPS secrets file and legacy SQLite database under `/opt/radiopad/backups/`.
+- Completed the SQLite-to-PostgreSQL cutover:
+  - created the `radiopad-postgres` container and `radiopad_pgdata` volume;
+  - imported the cold SQLite database with pgloader;
+  - normalized imported PostgreSQL column types for EF/Npgsql (`uuid`, `timestamptz`, `boolean`, numeric/integer types).
+- Rebuilt fresh no-cache `vps-radiopad-api` and `vps-radiopad-web` images from the new source.
+- Recreated the production stack with `radiopad-api`, `radiopad-web`, and `radiopad-postgres` healthy.
+- The web container is now bound to `127.0.0.1:8093` instead of public `0.0.0.0:8093`.
+
+### Validation
+
+- VPS source commit: `18f4158`.
+- `radiopad-api`: healthy.
+- `radiopad-web`: healthy.
+- `radiopad-postgres`: healthy.
+- `GET http://127.0.0.1:8093/api/health` returned `{"status":"ok","service":"radiopad-api",...}`.
+- `GET http://127.0.0.1:8093/api/health/ready` returned `{"status":"ready","db":true,...}`.
+- `HEAD http://127.0.0.1:8093/` returned `HTTP/1.1 200 OK`.
+- PostgreSQL contains the expected migrated tables including `AuthSessions` and `Tenants`.
+
+### Notes
+
+- The VPS pgloader image requires the SQLite source mount to be writable; the first read-only import attempt failed before mutating data.
+- The generated Postgres password was rotated to a URL-safe hex secret because pgloader did not accept the initial URL-encoded base64 secret.
+- The migrated PostgreSQL schema needed post-import type normalization because pgloader imported SQLite GUID/date/bool columns with SQLite-compatible affinities.
+- Existing unrelated local `rulebooks/*.yaml` and `pnpm-workspace.yaml` working-tree changes remain untouched and uncommitted.
+
+---
+
 ## Iteration 49 - Production auth RBAC hardening
 
 - **Date:** 2026-05-17
