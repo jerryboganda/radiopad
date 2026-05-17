@@ -11,6 +11,96 @@ public static class EnterpriseIdentityBridge
     public const string LegacyProviderKey = "legacy-user";
     public const string LegacyIssuer = "radiopad";
 
+    public static async Task EnsureSchemaAsync(RadioPadDbContext db, CancellationToken ct)
+    {
+        if (!string.Equals(db.Database.ProviderName, "Microsoft.EntityFrameworkCore.Sqlite", StringComparison.Ordinal))
+            return;
+
+        await db.Database.ExecuteSqlRawAsync("""
+            CREATE TABLE IF NOT EXISTS "GlobalUsers" (
+                "Id" TEXT NOT NULL CONSTRAINT "PK_GlobalUsers" PRIMARY KEY,
+                "CreatedAt" INTEGER NOT NULL,
+                "UpdatedAt" INTEGER NOT NULL,
+                "PrimaryEmail" TEXT NOT NULL,
+                "NormalizedEmail" TEXT NOT NULL,
+                "DisplayName" TEXT NOT NULL,
+                "IsActive" INTEGER NOT NULL,
+                "LastLoginAt" INTEGER NULL
+            );
+            """, ct);
+
+        await db.Database.ExecuteSqlRawAsync("""
+            CREATE TABLE IF NOT EXISTS "ExternalIdentities" (
+                "Id" TEXT NOT NULL CONSTRAINT "PK_ExternalIdentities" PRIMARY KEY,
+                "CreatedAt" INTEGER NOT NULL,
+                "UpdatedAt" INTEGER NOT NULL,
+                "GlobalUserId" TEXT NOT NULL,
+                "ProviderKey" TEXT NOT NULL,
+                "Issuer" TEXT NOT NULL,
+                "Subject" TEXT NOT NULL,
+                "Email" TEXT NOT NULL,
+                "NormalizedEmail" TEXT NOT NULL,
+                "DisplayName" TEXT NOT NULL,
+                "ClaimsJson" TEXT NOT NULL,
+                "LastSeenAt" INTEGER NULL,
+                "RevokedAt" INTEGER NULL
+            );
+            """, ct);
+
+        await db.Database.ExecuteSqlRawAsync("""
+            CREATE TABLE IF NOT EXISTS "TenantMemberships" (
+                "Id" TEXT NOT NULL CONSTRAINT "PK_TenantMemberships" PRIMARY KEY,
+                "CreatedAt" INTEGER NOT NULL,
+                "UpdatedAt" INTEGER NOT NULL,
+                "GlobalUserId" TEXT NOT NULL,
+                "TenantId" TEXT NOT NULL,
+                "UserId" TEXT NOT NULL,
+                "Status" TEXT NOT NULL,
+                "IsDefault" INTEGER NOT NULL,
+                "JoinedAt" INTEGER NOT NULL,
+                "RemovedAt" INTEGER NULL,
+                "SessionEpoch" INTEGER NOT NULL
+            );
+            """, ct);
+
+        await db.Database.ExecuteSqlRawAsync("""
+            CREATE TABLE IF NOT EXISTS "AuthSessions" (
+                "Id" TEXT NOT NULL CONSTRAINT "PK_AuthSessions" PRIMARY KEY,
+                "CreatedAt" INTEGER NOT NULL,
+                "UpdatedAt" INTEGER NOT NULL,
+                "GlobalUserId" TEXT NOT NULL,
+                "TenantMembershipId" TEXT NULL,
+                "TenantId" TEXT NULL,
+                "UserId" TEXT NULL,
+                "TokenHash" TEXT NOT NULL,
+                "Method" TEXT NOT NULL,
+                "IssuedAt" INTEGER NOT NULL,
+                "ExpiresAt" INTEGER NOT NULL,
+                "RevokedAt" INTEGER NULL,
+                "RevocationReason" TEXT NOT NULL,
+                "DeviceFingerprintHash" TEXT NOT NULL,
+                "IpHash" TEXT NOT NULL,
+                "UserAgentHash" TEXT NOT NULL,
+                "SessionEpochAtIssue" INTEGER NOT NULL
+            );
+            """, ct);
+
+        await db.Database.ExecuteSqlRawAsync("""CREATE INDEX IF NOT EXISTS "IX_GlobalUsers_NormalizedEmail" ON "GlobalUsers" ("NormalizedEmail");""", ct);
+        await db.Database.ExecuteSqlRawAsync("""CREATE UNIQUE INDEX IF NOT EXISTS "IX_ExternalIdentities_ProviderKey_Issuer_Subject" ON "ExternalIdentities" ("ProviderKey", "Issuer", "Subject");""", ct);
+        await db.Database.ExecuteSqlRawAsync("""CREATE INDEX IF NOT EXISTS "IX_ExternalIdentities_GlobalUserId_ProviderKey" ON "ExternalIdentities" ("GlobalUserId", "ProviderKey");""", ct);
+        await db.Database.ExecuteSqlRawAsync("""CREATE INDEX IF NOT EXISTS "IX_ExternalIdentities_NormalizedEmail" ON "ExternalIdentities" ("NormalizedEmail");""", ct);
+        await db.Database.ExecuteSqlRawAsync("""CREATE UNIQUE INDEX IF NOT EXISTS "IX_TenantMemberships_TenantId_UserId" ON "TenantMemberships" ("TenantId", "UserId");""", ct);
+        await db.Database.ExecuteSqlRawAsync("""CREATE UNIQUE INDEX IF NOT EXISTS "IX_TenantMemberships_GlobalUserId_TenantId" ON "TenantMemberships" ("GlobalUserId", "TenantId");""", ct);
+        await db.Database.ExecuteSqlRawAsync("""CREATE INDEX IF NOT EXISTS "IX_TenantMemberships_TenantId_Status" ON "TenantMemberships" ("TenantId", "Status");""", ct);
+        await db.Database.ExecuteSqlRawAsync("""CREATE UNIQUE INDEX IF NOT EXISTS "IX_AuthSessions_TokenHash" ON "AuthSessions" ("TokenHash");""", ct);
+        await db.Database.ExecuteSqlRawAsync("""CREATE INDEX IF NOT EXISTS "IX_AuthSessions_GlobalUserId_ExpiresAt" ON "AuthSessions" ("GlobalUserId", "ExpiresAt");""", ct);
+        await db.Database.ExecuteSqlRawAsync("""CREATE INDEX IF NOT EXISTS "IX_AuthSessions_TenantId_UserId_ExpiresAt" ON "AuthSessions" ("TenantId", "UserId", "ExpiresAt");""", ct);
+        await db.Database.ExecuteSqlRawAsync("""CREATE INDEX IF NOT EXISTS "IX_AuthSessions_RevokedAt_ExpiresAt" ON "AuthSessions" ("RevokedAt", "ExpiresAt");""", ct);
+        await db.Database.ExecuteSqlRawAsync("""CREATE UNIQUE INDEX IF NOT EXISTS "IX_MagicLinks_TokenHash" ON "MagicLinks" ("TokenHash");""", ct);
+        await db.Database.ExecuteSqlRawAsync("""CREATE UNIQUE INDEX IF NOT EXISTS "IX_DeviceAuth_DeviceCodeHash" ON "DeviceAuth" ("DeviceCodeHash");""", ct);
+        await db.Database.ExecuteSqlRawAsync("""CREATE UNIQUE INDEX IF NOT EXISTS "IX_DeviceAuth_UserCode" ON "DeviceAuth" ("UserCode");""", ct);
+    }
+
     public static async Task EnsureForAllUsersAsync(RadioPadDbContext db, CancellationToken ct)
     {
         var users = await db.Users.AsNoTracking().OrderBy(u => u.CreatedAt).ToListAsync(ct);

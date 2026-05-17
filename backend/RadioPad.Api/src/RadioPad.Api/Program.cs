@@ -6,6 +6,7 @@ using RadioPad.Api.Middleware;
 using RadioPad.Application.Abstractions;
 using RadioPad.Application.Providers;
 using RadioPad.Application.Services;
+using RadioPad.Infrastructure.Identity;
 using RadioPad.Infrastructure.Persistence;
 using RadioPad.Infrastructure.Repositories;
 using RadioPad.Infrastructure.Seeding;
@@ -404,6 +405,7 @@ if (!app.Environment.IsEnvironment("Testing"))
     // including auth flows (MagicLinkToken, DeviceAuthRequest), retention,
     // CMK and SCIM additions.
     await db.Database.MigrateAsync();
+    await EnterpriseIdentityBridge.EnsureSchemaAsync(db, default);
     var rulebooksDir = Path.Combine(AppContext.BaseDirectory, "..", "..", "..", "..", "..", "..", "..", "rulebooks");
     rulebooksDir = Path.GetFullPath(rulebooksDir);
     await DevSeed.EnsureSeededAsync(db, rulebooksDir, default);
