@@ -6,9 +6,11 @@ using System.Text.Json;
 using System.Xml;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
+using RadioPad.Api.Auth;
 using RadioPad.Application.Abstractions;
 using RadioPad.Domain.Entities;
 using RadioPad.Domain.Enums;
+using RadioPad.Infrastructure.Identity;
 using RadioPad.Infrastructure.Persistence;
 
 namespace RadioPad.Api.Controllers;
@@ -100,6 +102,10 @@ public class SamlController : ControllerBase
                 return Unauthorized(new { error = "Account locked.", kind = "unauthenticated" });
 
             var token = MagicLinkController.MintBearer(tenant.Slug, user.Email, user.SessionEpoch);
+            var expiresAt = DateTimeOffset.UtcNow.Add(RadioPadBearerToken.Lifetime);
+            await EnterpriseIdentityBridge.RecordAuthSessionAsync(_db, user, token, "saml", expiresAt, ct,
+                ip: HttpContext.Connection.RemoteIpAddress?.ToString(),
+                userAgent: HttpContext.Request.Headers.UserAgent.FirstOrDefault());
             await _audit.AppendAsync(new AuditEvent
             {
                 TenantId = tenant.Id,
@@ -113,7 +119,7 @@ public class SamlController : ControllerBase
                 token,
                 tenant = tenant.Slug,
                 user = user.Email,
-                expiresAt = DateTimeOffset.UtcNow.AddHours(12),
+                expiresAt,
                 relayState = form.RelayState,
             });
         }

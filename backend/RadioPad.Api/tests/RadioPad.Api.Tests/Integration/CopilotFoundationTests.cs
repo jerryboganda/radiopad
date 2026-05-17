@@ -3,6 +3,8 @@ using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.Data.Sqlite;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Configuration;
+using Microsoft.Extensions.DependencyInjection;
 using RadioPad.Api.Controllers;
 using RadioPad.Api.Services;
 using RadioPad.Application.Abstractions;
@@ -16,6 +18,12 @@ namespace RadioPad.Api.Tests.Integration;
 
 public class CopilotFoundationTests
 {
+    private static readonly IServiceProvider DevHeaderServices = new ServiceCollection()
+        .AddSingleton<IConfiguration>(new ConfigurationBuilder()
+            .AddInMemoryCollection(new Dictionary<string, string?> { ["RadioPad:DevHeaders"] = "true" })
+            .Build())
+        .BuildServiceProvider();
+
     [Fact]
     public async Task Admin_Settings_Are_Rbac_Guarded_And_Default_FailClosed()
     {
@@ -317,6 +325,7 @@ public class CopilotFoundationTests
     private static void SetHeaders(ControllerBase controller, Tenant tenant, User user)
     {
         var context = new DefaultHttpContext();
+        context.RequestServices = DevHeaderServices;
         context.Request.Headers["X-RadioPad-Tenant"] = tenant.Slug;
         context.Request.Headers["X-RadioPad-User"] = user.Email;
         context.TraceIdentifier = "copilot-test";

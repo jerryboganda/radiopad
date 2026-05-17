@@ -1,6 +1,7 @@
 using Microsoft.AspNetCore.RateLimiting;
 using Microsoft.EntityFrameworkCore;
 using OpenTelemetry.Metrics;
+using RadioPad.Api.Auth;
 using RadioPad.Api.Middleware;
 using RadioPad.Application.Abstractions;
 using RadioPad.Application.Providers;
@@ -17,6 +18,14 @@ var builder = WebApplication.CreateBuilder(args);
 // vars always win.
 RadioPad.Api.Auth.OidcProfiles.ApplyToEnvironment(
     Environment.GetEnvironmentVariable("RADIOPAD_OIDC_PRESET"));
+
+if (!builder.Environment.IsDevelopment()
+    && !builder.Environment.IsEnvironment("Testing")
+    && RadioPadBearerToken.UsesDefaultSecret)
+{
+    throw new InvalidOperationException(
+        "RADIOPAD_AUTH_SECRET must be set outside Development/Testing so RadioPad bearer tokens are not signed with the default secret.");
+}
 
 // Bind to localhost by default (safety boundary §local-trust).
 var bindUrl = Environment.GetEnvironmentVariable("RADIOPAD_BIND") ?? "http://127.0.0.1:7457";
@@ -74,6 +83,7 @@ builder.Services.AddSingleton<IAiProviderAdapter, RadioPad.Infrastructure.Provid
 builder.Services.AddSingleton<IAiProviderAdapter, RadioPad.Infrastructure.Providers.Cli.CodexCliProvider>();
 
 builder.Services.AddScoped<IAuditLog, EfAuditLog>();
+builder.Services.AddSingleton<RadioPad.Application.Security.IPermissionService, RadioPad.Application.Security.RolePermissionService>();
 builder.Services.AddScoped<RadioPad.Api.Auth.LockoutPolicy>();
 builder.Services.AddScoped<IRulebookStore, EfRulebookStore>();
 builder.Services.AddScoped<IAiUsageStore, EfAiUsageStore>();
@@ -327,8 +337,8 @@ builder.Services.AddRateLimiter(opts =>
     opts.RejectionStatusCode = StatusCodes.Status429TooManyRequests;
     opts.AddPolicy("ai", context =>
     {
-        var tenant = context.Request.Headers["X-RadioPad-Tenant"].ToString();
-        if (string.IsNullOrEmpty(tenant)) tenant = "dev";
+        var tenant = RadioPadRequestIdentity.TenantSlugOrDevHeader(context);
+        if (string.IsNullOrEmpty(tenant)) tenant = "__no_tenant";
         return System.Threading.RateLimiting.RateLimitPartition.GetFixedWindowLimiter(tenant,
             _ => new System.Threading.RateLimiting.FixedWindowRateLimiterOptions
             {
@@ -404,12 +414,16 @@ app.UseMiddleware<GlobalExceptionMiddleware>();
 // Iter-33 PERF-004 — record per-route request duration. Sits after
 // correlation/exception so failed requests still produce a histogram sample.
 app.UseMiddleware<PerfBudgetMiddleware>();
+// Enforce the operator-wide allowlist before auth middleware does JWT crypto
+// or tenant/user database lookups. Tenant-specific allowlists run after auth.
+app.UseMiddleware<GlobalIpAllowlistMiddleware>();
+app.UseMiddleware<OidcBearerMiddleware>();
+app.UseMiddleware<RadioPadBearerIdentityMiddleware>();
 app.UseMiddleware<IpAllowlistMiddleware>();
 // Iter-32 SEC-008 — global per-IP + per-tenant fixed-window rate limiter.
-// Sits after IP allowlist (so blocked IPs never even reach the limiter) and
-// before auth so brute-force attempts are rate-limited too.
+// Sits after identity projection so tenant partitions use verified context
+// rather than trusting raw client-supplied tenant headers.
 app.UseMiddleware<RateLimitMiddleware>();
-app.UseMiddleware<OidcBearerMiddleware>();
 app.UseMiddleware<SuspensionGuardMiddleware>();
 app.UseCors();
 app.UseRateLimiter();

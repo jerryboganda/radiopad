@@ -1,16 +1,20 @@
 # RadioPad — HTTP API reference
 
-**Status:** Current  ·  **Owner:** Engineering  ·  **Last Updated:** 2026-05-05
+**Status:** Current  ·  **Owner:** Engineering  ·  **Last Updated:** 2026-05-17
 > Base URL: `http://127.0.0.1:7457` (development).
-> All endpoints expect the tenant headers below; in production these are issued by the auth proxy.
+> Production-like endpoints require verified identity. Dev/test headers are available only when explicitly enabled.
 
-## Auth headers (every request)
+## Auth and context headers
 
 | Header | Required | Notes |
 | --- | --- | --- |
-| `X-RadioPad-Tenant` | yes | Tenant slug (e.g. `dev`). Resolved by `TenantedController.ResolveContextAsync`. |
-| `X-RadioPad-User`   | yes | User email — must already exist in the tenant. |
+| `Authorization: Bearer rp_<opaque>` | production path | 12-hour RadioPad bearer bound to tenant, user, session epoch, and issued-at time. Current middleware also requires tenant/user lookup hints. |
+| `Authorization: Bearer <jwt>` | production path | OIDC JWT accepted when OIDC env configuration is enabled. |
+| `X-RadioPad-Tenant` | dev/test or lookup hint | Tenant slug. Authoritative only when dev/test headers are explicitly enabled. |
+| `X-RadioPad-User`   | dev/test or lookup hint | User email. Authoritative only when dev/test headers are explicitly enabled. |
 | `X-RadioPad-RequestId` | optional | Echoed back; auto-generated when missing. Used for log correlation and the `requestId` field on error responses. |
+
+The enterprise identity foundation is backend-only in this release. `GlobalUser`, `ExternalIdentity`, `TenantMembership`, and `AuthSession` rows do not add public endpoints or response fields; `/api/tenant/me` continues to return the resolved tenant-scoped user.
 
 Errors are RFC 7807 `application/problem+json` for unhandled exceptions. PHI/policy failures from `POST /api/reports/{id}/ai` are converted to a `403 Forbidden` JSON body `{ error, kind: "provider_policy" }` by the controller — the global handler is the safety net for everything else:
 

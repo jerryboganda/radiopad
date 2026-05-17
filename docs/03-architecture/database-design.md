@@ -1,6 +1,6 @@
 # Database Design
 
-**Status:** Current  ·  **Owner:** Engineering  ·  **Last Updated:** 2026-05-04
+**Status:** Current  ·  **Owner:** Engineering  ·  **Last Updated:** 2026-05-17
 
 ## Engines
 
@@ -14,6 +14,10 @@
 | --- | --- | --- | --- |
 | `Tenant` | `Id Guid` | n/a | Slug + display name. |
 | `User` | `Id Guid` | yes (membership) | Email + role; v0.1 minimal. |
+| `GlobalUser` | `Id Guid` | no | Enterprise identity account metadata only; never grants tenant access by itself. |
+| `ExternalIdentity` | `Id Guid` | no | Stable login subject (`ProviderKey`, `Issuer`, `Subject`) linked to `GlobalUser`; email is a snapshot. |
+| `TenantMembership` | `Id Guid` | yes | Bridge from `GlobalUser` to the existing tenant-scoped `User`; `User` remains authoritative for role/lockout. |
+| `AuthSession` | `Id Guid` | optional | Hashed issued bearer inventory for future revocation/session management; no raw tokens. |
 | `Report` | `Id Guid` | yes | Status enum, modality, body part, accession, sections (`Indication`, `Technique`, `Comparison`, `Findings`, `Impression`, `Recommendations`), `AiHighlightsJson`, `RulebookId`. |
 | `ReportVersion` | `Id Guid` | yes (via Report) | `Sequence`, `AuthorUserId`, `Action`, `RulebookId`, `SnapshotJson`. |
 | `Rulebook` | `Id Guid` | yes | `RulebookId` (snake_case stable), `Version` semver, `Status` (draft/approved/deprecated), YAML. |
@@ -28,6 +32,9 @@
 - `ReportVersions (ReportId, Sequence)` unique.
 - `Rulebooks (TenantId, RulebookId, Version)` unique.
 - `AuditEvents (TenantId, CreatedAt)`; never DELETE/UPDATE rows.
+- `ExternalIdentities (ProviderKey, Issuer, Subject)` unique.
+- `TenantMemberships (TenantId, UserId)` unique and `(GlobalUserId, TenantId)` unique.
+- `AuthSessions (TokenHash)` unique plus lookup indexes by global user, tenant/user, expiry, and revocation.
 
 ## Constraints
 

@@ -29,8 +29,8 @@ export default function LoginPage() {
     try {
       localStorage.setItem(LS_TENANT, tenant.trim());
       localStorage.setItem(LS_USER, user.trim());
-      // Mint a session token. The header-based dev identity still works
-      // for tools and tests; the token unlocks future SSO/OIDC pipelines.
+      // Mint a dev/test session token. Production deployments use proof-based
+      // flows such as OIDC, SAML, WebAuthn, or magic-link delivery.
       const result = await api.auth.signIn(tenant.trim(), user.trim());
       await setAuthToken(result.token);
       setActiveAuthToken(result.token);
@@ -47,10 +47,9 @@ export default function LoginPage() {
     <div className="rp-container" style={{ maxWidth: 520 }}>
       <h1 className="rp-page-title">Sign in</h1>
       <p className="rp-page-sub">
-        Dev identity is conveyed via the <code>X-RadioPad-Tenant</code> and{' '}
-        <code>X-RadioPad-User</code> headers. In production, an authenticating reverse proxy maps the
-        real principal onto these headers. After sign-in we mint an opaque bearer token and store it
-        in {secure === null ? '…' : secure ? 'OS-level secure storage (Keychain / Keystore)' : 'browser-local storage (preview only)'}.
+        This local sign-in exchanges a tenant/user tuple for a dev/test bearer. Production deployments
+        use proof-based authentication; raw tenant/user headers are not trusted there. The bearer is
+        stored in {secure === null ? '…' : secure ? 'OS-level secure storage (Keychain / Keystore)' : 'browser-local storage (preview only)'}.
       </p>
 
       {err && <div className="banner warn">{err}</div>}

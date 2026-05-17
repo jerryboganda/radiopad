@@ -1,6 +1,8 @@
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
+using RadioPad.Api.Auth;
 using RadioPad.Application.Abstractions;
+using RadioPad.Application.Security;
 using RadioPad.Application.Services;
 using RadioPad.Domain.Entities;
 using RadioPad.Domain.Enums;
@@ -9,20 +11,39 @@ using RadioPad.Infrastructure.Persistence;
 namespace RadioPad.Api.Controllers;
 
 /// <summary>
-/// Resolves the active dev tenant + user from headers (`X-RadioPad-Tenant`,
-/// `X-RadioPad-User`). In production this is replaced by the OIDC pipeline,
-/// but the controller surface stays unchanged.
+/// Resolves the active tenant + user from a server-verified request context.
+/// Dev/test headers remain available only when explicitly enabled.
 /// </summary>
 public abstract class TenantedController : ControllerBase
 {
     protected async Task<(Tenant tenant, User user)> ResolveContextAsync(RadioPadDbContext db, CancellationToken ct)
     {
-        var slug = Request.Headers["X-RadioPad-Tenant"].FirstOrDefault() ?? "dev";
-        var email = Request.Headers["X-RadioPad-User"].FirstOrDefault() ?? "radiologist@radiopad.local";
+        string? slug;
+        string? email;
+
+        if (RadioPadRequestIdentity.TryGet(HttpContext, out var identity))
+        {
+            slug = identity.TenantSlug;
+            email = identity.UserEmail;
+        }
+        else if (RadioPadRequestIdentity.DevHeadersEnabled(HttpContext))
+        {
+            slug = Request.Headers["X-RadioPad-Tenant"].FirstOrDefault() ?? "dev";
+            email = Request.Headers["X-RadioPad-User"].FirstOrDefault() ?? "radiologist@radiopad.local";
+        }
+        else
+        {
+            throw new UnauthorizedAccessException("Authenticated tenant context is required.");
+        }
+
         var tenant = await db.Tenants.FirstOrDefaultAsync(t => t.Slug == slug, ct)
-            ?? throw new InvalidOperationException($"Tenant '{slug}' not found.");
+            ?? throw new UnauthorizedAccessException("Authenticated tenant context is invalid.");
         var user = await db.Users.FirstOrDefaultAsync(u => u.TenantId == tenant.Id && u.Email == email, ct)
-            ?? throw new InvalidOperationException($"User '{email}' not found in tenant '{slug}'.");
+            ?? throw new UnauthorizedAccessException("Authenticated tenant context is invalid.");
+        if (!user.IsActive)
+            throw new UnauthorizedAccessException("User has been deprovisioned.");
+        if (user.LockedUntil is not null && user.LockedUntil > DateTimeOffset.UtcNow)
+            throw new UnauthorizedAccessException("Account locked.");
         return (tenant, user);
     }
 
@@ -39,6 +60,22 @@ public abstract class TenantedController : ControllerBase
             error = $"Role '{user.Role}' is not permitted to perform this action.",
             kind = "forbidden",
             requiredRoles = allowed.Select(r => r.ToString()).ToArray(),
+        })
+        { StatusCode = StatusCodes.Status403Forbidden };
+    }
+
+    protected IActionResult? RequirePermission(User user, RbacPermission permission)
+    {
+        var service = HttpContext.RequestServices.GetRequiredService<IPermissionService>();
+        var decision = service.Authorize(user, permission);
+        if (decision.Allowed) return null;
+
+        return new ObjectResult(new
+        {
+            error = $"Role '{user.Role}' is not permitted to perform this action.",
+            kind = "forbidden",
+            requiredPermissions = new[] { decision.PermissionKey },
+            requiredRoles = decision.CompatibleRoles.Select(r => r.ToString()).ToArray(),
         })
         { StatusCode = StatusCodes.Status403Forbidden };
     }

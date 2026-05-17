@@ -49,6 +49,38 @@ public enum UserRole
     BillingAdmin = 5,
 }
 
+public enum RbacPermission
+{
+    ReportsRead = 0,
+    ReportsDraft = 1,
+    ReportsEdit = 2,
+    ReportsValidate = 3,
+    ReportsSign = 4,
+    ReportsExport = 5,
+    RulebooksRead = 20,
+    RulebooksManage = 21,
+    RulebooksApprove = 22,
+    TemplatesRead = 40,
+    TemplatesManage = 41,
+    TemplatesApprove = 42,
+    ProvidersRead = 60,
+    ProvidersManage = 61,
+    AuditRead = 80,
+    AuditVerify = 81,
+    AuditExport = 82,
+    UsersRead = 100,
+    UsersManage = 101,
+    UsersRevokeSessions = 102,
+    BillingRead = 120,
+    BillingManage = 121,
+    SecurityManage = 140,
+    ValidationPacksRead = 160,
+    ValidationPacksManage = 161,
+    ValidationPacksRun = 162,
+    McpToolsInvoke = 180,
+    McpToolsManage = 181,
+}
+
 public enum AuditAction
 {
     AiRequest = 0,

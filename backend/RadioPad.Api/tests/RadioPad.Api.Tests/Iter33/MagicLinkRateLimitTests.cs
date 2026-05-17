@@ -21,6 +21,10 @@ namespace RadioPad.Api.Tests.Iter33;
 /// <c>MagicLinkRateLimiter.ResetForTesting()</c> in the test-class
 /// constructor.
 /// </summary>
+[CollectionDefinition("MagicLinkRateLimiter")]
+public sealed class MagicLinkRateLimiterCollection;
+
+[Collection("MagicLinkRateLimiter")]
 public sealed class MagicLinkRateLimitTests : IClassFixture<RadioPadAppFactory>
 {
     private readonly RadioPadAppFactory _factory;

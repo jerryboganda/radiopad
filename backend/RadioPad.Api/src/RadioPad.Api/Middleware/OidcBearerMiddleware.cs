@@ -2,14 +2,14 @@ using System.IdentityModel.Tokens.Jwt;
 using Microsoft.IdentityModel.Protocols;
 using Microsoft.IdentityModel.Protocols.OpenIdConnect;
 using Microsoft.IdentityModel.Tokens;
+using RadioPad.Api.Auth;
 
 namespace RadioPad.Api.Middleware;
 
 /// <summary>
 /// PRD AUTH-002 — translate an external IdP OIDC bearer (Keycloak / Auth0 /
-/// Okta / etc.) into the dev `X-RadioPad-Tenant` + `X-RadioPad-User` headers
-/// so the existing <c>TenantedController.ResolveContextAsync</c> path keeps
-/// working without any change at the controller layer.
+/// Okta / etc.) into the server-verified tenant/user request context consumed
+/// by <c>TenantedController.ResolveContextAsync</c>.
 ///
 /// Configuration (env-only — never committed):
 ///   <list type="bullet">
@@ -18,14 +18,14 @@ namespace RadioPad.Api.Middleware;
 ///   <item><c>RADIOPAD_OIDC_TENANT_CLAIM</c> — claim that carries the tenant slug (default <c>tenant_slug</c>).</item>
 ///   <item><c>RADIOPAD_OIDC_EMAIL_CLAIM</c> — claim that carries the user email (default <c>email</c>).</item>
 ///   <item><c>RADIOPAD_OIDC_REQUIRE_MFA</c> — when <c>1</c>, the JWT must carry <c>amr</c> containing <c>mfa</c> or <c>otp</c>.</item>
-///   <item><c>RADIOPAD_DEV_HEADERS</c> — when <c>1</c>, dev headers are honoured even if a bearer is present (used by tests).</item>
+///   <item><c>RADIOPAD_DEV_HEADERS</c> — when <c>1</c>, dev headers remain available for local/test compatibility.</item>
 ///   </list>
 ///
 /// JWKS metadata is cached for an hour by
 /// <c>ConfigurationManager&lt;OpenIdConnectConfiguration&gt;</c>; signature
 /// validation is delegated to <c>JwtSecurityTokenHandler</c>. Failures fall
-/// through to the next middleware so the existing dev-header path can still
-/// service tests when configured.
+/// through to the next middleware so controllers reject unless explicit
+/// dev/test headers are configured.
 /// </summary>
 public sealed class OidcBearerMiddleware
 {
@@ -42,7 +42,6 @@ public sealed class OidcBearerMiddleware
     public async Task InvokeAsync(HttpContext ctx)
     {
         var authority = Environment.GetEnvironmentVariable("RADIOPAD_OIDC_AUTHORITY");
-        var devHeaders = Environment.GetEnvironmentVariable("RADIOPAD_DEV_HEADERS") == "1";
 
         if (string.IsNullOrWhiteSpace(authority))
         {
@@ -112,13 +111,9 @@ public sealed class OidcBearerMiddleware
                 }
             }
 
-            // Inject so TenantedController.ResolveContextAsync sees the OIDC identity.
-            // Dev headers win when explicitly enabled (test pipeline).
-            if (!devHeaders)
-            {
-                ctx.Request.Headers["X-RadioPad-Tenant"] = slug;
-                ctx.Request.Headers["X-RadioPad-User"] = email;
-            }
+            // Promote OIDC into the same verified context used by RadioPad bearers.
+            // Dev/test headers remain only a fallback when no verified identity exists.
+            RadioPadRequestIdentity.Set(ctx, slug, email, "oidc");
         }
         catch (SecurityTokenException ex)
         {

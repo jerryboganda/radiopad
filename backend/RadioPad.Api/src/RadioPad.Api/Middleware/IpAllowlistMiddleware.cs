@@ -4,6 +4,7 @@ using System.Text;
 using System.Text.Json;
 using Microsoft.EntityFrameworkCore;
 using RadioPad.Application.Abstractions;
+using RadioPad.Api.Auth;
 using RadioPad.Domain.Entities;
 using RadioPad.Domain.Enums;
 using RadioPad.Infrastructure.Persistence;
@@ -13,8 +14,8 @@ namespace RadioPad.Api.Middleware;
 /// <summary>
 /// PRD SEC-007 / Iter-32 SEC-008 — IP allowlist for the API. The global
 /// envvar <c>RADIOPAD_IP_ALLOWLIST</c> (CSV or newline-separated CIDR list)
-/// is the outer gate. When the request resolves a tenant context (via the
-/// <c>X-RadioPad-Tenant</c> header), the per-tenant allowlist
+/// is the outer gate. When the request resolves a tenant context (via verified
+/// identity, or explicit dev/test headers), the per-tenant allowlist
 /// (<see cref="TenantSettings.IpAllowlistJson"/> JSON array of CIDRs, falling
 /// back to the legacy CSV in <see cref="TenantSettings.IpAllowlistCidr"/>) is
 /// AND-ed with the global gate — both must match.
@@ -55,7 +56,7 @@ public sealed class IpAllowlistMiddleware
             return;
         }
 
-        var tenantSlug = ctx.Request.Headers["X-RadioPad-Tenant"].FirstOrDefault();
+        var tenantSlug = RadioPadRequestIdentity.TenantSlugOrDevHeader(ctx);
         if (!string.IsNullOrWhiteSpace(tenantSlug))
         {
             try
@@ -141,13 +142,13 @@ public sealed class IpAllowlistMiddleware
         });
     }
 
-    private static string HashIp(IPAddress addr)
+    internal static string HashIp(IPAddress addr)
     {
         var bytes = SHA256.HashData(Encoding.UTF8.GetBytes(addr.ToString()));
         return Convert.ToHexString(bytes, 0, 8).ToLowerInvariant();
     }
 
-    private static (IPAddress, int)[]? ResolveRanges(string? raw)
+    internal static (IPAddress, int)[]? ResolveRanges(string? raw)
     {
         if (string.IsNullOrWhiteSpace(raw)) return null;
         if (!ReferenceEquals(raw, _cachedRaw)) { _ranges = ParseRanges(raw); _cachedRaw = raw; }
@@ -201,7 +202,7 @@ public sealed class IpAllowlistMiddleware
         return true;
     }
 
-    private static bool MatchAny(IPAddress addr, (IPAddress, int)[] ranges)
+    internal static bool MatchAny(IPAddress addr, (IPAddress, int)[] ranges)
     {
         foreach (var (net, prefix) in ranges)
         {

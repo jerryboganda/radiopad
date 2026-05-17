@@ -3,9 +3,11 @@ using System.Text;
 using System.Text.Json;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
+using RadioPad.Api.Auth;
 using RadioPad.Application.Abstractions;
 using RadioPad.Domain.Entities;
 using RadioPad.Domain.Enums;
+using RadioPad.Infrastructure.Identity;
 using RadioPad.Infrastructure.Persistence;
 
 namespace RadioPad.Api.Controllers;
@@ -13,17 +15,16 @@ namespace RadioPad.Api.Controllers;
 /// <summary>
 /// PRD AUTH-001 (dev tier) — issue an opaque session token after the caller
 /// proves they own a tenant slug + user email. v0.1 keeps the existing
-/// header-based dev identity model: there is no password, the endpoint
+/// tenant-local dev identity model: there is no password, the endpoint
 /// accepts the same `(tenant, user)` tuple used by `X-RadioPad-Tenant` /
-/// `X-RadioPad-User` and exchanges it for a 32-byte random bearer the
+/// `X-RadioPad-User` and exchanges it for an opaque HMAC bearer the
 /// frontend can stash in the OS-level secure store. SSO replacement is
 /// tracked under ADR-0004.
 ///
 /// The bearer is HMAC-derived from a server secret + tenant + user so it is
 /// reproducible (no DB row) and revocable by rotating the secret. Tokens are
-/// stateless and validated by `BearerIdentityMiddleware` (when present); in
-/// the dev pipeline the `X-RadioPad-*` headers continue to work so existing
-/// integration tests stay green.
+/// stateless and validated by `RadioPadBearerIdentityMiddleware`; explicit
+/// dev/test mode keeps `X-RadioPad-*` headers available for local flows.
 /// </summary>
 [ApiController]
 [Route("api/auth")]
@@ -43,6 +44,15 @@ public class AuthController : ControllerBase
     {
         if (string.IsNullOrWhiteSpace(dto.Tenant) || string.IsNullOrWhiteSpace(dto.User))
             return BadRequest(new { error = "Tenant and user are required.", kind = "validation" });
+        if (!RadioPadRequestIdentity.DevHeadersEnabled(HttpContext))
+        {
+            await AuditBlockedDevSignInAsync(dto, ct);
+            return Unauthorized(new
+            {
+                error = "Dev sign-in is disabled outside explicit dev/test mode.",
+                kind = "unauthenticated",
+            });
+        }
 
         var tenant = await _db.Tenants.FirstOrDefaultAsync(t => t.Slug == dto.Tenant, ct);
         if (tenant is null)
@@ -57,7 +67,11 @@ public class AuthController : ControllerBase
         if (user.LockedUntil is not null && user.LockedUntil > DateTimeOffset.UtcNow)
             return Unauthorized(new { error = "Account locked.", kind = "unauthenticated", until = user.LockedUntil });
 
-        var token = MintToken(tenant.Slug, dto.User, user.SessionEpoch);
+        var token = RadioPadBearerToken.Mint(tenant.Slug, dto.User, user.SessionEpoch);
+        var expiresAt = DateTimeOffset.UtcNow.Add(RadioPadBearerToken.Lifetime);
+        await EnterpriseIdentityBridge.RecordAuthSessionAsync(_db, user, token, "dev-header", expiresAt, ct,
+            ip: HttpContext.Connection.RemoteIpAddress?.ToString(),
+            userAgent: HttpContext.Request.Headers.UserAgent.FirstOrDefault());
 
         await _audit.AppendAsync(new AuditEvent
         {
@@ -72,21 +86,23 @@ public class AuthController : ControllerBase
             token,
             tenant = tenant.Slug,
             user = dto.User,
-            expiresAt = DateTimeOffset.UtcNow.AddHours(12),
+            expiresAt,
         });
     }
 
-    private static string MintToken(string tenant, string user, int sessionEpoch)
+    private async Task AuditBlockedDevSignInAsync(SignInDto dto, CancellationToken ct)
     {
-        // Deterministic per (tenant, user, server-secret, sessionEpoch).
-        // Rotate the env var to invalidate every token at once; bumping the
-        // user's <see cref="Domain.Entities.User.SessionEpoch"/> via
-        // <c>POST /api/users/{id}/revoke-sessions</c> invalidates only that
-        // user's currently issued bearers.
-        var secret = Environment.GetEnvironmentVariable("RADIOPAD_AUTH_SECRET")
-            ?? "dev-only-not-for-production";
-        using var hmac = new HMACSHA256(Encoding.UTF8.GetBytes(secret));
-        var raw = hmac.ComputeHash(Encoding.UTF8.GetBytes($"v1|{tenant}|{user}|{sessionEpoch}"));
-        return "rp_" + Convert.ToBase64String(raw).Replace("+", "-").Replace("/", "_").TrimEnd('=');
+        var tenant = await _db.Tenants.FirstOrDefaultAsync(t => t.Slug == dto.Tenant, ct);
+        if (tenant is null)
+            return;
+
+        var user = await _db.Users.FirstOrDefaultAsync(u => u.TenantId == tenant.Id && u.Email == dto.User, ct);
+        await _audit.AppendAsync(new AuditEvent
+        {
+            TenantId = tenant.Id,
+            UserId = user?.Id,
+            Action = AuditAction.PolicyViolation,
+            DetailsJson = JsonSerializer.Serialize(new { reason = "dev_signin_disabled" }),
+        }, ct);
     }
 }

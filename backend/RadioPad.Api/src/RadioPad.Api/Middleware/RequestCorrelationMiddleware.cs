@@ -1,4 +1,5 @@
 using System.Diagnostics;
+using RadioPad.Api.Auth;
 
 namespace RadioPad.Api.Middleware;
 
@@ -28,7 +29,7 @@ public class RequestCorrelationMiddleware
         ctx.TraceIdentifier = rid;
         ctx.Response.Headers[Header] = rid;
 
-        var tenant = ctx.Request.Headers["X-RadioPad-Tenant"].ToString();
+        var tenant = RadioPadRequestIdentity.TenantSlugOrDevHeader(ctx);
         using (_log.BeginScope(new Dictionary<string, object>
         {
             ["RequestId"] = rid,

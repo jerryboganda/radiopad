@@ -2,8 +2,10 @@ openapi: 3.0.3
 info:
   title: RadioPad API
   description: |
-    AI-assisted radiology reporting platform. Authenticated header-based dev tenancy in v0.1
-    (planned: OIDC bearer in Phase 3). Errors are RFC-7807 problem details with a stable
+    AI-assisted radiology reporting platform. Production-like API requests use verified
+    identity via RadioPad opaque bearers or OIDC JWTs; raw tenant/user headers are
+    dev/test-only authority and current RadioPad bearer lookup hints. Enterprise identity
+    persistence is backend-only in this version and adds no public endpoints. Errors are RFC-7807 problem details with a stable
     `kind` field. See docs/03-architecture/api-design.md.
   version: "0.2.0"
   license:
@@ -15,7 +17,10 @@ servers:
     description: Hosted (planned)
 
 security:
-  - TenantHeader: []
+  - RadioPadBearer: []
+    TenantHeader: []
+    UserHeader: []
+  - BearerJwt: []
 
 components:
   securitySchemes:
@@ -23,10 +28,16 @@ components:
       type: apiKey
       in: header
       name: X-RadioPad-Tenant
+      description: Tenant slug. Authoritative only in explicit dev/test mode; used as a lookup hint for current rp_ bearers.
     UserHeader:
       type: apiKey
       in: header
       name: X-RadioPad-User
+      description: User email. Authoritative only in explicit dev/test mode; used as a lookup hint for current rp_ bearers.
+    RadioPadBearer:
+      type: http
+      scheme: bearer
+      bearerFormat: rp_ opaque HMAC bearer
     BearerJwt:
       type: http
       scheme: bearer

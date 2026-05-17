@@ -1,16 +1,28 @@
 # Auth Architecture
 
-**Status:** Current  ·  **Owner:** Engineering + Security  ·  **Last Updated:** 2026-05-04
+**Status:** Current  ·  **Owner:** Engineering + Security  ·  **Last Updated:** 2026-05-17
 
-## v0.1 — header-based dev tenant
+## Current — verified tenant context
 
-Authentication in v0.1 is intentionally simple to keep clinical-safety primitives front-and-centre:
+RadioPad now resolves tenant context from a server-verified request identity. Production-like traffic must use one of:
 
-- `X-RadioPad-Tenant: <slug>` identifies the tenant.
-- `X-RadioPad-User: <email>` identifies the user.
-- The backend resolves both lazily (creating dev rows if missing) via `TenantedController.ResolveContextAsync`.
-- Suitable for: local development, integration tests, on-prem reading rooms with a trusted reverse proxy enforcing identity upstream.
-- **Not** suitable for hosted multi-tenant deployments without an upstream identity gateway.
+- `Authorization: Bearer rp_<opaque>` minted by a proof-based flow. Current `rp_` bearers are HMAC-bound to tenant slug, user email, session epoch, and issued-at time; they expire after 12 hours and are invalidated by session-epoch revocation, lockout, or deprovisioning.
+- Valid OIDC JWTs accepted by `OidcBearerMiddleware` and promoted into the same verified context.
+
+`X-RadioPad-Tenant` and `X-RadioPad-User` are no longer authoritative in production-like mode. They are accepted only when explicit dev/test headers are enabled and are otherwise lookup hints for current `rp_` bearer validation. SCIM and ingest remain separate tenant-bearer integration surfaces.
+
+The `/api/auth/signin` tuple exchange is dev/test-only. Hosted deployments must use OIDC, SAML, WebAuthn, magic-link delivery, or another proof-based flow rather than minting a bearer from public identifiers.
+
+## Enterprise identity foundation
+
+RadioPad has an additive backend identity foundation for enterprise migration:
+
+- `GlobalUser` stores cross-tenant account metadata only. It is not an authorization principal.
+- `ExternalIdentity` links stable provider subjects (`provider + issuer + subject`) to a global account. Email is a snapshot, not the trust key.
+- `TenantMembership` bridges a global account into the current tenant-scoped `User` row. Existing `User.Role`, `User.IsActive`, `LockedUntil`, and `SessionEpoch` remain authoritative for request authorization.
+- `AuthSession` records hashed issued bearer sessions for inventory and future revocation workflows. Raw bearer tokens are never stored.
+
+This slice does not add public endpoints or change `/api/tenant/me`; existing controllers still resolve `(Tenant, User)` through verified request identity.
 
 ## Phase 3 — OIDC / SSO
 
@@ -37,9 +49,10 @@ The target authentication model:
 
 ## Token model
 
-- v0.1: none. Phase 3: short-lived access token (15 min) + refresh token; both rotated on each use.
+- Current: 12-hour `rp_` opaque bearer, HMAC-bound to tenant/user/session epoch/issued-at. Issued bearers are also recorded in `AuthSession` by one-way token hash for inventory; validation still enforces the HMAC, expiry, lockout/deprovisioning, and `User.SessionEpoch`. `RADIOPAD_AUTH_SECRET` is required outside Development/Testing.
+- Future: session-backed `rp_v3` or JWT/JWKS with refresh-token rotation and row-level revocation enforcement.
 
 ## CLI auth
 
-- `radiopad login` (Phase 3) opens a browser to the IdP, performs PKCE, stores the refresh token in the OS keychain.
-- v0.1: `radiopad login` writes `X-RadioPad-Tenant` and `X-RadioPad-User` into a local config file.
+- `radiopad login` should use the device flow or browser IdP flow and store the resulting bearer in the OS keychain.
+- Dev/test mode may still use tenant/user headers for local automation.

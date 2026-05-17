@@ -1,6 +1,7 @@
 using Microsoft.EntityFrameworkCore;
 using RadioPad.Domain.Entities;
 using RadioPad.Domain.Enums;
+using RadioPad.Infrastructure.Identity;
 using RadioPad.Infrastructure.Persistence;
 
 namespace RadioPad.Infrastructure.Seeding;
@@ -47,6 +48,8 @@ public static class DevSeed
                 PasswordHash = "dev",
             });
         }
+        await db.SaveChangesAsync(ct);
+        await EnterpriseIdentityBridge.EnsureForAllUsersAsync(db, ct);
 
         if (!await db.Providers.AnyAsync(p => p.TenantId == tenant.Id, ct))
         {

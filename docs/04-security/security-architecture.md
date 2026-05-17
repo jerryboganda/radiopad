@@ -13,7 +13,7 @@ storage**.
 | PHI in prompts | Leakage to non-approved AI provider | `AiGateway` PHI policy enforced before HTTP egress; `ProviderPolicyException` on violation |
 | Audit log | Tampering / silent edits | SHA-256 hash chain (`IntegrityChain`); only `INSERT`s allowed |
 | Provider API keys | Exfiltration via API responses | Keys stripped in `ProvidersController` GET responses (`apiKeyConfigured` boolean only) |
-| Cross-tenant access | Tenant A reading Tenant B's reports | Every controller filters by `TenantContext` resolved from `X-RadioPad-Tenant` header |
+| Cross-tenant access | Tenant A reading Tenant B's reports | Every controller filters by tenant resolved from verified request identity; raw tenant/user headers are dev/test-only |
 | Rulebook tampering | Unapproved edits hitting production | Status workflow `Draft → InReview → Approved`; approval requires passing golden tests (planned) |
 | AI hallucination | Unverified AI text becoming the signed report | `.ai-mark` UI + `aiHighlightsJson` persistence + Acknowledge step blocked when blockers > 0 |
 
@@ -31,12 +31,11 @@ Defined in `ProviderComplianceClass`:
 
 ## Identity & multi-tenancy
 
-- Tenant + user are conveyed on every HTTP request via the
-  `X-RadioPad-Tenant` and `X-RadioPad-User` headers.
-- `TenantedController.ResolveContextAsync` is the single resolution path.
-- Production deployments must front the API with an authenticating reverse
-  proxy (mTLS or OIDC) that maps the authenticated principal onto these
-  headers — direct client trust is **not** acceptable for production.
+- Tenant + user are resolved from a verified request identity. Current accepted production paths are `rp_` opaque bearers (plus tenant/user lookup hints) and validated OIDC JWTs.
+- `X-RadioPad-Tenant` and `X-RadioPad-User` are accepted as authoritative only in explicit dev/test mode.
+- `TenantedController.ResolveContextAsync` is the controller resolution path and rejects requests with no verified identity outside dev/test mode.
+- Enterprise identity rows are additive: `GlobalUser` is metadata only, `ExternalIdentity` maps stable provider subjects, and `TenantMembership` must point to an active tenant-scoped `User` before access is granted.
+- `AuthSession` stores hashed session inventory only. Raw bearer/session material must never be persisted or logged, and current revocation still honors `User.SessionEpoch`, lockout, and deprovisioning.
 
 ## Secrets
 
@@ -54,7 +53,7 @@ Defined in `ProviderComplianceClass`:
 | `RADIOPAD_STRIPE_SECRET_KEY` | Stripe server-side secret used for all Stripe API calls (Checkout, Billing Portal, invoices, refunds, Connect). | **Canonical**. Legacy `STRIPE_SECRET_KEY` is accepted as a fallback for one release; remove before v0.3. |
 | `RADIOPAD_STRIPE_WEBHOOK_SECRET` | HMAC secret for `/api/billing/webhook` signature verification. | **Canonical**. Legacy `STRIPE_WEBHOOK_SECRET` accepted for one release. |
 | `RADIOPAD_BIND` | API bind address. Defaults to `127.0.0.1`. | Remote exposure requires a TLS reverse proxy. |
-| `RADIOPAD_AUTH_SECRET` | HMAC secret used by dev sign-in (`/api/auth/signin`). | Required outside the `Testing` environment. |
+| `RADIOPAD_AUTH_SECRET` | HMAC secret used for `rp_` bearer signing. | Required outside Development/Testing; default secret is fail-closed. |
 | `RADIOPAD_OIDC_AUTHORITY` / `RADIOPAD_OIDC_REQUIRE_MFA` | OIDC issuer + MFA `amr` enforcement. | See ADR-0004. |
 | `RADIOPAD_IP_ALLOWLIST` | Comma-separated CIDR list. Empty = no-op. | PRD SEC-007. |
 
@@ -86,8 +85,9 @@ translates to `402 { kind: "quota_exceeded", resetAt }`. The
 ## Network defenses (SEC-008 / SEC-011, iter-32)
 
 Three controls protect the public API from network-layer abuse and
-exfiltration. All run before authentication so brute-force and probing
-attempts are stopped early.
+exfiltration. The operator-wide IP allowlist runs before authentication;
+tenant-specific allowlists and tenant/user rate partitions run after verified
+identity projection so they do not trust raw client headers.
 
 ### IP allowlist (`IpAllowlistMiddleware`, SEC-008)
 

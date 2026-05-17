@@ -7,6 +7,7 @@ using RadioPad.Application.Abstractions;
 using RadioPad.Application.Services.WebAuthn;
 using RadioPad.Domain.Entities;
 using RadioPad.Domain.Enums;
+using RadioPad.Infrastructure.Identity;
 using RadioPad.Infrastructure.Persistence;
 
 namespace RadioPad.Api.Controllers;
@@ -242,12 +243,18 @@ public class WebAuthnController : TenantedController
             DetailsJson = JsonSerializer.Serialize(new { method = "webauthn", credentialId = hash }),
         }, ct);
 
+        var token = MagicLinkController.MintBearer(tenant.Slug, user.Email, user.SessionEpoch);
+        var expiresAt = DateTimeOffset.UtcNow.Add(RadioPad.Api.Auth.RadioPadBearerToken.Lifetime);
+        await EnterpriseIdentityBridge.RecordAuthSessionAsync(_db, user, token, "webauthn", expiresAt, ct,
+            ip: HttpContext.Connection.RemoteIpAddress?.ToString(),
+            userAgent: HttpContext.Request.Headers.UserAgent.FirstOrDefault());
+
         return Ok(new
         {
-            token = MagicLinkController.MintBearer(tenant.Slug, user.Email, user.SessionEpoch),
+            token,
             tenant = tenant.Slug,
             user = user.Email,
-            expiresAt = DateTimeOffset.UtcNow.AddHours(12),
+            expiresAt,
         });
     }
 

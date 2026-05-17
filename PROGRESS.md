@@ -4,6 +4,128 @@
 
 ---
 
+## Iteration 47 - RBAC permission foundation
+
+- **Date:** 2026-05-17
+- **Branch:** `manwara575-star/literate-telegram`
+- **Scope:** Add a backend-only permission catalog and role-permission service while preserving current tenant-scoped `User.Role` behavior.
+
+### Delivered
+
+- Added `RbacPermission` as stable backend permission concepts for report, rulebook, template, provider, audit, user/session, billing, security, validation-pack, and MCP surfaces.
+- Added `PermissionCatalog`, `RolePermissionMap`, `IPermissionService`, `RolePermissionService`, and `PermissionDecision` under `RadioPad.Application.Security`.
+- Registered the permission service in DI and added `TenantedController.RequirePermission(...)` for future endpoint migrations while keeping `RequireRole(...)` compatible.
+- Preserved current clinical signing semantics: `reports.sign` is limited to `Radiologist` and `MedicalDirector`; operational roles such as `ReportingAdmin`, `ItAdmin`, and `BillingAdmin` are not granted signing by the permission foundation.
+- Added focused tests for stable role ordinals, catalog completeness/key shape, default-deny decision metadata, and key role-permission mappings.
+- Updated `docs/03-architecture/authorization-rbac.md` from the stale planned-role matrix to the current enum roles and backend-only permission foundation.
+
+### Validation
+
+- Focused RBAC tests: **Failed: 0, Passed: 8, Skipped: 0, Total: 8**.
+- Full backend suite: **Failed: 0, Passed: 472, Skipped: 5, Total: 477**.
+- Final independent code-review pass found no blocking issues.
+
+### Notes
+
+- This slice intentionally does not add DB-backed custom roles, role assignments, tenant permission overrides, or endpoint behavior changes.
+- Existing endpoints continue to use current role allow-lists until each action is intentionally migrated to `RequirePermission(...)`.
+- Remaining deferred phases are ABAC sensitive-action policy, durable refresh/session enforcement, device trust, SCIM lifecycle hardening, auth admin console, and break-glass controls.
+
+---
+
+## Iteration 46 - Enterprise identity foundation
+
+- **Date:** 2026-05-17
+- **Branch:** `manwara575-star/literate-telegram`
+- **Scope:** Add the first backend-only enterprise identity persistence layer without replacing the current tenant-scoped `User` authorization model.
+
+### Delivered
+
+- Added additive domain/EF models for `GlobalUser`, `ExternalIdentity`, `TenantMembership`, and `AuthSession`.
+- Added `EnterpriseIdentityBridge` to backfill one global identity + tenant membership per existing tenant-scoped user without merging same-email users across tenants.
+- Seeded dev/test identity bridges while keeping existing `User.Role`, `User.IsActive`, `LockedUntil`, and `SessionEpoch` authoritative.
+- Recorded issued RadioPad bearers in `AuthSession` by one-way token hash at dev sign-in, magic-link, device-flow, SAML, and WebAuthn mint points.
+- Made session recording and membership creation idempotent under unique-constraint races.
+- Fixed magic-link and device-code consumption races with atomic compare-and-set updates, and added uniqueness indexes for link/device token hashes.
+- Ensured validated OIDC JWTs always win over dev/test header fallback by promoting them to verified identity even when dev headers are enabled.
+- Adjusted no-IP rate-limit partitioning so TestServer/no-remote-IP traffic does not share one global bucket.
+- Updated auth/security/database/API docs and OpenAPI notes for the backend-only identity foundation.
+
+### Validation
+
+- Focused identity/auth/race tests: **Failed: 0, Passed: 19, Skipped: 0, Total: 19**.
+- Full backend suite: **Failed: 0, Passed: 464, Skipped: 5, Total: 469**.
+- Frontend typecheck: `frontend\node_modules\.bin\tsc.cmd -p frontend\tsconfig.json --noEmit` passed.
+- Final independent code-review pass found no blocking issues.
+
+### Notes
+
+- `GlobalUser` is account metadata only; tenant access still requires a `TenantMembership` mapped to an active tenant-scoped `User`.
+- `AuthSession` is inventory/audit foundation for this slice; request validation still enforces current `rp_` HMAC, expiry, lockout/deprovisioning, and `User.SessionEpoch`.
+- Pre-existing modified `rulebooks/*.yaml` files were left untouched.
+- Remaining deferred phases are permission catalog/RBAC, ABAC sensitive-action policy, durable refresh/session enforcement, device trust, SCIM lifecycle hardening, auth admin console, and break-glass controls.
+
+---
+
+## Iteration 45 - Production session-mint hardening
+
+- **Date:** 2026-05-17
+- **Branch:** `manwara575-star/literate-telegram`
+- **Scope:** Second enterprise auth/RBAC slice from the ultrawork planning pass: close credential-minting paths that could still rely on caller-supplied tenant/user tuples, while deferring schema-heavy global identity/RBAC work.
+
+### Delivered
+
+- Gated `/api/auth/signin` to explicit dev/test mode so production-like environments cannot mint an `rp_` bearer from a raw `{ tenant, user }` tuple.
+- Upgraded `rp_` bearer tokens to include an issued-at timestamp and enforce a 12-hour lifetime, while continuing to bind validation to tenant, email, session epoch, and the server-side auth secret.
+- Required verified request identity for MFA enrollment/verification and device approve/deny actions; inactive or locked users are rejected before bearer minting.
+- Gated magic-link `devLink` responses to explicit dev/test mode and burn consumed magic links before rejecting inactive or locked users.
+- Added a startup fail-closed guard for missing/default `RADIOPAD_AUTH_SECRET` outside Development/Testing.
+- Split operator-wide IP allowlist enforcement into an early global middleware before OIDC/bearer auth work, leaving tenant-specific allowlists after identity projection.
+- Changed dev-header detection to fail closed when `HttpContext.RequestServices` is absent and updated direct middleware/controller tests to provide explicit dev-header services.
+- Documented the production auth contract in auth/security/API docs, OpenAPI, and login copy.
+
+### Validation
+
+- Focused fail-closed/auth/network tests: **Failed: 0, Passed: 45, Skipped: 0, Total: 45**.
+- Magic-link/auth hardening isolation tests: **Failed: 0, Passed: 8, Skipped: 0, Total: 8**.
+- Full backend suite: **Failed: 0, Passed: 458, Skipped: 5, Total: 463**.
+- Frontend typecheck: `frontend\node_modules\.bin\tsc.cmd -p frontend\tsconfig.json --noEmit` passed.
+- Final independent code-review pass found no blocking issues.
+
+### Notes
+
+- Pre-existing modified `rulebooks/*.yaml` files were left untouched.
+- Follow-up phases remain global users/memberships, permission catalog/RBAC, durable sessions/refresh policy, device trust, SCIM routing/lifecycle hardening, admin console, and break-glass controls.
+
+---
+
+## Iteration 44 - Verified tenant access context
+
+- **Date:** 2026-05-17
+- **Branch:** `manwara575-star/ultrawork-planning`
+- **Scope:** First enterprise auth/RBAC slice from the ultrawork planning pass: stop trusting raw tenant/user headers in production request context while preserving tenant-scoped users and current `rp_` bearer format.
+
+### Delivered
+
+- Added shared `rp_` bearer mint/validation helpers and `RadioPadBearerIdentityMiddleware` to validate opaque HMAC tokens against tenant, user, and session epoch before promoting a verified request identity.
+- Hardened `TenantedController.ResolveContextAsync` so production-like requests require verified identity; explicit dev/test headers remain available only when `RadioPad:DevHeaders` / `RADIOPAD_DEV_HEADERS` permits them.
+- Mapped OIDC JWT validation into the same verified identity context instead of mutating tenant/user headers.
+- Updated IP allowlist, rate limit, suspension guard, request correlation, performance metrics, and AI rate-limit partitioning to use verified identity or explicit dev/test headers.
+- Kept SCIM and ingest header-based tenant selection unchanged because those endpoints use tenant-scoped shared bearer secrets and path/subdomain tenant routing is deferred to the SCIM hardening phase.
+- Added integration coverage for dev-header compatibility, production-like header rejection, valid `rp_` bearer resolution, forged user headers, cross-tenant bearer replay, session epoch revocation, and inactive/locked users.
+
+### Validation
+
+- Focused auth context tests: **Failed: 0, Passed: 7, Skipped: 0, Total: 7**.
+- Full backend suite: **Failed: 0, Passed: 452, Skipped: 5, Total: 457**.
+
+### Notes
+
+- Pre-existing modified `rulebooks/*.yaml` files were left untouched.
+- Follow-up phases remain global users/memberships, permission catalog/RBAC, MFA/session policy, device trust, SCIM routing/lifecycle hardening, admin console, and break-glass controls.
+
+---
+
 ## Iteration 43 — End-to-end UI/UX audit (read-only, no production code changes)
 
 - **Date:** 2026-05-17
