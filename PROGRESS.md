@@ -4,6 +4,35 @@
 
 ---
 
+## Iteration 48 - GitHub and VPS fresh deployment
+
+- **Date:** 2026-05-17
+- **Branch:** `manwara575-star/ultrawork-planning`
+- **Scope:** Push the completed auth/RBAC work to GitHub `main`, refresh the production VPS from GitHub, rebuild containers without stale cache, and verify the live service.
+
+### Delivered
+
+- Pushed auth hardening, enterprise identity foundation, RBAC permission foundation, and deployment safety fixes to GitHub `main`.
+- Added a SQLite additive schema bootstrap for existing VPS deployments so `GlobalUsers`, `ExternalIdentities`, `TenantMemberships`, and `AuthSessions` are created before identity seeding on production startup.
+- Fixed `deploy/vps/docker-compose.yml` so production secrets and SQLite data stay outside the fresh-synced source tree at `/opt/radiopad/.secrets.env` and `/opt/radiopad/data`.
+- Synced `/opt/radiopad/src` directly from GitHub on the VPS, rebuilt both production images with no Docker layer cache, recreated `radiopad-api` and `radiopad-web`, and cleared the nginx web cache.
+- Preserved unrelated pre-existing local `rulebooks/*.yaml` modifications by leaving them unstaged and out of the auth/RBAC/deploy commits.
+
+### Validation
+
+- Production API image rebuilt from GitHub commit `68010b2`.
+- Production web image rebuilt from GitHub commit `68010b2`; Next.js production build and TypeScript phase completed during the container build.
+- VPS health check passed: `GET http://127.0.0.1:8093/api/health` returned `{"status":"ok","service":"radiopad-api",...}`.
+- VPS homepage check passed: `HEAD http://127.0.0.1:8093/` returned `HTTP/1.1 200 OK`.
+- Production SQLite contains the additive enterprise identity tables: `AuthSessions`, `ExternalIdentities`, `GlobalUsers`, and `TenantMemberships`.
+
+### Notes
+
+- The VPS Docker BuildKit path stalled before executing build steps, so the deployment used Docker's classic builder with compose parallelism limited to one service; the final production images were still rebuilt with `--no-cache`.
+- GitHub reported existing Dependabot vulnerabilities after push; they were not introduced or remediated in this deployment slice.
+
+---
+
 ## Iteration 47 - RBAC permission foundation
 
 - **Date:** 2026-05-17
