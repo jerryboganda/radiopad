@@ -76,6 +76,15 @@
 .rp-mt-sm { margin-top: 8px; }
 .rp-mb-md { margin-bottom: 12px; }
 
+.rp-auth-shell {
+  max-width: 640px;
+}
+.rp-auth-action-list {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
 /* Section block — label + control, used everywhere in forms. */
 .section-block { margin-bottom: 14px; }
 .section-block label {

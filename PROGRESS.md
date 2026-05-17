@@ -4,6 +4,43 @@
 
 ---
 
+## Iteration 49 - Production auth RBAC hardening
+
+- **Date:** 2026-05-17
+- **Branch:** `manwara575-star/literate-telegram`
+- **Scope:** Complete the next production-ready Auth/RBAC slice: web OIDC login, cookie-backed sessions, revocation, endpoint permission gates, and VPS PostgreSQL deployment hardening.
+
+### Delivered
+
+- Added generic OIDC Authorization Code + PKCE authorize/callback routes with state, verifier, nonce validation, safe return-url handling, session minting, and HttpOnly/SameSite `rp_session` cookies.
+- Made RadioPad bearer middleware resolve cookie-only sessions from `AuthSessions`, require an active session row, and reject revoked or expired sessions.
+- Added logout, current-session, session-list, and per-session revoke APIs; session cookies are now appended by dev sign-in, magic-link, device-flow, SAML, WebAuthn, and OIDC sign-in paths.
+- Reworked the frontend `/login` page around production SSO, magic-link fallback, device pairing, and explicit dev/test-only tuple login; public auth pages no longer render inside the signed-in sidebar shell.
+- Added real frontend sign-out that calls backend logout, clears secure/native auth storage, clears active bearer state, and routes back to `/login`.
+- Added the endpoint permission matrix and migrated high-risk controller operations from role lists to permission checks while preserving the current fixed-role compatibility model.
+- Hardened production startup and VPS deployment: required auth/column-key secrets, disabled Swagger by default in Production, enabled forwarded headers behind nginx, added PostgreSQL compose services, loopback web binding, healthchecks, security/cache headers, and stripped inbound `X-RadioPad-*` at nginx.
+- Updated `.env.example`, OpenAPI, auth/RBAC/security/deployment/user/admin docs, and VPS migration instructions for the new OIDC/session/PostgreSQL posture.
+
+### Validation
+
+- Backend build: passed.
+- Targeted Auth/RBAC backend tests: **Failed: 0, Passed: 21, Skipped: 0, Total: 21**.
+- Full backend suite: **Failed: 0, Passed: 483, Skipped: 5, Total: 488**.
+- Frontend typecheck: passed.
+- Focused frontend auth tests: **2 files / 4 tests passed**.
+- Frontend production build: passed via direct `next build`.
+- Diff whitespace check passed; only existing CRLF normalization warnings were reported.
+- Independent code-review pass found one proxy-header issue, fixed before the final backend validation.
+
+### Notes
+
+- Docker is not installed in this Windows worktree, so local `docker compose config` validation could not run here; VPS validation must run on the production host after push.
+- `pnpm --filter @radiopad/frontend build` is blocked in this environment by pnpm's ignored-build-script policy, so the equivalent direct `frontend\node_modules\.bin\next.cmd build` was used after typecheck/tests.
+- Pre-existing unrelated `rulebooks/*.yaml` modifications remain intentionally untouched and unstaged.
+- DB-backed custom roles, full step-up MFA enforcement, hardened production WebAuthn challenge verification, break-glass, and SCIM/device-trust lifecycle hardening remain deferred enterprise phases.
+
+---
+
 ## Iteration 48 - GitHub and VPS fresh deployment
 
 - **Date:** 2026-05-17

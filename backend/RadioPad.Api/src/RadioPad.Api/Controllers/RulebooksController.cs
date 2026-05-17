@@ -1,6 +1,7 @@
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using RadioPad.Application.Abstractions;
+using RadioPad.Application.Security;
 using RadioPad.Domain.Entities;
 using RadioPad.Domain.Enums;
 using RadioPad.Infrastructure.Persistence;
@@ -51,7 +52,9 @@ public class RulebooksController : TenantedController
     [HttpPost]
     public async Task<IActionResult> Save([FromBody] SaveRulebookDto dto, CancellationToken ct)
     {
-        var (tenant, _) = await ResolveContextAsync(_db, ct);
+        var (tenant, user) = await ResolveContextAsync(_db, ct);
+        var deny = RequirePermission(user, RbacPermission.RulebooksManage);
+        if (deny is not null) return deny;
         RulebookSpec spec;
         try { spec = RulebookSpec.FromYaml(dto.Yaml); }
         catch (Exception ex) { return BadRequest(new { error = $"Invalid YAML: {ex.Message}" }); }
@@ -126,7 +129,7 @@ public class RulebooksController : TenantedController
     public async Task<IActionResult> Approve(Guid id, CancellationToken ct)
     {
         var (tenant, user) = await ResolveContextAsync(_db, ct);
-        var deny = RequireRole(user, UserRole.MedicalDirector, UserRole.ReportingAdmin, UserRole.ItAdmin);
+        var deny = RequirePermission(user, RbacPermission.RulebooksApprove);
         if (deny is not null) return deny;
         var rb = await _db.Rulebooks.FirstOrDefaultAsync(r => r.Id == id && r.TenantId == tenant.Id, ct);
         if (rb is null) return NotFound();
@@ -147,7 +150,7 @@ public class RulebooksController : TenantedController
     public async Task<IActionResult> Deprecate(Guid id, CancellationToken ct)
     {
         var (tenant, user) = await ResolveContextAsync(_db, ct);
-        var deny = RequireRole(user, UserRole.MedicalDirector, UserRole.ReportingAdmin, UserRole.ItAdmin);
+        var deny = RequirePermission(user, RbacPermission.RulebooksApprove);
         if (deny is not null) return deny;
         var rb = await _db.Rulebooks.FirstOrDefaultAsync(r => r.Id == id && r.TenantId == tenant.Id, ct);
         if (rb is null) return NotFound();
@@ -177,7 +180,7 @@ public class RulebooksController : TenantedController
     public async Task<IActionResult> Rollback(Guid id, [FromBody] RollbackDto dto, CancellationToken ct)
     {
         var (tenant, user) = await ResolveContextAsync(_db, ct);
-        var deny = RequireRole(user, UserRole.MedicalDirector, UserRole.ReportingAdmin, UserRole.ItAdmin);
+        var deny = RequirePermission(user, RbacPermission.RulebooksApprove);
         if (deny is not null) return deny;
         var current = await _db.Rulebooks.FirstOrDefaultAsync(r => r.Id == id && r.TenantId == tenant.Id, ct);
         if (current is null) return NotFound();

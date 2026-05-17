@@ -23,7 +23,10 @@ services:
     image: radiopad/api:<tag>
     environment:
       RADIOPAD_BIND: 0.0.0.0:7457
-      RADIOPAD_DB: Host=postgres;Database=radiopad;Username=radiopad;Password=...
+      ConnectionStrings__RadioPad: Host=postgres;Port=5432;Database=radiopad;Username=radiopad;Password=...
+      RADIOPAD_AUTH_SECRET: ...
+      RADIOPAD_COLUMN_KEY_REF: ...
+      RADIOPAD_COLUMN_KEY_WRAPPED: ...
       ASPNETCORE_ENVIRONMENT: Production
     depends_on: [postgres]
   postgres:
@@ -42,6 +45,20 @@ volumes:
 
 - The API image runs `dotnet ef database update` on startup if `RADIOPAD_RUN_MIGRATIONS=true`.
 - For controlled rollouts, run migrations as a separate one-shot job before the API rolls out.
+
+## Production environment requirements
+
+- Production uses Postgres via `ConnectionStrings__RadioPad`; SQLite is for local
+  development and legacy data migration only.
+- `RADIOPAD_AUTH_SECRET`, `RADIOPAD_COLUMN_KEY_REF`, and
+  `RADIOPAD_COLUMN_KEY_WRAPPED` must be set before starting a Production API.
+- Optional OIDC validation is enabled with `RADIOPAD_OIDC_AUTHORITY`; set
+  `RADIOPAD_OIDC_CLIENT_ID`, optional `RADIOPAD_OIDC_CLIENT_SECRET`,
+  `RADIOPAD_OIDC_REDIRECT_URI`, `RADIOPAD_OIDC_AUDIENCE`, tenant/email claim
+  env vars, and `RADIOPAD_OIDC_REQUIRE_MFA=1` to match the IdP policy.
+- The VPS manifest in `deploy/vps/` binds the web container to loopback by
+  default (`127.0.0.1:8093`) so Nginx Proxy Manager or another TLS proxy is the
+  only public entry point.
 
 ## Frontend
 

@@ -30,11 +30,14 @@ public static class PermissionCatalog
             [RbacPermission.BillingRead] = Define(RbacPermission.BillingRead, "billing.read", "Read tenant billing status."),
             [RbacPermission.BillingManage] = Define(RbacPermission.BillingManage, "billing.manage", "Manage billing, invoices, refunds, and marketplace payments."),
             [RbacPermission.SecurityManage] = Define(RbacPermission.SecurityManage, "security.manage", "Manage tenant security settings and alert delivery."),
+            [RbacPermission.TenantSettingsManage] = Define(RbacPermission.TenantSettingsManage, "tenant_settings.manage", "Manage tenant operational settings."),
             [RbacPermission.ValidationPacksRead] = Define(RbacPermission.ValidationPacksRead, "validation_packs.read", "Read clinical validation packs."),
             [RbacPermission.ValidationPacksManage] = Define(RbacPermission.ValidationPacksManage, "validation_packs.manage", "Create and approve validation packs.", clinical: true),
             [RbacPermission.ValidationPacksRun] = Define(RbacPermission.ValidationPacksRun, "validation_packs.run", "Run validation packs.", clinical: true),
             [RbacPermission.McpToolsInvoke] = Define(RbacPermission.McpToolsInvoke, "mcp_tools.invoke", "Invoke approved MCP tools."),
             [RbacPermission.McpToolsManage] = Define(RbacPermission.McpToolsManage, "mcp_tools.manage", "Register, approve, test, or revoke MCP tools."),
+            [RbacPermission.PromptOverridesManage] = Define(RbacPermission.PromptOverridesManage, "prompt_overrides.manage", "Create, update, or delete prompt overrides.", clinical: true),
+            [RbacPermission.PromptOverridesApprove] = Define(RbacPermission.PromptOverridesApprove, "prompt_overrides.approve", "Approve prompt overrides for runtime use.", clinical: true),
         };
 
     public static IReadOnlyCollection<PermissionDefinition> All => Definitions.Values.ToArray();

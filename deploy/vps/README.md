@@ -7,11 +7,11 @@ This differs from the root `deploy/` directory which uses Caddy for TLS.
 ## Architecture
 
 ```
-Internet → NPM (port 80/443) → radiopad-web:8093 (nginx + Next.js static)
+Internet → NPM (port 80/443) → 127.0.0.1:8093 → radiopad-web (nginx + Next.js static)
                                      ↓ /api/* proxy
                                radiopad-api:7457 (ASP.NET Core 8)
                                      ↓
-                               /data/radiopad.db (SQLite volume)
+                                radiopad-postgres:5432 (PostgreSQL volume)
 ```
 
 ## Files
@@ -28,45 +28,140 @@ Internet → NPM (port 80/443) → radiopad-web:8093 (nginx + Next.js static)
 - Docker 26+ with Compose plugin
 - Nginx Proxy Manager running on ports 80/443
 - SSH access to VPS (SSH key at `~/.ssh/id_ed25519`)
+- A protected secrets file at `/opt/radiopad/.secrets.env` (`chmod 600`)
+- For legacy SQLite migration only: `pgloader` available as a one-shot
+  container or installed on the host
 
 ## First-time setup
 
 ```bash
-mkdir -p /opt/radiopad/data
+mkdir -p /opt/radiopad
 cd /opt/radiopad
 git clone https://github.com/Sub-organization-maternal-mind/radiopad.git src
 
-# Create secrets file
-cat > .secrets.env << 'EOF'
-RADIOPAD_COLUMN_KEK=<generate-with: openssl rand -base64 32>
+# Create secrets file with your editor. Never commit real values.
+install -m 600 /dev/null .secrets.env
+${EDITOR:-nano} .secrets.env
+```
+
+Minimum contents:
+
+```dotenv
+POSTGRES_DB=radiopad
+POSTGRES_USER=radiopad
+POSTGRES_PASSWORD=<generate-with: openssl rand -base64 32>
+
+RADIOPAD_AUTH_SECRET=<generate-with: openssl rand -base64 32>
+RADIOPAD_COLUMN_KEY_REF=<kms-or-env-key-reference>
+RADIOPAD_COLUMN_KEY_WRAPPED=<base64-wrapped-column-data-key>
+
+# Optional OIDC JWT validation
+# RADIOPAD_OIDC_PRESET=keycloak
+# RADIOPAD_OIDC_AUTHORITY=https://auth.example.com/realms/radiopad
+# RADIOPAD_OIDC_CLIENT_ID=radiopad-web
+# RADIOPAD_OIDC_CLIENT_SECRET=<REDACTED_SECRET>
+# RADIOPAD_OIDC_REDIRECT_URI=https://radiopad.example.com/api/auth/oidc/callback
+# RADIOPAD_OIDC_SCOPE=openid profile email
+# RADIOPAD_OIDC_AUDIENCE=radiopad-api
+# RADIOPAD_OIDC_TENANT_CLAIM=tenant_slug
+# RADIOPAD_OIDC_EMAIL_CLAIM=email
+# RADIOPAD_OIDC_REQUIRE_MFA=1
+
+# Web is loopback-bound by default; NPM forwards to this port.
+RADIOPAD_WEB_PORT=8093
+
 # Optional: ANTHROPIC_API_KEY=...
-EOF
+```
+
+```bash
 chmod 600 .secrets.env
 
 # Build and start. The compose file keeps secrets and data outside the
-# fresh-synced source tree at /opt/radiopad/.secrets.env and /opt/radiopad/data.
+# fresh-synced source tree at /opt/radiopad/.secrets.env and in Docker volumes.
 cd src
 docker compose -f deploy/vps/docker-compose.yml --env-file ../.secrets.env up -d --build
+docker compose -f deploy/vps/docker-compose.yml --env-file ../.secrets.env ps
 ```
+
+## Required production secrets
+
+Production startup intentionally fails unless these are present:
+
+| Env var | Purpose |
+|---|---|
+| `POSTGRES_PASSWORD` | Password for the compose-managed PostgreSQL role |
+| `RADIOPAD_AUTH_SECRET` | RadioPad bearer token signing secret |
+| `RADIOPAD_COLUMN_KEY_REF` | KMS/KEK reference or env-backed wrapping key reference |
+| `RADIOPAD_COLUMN_KEY_WRAPPED` | Base64 wrapped data encryption key for encrypted columns |
+
+The deterministic development column key fallback must not be used in
+Production. If OIDC is enabled, also set `RADIOPAD_OIDC_AUTHORITY` and the
+matching `RADIOPAD_OIDC_CLIENT_ID`, optional `RADIOPAD_OIDC_CLIENT_SECRET`,
+`RADIOPAD_OIDC_AUDIENCE`, redirect URI, and claim mapping env vars for the IdP.
+
+## SQLite → PostgreSQL migration
+
+Use this only when moving an existing VPS from the legacy SQLite layout
+(`/opt/radiopad/data/radiopad.db`) to the PostgreSQL compose layout.
+
+1. Stop writes and take a cold SQLite backup.
+
+   ```bash
+   cd /opt/radiopad/src
+   docker compose -f deploy/vps/docker-compose.yml --env-file ../.secrets.env down
+   cp /opt/radiopad/data/radiopad.db /opt/radiopad/data/radiopad.db.pre-postgres
+   ```
+
+2. Start PostgreSQL only and wait for it to become healthy.
+
+   ```bash
+   docker compose -f deploy/vps/docker-compose.yml --env-file ../.secrets.env up -d radiopad-postgres
+   docker compose -f deploy/vps/docker-compose.yml --env-file ../.secrets.env ps radiopad-postgres
+   ```
+
+3. Load the SQLite database into PostgreSQL from the compose network. Replace
+   placeholders with the values from `/opt/radiopad/.secrets.env`.
+
+   ```bash
+   docker run --rm --network radiopad_network \
+     -v /opt/radiopad/data:/legacy:ro \
+     dimitri/pgloader:latest \
+     pgloader /legacy/radiopad.db \
+       postgresql://radiopad:<POSTGRES_PASSWORD>@radiopad-postgres:5432/radiopad
+   ```
+
+4. Start the API and web services, then run readiness checks.
+
+   ```bash
+   docker compose -f deploy/vps/docker-compose.yml --env-file ../.secrets.env up -d --build
+   curl -fsS http://127.0.0.1:8093/api/health
+   curl -fsS http://127.0.0.1:8093/api/health/ready
+   ```
+
+Keep the cold SQLite backup until smoke tests, tenant sign-in, report creation,
+and audit verification have passed. Do not run the old SQLite stack and the new
+PostgreSQL stack with live traffic at the same time.
 
 ## Updating
 
 ```bash
 cd /opt/radiopad
-# Backup VPS-specific config
-cp -r src/.deploy /tmp/deploy-bak
+# Backup VPS-specific config if you use src/.deploy
+rm -rf deploy-bak fresh-src
+cp -r src/.deploy deploy-bak
 
 # Pull latest
-rm -rf /tmp/fresh && git clone --depth=1 https://github.com/Sub-organization-maternal-mind/radiopad.git /tmp/fresh
-rsync -av --exclude='.deploy' /tmp/fresh/ src/ --delete
+git clone --depth=1 https://github.com/Sub-organization-maternal-mind/radiopad.git fresh-src
+rsync -av --exclude='.deploy' fresh-src/ src/ --delete
 
 # Restore VPS config (if using .deploy/ instead of deploy/vps/)
-cp -r /tmp/deploy-bak src/.deploy
+cp -r deploy-bak src/.deploy
 
 # Rebuild
 cd src
 docker compose -f deploy/vps/docker-compose.yml --env-file ../.secrets.env down
 docker compose -f deploy/vps/docker-compose.yml --env-file ../.secrets.env up -d --build --no-cache
+docker compose -f deploy/vps/docker-compose.yml --env-file ../.secrets.env ps
 ```
 
 ## NPM Proxy Host
@@ -78,9 +173,47 @@ Add a proxy host in Nginx Proxy Manager:
 - **Forward Port**: `8093`
 - **SSL**: Let's Encrypt (recommended)
 
-## Health check
+The compose file binds the web port to `127.0.0.1` by default:
+`127.0.0.1:${RADIOPAD_WEB_PORT:-8093}:80`. Do not change this to `0.0.0.0`
+unless a separate firewall and TLS exposure review has approved direct access.
+
+## Health and readiness checks
 
 ```bash
 curl http://127.0.0.1:8093/api/health
 # Expected: {"status":"ok","service":"radiopad-api","time":"..."}
+
+curl http://127.0.0.1:8093/api/health/ready
+# Expected: {"status":"ready","db":true,"time":"..."}
+
+docker compose -f deploy/vps/docker-compose.yml --env-file ../.secrets.env ps
+# Expected: radiopad-postgres, radiopad-api, and radiopad-web are healthy.
 ```
+
+## PostgreSQL backup and restore
+
+Create backups before every rebuild or migration, and store them off-host after
+encrypting them with the operator-approved backup process.
+
+```bash
+cd /opt/radiopad/src
+docker compose -f deploy/vps/docker-compose.yml --env-file ../.secrets.env exec radiopad-postgres \
+  pg_dump -U radiopad -d radiopad -Fc -f /var/lib/postgresql/data/radiopad-predeploy.dump
+```
+
+Restore into an isolated PostgreSQL volume first, run smoke checks, then repoint
+the API only after validation. Avoid restoring over the live volume unless the
+incident commander has approved downtime.
+
+## Rollback notes
+
+- **Before SQLite migration cutover:** keep the legacy SQLite DB backup at
+  `/opt/radiopad/data/radiopad.db.pre-postgres`; roll back by restoring the
+  previous git revision/compose file and the SQLite DB while the new stack is
+  stopped.
+- **After PostgreSQL cutover:** prefer rolling back application images/source
+  while keeping the PostgreSQL volume. Schema downgrades are not automatic; if a
+  migration changed schema, restore the predeploy Postgres backup into an
+  isolated volume and validate before repointing traffic.
+- **Traffic rollback:** disable the NPM proxy host or point it back to the last
+  healthy loopback port. The web port should remain loopback-only.

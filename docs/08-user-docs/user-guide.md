@@ -1,14 +1,17 @@
 # User Guide (Radiologist)
 
-**Status:** Current  ·  **Owner:** Product  ·  **Last Updated:** 2026-05-04
+**Status:** Current  Â·  **Owner:** Product  Â·  **Last Updated:** 2026-05-04
 
 This guide is for radiologists using RadioPad to draft, validate, and sign reports.
 
 ## Sign in
 
-- Web: open the RadioPad URL provided by your administrator.
-- Desktop: launch the RadioPad app; press `Ctrl+Shift+R` (Windows/Linux) or `⌘⇧R` (macOS) to bring it to the front.
-- Mobile: launch the app for read / acknowledge access.
+- Web: open the RadioPad URL provided by your administrator and sign in through your organization's identity provider. If your administrator enables it, use the emailed magic link fallback.
+- Desktop: launch the RadioPad app; press `Ctrl+Shift+R` (Windows/Linux) or `Cmd+Shift+R` (macOS) to bring it to the front. Desktop sign-in stores session material in the operating system secure store.
+- Mobile: launch the app for read / acknowledge access. Mobile sign-in uses the platform secure storage/keychain.
+- For sensitive actions such as signing, exporting PHI, or approving governance changes, RadioPad may ask for a fresh MFA/step-up check.
+
+Do not paste access tokens into chat, tickets, or browser storage. If you think your session is compromised, ask an administrator to revoke your sessions.
 
 ## Dashboard
 
@@ -20,14 +23,14 @@ This guide is for radiologists using RadioPad to draft, validate, and sign repor
 1. Click **New report**.
 2. Pick the modality + body part; the matching template loads.
 3. Fill in: Indication, Technique, Comparison, Findings, Impression, Recommendations.
-4. Save anytime — drafts auto-save.
+4. Save anytime - drafts auto-save.
 
 ## Asking AI for a draft
 
 1. Open the report editor.
 2. Choose a provider in the AI dropdown (Mock / Anthropic / Ollama / etc., per your admin's configuration).
 3. Click **Suggest impression** (or recommendations / technique).
-4. Review the suggestion — it appears in the **purple AI mark**.
+4. Review the suggestion - it appears in the **purple AI mark**.
 5. Edit freely, or click **Acknowledge AI suggestions** to accept.
 6. **You** are responsible for the final wording.
 
@@ -36,9 +39,9 @@ If you mark the request as containing PHI and the chosen provider isn't permitte
 ## Validation
 
 - Click **Validate**. The right pane shows findings grouped by severity:
-  - **Blocker (red)** — must be addressed before sign-off.
-  - **Warning (amber)** — review carefully.
-  - **Info (blue)** — informational.
+  - **Blocker (red)** - must be addressed before sign-off.
+  - **Warning (amber)** - review carefully.
+  - **Info (blue)** - informational.
 - The status moves to **Validated** if there are no Blockers.
 
 ## Acknowledge & sign
@@ -48,8 +51,8 @@ If you mark the request as containing PHI and the chosen provider isn't permitte
 
 ## Export
 
-- Click **Export → Text** for a plain-text radiology report.
-- Click **Export → FHIR** for a `DiagnosticReport` JSON ready to send to your EHR / RIS.
+- Click **Export â†’ Text** for a plain-text radiology report.
+- Click **Export â†’ FHIR** for a `DiagnosticReport` JSON ready to send to your EHR / RIS.
 
 ## Versions
 
@@ -58,7 +61,7 @@ If you mark the request as containing PHI and the chosen provider isn't permitte
 ## Tips
 
 - Use keyboard navigation: `Tab` between sections; `Esc` closes modals.
-- The clipboard is wiped after a short delay on the desktop app — paste promptly.
+- The clipboard is wiped after a short delay on the desktop app - paste promptly.
 - If a request fails, note the request id from the banner and share it with support.
 
 
@@ -69,7 +72,7 @@ frontend that the Capacitor WebView wraps. They use only the locked Open
 Design tokens; AI-drafted prose continues to wear the purple `.ai-mark`
 treatment until you accept it.
 
-### Dictate findings — `/mobile/dictate/[reportId]`
+### Dictate findings - `/mobile/dictate/[reportId]`
 
 1. Open the report on your phone and tap **Dictate**.
 2. Tap the large mic tile to start recording. The transcript appears live
@@ -79,23 +82,23 @@ treatment until you accept it.
    keyed by report id, so a network drop or accidental page reload does
    not lose your spoken notes.
 4. If your browser does not expose the Web Speech API (older iOS Safari),
-   the page shows a clear fallback banner — open the report in the editor
+   the page shows a clear fallback banner - open the report in the editor
    and type, or retry on Capacitor / Android Chrome.
 
-### Edit a draft — `/mobile/reports/[reportId]/edit`
+### Edit a draft - `/mobile/reports/[reportId]/edit`
 
 Each report section (Indication, Technique, Comparison, Findings,
 Impression, Recommendations) is its own collapsible panel sized for a
 thumb. Tap a section to expand and edit. AI-drafted text stays wrapped in
 `.ai-mark` (and tagged with the `AI draft` badge) until you save.
 
-### Acknowledge and export — `/mobile/reports/[reportId]/sign`
+### Acknowledge and export - `/mobile/reports/[reportId]/sign`
 
 RadioPad **never** auto-signs. Sign in your RIS / EHR; this screen records
 your acknowledgement and unlocks export. To proceed:
 
 1. Review the read-only report. Validation findings render with the locked
-   severity colours: **Blocker → red**, **Warning → amber**, **Info → blue**.
+   severity colours: **Blocker â†’ red**, **Warning â†’ amber**, **Info â†’ blue**.
 2. Tick *I have reviewed all AI-generated text* (mandatory).
 3. If unresolved warnings exist, tick *I acknowledge any unresolved warnings*.
 4. Pick a format (Text / JSON / FHIR / PDF) and tap **Acknowledge & Export**.

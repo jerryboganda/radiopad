@@ -293,6 +293,7 @@ public class MagicLinkController : ControllerBase
         await EnterpriseIdentityBridge.RecordAuthSessionAsync(_db, user, token, "magic-link", expiresAt, ct,
             ip: HttpContext.Connection.RemoteIpAddress?.ToString(),
             userAgent: HttpContext.Request.Headers.UserAgent.FirstOrDefault());
+        RadioPadSessionCookies.Append(HttpContext, token, expiresAt);
 
         return Ok(new
         {
@@ -571,6 +572,7 @@ public class DeviceAuthController : TenantedController
             deviceFingerprint: row.DeviceFingerprint,
             ip: HttpContext.Connection.RemoteIpAddress?.ToString(),
             userAgent: HttpContext.Request.Headers.UserAgent.FirstOrDefault());
+        RadioPadSessionCookies.Append(HttpContext, token, expiresAt);
 
         return Ok(new
         {

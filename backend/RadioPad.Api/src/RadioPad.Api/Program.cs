@@ -1,3 +1,4 @@
+using Microsoft.AspNetCore.HttpOverrides;
 using Microsoft.AspNetCore.RateLimiting;
 using Microsoft.EntityFrameworkCore;
 using OpenTelemetry.Metrics;
@@ -26,6 +27,15 @@ if (!builder.Environment.IsDevelopment()
 {
     throw new InvalidOperationException(
         "RADIOPAD_AUTH_SECRET must be set outside Development/Testing so RadioPad bearer tokens are not signed with the default secret.");
+}
+
+if (!builder.Environment.IsDevelopment()
+    && !builder.Environment.IsEnvironment("Testing")
+    && (string.IsNullOrWhiteSpace(Environment.GetEnvironmentVariable("RADIOPAD_COLUMN_KEY_REF"))
+        || string.IsNullOrWhiteSpace(Environment.GetEnvironmentVariable("RADIOPAD_COLUMN_KEY_WRAPPED"))))
+{
+    throw new InvalidOperationException(
+        "RADIOPAD_COLUMN_KEY_REF and RADIOPAD_COLUMN_KEY_WRAPPED must be set outside Development/Testing so encrypted columns do not use the dev fallback key.");
 }
 
 // Bind to localhost by default (safety boundary §local-trust).
@@ -411,6 +421,20 @@ if (!app.Environment.IsEnvironment("Testing"))
     await DevSeed.EnsureSeededAsync(db, rulebooksDir, default);
 }
 
+if (!app.Environment.IsDevelopment() && !app.Environment.IsEnvironment("Testing"))
+{
+    var forwardedHeaders = new ForwardedHeadersOptions
+    {
+        ForwardedHeaders = ForwardedHeaders.XForwardedFor
+            | ForwardedHeaders.XForwardedHost
+            | ForwardedHeaders.XForwardedProto,
+        ForwardLimit = 2,
+    };
+    forwardedHeaders.KnownNetworks.Clear();
+    forwardedHeaders.KnownProxies.Clear();
+    app.UseForwardedHeaders(forwardedHeaders);
+}
+
 app.UseMiddleware<RequestCorrelationMiddleware>();
 app.UseMiddleware<GlobalExceptionMiddleware>();
 // Iter-33 PERF-004 — record per-route request duration. Sits after
@@ -429,8 +453,13 @@ app.UseMiddleware<RateLimitMiddleware>();
 app.UseMiddleware<SuspensionGuardMiddleware>();
 app.UseCors();
 app.UseRateLimiter();
-app.UseSwagger();
-app.UseSwaggerUI();
+if (app.Environment.IsDevelopment()
+    || app.Environment.IsEnvironment("Testing")
+    || Environment.GetEnvironmentVariable("RADIOPAD_SWAGGER_ENABLED") == "1")
+{
+    app.UseSwagger();
+    app.UseSwaggerUI();
+}
 app.MapControllers();
 app.MapGet("/api/health", () => Results.Ok(new { status = "ok", service = "radiopad-api", time = DateTimeOffset.UtcNow }));
 app.MapGet("/api/health/ready", async (RadioPadDbContext db, CancellationToken ct) =>

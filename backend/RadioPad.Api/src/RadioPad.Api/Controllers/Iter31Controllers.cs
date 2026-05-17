@@ -1,6 +1,7 @@
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using RadioPad.Application.Abstractions;
+using RadioPad.Application.Security;
 using RadioPad.Domain.Entities;
 using RadioPad.Domain.Enums;
 using RadioPad.Infrastructure.Persistence;
@@ -49,7 +50,7 @@ public class PromptOverridesController : TenantedController
     public async Task<IActionResult> Save([FromBody] SaveOverrideDto dto, CancellationToken ct)
     {
         var (tenant, user) = await ResolveContextAsync(_db, ct);
-        var deny = RequireRole(user, UserRole.MedicalDirector, UserRole.ReportingAdmin);
+        var deny = RequirePermission(user, RbacPermission.PromptOverridesManage);
         if (deny is not null) return deny;
         if (string.IsNullOrWhiteSpace(dto.RulebookId) || string.IsNullOrWhiteSpace(dto.BlockKey))
             return BadRequest(new { error = "rulebookId and blockKey are required.", kind = "validation" });
@@ -89,7 +90,7 @@ public class PromptOverridesController : TenantedController
     public async Task<IActionResult> Approve(Guid id, CancellationToken ct)
     {
         var (tenant, user) = await ResolveContextAsync(_db, ct);
-        var deny = RequireRole(user, UserRole.MedicalDirector);
+        var deny = RequirePermission(user, RbacPermission.PromptOverridesApprove);
         if (deny is not null) return deny;
         var row = await _db.PromptOverrides.FirstOrDefaultAsync(
             p => p.Id == id && p.TenantId == tenant.Id, ct);
@@ -125,7 +126,7 @@ public class PromptOverridesController : TenantedController
     public async Task<IActionResult> Delete(Guid id, CancellationToken ct)
     {
         var (tenant, user) = await ResolveContextAsync(_db, ct);
-        var deny = RequireRole(user, UserRole.MedicalDirector, UserRole.ReportingAdmin);
+        var deny = RequirePermission(user, RbacPermission.PromptOverridesManage);
         if (deny is not null) return deny;
         var row = await _db.PromptOverrides.FirstOrDefaultAsync(p => p.Id == id && p.TenantId == tenant.Id, ct);
         if (row is null) return NotFound();
@@ -274,7 +275,9 @@ public class UsersController : TenantedController
     [HttpGet]
     public async Task<IActionResult> List(CancellationToken ct)
     {
-        var (tenant, _) = await ResolveContextAsync(_db, ct);
+        var (tenant, user) = await ResolveContextAsync(_db, ct);
+        var deny = RequirePermission(user, RbacPermission.UsersRead);
+        if (deny is not null) return deny;
         var rows = await _db.Users
             .Where(u => u.TenantId == tenant.Id)
             .OrderBy(u => u.Email)
@@ -305,7 +308,7 @@ public class UsersController : TenantedController
     public async Task<IActionResult> RevokeSessions(Guid id, CancellationToken ct)
     {
         var (tenant, user) = await ResolveContextAsync(_db, ct);
-        var deny = RequireRole(user, UserRole.MedicalDirector, UserRole.ItAdmin, UserRole.ComplianceReviewer);
+        var deny = RequirePermission(user, RbacPermission.UsersRevokeSessions);
         if (deny is not null) return deny;
         var target = await _db.Users.FirstOrDefaultAsync(u => u.Id == id && u.TenantId == tenant.Id, ct);
         if (target is null) return NotFound();
@@ -330,7 +333,7 @@ public class UsersController : TenantedController
     private async Task<IActionResult> SetActiveAsync(Guid id, bool active, CancellationToken ct)
     {
         var (tenant, user) = await ResolveContextAsync(_db, ct);
-        var deny = RequireRole(user, UserRole.MedicalDirector, UserRole.ItAdmin);
+        var deny = RequirePermission(user, RbacPermission.UsersManage);
         if (deny is not null) return deny;
         var target = await _db.Users.FirstOrDefaultAsync(u => u.Id == id && u.TenantId == tenant.Id, ct);
         if (target is null) return NotFound();

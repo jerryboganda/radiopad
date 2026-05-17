@@ -1,22 +1,51 @@
 services:
+  radiopad-postgres:
+    image: postgres:16-alpine
+    container_name: radiopad-postgres
+    restart: unless-stopped
+    env_file:
+      - ../../../.secrets.env
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:-radiopad}
+      POSTGRES_USER: ${POSTGRES_USER:-radiopad}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?set POSTGRES_PASSWORD in ../.secrets.env}
+    volumes:
+      - radiopad_pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U \"$${POSTGRES_USER}\" -d \"$${POSTGRES_DB}\""]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 20s
+    networks:
+      - radiopad
+
   radiopad-api:
     build:
       context: ../..
       dockerfile: deploy/vps/api.Dockerfile
     container_name: radiopad-api
     restart: unless-stopped
+    depends_on:
+      radiopad-postgres:
+        condition: service_healthy
     env_file:
       - ../../../.secrets.env
     environment:
       ASPNETCORE_ENVIRONMENT: Production
       RADIOPAD_BIND: http://0.0.0.0:7457
-      # SQLite database — change to a Postgres connection string for production scale
-      ConnectionStrings__RadioPad: Data Source=/data/radiopad.db
-      RADIOPAD_COLUMN_KEY_REF: env:RADIOPAD_COLUMN_KEK
+      ConnectionStrings__RadioPad: Host=radiopad-postgres;Port=5432;Database=${POSTGRES_DB:-radiopad};Username=${POSTGRES_USER:-radiopad};Password=${POSTGRES_PASSWORD:?set POSTGRES_PASSWORD in ../.secrets.env}
+      RADIOPAD_AUTH_SECRET: ${RADIOPAD_AUTH_SECRET:?set RADIOPAD_AUTH_SECRET in ../.secrets.env}
+      RADIOPAD_COLUMN_KEY_REF: ${RADIOPAD_COLUMN_KEY_REF:?set RADIOPAD_COLUMN_KEY_REF in ../.secrets.env}
+      RADIOPAD_COLUMN_KEY_WRAPPED: ${RADIOPAD_COLUMN_KEY_WRAPPED:?set RADIOPAD_COLUMN_KEY_WRAPPED in ../.secrets.env}
       RADIOPAD_RATE_LIMIT_IP_PER_MIN: "600"
       RADIOPAD_RATE_LIMIT_TENANT_PER_MIN: "5000"
-    volumes:
-      - ../../../data:/data
+    healthcheck:
+      test: ["CMD-SHELL", "curl -fsS http://127.0.0.1:7457/api/health/ready || exit 1"]
+      interval: 15s
+      timeout: 5s
+      retries: 12
+      start_period: 30s
     networks:
       - radiopad
 
@@ -27,11 +56,22 @@ services:
     container_name: radiopad-web
     restart: unless-stopped
     depends_on:
-      - radiopad-api
+      radiopad-api:
+        condition: service_healthy
     ports:
-      - "8093:80"
+      - "127.0.0.1:${RADIOPAD_WEB_PORT:-8093}:80"
+    healthcheck:
+      test: ["CMD-SHELL", "wget -q --spider http://127.0.0.1/ || exit 1"]
+      interval: 30s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
     networks:
       - radiopad
+
+volumes:
+  radiopad_pgdata:
+    name: radiopad_pgdata
 
 networks:
   radiopad:

@@ -17,6 +17,9 @@ RUN dotnet publish backend/RadioPad.Api/src/RadioPad.Api/RadioPad.Api.csproj -c 
 
 FROM mcr.microsoft.com/dotnet/aspnet:8.0
 WORKDIR /app
+RUN apt-get update \
+    && apt-get install -y --no-install-recommends curl \
+    && rm -rf /var/lib/apt/lists/*
 COPY --from=build /out ./
 ENV ASPNETCORE_ENVIRONMENT=Production
 ENV RADIOPAD_BIND=http://0.0.0.0:7457

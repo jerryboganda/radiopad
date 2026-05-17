@@ -4,6 +4,7 @@ using RadioPad.Api.Auth;
 using RadioPad.Application.Abstractions;
 using RadioPad.Domain.Entities;
 using RadioPad.Domain.Enums;
+using RadioPad.Infrastructure.Identity;
 using RadioPad.Infrastructure.Persistence;
 
 namespace RadioPad.Api.Middleware;
@@ -32,32 +33,49 @@ public sealed class RadioPadBearerIdentityMiddleware
             return;
         }
 
-        var auth = ctx.Request.Headers.Authorization.FirstOrDefault();
-        if (auth is null || !auth.StartsWith("Bearer ", StringComparison.OrdinalIgnoreCase))
+        var token = RadioPadSessionCookies.ExtractBearer(ctx.Request);
+        if (string.IsNullOrWhiteSpace(token))
         {
             await _next(ctx);
             return;
         }
 
-        var token = auth["Bearer ".Length..].Trim();
         if (!RadioPadBearerToken.IsRadioPadBearer(token))
         {
             await _next(ctx);
             return;
         }
 
+        var tokenHash = EnterpriseIdentityBridge.Sha256Hex(token);
         var tenantSlug = ctx.Request.Headers["X-RadioPad-Tenant"].FirstOrDefault();
         var email = ctx.Request.Headers["X-RadioPad-User"].FirstOrDefault();
+        Tenant? tenant = null;
+        User? user = null;
+        if (string.IsNullOrWhiteSpace(tenantSlug) || string.IsNullOrWhiteSpace(email))
+        {
+            var session = await db.AuthSessions.AsNoTracking()
+                .FirstOrDefaultAsync(s => s.TokenHash == tokenHash, ctx.RequestAborted);
+            if (session?.TenantId is Guid sessionTenantId && session.UserId is Guid sessionUserId)
+            {
+                tenant = await db.Tenants.AsNoTracking()
+                    .FirstOrDefaultAsync(t => t.Id == sessionTenantId, ctx.RequestAborted);
+                user = await db.Users.AsNoTracking()
+                    .FirstOrDefaultAsync(u => u.TenantId == sessionTenantId && u.Id == sessionUserId, ctx.RequestAborted);
+                tenantSlug = tenant?.Slug;
+                email = user?.Email;
+            }
+        }
+
         if (string.IsNullOrWhiteSpace(tenantSlug) || string.IsNullOrWhiteSpace(email))
         {
             await RejectAsync(ctx, "missing_rp_bearer_context", audit, null, null);
             return;
         }
 
-        var tenant = await db.Tenants.AsNoTracking()
+        tenant ??= await db.Tenants.AsNoTracking()
             .FirstOrDefaultAsync(t => t.Slug == tenantSlug, ctx.RequestAborted);
         var lookupTenantId = tenant?.Id ?? Guid.Empty;
-        var user = await db.Users.AsNoTracking()
+        user ??= await db.Users.AsNoTracking()
             .FirstOrDefaultAsync(u => u.TenantId == lookupTenantId && u.Email == email, ctx.RequestAborted);
         var tokenMatches = false;
         if (tenant is not null && user is not null)
@@ -85,6 +103,30 @@ public sealed class RadioPadBearerIdentityMiddleware
         if (!tokenMatches)
         {
             await RejectAsync(ctx, "invalid_rp_bearer", audit, tenant.Id, user.Id);
+            return;
+        }
+
+        var sessionState = await db.AuthSessions.AsNoTracking()
+            .Where(s => s.TokenHash == tokenHash
+                && s.TenantId == tenant.Id
+                && s.UserId == user.Id)
+            .Select(s => new { s.ExpiresAt, s.RevokedAt })
+            .FirstOrDefaultAsync(ctx.RequestAborted);
+        if (sessionState is null)
+        {
+            await RejectAsync(ctx, "missing_auth_session", audit, tenant.Id, user.Id);
+            return;
+        }
+
+        if (sessionState.RevokedAt is not null)
+        {
+            await RejectAsync(ctx, "revoked_rp_bearer", audit, tenant.Id, user.Id);
+            return;
+        }
+
+        if (sessionState.ExpiresAt <= DateTimeOffset.UtcNow)
+        {
+            await RejectAsync(ctx, "expired_auth_session", audit, tenant.Id, user.Id);
             return;
         }
 

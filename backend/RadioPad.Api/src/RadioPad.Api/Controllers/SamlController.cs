@@ -106,6 +106,7 @@ public class SamlController : ControllerBase
             await EnterpriseIdentityBridge.RecordAuthSessionAsync(_db, user, token, "saml", expiresAt, ct,
                 ip: HttpContext.Connection.RemoteIpAddress?.ToString(),
                 userAgent: HttpContext.Request.Headers.UserAgent.FirstOrDefault());
+            RadioPadSessionCookies.Append(HttpContext, token, expiresAt);
             await _audit.AppendAsync(new AuditEvent
             {
                 TenantId = tenant.Id,

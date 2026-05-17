@@ -74,11 +74,14 @@ public enum RbacPermission
     BillingRead = 120,
     BillingManage = 121,
     SecurityManage = 140,
+    TenantSettingsManage = 141,
     ValidationPacksRead = 160,
     ValidationPacksManage = 161,
     ValidationPacksRun = 162,
     McpToolsInvoke = 180,
     McpToolsManage = 181,
+    PromptOverridesManage = 200,
+    PromptOverridesApprove = 201,
 }
 
 public enum AuditAction

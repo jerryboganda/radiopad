@@ -48,9 +48,9 @@ public abstract class TenantedController : ControllerBase
     }
 
     /// <summary>
-    /// Minimal RBAC enforcement (PRD AUTH-002). Returns a 403 problem result
-    /// when the active user's role is not in the allow-list. Higher-fidelity
-    /// per-permission RBAC ships with OIDC integration in Phase 3.
+    /// Legacy role allow-list helper for endpoints whose policy has not yet
+    /// been migrated to the canonical permission matrix. Prefer
+    /// <see cref="RequirePermission"/> for new or high-risk endpoint gates.
     /// </summary>
     protected static IActionResult? RequireRole(User user, params UserRole[] allowed)
     {
@@ -379,6 +379,8 @@ public class ReportsController : TenantedController
     public async Task<IActionResult> RunAi(Guid id, [FromBody] AiActionDto dto, CancellationToken ct)
     {
         var (tenant, user) = await ResolveContextAsync(_db, ct);
+        var deny = RequirePermission(user, RbacPermission.ReportsEdit);
+        if (deny is not null) return deny;
         var report = await _db.Reports.FirstOrDefaultAsync(r => r.Id == id && r.TenantId == tenant.Id, ct);
         if (report is null) return NotFound();
 
@@ -476,6 +478,8 @@ public class ReportsController : TenantedController
     public async Task<IActionResult> ExportFhir(Guid id, CancellationToken ct)
     {
         var (tenant, user) = await ResolveContextAsync(_db, ct);
+        var deny = RequirePermission(user, RbacPermission.ReportsExport);
+        if (deny is not null) return deny;
         var report = await _db.Reports.FirstOrDefaultAsync(r => r.Id == id && r.TenantId == tenant.Id, ct);
         if (report is null) return NotFound();
         var gate = RequireAcknowledgedForExport(report, "FHIR");
@@ -489,6 +493,8 @@ public class ReportsController : TenantedController
     public async Task<IActionResult> ExportJson(Guid id, CancellationToken ct)
     {
         var (tenant, user) = await ResolveContextAsync(_db, ct);
+        var deny = RequirePermission(user, RbacPermission.ReportsExport);
+        if (deny is not null) return deny;
         var report = await _db.Reports.FirstOrDefaultAsync(r => r.Id == id && r.TenantId == tenant.Id, ct);
         if (report is null) return NotFound();
         var gate = RequireAcknowledgedForExport(report, "JSON");
@@ -518,6 +524,11 @@ public class ReportsController : TenantedController
     public async Task<IActionResult> ExportText(Guid id, [FromQuery] bool preview = false, CancellationToken ct = default)
     {
         var (tenant, user) = await ResolveContextAsync(_db, ct);
+        if (!preview)
+        {
+            var deny = RequirePermission(user, RbacPermission.ReportsExport);
+            if (deny is not null) return deny;
+        }
         var report = await _db.Reports.FirstOrDefaultAsync(r => r.Id == id && r.TenantId == tenant.Id, ct);
         if (report is null) return NotFound();
         // `preview=true` returns the narrative without auditing or moving status forward,
@@ -538,6 +549,8 @@ public class ReportsController : TenantedController
     public async Task<IActionResult> ExportPdf(Guid id, CancellationToken ct = default)
     {
         var (tenant, user) = await ResolveContextAsync(_db, ct);
+        var deny = RequirePermission(user, RbacPermission.ReportsExport);
+        if (deny is not null) return deny;
         var report = await _db.Reports.FirstOrDefaultAsync(r => r.Id == id && r.TenantId == tenant.Id, ct);
         if (report is null) return NotFound();
         var gate = RequireAcknowledgedForExport(report, "PDF");
@@ -552,6 +565,8 @@ public class ReportsController : TenantedController
     public async Task<IActionResult> ExportDocx(Guid id, CancellationToken ct = default)
     {
         var (tenant, user) = await ResolveContextAsync(_db, ct);
+        var deny = RequirePermission(user, RbacPermission.ReportsExport);
+        if (deny is not null) return deny;
         var report = await _db.Reports.FirstOrDefaultAsync(r => r.Id == id && r.TenantId == tenant.Id, ct);
         if (report is null) return NotFound();
         var gate = RequireAcknowledgedForExport(report, "DOCX");
@@ -568,6 +583,8 @@ public class ReportsController : TenantedController
     public async Task<IActionResult> ExportHl7(Guid id, CancellationToken ct = default)
     {
         var (tenant, user) = await ResolveContextAsync(_db, ct);
+        var deny = RequirePermission(user, RbacPermission.ReportsExport);
+        if (deny is not null) return deny;
         var report = await _db.Reports.FirstOrDefaultAsync(r => r.Id == id && r.TenantId == tenant.Id, ct);
         if (report is null) return NotFound();
         var gate = RequireAcknowledgedForExport(report, "HL7");

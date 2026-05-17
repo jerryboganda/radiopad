@@ -67,8 +67,38 @@ public class PermissionCatalogTests
         AssertAllowed(RbacPermission.SecurityManage, UserRole.ItAdmin, UserRole.MedicalDirector, UserRole.ComplianceReviewer);
         AssertDenied(RbacPermission.SecurityManage, UserRole.Radiologist, UserRole.ReportingAdmin, UserRole.BillingAdmin);
 
+        AssertAllowed(RbacPermission.TenantSettingsManage, UserRole.ReportingAdmin, UserRole.MedicalDirector, UserRole.ItAdmin);
+        AssertDenied(RbacPermission.TenantSettingsManage, UserRole.Radiologist, UserRole.ComplianceReviewer, UserRole.BillingAdmin);
+
         AssertAllowed(RbacPermission.AuditVerify, UserRole.ItAdmin, UserRole.MedicalDirector, UserRole.ComplianceReviewer);
         AssertDenied(RbacPermission.AuditVerify, UserRole.Radiologist, UserRole.ReportingAdmin, UserRole.BillingAdmin);
+    }
+
+    [Fact]
+    public void RoleMappings_PreservePromptOverrideSeparationOfDuties()
+    {
+        AssertAllowed(RbacPermission.PromptOverridesManage, UserRole.ReportingAdmin, UserRole.MedicalDirector);
+        AssertDenied(RbacPermission.PromptOverridesManage, UserRole.Radiologist, UserRole.ComplianceReviewer, UserRole.ItAdmin, UserRole.BillingAdmin);
+
+        AssertAllowed(RbacPermission.PromptOverridesApprove, UserRole.MedicalDirector);
+        AssertDenied(RbacPermission.PromptOverridesApprove, UserRole.Radiologist, UserRole.ReportingAdmin, UserRole.ComplianceReviewer, UserRole.ItAdmin, UserRole.BillingAdmin);
+    }
+
+    [Fact]
+    public void EndpointPermissionMatrix_IsCanonicalAndUsesCatalogKeys()
+    {
+        var entries = EndpointPermissionMatrix.All;
+        Assert.NotEmpty(entries);
+        Assert.Equal(
+            entries.Count,
+            entries.Select(e => $"{e.Method} {e.RouteTemplate}").Distinct(StringComparer.OrdinalIgnoreCase).Count());
+
+        foreach (var entry in entries)
+        {
+            Assert.Equal(entry.Method.ToUpperInvariant(), entry.Method);
+            Assert.Equal(PermissionCatalog.Get(entry.Permission).Key, entry.PermissionKey);
+            Assert.False(string.IsNullOrWhiteSpace(entry.Notes));
+        }
     }
 
     [Fact]

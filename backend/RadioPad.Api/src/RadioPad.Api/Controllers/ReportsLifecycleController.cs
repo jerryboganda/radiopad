@@ -4,6 +4,7 @@ using System.Text.Json;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using RadioPad.Application.Abstractions;
+using RadioPad.Application.Security;
 using RadioPad.Application.Services;
 using RadioPad.Domain.Entities;
 using RadioPad.Domain.Enums;
@@ -42,7 +43,7 @@ public class ReportsLifecycleController : TenantedController
     public async Task<IActionResult> Rewrite(Guid id, [FromBody] RewriteDto dto, CancellationToken ct)
     {
         var (tenant, user) = await ResolveContextAsync(_db, ct);
-        var deny = RequireRole(user, UserRole.Radiologist, UserRole.MedicalDirector, UserRole.ReportingAdmin);
+        var deny = RequirePermission(user, RbacPermission.ReportsEdit);
         if (deny is not null) return deny;
         var report = await _db.Reports.FirstOrDefaultAsync(r => r.Id == id && r.TenantId == tenant.Id, ct);
         if (report is null) return NotFound();
@@ -125,7 +126,7 @@ public class ReportsLifecycleController : TenantedController
     private async Task<IActionResult> SignCoreAsync(Guid id, SignDto dto, CancellationToken ct)
     {
         var (tenant, user) = await ResolveContextAsync(_db, ct);
-        var deny = RequireRole(user, UserRole.Radiologist, UserRole.MedicalDirector);
+        var deny = RequirePermission(user, RbacPermission.ReportsSign);
         if (deny is not null) return deny;
         var report = await _db.Reports.FirstOrDefaultAsync(r => r.Id == id && r.TenantId == tenant.Id, ct);
         if (report is null) return NotFound();
@@ -198,7 +199,7 @@ public class ReportsLifecycleController : TenantedController
     public async Task<IActionResult> Addendum(Guid id, [FromBody] AddendumDto dto, CancellationToken ct)
     {
         var (tenant, user) = await ResolveContextAsync(_db, ct);
-        var deny = RequireRole(user, UserRole.Radiologist, UserRole.MedicalDirector);
+        var deny = RequirePermission(user, RbacPermission.ReportsSign);
         if (deny is not null) return deny;
         var report = await _db.Reports.FirstOrDefaultAsync(r => r.Id == id && r.TenantId == tenant.Id, ct);
         if (report is null) return NotFound();

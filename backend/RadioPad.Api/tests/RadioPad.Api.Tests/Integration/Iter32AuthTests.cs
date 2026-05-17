@@ -10,6 +10,7 @@ using RadioPad.Api.Controllers;
 using RadioPad.Application.Abstractions;
 using RadioPad.Domain.Entities;
 using RadioPad.Domain.Enums;
+using RadioPad.Infrastructure.Identity;
 using RadioPad.Infrastructure.Persistence;
 using Xunit;
 
@@ -254,7 +255,7 @@ public class VerifiedTenantAccessContextTests : IClassFixture<RadioPadAppFactory
         await factory.InitializeAsync();
         try
         {
-            var token = MintBearer(factory, factory.SeedTenant.Slug, factory.SeedUser.Email);
+            var token = await MintSessionBearerAsync(factory, factory.SeedTenant.Slug, factory.SeedUser.Email);
             var http = factory.CreateClient();
             http.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", token);
             http.DefaultRequestHeaders.Add("X-RadioPad-Tenant", factory.SeedTenant.Slug);
@@ -279,7 +280,7 @@ public class VerifiedTenantAccessContextTests : IClassFixture<RadioPadAppFactory
         await factory.InitializeAsync();
         try
         {
-            var token = MintBearer(factory, factory.SeedTenant.Slug, factory.SeedUser.Email);
+            var token = await MintSessionBearerAsync(factory, factory.SeedTenant.Slug, factory.SeedUser.Email);
             var http = factory.CreateClient();
             http.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", token);
             http.DefaultRequestHeaders.Add("X-RadioPad-Tenant", factory.SeedTenant.Slug);
@@ -302,7 +303,7 @@ public class VerifiedTenantAccessContextTests : IClassFixture<RadioPadAppFactory
         await factory.InitializeAsync();
         try
         {
-            var token = MintBearer(factory, factory.SeedTenant.Slug, factory.SeedUser.Email);
+            var token = await MintSessionBearerAsync(factory, factory.SeedTenant.Slug, factory.SeedUser.Email);
             const string otherTenantSlug = "it-replay-target";
             using (var scope = factory.Services.CreateScope())
             {
@@ -341,7 +342,7 @@ public class VerifiedTenantAccessContextTests : IClassFixture<RadioPadAppFactory
         await factory.InitializeAsync();
         try
         {
-            var token = MintBearer(factory, factory.SeedTenant.Slug, factory.SeedUser.Email);
+            var token = await MintSessionBearerAsync(factory, factory.SeedTenant.Slug, factory.SeedUser.Email);
 
             using (var scope = factory.Services.CreateScope())
             {
@@ -364,6 +365,79 @@ public class VerifiedTenantAccessContextTests : IClassFixture<RadioPadAppFactory
         {
             await factory.DisposeAsync();
         }
+    }
+
+    [Fact]
+    public async Task RevokedAuthSessionRow_InvalidatesMatchingBearer()
+    {
+        var factory = new NoDevHeadersFactory();
+        await factory.InitializeAsync();
+        try
+        {
+            var token = await MintSessionBearerAsync(factory, factory.SeedTenant.Slug, factory.SeedUser.Email);
+            using (var scope = factory.Services.CreateScope())
+            {
+                var db = scope.ServiceProvider.GetRequiredService<RadioPadDbContext>();
+                var user = await db.Users.FirstAsync(u => u.Id == factory.SeedUser.Id);
+                var session = await EnterpriseIdentityBridge.RecordAuthSessionAsync(
+                    db,
+                    user,
+                    token,
+                    "test",
+                    DateTimeOffset.UtcNow.Add(RadioPadBearerToken.Lifetime),
+                    CancellationToken.None);
+                session.RevokedAt = DateTimeOffset.UtcNow;
+                session.RevocationReason = "test-revoked";
+                await db.SaveChangesAsync();
+            }
+
+            var http = factory.CreateClient();
+            http.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", token);
+            http.DefaultRequestHeaders.Add("X-RadioPad-Tenant", factory.SeedTenant.Slug);
+            http.DefaultRequestHeaders.Add("X-RadioPad-User", factory.SeedUser.Email);
+
+            var resp = await http.GetAsync("/api/tenant/me");
+
+            Assert.Equal(HttpStatusCode.Unauthorized, resp.StatusCode);
+        }
+        finally
+        {
+            await factory.DisposeAsync();
+        }
+    }
+
+    [Fact]
+    public async Task Logout_RevokesCurrentAuthSession_AndClearsSessionCookie()
+    {
+        using var http = _factory.CreateClient();
+        var signIn = await http.PostAsJsonAsync("/api/auth/signin", new
+        {
+            tenant = _factory.SeedTenant.Slug,
+            user = _factory.SeedUser.Email,
+        });
+        Assert.Equal(HttpStatusCode.OK, signIn.StatusCode);
+        Assert.True(signIn.Headers.TryGetValues("Set-Cookie", out var issuedCookies));
+        Assert.Contains(issuedCookies, c => c.Contains("rp_session=", StringComparison.Ordinal));
+
+        var body = await signIn.Content.ReadFromJsonAsync<JsonElement>();
+        var token = body.GetProperty("token").GetString()!;
+
+        using var logoutClient = _factory.CreateClient();
+        logoutClient.DefaultRequestHeaders.Add("Cookie", $"rp_session={token}");
+
+        var logout = await logoutClient.PostAsync("/api/auth/logout", content: null);
+
+        Assert.Equal(HttpStatusCode.OK, logout.StatusCode);
+        Assert.True(logout.Headers.TryGetValues("Set-Cookie", out var clearedCookies));
+        Assert.Contains(clearedCookies, c => c.Contains("rp_session=", StringComparison.Ordinal)
+            && c.Contains("expires=", StringComparison.OrdinalIgnoreCase));
+
+        using var scope = _factory.Services.CreateScope();
+        var db = scope.ServiceProvider.GetRequiredService<RadioPadDbContext>();
+        var tokenHash = EnterpriseIdentityBridge.Sha256Hex(token);
+        var session = await db.AuthSessions.AsNoTracking().SingleAsync(s => s.TokenHash == tokenHash);
+        Assert.NotNull(session.RevokedAt);
+        Assert.Equal("logout", session.RevocationReason);
     }
 
     [Fact]
@@ -429,6 +503,23 @@ public class VerifiedTenantAccessContextTests : IClassFixture<RadioPadAppFactory
 
     private static string MintBearer(RadioPadAppFactory factory, string tenant, string user) =>
         RadioPadBearerToken.Mint(tenant, user, factory.SeedUser.SessionEpoch);
+
+    private static async Task<string> MintSessionBearerAsync(RadioPadAppFactory factory, string tenant, string user)
+    {
+        var token = MintBearer(factory, tenant, user);
+        using var scope = factory.Services.CreateScope();
+        var db = scope.ServiceProvider.GetRequiredService<RadioPadDbContext>();
+        var dbTenant = await db.Tenants.FirstAsync(t => t.Slug == tenant);
+        var dbUser = await db.Users.FirstAsync(u => u.TenantId == dbTenant.Id && u.Email == user);
+        await EnterpriseIdentityBridge.RecordAuthSessionAsync(
+            db,
+            dbUser,
+            token,
+            "test",
+            DateTimeOffset.UtcNow.Add(RadioPadBearerToken.Lifetime),
+            CancellationToken.None);
+        return token;
+    }
 
     private sealed class NoDevHeadersFactory : RadioPadAppFactory
     {

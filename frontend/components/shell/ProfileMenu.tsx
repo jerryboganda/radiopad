@@ -2,19 +2,24 @@
 
 import Link from 'next/link';
 import { useEffect, useRef, useState } from 'react';
+import { useRouter } from 'next/navigation';
 import { useTranslations } from 'next-intl';
-import { api } from '@/lib/api';
+import { api, setActiveAuthToken } from '@/lib/api';
+import { clearAuthToken } from '@/lib/secureAuth';
 import LocalePicker from '../LocalePicker';
 
 type Me = { tenant: { displayName: string }; user: { email: string } } | null;
 
 export default function ProfileMenu() {
+  const router = useRouter();
   const tBar = useTranslations('topbar');
   const tNav = useTranslations('nav');
   const tProfile = useTranslations('profile');
   const tSubtle = useTranslations('buttons.subtle');
   const [me, setMe] = useState<Me>(null);
   const [open, setOpen] = useState(false);
+  const [signingOut, setSigningOut] = useState(false);
+  const [signOutError, setSignOutError] = useState<string | null>(null);
   const ref = useRef<HTMLDivElement | null>(null);
 
   useEffect(() => {
@@ -40,6 +45,31 @@ export default function ProfileMenu() {
   const initials = me?.user?.email?.slice(0, 1).toUpperCase() ?? '?';
   const email = me?.user?.email ?? tProfile('signedOut');
   const tenant = me?.tenant?.displayName ?? tBar('tagline');
+
+  async function signOut() {
+    setSigningOut(true);
+    setSignOutError(null);
+    setOpen(false);
+    let redirectStatus = '';
+    try {
+      await api.auth.logout();
+    } catch (e) {
+      const status = (e as { status?: number }).status;
+      redirectStatus = status === 404 || status === 405 ? '?signout=local' : '?signout=server-error';
+      setSignOutError(status === 404 || status === 405
+        ? 'Server logout endpoint is not available; local credentials were cleared.'
+        : 'Server logout failed; local credentials were cleared.');
+    } finally {
+      try {
+        await clearAuthToken();
+      } finally {
+        setActiveAuthToken(null);
+        setMe(null);
+        setSigningOut(false);
+        router.push(`/login${redirectStatus}`);
+      }
+    }
+  }
 
   return (
     <div className="rp-profile-menu" ref={ref}>
@@ -68,15 +98,28 @@ export default function ProfileMenu() {
           </Link>
           <div className="rp-profile-popover-divider" />
           <div className="rp-profile-popover-meta">{tProfile('language')}</div>
-          <div style={{ padding: '4px 6px' }}>
+          <div className="rp-profile-locale-slot">
             <LocalePicker ariaLabel={tSubtle('language')} />
           </div>
           <div className="rp-profile-popover-divider" />
-          <Link className="rp-profile-popover-item" role="menuitem" href="/login" onClick={() => setOpen(false)}>
-            {me ? tProfile('signOut') : tNav('signIn')}
-          </Link>
+          {me ? (
+            <button
+              className="rp-profile-popover-item"
+              role="menuitem"
+              type="button"
+              onClick={signOut}
+              disabled={signingOut}
+            >
+              {signingOut ? tProfile('signOut') : tProfile('signOut')}
+            </button>
+          ) : (
+            <Link className="rp-profile-popover-item" role="menuitem" href="/login" onClick={() => setOpen(false)}>
+              {tNav('signIn')}
+            </Link>
+          )}
         </div>
       )}
+      {signOutError && <div className="rp-profile-signout-error">{signOutError}</div>}
     </div>
   );
 }

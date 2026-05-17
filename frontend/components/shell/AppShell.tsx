@@ -1,6 +1,7 @@
 'use client';
 
 import type { ReactNode } from 'react';
+import { usePathname } from 'next/navigation';
 import Sidebar from './Sidebar';
 import Topbar from './Topbar';
 import MobileDrawerBackdrop from './MobileDrawerBackdrop';
@@ -26,6 +27,18 @@ function ShellRoot({ children }: { children: ReactNode }) {
 }
 
 export default function AppShell({ children }: { children: ReactNode }) {
+  const pathname = usePathname();
+  const publicAuthRoute = pathname === '/login' || pathname?.startsWith('/login/')
+    || pathname === '/pair' || pathname?.startsWith('/pair/');
+
+  if (publicAuthRoute) {
+    return (
+      <PageActionsProvider>
+        <main className="rp-public-auth-content">{children}</main>
+      </PageActionsProvider>
+    );
+  }
+
   return (
     <ShellProvider>
       <PageActionsProvider>

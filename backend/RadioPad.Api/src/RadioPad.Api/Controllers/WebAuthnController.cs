@@ -3,6 +3,7 @@ using System.Text;
 using System.Text.Json;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
+using RadioPad.Api.Auth;
 using RadioPad.Application.Abstractions;
 using RadioPad.Application.Services.WebAuthn;
 using RadioPad.Domain.Entities;
@@ -248,6 +249,7 @@ public class WebAuthnController : TenantedController
         await EnterpriseIdentityBridge.RecordAuthSessionAsync(_db, user, token, "webauthn", expiresAt, ct,
             ip: HttpContext.Connection.RemoteIpAddress?.ToString(),
             userAgent: HttpContext.Request.Headers.UserAgent.FirstOrDefault());
+        RadioPadSessionCookies.Append(HttpContext, token, expiresAt);
 
         return Ok(new
         {

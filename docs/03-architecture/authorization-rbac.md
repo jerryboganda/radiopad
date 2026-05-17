@@ -1,6 +1,6 @@
 # Authorization (RBAC)
 
-**Status:** Current foundation  ·  **Owner:** Engineering + Security  ·  **Last Updated:** 2026-05-17
+**Status:** Current foundation  Â·  **Owner:** Engineering + Security  Â·  **Last Updated:** 2026-05-17
 
 ## Current model
 
@@ -30,6 +30,71 @@ The backend now has a code-only permission catalog in `RadioPad.Application.Secu
 - `TenantedController.RequirePermission(...)` is available for endpoint migrations while `RequireRole(...)` remains for compatibility.
 
 This foundation does not add DB-backed custom roles, tenant role assignments, or public API response fields. Existing endpoints keep their current behavior until each controller action is intentionally migrated from role allow-lists to permission checks.
+
+## Role-to-permission matrix
+
+The matrix below is the current code-backed `RolePermissionMap`. It is the
+source for endpoint migration planning; where an endpoint has not yet moved to
+`RequirePermission(...)`, keep the documented current role allow-list in sync.
+
+| Permission key | Radiologist | ReportingAdmin | MedicalDirector | ComplianceReviewer | ItAdmin | BillingAdmin |
+| --- | :---: | :---: | :---: | :---: | :---: | :---: |
+| `reports.read` | Y | Y | Y | Y | Y |  |
+| `reports.draft` | Y | Y | Y |  | Y |  |
+| `reports.edit` | Y | Y | Y |  | Y |  |
+| `reports.validate` | Y | Y | Y |  | Y |  |
+| `reports.sign` | Y |  | Y |  |  |  |
+| `reports.export` | Y | Y | Y |  | Y |  |
+| `rulebooks.read` | Y | Y | Y | Y | Y |  |
+| `rulebooks.manage` |  | Y | Y |  | Y |  |
+| `rulebooks.approve` |  | Y | Y |  | Y |  |
+| `templates.read` | Y | Y | Y | Y | Y |  |
+| `templates.manage` |  | Y | Y |  | Y |  |
+| `templates.approve` |  | Y | Y |  | Y |  |
+| `providers.read` |  | Y | Y |  | Y | Y |
+| `providers.manage` |  | Y |  |  | Y |  |
+| `audit.read` | Y | Y | Y | Y | Y | Y |
+| `audit.verify` |  |  | Y | Y | Y |  |
+| `audit.export` |  |  | Y | Y | Y |  |
+| `users.read` | Y | Y | Y | Y | Y | Y |
+| `users.manage` |  |  | Y |  | Y |  |
+| `users.revoke_sessions` |  |  | Y | Y | Y |  |
+| `billing.read` | Y | Y | Y | Y | Y | Y |
+| `billing.manage` |  |  | Y |  | Y | Y |
+| `security.manage` |  |  | Y | Y | Y |  |
+| `validation_packs.read` | Y | Y | Y | Y | Y |  |
+| `validation_packs.manage` |  |  | Y |  | Y |  |
+| `validation_packs.run` | Y | Y | Y |  | Y |  |
+| `mcp_tools.invoke` | Y | Y | Y |  | Y |  |
+| `mcp_tools.manage` |  | Y | Y |  | Y |  |
+
+## Endpoint permission matrix (migration target)
+
+| Endpoint family / action | Permission to enforce | Roles from current map | Step-up MFA? |
+| --- | --- | --- | --- |
+| `GET /api/reports*` | `reports.read` | Radiologist, ReportingAdmin, MedicalDirector, ComplianceReviewer, ItAdmin | No |
+| `POST /api/reports`, draft creation | `reports.draft` | Radiologist, ReportingAdmin, MedicalDirector, ItAdmin | No |
+| `PATCH /api/reports/{id}`, addendum | `reports.edit` | Radiologist, ReportingAdmin, MedicalDirector, ItAdmin | Addendum: Yes |
+| `POST /api/reports/{id}/validate` | `reports.validate` | Radiologist, ReportingAdmin, MedicalDirector, ItAdmin | No |
+| `POST /api/reports/{id}/sign` | `reports.sign` | Radiologist, MedicalDirector | Yes |
+| Final report export endpoints | `reports.export` | Radiologist, ReportingAdmin, MedicalDirector, ItAdmin | Yes for PHI export |
+| Rulebook/template create/update | `rulebooks.manage` / `templates.manage` | ReportingAdmin, MedicalDirector, ItAdmin | Yes |
+| Rulebook/template approve/deprecate | `rulebooks.approve` / `templates.approve` | ReportingAdmin, MedicalDirector, ItAdmin | Yes |
+| Provider configuration and OAuth refresh-token vault | `providers.manage` | ReportingAdmin, ItAdmin | Yes |
+| Audit read | `audit.read` | All current roles | No |
+| Audit verify/export, SIEM export | `audit.verify` / `audit.export` | MedicalDirector, ComplianceReviewer, ItAdmin | Yes |
+| User lock/unlock/manage | `users.manage` | MedicalDirector, ItAdmin | Yes |
+| Session revocation | `users.revoke_sessions` | MedicalDirector, ComplianceReviewer, ItAdmin | Yes |
+| Billing checkout/portal/refunds/marketplace payment ops | `billing.manage` | MedicalDirector, ItAdmin, BillingAdmin | Yes |
+| Tenant security settings, KMS verify, security webhooks | `security.manage` | MedicalDirector, ComplianceReviewer, ItAdmin | Yes |
+| Validation pack manage/approve | `validation_packs.manage` | MedicalDirector, ItAdmin | Yes |
+| Validation pack run | `validation_packs.run` | Radiologist, ReportingAdmin, MedicalDirector, ItAdmin | No |
+| MCP invoke/manage | `mcp_tools.invoke` / `mcp_tools.manage` | Invoke: Radiologist, ReportingAdmin, MedicalDirector, ItAdmin. Manage: ReportingAdmin, MedicalDirector, ItAdmin. | Manage: Yes |
+
+Step-up MFA is a production requirement for the rows marked **Yes**. It is not
+fully enforced by all current endpoints yet; until implemented, treat those
+entries as required migration work, not evidence that the backend already
+checks MFA freshness.
 
 ## Current high-level permission families
 
