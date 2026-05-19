@@ -6,6 +6,48 @@ The format is based on [Keep a Changelog 1.1.0](https://keepachangelog.com/en/1.
 
 ## [Unreleased]
 
+### Changed
+- **Iter-45 — Radiologist-friendly UI sweep**: project-wide rewrite of
+  user-facing copy and a layout fix so admin/settings surfaces fill widescreen
+  monitors. Highlights:
+  - `frontend/app/shell.css` — `.rp-container` cap raised from `1280px` to
+    `1600px`; new `.rp-page-grid` (form + sticky 320px help sidecar, collapses
+    under 1080px), `.rp-help` / `.rp-help-title` (sidecar cards), and
+    `.rp-advanced` (styled `<details>` to hide technical fields behind a
+    single "Show advanced options" disclosure).
+  - `frontend/app/admin/settings/page.tsx` — full rewrite as the canonical
+    friendly template: plain-English headings ("Workspace settings", "AI
+    safety check", "Your subscription", "Hospital connections", "Encryption
+    key (optional, for compliance teams)"), severity rendered as a question
+    ("How strict should the safety check be?") with friendly option labels
+    ("Just show a note" / "Show a warning (recommended)" / "Block signing
+    until reviewed"), and a right-hand help sidecar ("What you control here"
+    / "Need help?" / "Privacy & safety"). All PRD codes, env-var scheme
+    samples (`env:NAME`, `aws:arn:…`, `azkv:…`, `gcp:…`), and API paths
+    removed from user-visible copy.
+  - Same friendly-copy + jargon-removal sweep applied to
+    `frontend/app/providers/page.tsx`, `frontend/app/audit/page.tsx`,
+    `frontend/app/offline/page.tsx`,
+    `frontend/app/admin/validation-packs/page.tsx`,
+    `frontend/app/analytics/page.tsx`, `frontend/app/validation/page.tsx`,
+    `frontend/app/marketplace/page.tsx`, `frontend/app/terminology/page.tsx`,
+    `frontend/app/admin/governance/page.tsx`,
+    `frontend/app/admin/model-eval/page.tsx`, `frontend/app/reports/page.tsx`,
+    `frontend/app/rulebooks/page.tsx`, `frontend/app/templates/page.tsx`,
+    `frontend/app/prompts/page.tsx`, and
+    `frontend/app/admin/providers/[id]/ProviderOAuthAdminClient.tsx`.
+    `COMPLIANCE_LABELS` in `frontend/lib/api.ts` re-labelled (e.g.
+    "Sandbox" → "No patient data", "PHI-approved" → "Safe for patient data",
+    "Local only" → "Runs on-site").
+  - No new accent colours, no Tailwind/MUI, no dark mode, no emoji icons —
+    only locked design tokens (`--accent: #c96442`, `--bg`, `--text`,
+    `--border`, semantic green/blue/purple/red/amber). Test anchors
+    (`panel-model-inventory`, `panel-eval-form`, `select-rulebook`, etc.)
+    preserved.
+  - Deployment: static export rebuilt and pushed to the `radiopad-web`
+    container at `/usr/share/nginx/html/`, nginx reloaded. Origin returns
+    HTTP 200 on every route post-deploy.
+
 ### Added
 - **Iter-36 — Stripe webhook hardening**: `POST /api/billing/webhook` now
   handles `invoice.payment_succeeded` (clears `gracePeriodUntil` +

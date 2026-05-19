@@ -188,10 +188,9 @@ export default function AdminModelEvalPage() {
 
   return (
     <div className="rp-container">
-      <h1 className="rp-page-title">Model evaluation</h1>
+      <h1 className="rp-page-title">Compare AI models</h1>
       <p className="rp-page-sub">
-        Side-by-side sandbox comparison + golden-case validation. Use this before promoting a
-        rulebook revision into production.
+        Try the same report on several AI models and see which one drafts best — before you approve a new rulebook for everyday use.
       </p>
 
       {errors.length > 0 && (

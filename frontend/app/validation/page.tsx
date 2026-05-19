@@ -73,8 +73,8 @@ export default function ValidationCenterPage() {
   return (
     <Container>
       <PageHeader
-        title="Validation center"
-        description={<>Re-runs the validation engine over every non-exported draft. Severities map to the locked semantic families: <span className="badge danger">blocker → red</span> <span className="badge warn">warning → amber</span> <span className="badge info">info → blue</span>.</>}
+        title="Quality check"
+        description={<>Spots problems in your team&apos;s draft reports — things like missing key findings or contradictions. Severity: <span className="badge danger">stop — must fix</span> <span className="badge warn">should review</span> <span className="badge info">heads-up</span>.</>}
       />
 
       {err && <div className="banner warn">{err}</div>}
@@ -83,20 +83,20 @@ export default function ValidationCenterPage() {
         <div className="rp-panel-title">Summary</div>
         <div className="rp-grid-3">
           <div className="rp-panel" style={{ padding: 16 }}>
-            <div className="rp-page-sub">Reports scanned</div>
+            <div className="rp-page-sub">Drafts checked</div>
             <div style={{ fontSize: 28, fontFamily: 'var(--serif)' }}>{rows.length}</div>
           </div>
           <div className="rp-panel" style={{ padding: 16 }}>
-            <div className="rp-page-sub">Blockers</div>
+            <div className="rp-page-sub">Must-fix issues</div>
             <div style={{ fontSize: 28, fontFamily: 'var(--serif)' }}>
               {totals.blockers}{' '}
               <span className={`badge ${totals.blockers > 0 ? 'danger' : 'ok'}`}>
-                {totals.blockers > 0 ? 'attention' : 'clean'}
+                {totals.blockers > 0 ? 'needs attention' : 'all clear'}
               </span>
             </div>
           </div>
           <div className="rp-panel" style={{ padding: 16 }}>
-            <div className="rp-page-sub">Warnings / info</div>
+            <div className="rp-page-sub">Warnings / heads-up</div>
             <div style={{ fontSize: 28, fontFamily: 'var(--serif)' }}>
               {totals.warnings} / {totals.infos}
             </div>
@@ -104,26 +104,26 @@ export default function ValidationCenterPage() {
         </div>
         <div style={{ marginTop: 12 }}>
           <button className="ghost" onClick={refresh} disabled={busy}>
-            {busy ? 'Re-validating…' : 'Re-run validation'}
+            {busy ? 'Re-checking…' : 'Re-run check'}
           </button>
         </div>
       </div>
 
       <div className="rp-panel">
-        <div className="rp-panel-title">Reports</div>
+        <div className="rp-panel-title">Drafts</div>
         <table className="rp-table">
           <thead>
             <tr>
               <th>Accession</th>
               <th>Modality</th>
               <th>Body part</th>
-              <th>Findings</th>
+              <th>Issues found</th>
               <th></th>
             </tr>
           </thead>
           <tbody>
             {rows.length === 0 && !busy && (
-              <tr><td colSpan={5} style={{ color: 'var(--text-muted)' }}>No drafts to validate.</td></tr>
+              <tr><td colSpan={5} style={{ color: 'var(--text-muted)' }}>No drafts to check right now.</td></tr>
             )}
             {rows.map(({ report, result, err: e }) => {
               const findings = result?.findings ?? [];
@@ -137,7 +137,7 @@ export default function ValidationCenterPage() {
               }).length;
               return (
                 <tr key={report.id}>
-                  <td><code>{report.study.accessionNumber || '—'}</code></td>
+                  <td>{report.study.accessionNumber || '—'}</td>
                   <td>{report.study.modality}</td>
                   <td>{report.study.bodyPart}</td>
                   <td>
@@ -145,9 +145,9 @@ export default function ValidationCenterPage() {
                       ? <span className="badge warn">{e}</span>
                       : (
                         <>
-                          {blockers > 0 && <span className="badge danger">{blockers} blocker</span>}{' '}
+                          {blockers > 0 && <span className="badge danger">{blockers} must-fix</span>}{' '}
                           {warnings > 0 && <span className="badge warn">{warnings} warning</span>}{' '}
-                          {findings.length === 0 && <span className="badge ok">clean</span>}
+                          {findings.length === 0 && <span className="badge ok">all clear</span>}
                         </>
                       )}
                   </td>

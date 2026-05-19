@@ -45,16 +45,21 @@ async function apiBase(): Promise<string> {
   return resolvedApiBase;
 }
 
+export async function apiUrl(path: string): Promise<string> {
+  const base = await apiBase();
+  return `${base}${path}`;
+}
+
 const TENANT_HEADER = 'X-RadioPad-Tenant';
 const USER_HEADER = 'X-RadioPad-User';
 
-function activeTenant(): string {
-  if (typeof window === 'undefined') return 'dev';
-  return localStorage.getItem('radiopad.tenant') || 'dev';
+function activeTenant(): string | null {
+  if (typeof window === 'undefined') return null;
+  return localStorage.getItem('radiopad.tenant');
 }
-function activeUser(): string {
-  if (typeof window === 'undefined') return 'radiologist@radiopad.local';
-  return localStorage.getItem('radiopad.user') || 'radiologist@radiopad.local';
+function activeUser(): string | null {
+  if (typeof window === 'undefined') return null;
+  return localStorage.getItem('radiopad.user');
 }
 
 /**
@@ -76,14 +81,26 @@ function applyAuthHeader(headers: Headers): void {
   }
 }
 
+function applyTenantHeaders(headers: Headers): void {
+  const tenant = activeTenant();
+  const user = activeUser();
+  if (tenant && user) {
+    headers.set(TENANT_HEADER, tenant);
+    headers.set(USER_HEADER, user);
+  }
+}
+
 async function request<T>(path: string, init?: RequestInit): Promise<T> {
   const headers = new Headers(init?.headers || {});
   if (!headers.has('Content-Type')) headers.set('Content-Type', 'application/json');
-  headers.set(TENANT_HEADER, activeTenant());
-  headers.set(USER_HEADER, activeUser());
+  applyTenantHeaders(headers);
   applyAuthHeader(headers);
   const base = await apiBase();
-  const res = await fetch(`${base}${path}`, { ...init, headers });
+  const res = await fetch(`${base}${path}`, {
+    credentials: init?.credentials ?? 'include',
+    ...init,
+    headers,
+  });
   if (!res.ok) {
     let body: unknown = null;
     try {
@@ -104,11 +121,10 @@ async function request<T>(path: string, init?: RequestInit): Promise<T> {
 async function requestPaged<T>(path: string): Promise<{ items: T[]; total: number }> {
   const headers = new Headers();
   headers.set('Content-Type', 'application/json');
-  headers.set(TENANT_HEADER, activeTenant());
-  headers.set(USER_HEADER, activeUser());
+  applyTenantHeaders(headers);
   applyAuthHeader(headers);
   const base = await apiBase();
-  const res = await fetch(`${base}${path}`, { headers });
+  const res = await fetch(`${base}${path}`, { credentials: 'include', headers });
   if (!res.ok) throw Object.assign(new Error(`API ${res.status} ${res.statusText}`), { status: res.status });
   const items = (await res.json()) as T[];
   const total = Number(res.headers.get('X-Total-Count') ?? items.length);
@@ -117,11 +133,10 @@ async function requestPaged<T>(path: string): Promise<{ items: T[]; total: numbe
 
 async function requestBlob(path: string): Promise<Blob> {
   const headers = new Headers();
-  headers.set(TENANT_HEADER, activeTenant());
-  headers.set(USER_HEADER, activeUser());
+  applyTenantHeaders(headers);
   applyAuthHeader(headers);
   const base = await apiBase();
-  const res = await fetch(`${base}${path}`, { headers });
+  const res = await fetch(`${base}${path}`, { credentials: 'include', headers });
   if (!res.ok) {
     let body: unknown = null;
     try { body = await res.json(); } catch { body = await res.text(); }
@@ -1061,8 +1076,7 @@ export const api = {
     importCsv: async (csv: string, replaceAll = false): Promise<{ upserts: number; removed: number }> => {
       const headers = new Headers();
       headers.set('Content-Type', 'text/csv');
-      headers.set(TENANT_HEADER, activeTenant());
-      headers.set(USER_HEADER, activeUser());
+      applyTenantHeaders(headers);
       applyAuthHeader(headers);
       const base = await apiBase();
       const res = await fetch(`${base}/api/lexicon/import-csv?replaceAll=${replaceAll ? 'true' : 'false'}`, {
@@ -1186,6 +1200,18 @@ export const api = {
     },
   },
   auth: {
+    oidcAuthorizeUrl: (returnUrl?: string) => {
+      const sp = new URLSearchParams();
+      if (returnUrl) sp.set('returnUrl', returnUrl);
+      const qs = sp.toString();
+      return apiUrl(`/api/auth/oidc/authorize${qs ? `?${qs}` : ''}`);
+    },
+    logout: () =>
+      request<void>('/api/auth/logout', { method: 'POST' }),
+    session: () =>
+      request<{ tenant: { slug: string; displayName: string }; user: { email: string; role?: number } }>(
+        '/api/auth/session',
+      ),
     signIn: (tenant: string, user: string) =>
       request<{ token: string; tenant: string; user: string; expiresAt: string }>(
         '/api/auth/signin',
@@ -1255,6 +1281,25 @@ export const api = {
       }),
     webAuthnCredentials: () =>
       request<WebAuthnCredentialRow[]>('/api/auth/webauthn/credentials'),
+    webAuthnSignInOptions: () =>
+      request<{
+        challenge: string;
+        rpId?: string;
+        timeout?: number;
+        userVerification?: UserVerificationRequirement;
+        allowCredentials?: Array<{ type: 'public-key'; id: string }>;
+      }>('/api/auth/webauthn/signin-options', { method: 'POST', body: JSON.stringify({}) }),
+    webAuthnSignIn: (body: {
+      credentialId: string;
+      clientDataJson: string;
+      authenticatorData: string;
+      signature: string;
+      signCount: number;
+    }) =>
+      request<{ token: string; tenant: string; user: string; expiresAt: string }>(
+        '/api/auth/webauthn/signin',
+        { method: 'POST', body: JSON.stringify(body) },
+      ),
   },
   security: {
     testWebhook: () =>

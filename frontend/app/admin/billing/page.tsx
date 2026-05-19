@@ -3,6 +3,8 @@
 import { useEffect, useState } from 'react';
 import Link from 'next/link';
 import { api, publicEnv, type BillingInvoice, type BillingStatus, type BillingCredits } from '@/lib/api';
+import { isAuthError, useAuthSession } from '@/lib/useAuthSession';
+import SignInRequired from '@/components/ui/SignInRequired';
 
 type AnalyticsSummary = Awaited<ReturnType<typeof api.analytics.summary>>;
 type FeatureMap = Awaited<ReturnType<typeof api.billing.features>>;
@@ -50,9 +52,11 @@ function daysUntil(iso: string): number {
 }
 
 export default function BillingDashboardPage() {
+  const session = useAuthSession();
   const [status, setStatus] = useState<BillingStatus | null>(null);
   const [statusError, setStatusError] = useState<string | null>(null);
   const [statusUnavailable, setStatusUnavailable] = useState(false);
+  const [authBlocked, setAuthBlocked] = useState(false);
   const [features, setFeatures] = useState<FeatureMap | null>(null);
   const [usage, setUsage] = useState<AnalyticsSummary | null>(null);
   const [usageError, setUsageError] = useState<string | null>(null);
@@ -70,20 +74,32 @@ export default function BillingDashboardPage() {
   const [bulkBusy, setBulkBusy] = useState(false);
 
   useEffect(() => {
+    if (session.loading || session.signedOut) return;
     api.billing.status()
       .then((s) => { setStatus(s); setStatusUnavailable(false); })
       .catch((e: Error & { status?: number }) => {
+        if (isAuthError(e)) { setAuthBlocked(true); return; }
         if (e.status === 503) setStatusUnavailable(true);
         else setStatusError(e.message);
       });
-    api.billing.features().then(setFeatures).catch((e: Error) => setStatusError(e.message));
-    api.analytics.summary().then(setUsage).catch((e: Error) => setUsageError(e.message));
+    api.billing.features().then(setFeatures).catch((e: Error & { status?: number }) => {
+      if (isAuthError(e)) setAuthBlocked(true);
+      else setStatusError(e.message);
+    });
+    api.analytics.summary().then(setUsage).catch((e: Error & { status?: number }) => {
+      if (isAuthError(e)) setUsageError('Insufficient permissions for usage analytics.');
+      else setUsageError(e.message);
+    });
     api.billing.invoices().then(setInvoices).catch((e: Error & { status?: number }) => {
       if (e.status === 503) setInvoicesError('Stripe is not configured for this tenant.');
+      else if (isAuthError(e)) setInvoicesError('Invoices require the Billing Admin, IT Admin, or Medical Director role.');
       else setInvoicesError(e.message);
     });
-    api.billing.credits().then(setCredits).catch((e: Error) => setCreditsError(e.message));
-  }, []);
+    api.billing.credits().then(setCredits).catch((e: Error & { status?: number }) => {
+      if (isAuthError(e)) setCreditsError('Insufficient permissions for AI credit usage.');
+      else setCreditsError(e.message);
+    });
+  }, [session.loading, session.signedOut]);
 
   async function openPortal() {
     try {
@@ -134,15 +150,36 @@ export default function BillingDashboardPage() {
     }
   }
 
+  if (session.signedOut) {
+    return (
+      <div className="rp-container">
+        <h1 className="rp-page-title">Billing &amp; plan</h1>
+        <SignInRequired surface="Please sign in to view your workspace billing." />
+      </div>
+    );
+  }
+
+  if (authBlocked) {
+    return (
+      <div className="rp-container">
+        <h1 className="rp-page-title">Billing &amp; plan</h1>
+        <SignInRequired
+          surface="You don't have access to billing for this workspace."
+          detail="Ask your Billing Admin, IT Admin, or Medical Director to give you access — or to handle this for you."
+        />
+      </div>
+    );
+  }
+
   if (statusUnavailable) {
     return (
       <div className="rp-container">
-        <h1 className="rp-page-title">Billing</h1>
+        <h1 className="rp-page-title">Billing &amp; plan</h1>
         <div className="rp-panel">
-          <div className="rp-panel-title">Billing not configured</div>
+          <div className="rp-panel-title">Billing isn&apos;t set up yet</div>
           <p className="rp-page-sub">
-            Billing is not yet configured for this tenant. Contact your
-            administrator to enable Stripe integration.
+            Billing hasn&apos;t been turned on for this workspace yet. Ask your
+            workspace admin to finish setup.
           </p>
         </div>
       </div>
@@ -151,17 +188,24 @@ export default function BillingDashboardPage() {
 
   return (
     <div className="rp-container">
-      <h1 className="rp-page-title">Billing</h1>
-      <p className="rp-page-sub">
-        Plan, invoices, usage, and feature entitlements for the current tenant.
-      </p>
+      <header className="rp-page-header">
+        <div className="rp-page-header-text">
+          <h1 className="rp-page-title">Billing &amp; plan</h1>
+          <p className="rp-page-sub">
+            Your current plan, this month&apos;s AI usage, invoices, and what each plan unlocks.
+          </p>
+        </div>
+      </header>
 
       {error && <div className="banner warn">{error}</div>}
       {statusError && <div className="banner warn">{statusError}</div>}
 
+      <div className="rp-page-grid">
+        <div className="rp-page-main">
+
       {/* 1. Plan & status ------------------------------------------ */}
       <section className="rp-panel">
-        <div className="rp-panel-title">Plan &amp; status</div>
+        <div className="rp-panel-title">Your plan</div>
         {!status && !statusError && <p className="rp-page-sub">Loading…</p>}
         {status && (
           <>
@@ -170,7 +214,7 @@ export default function BillingDashboardPage() {
                 {PLAN_LABELS[status.plan] ?? `Plan ${status.plan}`}
               </span>
               {status.subscriptionStatus && (
-                <span className="badge">Stripe: <code>{status.subscriptionStatus}</code></span>
+                <span className="badge">Status: {status.subscriptionStatus}</span>
               )}
               {status.currentPeriodEnd && (
                 <span className="badge info">Renews {fmtDate(status.currentPeriodEnd)}</span>
@@ -184,20 +228,17 @@ export default function BillingDashboardPage() {
 
             {status.gracePeriodUntil && (
               <div className="banner warn">
-                Payment overdue. Grace period ends{' '}
-                <code>{fmtDate(status.gracePeriodUntil)}</code> ({daysUntil(status.gracePeriodUntil)} days remaining).
+                A payment is overdue. You have until {fmtDate(status.gracePeriodUntil)} ({daysUntil(status.gracePeriodUntil)} days) before AI features pause.
               </div>
             )}
             {status.suspendedAt && (
               <div className="banner danger">
-                Tenant suspended on <code>{fmtDate(status.suspendedAt)}</code>.
-                Resolve outstanding balance to restore access.
+                This workspace was suspended on {fmtDate(status.suspendedAt)}. Pay the outstanding invoice to restore access.
               </div>
             )}
             {!status.customerConfigured && (
               <p className="rp-page-sub">
-                No Stripe customer is linked yet. Start a checkout below to
-                provision one automatically.
+                You haven&apos;t added a payment method yet. Click &ldquo;Upgrade&rdquo; below — we&apos;ll set everything up automatically.
               </p>
             )}
 
@@ -207,7 +248,7 @@ export default function BillingDashboardPage() {
                 onClick={openPortal}
                 disabled={!status.customerConfigured}
               >
-                Manage in Stripe
+                Manage billing &amp; invoices
               </button>
               <button className="primary-ghost" onClick={upgradeTeam}>
                 Upgrade plan
@@ -219,18 +260,18 @@ export default function BillingDashboardPage() {
 
       {/* 2. AI credits this period (BILL-002) ----------------- */}
       <section className="rp-panel">
-        <div className="rp-panel-title">AI credits</div>
+        <div className="rp-panel-title">AI credit usage this period</div>
         {creditsError && <div className="banner warn">{creditsError}</div>}
         {!credits && !creditsError && <p className="rp-page-sub">Loading…</p>}
         {credits && (
           <>
             <p className="rp-page-sub">
-              Period <code>{fmtDate(credits.periodStart)}</code> – <code>{fmtDate(credits.periodEnd)}</code>{' '}
+              {fmtDate(credits.periodStart)} – {fmtDate(credits.periodEnd)}{' '}
               · Plan <span className="badge info">{credits.plan}</span>
             </p>
             <div className="rp-grid-3">
               {(['calls', 'inputTokens', 'outputTokens'] as const).map((k) => {
-                const labels = { calls: 'AI calls', inputTokens: 'Input tokens', outputTokens: 'Output tokens' } as const;
+                const labels = { calls: 'AI requests', inputTokens: 'Words sent to AI', outputTokens: 'Words received from AI' } as const;
                 const used = credits.used[k];
                 const limit = credits.limits[k];
                 const remaining = credits.remaining[k];
@@ -258,22 +299,19 @@ export default function BillingDashboardPage() {
       {/* 3. Trial countdown (BILL-007) ----------------------- */}
       {credits && credits.plan === 'Trial' && credits.trialEndsAt && (
         <section className="rp-panel">
-          <div className="rp-panel-title">Trial</div>
+          <div className="rp-panel-title">Free trial</div>
           {(() => {
             const days = daysUntil(credits.trialEndsAt!);
             if (days <= 3) {
               return (
                 <div className="rp-banner warn">
-                  Trial ends in {days} day{days === 1 ? '' : 's'} (
-                  <code>{fmtDate(credits.trialEndsAt)}</code>). Upgrade to keep AI features
-                  enabled past the trial period.
+                  Your free trial ends in {days} day{days === 1 ? '' : 's'} (on {fmtDate(credits.trialEndsAt)}). Upgrade now to keep using AI drafting after that.
                 </div>
               );
             }
             return (
               <p className="rp-page-sub">
-                Trial active — <strong>{days}</strong> days remaining (ends{' '}
-                <code>{fmtDate(credits.trialEndsAt)}</code>).
+                Free trial active — <strong>{days}</strong> days remaining (ends {fmtDate(credits.trialEndsAt)}).
               </p>
             );
           })()}
@@ -282,54 +320,57 @@ export default function BillingDashboardPage() {
 
       {/* 4. Usage this month --------------------------------------- */}
       <section className="rp-panel">
-        <div className="rp-panel-title">Usage this month</div>
+        <div className="rp-panel-title">AI activity this month</div>
         {usageError && <div className="banner warn">{usageError}</div>}
         {!usage && !usageError && <p className="rp-page-sub">Loading…</p>}
         {usage && (
           <>
             <div className="rp-grid-3 rp-mb-md">
               <div>
-                <div className="rp-stat-label">AI calls</div>
+                <div className="rp-stat-label">AI requests</div>
                 <div className="rp-stat-value">{usage.ai.totalRequests.toLocaleString()}</div>
               </div>
               <div>
-                <div className="rp-stat-label">Blocked / errors</div>
+                <div className="rp-stat-label">Blocked for safety / errors</div>
                 <div className="rp-stat-value">
                   {usage.ai.blockedCount.toLocaleString()} / {usage.ai.errorCount.toLocaleString()}
                 </div>
               </div>
               <div>
-                <div className="rp-stat-label">Avg latency</div>
+                <div className="rp-stat-label">Average speed</div>
                 <div className="rp-stat-value">
                   {Math.round(usage.ai.avgLatencyMs).toLocaleString()} ms
                 </div>
               </div>
             </div>
 
-            <ul className="rp-list">
-              <li className="rp-row between rp-divider-row">
-                <span className="rp-stat-label rp-cell f2">Provider</span>
-                <span className="rp-stat-label rp-cell f1 r">Calls</span>
-                <span className="rp-stat-label rp-cell f1 r">In tokens</span>
-                <span className="rp-stat-label rp-cell f1 r">Out tokens</span>
-              </li>
-              {usage.ai.byProvider.length === 0 && (
-                <li className="rp-page-sub rp-divider-row">No provider activity in the current window.</li>
-              )}
-              {usage.ai.byProvider.map((p) => (
-                <li
-                  key={`${p.provider}:${p.adapter}`}
-                  className="rp-row between rp-divider-row"
-                >
-                  <span className="rp-cell f2">
-                    {p.provider} <code>{p.adapter}</code>
-                  </span>
-                  <span className="rp-cell f1 r">{p.requests.toLocaleString()}</span>
-                  <span className="rp-cell f1 r">{p.inputTokens.toLocaleString()}</span>
-                  <span className="rp-cell f1 r">{p.outputTokens.toLocaleString()}</span>
+            <details className="rp-advanced">
+              <summary>Show usage by AI model</summary>
+              <ul className="rp-list">
+                <li className="rp-row between rp-divider-row">
+                  <span className="rp-stat-label rp-cell f2">Model</span>
+                  <span className="rp-stat-label rp-cell f1 r">Requests</span>
+                  <span className="rp-stat-label rp-cell f1 r">Words in</span>
+                  <span className="rp-stat-label rp-cell f1 r">Words out</span>
                 </li>
-              ))}
-            </ul>
+                {usage.ai.byProvider.length === 0 && (
+                  <li className="rp-page-sub rp-divider-row">No AI activity yet this period.</li>
+                )}
+                {usage.ai.byProvider.map((p) => (
+                  <li
+                    key={`${p.provider}:${p.adapter}`}
+                    className="rp-row between rp-divider-row"
+                  >
+                    <span className="rp-cell f2">
+                      {p.provider} <code>{p.adapter}</code>
+                    </span>
+                    <span className="rp-cell f1 r">{p.requests.toLocaleString()}</span>
+                    <span className="rp-cell f1 r">{p.inputTokens.toLocaleString()}</span>
+                    <span className="rp-cell f1 r">{p.outputTokens.toLocaleString()}</span>
+                  </li>
+                ))}
+              </ul>
+            </details>
           </>
         )}
       </section>
@@ -379,7 +420,7 @@ export default function BillingDashboardPage() {
 
       {/* 4. Plan-feature flags ------------------------------------- */}
       <section className="rp-panel">
-        <div className="rp-panel-title">Plan features</div>
+        <div className="rp-panel-title">What&apos;s included in your plan</div>
         {!features && <p className="rp-page-sub">Loading…</p>}
         {features && (
           <>
@@ -392,12 +433,12 @@ export default function BillingDashboardPage() {
                   key={name}
                   className="rp-row between rp-divider-row"
                 >
-                  <span><code>{name}</code></span>
+                  <span>{friendlyFeatureName(name)}</span>
                   {enabled ? (
-                    <span className="badge ok">Enabled</span>
+                    <span className="badge ok">Included</span>
                   ) : (
                     <span className="badge">
-                      Locked · <Link href="/admin/billing" onClick={(e) => { e.preventDefault(); upgradeTeam(); }}>Upgrade</Link>
+                      Not on this plan · <Link href="/admin/billing" onClick={(e) => { e.preventDefault(); upgradeTeam(); }}>Upgrade</Link>
                     </span>
                   )}
                 </div>
@@ -409,10 +450,10 @@ export default function BillingDashboardPage() {
 
       {/* 5. Bulk export ------------------------------------------- */}
       <section className="rp-panel">
-        <div className="rp-panel-title">Bulk export</div>
+        <div className="rp-panel-title">Download invoices in bulk</div>
         <p className="rp-page-sub">
-          Export invoices in the selected date range as a CSV summary or a ZIP
-          archive of the underlying PDF documents.
+          Pick a date range to download all invoices from that period — as one
+          spreadsheet or as a ZIP of PDFs.
         </p>
         <div className="rp-grid-3 rp-mb-md">
           <div className="section-block">
@@ -445,8 +486,8 @@ export default function BillingDashboardPage() {
               value={bulkFormat}
               onChange={(e) => setBulkFormat(e.target.value as 'csv' | 'zip')}
             >
-              <option value="csv">CSV summary</option>
-              <option value="zip">ZIP of PDFs</option>
+              <option value="csv">Spreadsheet summary (CSV)</option>
+              <option value="zip">All PDFs in a ZIP</option>
             </select>
           </div>
         </div>
@@ -456,10 +497,41 @@ export default function BillingDashboardPage() {
             disabled={bulkBusy || !bulkFrom || !bulkTo}
             onClick={runBulkExport}
           >
-            {bulkBusy ? 'Exporting…' : 'Export'}
+            {bulkBusy ? 'Preparing…' : 'Download'}
           </button>
         </div>
       </section>
+
+        </div>
+        <aside className="rp-page-aside">
+          <div className="rp-help">
+            <div className="rp-help-title">What you control here</div>
+            <p>Your plan, payment method, AI credit usage, and invoices.</p>
+            <p>To change your plan, click <strong>Upgrade plan</strong> or <strong>Manage billing &amp; invoices</strong>. We&apos;ll take you to a secure checkout — no card details are stored in RadioPad.</p>
+          </div>
+          <div className="rp-help">
+            <div className="rp-help-title">Need help?</div>
+            <p>Ask your Billing Admin or IT Admin to handle plan changes, or email <a href="mailto:support@radiopad.com">support@radiopad.com</a>.</p>
+          </div>
+        </aside>
+      </div>
     </div>
   );
+}
+
+const FEATURE_LABELS: Record<string, string> = {
+  scim: 'Auto-add users from your identity provider',
+  siemExport: 'Audit log export for security teams',
+  marketplacePublish: 'Publish rulebooks to the marketplace',
+  advancedAnalytics: 'Advanced analytics',
+  stripeConnect: 'Marketplace payouts',
+  customKms: 'Bring-your-own encryption key',
+  ipAllowlist: 'IP address allowlist',
+  priorCompare: 'Compare with prior report',
+  voiceDictation: 'Voice dictation',
+  mcpReadOnly: 'External AI tools (read-only)',
+};
+
+function friendlyFeatureName(flag: string): string {
+  return FEATURE_LABELS[flag] ?? flag;
 }

@@ -130,7 +130,7 @@ export default function AnalyticsPage() {
         <>
           {/* ── Product KPIs (§18.1) ──────────────────────────────── */}
           <div className="rp-panel">
-            <div className="rp-panel-title">Product KPIs (§18.1)</div>
+            <div className="rp-panel-title">Productivity &amp; quality</div>
             <div className="rp-grid-3">
               <Kpi
                 label="Draft acceptance rate"

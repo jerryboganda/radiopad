@@ -95,25 +95,26 @@ export default function ValidationPacksPage() {
 
   return (
     <div className="rp-container">
-      <h1 className="rp-page-title">Validation packs</h1>
-      <p className="rp-page-sub">
-        Versioned clinical validation packs (rulebook golden suites). Each pack is a tenant-scoped
-        bundle of <code>{'{report, expectFlagged}'}</code> golden cases that a rulebook must pass
-        before promotion. Lifecycle: <span className="badge info">Draft</span> →{' '}
-        <span className="badge ok">Approved</span> → <span className="badge danger">Deprecated</span>.
-      </p>
+      <header className="rp-page-header">
+        <div className="rp-page-header-text">
+          <h1 className="rp-page-title">Quality check packs</h1>
+          <p className="rp-page-sub">
+            Test sets that prove a rulebook still catches the issues it&apos;s supposed to catch. Each pack runs against a set of example reports and shows whether the rulebook still passes.
+          </p>
+        </div>
+      </header>
 
       {error && <div className="banner warn">{error}</div>}
       {info && <div className="banner ok">{info}</div>}
 
       <div className="rp-panel">
         <div className="rp-panel-title">
-          Filter
+          Filter by rulebook
           <span style={{ flex: 1 }} />
           <input
             className="rp-input"
             style={{ maxWidth: 280 }}
-            placeholder="rulebook id (e.g. chest_ct_v1)"
+            placeholder="e.g. chest_ct_v1"
             value={filter}
             onChange={(e) => setFilter(e.target.value)}
           />
@@ -125,14 +126,14 @@ export default function ValidationPacksPage() {
 
       {grouped.length === 0 && (
         <div className="rp-panel">
-          <p className="rp-page-sub">No validation packs yet for this tenant.</p>
+          <p className="rp-page-sub">No quality check packs yet for your workspace.</p>
         </div>
       )}
 
       {grouped.map(([rb, list]) => (
         <div className="rp-panel" key={rb}>
           <div className="rp-panel-title">
-            <code>{rb}</code>
+            {rb}
             <span className="rp-page-sub" style={{ marginLeft: 8 }}>
               {list.length} pack{list.length === 1 ? '' : 's'}
             </span>
@@ -145,41 +146,37 @@ export default function ValidationPacksPage() {
                   <div style={{ flex: 1 }}>
                     <div>
                       <strong>{p.name}</strong>{' '}
-                      <code>v{p.version}</code>{' '}
+                      <span className="rp-page-sub">v{p.version}</span>{' '}
                       <span className={`badge ${STATUS_BADGE[p.status]}`}>{p.status}</span>
                       <span className="rp-page-sub" style={{ marginLeft: 8 }}>
                         {p.caseCount} case{p.caseCount === 1 ? '' : 's'}
                       </span>
                     </div>
                     <div className="rp-page-sub">
-                      created <code>{new Date(p.createdAt).toLocaleString()}</code>
-                      {p.approvedAt && (
-                        <>
-                          {' '}
-                          · approved <code>{new Date(p.approvedAt).toLocaleString()}</code>
-                        </>
-                      )}
+                      Created {new Date(p.createdAt).toLocaleString()}
+                      {p.approvedAt && <> · approved {new Date(p.approvedAt).toLocaleString()}</>}
                     </div>
                     {lastRun && (
                       <div className="rp-page-sub">
                         Last run:{' '}
-                        <span
-                          className={`badge ${lastRun.failed === 0 ? 'ok' : 'danger'}`}
-                        >
+                        <span className={`badge ${lastRun.failed === 0 ? 'ok' : 'danger'}`}>
                           {lastRun.passed}/{lastRun.totalCases} passed
                         </span>
                         {lastRun.failures.length > 0 && (
-                          <ul className="rp-list" style={{ marginTop: 6 }}>
-                            {lastRun.failures.map((f) => (
-                              <li key={f.caseId}>
-                                <code>{f.caseId}</code>
-                                {f.missing.length > 0 && <> · missing [{f.missing.join(', ')}]</>}
-                                {f.unexpected.length > 0 && (
-                                  <> · unexpected [{f.unexpected.join(', ')}]</>
-                                )}
-                              </li>
-                            ))}
-                          </ul>
+                          <details className="rp-advanced">
+                            <summary>Show failures</summary>
+                            <ul className="rp-list" style={{ marginTop: 6 }}>
+                              {lastRun.failures.map((f) => (
+                                <li key={f.caseId}>
+                                  Case {f.caseId}
+                                  {f.missing.length > 0 && <> · missing [{f.missing.join(', ')}]</>}
+                                  {f.unexpected.length > 0 && (
+                                    <> · unexpected [{f.unexpected.join(', ')}]</>
+                                  )}
+                                </li>
+                              ))}
+                            </ul>
+                          </details>
                         )}
                       </div>
                     )}
@@ -191,7 +188,7 @@ export default function ValidationPacksPage() {
                       disabled={busy === p.id}
                       onClick={() => run(p.id)}
                     >
-                      Run
+                      Run check
                     </button>
                     {p.status === 'Draft' && (
                       <button
@@ -210,7 +207,7 @@ export default function ValidationPacksPage() {
                         disabled={busy === p.id}
                         onClick={() => deprecate(p.id)}
                       >
-                        Deprecate
+                        Retire
                       </button>
                     )}
                   </div>

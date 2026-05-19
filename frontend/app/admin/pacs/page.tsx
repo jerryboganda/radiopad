@@ -57,49 +57,54 @@ export default function PacsAdminPage() {
 
   return (
     <div className="rp-container">
-      <h1 className="rp-page-title">PACS bridge</h1>
-      <p className="rp-page-sub">
-        DICOMweb tenant config, bundled Orthanc proxy availability, and signed
-        vendor plugins. PACS connectivity is documented in
-        <code> docs/06-operations/pacs-bridge.md</code>.
-      </p>
+      <header className="rp-page-header">
+        <div className="rp-page-header-text">
+          <h1 className="rp-page-title">Imaging archive</h1>
+          <p className="rp-page-sub">
+            How RadioPad connects to your hospital&apos;s imaging archive so the right images appear next to each report.
+          </p>
+        </div>
+      </header>
+
+      <div className="rp-page-grid">
+        <div className="rp-page-main">
 
       {error && <div className="banner warn">{error}</div>}
 
       <div className="rp-panel">
-        <div className="rp-panel-title">DICOMweb</div>
+        <div className="rp-panel-title">Hospital imaging archive</div>
         {tenant === null ? (
           <p className="rp-page-sub">Loading…</p>
         ) : (
           <>
             <p className="rp-page-sub">
-              Base URL:{' '}
               {tenant.dicomWeb.baseUrl
-                ? <code>{tenant.dicomWeb.baseUrl}</code>
-                : <span className="badge warn">not configured</span>}
+                ? <>Connected to: <strong>{tenant.dicomWeb.baseUrl}</strong></>
+                : <span className="badge warn">Not connected yet</span>}
               {' · '}
-              Bearer:{' '}
-              <span className={`badge ${tenant.dicomWeb.bearerConfigured ? 'ok' : 'info'}`}>
-                {tenant.dicomWeb.bearerConfigured ? 'configured' : 'optional'}
-              </span>
-              {' · '}
-              Reachability:{' '}
               <span className={`badge ${health?.dicomWeb.reachable ? 'ok' : 'warn'}`}>
                 {health
-                  ? (health.dicomWeb.reachable ? 'reachable' : (health.dicomWeb.configured ? 'unreachable' : 'n/a'))
-                  : '…'}
+                  ? (health.dicomWeb.reachable ? 'Online' : (health.dicomWeb.configured ? 'Offline' : 'Not connected'))
+                  : 'Checking…'}
               </span>
             </p>
+            <details className="rp-advanced">
+              <summary>Show technical details</summary>
+              <p className="rp-page-sub">
+                Authentication: <span className={`badge ${tenant.dicomWeb.bearerConfigured ? 'ok' : 'info'}`}>
+                  {tenant.dicomWeb.bearerConfigured ? 'configured' : 'optional'}
+                </span>{' '}
+                · Edit the connection on the <a href="/admin/settings">Workspace settings</a> page (advanced section).
+              </p>
+            </details>
           </>
         )}
       </div>
 
       <div className="rp-panel">
-        <div className="rp-panel-title">Bundled Orthanc proxy</div>
+        <div className="rp-panel-title">Built-in test viewer</div>
         <p className="rp-page-sub">
-          Optional. Started via <code>docker compose --profile pacs up -d orthanc</code>.
-          Activated by setting <code>RADIOPAD_ORTHANC_URL</code> in the API
-          environment.
+          An optional sample image server, useful for trying out RadioPad without connecting to your real archive.
         </p>
         {health === null ? (
           <p className="rp-page-sub">Loading…</p>
@@ -108,63 +113,66 @@ export default function PacsAdminPage() {
             Status:{' '}
             <span className={`badge ${health.orthanc.reachable ? 'ok' : (health.orthanc.configured ? 'warn' : 'info')}`}>
               {health.orthanc.configured
-                ? (health.orthanc.reachable ? 'reachable' : 'unreachable')
-                : 'not configured'}
+                ? (health.orthanc.reachable ? 'Online' : 'Offline')
+                : 'Not enabled'}
             </span>
-            {health.orthanc.url && <> · URL: <code>{health.orthanc.url}</code></>}
           </p>
         )}
+        <details className="rp-advanced">
+          <summary>For IT teams — how to enable</summary>
+          <p className="rp-page-sub">
+            Start the bundled Orthanc proxy via <code>docker compose --profile pacs up -d orthanc</code>{' '}
+            and set <code>RADIOPAD_ORTHANC_URL</code> on the API host.
+          </p>
+        </details>
       </div>
 
       <div className="rp-panel">
-        <div className="rp-panel-title">Signed vendor plugins</div>
+        <div className="rp-panel-title">Vendor add-ons</div>
         <p className="rp-page-sub">
-          Plugins installed in the desktop&apos;s plugins folder. Each manifest
-          is verified by SHA-256 + Ed25519 against{' '}
-          <code>RADIOPAD_PLUGIN_PUBKEY</code>. Manifest format and onboarding:
-          {' '}<code>desktop/plugin-sdk/</code>.
+          Plug-ins from your imaging vendor (Sectra, AGFA, Visage, Merge, Hyland) that let RadioPad open studies in the way that&apos;s native to your hospital.
         </p>
         {plugins === null ? (
           <p className="rp-page-sub">Loading…</p>
         ) : plugins.length === 0 ? (
-          <p className="rp-page-sub">No plugins installed.</p>
+          <p className="rp-page-sub">No add-ons installed yet.</p>
         ) : (
           <table className="rp-table">
             <thead>
               <tr>
-                <th>ID</th>
+                <th>Add-on</th>
                 <th>Vendor</th>
                 <th>Version</th>
-                <th>Capabilities</th>
+                <th>What it can do</th>
                 <th>Status</th>
-                <th>Actions</th>
+                <th>Action</th>
               </tr>
             </thead>
             <tbody>
               {plugins.map((p) => (
                 <tr key={p.id}>
-                  <td><code>{p.id}</code></td>
+                  <td>{p.name}</td>
                   <td>{p.vendor}</td>
-                  <td><code>{p.version}</code></td>
+                  <td>{p.version}</td>
                   <td>{p.capabilities.join(', ')}</td>
                   <td>
                     <span className={`badge ${p.verified ? 'ok' : 'danger'}`}>
-                      {p.verified ? 'verified' : 'unsigned / failed'}
+                      {p.verified ? 'Trusted' : 'Not trusted'}
                     </span>
                     {' '}
                     <span className={`badge ${p.enabled ? 'ok' : 'info'}`}>
-                      {p.enabled ? 'enabled' : 'disabled'}
+                      {p.enabled ? 'On' : 'Off'}
                     </span>
-                    {p.error && <> · <code>{p.error}</code></>}
+                    {p.error && <> · <span className="rp-page-sub">{p.error}</span></>}
                   </td>
                   <td>
                     <button
                       className="ghost"
                       onClick={() => api.pacs.setPluginEnabled(p.id, !p.enabled).then(refresh)}
                       disabled={!p.verified}
-                      title={!p.verified ? 'Plugin signature not verified — cannot enable' : undefined}
+                      title={!p.verified ? "This add-on hasn't been verified — ask your IT team" : undefined}
                     >
-                      {p.enabled ? 'Disable' : 'Enable'}
+                      {p.enabled ? 'Turn off' : 'Turn on'}
                     </button>
                   </td>
                 </tr>
@@ -172,6 +180,26 @@ export default function PacsAdminPage() {
             </tbody>
           </table>
         )}
+        <details className="rp-advanced">
+          <summary>For IT teams — trust &amp; signing</summary>
+          <p className="rp-page-sub">
+            Each add-on is verified by SHA-256 + Ed25519 against{' '}
+            <code>RADIOPAD_PLUGIN_PUBKEY</code>. Manifest format and onboarding live in <code>desktop/plugin-sdk/</code>.
+          </p>
+        </details>
+      </div>
+
+        </div>
+        <aside className="rp-page-aside">
+          <div className="rp-help">
+            <div className="rp-help-title">Why this matters</div>
+            <p>When this is working, opening a report in RadioPad will automatically show the matching images from your hospital&apos;s archive — no extra clicks needed.</p>
+          </div>
+          <div className="rp-help">
+            <div className="rp-help-title">Need help?</div>
+            <p>This page is mostly for your IT team. If something here shows red or &quot;Not connected&quot;, ask them to take a look.</p>
+          </div>
+        </aside>
       </div>
     </div>
   );

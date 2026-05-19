@@ -586,3 +586,20 @@ translated. Message bundles in `frontend/messages/*.json` deliberately
 omit those keys; if a clinical surface needs localized chrome (severity
 labels, banner copy), add it to the `validation.severity` /
 `banner` namespaces; never to a "rulebook" namespace.
+
+## 4.11 Iter-45 friendly-copy + widescreen layout
+
+To make the product comfortable for non-technical radiologists on widescreen monitors, three additions to the locked token layer:
+
+- .rp-container max-width raised from 1280px to 1600px so admin/settings pages fill more of the available canvas. .rp-container.fluid (no cap) and .rp-container.narrow (880px) remain available as opt-ins.
+- .rp-page-grid — two-column page layout: `grid-template-columns: minmax(0,1fr) 320px`. Children: .rp-page-main (form/content) and .rp-page-aside (sticky help sidecar). Collapses to one column under 1080px so 13-inch laptops still get a comfortable single-column reading width.
+- .rp-help / .rp-help-title — sidecar help card on the muted surface (`--bg-subtle` + `--border-soft`) for short `What you control here` / `Need help?` / `Privacy & safety` blocks.
+- .rp-advanced — styled `<details>` element used to hide technical fields (env-var refs, URLs, JWT settings, raw JSON, sensitivity tuning) behind a single `Show advanced options` disclosure. `::-webkit-details-marker` is hidden; a rotating `?` glyph is used instead.
+
+Copy rules added with this iteration:
+
+- **No PRD codes, no iteration codes, no API paths** in user-visible JSX strings.
+- **No raw acronyms** as labels (`WADO-RS`, `QIDO-RS`, `DICOMweb`, `CMK`, `KMS`, `SCIM`, `OIDC`, `RBAC`). When the underlying concept is still needed in copy, use plain-English language (`imaging archive`, `encryption key`, `single sign-on`) and tuck the technical detail inside .rp-advanced.
+- **No env-var scheme samples** (`env:NAME`, `aws:arn:…`, `azkv:…`, `gcp:…`) shown to end users. If a placeholder is needed, use the existing configured value, never the raw scheme grammar.
+- **No technical jargon as severity labels.** The severity dropdown asks a question (`How strict should the safety check be?`) and uses friendly answers (`Just show a note` / `Show a warning (recommended)` / `Block signing until reviewed`) while preserving the underlying `Info`/`Warning`/`Blocker` enum.
+

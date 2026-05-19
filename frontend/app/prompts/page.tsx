@@ -288,10 +288,9 @@ export default function PromptStudioPage() {
       <div className="panel">
         <div className="panel-header">
           <div>
-            <h1 className="rp-page-title">Prompt Studio</h1>
+            <h1 className="rp-page-title">Prompt studio</h1>
             <p className="rp-page-sub">
-              Author, test, compare, and approve prompt overrides and rulebook
-              prompt blocks (PRD §16.4).
+              Write and refine the instructions you give the AI. Test changes, compare versions side-by-side, and submit them for medical-director approval.
             </p>
           </div>
           {active ? (

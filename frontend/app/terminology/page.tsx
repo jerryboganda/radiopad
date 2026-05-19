@@ -57,12 +57,14 @@ export default function TerminologyPage() {
 
   return (
     <div className="rp-container">
-      <h1 className="rp-page-title">Terminology browser</h1>
-      <p className="rp-page-sub">
-        Read-only reference. Use it to look up RadLex preferred terms or the
-        official categories of a RADS reporting system. Nothing here is
-        clinical advice.
-      </p>
+      <header className="rp-page-header">
+        <div className="rp-page-header-text">
+          <h1 className="rp-page-title">Terminology</h1>
+          <p className="rp-page-sub">
+            Look up the official term for a finding (RadLex) or the standard categories used in structured reporting (RADS). For reference only — not clinical advice.
+          </p>
+        </div>
+      </header>
 
       <div className="rp-tabs" role="tablist" aria-label="Terminology source">
         <button

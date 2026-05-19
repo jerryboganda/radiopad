@@ -53,7 +53,7 @@ export default function RulebooksPage() {
     <Container>
       <PageHeader
         title="Rulebooks"
-        description="Versioned, testable, institution-approved configuration packages that govern AI generation and validation."
+        description="Your clinic's approved playbooks for AI drafting and quality checks — versioned, testable, and reviewed by your team before going live."
         primaryAction={
           <Link href={rulebookEditorHref()} className="primary-ghost" style={{ textDecoration: 'none' }}>+ Create new (visual)</Link>
         }

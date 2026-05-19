@@ -10,6 +10,8 @@
 
 import { useEffect, useMemo, useState } from 'react';
 import { api, type UsageSummary } from '@/lib/api';
+import { isAuthError, useAuthSession } from '@/lib/useAuthSession';
+import SignInRequired from '@/components/ui/SignInRequired';
 
 type AnalyticsSummary = Awaited<ReturnType<typeof api.analytics.summary>>;
 
@@ -37,14 +39,17 @@ type MonthRow = {
 };
 
 export default function UsageDashboardPage() {
+  const session = useAuthSession();
   const months = useMemo(() => lastNMonths(6), []);
   const [rows, setRows] = useState<MonthRow[]>([]);
   const [lifetime, setLifetime] = useState<UsageSummary | null>(null);
   const [windowed, setWindowed] = useState<AnalyticsSummary | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [authBlocked, setAuthBlocked] = useState(false);
 
   useEffect(() => {
+    if (session.loading || session.signedOut) return;
     let cancelled = false;
     setLoading(true);
     (async () => {
@@ -86,70 +91,99 @@ export default function UsageDashboardPage() {
         );
         if (!cancelled) setRows(perMonth);
       } catch (e) {
-        if (!cancelled) setError((e as Error).message);
+        if (cancelled) return;
+        if (isAuthError(e)) setAuthBlocked(true);
+        else setError((e as Error).message);
       } finally {
         if (!cancelled) setLoading(false);
       }
     })();
     return () => { cancelled = true; };
-  }, [months]);
+  }, [months, session.loading, session.signedOut]);
+
+  if (session.signedOut) {
+    return (
+      <div className="rp-container">
+        <h1 className="rp-page-title">Usage</h1>
+        <SignInRequired surface="Please sign in to view usage for your workspace." />
+      </div>
+    );
+  }
+
+  if (authBlocked) {
+    return (
+      <div className="rp-container">
+        <h1 className="rp-page-title">Usage</h1>
+        <SignInRequired
+          surface="You don't have access to usage analytics."
+          detail="Ask your Medical Director, IT Admin, or Billing Admin for access."
+        />
+      </div>
+    );
+  }
 
   return (
     <div className="rp-container">
-      <h1 className="rp-page-title">Usage</h1>
-      <p className="rp-page-sub">
-        Per-month seats, AI requests, tokens, and report generations. Tenant-scoped.
-        Numbers come from <code>/api/usage/summary</code> and <code>/api/usage/analytics</code>.
-      </p>
+      <header className="rp-page-header">
+        <div className="rp-page-header-text">
+          <h1 className="rp-page-title">Usage</h1>
+          <p className="rp-page-sub">
+            How much your workspace has used RadioPad each month — active radiologists, AI requests, and reports.
+          </p>
+        </div>
+      </header>
 
       {error && <div className="banner warn">{error}</div>}
-      {loading && <p className="rp-page-sub">Loading usage…</p>}
+      {loading && <p className="rp-page-sub">Loading…</p>}
 
       {windowed && lifetime && (
         <div className="rp-panel">
-          <div className="rp-panel-title">Last 30 days · summary</div>
+          <div className="rp-panel-title">Last 30 days</div>
           <div className="rp-grid-3">
             <Stat label="Active radiologists" value={windowed.product.activeRadiologists} />
-            <Stat label="Validation pass rate" value={`${(windowed.product.validationPassRate * 100).toFixed(1)}%`} />
-            <Stat label="Rulebook adoption" value={`${(windowed.product.rulebookAdoption * 100).toFixed(1)}%`} />
+            <Stat label="Reports passing review" value={`${(windowed.product.validationPassRate * 100).toFixed(1)}%`} />
+            <Stat label="Rulebook usage" value={`${(windowed.product.rulebookAdoption * 100).toFixed(1)}%`} />
             <Stat label="AI requests" value={windowed.ai.totalRequests} />
-            <Stat label="AI tokens (in/out)" value={fmtTokens(windowed.ai.inputTokens, windowed.ai.outputTokens)} />
-            <Stat label="Avg latency" value={`${windowed.ai.avgLatencyMs} ms`} />
-            <Stat label="AI cost (USD)" value={`$${fmtUsd(windowed.ai.costTotalUsd)}`} />
+            <Stat label="AI words (in / out)" value={fmtTokens(windowed.ai.inputTokens, windowed.ai.outputTokens)} />
+            <Stat label="Average AI speed" value={`${windowed.ai.avgLatencyMs} ms`} />
+            <Stat label="AI cost" value={`$${fmtUsd(windowed.ai.costTotalUsd)}`} />
           </div>
-          <p className="rp-page-sub rp-mt-sm">
-            Lifetime AI requests: <code>{lifetime.totalRequests.toLocaleString()}</code>{' '}
-            · ok <code>{lifetime.okCount}</code> · blocked{' '}
-            <code>{lifetime.blockedCount}</code> · error{' '}
-            <code>{lifetime.errorCount}</code> · cost{' '}
-            <code>${fmtUsd(lifetime.costTotalUsd)}</code>.
-          </p>
+          <details className="rp-advanced">
+            <summary>Show all-time totals</summary>
+            <p className="rp-page-sub">
+              Lifetime AI requests: <strong>{lifetime.totalRequests.toLocaleString()}</strong>{' '}
+              · succeeded {lifetime.okCount.toLocaleString()}{' '}
+              · blocked for safety {lifetime.blockedCount.toLocaleString()}{' '}
+              · errors {lifetime.errorCount.toLocaleString()}{' '}
+              · total cost ${fmtUsd(lifetime.costTotalUsd)}.
+            </p>
+          </details>
         </div>
       )}
 
       <div className="rp-panel">
-        <div className="rp-panel-title">Monthly breakdown</div>
+        <div className="rp-panel-title">Month by month</div>
         <table className="rp-table">
           <thead>
             <tr>
               <th>Month</th>
-              <th>Seats</th>
+              <th>Active users</th>
               <th>Reports</th>
               <th>Exported</th>
               <th>AI requests</th>
-              <th>Input tokens</th>
-              <th>Output tokens</th>
+              <th>Words in</th>
+              <th>Words out</th>
             </tr>
           </thead>
           <tbody>
             {rows.length === 0 && !loading && (
               <tr>
-                <td colSpan={7} className="rp-page-sub">No data.</td>
+                <td colSpan={7} className="rp-page-sub">No data yet.</td>
               </tr>
             )}
             {rows.map((r) => (
               <tr key={r.month.label}>
-                <td><code>{r.month.label}</code></td>
+                <td>{r.month.label}</td>
                 <td>{r.activeUsers}</td>
                 <td>{r.reportsTotal}</td>
                 <td>{r.reportsExported}</td>
@@ -163,20 +197,20 @@ export default function UsageDashboardPage() {
       </div>
 
       {rows.some((r) => r.ai && r.ai.byProvider.length > 0) && (
-        <div className="rp-panel">
-          <div className="rp-panel-title">By provider · last full month</div>
+        <details className="rp-panel rp-advanced">
+          <summary className="rp-panel-title" style={{ cursor: 'pointer' }}>Last month broken down by AI model</summary>
           {(() => {
             const last = rows[rows.length - 1];
-            if (!last?.ai) return <p className="rp-page-sub">No provider activity.</p>;
+            if (!last?.ai) return <p className="rp-page-sub">No AI activity.</p>;
             return (
               <table className="rp-table">
                 <thead>
                   <tr>
                     <th>Provider</th>
-                    <th>Adapter</th>
+                    <th>Model</th>
                     <th>Requests</th>
-                    <th>Input</th>
-                    <th>Output</th>
+                    <th>Words in</th>
+                    <th>Words out</th>
                     <th>Cost (USD)</th>
                   </tr>
                 </thead>
@@ -188,15 +222,15 @@ export default function UsageDashboardPage() {
                   )}
                   {last.ai.byProvider.map((p) => (
                     <tr key={`${p.provider}-${p.adapter}`}>
-                      <td><code>{p.provider}</code></td>
+                      <td>{p.provider}</td>
                       <td>{p.adapter}</td>
                       <td>{p.requests}</td>
                       <td>{p.inputTokens.toLocaleString()}</td>
                       <td>{p.outputTokens.toLocaleString()}</td>
                       <td>
-                        <code>${fmtUsd(p.costTotalUsd)}</code>
+                        ${fmtUsd(p.costTotalUsd)}
                         {p.unpriced && (
-                          <span className="rp-page-sub"> · unpriced</span>
+                          <span className="rp-page-sub"> · price unknown</span>
                         )}
                       </td>
                     </tr>
@@ -205,7 +239,7 @@ export default function UsageDashboardPage() {
               </table>
             );
           })()}
-        </div>
+        </details>
       )}
     </div>
   );

@@ -131,15 +131,20 @@ export default function McpAdminPage() {
 
   return (
     <div className="rp-container">
-      <h1 className="rp-page-title">MCP tool registry</h1>
-      <p className="rp-page-sub">
-        Model Context Protocol tools registered for this tenant. Only{' '}
-        <span className="badge ok">Approved</span> tools may be invoked. Tools whose scope contains{' '}
-        <code>shell:</code>, <code>fs:</code>, or <code>net:</code> are <em>default-deny</em>.
-      </p>
+      <header className="rp-page-header">
+        <div className="rp-page-header-text">
+          <h1 className="rp-page-title">External AI tools</h1>
+          <p className="rp-page-sub">
+            Approve, block, and test add-on tools that your AI assistant can use. Only approved tools can run — everything else is blocked by default.
+          </p>
+        </div>
+      </header>
 
       {error && <div className="banner warn">{error}</div>}
       {info && <div className="banner ok">{info}</div>}
+
+      <div className="rp-page-grid">
+        <div className="rp-page-main">
 
       <div className="rp-panel">
         <div className="rp-panel-title">
@@ -150,65 +155,63 @@ export default function McpAdminPage() {
             style={{ marginLeft: 'auto' }}
             onClick={() => setShowRegister((v) => !v)}
           >
-            {showRegister ? 'Cancel' : 'Register tool'}
+            {showRegister ? 'Cancel' : 'Add a tool'}
           </button>
         </div>
 
         {showRegister && (
           <form onSubmit={submitRegister} className="rp-field">
             <label className="rp-field">
-              <span>Name</span>
+              <span>Tool name</span>
               <input className="rp-input" value={regName} onChange={(e) => setRegName(e.target.value)} />
             </label>
             <label className="rp-field">
               <span>Version</span>
               <input className="rp-input" value={regVersion} onChange={(e) => setRegVersion(e.target.value)} />
             </label>
-            <label className="rp-field">
-              <span>Scope (comma-separated tokens, e.g. <code>net:dicomweb</code>)</span>
-              <input className="rp-input" value={regScope} onChange={(e) => setRegScope(e.target.value)} />
-            </label>
-            <label className="rp-field">
-              <span>Manifest JSON</span>
-              <textarea
-                className="rp-input"
-                rows={6}
-                value={regManifest}
-                onChange={(e) => setRegManifest(e.target.value)}
-              />
-            </label>
-            <label className="rp-field">
-              <span>Detached Ed25519 signature (base64, optional for tenant-authored)</span>
-              <input className="rp-input" value={regSig} onChange={(e) => setRegSig(e.target.value)} />
-            </label>
+            <details className="rp-advanced" open>
+              <summary>Technical details (IT team only)</summary>
+              <label className="rp-field">
+                <span>Scope (comma-separated tokens, e.g. <code>net:dicomweb</code>)</span>
+                <input className="rp-input" value={regScope} onChange={(e) => setRegScope(e.target.value)} />
+              </label>
+              <label className="rp-field">
+                <span>Manifest JSON</span>
+                <textarea
+                  className="rp-input"
+                  rows={6}
+                  value={regManifest}
+                  onChange={(e) => setRegManifest(e.target.value)}
+                />
+              </label>
+              <label className="rp-field">
+                <span>Signature (base64, optional)</span>
+                <input className="rp-input" value={regSig} onChange={(e) => setRegSig(e.target.value)} />
+              </label>
+            </details>
             <button type="submit" className="primary">
-              Submit
+              Submit for approval
             </button>
           </form>
         )}
 
         {tools.length === 0 ? (
-          <p className="rp-page-sub">No tools registered for this tenant.</p>
+          <p className="rp-page-sub">No external tools registered yet.</p>
         ) : (
           <ul className="rp-list">
             {tools.map((t) => (
               <li key={t.id} className="rp-list-row">
                 <div>
-                  <strong>{t.name}</strong> <code>v{t.version}</code>{' '}
+                  <strong>{t.name}</strong> <span className="rp-page-sub">v{t.version}</span>{' '}
                   <span className={`badge ${STATUS_BADGE[t.status]}`}>{STATUS_LABEL[t.status]}</span>
                   {t.isBuiltIn && <span className="badge info" style={{ marginLeft: 6 }}>built-in</span>}
-                  {t.manifestSigned && <span className="badge ok" style={{ marginLeft: 6 }}>signed</span>}
+                  {t.manifestSigned && <span className="badge ok" style={{ marginLeft: 6 }}>trusted</span>}
                   {isDangerous(t.scopeString) && (
-                    <span className="badge danger" style={{ marginLeft: 6 }}>dangerous-scope</span>
+                    <span className="badge danger" style={{ marginLeft: 6 }}>powerful access</span>
                   )}
                   <div className="rp-page-sub">
-                    Scope: <code>{t.scopeString || SCOPE_LABEL[t.scope] || 'ReadOnly'}</code>
+                    Access level: {SCOPE_LABEL[t.scope] || 'ReadOnly'}
                   </div>
-                  {t.manifestSha256 && (
-                    <div className="rp-page-sub">
-                      sha256: <code>{t.manifestSha256.slice(0, 16)}…</code>
-                    </div>
-                  )}
                 </div>
                 <div style={{ display: 'flex', gap: 8 }}>
                   {t.status !== 1 && (
@@ -222,7 +225,7 @@ export default function McpAdminPage() {
                     </button>
                   )}
                   <button type="button" className="subtle" onClick={() => runTest(t)}>
-                    Sandbox test
+                    Test safely
                   </button>
                   <button type="button" className="subtle" onClick={() => remove(t.id)}>
                     Delete
@@ -236,40 +239,57 @@ export default function McpAdminPage() {
 
       {testTool && (
         <div className="rp-panel">
-          <div className="rp-panel-title">Sandbox test — {testTool.name}</div>
+          <div className="rp-panel-title">Safe test — {testTool.name}</div>
           <p className="rp-page-sub">
-            Runs the tool body in an in-process sandbox with a 5-second wall-clock timeout, soft 256
-            MiB memory cap, and BelowNormal thread priority. Network access is denied unless scope
-            contains <code>net:</code>.
+            Runs this tool in a sandbox with strict limits: 5-second timeout, low priority, no network unless its access level allows it.
           </p>
-          <label className="rp-field">
-            <span>Input JSON</span>
-            <textarea
-              className="rp-input"
-              rows={4}
-              value={testInput}
-              onChange={(e) => setTestInput(e.target.value)}
-            />
-          </label>
+          <details className="rp-advanced">
+            <summary>Show test input (technical)</summary>
+            <label className="rp-field">
+              <span>Input JSON</span>
+              <textarea
+                className="rp-input"
+                rows={4}
+                value={testInput}
+                onChange={(e) => setTestInput(e.target.value)}
+              />
+            </label>
+          </details>
           <button type="button" className="primary" onClick={() => runTest(testTool)}>
-            Run sandbox
+            Run test
           </button>
           {testResult && (
             <div className="rp-field" style={{ marginTop: 12 }}>
               <span>
-                Status:{' '}
+                Result:{' '}
                 <span className={`badge ${testResult.status === 'ok' ? 'ok' : 'danger'}`}>
-                  {testResult.status}
+                  {testResult.status === 'ok' ? 'OK' : 'Failed'}
                 </span>{' '}
-                · {testResult.latencyMs} ms · {(testResult.memoryBytes / 1024).toFixed(1)} KiB
+                · took {testResult.latencyMs} ms
               </span>
-              <pre className="rp-input" style={{ whiteSpace: 'pre-wrap' }}>
-                {testResult.output || '(empty)'}
-              </pre>
+              <details className="rp-advanced">
+                <summary>Show raw output</summary>
+                <pre className="rp-input" style={{ whiteSpace: 'pre-wrap' }}>
+                  {testResult.output || '(empty)'}
+                </pre>
+              </details>
             </div>
           )}
         </div>
       )}
+
+        </div>
+        <aside className="rp-page-aside">
+          <div className="rp-help">
+            <div className="rp-help-title">What are external tools?</div>
+            <p>Small add-ons that let an AI assistant do extra things — like look up a code, or fetch a study. They run inside RadioPad&apos;s sandbox.</p>
+          </div>
+          <div className="rp-help">
+            <div className="rp-help-title">Are they safe?</div>
+            <p>Every tool is blocked until you approve it. Tools that need powerful access (file system, shell, network) are flagged in red. When in doubt, leave them blocked and ask IT.</p>
+          </div>
+        </aside>
+      </div>
     </div>
   );
 }

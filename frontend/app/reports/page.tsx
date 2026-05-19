@@ -20,7 +20,7 @@ export default function ReportsPage() {
   return (
     <>
       <h1 className="rp-page-title">Reports</h1>
-      <p className="rp-page-sub">All reports for the active tenant.</p>
+      <p className="rp-page-sub">All radiology reports in your workspace.</p>
       {error && <div className="banner warn">{error}</div>}
       {loading ? (
         <div className="rp-page-sub">Loading…</div>

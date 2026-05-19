@@ -132,14 +132,14 @@ export default function TemplatesPage() {
     <Container>
       <PageHeader
         title="Templates"
-        description={<>Structured report templates per modality / body part / subspecialty. Templates loaded from <code>templates/</code> at startup; tenant-local edits saved here override them.</>}
+        description={<>Pre-built report structures (sections like Indication, Findings, Impression) for each kind of study. Built-in templates ship with the app; your edits stay inside your workspace.</>}
         primaryAction={<button className="primary" onClick={newTemplate}>+ New template</button>}
       />
 
       {error && <div className="banner warn">{error}</div>}
 
       <div className="rp-panel">
-        <div className="rp-panel-title">Tenant templates</div>
+        <div className="rp-panel-title">Your templates</div>
         <table className="rp-table">
           <thead>
             <tr>
@@ -153,7 +153,7 @@ export default function TemplatesPage() {
           </thead>
           <tbody>
             {items.length === 0 && (
-              <tr><td colSpan={6} style={{ color: 'var(--text-muted)' }}>No tenant templates yet.</td></tr>
+              <tr><td colSpan={6} style={{ color: 'var(--text-muted)' }}>No custom templates yet.</td></tr>
             )}
             {items.map((t) => {
               const status = templateStatusLabel(t.status);

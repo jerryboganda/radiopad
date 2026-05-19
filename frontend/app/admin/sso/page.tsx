@@ -58,20 +58,27 @@ export default function SsoAdminPage() {
 
   return (
     <div className="rp-container">
-      <h1 className="rp-page-title">Single sign-on</h1>
-      <p className="rp-page-sub">
-        Pick the IdP you have already provisioned and follow the operator
-        notes. The backend reads <code>RADIOPAD_OIDC_*</code> env vars at
-        request time; this page only emits guidance — secrets are never
-        captured by the UI.
-      </p>
+      <header className="rp-page-header">
+        <div className="rp-page-header-text">
+          <h1 className="rp-page-title">Single sign-on (SSO)</h1>
+          <p className="rp-page-sub">
+            Let your team sign in to RadioPad using your hospital&apos;s existing identity system, so they don&apos;t need a separate password.
+          </p>
+        </div>
+      </header>
 
       {error && <div className="banner warn">{error}</div>}
 
+      <div className="rp-page-grid">
+        <div className="rp-page-main">
+
       <div className="rp-panel">
-        <div className="rp-panel-title">OIDC preset</div>
+        <div className="rp-panel-title">Identity system setup</div>
+        <p className="rp-page-sub">
+          Pick the identity system your hospital uses, then share the notes below with your IT team. They&apos;ll finish the setup.
+        </p>
         <label className="rp-field">
-          <span>Provider</span>
+          <span>Identity system</span>
           <select
             className="rp-input"
             value={selected}
@@ -84,78 +91,80 @@ export default function SsoAdminPage() {
             ))}
           </select>
         </label>
-        <dl className="rp-defs">
-          <dt>Tenant claim</dt>
-          <dd>
-            <code>{profile.defaultTenantClaim}</code>
-          </dd>
-          <dt>Email claim</dt>
-          <dd>
-            <code>{profile.defaultEmailClaim}</code>
-          </dd>
-          <dt>Require MFA</dt>
-          <dd>{profile.defaultRequireMfa ? 'Yes' : 'No'}</dd>
-        </dl>
-        <p className="rp-page-sub">{profile.operatorNotes}</p>
-        <p className="rp-page-sub">
-          To activate, set <code>RADIOPAD_OIDC_PRESET={profile.name}</code>{' '}
-          plus your IdP-specific{' '}
-          <code>RADIOPAD_OIDC_AUTHORITY</code> /{' '}
-          <code>RADIOPAD_OIDC_AUDIENCE</code> in the API process environment.
-        </p>
+        <p className="rp-page-sub"><strong>For your IT team:</strong> {profile.operatorNotes}</p>
+        <details className="rp-advanced">
+          <summary>Show technical settings (IT team only)</summary>
+          <dl className="rp-defs">
+            <dt>Tenant claim</dt>
+            <dd><code>{profile.defaultTenantClaim}</code></dd>
+            <dt>Email claim</dt>
+            <dd><code>{profile.defaultEmailClaim}</code></dd>
+            <dt>Require MFA</dt>
+            <dd>{profile.defaultRequireMfa ? 'Yes' : 'No'}</dd>
+          </dl>
+          <p className="rp-page-sub">
+            To activate, set <code>RADIOPAD_OIDC_PRESET={profile.name}</code>{' '}
+            plus your <code>RADIOPAD_OIDC_AUTHORITY</code> /{' '}
+            <code>RADIOPAD_OIDC_AUDIENCE</code> on the API host.
+          </p>
+        </details>
       </div>
 
-      <div className="rp-panel">
-        <div className="rp-panel-title">SAML 2.0</div>
+      <details className="rp-panel rp-advanced">
+        <summary className="rp-panel-title" style={{ cursor: 'pointer' }}>SAML 2.0 (IT team only)</summary>
         <p className="rp-page-sub">
-          The service-provider metadata document is served at{' '}
-          <a href="/saml/metadata" target="_blank" rel="noreferrer">
-            <code>/saml/metadata</code>
-          </a>
-          . Configure the IdP signing certificate via{' '}
-          <code>RADIOPAD_SAML_IDP_CERT_PEM</code> and the tenant attribute
-          name via <code>RADIOPAD_SAML_TENANT_ATTRIBUTE</code> (default{' '}
-          <code>tenant_slug</code>). The Assertion Consumer Service endpoint
-          is <code>POST /saml/acs</code>.
+          The service-provider metadata document is at{' '}
+          <a href="/saml/metadata" target="_blank" rel="noreferrer"><code>/saml/metadata</code></a>.
+          Configure <code>RADIOPAD_SAML_IDP_CERT_PEM</code> and{' '}
+          <code>RADIOPAD_SAML_TENANT_ATTRIBUTE</code> (default <code>tenant_slug</code>).
+          The ACS endpoint is <code>POST /saml/acs</code>.
         </p>
         <a className="primary" href="/saml/metadata" target="_blank" rel="noreferrer">
           Download metadata
         </a>
-      </div>
+      </details>
 
       <div className="rp-panel">
-        <div className="rp-panel-title">Passkeys / WebAuthn</div>
+        <div className="rp-panel-title">Passkeys / fingerprint sign-in</div>
         <p className="rp-page-sub">
-          Each user can enrol a FIDO2 / passkey credential from their
-          profile page. Admins can audit enrolment from this list. Removing
-          a credential here invalidates it immediately for the user.
+          Lets each radiologist sign in with a fingerprint or device PIN instead of a password.
+          Users enrol from their own profile page. You can see who&apos;s enrolled below.
         </p>
         {creds.length === 0 ? (
-          <p className="rp-page-sub">No credentials enrolled.</p>
+          <p className="rp-page-sub">No one&apos;s enrolled a passkey yet.</p>
         ) : (
           <table className="rp-table">
             <thead>
               <tr>
-                <th>Label</th>
-                <th>Created</th>
+                <th>Name</th>
+                <th>Enrolled</th>
                 <th>Last used</th>
-                <th>Sign count</th>
               </tr>
             </thead>
             <tbody>
               {creds.map((c) => (
                 <tr key={c.id}>
-                  <td>{c.label || <em>unlabelled</em>}</td>
+                  <td>{c.label || <em>(unnamed device)</em>}</td>
                   <td>{new Date(c.createdAt).toLocaleString()}</td>
                   <td>{c.lastUsedAt ? new Date(c.lastUsedAt).toLocaleString() : '—'}</td>
-                  <td>
-                    <code>{c.signCount}</code>
-                  </td>
                 </tr>
               ))}
             </tbody>
           </table>
         )}
+      </div>
+
+        </div>
+        <aside className="rp-page-aside">
+          <div className="rp-help">
+            <div className="rp-help-title">What is single sign-on?</div>
+            <p>It means your team uses their normal hospital login (the one they use for email and other apps) to sign in to RadioPad. No extra password to remember.</p>
+          </div>
+          <div className="rp-help">
+            <div className="rp-help-title">Who sets this up?</div>
+            <p>Your IT team. Share this page with them — the technical notes are tucked under &ldquo;Show technical settings&rdquo;.</p>
+          </div>
+        </aside>
       </div>
     </div>
   );

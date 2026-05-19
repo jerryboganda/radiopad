@@ -164,7 +164,7 @@ export default function MarketplacePage() {
           <div>
             <h1 className="rp-page-title">Marketplace</h1>
             <p className="rp-page-sub">
-              Community-published rulebooks, templates and prompt packs (PRD §16).
+              Browse and install rulebooks, templates, and prompt packs shared by other clinics. You can also publish your own.
             </p>
           </div>
           <button
@@ -172,7 +172,7 @@ export default function MarketplacePage() {
             className="primary-ghost"
             onClick={() => setShowSubmitForm(!showSubmitForm)}
           >
-            Submit to Marketplace
+            Publish something
           </button>
         </div>
 

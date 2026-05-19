@@ -96,14 +96,10 @@ export default function ProviderOAuthAdminPage() {
   return (
     <div className="rp-container">
       <h1 className="rp-page-title">
-        Provider OAuth — {provider?.name ?? providerId ?? ''}
+        Sign-in token for {provider?.name ?? providerId ?? ''}
       </h1>
       <p className="rp-page-sub">
-        Per-provider OAuth refresh-token vault. Tokens are encrypted at rest
-        with AES-256-GCM under a tenant-scoped KMS key; only{' '}
-        <code>hasToken</code>, timestamps, and the rotation policy are
-        returned to the UI. The rotation worker scans every 15 min and
-        refreshes any token whose policy + expiry indicate it is due.
+        Some AI models need an extra sign-in token (called a refresh token) that lets RadioPad reconnect to them automatically. Tokens are stored encrypted and never shown back to anyone, including IT.
       </p>
 
       {error && <div className="banner warn">{error}</div>}

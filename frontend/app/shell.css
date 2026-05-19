@@ -337,11 +337,87 @@
 /* -------- Page header --------------------------------------------- */
 .rp-container {
   width: 100%;
-  max-width: 1280px;
+  max-width: 1600px;
   margin: 0 auto;
 }
 
 .rp-container.fluid { max-width: none; }
+.rp-container.narrow { max-width: 880px; }
+
+/* -------- Two-column page grid (form + sidecar) ------------------- */
+/* For admin/settings surfaces: form on the left, "What this means"
+   help / status sidecar on the right. Collapses to one column under
+   1080px so radiologists on smaller laptops still get a comfortable
+   reading width. */
+.rp-page-grid {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 320px;
+  gap: 24px;
+  align-items: start;
+}
+
+.rp-page-grid > .rp-page-main { min-width: 0; }
+.rp-page-grid > .rp-page-aside { min-width: 0; display: flex; flex-direction: column; gap: 12px; position: sticky; top: calc(var(--rp-topbar-h) + 16px); }
+
+@media (max-width: 1080px) {
+  .rp-page-grid { grid-template-columns: 1fr; }
+  .rp-page-grid > .rp-page-aside { position: static; }
+}
+
+/* -------- Help card (sidecar / inline) ---------------------------- */
+.rp-help {
+  background: var(--bg-subtle);
+  border: 1px solid var(--border-soft);
+  border-radius: var(--radius);
+  padding: 14px 16px;
+}
+.rp-help-title {
+  font: 600 12px/1.3 var(--sans);
+  color: var(--text-strong);
+  margin: 0 0 6px;
+}
+.rp-help p {
+  font: 400 13px/1.5 var(--sans);
+  color: var(--text-muted);
+  margin: 0 0 8px;
+}
+.rp-help p:last-child { margin-bottom: 0; }
+.rp-help ul {
+  margin: 0;
+  padding-left: 18px;
+  color: var(--text-muted);
+  font: 400 13px/1.5 var(--sans);
+}
+
+/* -------- Advanced disclosure ------------------------------------- */
+/* For technical fields (URLs, env-var refs, KMS schemes) that
+   radiologists shouldn't see by default. Hidden behind a single
+   "Show advanced options" toggle. */
+.rp-advanced {
+  border-top: 1px solid var(--border-soft);
+  padding-top: 12px;
+  margin-top: 12px;
+}
+.rp-advanced > summary {
+  cursor: pointer;
+  font: 500 12.5px/1.3 var(--sans);
+  color: var(--text-muted);
+  padding: 4px 0;
+  list-style: none;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+.rp-advanced > summary::-webkit-details-marker { display: none; }
+.rp-advanced > summary::before {
+  content: "▸";
+  font-size: 10px;
+  color: var(--text-faint);
+  transition: transform 120ms ease;
+}
+.rp-advanced[open] > summary::before { transform: rotate(90deg); }
+.rp-advanced > summary:hover { color: var(--text); }
+.rp-advanced[open] > summary { margin-bottom: 8px; }
 
 .rp-page-header {
   display: flex;

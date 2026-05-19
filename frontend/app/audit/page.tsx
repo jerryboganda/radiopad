@@ -39,11 +39,14 @@ export default function AuditPage() {
 
   return (
     <div className="rp-container">
-      <h1 className="rp-page-title">Audit log</h1>
-      <p className="rp-page-sub">
-        Append-only record of every AI event, report change, and policy decision. Each event carries an{' '}
-        <code>integrityChain</code> hash so tampering is detectable.
-      </p>
+      <header className="rp-page-header">
+        <div className="rp-page-header-text">
+          <h1 className="rp-page-title">Activity log</h1>
+          <p className="rp-page-sub">
+            A tamper-proof record of every important action in your workspace — AI requests, report edits, exports, and policy decisions.
+          </p>
+        </div>
+      </header>
 
       {error && <div className="banner warn">{error}</div>}
 
@@ -51,10 +54,9 @@ export default function AuditPage() {
         <table className="rp-table">
           <thead>
             <tr>
-              <th>Time</th>
-              <th>Action</th>
+              <th>When</th>
+              <th>What happened</th>
               <th>Details</th>
-              <th>Chain</th>
             </tr>
           </thead>
           <tbody>
@@ -64,13 +66,18 @@ export default function AuditPage() {
                   {new Date(e.createdAt).toLocaleString()}
                 </td>
                 <td><span className={`badge ${badgeFor(e.action)}`}>{actionLabel(e.action)}</span></td>
-                <td><code style={{ fontSize: 11 }}>{truncate(e.detailsJson, 80)}</code></td>
-                <td><code style={{ fontSize: 11 }}>{e.integrityChain.slice(0, 12)}…</code></td>
+                <td style={{ color: 'var(--text-muted)', fontSize: 13 }}>{truncate(e.detailsJson, 80)}</td>
               </tr>
             ))}
-            {events.length === 0 && <tr><td colSpan={4} style={{ color: 'var(--text-muted)' }}>No audit events yet.</td></tr>}
+            {events.length === 0 && <tr><td colSpan={3} style={{ color: 'var(--text-muted)' }}>No activity yet.</td></tr>}
           </tbody>
         </table>
+        <details className="rp-advanced">
+          <summary>About tamper-proof logging</summary>
+          <p className="rp-page-sub">
+            Each entry is sealed with a cryptographic fingerprint that links to the previous one, so any tampering is detectable. Entries can never be edited or deleted.
+          </p>
+        </details>
       </div>
     </div>
   );

@@ -64,16 +64,18 @@ export default function OfflineDraftsPage() {
 
   return (
     <div>
-      <h1 className="rp-page-title">Offline drafts</h1>
-      <p className="rp-page-sub">
-        Drafts saved while the device is offline are buffered locally and
-        replayed against the server once connectivity returns. You can also
-        sync manually below.
-      </p>
+      <header className="rp-page-header">
+        <div className="rp-page-header-text">
+          <h1 className="rp-page-title">Offline drafts</h1>
+          <p className="rp-page-sub">
+            Drafts you wrote while your device was offline. They&apos;ll sync back to the server automatically when you reconnect — or you can sync them now.
+          </p>
+        </div>
+      </header>
 
       <div className="rp-panel">
         <div className="rp-panel-title">
-          {drafts.length} draft{drafts.length === 1 ? '' : 's'} in buffer
+          {drafts.length} draft{drafts.length === 1 ? '' : 's'} waiting
         </div>
         <div style={{ display: 'flex', gap: 8, marginBottom: 12 }}>
           <button className="primary" disabled={busy} onClick={onSync}>
@@ -84,7 +86,7 @@ export default function OfflineDraftsPage() {
         {msg && <p className="rp-page-sub">{msg}</p>}
 
         {drafts.length === 0 && (
-          <p className="rp-page-sub">No offline drafts. New drafts created while offline will appear here.</p>
+          <p className="rp-page-sub">No offline drafts. Any new drafts you write while offline will appear here.</p>
         )}
 
         <ul style={{ listStyle: 'none', padding: 0, margin: 0 }}>
@@ -93,17 +95,13 @@ export default function OfflineDraftsPage() {
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 12 }}>
                 <div>
                   <div className="rp-panel-title">
-                    {d.modality || 'Modality?'} · {d.bodyPart || 'Body part?'}
+                    {d.modality || 'No modality'} · {d.bodyPart || 'No body part'}
                   </div>
                   <div className="rp-page-sub">
-                    Accession <code>{d.accessionNumber || '—'}</code> · rev {d.rev} ·{' '}
-                    {new Date(d.updatedAt).toLocaleString()}{' '}
+                    Accession {d.accessionNumber || '—'} · saved {new Date(d.updatedAt).toLocaleString()}{' '}
                     {d.dirty
-                      ? <span className="badge warn">dirty</span>
-                      : <span className="badge ok">synced</span>}{' '}
-                    {d.serverId
-                      ? <span className="badge info">server id known</span>
-                      : <span className="badge warn">never synced</span>}
+                      ? <span className="badge warn">not synced</span>
+                      : <span className="badge ok">synced</span>}
                   </div>
                 </div>
                 <div style={{ display: 'flex', gap: 6 }}>

@@ -5,6 +5,7 @@ using MailKit.Net.Smtp;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using MimeKit;
+using MimeKit.Utils;
 using RadioPad.Api.Middleware;
 using RadioPad.Application.Abstractions;
 using RadioPad.Domain.Entities;
@@ -241,7 +242,9 @@ public class MagicLinkController : ControllerBase
         });
         await _db.SaveChangesAsync(ct);
 
-        var callback = dto.CallbackUrl ?? "http://localhost:3000/login";
+        var callback = !string.IsNullOrWhiteSpace(dto.CallbackUrl)
+            ? dto.CallbackUrl!
+            : ResolveDefaultCallback();
         var link = $"{callback}?magic={Uri.EscapeDataString(raw)}";
         var sent = await TrySendAsync(dto.Email, link, ct);
         // In dev (no SMTP) we surface the link so QA/tests can complete the flow.
@@ -294,6 +297,26 @@ public class MagicLinkController : ControllerBase
         return "rp_" + Convert.ToBase64String(raw).Replace("+", "-").Replace("/", "_").TrimEnd('=');
     }
 
+    private string ResolveDefaultCallback()
+    {
+        var configured = Environment.GetEnvironmentVariable("RADIOPAD_PUBLIC_WEB_URL");
+        if (!string.IsNullOrWhiteSpace(configured))
+        {
+            var trimmed = configured.TrimEnd('/');
+            return trimmed.EndsWith("/login", StringComparison.OrdinalIgnoreCase) ? trimmed : trimmed + "/login";
+        }
+        var req = HttpContext?.Request;
+        if (req is not null)
+        {
+            var origin = req.Headers["Origin"].ToString();
+            if (!string.IsNullOrWhiteSpace(origin)) return origin.TrimEnd('/') + "/login";
+            var referer = req.Headers["Referer"].ToString();
+            if (Uri.TryCreate(referer, UriKind.Absolute, out var refUri))
+                return $"{refUri.Scheme}://{refUri.Authority}/login";
+        }
+        return "http://localhost:3000/login";
+    }
+
     private async Task<bool> TrySendAsync(string to, string link, CancellationToken ct)
     {
         var host = Environment.GetEnvironmentVariable("RADIOPAD_SMTP_HOST");
@@ -303,13 +326,44 @@ public class MagicLinkController : ControllerBase
             int port = int.TryParse(Environment.GetEnvironmentVariable("RADIOPAD_SMTP_PORT"), out var p) ? p : 587;
             var user = Environment.GetEnvironmentVariable("RADIOPAD_SMTP_USER");
             var pass = Environment.GetEnvironmentVariable("RADIOPAD_SMTP_PASS");
-            var from = Environment.GetEnvironmentVariable("RADIOPAD_SMTP_FROM") ?? "no-reply@radiopad.local";
+            var fromRaw = Environment.GetEnvironmentVariable("RADIOPAD_SMTP_FROM") ?? "no-reply@radiopad.local";
+            var replyToRaw = Environment.GetEnvironmentVariable("RADIOPAD_SMTP_REPLY_TO");
+
+            // For Gmail-relayed mail the From address MUST match the authenticated
+            // mailbox or Gmail rewrites the header / treats it as spam. Normalise
+            // the address part to the SMTP user while preserving the display name.
+            var from = MailboxAddress.Parse(fromRaw);
+            var isGmail = host.Equals("smtp.gmail.com", StringComparison.OrdinalIgnoreCase);
+            if (isGmail && !string.IsNullOrEmpty(user) && user.Contains('@')
+                && !string.Equals(from.Address, user, StringComparison.OrdinalIgnoreCase))
+            {
+                from = new MailboxAddress(from.Name, user);
+            }
 
             var msg = new MimeMessage();
-            msg.From.Add(MailboxAddress.Parse(from));
+            msg.From.Add(from);
             msg.To.Add(MailboxAddress.Parse(to));
+            if (!string.IsNullOrWhiteSpace(replyToRaw))
+            {
+                msg.ReplyTo.Add(MailboxAddress.Parse(replyToRaw));
+            }
             msg.Subject = "Your RadioPad sign-in link";
-            msg.Body = new TextPart("plain") { Text = $"Click to sign in (expires in 15 minutes):\n\n{link}\n" };
+            msg.MessageId = MimeUtils.GenerateMessageId(from.Domain);
+            msg.Headers.Add("Auto-Submitted", "auto-generated");
+            msg.Headers.Add("X-Auto-Response-Suppress", "All");
+            msg.Headers.Add("X-Entity-Ref-ID", Guid.NewGuid().ToString("N"));
+
+            var plain = "Hi,\r\n\r\nUse this secure link to sign in to RadioPad. It expires in 15 minutes and can be used once:\r\n\r\n"
+                + link
+                + "\r\n\r\nIf you did not request this, you can safely ignore this email.\r\n\r\n-- RadioPad\r\n";
+            var html = BuildMagicLinkHtml(link);
+
+            var alt = new MultipartAlternative
+            {
+                new TextPart("plain") { Text = plain },
+                new TextPart("html") { Text = html },
+            };
+            msg.Body = alt;
 
             using var client = new SmtpClient();
             await client.ConnectAsync(host, port, MailKit.Security.SecureSocketOptions.StartTlsWhenAvailable, ct);
@@ -323,6 +377,33 @@ public class MagicLinkController : ControllerBase
             _log.LogWarning(ex, "Magic-link SMTP send failed; falling back to dev link.");
             return false;
         }
+    }
+
+    private static string BuildMagicLinkHtml(string link)
+    {
+        var sb = new StringBuilder();
+        sb.Append("<!doctype html><html><body style=\"margin:0;padding:0;background:#faf9f7;font-family:-apple-system,Segoe UI,Roboto,Helvetica,Arial,sans-serif;color:#2b2b2b\">");
+        sb.Append("<table role=\"presentation\" width=\"100%\" cellpadding=\"0\" cellspacing=\"0\" style=\"background:#faf9f7;padding:32px 16px\"><tr><td align=\"center\">");
+        sb.Append("<table role=\"presentation\" width=\"560\" cellpadding=\"0\" cellspacing=\"0\" style=\"max-width:560px;background:#ffffff;border:1px solid #e7e3dc;border-radius:12px;overflow:hidden\">");
+        sb.Append("<tr><td style=\"padding:28px 32px 8px 32px\">");
+        sb.Append("<div style=\"font-size:13px;letter-spacing:.04em;color:#c96442;text-transform:uppercase;font-weight:600\">RadioPad</div>");
+        sb.Append("<h1 style=\"margin:8px 0 0 0;font-size:22px;font-weight:600;color:#1f1f1f\">Sign in to your workspace</h1>");
+        sb.Append("</td></tr>");
+        sb.Append("<tr><td style=\"padding:8px 32px 0 32px;font-size:15px;line-height:1.55;color:#3a3a3a\">");
+        sb.Append("<p style=\"margin:12px 0\">Click the button below to sign in. The link expires in <strong>15 minutes</strong> and works only once.</p>");
+        sb.Append("</td></tr>");
+        sb.Append("<tr><td style=\"padding:20px 32px 8px 32px\">");
+        sb.Append("<a href=\"").Append(link).Append("\" style=\"display:inline-block;background:#c96442;color:#ffffff;text-decoration:none;font-weight:600;font-size:15px;padding:12px 22px;border-radius:8px\">Sign in to RadioPad</a>");
+        sb.Append("</td></tr>");
+        sb.Append("<tr><td style=\"padding:8px 32px 0 32px;font-size:13px;line-height:1.55;color:#666\">");
+        sb.Append("<p style=\"margin:12px 0\">Or paste this link into your browser:</p>");
+        sb.Append("<p style=\"margin:6px 0;word-break:break-all;font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;font-size:12px;color:#444\">").Append(link).Append("</p>");
+        sb.Append("</td></tr>");
+        sb.Append("<tr><td style=\"padding:20px 32px 28px 32px;font-size:12px;line-height:1.55;color:#888;border-top:1px solid #f0ece5\">");
+        sb.Append("<p style=\"margin:12px 0 0 0\">If you did not request this sign-in link, you can safely ignore this email -- no action will be taken.</p>");
+        sb.Append("</td></tr>");
+        sb.Append("</table></td></tr></table></body></html>");
+        return sb.ToString();
     }
 
     internal static string Sha256Hex(string s)

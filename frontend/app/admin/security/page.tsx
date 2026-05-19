@@ -114,8 +114,8 @@ export default function SecurityAdminPage() {
     setBusy(true); setError(null); setInfo(null);
     try {
       const result = await api.security.testWebhook();
-      if (result.sent) setInfo('Test alert dispatched. Check your security webhook receiver.');
-      else setInfo('Security webhook is not configured for this environment.');
+      if (result.sent) setInfo('Test alert sent. Ask your security team to confirm they received it.');
+      else setInfo("A security alert destination hasn't been set up for this workspace yet.");
     } catch (e) {
       setError((e as Error).message);
     } finally {
@@ -125,84 +125,71 @@ export default function SecurityAdminPage() {
 
   return (
     <div className="rp-container">
-      <h1 className="rp-page-title">Security &amp; SIEM</h1>
-      <p className="rp-page-sub">
-        Continuous SIEM delivery from the append-only audit log. Sinks are
-        opt-in via env vars; failures retry up to 3× with backoff and never
-        block <code>/api/*</code>. PHI minimisation: only ids + action codes +
-        timestamps + integrity hash are exported. <code>DetailsJson</code> is
-        intentionally excluded.
-      </p>
+      <header className="rp-page-header">
+        <div className="rp-page-header-text">
+          <h1 className="rp-page-title">Security</h1>
+          <p className="rp-page-sub">
+            Restrict who can access RadioPad, see recent security alerts, and forward audit events to your security team&apos;s tools.
+          </p>
+        </div>
+      </header>
 
       {error && <div className="banner warn">{error}</div>}
       {info && <div className="banner ok">{info}</div>}
 
+      <div className="rp-page-grid">
+        <div className="rp-page-main">
+
       <div className="rp-panel">
-        <div className="rp-panel-title">IP allowlist</div>
+        <div className="rp-panel-title">Allowed networks</div>
         <p className="rp-page-sub">
-          JSON array of CIDR strings (IPv4 + IPv6). ANDed with the global
-          {' '}<code>RADIOPAD_IP_ALLOWLIST</code> envvar. Loopback
-          (<code>127.0.0.1</code>, <code>::1</code>) is always allowed.
-          {' '}<code>X-Forwarded-For</code> is honoured only when
-          {' '}<code>RADIOPAD_TRUST_FORWARDED_FOR=1</code>.
+          Only let users sign in from specific office networks. Leave blank to allow any network.
         </p>
-        <p className="rp-page-sub"><strong>Active:</strong> {savedSummary || '— (none configured)'}</p>
-        <textarea
-          className="rp-textarea"
-          rows={8}
-          spellCheck={false}
-          placeholder={SAMPLE_PLACEHOLDER}
-          value={allowlistJson}
-          onChange={(e) => { setAllowlistJson(e.target.value); setAllowlistDirty(true); }}
-        />
-        <div className="rp-row" style={{ marginTop: 8 }}>
-          <button className="primary" onClick={saveAllowlist} disabled={busy || !allowlistDirty}>
-            Save allowlist
-          </button>
-          <button className="ghost" onClick={refresh} disabled={busy} style={{ marginLeft: 8 }}>
-            Refresh
-          </button>
-        </div>
+        <p className="rp-page-sub"><strong>Currently active:</strong> {savedSummary || 'No restrictions — any network is allowed.'}</p>
+        <details className="rp-advanced">
+          <summary>Edit allowed networks (technical — IT team only)</summary>
+          <p className="rp-page-sub">
+            Enter a JSON list of network ranges (CIDR), one per line.
+          </p>
+          <textarea
+            className="rp-textarea"
+            rows={8}
+            spellCheck={false}
+            placeholder={SAMPLE_PLACEHOLDER}
+            value={allowlistJson}
+            onChange={(e) => { setAllowlistJson(e.target.value); setAllowlistDirty(true); }}
+          />
+          <div className="rp-row" style={{ marginTop: 8 }}>
+            <button className="primary" onClick={saveAllowlist} disabled={busy || !allowlistDirty}>
+              Save
+            </button>
+            <button className="ghost" onClick={refresh} disabled={busy} style={{ marginLeft: 8 }}>
+              Refresh
+            </button>
+          </div>
+        </details>
       </div>
 
       <div className="rp-panel">
-        <div className="rp-panel-title">Rate limit</div>
-        <p className="rp-page-sub">Active limits (60-second fixed window):</p>
-        <ul className="rp-list">
-          <li><strong>Per-IP:</strong> 100 req/min (override <code>RADIOPAD_RATE_LIMIT_IP_PER_MIN</code>)</li>
-          <li><strong>Per-tenant:</strong> 5000 req/min (override <code>RADIOPAD_RATE_LIMIT_TENANT_PER_MIN</code>)</li>
-          <li><strong>Bypass:</strong> <code>/api/health</code>, <code>/api/health/ready</code>, loopback</li>
-        </ul>
+        <div className="rp-panel-title">Recent security alerts</div>
         <p className="rp-page-sub">
-          Rejections return RFC-7807 problem+json with{' '}
-          <code>kind: &quot;rate_limited&quot;</code> and a{' '}
-          <code>Retry-After</code> header.
-        </p>
-      </div>
-
-      <div className="rp-panel">
-        <div className="rp-panel-title">Security alerts</div>
-        <p className="rp-page-sub">
-          Latest 50 entries from the anomaly detector (audit action{' '}
-          <code>SecurityAlert</code>).
+          Unusual activity our system flagged — like many failed sign-in attempts in a short window.
         </p>
         {alerts.length === 0 ? (
-          <p className="rp-page-sub">No alerts in the audit window.</p>
+          <p className="rp-page-sub">No alerts to report. Things look quiet.</p>
         ) : (
           <table className="rp-table">
             <thead>
               <tr>
-                <th>Time (UTC)</th>
+                <th>When</th>
                 <th>Reason</th>
-                <th>Details</th>
               </tr>
             </thead>
             <tbody>
               {alerts.map((a) => (
                 <tr key={a.id}>
-                  <td><code>{a.createdAt}</code></td>
+                  <td>{new Date(a.createdAt).toLocaleString()}</td>
                   <td>{extractField(a.detailsJson, 'reason') || '—'}</td>
-                  <td><code>{a.detailsJson || ''}</code></td>
                 </tr>
               ))}
             </tbody>
@@ -211,56 +198,44 @@ export default function SecurityAdminPage() {
       </div>
 
       <div className="rp-panel">
-        <div className="rp-panel-title">Security webhook</div>
+        <div className="rp-panel-title">Alert your security team</div>
         <p className="rp-page-sub">
-          Anomaly detector POSTs JSON to <code>RADIOPAD_SECURITY_WEBHOOK_URL</code>{' '}
-          with an <code>X-RadioPad-Signature: sha256=&lt;hex&gt;</code> HMAC header
-          derived from <code>RADIOPAD_SECURITY_WEBHOOK_SECRET</code>. The secret is
-          never echoed back in responses or audit rows.
+          When something suspicious happens, RadioPad can send an automatic notification to your hospital&apos;s security team.
         </p>
         <button className="primary-ghost" onClick={testWebhook} disabled={busy}>
-          Test webhook
+          Send test alert
         </button>
+        <details className="rp-advanced">
+          <summary>For IT teams — webhook configuration</summary>
+          <p className="rp-page-sub">
+            Alerts POST JSON to <code>RADIOPAD_SECURITY_WEBHOOK_URL</code> signed with{' '}
+            <code>X-RadioPad-Signature: sha256=&lt;hex&gt;</code> HMAC derived from{' '}
+            <code>RADIOPAD_SECURITY_WEBHOOK_SECRET</code>. The secret is never echoed back.
+          </p>
+        </details>
       </div>
 
       <div className="rp-panel">
-        <div className="rp-panel-title">Availability</div>
-        <p className="rp-page-sub">
-          In-process synthetic monitor. Probes the listed health endpoints
-          every <code>RADIOPAD_AVAILABILITY_PROBE_INTERVAL_SEC</code> seconds
-          and maintains a 5-minute rolling failure window. Burn-rate
-          breaches above the configured threshold append a
-          {' '}<code>SystemAlert</code> audit row with{' '}
-          <code>kind=availability_burn_rate</code>.
-        </p>
-        {availabilityError && (
-          <div className="rp-banner danger">{availabilityError}</div>
-        )}
+        <div className="rp-panel-title">System availability</div>
+        {availabilityError && <div className="rp-banner danger">{availabilityError}</div>}
         {availability === null ? (
           <p className="rp-page-sub">Loading…</p>
         ) : (
           <>
             {availability.errorRate > AVAILABILITY_BURN_THRESHOLD && (
               <div className="rp-banner warn">
-                Burn-rate threshold exceeded — error rate{' '}
-                <code>{(availability.errorRate * 100).toFixed(1)}%</code>{' '}
-                over the last <code>{availability.windowSec}s</code>.
+                System health check warning — RadioPad is responding more slowly than expected. Ask IT to take a look.
               </div>
             )}
             <div className="rp-grid-3">
               <div className="rp-stat-tile">
-                <div className="rp-stat-label">Error rate</div>
+                <div className="rp-stat-label">Uptime (last 5 minutes)</div>
                 <div className="rp-stat-value">
-                  {(availability.errorRate * 100).toFixed(2)}%
+                  {(100 - availability.errorRate * 100).toFixed(2)}%
                 </div>
                 <div className="rp-stat-sub">
-                  {availability.errorCount} / {availability.totalProbes} probes
+                  {availability.totalProbes - availability.errorCount} of {availability.totalProbes} checks passed
                 </div>
-              </div>
-              <div className="rp-stat-tile">
-                <div className="rp-stat-label">Window</div>
-                <div className="rp-stat-value">{availability.windowSec}s</div>
-                <div className="rp-stat-sub">rolling 5-minute window</div>
               </div>
               <div className="rp-stat-tile">
                 <div className="rp-stat-label">Last checked</div>
@@ -270,18 +245,10 @@ export default function SecurityAdminPage() {
                     : '—'}
                 </div>
                 <div className="rp-stat-sub">
-                  {availability.targets.length} target
-                  {availability.targets.length === 1 ? '' : 's'}
+                  Monitoring {availability.targets.length} service{availability.targets.length === 1 ? '' : 's'}
                 </div>
               </div>
             </div>
-            <ul className="rp-list" style={{ marginTop: 8 }}>
-              {availability.targets.map((t) => (
-                <li key={t} className="rp-divider-row">
-                  <code>{t}</code>
-                </li>
-              ))}
-            </ul>
             <div className="rp-row" style={{ marginTop: 8 }}>
               <button className="ghost" onClick={refreshAvailability} disabled={busy}>
                 Refresh
@@ -291,50 +258,60 @@ export default function SecurityAdminPage() {
         )}
       </div>
 
-      <div className="rp-panel">
-        <div className="rp-panel-title">SIEM sinks</div>
+      <details className="rp-panel rp-advanced">
+        <summary className="rp-panel-title" style={{ cursor: 'pointer' }}>Advanced — rate limits &amp; SIEM forwarding</summary>
+        <p className="rp-page-sub rp-mt-sm"><strong>Rate limits (per minute):</strong> 100 per IP, 5000 per workspace. Override via{' '}
+          <code>RADIOPAD_RATE_LIMIT_IP_PER_MIN</code> /{' '}
+          <code>RADIOPAD_RATE_LIMIT_TENANT_PER_MIN</code>.
+        </p>
+        <p className="rp-page-sub">
+          <strong>SIEM forwarding:</strong> audit events are forwarded continuously to Splunk HEC / Sentinel Log Analytics / Elastic / Syslog when sink env vars are set. PHI is excluded — only ids, action codes, timestamps and integrity hashes ship.
+        </p>
         {sinks === null ? (
           <p className="rp-page-sub">Loading…</p>
         ) : sinks.length === 0 ? (
-          <p className="rp-page-sub">No sinks registered.</p>
+          <p className="rp-page-sub">No SIEM destinations registered.</p>
         ) : (
           <table className="rp-table">
             <thead>
               <tr>
-                <th>Sink</th>
+                <th>Destination</th>
                 <th>Configured</th>
                 <th>Last push</th>
                 <th>Total pushed</th>
                 <th>Errors</th>
-                <th>Last error</th>
               </tr>
             </thead>
             <tbody>
               {sinks.map((s) => (
                 <tr key={s.name}>
-                  <td><code>{s.name}</code></td>
+                  <td>{s.name}</td>
                   <td>
                     <span className={`badge ${s.configured ? 'ok' : 'info'}`}>
-                      {s.configured ? 'configured' : 'not configured'}
+                      {s.configured ? 'yes' : 'no'}
                     </span>
                   </td>
                   <td>{s.lastPushAt ? new Date(s.lastPushAt).toLocaleString() : '—'}</td>
-                  <td><code>{s.totalPushed}</code></td>
-                  <td><code>{s.totalErrors}</code></td>
-                  <td>{s.lastError ? <code>{s.lastError}</code> : '—'}</td>
+                  <td>{s.totalPushed}</td>
+                  <td>{s.totalErrors}</td>
                 </tr>
               ))}
             </tbody>
           </table>
         )}
-      </div>
+      </details>
 
-      <div className="rp-panel">
-        <div className="rp-panel-title">Snapshot export</div>
-        <p className="rp-page-sub">
-          Continuous SIEM delivery is the default. For ad-hoc compliance pulls
-          use the snapshot endpoint <code>GET /api/audit/siem?format=json|cef</code>.
-        </p>
+        </div>
+        <aside className="rp-page-aside">
+          <div className="rp-help">
+            <div className="rp-help-title">What this page does</div>
+            <p>Manages who can access RadioPad and how your security team is alerted to suspicious activity.</p>
+          </div>
+          <div className="rp-help">
+            <div className="rp-help-title">Who should use it</div>
+            <p>IT Admin, Security Admin. If something here looks wrong, ask them — don&apos;t change settings unless you&apos;re sure.</p>
+          </div>
+        </aside>
       </div>
     </div>
   );

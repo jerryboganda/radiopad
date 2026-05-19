@@ -13,44 +13,44 @@ type FeatureMap = Awaited<ReturnType<typeof api.billing.features>>;
 
 const FLAG_DESCRIPTIONS: Record<string, { label: string; gates: string }> = {
   scim: {
-    label: 'SCIM 2.0 provisioning',
-    gates: 'Automatic user lifecycle from Okta / Azure AD / Google Workspace via /scim/v2/Users.',
+    label: 'Auto-add users from your identity provider',
+    gates: 'Automatically create / disable user accounts based on what your identity system (Okta, Azure AD, Google Workspace) says.',
   },
   siemExport: {
-    label: 'SIEM export',
-    gates: 'NDJSON / CEF audit-log export at GET /api/audit/siem for Splunk / QRadar / Sentinel.',
+    label: 'Forward audit log to security tools',
+    gates: 'Lets your security team pull RadioPad activity into their monitoring tools (Splunk, QRadar, Sentinel).',
   },
   marketplacePublish: {
-    label: 'Marketplace publishing',
-    gates: 'Submit rulebooks / templates to the marketplace and earn revenue share via Stripe Connect.',
+    label: 'Publish rulebooks to the marketplace',
+    gates: 'Lets your workspace publish rulebooks and templates other clinics can use — with optional revenue share.',
   },
   advancedAnalytics: {
     label: 'Advanced analytics',
-    gates: 'Per-month KPI breakdowns, cohort comparisons, and export of analytics rows beyond the 30-day default.',
+    gates: 'Per-month breakdowns, comparisons across teams, and data exports beyond the past 30 days.',
   },
   stripeConnect: {
-    label: 'Stripe Connect payouts',
-    gates: 'Receive marketplace payouts via Express onboarding (POST /api/marketplace/connect/onboarding).',
+    label: 'Marketplace payouts',
+    gates: 'Receive payouts when others use rulebooks or templates your workspace published.',
   },
   customKms: {
-    label: 'Customer-managed keys',
-    gates: 'Bring-your-own KMS reference for at-rest encryption (AWS KMS / Azure Key Vault / GCP KMS).',
+    label: 'Bring-your-own encryption key',
+    gates: 'Manage the encryption key for your data with your own cloud key vault (AWS / Azure / GCP).',
   },
   ipAllowlist: {
-    label: 'IP allowlist',
-    gates: 'Restrict the API to the CIDR ranges in RADIOPAD_IP_ALLOWLIST (loopback always permitted).',
+    label: 'Restrict access by network',
+    gates: 'Only allow sign-in from specific office networks you list.',
   },
   priorCompare: {
-    label: 'Prior-report comparison',
-    gates: 'Side-by-side comparison of the current report with the most recent prior on the same body part.',
+    label: 'Compare with prior report',
+    gates: 'Show the most recent prior report on the same body part side-by-side while drafting.',
   },
   voiceDictation: {
     label: 'Voice dictation',
-    gates: 'In-browser dictation via the Web Speech API and the optional Whisper-local desktop sidecar.',
+    gates: 'Dictate into reports using your microphone, in the browser or with an offline desktop helper.',
   },
   mcpReadOnly: {
-    label: 'MCP read-only server',
-    gates: 'Expose RadioPad as a read-only Model Context Protocol server via `radiopad mcp serve`.',
+    label: 'External AI tools (read-only)',
+    gates: 'Let approved external AI tools read from RadioPad for analysis. No writes.',
   },
 };
 
@@ -58,7 +58,7 @@ function describe(flag: string): { label: string; gates: string } {
   return (
     FLAG_DESCRIPTIONS[flag] ?? {
       label: flag,
-      gates: 'No description recorded — see docs/03-architecture/api-reference.md.',
+      gates: 'No description yet — ask your IT team.',
     }
   );
 }
@@ -73,11 +73,14 @@ export default function FeatureFlagsPage() {
 
   return (
     <div className="rp-container">
-      <h1 className="rp-page-title">Plan feature flags</h1>
-      <p className="rp-page-sub">
-        Read-only view of the active tenant&apos;s plan and the feature flags it gates.
-        Source: <code>GET /api/billing/features</code>.
-      </p>
+      <header className="rp-page-header">
+        <div className="rp-page-header-text">
+          <h1 className="rp-page-title">What&apos;s included in your plan</h1>
+          <p className="rp-page-sub">
+            A read-only list of features your workspace can use today, and what each one unlocks.
+          </p>
+        </div>
+      </header>
 
       {error && <div className="banner warn">{error}</div>}
       {!data && !error && <p className="rp-page-sub">Loading…</p>}
@@ -86,12 +89,11 @@ export default function FeatureFlagsPage() {
         <>
           <div className="rp-panel">
             <div className="rp-panel-title">
-              Plan
-              <span className="badge info">{data.plan}</span>
+              Your plan
+              <span className="badge info" style={{ marginLeft: 8 }}>{data.plan}</span>
             </div>
             <p className="rp-page-sub">
-              Plan changes are applied via Stripe Checkout / Billing Portal.
-              See <code>/admin/billing</code>.
+              To change plans, go to <a href="/admin/billing">Billing &amp; plan</a>.
             </p>
           </div>
 
@@ -100,15 +102,15 @@ export default function FeatureFlagsPage() {
             <table className="rp-table">
               <thead>
                 <tr>
-                  <th>Flag</th>
+                  <th>Feature</th>
                   <th>Status</th>
-                  <th>Gates</th>
+                  <th>What it does</th>
                 </tr>
               </thead>
               <tbody>
                 {Object.keys(data.features).length === 0 && (
                   <tr>
-                    <td colSpan={3} className="rp-page-sub">No flags returned.</td>
+                    <td colSpan={3} className="rp-page-sub">No features to show.</td>
                   </tr>
                 )}
                 {Object.entries(data.features).map(([flag, enabled]) => {
@@ -116,14 +118,13 @@ export default function FeatureFlagsPage() {
                   return (
                     <tr key={flag}>
                       <td>
-                        <code>{flag}</code>
-                        <div className="rp-stat-label">{meta.label}</div>
+                        <strong>{meta.label}</strong>
                       </td>
                       <td>
                         {enabled ? (
-                          <span className="badge ok">enabled</span>
+                          <span className="badge ok">Included</span>
                         ) : (
-                          <span className="badge">disabled</span>
+                          <span className="badge">Not on this plan</span>
                         )}
                       </td>
                       <td>{meta.gates}</td>

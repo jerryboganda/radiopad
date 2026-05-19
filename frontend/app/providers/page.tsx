@@ -121,25 +121,25 @@ export default function ProvidersPage() {
   return (
     <Container>
       <PageHeader
-        title="AI providers"
-        description={<>Tenant provider registry. PHI requests are blocked unless the destination provider's compliance class is <span className="badge ok">PHI-approved</span> or <span className="badge ai">Local-only</span>.</>}
-        primaryAction={<button className="primary" onClick={newProvider}>+ New provider</button>}
+        title="AI models"
+        description={<>The AI models your workspace can use for drafting reports. Patient information is only sent to models marked <span className="badge ok">Safe for patient data</span> or <span className="badge ai">Runs on-site</span>.</>}
+        primaryAction={<button className="primary" onClick={newProvider}>+ Add a model</button>}
       />
 
       {error && <div className="banner warn">{error}</div>}
 
       <div className="rp-panel">
-        <div className="rp-panel-title">Configured providers</div>
+        <div className="rp-panel-title">Available models</div>
         <table className="rp-table">
           <thead>
             <tr>
               <th>Name</th>
-              <th>Adapter</th>
+              <th>Type</th>
               <th>Model</th>
-              <th>Compliance</th>
-              <th>Enabled</th>
-              <th>Key</th>
-              <th>Health</th>
+              <th>Patient data?</th>
+              <th>On / off</th>
+              <th>API key</th>
+              <th>Connection</th>
               <th></th>
             </tr>
           </thead>
@@ -147,26 +147,21 @@ export default function ProvidersPage() {
             {items.map((p) => (
               <tr key={p.id}>
                 <td>{p.name}</td>
-                <td><code>{p.adapter}</code></td>
+                <td>{p.adapter}</td>
                 <td>{p.model || <span className="rp-faint">(default)</span>}</td>
                 <td>
                   <span className={`badge ${COMPLIANCE_BADGE[p.compliance] || ''}`}>
                     {COMPLIANCE_LABELS[p.compliance] || `class ${p.compliance}`}
                   </span>
-                  {p.retentionLabel ? (
-                    <div className="rp-faint" style={{ marginTop: 4 }}>
-                      <code>{p.retentionLabel}</code>
-                    </div>
-                  ) : null}
                 </td>
                 <td>
                   <button className="subtle" onClick={() => toggleEnabled(p)}>
-                    {p.enabled ? 'Enabled' : 'Disabled'}
+                    {p.enabled ? 'On' : 'Off'}
                   </button>
                 </td>
-                <td>{p.apiKeyConfigured ? <span className="badge ok">configured</span> : <span className="badge warn">missing</span>}</td>
+                <td>{p.apiKeyConfigured ? <span className="badge ok">set</span> : <span className="badge warn">missing</span>}</td>
                 <td>
-                  <button className="subtle" onClick={() => probeHealth(p)} title="Iter-32 AI-011 health probe">Test</button>
+                  <button className="subtle" onClick={() => probeHealth(p)} title="Check this model is reachable">Test</button>
                   {healthMsg[p.id] && <span className="rp-faint" style={{ marginLeft: 6 }}>{healthMsg[p.id]}</span>}
                 </td>
                 <td><button className="subtle" onClick={() => editProvider(p)}>Edit</button></td>

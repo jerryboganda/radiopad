@@ -168,11 +168,11 @@ export default function AdminGovernancePage() {
 
   return (
     <div className="rp-container">
-      <h1 className="rp-page-title">Governance</h1>
+      <h1 className="rp-page-title">Oversight dashboard</h1>
       <p className="rp-page-sub">
-        Tenant-scoped Enterprise-GA dashboard. Signed in as{' '}
-        <code>{me?.user.email}</code> ·{' '}
-        <code>{typeof role === 'number' ? ROLE_LABELS[role] ?? role : 'unknown'}</code>.
+        A single view of AI activity, rulebook approvals, and patient-data routing for your workspace. Signed in as{' '}
+        <strong>{me?.user.email}</strong> ·{' '}
+        <em>{typeof role === 'number' ? ROLE_LABELS[role] ?? role : 'unknown'}</em>.
       </p>
 
       {errors.length > 0 && (
@@ -183,9 +183,9 @@ export default function AdminGovernancePage() {
 
       {/* 1 — Model inventory ------------------------------------------------ */}
       <div className="rp-panel" data-testid="panel-model-inventory">
-        <div className="rp-panel-title">Model inventory</div>
+        <div className="rp-panel-title">AI models</div>
         {providers.length === 0 ? (
-          <p className="rp-page-sub">No providers configured.</p>
+          <p className="rp-page-sub">No AI models set up yet.</p>
         ) : (
           <table className="rp-table">
             <thead>
