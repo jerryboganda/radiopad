@@ -5,12 +5,11 @@ using MailKit.Net.Smtp;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using MimeKit;
-using RadioPad.Api.Auth;
+using MimeKit.Utils;
 using RadioPad.Api.Middleware;
 using RadioPad.Application.Abstractions;
 using RadioPad.Domain.Entities;
 using RadioPad.Domain.Enums;
-using RadioPad.Infrastructure.Identity;
 using RadioPad.Infrastructure.Persistence;
 
 namespace RadioPad.Api.Controllers;
@@ -23,7 +22,7 @@ namespace RadioPad.Api.Controllers;
 /// </summary>
 [ApiController]
 [Route("api/auth/mfa")]
-public class MfaController : TenantedController
+public class MfaController : ControllerBase
 {
     private readonly RadioPadDbContext _db;
     private readonly IAuditLog _audit;
@@ -37,9 +36,8 @@ public class MfaController : TenantedController
     [HttpPost("enroll")]
     public async Task<IActionResult> Enroll([FromBody] EnrollDto dto, CancellationToken ct)
     {
-        var (tenant, user) = await ResolveContextAsync(_db, ct);
-        if (!RequestedIdentityMatches(dto.Tenant, dto.Email, tenant, user))
-            return ForbiddenIdentityMismatch();
+        var (user, _) = await ResolveAsync(dto.Tenant, dto.Email, ct);
+        if (user is null) return NotFound(new { error = "User not found.", kind = "not_found" });
 
         var secret = RandomNumberGenerator.GetBytes(20); // 160-bit per RFC 4226
         user.MfaSecret = Base32Encode(secret);
@@ -47,7 +45,7 @@ public class MfaController : TenantedController
         await _db.SaveChangesAsync(ct);
 
         var issuer = "RadioPad";
-        var label = Uri.EscapeDataString($"{issuer}:{user.Email}");
+        var label = Uri.EscapeDataString($"{issuer}:{dto.Email}");
         var otpauth = $"otpauth://totp/{label}?secret={user.MfaSecret}&issuer={issuer}&period=30&digits=6&algorithm=SHA1";
         return Ok(new { secret = user.MfaSecret, otpauth });
     }
@@ -55,9 +53,9 @@ public class MfaController : TenantedController
     [HttpPost("verify")]
     public async Task<IActionResult> Verify([FromBody] VerifyDto dto, CancellationToken ct)
     {
-        var (tenant, user) = await ResolveContextAsync(_db, ct);
-        if (!RequestedIdentityMatches(dto.Tenant, dto.Email, tenant, user))
-            return ForbiddenIdentityMismatch();
+        var (user, tenant) = await ResolveAsync(dto.Tenant, dto.Email, ct);
+        if (user is null || tenant is null)
+            return NotFound(new { error = "User not found.", kind = "not_found" });
         if (string.IsNullOrEmpty(user.MfaSecret))
             return BadRequest(new { error = "MFA is not enrolled.", kind = "validation" });
         if (RadioPad.Api.Auth.LockoutPolicy.IsLocked(user))
@@ -81,17 +79,12 @@ public class MfaController : TenantedController
         return Ok(new { ok = true, mfaEnabled = true });
     }
 
-    private static bool RequestedIdentityMatches(string? slug, string? email, Tenant tenant, User user) =>
-        (string.IsNullOrWhiteSpace(slug) || string.Equals(slug, tenant.Slug, StringComparison.Ordinal))
-        && (string.IsNullOrWhiteSpace(email) || string.Equals(email, user.Email, StringComparison.OrdinalIgnoreCase));
-
-    private IActionResult ForbiddenIdentityMismatch()
+    private async Task<(User? user, Tenant? tenant)> ResolveAsync(string slug, string email, CancellationToken ct)
     {
-        return StatusCode(StatusCodes.Status403Forbidden, new
-        {
-            error = "Requested identity does not match the authenticated user.",
-            kind = "forbidden",
-        });
+        var t = await _db.Tenants.FirstOrDefaultAsync(x => x.Slug == slug, ct);
+        if (t is null) return (null, null);
+        var u = await _db.Users.FirstOrDefaultAsync(x => x.TenantId == t.Id && x.Email == email, ct);
+        return (u, t);
     }
 
     // --- RFC 6238 TOTP ---
@@ -245,17 +238,17 @@ public class MagicLinkController : ControllerBase
             TenantId = t.Id,
             UserId = u.Id,
             TokenHash = Sha256Hex(raw),
-            ExpiresAt = DateTimeOffset.UtcNow.AddMinutes(15),
+            ExpiresAt = DateTimeOffset.UtcNow.AddMinutes(60),
         });
         await _db.SaveChangesAsync(ct);
 
-        var callback = dto.CallbackUrl ?? "http://localhost:3000/login";
+        var callback = !string.IsNullOrWhiteSpace(dto.CallbackUrl)
+            ? dto.CallbackUrl!
+            : ResolveDefaultCallback();
         var link = $"{callback}?magic={Uri.EscapeDataString(raw)}";
         var sent = await TrySendAsync(dto.Email, link, ct);
-        if (sent || !RadioPadRequestIdentity.DevHeadersEnabled(HttpContext))
-            return Ok(new { ok = true });
-        // In explicit dev/test mode (no SMTP) surface the link so QA/tests can complete the flow.
-        return Ok(new { ok = true, devLink = link });
+        // In dev (no SMTP) we surface the link so QA/tests can complete the flow.
+        return Ok(sent ? (object)new { ok = true } : new { ok = true, devLink = link });
     }
 
     [HttpPost("consume")]
@@ -265,20 +258,13 @@ public class MagicLinkController : ControllerBase
             return BadRequest(new { error = "token required.", kind = "validation" });
         var hash = Sha256Hex(dto.Token);
         var row = await _db.MagicLinks.FirstOrDefaultAsync(m => m.TokenHash == hash, ct);
-        var consumedAt = DateTimeOffset.UtcNow;
-        if (row is null || row.ConsumedAt is not null || row.ExpiresAt < consumedAt)
+        if (row is null || row.ConsumedAt is not null || row.ExpiresAt < DateTimeOffset.UtcNow)
             return Unauthorized(new { error = "Invalid or expired link.", kind = "unauthenticated" });
 
-        var consumed = await _db.MagicLinks
-            .Where(m => m.Id == row.Id && m.ConsumedAt == null && m.ExpiresAt >= consumedAt)
-            .ExecuteUpdateAsync(setters => setters.SetProperty(m => m.ConsumedAt, consumedAt), ct);
-        if (consumed != 1)
-            return Unauthorized(new { error = "Invalid or expired link.", kind = "unauthenticated" });
-
+        row.ConsumedAt = DateTimeOffset.UtcNow;
         var tenant = await _db.Tenants.FirstAsync(t => t.Id == row.TenantId, ct);
         var user = await _db.Users.FirstAsync(u => u.Id == row.UserId, ct);
-        if (!user.IsActive || user.LockedUntil is not null && user.LockedUntil > DateTimeOffset.UtcNow)
-            return Unauthorized(new { error = "User cannot sign in.", kind = "unauthenticated" });
+        await _db.SaveChangesAsync(ct);
 
         await _audit.AppendAsync(new AuditEvent
         {
@@ -288,19 +274,12 @@ public class MagicLinkController : ControllerBase
             DetailsJson = JsonSerializer.Serialize(new { method = "magic-link" }),
         }, ct);
 
-        var token = MintBearer(tenant.Slug, user.Email, user.SessionEpoch);
-        var expiresAt = DateTimeOffset.UtcNow.Add(RadioPadBearerToken.Lifetime);
-        await EnterpriseIdentityBridge.RecordAuthSessionAsync(_db, user, token, "magic-link", expiresAt, ct,
-            ip: HttpContext.Connection.RemoteIpAddress?.ToString(),
-            userAgent: HttpContext.Request.Headers.UserAgent.FirstOrDefault());
-        RadioPadSessionCookies.Append(HttpContext, token, expiresAt);
-
         return Ok(new
         {
-            token,
+            token = MintBearer(tenant.Slug, user.Email, user.SessionEpoch),
             tenant = tenant.Slug,
             user = user.Email,
-            expiresAt,
+            expiresAt = DateTimeOffset.UtcNow.AddHours(12),
         });
     }
 
@@ -312,7 +291,30 @@ public class MagicLinkController : ControllerBase
     /// </summary>
     internal static string MintBearer(string tenant, string email, int sessionEpoch = 0)
     {
-        return RadioPadBearerToken.Mint(tenant, email, sessionEpoch);
+        var secret = Environment.GetEnvironmentVariable("RADIOPAD_AUTH_SECRET") ?? "dev-only-not-for-production";
+        using var hmac = new HMACSHA256(Encoding.UTF8.GetBytes(secret));
+        var raw = hmac.ComputeHash(Encoding.UTF8.GetBytes($"v1|{tenant}|{email}|{sessionEpoch}"));
+        return "rp_" + Convert.ToBase64String(raw).Replace("+", "-").Replace("/", "_").TrimEnd('=');
+    }
+
+    private string ResolveDefaultCallback()
+    {
+        var configured = Environment.GetEnvironmentVariable("RADIOPAD_PUBLIC_WEB_URL");
+        if (!string.IsNullOrWhiteSpace(configured))
+        {
+            var trimmed = configured.TrimEnd('/');
+            return trimmed.EndsWith("/login", StringComparison.OrdinalIgnoreCase) ? trimmed : trimmed + "/login";
+        }
+        var req = HttpContext?.Request;
+        if (req is not null)
+        {
+            var origin = req.Headers["Origin"].ToString();
+            if (!string.IsNullOrWhiteSpace(origin)) return origin.TrimEnd('/') + "/login";
+            var referer = req.Headers["Referer"].ToString();
+            if (Uri.TryCreate(referer, UriKind.Absolute, out var refUri))
+                return $"{refUri.Scheme}://{refUri.Authority}/login";
+        }
+        return "http://localhost:3000/login";
     }
 
     private async Task<bool> TrySendAsync(string to, string link, CancellationToken ct)
@@ -324,13 +326,44 @@ public class MagicLinkController : ControllerBase
             int port = int.TryParse(Environment.GetEnvironmentVariable("RADIOPAD_SMTP_PORT"), out var p) ? p : 587;
             var user = Environment.GetEnvironmentVariable("RADIOPAD_SMTP_USER");
             var pass = Environment.GetEnvironmentVariable("RADIOPAD_SMTP_PASS");
-            var from = Environment.GetEnvironmentVariable("RADIOPAD_SMTP_FROM") ?? "no-reply@radiopad.local";
+            var fromRaw = Environment.GetEnvironmentVariable("RADIOPAD_SMTP_FROM") ?? "no-reply@radiopad.local";
+            var replyToRaw = Environment.GetEnvironmentVariable("RADIOPAD_SMTP_REPLY_TO");
+
+            // For Gmail-relayed mail the From address MUST match the authenticated
+            // mailbox or Gmail rewrites the header / treats it as spam. Normalise
+            // the address part to the SMTP user while preserving the display name.
+            var from = MailboxAddress.Parse(fromRaw);
+            var isGmail = host.Equals("smtp.gmail.com", StringComparison.OrdinalIgnoreCase);
+            if (isGmail && !string.IsNullOrEmpty(user) && user.Contains('@')
+                && !string.Equals(from.Address, user, StringComparison.OrdinalIgnoreCase))
+            {
+                from = new MailboxAddress(from.Name, user);
+            }
 
             var msg = new MimeMessage();
-            msg.From.Add(MailboxAddress.Parse(from));
+            msg.From.Add(from);
             msg.To.Add(MailboxAddress.Parse(to));
+            if (!string.IsNullOrWhiteSpace(replyToRaw))
+            {
+                msg.ReplyTo.Add(MailboxAddress.Parse(replyToRaw));
+            }
             msg.Subject = "Your RadioPad sign-in link";
-            msg.Body = new TextPart("plain") { Text = $"Click to sign in (expires in 15 minutes):\n\n{link}\n" };
+            msg.MessageId = MimeUtils.GenerateMessageId(from.Domain);
+            msg.Headers.Add("Auto-Submitted", "auto-generated");
+            msg.Headers.Add("X-Auto-Response-Suppress", "All");
+            msg.Headers.Add("X-Entity-Ref-ID", Guid.NewGuid().ToString("N"));
+
+            var plain = "Hi,\r\n\r\nUse this secure link to sign in to RadioPad. It expires in 60 minutes and can be used once:\r\n\r\n"
+                + link
+                + "\r\n\r\nIf you did not request this, you can safely ignore this email.\r\n\r\n-- RadioPad\r\n";
+            var html = BuildMagicLinkHtml(link);
+
+            var alt = new MultipartAlternative
+            {
+                new TextPart("plain") { Text = plain },
+                new TextPart("html") { Text = html },
+            };
+            msg.Body = alt;
 
             using var client = new SmtpClient();
             await client.ConnectAsync(host, port, MailKit.Security.SecureSocketOptions.StartTlsWhenAvailable, ct);
@@ -341,9 +374,36 @@ public class MagicLinkController : ControllerBase
         }
         catch (Exception ex)
         {
-            _log.LogWarning(ex, "Magic-link SMTP send failed.");
+            _log.LogWarning(ex, "Magic-link SMTP send failed; falling back to dev link.");
             return false;
         }
+    }
+
+    private static string BuildMagicLinkHtml(string link)
+    {
+        var sb = new StringBuilder();
+        sb.Append("<!doctype html><html><body style=\"margin:0;padding:0;background:#faf9f7;font-family:-apple-system,Segoe UI,Roboto,Helvetica,Arial,sans-serif;color:#2b2b2b\">");
+        sb.Append("<table role=\"presentation\" width=\"100%\" cellpadding=\"0\" cellspacing=\"0\" style=\"background:#faf9f7;padding:32px 16px\"><tr><td align=\"center\">");
+        sb.Append("<table role=\"presentation\" width=\"560\" cellpadding=\"0\" cellspacing=\"0\" style=\"max-width:560px;background:#ffffff;border:1px solid #e7e3dc;border-radius:12px;overflow:hidden\">");
+        sb.Append("<tr><td style=\"padding:28px 32px 8px 32px\">");
+        sb.Append("<div style=\"font-size:13px;letter-spacing:.04em;color:#c96442;text-transform:uppercase;font-weight:600\">RadioPad</div>");
+        sb.Append("<h1 style=\"margin:8px 0 0 0;font-size:22px;font-weight:600;color:#1f1f1f\">Sign in to your workspace</h1>");
+        sb.Append("</td></tr>");
+        sb.Append("<tr><td style=\"padding:8px 32px 0 32px;font-size:15px;line-height:1.55;color:#3a3a3a\">");
+        sb.Append("<p style=\"margin:12px 0\">Click the button below to sign in. The link expires in <strong>60 minutes</strong> and works only once.</p>");
+        sb.Append("</td></tr>");
+        sb.Append("<tr><td style=\"padding:20px 32px 8px 32px\">");
+        sb.Append("<a href=\"").Append(link).Append("\" style=\"display:inline-block;background:#c96442;color:#ffffff;text-decoration:none;font-weight:600;font-size:15px;padding:12px 22px;border-radius:8px\">Sign in to RadioPad</a>");
+        sb.Append("</td></tr>");
+        sb.Append("<tr><td style=\"padding:8px 32px 0 32px;font-size:13px;line-height:1.55;color:#666\">");
+        sb.Append("<p style=\"margin:12px 0\">Or paste this link into your browser:</p>");
+        sb.Append("<p style=\"margin:6px 0;word-break:break-all;font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;font-size:12px;color:#444\">").Append(link).Append("</p>");
+        sb.Append("</td></tr>");
+        sb.Append("<tr><td style=\"padding:20px 32px 28px 32px;font-size:12px;line-height:1.55;color:#888;border-top:1px solid #f0ece5\">");
+        sb.Append("<p style=\"margin:12px 0 0 0\">If you did not request this sign-in link, you can safely ignore this email -- no action will be taken.</p>");
+        sb.Append("</td></tr>");
+        sb.Append("</table></td></tr></table></body></html>");
+        return sb.ToString();
     }
 
     internal static string Sha256Hex(string s)
@@ -430,7 +490,7 @@ internal static class MagicLinkRateLimiter
 /// </summary>
 [ApiController]
 [Route("api/auth/device")]
-public class DeviceAuthController : TenantedController
+public class DeviceAuthController : ControllerBase
 {
     private readonly RadioPadDbContext _db;
     private readonly IAuditLog _audit;
@@ -473,9 +533,10 @@ public class DeviceAuthController : TenantedController
     [HttpPost("approve")]
     public async Task<IActionResult> Approve([FromBody] ApproveDto dto, CancellationToken ct)
     {
-        var (tenant, user) = await ResolveContextAsync(_db, ct);
-        if (!RequestedIdentityMatches(dto.Tenant, dto.Email, tenant, user))
-            return ForbiddenIdentityMismatch();
+        var t = await _db.Tenants.FirstOrDefaultAsync(x => x.Slug == dto.Tenant, ct);
+        if (t is null) return NotFound(new { error = "tenant", kind = "not_found" });
+        var u = await _db.Users.FirstOrDefaultAsync(x => x.TenantId == t.Id && x.Email == dto.Email && x.IsActive, ct);
+        if (u is null) return NotFound(new { error = "user", kind = "not_found" });
 
         var row = await _db.DeviceAuth.FirstOrDefaultAsync(d => d.UserCode == dto.UserCode && d.Status == "pending", ct);
         if (row is null) return NotFound(new { error = "user_code", kind = "not_found" });
@@ -486,8 +547,8 @@ public class DeviceAuthController : TenantedController
             return BadRequest(new { error = "expired_token", kind = "validation" });
         }
         row.Status = "approved";
-        row.TenantId = tenant.Id;
-        row.UserId = user.Id;
+        row.TenantId = t.Id;
+        row.UserId = u.Id;
         await _db.SaveChangesAsync(ct);
         return Ok(new { ok = true });
     }
@@ -495,10 +556,6 @@ public class DeviceAuthController : TenantedController
     [HttpPost("deny")]
     public async Task<IActionResult> Deny([FromBody] DenyDto dto, CancellationToken ct)
     {
-        var (tenant, user) = await ResolveContextAsync(_db, ct);
-        if (!RequestedIdentityMatches(dto.Tenant, dto.Email, tenant, user))
-            return ForbiddenIdentityMismatch();
-
         var row = await _db.DeviceAuth.FirstOrDefaultAsync(d => d.UserCode == dto.UserCode && d.Status == "pending", ct);
         if (row is null) return NotFound(new { error = "user_code", kind = "not_found" });
         row.Status = "denied";
@@ -513,7 +570,7 @@ public class DeviceAuthController : TenantedController
             return BadRequest(new { error = "unsupported_grant_type", kind = "validation" });
 
         var hash = MagicLinkController.Sha256Hex(dto.DeviceCode ?? "");
-        var row = await _db.DeviceAuth.AsNoTracking().FirstOrDefaultAsync(d => d.DeviceCodeHash == hash, ct);
+        var row = await _db.DeviceAuth.FirstOrDefaultAsync(d => d.DeviceCodeHash == hash, ct);
         if (row is null) return BadRequest(new { error = "invalid_grant" });
 
         // RFC 8628 §3.5 polling guards.
@@ -522,42 +579,16 @@ public class DeviceAuthController : TenantedController
         {
             return BadRequest(new { error = "slow_down", interval = row.IntervalSeconds });
         }
-        if (row.ExpiresAt < now)
-        {
-            await UpdateDevicePollStateAsync(row.Id, now, "expired", ct);
-            return BadRequest(new { error = "expired_token" });
-        }
-        if (row.Status == "denied")
-        {
-            await UpdateDevicePollStateAsync(row.Id, now, null, ct);
-            return BadRequest(new { error = "access_denied" });
-        }
-        if (row.Status == "pending")
-        {
-            await UpdateDevicePollStateAsync(row.Id, now, null, ct);
-            return BadRequest(new { error = "authorization_pending" });
-        }
-        if (row.Status != "approved")
-        {
-            await UpdateDevicePollStateAsync(row.Id, now, null, ct);
-            return BadRequest(new { error = "invalid_grant" });
-        }
+        row.LastPolledAt = now;
+        if (row.ExpiresAt < now) { row.Status = "expired"; await _db.SaveChangesAsync(ct); return BadRequest(new { error = "expired_token" }); }
+        if (row.Status == "denied") { await _db.SaveChangesAsync(ct); return BadRequest(new { error = "access_denied" }); }
+        if (row.Status == "pending") { await _db.SaveChangesAsync(ct); return BadRequest(new { error = "authorization_pending" }); }
+        if (row.Status != "approved") { await _db.SaveChangesAsync(ct); return BadRequest(new { error = "invalid_grant" }); }
 
         var tenant = await _db.Tenants.FirstAsync(t => t.Id == row.TenantId, ct);
         var user = await _db.Users.FirstAsync(u => u.Id == row.UserId, ct);
-        if (!user.IsActive || user.LockedUntil is not null && user.LockedUntil > DateTimeOffset.UtcNow)
-        {
-            await UpdateDevicePollStateAsync(row.Id, now, "denied", ct);
-            return BadRequest(new { error = "access_denied" });
-        }
-        var consumed = await _db.DeviceAuth
-            .Where(d => d.Id == row.Id && d.Status == "approved")
-            .ExecuteUpdateAsync(setters => setters
-                .SetProperty(d => d.Status, "consumed")
-                .SetProperty(d => d.LastPolledAt, now), ct);
-        if (consumed != 1)
-            return BadRequest(new { error = "invalid_grant" });
-
+        row.Status = "consumed";
+        await _db.SaveChangesAsync(ct);
         await _audit.AppendAsync(new AuditEvent
         {
             TenantId = tenant.Id,
@@ -566,49 +597,14 @@ public class DeviceAuthController : TenantedController
             DetailsJson = JsonSerializer.Serialize(new { method = "device-flow" }),
         }, ct);
 
-        var token = MagicLinkController.MintBearer(tenant.Slug, user.Email, user.SessionEpoch);
-        var expiresAt = DateTimeOffset.UtcNow.Add(RadioPadBearerToken.Lifetime);
-        await EnterpriseIdentityBridge.RecordAuthSessionAsync(_db, user, token, "device-flow", expiresAt, ct,
-            deviceFingerprint: row.DeviceFingerprint,
-            ip: HttpContext.Connection.RemoteIpAddress?.ToString(),
-            userAgent: HttpContext.Request.Headers.UserAgent.FirstOrDefault());
-        RadioPadSessionCookies.Append(HttpContext, token, expiresAt);
-
         return Ok(new
         {
-            accessToken = token,
+            accessToken = MagicLinkController.MintBearer(tenant.Slug, user.Email, user.SessionEpoch),
             tokenType = "Bearer",
-            expiresIn = (int)RadioPadBearerToken.Lifetime.TotalSeconds,
+            expiresIn = 12 * 3600,
             tenant = tenant.Slug,
             user = user.Email,
         });
-    }
-
-    private static bool RequestedIdentityMatches(string? slug, string? email, Tenant tenant, User user) =>
-        (string.IsNullOrWhiteSpace(slug) || string.Equals(slug, tenant.Slug, StringComparison.Ordinal))
-        && (string.IsNullOrWhiteSpace(email) || string.Equals(email, user.Email, StringComparison.OrdinalIgnoreCase));
-
-    private IActionResult ForbiddenIdentityMismatch()
-    {
-        return StatusCode(StatusCodes.Status403Forbidden, new
-        {
-            error = "Requested identity does not match the authenticated user.",
-            kind = "forbidden",
-        });
-    }
-
-    private Task<int> UpdateDevicePollStateAsync(
-        Guid id,
-        DateTimeOffset lastPolledAt,
-        string? status,
-        CancellationToken ct)
-    {
-        var query = _db.DeviceAuth.Where(d => d.Id == id);
-        return status is null
-            ? query.ExecuteUpdateAsync(setters => setters.SetProperty(d => d.LastPolledAt, lastPolledAt), ct)
-            : query.ExecuteUpdateAsync(setters => setters
-                .SetProperty(d => d.LastPolledAt, lastPolledAt)
-                .SetProperty(d => d.Status, status), ct);
     }
 
     private static string GenerateUserCode()

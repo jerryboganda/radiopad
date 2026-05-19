@@ -78,8 +78,9 @@ function LoginContent() {
       })
       .catch((e: unknown) => {
         if (cancelled) return;
-        const ex = e as { body?: { error?: string }; message?: string };
-        setErr(ex.body?.error || ex.message || 'The magic link could not be used.');
+        const ex = e as { body?: { error?: string } | string; status?: number; message?: string };
+        const bodyErr = typeof ex.body === 'object' && ex.body?.error ? ex.body.error : null;
+        setErr(bodyErr || (ex.status === 401 ? 'This sign-in link has expired or was already used. Please request a new one below.' : ex.message || 'The magic link could not be used.'));
       })
       .finally(() => {
         if (!cancelled) setBusy(null);
