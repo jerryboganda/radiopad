@@ -1,42 +1,46 @@
-# AI provider catalog
+# AI Provider Catalog
 
-RadioPad routes every AI request through the AI gateway, which enforces tenant policy before invoking a provider adapter. This page lists the adapters that ship out of the box.
+**Status:** Current  ·  **Owner:** Engineering + Security  ·  **Last Updated:** 2026-05-19
 
-> Adding a new provider requires implementing `IAiProviderAdapter` in `RadioPad.Application/Services/Adapters` and registering it in `Program.cs`. Secrets are referenced by `ApiKeySecretRef` (e.g. `env:ANTHROPIC_API_KEY`) — never persisted in the database.
+RadioPad routes every AI request through `IAiGateway`. The gateway enforces tenant policy before invoking a provider adapter, writes append-only audit rows, records usage, and blocks PHI unless the configured provider row is `PhiApproved` or `LocalOnly`.
 
-## Adapters
+Secrets are always referenced as `ApiKeySecretRef = "env:<NAME>"`. Literal API keys are rejected by `POST /api/providers` and must never be stored in the database, frontend state, logs, fixtures, or docs. Hosted provider endpoint overrides are allowlisted by adapter before any bearer/API-key header is attached; use `openai-compatible` for reviewed BYO endpoints.
 
-### `mock`
+## Adapter IDs
 
-- **Use:** local development, integration tests, CI.
-- **Compliance class:** `LocalOnly` (PHI permitted) or `Sandbox` (PHI blocked) — set per provider config.
-- **Endpoint:** none — the adapter echoes deterministic text.
-- **Secrets:** none.
+| Adapter id | Kind | Default compliance | Configuration | Notes |
+| --- | --- | --- | --- | --- |
+| `mock` | In-process | `Sandbox` or `LocalOnly` by row | no endpoint, no secret | Deterministic dev/test adapter. |
+| `anthropic` | HTTPS | `DeIdentifiedOnly` / `Sandbox` until BAA | `env:ANTHROPIC_API_KEY` | Anthropic Messages API. PHI requires explicit `PhiApproved` review. |
+| `openai` | HTTPS | `Sandbox` | `env:OPENAI_API_KEY` | Direct OpenAI adapter. Endpoint overrides are restricted to `api.openai.com`; PHI requires BAA/ZDR/abuse-monitoring review before `PhiApproved`. |
+| `openai-compatible` | HTTPS/local HTTP | remote `Sandbox`, local `LocalOnly` when the endpoint is actually tenant-controlled | endpoint URL, optional `env:<NAME>` key | Generic `/v1/chat/completions` adapter for OpenRouter, Groq, Together, Mistral, NVIDIA NIM, vLLM, local shims, and similar endpoints. Private-network endpoints require `LocalOnly`; PHI requires `LocalOnly` or an explicit reviewed allow flag. |
+| `azure-openai` | HTTPS | `PhiApproved` when tenant has Microsoft BAA | Azure deployment endpoint + `env:<NAME>` key | Recommended cloud path for PHI tenants after region/BAA review. Endpoints must be Azure OpenAI / Cognitive Services hosts. |
+| `aws-bedrock` | HTTPS | `PhiApproved` when tenant has AWS BAA | region/model + AWS env refs | Use only Bedrock models in the tenant-approved compliance scope. Endpoints must be Bedrock AWS hosts. |
+| `google-vertex` | HTTPS | `PhiApproved` when tenant has Google Cloud BAA | project/location/model + service account env ref | Vertex publisher models only. Endpoints must be Google AI Platform hosts. |
+| `ollama` | Local HTTP | `LocalOnly` | `http://127.0.0.1:11434` | Legacy `/api/generate` adapter. |
+| `ollama-chat` | Local HTTP | `LocalOnly` | `http://127.0.0.1:11434` | Preferred Ollama chat adapter. |
+| `vllm` | Local OpenAI-compatible HTTP | `LocalOnly` | `http://127.0.0.1:8000` | Local/on-prem vLLM endpoint. |
+| `llama-cpp` | Local HTTP | `LocalOnly` | `http://127.0.0.1:8080` | Local llama.cpp server. |
+| `github-copilot-sdk` | Official SDK transport, fail-closed | `Sandbox` | no secret until official backend-safe transport is installed | Provider id exists so policy can be modeled. Runtime returns `runtime_not_configured` until a reviewed official SDK transport is enabled. PHI routing is always refused. |
+| `github-copilot-cli` | CLI subprocess | `Sandbox` | `RADIOPAD_COPILOT_BIN` (default `copilot`) | Prompt is supplied through Copilot CLI's stdin option stream. PHI and secret-like prompts are refused before launch. |
+| `gemini-cli` | CLI subprocess | `Sandbox` | `RADIOPAD_GEMINI_BIN` (default `gemini`) | Prompt is piped on stdin in headless mode with `--output-format json`. JSON stdout is parsed when present; PHI and secret-like prompts are refused before launch. |
+| `codex-cli` | CLI subprocess, fail-closed | `Sandbox` | `RADIOPAD_CODEX_BIN` (default `codex`), `RADIOPAD_CODEX_CLI_ENABLED=1` | Prompt is piped on stdin via `codex exec --sandbox read-only -`. The adapter never opts into full-auto mode; PHI and secret-like prompts are refused before launch. |
 
-### `anthropic`
+Production CLI providers require `RADIOPAD_CLI_PROVIDER_ALLOWED_PATHS`; empty/unset allowlists are accepted only in development. Server-side GitHub Copilot CLI execution in production also requires `RADIOPAD_COPILOT_SERVER_CLI_ENABLED=1`.
 
-- **Use:** Claude 3.5 / Claude 4 family for impression generation and cleanup.
-- **Compliance class:** typically `PhiApproved` once a BAA is in place; otherwise `DeIdentifiedOnly`.
-- **Endpoint:** `https://api.anthropic.com/v1/messages`.
-- **Secrets:** `env:ANTHROPIC_API_KEY`.
-- **Notes:** the gateway forwards `model`, `system`, and `messages`. Streaming is not used today.
+## Health Probes
 
-### `ollama`
+`POST /api/providers/{id}/health` is prompt-free and never sends clinical content.
 
-- **Use:** on-prem GPU deployments. Default for tenants with `RequirePhiApprovedProvider = true` and no cloud BAA.
-- **Compliance class:** `LocalOnly`.
-- **Endpoint:** `http://localhost:11434/api/generate` (override per tenant).
-- **Secrets:** none.
-- **Notes:** good fits for `llama3.1`, `qwen2.5`, and other models tuned for medical text. Resource footprint is the operator's responsibility.
+- Local providers probe their metadata endpoints (`/api/tags`, `/v1/models`, or `/health`).
+- `openai-compatible` probes `GET /v1/models` without bearer auth and blocks unsafe endpoint targets before the request.
+- CLI providers verify the configured binary without passing a prompt.
+- `github-copilot-sdk` reports unavailable until an official backend-safe SDK transport is installed and reviewed.
 
-## Compliance classes
+## Adding A Provider
 
-The gateway permits PHI (`AiCompletionRequest.ContainsPhi == true`) only for providers in `PhiApproved` or `LocalOnly`. Disabled and `Blocked` providers are rejected unconditionally. Every rejection writes an `AuditAction.ProviderBlocked` event to the append-only log.
-
-## Adding a new provider
-
-1. Implement `IAiProviderAdapter` and register in `Program.cs`.
-2. Add an entry to the tenant via `POST /api/providers` or the Providers UI.
-3. Set `ApiKeySecretRef` to an `env:NAME` reference.
-4. Document the new adapter on this page.
-5. Add an integration test that proves PHI policy is honoured for the new compliance class.
+1. Implement `IAiProviderAdapter`; implement `IAiProviderHealthProbe` when a safe prompt-free readiness check exists.
+2. Register the adapter in `Program.cs`.
+3. Add the adapter id to the Providers UI, CLI registration allowlist, OpenAPI schema, and this catalog.
+4. Add tests for happy path, missing configuration, transport failure, and PHI policy block.
+5. Update `docs/01-ai-agent/model-policy.md` and `docs/09-regulatory/vendor-risk-register.md` with the compliance posture.

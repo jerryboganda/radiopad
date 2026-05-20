@@ -7,14 +7,22 @@
 
 type PublicProcess = { env?: Record<string, string | undefined> };
 
-const PUBLIC_ENV =
+const RUNTIME_PUBLIC_ENV =
   (globalThis as typeof globalThis & { process?: PublicProcess }).process?.env ?? {};
+const BUILD_PUBLIC_ENV: Record<string, string | undefined> = {
+  NODE_ENV: process.env.NODE_ENV,
+  NEXT_PUBLIC_API_BASE: process.env.NEXT_PUBLIC_API_BASE,
+  NEXT_PUBLIC_ALLOW_DEV_LOGIN: process.env.NEXT_PUBLIC_ALLOW_DEV_LOGIN,
+  NEXT_PUBLIC_ENABLE_SSO: process.env.NEXT_PUBLIC_ENABLE_SSO,
+  NEXT_PUBLIC_STRIPE_PRICE_TEAM: process.env.NEXT_PUBLIC_STRIPE_PRICE_TEAM,
+  NEXT_PUBLIC_STRIPE_PRICE_ENTERPRISE: process.env.NEXT_PUBLIC_STRIPE_PRICE_ENTERPRISE,
+};
 
 export function publicEnv(name: string): string | undefined {
-  return PUBLIC_ENV[name];
+  return (BUILD_PUBLIC_ENV[name] ?? RUNTIME_PUBLIC_ENV[name]);
 }
 
-const CONFIGURED_API_BASE = PUBLIC_ENV.NEXT_PUBLIC_API_BASE || '';
+const CONFIGURED_API_BASE = (publicEnv('NEXT_PUBLIC_API_BASE') || '').replace(/\/+$/, '');
 let resolvedApiBase: string | null = null;
 
 async function apiBase(): Promise<string> {
@@ -90,17 +98,57 @@ function applyTenantHeaders(headers: Headers): void {
   }
 }
 
+function requestCredentials(base: string, explicit?: RequestCredentials): RequestCredentials {
+  if (explicit) return explicit;
+  return base ? 'include' : 'same-origin';
+}
+
+function normalizeRequestPath(path: string, init?: RequestInit): string {
+  const method = (init?.method ?? 'GET').toUpperCase();
+  if (method === 'GET' || method === 'HEAD' || !path.startsWith('/api/auth/')) return path;
+  const queryIndex = path.indexOf('?');
+  const route = queryIndex >= 0 ? path.slice(0, queryIndex) : path;
+  const query = queryIndex >= 0 ? path.slice(queryIndex) : '';
+  return route.endsWith('/') ? path : `${route}/${query}`;
+}
+
+async function hydrateAuthTokenFromSecureStore(): Promise<boolean> {
+  if (cachedAuthToken || typeof window === 'undefined') return false;
+  try {
+    const { getAuthToken } = await import('./secureAuth');
+    const token = await getAuthToken();
+    if (!token) return false;
+    setActiveAuthToken(token);
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+async function fetchWithAuthRetry(
+  url: string,
+  init: RequestInit,
+  headers: Headers,
+): Promise<Response> {
+  let res = await fetch(url, { ...init, headers });
+  if ((res.status === 401 || res.status === 403) && !cachedAuthToken && await hydrateAuthTokenFromSecureStore()) {
+    applyAuthHeader(headers);
+    res = await fetch(url, { ...init, headers });
+  }
+  return res;
+}
+
 async function request<T>(path: string, init?: RequestInit): Promise<T> {
   const headers = new Headers(init?.headers || {});
   if (!headers.has('Content-Type')) headers.set('Content-Type', 'application/json');
   applyTenantHeaders(headers);
   applyAuthHeader(headers);
   const base = await apiBase();
-  const res = await fetch(`${base}${path}`, {
-    credentials: init?.credentials ?? 'include',
+  const normalizedPath = normalizeRequestPath(path, init);
+  const res = await fetchWithAuthRetry(`${base}${normalizedPath}`, {
     ...init,
-    headers,
-  });
+    credentials: requestCredentials(base, init?.credentials),
+  }, headers);
   if (!res.ok) {
     let body: unknown = null;
     try {
@@ -124,7 +172,9 @@ async function requestPaged<T>(path: string): Promise<{ items: T[]; total: numbe
   applyTenantHeaders(headers);
   applyAuthHeader(headers);
   const base = await apiBase();
-  const res = await fetch(`${base}${path}`, { credentials: 'include', headers });
+  const res = await fetchWithAuthRetry(`${base}${path}`, {
+    credentials: requestCredentials(base),
+  }, headers);
   if (!res.ok) throw Object.assign(new Error(`API ${res.status} ${res.statusText}`), { status: res.status });
   const items = (await res.json()) as T[];
   const total = Number(res.headers.get('X-Total-Count') ?? items.length);
@@ -136,7 +186,9 @@ async function requestBlob(path: string): Promise<Blob> {
   applyTenantHeaders(headers);
   applyAuthHeader(headers);
   const base = await apiBase();
-  const res = await fetch(`${base}${path}`, { credentials: 'include', headers });
+  const res = await fetchWithAuthRetry(`${base}${path}`, {
+    credentials: requestCredentials(base),
+  }, headers);
   if (!res.ok) {
     let body: unknown = null;
     try { body = await res.json(); } catch { body = await res.text(); }
@@ -1083,6 +1135,7 @@ export const api = {
         method: 'POST',
         headers,
         body: csv,
+        credentials: requestCredentials(base),
       });
       if (!res.ok) {
         let body: unknown = null;
@@ -1103,14 +1156,22 @@ export const api = {
           hallucinationMinSupport: number;
           plan: 0 | 1 | 2;
           featureFlagsJson: string;
+          ipAllowlistJson: string;
           ingest: { bearerConfigured: boolean };
           dicomWeb: { baseUrl: string; bearerConfigured: boolean };
+          pacs: { vendor: 'sectra' | 'visage' | 'carestream' | null };
           stripe: {
             customerId: string | null;
             subscriptionId: string | null;
             status: string | null;
             currentPeriodEnd: string | null;
           };
+          retention: {
+            days: number;
+            hashOnlyAuditMode: boolean;
+            legalHold: boolean;
+          };
+          scim: { bearerConfigured: boolean };
           // Iter-32 SEC-003 — customer-managed key (CMK) status. The
           // `keyRef` is opaque (e.g. `aws:arn:...`); the backend never
           // returns wrapped key material here.
@@ -1119,18 +1180,31 @@ export const api = {
             lastVerifiedAt: string | null;
             configured: boolean;
           };
+          validation: {
+            requireZeroBlockers: boolean;
+            warnAsBlocker: boolean;
+          };
         }>('/api/tenant/settings'),
       save: (body: {
-        hallucinationDetectionEnabled: boolean;
-        hallucinationSeverity: 'Info' | 'Warning' | 'Blocker';
-        hallucinationAllowList: string;
-        hallucinationMinSupport: number;
-        plan: 0 | 1 | 2;
-        featureFlagsJson: string;
+        hallucinationDetectionEnabled?: boolean;
+        hallucinationSeverity?: 'Info' | 'Warning' | 'Blocker';
+        hallucinationAllowList?: string;
+        hallucinationMinSupport?: number;
+        plan?: 0 | 1 | 2;
+        featureFlagsJson?: string;
+        ipAllowlistJson?: string;
         ingestBearerSecret?: string | null;
         dicomWebBaseUrl?: string | null;
         dicomWebBearerSecret?: string | null;
+        pacsVendor?: 'sectra' | 'visage' | 'carestream' | '' | null;
+        retentionDays?: number | null;
+        hashOnlyAuditMode?: boolean | null;
+        legalHold?: boolean | null;
+        scimBearerSecret?: string | null;
         cmkKeyRef?: string | null;
+        cmkVerified?: boolean | null;
+        requireZeroBlockers?: boolean | null;
+        warnAsBlocker?: boolean | null;
       }) =>
         request<{ id: string }>('/api/tenant/settings', {
           method: 'POST',
@@ -1201,13 +1275,11 @@ export const api = {
   },
   auth: {
     oidcAuthorizeUrl: (returnUrl?: string) => {
-      const sp = new URLSearchParams();
-      if (returnUrl) sp.set('returnUrl', returnUrl);
-      const qs = sp.toString();
-      return apiUrl(`/api/auth/oidc/authorize${qs ? `?${qs}` : ''}`);
+      const q = returnUrl ? `?returnUrl=${encodeURIComponent(returnUrl)}` : '';
+      return request<{ url: string }>(`/api/auth/oidc/authorize-url${q}`).then((r) => r.url);
     },
     logout: () =>
-      request<void>('/api/auth/logout', { method: 'POST' }),
+      request<void>('/api/auth/logout/', { method: 'POST' }),
     session: () =>
       request<{ tenant: { slug: string; displayName: string }; user: { email: string; role?: number } }>(
         '/api/auth/session',

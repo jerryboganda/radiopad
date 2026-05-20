@@ -1,3 +1,5 @@
+using System.Net;
+using System.Text.Json;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using RadioPad.Application.Abstractions;
@@ -262,7 +264,8 @@ public class TemplatesController : TenantedController
 public class ProvidersController : TenantedController
 {
     private readonly RadioPadDbContext _db;
-    public ProvidersController(RadioPadDbContext db) => _db = db;
+    private readonly IAuditLog _audit;
+    public ProvidersController(RadioPadDbContext db, IAuditLog audit) { _db = db; _audit = audit; }
 
     [HttpGet]
     public async Task<IActionResult> List(CancellationToken ct)
@@ -295,6 +298,16 @@ public class ProvidersController : TenantedController
         var (tenant, user) = await ResolveContextAsync(_db, ct);
         var deny = RequireRole(user, UserRole.ItAdmin, UserRole.ReportingAdmin);
         if (deny is not null) return deny;
+        if (!string.IsNullOrEmpty(dto.ApiKeySecretRef) &&
+            !dto.ApiKeySecretRef.StartsWith("env:", StringComparison.OrdinalIgnoreCase))
+        {
+            return BadRequest(new
+            {
+                error = "Provider API keys must be referenced as env:<NAME>; inline secret values are not accepted.",
+                kind = "validation",
+            });
+        }
+
         ProviderConfig p;
         if (dto.Id is null)
         {
@@ -305,22 +318,17 @@ public class ProvidersController : TenantedController
         {
             p = await _db.Providers.FirstAsync(x => x.Id == dto.Id && x.TenantId == tenant.Id, ct);
         }
+        await RadioPad.Infrastructure.Providers.OpenAiChatHelpers.ValidateProviderEndpointAsync(
+            dto.Adapter,
+            dto.EndpointUrl,
+            dto.Compliance == ProviderComplianceClass.LocalOnly,
+            ct);
         p.Name = dto.Name;
         p.Adapter = dto.Adapter;
         p.Model = dto.Model;
         p.EndpointUrl = dto.EndpointUrl;
         if (!string.IsNullOrEmpty(dto.ApiKeySecretRef))
-        {
-            if (!dto.ApiKeySecretRef.StartsWith("env:", StringComparison.OrdinalIgnoreCase))
-            {
-                return BadRequest(new
-                {
-                    error = "Provider API keys must be referenced as env:<NAME>; inline secret values are not accepted.",
-                    kind = "validation",
-                });
-            }
             p.ApiKeySecretRef = dto.ApiKeySecretRef;
-        }
         p.Compliance = dto.Compliance;
         p.Enabled = dto.Enabled;
         p.Priority = dto.Priority;
@@ -331,19 +339,30 @@ public class ProvidersController : TenantedController
         p.RetentionLabel = dto.RetentionLabel ?? string.Empty;
         p.UpdatedAt = DateTimeOffset.UtcNow;
         await _db.SaveChangesAsync(ct);
+        await _audit.AppendAsync(new AuditEvent
+        {
+            TenantId = tenant.Id,
+            UserId = user.Id,
+            Action = AuditAction.PolicyViolation,
+            DetailsJson = JsonSerializer.Serialize(new
+            {
+                eventType = "provider_config_saved",
+                providerId = p.Id,
+                adapter = p.Adapter,
+                enabled = p.Enabled,
+                compliance = (int)p.Compliance,
+            }),
+        }, ct);
         return Ok(new { p.Id });
     }
 
     /// <summary>
-    /// Iter-32 AI-011 — admin health probe. Calls the local-provider's
-    /// <c>ProbeAsync</c> if the adapter exposes one (Ollama / vLLM /
-    /// llama.cpp); falls back to <c>HEAD endpointUrl</c> otherwise. Never
-    /// exposes secrets, never throws.
+    /// Iter-32 AI-011 — admin health probe. Calls explicit adapter probes only;
+    /// probes never send clinical content or secrets.
     /// </summary>
     [HttpPost("{id:guid}/health")]
     public async Task<IActionResult> Health(
         Guid id,
-        [FromServices] IHttpClientFactory http,
         [FromServices] IEnumerable<IAiProviderAdapter> adapters,
         CancellationToken ct)
     {
@@ -359,34 +378,58 @@ public class ProvidersController : TenantedController
             case RadioPad.Infrastructure.Providers.Local.OllamaProvider ol:
             {
                 var (ok, error) = await ol.ProbeAsync(p.EndpointUrl, ct);
+                await AuditHealthAsync(tenant.Id, user.Id, p, ok, error, null, ct);
                 return Ok(new { ok, error, probedAt = DateTimeOffset.UtcNow });
             }
             case RadioPad.Infrastructure.Providers.Local.VLlmProvider vl:
             {
                 var (ok, error) = await vl.ProbeAsync(p.EndpointUrl, ct);
+                await AuditHealthAsync(tenant.Id, user.Id, p, ok, error, null, ct);
                 return Ok(new { ok, error, probedAt = DateTimeOffset.UtcNow });
             }
             case RadioPad.Infrastructure.Providers.Local.LlamaCppProvider lc:
             {
                 var (ok, error) = await lc.ProbeAsync(p.EndpointUrl, ct);
+                await AuditHealthAsync(tenant.Id, user.Id, p, ok, error, null, ct);
                 return Ok(new { ok, error, probedAt = DateTimeOffset.UtcNow });
             }
         }
 
-        if (string.IsNullOrWhiteSpace(p.EndpointUrl))
-            return Ok(new { ok = true, error = (string?)null, probedAt = DateTimeOffset.UtcNow, note = "no endpoint configured (managed adapter)" });
-        try
+        if (adapter is IAiProviderHealthProbe probe)
         {
-            var client = http.CreateClient("ai");
-            using var req = new HttpRequestMessage(HttpMethod.Head, p.EndpointUrl);
-            using var resp = await client.SendAsync(req, ct);
-            return Ok(new { ok = resp.IsSuccessStatusCode || (int)resp.StatusCode == 405, status = (int)resp.StatusCode, probedAt = DateTimeOffset.UtcNow });
+            var result = await probe.ProbeAsync(p, ct);
+            await AuditHealthAsync(tenant.Id, user.Id, p, result.Ok, result.Error ?? result.Note, result.Status, ct);
+            return Ok(new
+            {
+                ok = result.Ok,
+                error = result.Error,
+                note = result.Note,
+                status = result.Status,
+                runtime = result.Runtime,
+                probedAt = DateTimeOffset.UtcNow,
+            });
         }
-        catch (Exception ex)
-        {
-            return Ok(new { ok = false, error = ex.Message, probedAt = DateTimeOffset.UtcNow });
-        }
+
+        await AuditHealthAsync(tenant.Id, user.Id, p, false, "health_probe_not_supported", null, ct);
+        return Ok(new { ok = false, error = "health_probe_not_supported", probedAt = DateTimeOffset.UtcNow });
     }
+
+    private Task AuditHealthAsync(Guid tenantId, Guid userId, ProviderConfig provider, bool ok, string? error, int? status, CancellationToken ct) =>
+        _audit.AppendAsync(new AuditEvent
+        {
+            TenantId = tenantId,
+            UserId = userId,
+            Action = AuditAction.PolicyViolation,
+            DetailsJson = JsonSerializer.Serialize(new
+            {
+                eventType = "provider_health_probe",
+                providerId = provider.Id,
+                adapter = provider.Adapter,
+                ok,
+                error,
+                status,
+            }),
+        }, ct);
 
     // ---------------------------------------------------------------------
     // Iter-35 PROV-007 — OAuth refresh-token vault.
@@ -1515,6 +1558,7 @@ public class TenantSettingsController : TenantedController
             s.HallucinationMinSupport,
             s.Plan,
             s.FeatureFlagsJson,
+            s.IpAllowlistJson,
             // PRD INT-001..004 / DCM-001..006: never echo the raw secrets;
             // surface only an `*Configured` boolean so admins can see whether
             // the integration is live without leaking the bearer token.
@@ -1571,12 +1615,13 @@ public class TenantSettingsController : TenantedController
     }
 
     public record SaveTenantSettingsDto(
-        bool HallucinationDetectionEnabled,
-        string HallucinationSeverity,
-        string HallucinationAllowList,
-        double HallucinationMinSupport,
-        TenantPlan Plan,
-        string FeatureFlagsJson,
+        bool? HallucinationDetectionEnabled = null,
+        string? HallucinationSeverity = null,
+        string? HallucinationAllowList = null,
+        double? HallucinationMinSupport = null,
+        TenantPlan? Plan = null,
+        string? FeatureFlagsJson = null,
+        string? IpAllowlistJson = null,
         string? IngestBearerSecret = null,
         string? DicomWebBaseUrl = null,
         string? DicomWebBearerSecret = null,
@@ -1602,8 +1647,10 @@ public class TenantSettingsController : TenantedController
         if (dto.HallucinationMinSupport is < 0d or > 1d)
             return BadRequest(new { error = "minSupport must be between 0 and 1.", kind = "validation" });
         var allowed = new[] { "Info", "Warning", "Blocker" };
-        if (!allowed.Contains(dto.HallucinationSeverity))
+        if (dto.HallucinationSeverity is not null && !allowed.Contains(dto.HallucinationSeverity))
             return BadRequest(new { error = "severity must be Info|Warning|Blocker.", kind = "validation" });
+        if (dto.IpAllowlistJson is not null && !ValidateIpAllowlistJson(dto.IpAllowlistJson, out var ipAllowlistError))
+            return BadRequest(new { error = ipAllowlistError, kind = "validation" });
 
         var s = await _db.TenantSettings.FirstOrDefaultAsync(x => x.TenantId == tenant.Id, ct);
         if (s is null)
@@ -1611,12 +1658,13 @@ public class TenantSettingsController : TenantedController
             s = new TenantSettings { TenantId = tenant.Id };
             _db.TenantSettings.Add(s);
         }
-        s.HallucinationDetectionEnabled = dto.HallucinationDetectionEnabled;
-        s.HallucinationSeverity = dto.HallucinationSeverity;
-        s.HallucinationAllowList = dto.HallucinationAllowList ?? "";
-        s.HallucinationMinSupport = dto.HallucinationMinSupport;
-        s.Plan = dto.Plan;
-        s.FeatureFlagsJson = string.IsNullOrWhiteSpace(dto.FeatureFlagsJson) ? "{}" : dto.FeatureFlagsJson;
+        if (dto.HallucinationDetectionEnabled is not null) s.HallucinationDetectionEnabled = dto.HallucinationDetectionEnabled.Value;
+        if (dto.HallucinationSeverity is not null) s.HallucinationSeverity = dto.HallucinationSeverity;
+        if (dto.HallucinationAllowList is not null) s.HallucinationAllowList = dto.HallucinationAllowList;
+        if (dto.HallucinationMinSupport is not null) s.HallucinationMinSupport = dto.HallucinationMinSupport.Value;
+        if (dto.Plan is not null) s.Plan = dto.Plan.Value;
+        if (dto.FeatureFlagsJson is not null) s.FeatureFlagsJson = string.IsNullOrWhiteSpace(dto.FeatureFlagsJson) ? "{}" : dto.FeatureFlagsJson;
+        if (dto.IpAllowlistJson is not null) s.IpAllowlistJson = dto.IpAllowlistJson.Trim();
         // Optional secrets: only update when the caller actually sent a value.
         // An empty string means "clear it"; null means "leave as-is".
         if (dto.IngestBearerSecret is not null) s.IngestBearerSecret = dto.IngestBearerSecret;
@@ -1646,6 +1694,48 @@ public class TenantSettingsController : TenantedController
         s.UpdatedAt = DateTimeOffset.UtcNow;
         await _db.SaveChangesAsync(ct);
         return Ok(new { s.Id });
+    }
+
+    private static bool ValidateIpAllowlistJson(string value, out string error)
+    {
+        error = "";
+        if (string.IsNullOrWhiteSpace(value)) return true;
+
+        try
+        {
+            using var doc = JsonDocument.Parse(value);
+            if (doc.RootElement.ValueKind != JsonValueKind.Array)
+            {
+                error = "ipAllowlistJson must be a JSON array of CIDR strings.";
+                return false;
+            }
+
+            foreach (var item in doc.RootElement.EnumerateArray())
+            {
+                if (item.ValueKind != JsonValueKind.String || !TryParseCidr(item.GetString()))
+                {
+                    error = "ipAllowlistJson entries must be valid IPv4 or IPv6 CIDR strings.";
+                    return false;
+                }
+            }
+
+            return true;
+        }
+        catch (JsonException)
+        {
+            error = "ipAllowlistJson must be valid JSON.";
+            return false;
+        }
+    }
+
+    private static bool TryParseCidr(string? value)
+    {
+        if (string.IsNullOrWhiteSpace(value)) return false;
+        var parts = value.Trim().Split('/');
+        if (parts.Length > 2 || !IPAddress.TryParse(parts[0], out var address)) return false;
+        var maxPrefix = address.AddressFamily == System.Net.Sockets.AddressFamily.InterNetwork ? 32 : 128;
+        if (parts.Length == 1) return true;
+        return int.TryParse(parts[1], out var prefix) && prefix >= 0 && prefix <= maxPrefix;
     }
 
     /// <summary>

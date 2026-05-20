@@ -1,4 +1,5 @@
 using System.Net.Http.Json;
+using RadioPad.Domain.Enums;
 
 namespace RadioPad.Cli.Commands;
 
@@ -14,8 +15,9 @@ public static class ProviderRegister
 {
     public static readonly string[] SupportedTypes =
     {
-        "azure-openai", "aws-bedrock", "gcp-vertex", "openai",
-        "openai-compatible", "anthropic", "mock", "ollama",
+        "azure-openai", "aws-bedrock", "google-vertex", "gcp-vertex", "vertex-ai", "google-vertex-ai",
+        "openai", "openai-direct", "openai-compatible", "anthropic", "mock", "ollama", "ollama-chat",
+        "vllm", "llama-cpp", "github-copilot-sdk", "github-copilot-cli", "gemini-cli", "codex-cli",
     };
 
     /// <summary>
@@ -23,21 +25,22 @@ public static class ProviderRegister
     /// for unit tests so we never regress the wire shape per adapter.
     /// </summary>
     public static Dictionary<string, object?> BuildPayload(
-        string type, string name, string? baseUrl, string model, string apiKeyRef,
-        string compliance = "Sandbox", bool enabled = true, int priority = 100)
+        string type, string name, string? baseUrl, string model, string? apiKeyRef,
+        ProviderComplianceClass compliance = ProviderComplianceClass.Sandbox, bool enabled = true, int priority = 100)
     {
         if (!SupportedTypes.Contains(type, StringComparer.OrdinalIgnoreCase))
             throw new ArgumentException($"unsupported provider type: {type}", nameof(type));
 
+        var adapter = CanonicalAdapter(type);
         var url = baseUrl ?? "";
         // Per-adapter sane defaults for endpoint URL when the operator omits --base-url.
         if (string.IsNullOrWhiteSpace(url))
         {
-            url = type.ToLowerInvariant() switch
+            url = adapter switch
             {
                 "openai" => "https://api.openai.com/v1",
                 "anthropic" => "https://api.anthropic.com",
-                "ollama" => "http://127.0.0.1:11434",
+                "ollama" or "ollama-chat" => "http://127.0.0.1:11434",
                 "mock" => "mock://local",
                 _ => "",
             };
@@ -47,18 +50,18 @@ public static class ProviderRegister
         {
             ["id"] = (object?)null,
             ["name"] = name,
-            ["adapter"] = type.ToLowerInvariant(),
+            ["adapter"] = adapter,
             ["model"] = model,
             ["endpointUrl"] = url,
-            ["apiKeySecretRef"] = apiKeyRef,
-            ["compliance"] = compliance,
+            ["apiKeySecretRef"] = apiKeyRef ?? string.Empty,
+            ["compliance"] = (int)compliance,
             ["enabled"] = enabled,
             ["priority"] = priority,
         };
     }
 
     public static async Task<int> RegisterAsync(
-        string type, string name, string? baseUrl, string model, string apiKeyRef,
+        string type, string name, string? baseUrl, string model, string? apiKeyRef,
         CancellationToken ct)
     {
         Dictionary<string, object?> payload;
@@ -69,9 +72,16 @@ public static class ProviderRegister
             return CliRuntime.ExitInvalidInput;
         }
 
-        if (!apiKeyRef.StartsWith("env:", StringComparison.OrdinalIgnoreCase) && type != "mock" && type != "ollama")
+        var adapter = CanonicalAdapter(type);
+        apiKeyRef ??= string.Empty;
+        if (!string.IsNullOrEmpty(apiKeyRef) && !apiKeyRef.StartsWith("env:", StringComparison.OrdinalIgnoreCase))
         {
-            Console.Error.WriteLine("--api-key-ref must be of the form 'env:<NAME>' (the literal env-var name).");
+            Console.Error.WriteLine("--api-key-ref must be of the form 'env:<NAME>' (the literal env-var name)." );
+            return CliRuntime.ExitInvalidInput;
+        }
+        if (RequiresApiKey(adapter) && string.IsNullOrEmpty(apiKeyRef))
+        {
+            Console.Error.WriteLine($"--api-key-ref is required for provider type '{adapter}' and must be of the form 'env:<NAME>'.");
             return CliRuntime.ExitInvalidInput;
         }
 
@@ -82,4 +92,14 @@ public static class ProviderRegister
         Console.WriteLine(await resp.Content.ReadAsStringAsync(ct));
         return resp.IsSuccessStatusCode ? 0 : CliRuntime.ExitFailure;
     }
+
+    private static string CanonicalAdapter(string type) => type.ToLowerInvariant() switch
+    {
+        "gcp-vertex" or "vertex-ai" or "google-vertex-ai" => "google-vertex",
+        "openai-direct" => "openai",
+        _ => type.ToLowerInvariant(),
+    };
+
+    private static bool RequiresApiKey(string adapter) => adapter is
+        "anthropic" or "openai" or "azure-openai" or "aws-bedrock" or "google-vertex";
 }

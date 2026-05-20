@@ -7,21 +7,24 @@
  */
 
 import { setActiveAuthToken } from './api';
+import { isNativeCapacitorPlatform } from './nativeRuntime';
 import { getAuthToken } from './secureAuth';
 
 const BIOMETRIC_PREF_KEY = 'radiopad.biometricLock';
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 async function loadBiometric(): Promise<any | null> {
+  if (!isNativeCapacitorPlatform()) return null;
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const mod: any = await import('@aparajita/capacitor-biometric-auth').catch(() => null);
+  const mod: any = await import('@aparajita/capacitor-biometric-auth').catch(() => null);
   return mod?.BiometricAuth ?? null;
 }
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 async function loadPreferences(): Promise<any | null> {
+  if (!isNativeCapacitorPlatform()) return null;
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const mod: any = await import('@capacitor/preferences').catch(() => null);
+  const mod: any = await import('@capacitor/preferences').catch(() => null);
   return mod?.Preferences ?? null;
 }
 

@@ -17,4 +17,4 @@
    - keep PHI/report context out of Copilot prompts because RadioPad blocks clinical context before spawn.
 6. Do not enable SDK/enterprise-managed runtime until an official backend-safe SDK transport and token vault have been reviewed.
 
-Current state: `LocalCli` is implemented for non-PHI coding assistance through fixed `gh copilot suggest --type explain` calls. SDK/OAuth enterprise-managed and BYO modes remain policy/configuration surfaces until a backend-safe SDK transport is added.
+Current state: `LocalCli` is implemented for non-PHI coding assistance through Copilot CLI's prompt option stream over stdin. SDK/OAuth enterprise-managed and BYO modes remain policy/configuration surfaces until a backend-safe SDK transport is added.

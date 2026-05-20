@@ -4,6 +4,178 @@
 
 ---
 
+## Iteration 49 — Settings/security end-to-end closeout
+
+- **Date:** 2026-05-20
+- **Scope:** Close the remaining deferred settings, auth, allowlist, SAML,
+  frontend API-client, docs, and browser-QA items from the post-Iteration 48
+  review.
+
+### Delivered
+
+- Tenant settings GET/POST are partial-safe and aligned with the frontend
+  contract for `ipAllowlistJson`, PACS vendor, retention, SCIM, CMK, and
+  validation fields; invalid CIDR JSON is rejected at save time.
+- Global and per-tenant IP allowlists now fail closed with
+  `kind: "ip_allowlist_invalid"` when configured values are malformed, and
+  per-tenant lookup failures continue to fail closed; authenticated API
+  requests evaluate tenant allowlists after bearer/cookie/OIDC tenant
+  projection.
+- SAML ACS hardening now rejects the `RADIOPAD_SAML_DEV_INSECURE=true` unsigned
+  assertion escape hatch in Production and requires the XML signature reference
+  to cover the selected assertion ID before trusting NameID/tenant attributes.
+- OIDC browser authorize URL generation now includes
+  `RADIOPAD_OIDC_AUDIENCE` when configured and remains explicitly operator
+  gated; OIDC bearer projection still re-checks local active/locked users.
+- Magic-link consume is atomic and re-checks active/locked users before session
+  minting; login preserves sanitized local `returnTo` targets.
+- Column encryption coverage now includes FHIR/SCIM tenant secrets and provider
+  `ApiKeySecretRef` values, with legacy plaintext rows passing through until
+  rewritten.
+- Frontend API calls use credentials, secure-store hydration retry, and
+  auth-route trailing-slash normalization; lexicon CSV import now shares the
+  same retry path.
+- Admin PACS UI exposes a PACS vendor selector, and the API/OpenAPI/reference
+  docs describe the richer settings and OIDC authorize URL contracts.
+
+### Validation
+
+- Focused backend regression tests passed:
+  `Iter31SecurityTests` + `Iter32SamlAcsTests` — 18 passed, 0 failed.
+- Full backend suite passed after the final security review patch:
+  520 total / 515 passed / 5 skipped / 0 failed.
+- Earlier same-day frontend/spec/browser validation passed:
+  `pnpm typecheck`, `pnpm build`, Redocly structural OpenAPI validation, and
+  browser magic-link `returnTo` → `/reports/`, billing/status, reports, and
+  logout-path checks.
+- Remaining live `radiopad.polytronx.com` redeploy and public-edge E2E are
+  operator-gated by production SMTP/public URL/OIDC/KMS/trusted-proxy secrets.
+
+---
+
+## Iteration 48 — Browser auth / live panel hardening
+
+- **Date:** 2026-05-20
+- **Scope:** Close live browser E2E blockers found while logging into
+  `radiopad.polytronx.com` and reviewing the production auth/proxy path.
+
+### Delivered
+
+- Magic-link consume now sets an HttpOnly `radiopad_session` cookie for browser
+  sessions while preserving returned `rp_` bearers for native shells.
+- Production magic-link request requires SMTP plus `RADIOPAD_PUBLIC_WEB_URL`,
+  ignores client-supplied callback origins, and never exposes raw `devLink`
+  tokens in API responses.
+- Production browser sign-in keeps the returned bearer only in memory for the
+  first SPA navigation and relies on the HttpOnly cookie for reloads.
+- Profile sign-out calls `POST /api/auth/logout/`, clears the session cookie,
+  clears secure/native token storage, and drops the active in-memory bearer.
+- SSO CTA is hidden unless `NEXT_PUBLIC_ENABLE_SSO=true`; the visible login
+  surface no longer advertises a backend flow that is not configured.
+- Caddy and VPS nginx production configs now proxy `/saml/*` and `/scim/v2/*`
+  to the API; deployment examples require `RADIOPAD_PUBLIC_WEB_URL` and expose
+  SMTP envs for passwordless sign-in.
+- Production Swagger UI is disabled unless `RADIOPAD_ENABLE_SWAGGER=1`.
+- Production column encryption fails startup without a configured KMS key ref
+  and wrapped data key; public magic-link requests resolve the body tenant for
+  per-tenant IP allowlists; production `X-Forwarded-For` trust now requires a
+  trusted proxy CIDR; OIDC-mapped identities are re-checked for active/locked
+  user state before header projection.
+- Operational helper scripts no longer contain real mailbox addresses, SMTP app
+  passwords, or hard-coded live test users; they require environment variables
+  for operator-specific values.
+- Added the missing `TenantSettings.PacsVendor` migration discovered during
+  browser QA, eliminating 500s from upgraded SQLite databases on tenant settings
+  reads.
+- Fixed browser sign-out to post directly to `/api/auth/logout/`, avoiding the
+  Next static-export trailing-slash redirect that aborted the logout request.
+
+### Notes
+
+- Live browser panel was reachable after reloading the authenticated root page;
+  `/api/tenant/me` and `/api/reports` returned 200 for the QA user. Full live
+  redeploy still requires operator SMTP/public URL configuration on the VPS.
+
+---
+
+## Iteration 47 — Provider/auth/release hardening close-out
+
+- **Date:** 2026-05-19
+- **Scope:** Close the remaining blockers found by the parallel OmO security,
+  frontend, vendor-contract, and release QA pass after Iteration 46.
+
+### Delivered
+
+- Expanded report PHI detection across every prompt-bearing report field and
+  exact prompt body; rewrite and Copilot preview paths now reuse the broader
+  detector before routing to the AI gateway.
+- Centralized hosted provider endpoint allowlists for OpenAI, Azure OpenAI,
+  AWS Bedrock, and Google Vertex so arbitrary endpoint overrides cannot receive
+  bearer/API-key credentials. Generic BYO endpoints remain under
+  `openai-compatible` with SSRF/private-network validation.
+- Replaced deterministic `rp_` bearer tokens with signed expiring payloads
+  carrying `iat`, `exp`, `jti`, tenant, user, and session epoch; Production now
+  rejects missing/default/weak `RADIOPAD_AUTH_SECRET` at startup.
+- Updated Codex CLI invocation to `codex exec --sandbox read-only -`, required
+  CLI binary allowlists in Production, and gated server-side Copilot CLI
+  execution with `RADIOPAD_COPILOT_SERVER_CLI_ENABLED=1`.
+- Serialized audit appends per tenant inside a serializable transaction and
+  made chain verification order deterministic.
+- Tightened frontend provider/Copilot/OAuth admin states, added Copilot sidebar
+  links, removed invalid Gemini/Codex preset model defaults, and made provider
+  tables/sandbox compare friendlier on narrow/empty states.
+- Aligned golden-case tooling and instructions on `expectFlagged`, with CLI
+  backwards compatibility for legacy `expectedFindings` fixtures.
+- Replaced release placeholders: beta release now validates/builds and uploads
+  a web artifact; desktop release requires an explicit dispatch-time AWS signing
+  role ARN instead of a fake account id.
+
+### Notes
+
+- GitHub Copilot SDK remains fail-closed by design until an official reviewed
+  backend-safe SDK transport exists; docs and UI continue to make that posture
+  explicit.
+- Live smoke tests for `copilot`, `gemini`, `codex`, Tauri, and cargo remain
+  operator-environment checks because the local host did not have those real
+  binaries/toolchains installed during the prior verification pass.
+
+---
+
+## Iteration 46 — AI provider catalog hardening (Copilot SDK / Gemini CLI / OpenAI-compatible)
+
+- **Date:** 2026-05-19
+- **Scope:** Implement the provider-registry work for GitHub Copilot SDK,
+  GitHub Copilot CLI, Gemini CLI, and OpenAI-compatible endpoints while
+  preserving the AI gateway PHI boundary and env-var-only secret model.
+
+### Delivered
+
+- `github-copilot-sdk` registered as an `IAiProviderAdapter` with fail-closed
+  runtime behavior (`runtime_not_configured`) and an adapter-level PHI block.
+- CLI providers gained prompt-free health probes through the existing safe
+  subprocess launcher; OpenAI-compatible providers now probe `/v1/models`.
+- Providers UI presets and adapter picker now expose Copilot SDK, Copilot CLI,
+  Gemini CLI, Codex CLI, and canonical `openai` / `google-vertex` ids.
+- CLI provider registration now canonicalizes legacy aliases and sends the
+  numeric enum shape expected by `POST /api/providers`.
+- Copilot session/chat execution now requires a tenant-owned
+  `github-copilot-cli` provider and routes through `IAiGateway`; the old
+  controller/service-level direct Copilot subprocess path was removed.
+- Provider health no longer performs a generic controller-level `HEAD` to
+  arbitrary endpoints; only explicit prompt-free adapter probes run.
+- OpenAPI, provider catalog, model policy, deployment docs, CLI guide, and
+  vendor risk register updated for the new provider posture.
+
+### Notes
+
+- No database migration required: `ProviderConfig` already carries adapter,
+  model, endpoint, env secret ref, compliance, retention, and routing fields.
+- Copilot SDK remains intentionally unavailable until an official backend-safe
+  SDK transport is reviewed; this avoids private endpoint calls or token
+  scraping while still making policy/admin setup explicit.
+
+---
+
 ## Iteration 44 — Admin pages: friendly auth-error handling (Settings / Billing / Usage)
 
 - **Date:** 2026-05-19
@@ -138,7 +310,7 @@
 - **CI fixes** (frontend, backend, mobile):
   - Removed `packageManager: pnpm@9.15.9` from root `package.json` to resolve conflict with `pnpm/action-setup@v4 version:9` in CI.
   - Fixed `MarketplaceController` Install endpoint: used `mp-{listing.Id:N}` as installed template ID to avoid false-positive duplicate check against source template.
-  - Fixed `Iter36CliProviderTests.Codex_HappyPath_PipesPromptOnStdin` to assert `--quiet` + `--full-auto` (not `--stdin` which is not a real flag).
+  - Fixed `Iter36CliProviderTests.Codex_HappyPath_PipesPromptOnStdin` to assert the current quiet stdin contract and no `--full-auto` provider flag.
   - Generated fresh Ed25519 key pair; re-signed all MCP connector manifests (`dicomweb-qido`, `fhir-servicerequest`, `pacs-recent-studies`) over LF-normalized bytes (matching git object store on all platforms).
   - Added `.gitattributes` with `eol=lf` for source files and `binary` for `.sig`/`.pub` to prevent future CRLF-vs-LF signature mismatches.
 - **Production Docker stack** (`deploy/docker-compose.prod.yml`): postgres:16-alpine + API + Caddy TLS reverse proxy (static frontend serve + `/api/*` proxy) + optional Orthanc PACS (profile-gated).
@@ -199,9 +371,9 @@
 - Implemented token-free LocalCli account linking and entitlement snapshots. Users can start the official GitHub CLI auth path, link local CLI status metadata, revoke the RadioPad link, and see actionable denial reasons without exposing token bytes.
 - Added Copilot session metadata, message metadata, entitlement, and quota-policy tables/indexes in the existing Copilot migration and EF snapshot.
 - Implemented context preview/filtering before session execution: empty/binary/lock/media/generated paths, secret-bearing text, and clinical/PHI-like context are removed or blocked.
-- Implemented backend LocalCli session execution through fixed `gh copilot suggest --type explain` arguments with prompt text on stdin, cancellation propagation, metadata-only hashes, lifecycle usage rows, and append-only audit events.
+- Implemented backend LocalCli session execution through the local GitHub Copilot CLI provider, cancellation propagation, metadata-only hashes, lifecycle usage rows, and append-only audit events.
 - Added request/concurrency quotas with safe defaults plus admin quota CRUD and seven-day usage summaries.
-- Added fixed Tauri Copilot CLI commands for status, login, logout, and session run. Commands return status/output only, never credentials, and warn on environment-token overrides.
+- Added fixed Tauri Copilot CLI commands for status, login, and logout. Copilot chat execution now stays behind backend session broker calls; commands return status/output only, never credentials, and warn on environment-token overrides.
 - Updated the locked-design user/admin Copilot pages for account linking, entitlement state, context preview, AI output marked with `.ai-mark`, quotas, and usage.
 - Updated Copilot architecture, threat model, admin runbook, and session plan notes to describe the implemented LocalCli path and remaining SDK/OAuth boundary.
 
@@ -325,7 +497,7 @@ Eight-axis review (design lock, tenant isolation, audit chain, PHI policy, stack
 1. **Design lock (Warning):** `frontend/app/pair/page.tsx` shipped with three inline `style={{...}}` props for layout/typography on the pairing-code chip. Per AGENTS.md §0, font-size + letter-spacing are not "layout-specific positions" and require a locked component class.
 2. **Tenant isolation (PASS):** new `UpdateFromInvoicePaymentSucceededAsync` / `UpdateFromInvoicePaymentFailedAsync` resolve tenant via `TenantSettings.StripeCustomerId == inv.CustomerId`, mirroring the pre-existing `UpdateFromSubscriptionAsync` pattern.
 3. **Audit chain (PASS):** max enum value still `44`. No new ints.
-4. **PHI policy (PASS):** `AiGateway.EnforcePhiPolicy` untouched; CLI providers default `LocalOnly`; `OpenAiCompatibleProvider` defaults `Sandbox` for non-local hosts and now fail-fasts with `ProviderPolicyException("api_key_missing")` when secret-ref is set but resolves empty.
+4. **PHI policy (PASS):** `AiGateway.EnforcePhiPolicy` untouched; CLI providers default `Sandbox`; `OpenAiCompatibleProvider` defaults `Sandbox` for non-local hosts and now fail-fasts with `ProviderPolicyException("api_key_missing")` when secret-ref is set but resolves empty.
 5. **Stack lock (PASS):** `mobile/package.json` pins Capacitor 6 line (`@capacitor/core@^6.1.2`, `@capacitor-community/speech-recognition@^6.0.0`).
 6. **Secrets hygiene (PASS):** all CLI providers route through `ProcessLaunchSpec.ArgumentList` (never `Arguments`), prompts pass on stdin, stderr truncated to 4 KiB; webhook handler audit detail uses Stripe-issued opaque ids only, no API keys.
 7. **Test sanity (PASS):** xUnit + plain `Assert` only; no PHI in fixtures; tenant slug `it`; one Info note that `Iter36CliProviderTests.BinaryAllowlist_DeniesUnlistedBinary` mutates a process-wide env var and a concurrent test could observe the temporary value (not exploitable, noted for follow-up).
@@ -337,7 +509,7 @@ Resolved the single Warning. Added three locked classes to `frontend/app/radiopa
 
 ### Open follow-ups (post-iter-36, all operator-gated)
 
-1. **Vendor-CLI argument contracts:** the actual `gh copilot` / `gemini` / `codex` binaries do not yet expose a stable non-interactive "chat from stdin" API; the placeholder argument lists (`gh copilot explain --shell-out`, `gemini --prompt-stdin`, `codex exec --stdin --quiet`) need a one-line update per adapter once each vendor publishes a canonical flag. The `IProcessLauncher` abstraction makes this a one-line change.
+1. **Vendor-CLI argument contracts:** current adapters now use the documented Copilot CLI programmatic option stream, Gemini headless JSON mode, and Codex quiet stdin mode through `IProcessLauncher`; live smoke tests still require those binaries on the deployment host.
 2. **Capacitor native projects:** `mobile/ios/` and `mobile/android/` are not materialised in the repo. After `pnpm exec cap add ios|android`, the documented permission strings (`NSSpeechRecognitionUsageDescription`, `NSMicrophoneUsageDescription`, `RECORD_AUDIO`) need to be added to the generated `Info.plist` / `AndroidManifest.xml`.
 3. **Frontend `pnpm typecheck` / vitest CI run:** Node + pnpm are not on PATH in the agent shell; CI must run them before tagging.
 4. **Per-tenant test parallelisation isolation:** Momus Info — `Iter36CliProviderTests.BinaryAllowlist_DeniesUnlistedBinary` mutates `RADIOPAD_CLI_PROVIDER_ALLOWED_PATHS` for the duration of one test. Wrap in a per-test env-var fixture if xUnit's `[Collection]` attribute is later widened.
@@ -1024,7 +1196,7 @@ Independent reviewer audited the iter-32 fan-out claims and the closeout sweep a
 
 **Findings + fixes (this turn):**
 
-1. **🚨 HIGH — SAML fail-open auth bypass.** `SamlController.ProcessAcs` was wrapping the `SignedXml.CheckSignature(...)` call in `if (!string.IsNullOrWhiteSpace(certPem)) { ... }`, so an operator deploying without `RADIOPAD_SAML_IDP_CERT_PEM` accepted any forged SAMLResponse and minted a 12h bearer for an existing tenant/user. **FIXED**: control flow inverted to fail-CLOSED. Unsigned assertions are accepted only when the explicit `RADIOPAD_SAML_DEV_INSECURE=true` opt-in is set. New regression test `Iter32SamlAcsTests.Acs_FailClosed_When_NoCert_And_No_DevInsecureFlag` asserts 401 when neither env var is set.
+1. **🚨 HIGH — SAML fail-open auth bypass.** `SamlController.ProcessAcs` was wrapping the `SignedXml.CheckSignature(...)` call in `if (!string.IsNullOrWhiteSpace(certPem)) { ... }`, so an operator deploying without `RADIOPAD_SAML_IDP_CERT_PEM` accepted any forged SAMLResponse and minted a 12h bearer for an existing tenant/user. **FIXED**: control flow inverted to fail-CLOSED. Unsigned assertions are accepted only when the explicit `RADIOPAD_SAML_DEV_INSECURE=true` opt-in is set, and that opt-in is ignored in Production. New regression test `Iter32SamlAcsTests.Acs_FailClosed_When_NoCert_And_No_DevInsecureFlag` asserts 401 when neither env var is set.
 2. **DOC LAG — traceability matrix.** Five iter-31 entries (`MCP-005`, `MCP-006`, `MCP-007`, `SEC-008`, `SEC-011`) were still 🔴 even though shipping code exists (`McpToolRegistryController` default-deny, `McpSandboxRunner`, `PacsPlugins` Tauri verifier, `IpAllowlistMiddleware`, `AnomalyDetector`). **FIXED**: rows promoted to 🟡 with explicit implementation references; iter-32 summary table updated to `105 ✅ / 24 🟡 / 0 🔴 / 0 ⏸`.
 3. **WebAuthn registration is TOFU** (no attestation parsing, no challenge-binding on register). Self-documented in the controller header. **Acknowledged for iter-33** — paired with lockout policy this is acceptable for v0.1 dev posture; tracked as iter-33 follow-up.
 4. **SCIM `/Groups` endpoint not implemented; filter is `userName eq` only.** Original iter-32 claim was over-stated. **Acknowledged for iter-33** — Users CRUD + PATCH + bearer rotation are real and pass tests.
@@ -1302,7 +1474,7 @@ Total tracked PRD ids: **129** (was 112; iter-32 added 17 finer-grained sub-ids)
 ## Iteration 36 (continued) — CLI-AI provider adapters
 
 - **Date:** 2026-05-04
-- **Scope:** Add four first-class `IAiProviderAdapter` rows for local AI CLIs and a generic OpenAI-compatible HTTP endpoint. New adapters under `backend/RadioPad.Api/src/RadioPad.Infrastructure/Providers/Cli/`: `GitHubCopilotCliProvider` (id `github-copilot-cli`), `GeminiCliProvider` (`gemini-cli`), `CodexCliProvider` (`codex-cli`). The fourth row, `openai-compatible`, already shipped in iter-31 and was hardened this iteration to throw `ProviderPolicyException("api_key_missing")` when `apiKeySecretRef` is set but resolves empty. New `IProcessLauncher` abstraction (`DefaultProcessLauncher` + stub for tests) supports cancellation, configurable per-process timeout (`RADIOPAD_CLI_PROVIDER_TIMEOUT_MS`, default 60s), default-deny binary allowlist (`RADIOPAD_CLI_PROVIDER_ALLOWED_PATHS`), and a control-character prompt sanitiser. Per-provider binary override envs: `RADIOPAD_GH_COPILOT_BIN` / `RADIOPAD_GEMINI_BIN` / `RADIOPAD_CODEX_BIN`.
+- **Scope:** Add four first-class `IAiProviderAdapter` rows for local AI CLIs and a generic OpenAI-compatible HTTP endpoint. New adapters under `backend/RadioPad.Api/src/RadioPad.Infrastructure/Providers/Cli/`: `GitHubCopilotCliProvider` (id `github-copilot-cli`), `GeminiCliProvider` (`gemini-cli`), `CodexCliProvider` (`codex-cli`). The fourth row, `openai-compatible`, already shipped in iter-31 and was hardened this iteration to throw `ProviderPolicyException("api_key_missing")` when `apiKeySecretRef` is set but resolves empty. New `IProcessLauncher` abstraction (`DefaultProcessLauncher` + stub for tests) supports cancellation, configurable per-process timeout (`RADIOPAD_CLI_PROVIDER_TIMEOUT_MS`, default 60s), default-deny binary allowlist (`RADIOPAD_CLI_PROVIDER_ALLOWED_PATHS`), and a control-character prompt sanitiser. Per-provider binary override envs: `RADIOPAD_COPILOT_BIN` / `RADIOPAD_GEMINI_BIN` / `RADIOPAD_CODEX_BIN`.
 - **Files added:** `Providers/Cli/IProcessLauncher.cs`, `Providers/Cli/CliProviderRunner.cs`, `Providers/Cli/GitHubCopilotCliProvider.cs`, `Providers/Cli/GeminiCliProvider.cs`, `Providers/Cli/CodexCliProvider.cs`, `tests/RadioPad.Api.Tests/Providers/Iter36CliProviderTests.cs`.
 - **Files modified:** `RadioPad.Api/Program.cs` (DI registration of the four new singletons + the launcher), `Providers/OpenAiCompatibleProvider.cs` (missing-API-key policy guard), `docs/03-architecture/api-reference.md` (provider catalog table), `docs/08-user-docs/cli-guide.md` (CLI-AI providers section), `CHANGELOG.md`.
 - **Validation:** `dotnet build RadioPad.Api.sln /p:UseSharedCompilation=false` ⇒ 0 errors. Targeted `dotnet test --filter "FullyQualifiedName~Iter36CliProvider"` ⇒ **16 / 16 pass**. Full backend `dotnet test --no-build` ⇒ **Failed: 0, Passed: 395, Skipped: 5, Total: 400** (+16 vs iter-35's 379).
@@ -1325,13 +1497,24 @@ Total tracked PRD ids: **129** (was 112; iter-32 added 17 finer-grained sub-ids)
 
 - `pnpm typecheck` and `pnpm test --run admin`: not run from this environment � Node.js / pnpm are not on PATH in the agent shell. The author of the next iteration should run both before tagging.
 
-## Iter-45 � Radiologist-friendly UI sweep
+## Iter-45 � Radiologist-friendly UI sweep
 
 - **Date**: 2026-05-19
 - **Trigger**: Production user reported (1) `the right half is completely empty` on every page on widescreen, and (2) `THE ENTIRE PROJECT IS USING UN-NECESSARY DEVELOPER NOTES AND GIBBERISH TEXT NOT FRIENDLY FOR RADIOLOGISTS`.
 - **Layout fix** (rontend/app/shell.css): .rp-container cap 1280px ? 1600px; added .rp-page-grid (form + sticky 320px help sidecar, 1080px breakpoint), .rp-help (sidecar card), .rp-advanced (disclosure for technical fields).
-- **Copy sweep**: rontend/app/admin/settings/page.tsx rewritten as the canonical friendly template (plain-English headings, severity-as-question, encryption/PACS fields collapsed into `.rp-advanced`, help sidecar). OmO Hephaestus applied the same pattern across 15 additional pages (providers, audit, offline, validation-packs, analytics, validation, marketplace, terminology, governance, model-eval, reports, rulebooks, templates, prompts, provider OAuth admin) plus COMPLIANCE_LABELS in rontend/lib/api.ts. Removed every visible `PRD <PREFIX>-NNN` code, `WADO-RS`/`QIDO-RS`/`DICOMweb` acronym, `env:NAME`/`aws:arn:�`/`azkv:�`/`gcp:�` scheme sample, and `/api/�` path from JSX strings.
-- **Build**: `pnpm install` (after wipe-and-reinstall � node_modules was already broken pre-edit), `pnpm run build` clean (Next 16 static export, 38 routes generated).
-- **Deploy**: tarred `frontend/out/` ? scp ? `docker cp` into `radiopad-web:/usr/share/nginx/html/` ? `nginx -s reload`. Origin (`curl http://127.0.0.1:8093/admin/settings/`) returns HTTP 200 with the new copy. Cloudflare edge intermittently returned 502 (CF ? origin path issue, independent of the code change � same NPM, same DNS, same firewall; my external curl to the public IP worked while CF's edge could not reach).
-- **Docs**: `CHANGELOG.md` Unreleased block + `docs/02-design/design.md` �4.11 updated in the same change to register the new tokens/classes.
+- **Copy sweep**: rontend/app/admin/settings/page.tsx rewritten as the canonical friendly template (plain-English headings, severity-as-question, encryption/PACS fields collapsed into `.rp-advanced`, help sidecar). OmO Hephaestus applied the same pattern across 15 additional pages (providers, audit, offline, validation-packs, analytics, validation, marketplace, terminology, governance, model-eval, reports, rulebooks, templates, prompts, provider OAuth admin) plus COMPLIANCE_LABELS in rontend/lib/api.ts. Removed every visible `PRD <PREFIX>-NNN` code, `WADO-RS`/`QIDO-RS`/`DICOMweb` acronym, `env:NAME`/`aws:arn:�`/`azkv:�`/`gcp:�` scheme sample, and `/api/�` path from JSX strings.
+- **Build**: `pnpm install` (after wipe-and-reinstall � node_modules was already broken pre-edit), `pnpm run build` clean (Next 16 static export, 38 routes generated).
+- **Deploy**: tarred `frontend/out/` ? scp ? `docker cp` into `radiopad-web:/usr/share/nginx/html/` ? `nginx -s reload`. Origin (`curl http://127.0.0.1:8093/admin/settings/`) returns HTTP 200 with the new copy. Cloudflare edge intermittently returned 502 (CF ? origin path issue, independent of the code change � same NPM, same DNS, same firewall; my external curl to the public IP worked while CF's edge could not reach).
+- **Docs**: `CHANGELOG.md` Unreleased block + `docs/02-design/design.md` �4.11 updated in the same change to register the new tokens/classes.
+
+## Iter-46 - AI provider integration completion pass
+
+- **Date**: 2026-05-19
+- **Trigger**: User requested end-to-end completion of GitHub Copilot SDK/CLI, Gemini CLI, Codex CLI, and OpenAI-compatible AI provider integration with all deferred gaps closed.
+- **Backend security**: Copilot session/chat now routes through an enabled tenant-owned `github-copilot-cli` provider via `IAiGateway.RouteAsync`; secret-shaped Copilot prompts are blocked before session creation. The desktop bridge no longer exposes a native Copilot session execution command, so chat execution must pass through backend tenant/quota/audit/provider gates. Production identity now requires validated OIDC or `rp_` bearer tokens unless `RADIOPAD_DEV_HEADERS=1` is explicitly enabled. OIDC marks validated requests through `RadioPad.Identity.Validated`.
+- **Provider hardening**: CLI adapters refuse PHI and secret-shaped prompts before process launch, run with a scrubbed environment and neutral working directory, use prompt-free health probes, and keep prompts on stdin. Codex CLI is fail-closed unless `RADIOPAD_CODEX_CLI_ENABLED=1` and no longer uses agentic/full-auto flags by default. OpenAI-compatible endpoints are validated against unsafe schemes and private-network/SSRF use unless the provider is `LocalOnly`; health checks no longer send bearer auth.
+- **Audit / tenant governance**: provider config saves and health probes append audit rows through `IAuditLog.AppendAsync`; provider admin save validates OpenAI-compatible endpoint policy before persistence. Tenant scoping remains through `TenantedController.ResolveContextAsync`.
+- **Frontend / CLI**: provider admin UI now has data-driven loading, empty, and retryable error states, friendly health status rendering, and sandbox compare supports one to four selected sandbox providers. CLI provider registration accepts no-key providers while still requiring `env:<NAME>` refs for direct cloud providers.
+- **Docs / contracts / deploy**: updated env examples, production compose/Caddy templates, API reference, OpenAPI schemas, CLI guide, deployment docs, troubleshooting, model policy, provider catalog, vendor-risk register, traceability matrix, and changelog. OpenAPI `AuditAction` enum now includes marketplace and Copilot actions through 53.
+- **Validation closeout**: full backend `dotnet test` passed with 482 succeeded, 5 skipped, 0 failed (487 total), including quota and usage-summary regressions proving completed Copilot requests count once. Frontend `pnpm typecheck`, `pnpm test` (124 / 124), and `pnpm build` passed; build retained existing static-export rewrite/proxy warnings. OpenAPI Redocly lint has 0 errors and 256 warnings. Current CLI adapters use the documented Copilot CLI and Gemini headless contracts; live smoke tests require `copilot` / `gemini` binaries on the deployment host.
 

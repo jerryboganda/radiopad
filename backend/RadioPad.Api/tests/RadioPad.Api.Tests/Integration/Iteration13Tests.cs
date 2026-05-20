@@ -273,6 +273,78 @@ public class TenantSettingsApiTests : IClassFixture<RadioPadAppFactory>
             await db.SaveChangesAsync();
         }
     }
+
+    [Fact]
+    public async Task Save_Partial_IpAllowlist_Does_Not_Reset_Other_Settings()
+    {
+        using var scope = _factory.Services.CreateScope();
+        var db = scope.ServiceProvider.GetRequiredService<RadioPadDbContext>();
+        var user = await db.Users.FirstAsync(u => u.Id == _factory.SeedUser.Id);
+        var original = user.Role;
+        user.Role = UserRole.ItAdmin;
+        var settings = await db.TenantSettings.FirstOrDefaultAsync(x => x.TenantId == _factory.SeedTenant.Id)
+            ?? new TenantSettings { TenantId = _factory.SeedTenant.Id };
+        if (db.Entry(settings).State == EntityState.Detached) db.TenantSettings.Add(settings);
+        settings.HallucinationDetectionEnabled = false;
+        settings.HallucinationSeverity = "Info";
+        settings.Plan = TenantPlan.Team;
+        await db.SaveChangesAsync();
+
+        try
+        {
+            using var client = _factory.CreateTenantClient();
+            var resp = await client.PostAsJsonAsync("/api/tenant/settings", new
+            {
+                ipAllowlistJson = "[\"10.0.0.0/8\"]",
+            });
+            Assert.Equal(HttpStatusCode.OK, resp.StatusCode);
+
+            db.ChangeTracker.Clear();
+            var saved = await db.TenantSettings.FirstAsync(x => x.TenantId == _factory.SeedTenant.Id);
+            Assert.False(saved.HallucinationDetectionEnabled);
+            Assert.Equal("Info", saved.HallucinationSeverity);
+            Assert.Equal(TenantPlan.Team, saved.Plan);
+            Assert.Equal("[\"10.0.0.0/8\"]", saved.IpAllowlistJson);
+
+            var get = await client.GetAsync("/api/tenant/settings");
+            var doc = await JsonDocument.ParseAsync(await get.Content.ReadAsStreamAsync());
+            Assert.Equal("[\"10.0.0.0/8\"]", doc.RootElement.GetProperty("ipAllowlistJson").GetString());
+        }
+        finally
+        {
+            var cleanupUser = await db.Users.FirstAsync(u => u.Id == _factory.SeedUser.Id);
+            cleanupUser.Role = original;
+            var s = await db.TenantSettings.FirstOrDefaultAsync(x => x.TenantId == _factory.SeedTenant.Id);
+            if (s is not null) db.TenantSettings.Remove(s);
+            await db.SaveChangesAsync();
+        }
+    }
+
+    [Fact]
+    public async Task Save_Rejects_Invalid_IpAllowlistJson()
+    {
+        using var scope = _factory.Services.CreateScope();
+        var db = scope.ServiceProvider.GetRequiredService<RadioPadDbContext>();
+        var user = await db.Users.FirstAsync(u => u.Id == _factory.SeedUser.Id);
+        var original = user.Role;
+        user.Role = UserRole.ItAdmin;
+        await db.SaveChangesAsync();
+
+        try
+        {
+            using var client = _factory.CreateTenantClient();
+            var resp = await client.PostAsJsonAsync("/api/tenant/settings", new
+            {
+                ipAllowlistJson = "[\"999.0.0.0/8\"]",
+            });
+            Assert.Equal(HttpStatusCode.BadRequest, resp.StatusCode);
+        }
+        finally
+        {
+            user.Role = original;
+            await db.SaveChangesAsync();
+        }
+    }
 }
 
 public class PdfDocxExportTests : IClassFixture<RadioPadAppFactory>

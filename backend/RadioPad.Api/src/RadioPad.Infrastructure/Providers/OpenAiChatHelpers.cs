@@ -1,4 +1,5 @@
 using System.Diagnostics;
+using System.Net;
 using System.Net.Http.Json;
 using System.Text;
 using System.Text.Json;
@@ -14,7 +15,7 @@ namespace RadioPad.Infrastructure.Providers;
 /// request body, response parsing, and HTTP-error mapping so each adapter
 /// stays a thin shim.
 /// </summary>
-internal static class OpenAiChatHelpers
+public static class OpenAiChatHelpers
 {
     public static object BuildChatBody(string model, string systemPrompt, string userPrompt, int? maxTokens = null)
     {
@@ -37,6 +38,132 @@ internal static class OpenAiChatHelpers
         if (url.EndsWith("/chat/completions", StringComparison.OrdinalIgnoreCase)) return url;
         if (url.EndsWith("/v1", StringComparison.OrdinalIgnoreCase)) return $"{url}/chat/completions";
         return $"{url}/v1/chat/completions";
+    }
+
+    public static string NormalizeModelsUrl(string baseOrFullUrl)
+    {
+        var url = (baseOrFullUrl ?? "").Trim().TrimEnd('/');
+        if (url.EndsWith("/chat/completions", StringComparison.OrdinalIgnoreCase))
+            return url[..^"/chat/completions".Length] + "/models";
+        if (url.EndsWith("/v1", StringComparison.OrdinalIgnoreCase)) return $"{url}/models";
+        return $"{url}/v1/models";
+    }
+
+    public static async Task<Uri> ValidateEndpointAsync(string url, bool allowPrivateNetwork, string adapterId, CancellationToken ct)
+    {
+        if (!Uri.TryCreate(url, UriKind.Absolute, out var uri) ||
+            (uri.Scheme != Uri.UriSchemeHttps && uri.Scheme != Uri.UriSchemeHttp))
+        {
+            throw new ProviderPolicyException($"{adapterId}: endpoint_url_invalid");
+        }
+
+        if (uri.Scheme == Uri.UriSchemeHttp && !IsLocalHost(uri.Host))
+            throw new ProviderPolicyException($"{adapterId}: endpoint_requires_https");
+
+        if (allowPrivateNetwork) return uri;
+
+        IPAddress[] addresses;
+        try
+        {
+            addresses = IPAddress.TryParse(uri.Host, out var literal)
+                ? new[] { literal }
+                : await Dns.GetHostAddressesAsync(uri.Host, ct);
+        }
+        catch (Exception ex) when (ex is System.Net.Sockets.SocketException or ArgumentException)
+        {
+            throw new ProviderPolicyException($"{adapterId}: endpoint_host_unresolvable");
+        }
+
+        if (addresses.Length == 0 || addresses.Any(IsPrivateAddress))
+            throw new ProviderPolicyException($"{adapterId}: endpoint_private_network_blocked");
+
+        return uri;
+    }
+
+    public static Uri ValidateHostedEndpoint(string url, string adapterId)
+    {
+        if (!Uri.TryCreate(url, UriKind.Absolute, out var uri) || uri.Scheme != Uri.UriSchemeHttps)
+            throw new ProviderPolicyException($"{adapterId}: endpoint_requires_https");
+
+        if (!string.IsNullOrEmpty(uri.UserInfo))
+            throw new ProviderPolicyException($"{adapterId}: endpoint_userinfo_blocked");
+
+        if (!uri.IsDefaultPort && uri.Port != 443)
+            throw new ProviderPolicyException($"{adapterId}: endpoint_port_blocked");
+
+        if (IPAddress.TryParse(uri.Host, out _))
+            throw new ProviderPolicyException($"{adapterId}: endpoint_ip_literal_blocked");
+
+        var host = uri.Host.ToLowerInvariant();
+        var allowed = adapterId switch
+        {
+            OpenAiDirectProvider.AdapterId => host == "api.openai.com",
+            AzureOpenAiProvider.AdapterId => host.EndsWith(".openai.azure.com", StringComparison.Ordinal) ||
+                                             host.EndsWith(".cognitiveservices.azure.com", StringComparison.Ordinal),
+            AwsBedrockProvider.AdapterId => host.StartsWith("bedrock", StringComparison.Ordinal) &&
+                                            (host.EndsWith(".amazonaws.com", StringComparison.Ordinal) ||
+                                             host.EndsWith(".amazonaws.com.cn", StringComparison.Ordinal)),
+            GoogleVertexAiProvider.AdapterId => host == "aiplatform.googleapis.com" ||
+                                                host.EndsWith("-aiplatform.googleapis.com", StringComparison.Ordinal),
+            _ => true,
+        };
+
+        if (!allowed)
+            throw new ProviderPolicyException($"{adapterId}: endpoint_host_not_allowed");
+
+        return uri;
+    }
+
+    public static async Task ValidateProviderEndpointAsync(
+        string adapterId,
+        string? endpointUrl,
+        bool allowPrivateNetwork,
+        CancellationToken ct)
+    {
+        if (string.IsNullOrWhiteSpace(endpointUrl)) return;
+
+        if (string.Equals(adapterId, OpenAiCompatibleProvider.AdapterId, StringComparison.OrdinalIgnoreCase))
+        {
+            await ValidateEndpointAsync(NormalizeChatCompletionsUrl(endpointUrl), allowPrivateNetwork, adapterId, ct);
+            return;
+        }
+
+        if (IsHostedAdapter(adapterId))
+            ValidateHostedEndpoint(endpointUrl, adapterId);
+    }
+
+    private static bool IsHostedAdapter(string adapterId) =>
+        string.Equals(adapterId, OpenAiDirectProvider.AdapterId, StringComparison.OrdinalIgnoreCase) ||
+        string.Equals(adapterId, AzureOpenAiProvider.AdapterId, StringComparison.OrdinalIgnoreCase) ||
+        string.Equals(adapterId, AwsBedrockProvider.AdapterId, StringComparison.OrdinalIgnoreCase) ||
+        string.Equals(adapterId, GoogleVertexAiProvider.AdapterId, StringComparison.OrdinalIgnoreCase);
+
+    private static bool IsLocalHost(string host) =>
+        string.Equals(host, "localhost", StringComparison.OrdinalIgnoreCase) ||
+        string.Equals(host, "127.0.0.1", StringComparison.Ordinal) ||
+        string.Equals(host, "::1", StringComparison.Ordinal) ||
+        host.EndsWith(".local", StringComparison.OrdinalIgnoreCase);
+
+    private static bool IsPrivateAddress(IPAddress address)
+    {
+        if (IPAddress.IsLoopback(address)) return true;
+        var bytes = address.GetAddressBytes();
+        if (address.AddressFamily == System.Net.Sockets.AddressFamily.InterNetwork)
+        {
+            return bytes[0] == 10
+                || (bytes[0] == 172 && bytes[1] >= 16 && bytes[1] <= 31)
+                || (bytes[0] == 192 && bytes[1] == 168)
+                || (bytes[0] == 169 && bytes[1] == 254)
+                || bytes[0] == 0
+                || bytes[0] == 127;
+        }
+
+        if (address.AddressFamily == System.Net.Sockets.AddressFamily.InterNetworkV6)
+        {
+            return address.IsIPv6LinkLocal || address.IsIPv6SiteLocal || bytes[0] == 0xFC || bytes[0] == 0xFD;
+        }
+
+        return true;
     }
 
     /// <summary>

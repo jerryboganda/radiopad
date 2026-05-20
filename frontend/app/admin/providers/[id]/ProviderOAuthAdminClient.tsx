@@ -3,6 +3,11 @@
 import { useEffect, useState } from 'react';
 import { api, type Provider } from '@/lib/api';
 import { readQueryParam } from '@/lib/browserParams';
+import Container from '@/components/shell/Container';
+import PageHeader from '@/components/shell/PageHeader';
+import EmptyState from '@/components/ui/EmptyState';
+import ErrorState from '@/components/ui/ErrorState';
+import Skeleton from '@/components/ui/Skeleton';
 
 /**
  * Iter-35 PROV-007 — admin surface for the per-provider OAuth refresh-token
@@ -29,25 +34,35 @@ export default function ProviderOAuthAdminPage() {
   const [token, setToken] = useState('');
   const [expiresAt, setExpiresAt] = useState('');
   const [rotationPolicy, setRotationPolicy] = useState<Status['rotationPolicy']>('before_expiry');
+  const [loading, setLoading] = useState(true);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [info, setInfo] = useState<string | null>(null);
 
   useEffect(() => {
-    setProviderId(readQueryParam('id'));
+    const id = readQueryParam('id');
+    setProviderId(id);
+    if (!id) setLoading(false);
   }, []);
 
   useEffect(() => {
     if (!providerId) return;
-    void refresh();
-    void api.providers.list().then((rows) => {
-      const p = rows.find((r) => r.id === providerId) ?? null;
-      setProvider(p);
-    });
+    setLoading(true);
+    Promise.all([api.providers.oauth.status(providerId), api.providers.list()])
+      .then(([s, rows]) => {
+        const p = rows.find((r) => r.id === providerId) ?? null;
+        setStatus(s);
+        setRotationPolicy(s.rotationPolicy);
+        setProvider(p);
+        setError(p ? null : 'Provider was not found in this workspace.');
+      })
+      .catch((e: Error) => setError(e.message))
+      .finally(() => setLoading(false));
   }, [providerId]);
 
   async function refresh() {
     if (!providerId) return;
+    setBusy(true);
     try {
       const s = await api.providers.oauth.status(providerId);
       setStatus(s);
@@ -55,6 +70,8 @@ export default function ProviderOAuthAdminPage() {
       setError(null);
     } catch (e) {
       setError((e as Error).message);
+    } finally {
+      setBusy(false);
     }
   }
 
@@ -93,17 +110,41 @@ export default function ProviderOAuthAdminPage() {
     }
   }
 
+  if (!providerId) {
+    return (
+      <Container>
+        <PageHeader title="Provider sign-in token" description="Tokens are stored encrypted and never shown back to anyone, including IT." />
+        <EmptyState title="Provider id required" description="Open this page from a provider row so RadioPad can load the token vault entry." />
+      </Container>
+    );
+  }
+
+  if (loading && !status) {
+    return (
+      <Container>
+        <PageHeader title="Provider sign-in token" description="Tokens are stored encrypted and never shown back to anyone, including IT." />
+        <div className="rp-panel"><Skeleton variant="block" height={160} /></div>
+      </Container>
+    );
+  }
+
+  if (error && !status) {
+    return (
+      <Container>
+        <PageHeader title="Provider sign-in token" description="Tokens are stored encrypted and never shown back to anyone, including IT." />
+        <ErrorState title="Couldn't load provider token status" message={error} onRetry={() => { void refresh(); }} />
+      </Container>
+    );
+  }
+
   return (
-    <div className="rp-container">
-      <h1 className="rp-page-title">
-        Sign-in token for {provider?.name ?? providerId ?? ''}
-      </h1>
-      <p className="rp-page-sub">
-        Some AI models need an extra sign-in token (called a refresh token) that lets RadioPad reconnect to them automatically. Tokens are stored encrypted and never shown back to anyone, including IT.
-      </p>
+    <Container>
+      <PageHeader
+        title={`Sign-in token for ${provider?.name ?? providerId}`}
+        description="Some AI models need an extra sign-in token that lets RadioPad reconnect to them automatically. Tokens are stored encrypted and never shown back to anyone, including IT."
+      />
 
       {error && <div className="banner warn">{error}</div>}
-      {providerId === '' && <div className="banner warn">Missing provider id.</div>}
       {info && <div className="banner ok">{info}</div>}
 
       <div className="rp-panel">
@@ -185,6 +226,6 @@ export default function ProviderOAuthAdminPage() {
           </button>
         </div>
       </div>
-    </div>
+    </Container>
   );
 }

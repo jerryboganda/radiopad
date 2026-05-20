@@ -2,6 +2,7 @@ using System.Net.Http.Headers;
 using Microsoft.Extensions.Logging;
 using RadioPad.Application.Abstractions;
 using RadioPad.Application.Services;
+using RadioPad.Domain.Entities;
 using RadioPad.Domain.Enums;
 using RadioPad.Domain.ValueObjects;
 
@@ -24,7 +25,7 @@ namespace RadioPad.Infrastructure.Providers;
 /// </list>
 /// </para>
 /// </summary>
-public sealed class OpenAiCompatibleProvider : IAiProviderAdapter
+public sealed class OpenAiCompatibleProvider : IAiProviderAdapter, IAiProviderHealthProbe
 {
     public const string AdapterId = "openai-compatible";
 
@@ -39,15 +40,58 @@ public sealed class OpenAiCompatibleProvider : IAiProviderAdapter
 
     public string Id => AdapterId;
 
+    public async Task<AiProviderHealthResult> ProbeAsync(ProviderConfig provider, CancellationToken cancellationToken)
+    {
+        if (string.IsNullOrWhiteSpace(provider.EndpointUrl))
+            return new AiProviderHealthResult(false, "endpoint_url_missing", Runtime: AdapterId);
+
+        var apiKey = ProviderSecretResolver.Resolve(provider.ApiKeySecretRef);
+        if (!string.IsNullOrEmpty(provider.ApiKeySecretRef) && string.IsNullOrEmpty(apiKey))
+            return new AiProviderHealthResult(false, "api_key_missing", Runtime: AdapterId);
+
+        var url = OpenAiChatHelpers.NormalizeModelsUrl(provider.EndpointUrl);
+        try
+        {
+            await OpenAiChatHelpers.ValidateEndpointAsync(
+                url,
+                provider.Compliance == ProviderComplianceClass.LocalOnly,
+                AdapterId,
+                cancellationToken);
+            var client = _http.CreateClient("ai");
+            using var req = new HttpRequestMessage(HttpMethod.Get, url);
+            using var resp = await client.SendAsync(req, cancellationToken);
+            return new AiProviderHealthResult(
+                Ok: resp.IsSuccessStatusCode,
+                Error: resp.IsSuccessStatusCode ? null : $"HTTP {(int)resp.StatusCode}",
+                Status: (int)resp.StatusCode,
+                Runtime: AdapterId);
+        }
+        catch (Exception ex) when (ex is HttpRequestException or TaskCanceledException)
+        {
+            return new AiProviderHealthResult(false, ex.Message, Runtime: AdapterId);
+        }
+        catch (ProviderPolicyException ex)
+        {
+            return new AiProviderHealthResult(false, ex.Message, Runtime: AdapterId);
+        }
+    }
+
     public async Task<AiResult> CompleteAsync(AiCompletionRequest request, CancellationToken cancellationToken)
     {
         var p = request.Provider;
         if (string.IsNullOrWhiteSpace(p.EndpointUrl))
             throw new ProviderTransportException($"{AdapterId}: provider '{p.Name}' is missing an endpoint URL.");
+        if (request.ContainsPhi && p.Compliance != ProviderComplianceClass.LocalOnly && Environment.GetEnvironmentVariable("RADIOPAD_OPENAI_COMPATIBLE_ALLOW_PHI") != "1")
+            throw new ProviderPolicyException($"{AdapterId}: phi_requires_reviewed_provider");
 
         var baseUrl = p.EndpointUrl.TrimEnd('/');
         var model = string.IsNullOrWhiteSpace(p.Model) ? "default" : p.Model;
         var url = OpenAiChatHelpers.NormalizeChatCompletionsUrl(baseUrl);
+        await OpenAiChatHelpers.ValidateEndpointAsync(
+            url,
+            p.Compliance == ProviderComplianceClass.LocalOnly,
+            AdapterId,
+            cancellationToken);
 
         var client = _http.CreateClient("ai");
         var apiKey = ProviderSecretResolver.Resolve(p.ApiKeySecretRef);

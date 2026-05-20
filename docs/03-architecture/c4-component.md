@@ -34,7 +34,7 @@ C4Component
   Container_Boundary(infra, "RadioPad.Infrastructure") {
     Component(db, "RadioPadDbContext", "EF Core")
     Component(audlog, "AuditLog", "Service", "AppendAsync + SHA-256 chain")
-    Component(secrets, "EnvSecretResolver", "Service", "Resolve env:NAME refs")
+    Component(secrets, "ProviderSecretResolver", "Service", "Resolve env:NAME refs")
   }
 
   Rel(prog, corr, "uses")

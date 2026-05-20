@@ -6,6 +6,7 @@ using Microsoft.Extensions.Logging.Abstractions;
 using RadioPad.Api.Middleware;
 using RadioPad.Api.Services;
 using RadioPad.Application.Abstractions;
+using RadioPad.Api.Tests.Infrastructure;
 using RadioPad.Domain.Entities;
 using RadioPad.Domain.Enums;
 using RadioPad.Infrastructure.Persistence;
@@ -129,6 +130,38 @@ public class Iter32NetworkDefenseTests : IClassFixture<RadioPadAppFactory>
     }
 
     [Fact]
+    public async Task IpAllowlist_AppliesTenantCidrFromPublicMagicLinkBody()
+    {
+        using var scope = _factory.Services.CreateScope();
+        var db = scope.ServiceProvider.GetRequiredService<RadioPadDbContext>();
+        var audit = scope.ServiceProvider.GetRequiredService<IAuditLog>();
+
+        var s = await EnsureSettings(db);
+        s.IpAllowlistJson = "[\"198.51.100.0/24\"]";
+        s.IpAllowlistCidr = "";
+        await db.SaveChangesAsync();
+
+        var nextCalled = false;
+        var middleware = new IpAllowlistMiddleware(_ => { nextCalled = true; return Task.CompletedTask; }, NullLogger<IpAllowlistMiddleware>.Instance);
+
+        var body = System.Text.Encoding.UTF8.GetBytes($"{{\"tenant\":\"{_factory.SeedTenant.Slug}\",\"email\":\"it-radiologist@radiopad.local\"}}");
+        var ctx = new DefaultHttpContext();
+        ctx.Connection.RemoteIpAddress = IPAddress.Parse("203.0.113.7");
+        ctx.Request.Method = HttpMethods.Post;
+        ctx.Request.Path = "/api/auth/magic-link/request";
+        ctx.Request.ContentType = "application/json";
+        ctx.Request.ContentLength = body.Length;
+        ctx.Request.Body = new MemoryStream(body);
+        ctx.Response.Body = new MemoryStream();
+
+        await middleware.InvokeAsync(ctx, db, audit);
+
+        Assert.False(nextCalled);
+        Assert.Equal(StatusCodes.Status403Forbidden, ctx.Response.StatusCode);
+        Assert.Equal(0, ctx.Request.Body.Position);
+    }
+
+    [Fact]
     public void IpAllowlist_XForwardedFor_IgnoredByDefault()
     {
         Environment.SetEnvironmentVariable("RADIOPAD_TRUST_FORWARDED_FOR", null);
@@ -157,6 +190,34 @@ public class Iter32NetworkDefenseTests : IClassFixture<RadioPadAppFactory>
         {
             Environment.SetEnvironmentVariable("RADIOPAD_TRUST_FORWARDED_FOR", null);
         }
+    }
+
+    [Fact]
+    public void IpAllowlist_XForwardedFor_InProductionRequiresTrustedProxyCidr()
+    {
+        using var trust = EnvVarScope.Set("RADIOPAD_TRUST_FORWARDED_FOR", "1");
+        using var env = EnvVarScope.Set("ASPNETCORE_ENVIRONMENT", "Production");
+        using var trusted = EnvVarScope.Set("RADIOPAD_TRUSTED_PROXY_CIDRS", null);
+        var ctx = new DefaultHttpContext();
+        ctx.Connection.RemoteIpAddress = IPAddress.Parse("10.0.0.5");
+        ctx.Request.Headers["X-Forwarded-For"] = "203.0.113.7, 10.0.0.5";
+
+        var resolved = IpAllowlistMiddleware.ResolveRemoteIp(ctx);
+        Assert.Equal(IPAddress.Parse("10.0.0.5"), resolved);
+    }
+
+    [Fact]
+    public void IpAllowlist_XForwardedFor_InProductionHonouredForTrustedProxyCidr()
+    {
+        using var trust = EnvVarScope.Set("RADIOPAD_TRUST_FORWARDED_FOR", "1");
+        using var env = EnvVarScope.Set("ASPNETCORE_ENVIRONMENT", "Production");
+        using var trusted = EnvVarScope.Set("RADIOPAD_TRUSTED_PROXY_CIDRS", "10.0.0.0/8");
+        var ctx = new DefaultHttpContext();
+        ctx.Connection.RemoteIpAddress = IPAddress.Parse("10.0.0.5");
+        ctx.Request.Headers["X-Forwarded-For"] = "203.0.113.7, 10.0.0.5";
+
+        var resolved = IpAllowlistMiddleware.ResolveRemoteIp(ctx);
+        Assert.Equal(IPAddress.Parse("203.0.113.7"), resolved);
     }
 
     // ---------- RateLimitMiddleware ----------

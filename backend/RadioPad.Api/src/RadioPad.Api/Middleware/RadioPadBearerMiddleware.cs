@@ -1,0 +1,129 @@
+using Microsoft.EntityFrameworkCore;
+using RadioPad.Api.Auth;
+using RadioPad.Infrastructure.Persistence;
+
+namespace RadioPad.Api.Middleware;
+
+/// <summary>
+/// Validates RadioPad-issued opaque bearers (<c>rp_...</c>) and prevents the
+/// dev header identity fallback from being accepted in production unless the
+/// operator explicitly enables <c>RADIOPAD_DEV_HEADERS=1</c>.
+/// </summary>
+public sealed class RadioPadBearerMiddleware
+{
+    private readonly RequestDelegate _next;
+    private readonly IWebHostEnvironment _env;
+
+    public RadioPadBearerMiddleware(RequestDelegate next, IWebHostEnvironment env)
+    {
+        _next = next;
+        _env = env;
+    }
+
+    public async Task InvokeAsync(HttpContext ctx, RadioPadDbContext db)
+    {
+        if (!ctx.Request.Path.StartsWithSegments("/api") || IsPublicApi(ctx.Request.Path))
+        {
+            await _next(ctx);
+            return;
+        }
+
+        var devHeadersAllowed = Environment.GetEnvironmentVariable("RADIOPAD_DEV_HEADERS") == "1";
+        var auth = ctx.Request.Headers.Authorization.FirstOrDefault();
+        var bearer = auth is not null && auth.StartsWith("Bearer ", StringComparison.OrdinalIgnoreCase)
+            ? auth["Bearer ".Length..].Trim()
+            : null;
+        var cookieBearer = ctx.Request.Cookies[RadioPadSessionCookies.CookieName];
+        var token = !string.IsNullOrWhiteSpace(bearer) ? bearer : cookieBearer;
+        var tokenFromCookie = string.IsNullOrWhiteSpace(bearer) && !string.IsNullOrWhiteSpace(cookieBearer);
+
+        if (!string.IsNullOrWhiteSpace(token) && token.StartsWith("rp_", StringComparison.Ordinal))
+        {
+            var slug = ctx.Request.Headers["X-RadioPad-Tenant"].FirstOrDefault();
+            var email = ctx.Request.Headers["X-RadioPad-User"].FirstOrDefault();
+
+            if (tokenFromCookie || string.IsNullOrWhiteSpace(slug) || string.IsNullOrWhiteSpace(email))
+            {
+                if (!RadioPadBearerTokens.TryReadUnvalidatedContext(token, out var tokenTenant, out var tokenUser))
+                {
+                    await RejectAsync(ctx, "invalid_token", "Bearer token is invalid or expired.");
+                    return;
+                }
+
+                slug = tokenTenant;
+                email = tokenUser;
+            }
+
+            if (string.IsNullOrWhiteSpace(slug) || string.IsNullOrWhiteSpace(email))
+            {
+                await RejectAsync(ctx, "tenant_user_required", "Bearer requests must include tenant and user context.");
+                return;
+            }
+
+            var tenant = await db.Tenants.FirstOrDefaultAsync(t => t.Slug == slug, ctx.RequestAborted);
+            if (tenant is null)
+            {
+                await RejectAsync(ctx, "unauthenticated", "Bearer tenant is not active.");
+                return;
+            }
+
+            var user = await db.Users
+                .FirstOrDefaultAsync(u => u.Email == email && u.TenantId == tenant.Id, ctx.RequestAborted);
+            if (user is null || !user.IsActive || user.LockedUntil > DateTimeOffset.UtcNow)
+            {
+                await RejectAsync(ctx, "unauthenticated", "Bearer identity is not active.");
+                return;
+            }
+
+            if (!RadioPadBearerTokens.TryValidate(token, slug, email, user.SessionEpoch, _env, out var reason))
+            {
+                await RejectAsync(ctx, reason, "Bearer token is invalid or expired.");
+                return;
+            }
+
+            ctx.Request.Headers["X-RadioPad-Tenant"] = slug;
+            ctx.Request.Headers["X-RadioPad-User"] = email;
+            await _next(ctx);
+            return;
+        }
+
+        if (ctx.Items.ContainsKey("RadioPad.Identity.Validated"))
+        {
+            await _next(ctx);
+            return;
+        }
+
+        if (_env.IsProduction() && !devHeadersAllowed)
+        {
+            await RejectAsync(ctx, "authentication_required", "Production API requests require a validated bearer or OIDC identity.");
+            return;
+        }
+
+        await _next(ctx);
+    }
+
+    private static bool IsPublicApi(PathString path) =>
+        path.StartsWithSegments("/api/health") ||
+        path.StartsWithSegments("/api/auth/logout") ||
+        path.StartsWithSegments("/api/auth/oidc/authorize-url") ||
+        path.StartsWithSegments("/api/auth/magic-link/request") ||
+        path.StartsWithSegments("/api/auth/magic-link/consume") ||
+        path.StartsWithSegments("/api/auth/device/authorize") ||
+        path.StartsWithSegments("/api/auth/device/token") ||
+        path.StartsWithSegments("/api/billing/webhook");
+
+    private static async Task RejectAsync(HttpContext ctx, string kind, string message)
+    {
+        ctx.Response.StatusCode = StatusCodes.Status401Unauthorized;
+        ctx.Response.ContentType = "application/problem+json";
+        await ctx.Response.WriteAsJsonAsync(new
+        {
+            type = "https://radiopad.app/problems/authentication-required",
+            title = "Authentication required",
+            status = StatusCodes.Status401Unauthorized,
+            kind,
+            detail = message,
+        });
+    }
+
+}

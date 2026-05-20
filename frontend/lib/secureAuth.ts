@@ -11,6 +11,8 @@
  * preview. Production desktop/mobile builds must use the native secure paths.
  */
 
+import { isNativeCapacitorPlatform } from './nativeRuntime';
+
 const KEY = 'radiopad.auth.token.v1';
 
 type Backend = {
@@ -56,51 +58,53 @@ async function pickBackend(): Promise<Backend> {
     return backend;
   }
 
-  // 2. Native mobile secure storage (iOS Keychain / Android Keystore).
-  try {
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  if (isNativeCapacitorPlatform()) {
+    // 2. Native mobile secure storage (iOS Keychain / Android Keystore).
+    try {
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
       const sec: any = await import('capacitor-secure-storage-plugin').catch(() => null);
-    if (sec?.SecureStoragePlugin) {
-      backend = {
-        async get() {
-          try {
-            const v = await sec.SecureStoragePlugin.get({ key: KEY });
-            return (v?.value as string | undefined) ?? null;
-          } catch { return null; }
-        },
-        async set(value: string) {
-          await sec.SecureStoragePlugin.set({ key: KEY, value });
-        },
-        async clear() {
-          try { await sec.SecureStoragePlugin.remove({ key: KEY }); } catch { /* ignore */ }
-        },
-        isSecure: true,
-      };
-      return backend;
-    }
-  } catch { /* fall through */ }
+      if (sec?.SecureStoragePlugin) {
+        backend = {
+          async get() {
+            try {
+              const v = await sec.SecureStoragePlugin.get({ key: KEY });
+              return (v?.value as string | undefined) ?? null;
+            } catch { return null; }
+          },
+          async set(value: string) {
+            await sec.SecureStoragePlugin.set({ key: KEY, value });
+          },
+          async clear() {
+            try { await sec.SecureStoragePlugin.remove({ key: KEY }); } catch { /* ignore */ }
+          },
+          isSecure: true,
+        };
+        return backend;
+      }
+    } catch { /* fall through */ }
 
-  // 3. Capacitor Preferences (encrypted-at-rest on iOS, plain on Android).
-  try {
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    // 3. Capacitor Preferences (encrypted-at-rest on iOS, plain on Android).
+    try {
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
       const mod: any = await import('@capacitor/preferences').catch(() => null);
-    if (mod?.Preferences) {
-      backend = {
-        async get() {
-          const { value } = await mod.Preferences.get({ key: KEY });
-          return (value as string | null) ?? null;
-        },
-        async set(value: string) {
-          await mod.Preferences.set({ key: KEY, value });
-        },
-        async clear() {
-          await mod.Preferences.remove({ key: KEY });
-        },
-        isSecure: false,
-      };
-      return backend;
-    }
-  } catch { /* fall through */ }
+      if (mod?.Preferences) {
+        backend = {
+          async get() {
+            const { value } = await mod.Preferences.get({ key: KEY });
+            return (value as string | null) ?? null;
+          },
+          async set(value: string) {
+            await mod.Preferences.set({ key: KEY, value });
+          },
+          async clear() {
+            await mod.Preferences.remove({ key: KEY });
+          },
+          isSecure: false,
+        };
+        return backend;
+      }
+    } catch { /* fall through */ }
+  }
 
   // 4. Last-resort web fallback. Not for production.
   backend = {

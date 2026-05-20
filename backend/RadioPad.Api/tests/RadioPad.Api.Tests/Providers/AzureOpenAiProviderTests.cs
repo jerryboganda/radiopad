@@ -63,7 +63,7 @@ public class AzureOpenAiProviderTests
             var stub = StubHandler.Json(HttpStatusCode.OK, OkBody);
             var sut = new AzureOpenAiProvider(new StubHttpClientFactory(stub), NullLogger<AzureOpenAiProvider>.Instance);
             var req = Request();
-            req.Provider.EndpointUrl = "https://aoai.example.com?api-version=2025-03-01";
+            req.Provider.EndpointUrl = "https://example-aoai.openai.azure.com?api-version=2025-03-01";
             await sut.CompleteAsync(req, CancellationToken.None);
             Assert.Contains("api-version=2025-03-01", stub.Captured[0].RequestUri!.Query);
         }

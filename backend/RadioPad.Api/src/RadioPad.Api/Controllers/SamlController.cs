@@ -1,3 +1,4 @@
+using System.Collections.Concurrent;
 using System.Security.Cryptography;
 using System.Security.Cryptography.X509Certificates;
 using System.Security.Cryptography.Xml;
@@ -6,6 +7,7 @@ using System.Text.Json;
 using System.Xml;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
+using RadioPad.Api.Auth;
 using RadioPad.Application.Abstractions;
 using RadioPad.Domain.Entities;
 using RadioPad.Domain.Enums;
@@ -39,19 +41,21 @@ namespace RadioPad.Api.Controllers;
 /// header pipeline. <see cref="ProcessAcs"/> verifies the XML digital
 /// signature against the configured IdP certificate and rejects the
 /// assertion on any mismatch. When no IdP certificate is configured
-/// the controller is fail-CLOSED — operators must opt in to insecure
-/// dev mode by setting <c>RADIOPAD_SAML_DEV_INSECURE=true</c>.
+/// the controller is fail-CLOSED — non-production operators may opt in to
+/// insecure dev mode by setting <c>RADIOPAD_SAML_DEV_INSECURE=true</c>.
 /// </summary>
 [ApiController]
 [Route("saml")]
 public class SamlController : ControllerBase
 {
+    private static readonly ConcurrentDictionary<string, DateTimeOffset> SeenAssertionIds = new();
     private readonly RadioPadDbContext _db;
     private readonly IAuditLog _audit;
     private readonly ILogger<SamlController> _log;
+    private readonly IWebHostEnvironment _env;
 
-    public SamlController(RadioPadDbContext db, IAuditLog audit, ILogger<SamlController> log)
-    { _db = db; _audit = audit; _log = log; }
+    public SamlController(RadioPadDbContext db, IAuditLog audit, ILogger<SamlController> log, IWebHostEnvironment env)
+    { _db = db; _audit = audit; _log = log; _env = env; }
 
     [HttpGet("metadata")]
     [Produces("application/xml")]
@@ -99,7 +103,8 @@ public class SamlController : ControllerBase
             if (user.LockedUntil is not null && user.LockedUntil > DateTimeOffset.UtcNow)
                 return Unauthorized(new { error = "Account locked.", kind = "unauthenticated" });
 
-            var token = MagicLinkController.MintBearer(tenant.Slug, user.Email, user.SessionEpoch);
+            var issuedAt = DateTimeOffset.UtcNow;
+            var token = RadioPadBearerTokens.Mint(tenant.Slug, user.Email, user.SessionEpoch, _env, issuedAt);
             await _audit.AppendAsync(new AuditEvent
             {
                 TenantId = tenant.Id,
@@ -113,7 +118,7 @@ public class SamlController : ControllerBase
                 token,
                 tenant = tenant.Slug,
                 user = user.Email,
-                expiresAt = DateTimeOffset.UtcNow.AddHours(12),
+                expiresAt = RadioPadBearerTokens.ExpiresAt(issuedAt),
                 relayState = form.RelayState,
             });
         }
@@ -142,7 +147,12 @@ public class SamlController : ControllerBase
         nsm.AddNamespace("saml", "urn:oasis:names:tc:SAML:2.0:assertion");
         nsm.AddNamespace("ds", "http://www.w3.org/2000/09/xmldsig#");
 
+        var assertions = doc.SelectNodes("//saml:Assertion", nsm);
+        if (assertions is null || assertions.Count != 1) return null;
+        var assertion = (XmlElement)assertions[0]!;
+
         var certPem = Environment.GetEnvironmentVariable("RADIOPAD_SAML_IDP_CERT_PEM");
+        var devInsecure = false;
         if (string.IsNullOrWhiteSpace(certPem))
         {
             // SECURITY (iter-32 closeout, Momus finding #1): SAML ACS is
@@ -150,29 +160,120 @@ public class SamlController : ControllerBase
             // escape hatch (`RADIOPAD_SAML_DEV_INSECURE=true`) lets local
             // integration tests run without a real IdP, but the default
             // posture for any real environment is to refuse the assertion.
-            var devInsecure = Environment.GetEnvironmentVariable("RADIOPAD_SAML_DEV_INSECURE");
-            if (!string.Equals(devInsecure, "true", StringComparison.OrdinalIgnoreCase))
+            var isProduction = string.Equals(
+                    Environment.GetEnvironmentVariable("ASPNETCORE_ENVIRONMENT"),
+                    "Production",
+                    StringComparison.OrdinalIgnoreCase) ||
+                string.Equals(
+                    Environment.GetEnvironmentVariable("DOTNET_ENVIRONMENT"),
+                    "Production",
+                    StringComparison.OrdinalIgnoreCase);
+            devInsecure = !isProduction && string.Equals(
+                Environment.GetEnvironmentVariable("RADIOPAD_SAML_DEV_INSECURE"),
+                "true",
+                StringComparison.OrdinalIgnoreCase);
+            if (!devInsecure)
             {
                 return null;
             }
         }
         else
         {
+            var assertionId = assertion.GetAttribute("ID");
+            if (string.IsNullOrWhiteSpace(assertionId)) return null;
+
             // Verify the assertion signature against the configured IdP cert.
             var cert = LoadCert(certPem);
-            var signedNode = doc.SelectSingleNode("//ds:Signature", nsm) as XmlElement;
+            var signedNode = assertion.SelectSingleNode("./ds:Signature", nsm) as XmlElement;
             if (signedNode is null) return null;
-            var signed = new SignedXml((XmlElement)signedNode.ParentNode!);
+            var signed = new SignedXml(assertion);
             signed.LoadXml(signedNode);
+            if (!SignatureReferencesSelectedAssertion(signed, assertionId)) return null;
             if (!signed.CheckSignature(cert, true)) return null;
         }
 
-        var nameId = doc.SelectSingleNode("//saml:Subject/saml:NameID", nsm)?.InnerText;
+        if (!devInsecure && !ValidateSignedAssertion(assertion, doc.DocumentElement, nsm)) return null;
+
+        var nameId = assertion.SelectSingleNode(".//saml:Subject/saml:NameID", nsm)?.InnerText;
         var attrName = Environment.GetEnvironmentVariable("RADIOPAD_SAML_TENANT_ATTRIBUTE") ?? "tenant_slug";
-        var tenantValue = doc.SelectSingleNode(
-            $"//saml:Attribute[@Name='{attrName}']/saml:AttributeValue", nsm)?.InnerText;
+        var tenantValue = assertion.SelectSingleNode(
+            $".//saml:Attribute[@Name='{attrName}']/saml:AttributeValue", nsm)?.InnerText;
         if (string.IsNullOrWhiteSpace(nameId) || string.IsNullOrWhiteSpace(tenantValue)) return null;
         return (tenantValue.Trim(), nameId.Trim());
+    }
+
+    private static bool SignatureReferencesSelectedAssertion(SignedXml signed, string assertionId)
+    {
+        if (string.IsNullOrWhiteSpace(assertionId)) return false;
+        var references = signed.SignedInfo?.References;
+        if (references is null || references.Count != 1) return false;
+        var reference = references[0] as Reference;
+        return string.Equals(reference?.Uri, "#" + assertionId, StringComparison.Ordinal);
+    }
+
+    private static bool ValidateSignedAssertion(XmlElement assertion, XmlElement? response, XmlNamespaceManager nsm)
+    {
+        var now = DateTimeOffset.UtcNow;
+        foreach (var entry in SeenAssertionIds.Where(x => x.Value <= now).ToArray())
+            SeenAssertionIds.TryRemove(entry.Key, out _);
+
+        var assertionId = assertion.GetAttribute("ID");
+        if (string.IsNullOrWhiteSpace(assertionId)) return false;
+
+        var conditions = assertion.SelectSingleNode("./saml:Conditions", nsm) as XmlElement;
+        if (conditions is null) return false;
+        if (!ValidateSamlTimeWindow(conditions.GetAttribute("NotBefore"), conditions.GetAttribute("NotOnOrAfter"), now, out var expiresAt))
+            return false;
+
+        var entityId = Environment.GetEnvironmentVariable("RADIOPAD_SAML_ENTITY_ID") ?? "https://radiopad.local/saml";
+        var audiences = conditions.SelectNodes("./saml:AudienceRestriction/saml:Audience", nsm);
+        if (audiences is null || !audiences.Cast<XmlNode>().Any(a => string.Equals(a.InnerText.Trim(), entityId, StringComparison.Ordinal)))
+            return false;
+
+        var expectedIssuer = Environment.GetEnvironmentVariable("RADIOPAD_SAML_IDP_ISSUER");
+        if (!string.IsNullOrWhiteSpace(expectedIssuer))
+        {
+            var issuer = assertion.SelectSingleNode("./saml:Issuer", nsm)?.InnerText.Trim();
+            if (!string.Equals(issuer, expectedIssuer, StringComparison.Ordinal)) return false;
+        }
+
+        var acsUrl = Environment.GetEnvironmentVariable("RADIOPAD_SAML_ACS_URL");
+        if (!string.IsNullOrWhiteSpace(acsUrl))
+        {
+            var destination = response?.GetAttribute("Destination");
+            if (!string.IsNullOrWhiteSpace(destination) && !string.Equals(destination, acsUrl, StringComparison.Ordinal))
+                return false;
+            var recipient = assertion.SelectSingleNode(".//saml:SubjectConfirmationData", nsm) as XmlElement;
+            var recipientUrl = recipient?.GetAttribute("Recipient");
+            if (!string.IsNullOrWhiteSpace(recipientUrl) && !string.Equals(recipientUrl, acsUrl, StringComparison.Ordinal))
+                return false;
+            if (recipient is not null && !ValidateSamlTimeWindow(null, recipient.GetAttribute("NotOnOrAfter"), now, out _))
+                return false;
+        }
+
+        return SeenAssertionIds.TryAdd(assertionId, expiresAt ?? now.AddMinutes(5));
+    }
+
+    private static bool ValidateSamlTimeWindow(string? notBeforeRaw, string? notOnOrAfterRaw, DateTimeOffset now, out DateTimeOffset? expiresAt)
+    {
+        expiresAt = null;
+        var skew = TimeSpan.FromMinutes(2);
+        if (!string.IsNullOrWhiteSpace(notBeforeRaw))
+        {
+            if (!DateTimeOffset.TryParse(notBeforeRaw, out var notBefore)) return false;
+            if (now + skew < notBefore.ToUniversalTime()) return false;
+        }
+        if (!string.IsNullOrWhiteSpace(notOnOrAfterRaw))
+        {
+            if (!DateTimeOffset.TryParse(notOnOrAfterRaw, out var notOnOrAfter)) return false;
+            expiresAt = notOnOrAfter.ToUniversalTime();
+            if (now - skew >= expiresAt.Value) return false;
+        }
+        else
+        {
+            return false;
+        }
+        return true;
     }
 
     private static X509Certificate2 LoadCert(string pem)

@@ -1,6 +1,6 @@
 # Vendor Risk Register
 
-**Status:** Draft  ·  **Owner:** Regulatory + Security  ·  **Last Updated:** 2026-05-04  ·  **Iteration:** 31
+**Status:** Draft  ·  **Owner:** Regulatory + Security  ·  **Last Updated:** 2026-05-20  ·  **Iteration:** 48
 
 This register inventories every external vendor / processor that may touch RadioPad customer data, alongside the compliance posture and the safeguards that gate them. It is the canonical source for HIPAA Subprocessor disclosures and GDPR Article 28 records.
 
@@ -23,7 +23,11 @@ The PHI policy gate (`AiGateway.EnforcePhiPolicy`) **never** routes PHI to a ven
 | AWS Bedrock | `AwsBedrockProvider` | tenant-pinned (e.g. `eu-central-1`, `us-east-1`) | `PhiApproved` (with AWS BAA) | yes (AWS BAA) | No retention by Bedrock; provider-model dependent | AWS SCCs | Use Anthropic Claude / Meta Llama models that AWS confirms in scope. |
 | Google Vertex AI | `GoogleVertexAiProvider` | tenant-pinned (e.g. `europe-west4`, `us-central1`) | `PhiApproved` (with Google BAA) | yes (Google Cloud BAA) | No prompt logging on configured projects | Google SCCs | Vertex publisher models only; user-managed encryption keys when SEC-003 lands. |
 | OpenAI direct | `OpenAiDirectProvider` | global | `PhiApproved` only after BAA + ZDR + abuse-monitoring exemption | yes (OpenAI BAA) | ZDR + Modified Abuse Monitoring required for PHI | OpenAI SCCs | Without BAA + ZDR the adapter is set to `DeIdentifiedOnly`. |
-| OpenAI-compatible (generic) | `OpenAiCompatibleProvider` | depends on endpoint | per-endpoint (defaults to `DeIdentifiedOnly`; admin can set `LocalOnly` for self-hosted) | per-endpoint | per-endpoint | per-endpoint | Covers DigitalOcean serverless inference, NVIDIA NIM, Cloudflare AI, Together, Groq, vLLM, Mistral, OpenRouter, Ollama, etc. Each tenant declares the class. |
+| OpenAI-compatible (generic) | `OpenAiCompatibleProvider` | depends on endpoint | per-endpoint (remote defaults to `Sandbox`; admin can set `LocalOnly` for self-hosted) | per-endpoint | per-endpoint | per-endpoint | Covers DigitalOcean serverless inference, NVIDIA NIM, Cloudflare AI, Together, Groq, vLLM, Mistral, OpenRouter, Ollama, etc. Private-network endpoints require `LocalOnly`; hosted adapters validate HTTPS, host allowlists, default ports, no userinfo, and no IP literals before credentials attach. PHI requires `LocalOnly` or an explicit reviewed allow flag. |
+| GitHub Copilot SDK | `GitHubCopilotSdkProvider` | GitHub-hosted / backend SDK transport, when available | `Sandbox`; PHI refused by adapter | pending reviewed contract | pending official SDK transport | pending | Provider id is fail-closed. No IDE-token scraping, undocumented endpoints, or PHI routing. |
+| GitHub Copilot CLI | `GitHubCopilotCliProvider` | local binary, vendor cloud possible | `Sandbox`; PHI refused by adapter | per-customer GitHub agreement | vendor-controlled | per-customer | Prompt is piped on stdin; production server-side execution requires `RADIOPAD_COPILOT_SERVER_CLI_ENABLED=1`; binary allowlist, env scrub, timeout, and secret/PHI refusal apply. |
+| Gemini CLI | `GeminiCliProvider` | local binary, Google cloud possible | `Sandbox`; PHI refused by adapter | per-customer Google agreement | vendor-controlled | per-customer | Prompt is piped on stdin; JSON stdout is parsed when present; env scrub and secret/PHI refusal apply. |
+| OpenAI Codex CLI | `CodexCliProvider` | local binary, OpenAI cloud possible | `Sandbox`; PHI refused by adapter | per-customer OpenAI agreement | vendor-controlled | per-customer | Fails closed unless `RADIOPAD_CODEX_CLI_ENABLED=1`; invokes `codex exec --sandbox read-only -`; no full-auto mode by default; env scrub and secret/PHI refusal apply. |
 
 ## Cloud / infrastructure
 
@@ -50,4 +54,7 @@ The PHI policy gate (`AiGateway.EnforcePhiPolicy`) **never** routes PHI to a ven
 
 | Date | Change | Iter |
 | --- | --- | --- |
+| 2026-05-19 | Added Iter-47 provider hardening notes for hosted endpoint allowlists, Copilot production CLI opt-in, and Codex read-only invocation | 47 |
+| 2026-05-20 | Added Iter-48 browser-auth hardening posture: production magic links require configured SMTP/public URL and no raw dev links are exposed | 48 |
+| 2026-05-19 | Added fail-closed GitHub Copilot SDK, GitHub Copilot CLI, Gemini CLI, and Codex CLI provider rows; clarified OpenAI-compatible endpoint/PHI posture | 46 |
 | 2026-05-04 | Initial register; 5 AI provider rows; scaffolding for KMS / SCIM follow-ups | 31 |

@@ -17,14 +17,17 @@ var builder = WebApplication.CreateBuilder(args);
 // vars always win.
 RadioPad.Api.Auth.OidcProfiles.ApplyToEnvironment(
     Environment.GetEnvironmentVariable("RADIOPAD_OIDC_PRESET"));
+RadioPad.Api.Auth.RadioPadBearerTokens.ValidateStartupSecret(builder.Environment);
 
 // Bind to localhost by default (safety boundary §local-trust).
 var bindUrl = Environment.GetEnvironmentVariable("RADIOPAD_BIND") ?? "http://127.0.0.1:7457";
+if (!bindUrl.Contains("://", StringComparison.Ordinal)) bindUrl = $"http://{bindUrl}";
 builder.WebHost.UseUrls(bindUrl);
 
 builder.Services.AddDbContext<RadioPadDbContext>(opt =>
 {
     var conn = builder.Configuration.GetConnectionString("RadioPad")
+        ?? Environment.GetEnvironmentVariable("RADIOPAD_DB")
         ?? "Data Source=radiopad.dev.db";
     // Connection-string sniff: "Host=..." or "Server=...;Port=..." => Postgres,
     // anything else falls back to SQLite for the dev workstation case.
@@ -47,7 +50,7 @@ builder.Services.AddHttpClient("ai", c =>
 {
     var sec = int.TryParse(Environment.GetEnvironmentVariable("RADIOPAD_AI_HTTP_TIMEOUT_SEC"), out var t) && t > 0 ? t : 60;
     c.Timeout = TimeSpan.FromSeconds(sec);
-});
+}).ConfigurePrimaryHttpMessageHandler(() => new HttpClientHandler { AllowAutoRedirect = false });
 
 // AI provider adapters
 builder.Services.AddSingleton<IAiProviderAdapter, MockAiAdapter>();
@@ -59,13 +62,15 @@ builder.Services.AddSingleton<IAiProviderAdapter, RadioPad.Infrastructure.Provid
 builder.Services.AddSingleton<IAiProviderAdapter, RadioPad.Infrastructure.Providers.GoogleVertexAiProvider>();
 builder.Services.AddSingleton<IAiProviderAdapter, RadioPad.Infrastructure.Providers.OpenAiDirectProvider>();
 builder.Services.AddSingleton<IAiProviderAdapter, RadioPad.Infrastructure.Providers.OpenAiCompatibleProvider>();
+builder.Services.AddSingleton<IAiProviderAdapter, RadioPad.Infrastructure.Providers.GitHubCopilotSdkProvider>();
 // Iter-32 AI-011 — local-only adapters. Default to 127.0.0.1; remote URLs
 // require explicit operator configuration. Compliance class defaults to
 // LocalOnly so PHI may be routed when the operator opts in.
 builder.Services.AddSingleton<IAiProviderAdapter, RadioPad.Infrastructure.Providers.Local.OllamaProvider>();
 builder.Services.AddSingleton<IAiProviderAdapter, RadioPad.Infrastructure.Providers.Local.VLlmProvider>();
 builder.Services.AddSingleton<IAiProviderAdapter, RadioPad.Infrastructure.Providers.Local.LlamaCppProvider>();
-// Iter-36 AI-012 — CLI-spawning adapters (default LocalOnly). The
+// Iter-36 AI-012 — CLI-spawning adapters (default Sandbox because the
+// local binary may call vendor cloud APIs). The
 // per-process launcher is a singleton so test code can substitute it.
 builder.Services.AddSingleton<RadioPad.Infrastructure.Providers.Cli.IProcessLauncher,
     RadioPad.Infrastructure.Providers.Cli.DefaultProcessLauncher>();
@@ -213,12 +218,18 @@ builder.Services.AddHostedService(sp =>
 // resolved once at startup from RADIOPAD_COLUMN_KEY_REF (KMS reference) +
 // RADIOPAD_COLUMN_KEY_WRAPPED (b64 wrapped DEK). When unset (dev/test) the
 // encryptor falls back to a deterministic key so EnsureCreated suites work
-// without operator setup.
+// without operator setup. Production fails closed if either value is missing.
 builder.Services.AddSingleton<RadioPad.Application.Abstractions.IColumnEncryptor>(sp =>
 {
     var resolver = sp.GetService<RadioPad.Application.Services.Kms.IKmsResolver>();
     var keyRef = Environment.GetEnvironmentVariable("RADIOPAD_COLUMN_KEY_REF");
     var wrapped = Environment.GetEnvironmentVariable("RADIOPAD_COLUMN_KEY_WRAPPED");
+    if (builder.Environment.IsProduction() &&
+        (string.IsNullOrWhiteSpace(keyRef) || string.IsNullOrWhiteSpace(wrapped)))
+    {
+        throw new InvalidOperationException("Production requires RADIOPAD_COLUMN_KEY_REF and RADIOPAD_COLUMN_KEY_WRAPPED for column encryption.");
+    }
+
     var enc = RadioPad.Infrastructure.Security.AesGcmColumnEncryptor
         .CreateAsync(resolver, keyRef, wrapped, default)
         .GetAwaiter().GetResult();
@@ -385,6 +396,18 @@ builder.Logging.AddSimpleConsole(o =>
 
 var app = builder.Build();
 
+if (app.Environment.IsProduction() &&
+    !string.IsNullOrWhiteSpace(Environment.GetEnvironmentVariable("RADIOPAD_OIDC_AUTHORITY")) &&
+    string.IsNullOrWhiteSpace(Environment.GetEnvironmentVariable("RADIOPAD_OIDC_AUDIENCE")))
+{
+    throw new InvalidOperationException("Production OIDC requires RADIOPAD_OIDC_AUDIENCE when RADIOPAD_OIDC_AUTHORITY is configured.");
+}
+
+// Resolve the encryptor before EF builds its model for migrations/seeding.
+// This makes the production KMS contract fail closed during startup rather
+// than silently letting EF converters initialize the non-production fallback.
+_ = app.Services.GetRequiredService<RadioPad.Application.Abstractions.IColumnEncryptor>();
+
 if (!app.Environment.IsEnvironment("Testing"))
 {
     using var scope = app.Services.CreateScope();
@@ -394,9 +417,12 @@ if (!app.Environment.IsEnvironment("Testing"))
     // including auth flows (MagicLinkToken, DeviceAuthRequest), retention,
     // CMK and SCIM additions.
     await db.Database.MigrateAsync();
-    var rulebooksDir = Path.Combine(AppContext.BaseDirectory, "..", "..", "..", "..", "..", "..", "..", "rulebooks");
-    rulebooksDir = Path.GetFullPath(rulebooksDir);
-    await DevSeed.EnsureSeededAsync(db, rulebooksDir, default);
+    if (app.Environment.IsDevelopment() || Environment.GetEnvironmentVariable("RADIOPAD_DEV_SEED") == "1")
+    {
+        var rulebooksDir = Path.Combine(AppContext.BaseDirectory, "..", "..", "..", "..", "..", "..", "..", "rulebooks");
+        rulebooksDir = Path.GetFullPath(rulebooksDir);
+        await DevSeed.EnsureSeededAsync(db, rulebooksDir, default);
+    }
 }
 
 app.UseMiddleware<RequestCorrelationMiddleware>();
@@ -404,17 +430,23 @@ app.UseMiddleware<GlobalExceptionMiddleware>();
 // Iter-33 PERF-004 — record per-route request duration. Sits after
 // correlation/exception so failed requests still produce a histogram sample.
 app.UseMiddleware<PerfBudgetMiddleware>();
-app.UseMiddleware<IpAllowlistMiddleware>();
 // Iter-32 SEC-008 — global per-IP + per-tenant fixed-window rate limiter.
-// Sits after IP allowlist (so blocked IPs never even reach the limiter) and
-// before auth so brute-force attempts are rate-limited too.
+// Sits before auth so brute-force attempts are rate-limited too.
 app.UseMiddleware<RateLimitMiddleware>();
 app.UseMiddleware<OidcBearerMiddleware>();
+app.UseMiddleware<RadioPadBearerMiddleware>();
+// Runs after identity projection so per-tenant allowlists are evaluated
+// against the validated bearer/cookie/OIDC tenant, while public magic-link
+// requests still resolve the tenant from the request body.
+app.UseMiddleware<IpAllowlistMiddleware>();
 app.UseMiddleware<SuspensionGuardMiddleware>();
 app.UseCors();
 app.UseRateLimiter();
-app.UseSwagger();
-app.UseSwaggerUI();
+if (!app.Environment.IsProduction() || Environment.GetEnvironmentVariable("RADIOPAD_ENABLE_SWAGGER") == "1")
+{
+    app.UseSwagger();
+    app.UseSwaggerUI();
+}
 app.MapControllers();
 app.MapGet("/api/health", () => Results.Ok(new { status = "ok", service = "radiopad-api", time = DateTimeOffset.UtcNow }));
 app.MapGet("/api/health/ready", async (RadioPadDbContext db, CancellationToken ct) =>

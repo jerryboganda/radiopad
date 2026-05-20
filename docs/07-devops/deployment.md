@@ -1,6 +1,6 @@
 # Deployment
 
-**Status:** Current (basic)  ·  **Owner:** Ops  ·  **Last Updated:** 2026-05-04
+**Status:** Current (basic)  ·  **Owner:** Ops  ·  **Last Updated:** 2026-05-20
 
 ## Targets
 
@@ -23,8 +23,15 @@ services:
     image: radiopad/api:<tag>
     environment:
       RADIOPAD_BIND: 0.0.0.0:7457
-      RADIOPAD_DB: Host=postgres;Database=radiopad;Username=radiopad;Password=...
+      ConnectionStrings__RadioPad: Host=postgres;Database=radiopad;Username=radiopad;Password=...
       ASPNETCORE_ENVIRONMENT: Production
+      RADIOPAD_AUTH_SECRET: <random-32-byte-secret>
+      RADIOPAD_PUBLIC_WEB_URL: https://radiopad.example.com
+      RADIOPAD_DEV_HEADERS: "0"
+      RADIOPAD_ENABLE_SWAGGER: "0"
+      RADIOPAD_COLUMN_KEY_REF: env:RADIOPAD_COLUMN_KEK
+      RADIOPAD_COLUMN_KEK: <base64-32-byte-wrapping-key>
+      RADIOPAD_COLUMN_KEY_WRAPPED: <base64-wrapped-32-byte-data-key>
     depends_on: [postgres]
   postgres:
     image: postgres:16
@@ -57,4 +64,8 @@ volumes:
 - `curl /api/health` → 200.
 - `curl /api/health/ready` → 200.
 - Sign in to staging tenant and run the full smoke flow.
+- Request a magic link and confirm the response never includes `devLink` in Production.
+- Confirm `/saml/metadata` and `/scim/v2/ServiceProviderConfig` are proxied to the API when those integrations are enabled.
 - Verify audit chain: `radiopad audit verify --tenant <slug>`.
+- Confirm production API calls without a valid bearer/OIDC identity return 401 unless `RADIOPAD_DEV_HEADERS=1` was explicitly set for a controlled test host.
+- If `RADIOPAD_TRUST_FORWARDED_FOR=1`, confirm `RADIOPAD_TRUSTED_PROXY_CIDRS` covers only the immediate reverse proxy peer.

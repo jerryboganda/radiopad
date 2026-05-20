@@ -11,19 +11,14 @@
  */
 
 import { api } from './api';
+import { getNativeCapacitorPlatform } from './nativeRuntime';
 
 export type PushPlatform = 'ios' | 'android' | 'web';
 
 export type PushRegistration = { token: string; platform: PushPlatform };
 
 function detectPlatform(): PushPlatform {
-  // Capacitor Core exposes a global `Capacitor.getPlatform()` when running
-  // inside the native shell. We avoid a static import so the web build does
-  // not pull the plugin runtime.
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const cap = (globalThis as any)?.Capacitor;
-  const p = typeof cap?.getPlatform === 'function' ? cap.getPlatform() : 'web';
-  return p === 'ios' || p === 'android' ? p : 'web';
+  return getNativeCapacitorPlatform() ?? 'web';
 }
 
 /**

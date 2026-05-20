@@ -37,6 +37,7 @@ public sealed class AzureOpenAiProvider : IAiProviderAdapter
         var p = request.Provider;
         if (string.IsNullOrWhiteSpace(p.EndpointUrl))
             throw new ProviderTransportException($"{AdapterId}: provider '{p.Name}' is missing an endpoint URL.");
+        OpenAiChatHelpers.ValidateHostedEndpoint(p.EndpointUrl, AdapterId);
 
         var apiKey = ProviderSecretResolver.Resolve(p.ApiKeySecretRef, fallbackEnv: "RADIOPAD_PROVIDER_AZURE_OPENAI_API_KEY");
         if (string.IsNullOrEmpty(apiKey))

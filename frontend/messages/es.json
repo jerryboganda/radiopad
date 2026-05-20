@@ -4,6 +4,8 @@
     "rulebooks": "Reglamentos",
     "templates": "Plantillas",
     "providers": "Proveedores",
+    "copilot": "GitHub Copilot",
+    "copilotAdmin": "Administración de Copilot",
     "prompts": "Indicaciones",
     "marketplace": "Mercado",
     "validation": "Validación",

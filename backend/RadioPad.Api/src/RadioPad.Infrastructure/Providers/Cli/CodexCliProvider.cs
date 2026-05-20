@@ -2,6 +2,7 @@ using System.Diagnostics;
 using Microsoft.Extensions.Logging;
 using RadioPad.Application.Abstractions;
 using RadioPad.Application.Services;
+using RadioPad.Domain.Entities;
 using RadioPad.Domain.Enums;
 using RadioPad.Domain.ValueObjects;
 
@@ -11,11 +12,11 @@ namespace RadioPad.Infrastructure.Providers.Cli;
 /// Iter-36 — adapter that shells out to the OpenAI Codex CLI
 /// (<c>codex</c>). Provider id <c>codex-cli</c>. Binary defaults to
 /// <c>codex</c>; override with <c>RADIOPAD_CODEX_BIN</c>. The prompt is
-/// piped on stdin via <c>--stdin</c>. Compliance class defaults to
+/// piped on stdin through <c>codex exec -</c>. Compliance class defaults to
 /// <see cref="ProviderComplianceClass.Sandbox"/> because the CLI may call a
 /// vendor cloud.
 /// </summary>
-public sealed class CodexCliProvider : IAiProviderAdapter
+public sealed class CodexCliProvider : IAiProviderAdapter, IAiProviderHealthProbe
 {
     public const string AdapterId = "codex-cli";
     public const string BinaryEnvVar = "RADIOPAD_CODEX_BIN";
@@ -33,8 +34,18 @@ public sealed class CodexCliProvider : IAiProviderAdapter
 
     public string Id => AdapterId;
 
+    public Task<AiProviderHealthResult> ProbeAsync(ProviderConfig provider, CancellationToken cancellationToken)
+    {
+        var bin = CliProviderRunner.ResolveBinary(BinaryEnvVar, DefaultBinary);
+        return CliProviderRunner.ProbeBinaryAsync(AdapterId, bin, new[] { "--version" }, _launcher, cancellationToken);
+    }
+
     public async Task<AiResult> CompleteAsync(AiCompletionRequest request, CancellationToken cancellationToken)
     {
+        CliProviderRunner.EnforceRequestPolicy(AdapterId, request);
+        if (Environment.GetEnvironmentVariable("RADIOPAD_CODEX_CLI_ENABLED") != "1")
+            throw new ProviderPolicyException($"{AdapterId}: runtime_not_enabled");
+
         var p = request.Provider;
         var bin = CliProviderRunner.ResolveBinary(BinaryEnvVar, DefaultBinary);
         CliProviderRunner.EnforceBinaryAllowlist(AdapterId, bin);
@@ -42,17 +53,14 @@ public sealed class CodexCliProvider : IAiProviderAdapter
             CliProviderRunner.Sanitise(AdapterId, request.SystemPrompt),
             CliProviderRunner.Sanitise(AdapterId, request.UserPrompt));
 
-        // D1 — Updated 2025-06: codex CLI uses `--quiet` to suppress
-        // interactive UI and `--full-auto` for non-interactive execution.
-        // `--stdin` is not a published flag; prompt is piped via stdin
-        // naturally. Wrapping mode defaults to full-auto for headless use.
-        // TODO: Update when vendor publishes stable non-interactive flags
-        var args = new List<string> { "--quiet", "--full-auto" };
+        // Keep Codex read-only by default; edit-capable modes require a separate reviewed flow.
+        var args = new List<string> { "exec", "--sandbox", "read-only" };
         if (!string.IsNullOrWhiteSpace(p.Model))
         {
             args.Add("--model");
             args.Add(p.Model);
         }
+        args.Add("-");
 
         var spec = new ProcessLaunchSpec(
             FileName: bin,

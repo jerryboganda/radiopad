@@ -12,6 +12,7 @@
  */
 
 import { api } from './api';
+import { isNativeCapacitorPlatform } from './nativeRuntime';
 
 export type OfflineDraft = {
   /** Local id; replaced with the server id once the create succeeds. */
@@ -90,24 +91,26 @@ async function getStorage(): Promise<Storage> {
   } catch {
     /* fall through to Capacitor / localStorage */
   }
-  try {
-    // Capacitor Preferences is dynamic so the web bundle stays small.
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  if (isNativeCapacitorPlatform()) {
+    try {
+      // Capacitor Preferences is dynamic so the web bundle stays small.
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
       const mod: any = await import('@capacitor/preferences').catch(() => null);
-    if (mod?.Preferences) {
-      storage = {
-        async get() {
-          const { value } = await mod.Preferences.get({ key: STORAGE_KEY });
-          return value ? (JSON.parse(value) as OfflineDraft[]) : [];
-        },
-        async set(v) {
-          await mod.Preferences.set({ key: STORAGE_KEY, value: JSON.stringify(v) });
-        },
-      };
-      return storage;
+      if (mod?.Preferences) {
+        storage = {
+          async get() {
+            const { value } = await mod.Preferences.get({ key: STORAGE_KEY });
+            return value ? (JSON.parse(value) as OfflineDraft[]) : [];
+          },
+          async set(v) {
+            await mod.Preferences.set({ key: STORAGE_KEY, value: JSON.stringify(v) });
+          },
+        };
+        return storage;
+      }
+    } catch {
+      /* fall through to localStorage */
     }
-  } catch {
-    /* fall through to localStorage */
   }
   storage = {
     async get() {

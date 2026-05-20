@@ -76,9 +76,9 @@ public static class DevSeed
                 {
                     TenantId = tenant.Id,
                     Name = "Local Ollama",
-                    Adapter = "ollama",
+                    Adapter = "ollama-chat",
                     Model = "llama3.1:8b-instruct",
-                    EndpointUrl = "http://localhost:11434/api/generate",
+                    EndpointUrl = "http://127.0.0.1:11434",
                     Compliance = ProviderComplianceClass.LocalOnly,
                     Enabled = false,
                     Priority = 10,

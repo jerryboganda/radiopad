@@ -8,5 +8,5 @@
     "impression": "1. Critical right frontal acute subdural haematoma with 5 mm midline shift.\n2. Non-displaced right frontal skull fracture.",
     "recommendations": "Neurosurgery consult."
   },
-  "expectFlagged": ["critical_result_language"]
+  "expectFlagged": ["critical_result_language", "critical_finding_language"]
 }

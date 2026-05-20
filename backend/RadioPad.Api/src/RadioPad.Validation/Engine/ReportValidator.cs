@@ -24,8 +24,8 @@ public class ReportValidator
     private static readonly Regex LiRadsCategoryRe = new(@"\bLI[-\s]?RADS\b\s*:?\s*(?:category\s*:?\s*)?(?:LR[-\s]?)?(1|2|3|4|5|M|TIV|NC)\b|\bLR[-\s]?(1|2|3|4|5|M|TIV|NC)\b", RegexOptions.IgnoreCase | RegexOptions.Compiled);
     private static readonly Regex PiRadsCategoryRe = new(@"\bPI[-\s]?RADS\b\s*:?\s*(?:category\s*:?\s*)?([1-5])\b", RegexOptions.IgnoreCase | RegexOptions.Compiled);
     private static readonly Regex BiRadsCategoryLineRe = new(@"(?m)^\s*(?:\d+\.|[-*])?\s*BI[-\s]?RADS\b\s*:?\s*(?:category\s*:?\s*)?(0|1|2|3|4A|4B|4C|4|5|6)\b", RegexOptions.IgnoreCase | RegexOptions.Compiled);
-    private static readonly Regex TiRadsCategoryRe = new(@"\bTI[-\s]?RADS\b\s*:?\s*(?:category\s*:?\s*)?(?:TR)?[1-5]\b", RegexOptions.IgnoreCase | RegexOptions.Compiled);
-    private static readonly Regex ContrastPhaseRe = new(@"\b(portal\s+venous|arterial|delayed|non[-\s]?contrast|with\s+contrast)\b", RegexOptions.IgnoreCase | RegexOptions.Compiled);
+    private static readonly Regex TiRadsCategoryRe = new(@"\b(?:TI[-\s]?RADS\b\s*:?\s*(?:category\s*:?\s*)?(?:TR)?[1-5]|TR[1-5])\b", RegexOptions.IgnoreCase | RegexOptions.Compiled);
+    private static readonly Regex ContrastPhaseRe = new(@"\b(portal[-\s]+venous|arterial|delayed|non[-\s]?contrast|with\s+contrast)\b", RegexOptions.IgnoreCase | RegexOptions.Compiled);
     private static readonly Regex GcsRe = new(@"\bGCS\s*:?\s*\d{1,2}\b", RegexOptions.IgnoreCase | RegexOptions.Compiled);
     private static readonly Regex BiaxialMeasurementRe = new(@"\d+(?:\.\d+)?\s*[x×]\s*\d+(?:\.\d+)?\s*(?:mm|cm)\b", RegexOptions.IgnoreCase | RegexOptions.Compiled);
     private static readonly Regex FigoStageRe = new(@"\bFIGO\s+stage\b|\bStage\s+(?:I{1,3}V?|IV)\b", RegexOptions.IgnoreCase | RegexOptions.Compiled);
@@ -676,6 +676,8 @@ public class ReportValidator
         {
             if (!Regex.IsMatch(clause, @"\bmidline\s+shift\b", RegexOptions.IgnoreCase))
                 continue;
+            if (IsNegatedMention(clause, "midline shift"))
+                continue;
             if (MeasurementRe.IsMatch(clause))
                 continue;
             yield return new ValidationFinding(
@@ -821,7 +823,7 @@ public class ReportValidator
         var recommendations = r.Recommendations ?? string.Empty;
 
         // Only fire when TI-RADS >= 3
-        var tiRadsMatch = Regex.Match(impression, @"\bTI[-\s]?RADS\b\s*:?\s*(?:category\s*:?\s*)?(?:TR)?([1-5])\b", RegexOptions.IgnoreCase);
+        var tiRadsMatch = Regex.Match(impression, @"\b(?:TI[-\s]?RADS\b\s*:?\s*(?:category\s*:?\s*)?(?:TR)?|TR)([1-5])\b", RegexOptions.IgnoreCase);
         if (!tiRadsMatch.Success)
             yield break;
         if (int.TryParse(tiRadsMatch.Groups[1].Value, out var category) && category < 3)

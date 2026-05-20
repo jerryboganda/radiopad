@@ -15,6 +15,23 @@ public interface IAiProviderAdapter
     Task<AiResult> CompleteAsync(AiCompletionRequest request, CancellationToken cancellationToken);
 }
 
+/// <summary>
+/// Optional capability for provider adapters that can perform a safe,
+/// prompt-free readiness probe. Implementations must never send clinical
+/// text or secret material during a probe.
+/// </summary>
+public interface IAiProviderHealthProbe
+{
+    Task<AiProviderHealthResult> ProbeAsync(ProviderConfig provider, CancellationToken cancellationToken);
+}
+
+public sealed record AiProviderHealthResult(
+    bool Ok,
+    string? Error = null,
+    string? Note = null,
+    int? Status = null,
+    string? Runtime = null);
+
 public sealed record AiCompletionRequest(
     ProviderConfig Provider,
     string SystemPrompt,

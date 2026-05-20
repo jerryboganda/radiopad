@@ -2,16 +2,68 @@ name: release-beta
 
 on:
   workflow_dispatch:
+    inputs:
+      version:
+        description: Beta version or tag name to validate
+        required: true
+        type: string
 
 permissions:
   contents: read
 
+concurrency:
+  group: release-beta-${{ github.ref }}-${{ inputs.version }}
+  cancel-in-progress: false
+
 jobs:
-  placeholder:
-    name: Release beta placeholder
+  validate-beta:
+    name: Validate beta build
     runs-on: ubuntu-latest
     steps:
-      - name: Note pending release-beta implementation
-        run: |
-          echo "release-beta workflow placeholder"
-          echo "TODO: wire build, packaging, e2e, and beta publishing after release boundaries are defined."
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup .NET
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: 8.0.x
+
+      - name: Setup Node + pnpm
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+      - uses: pnpm/action-setup@v3
+        with:
+          version: 9
+
+      - name: Restore backend
+        working-directory: backend/RadioPad.Api
+        run: dotnet restore
+
+      - name: Build backend
+        working-directory: backend/RadioPad.Api
+        run: dotnet build --no-restore
+
+      - name: Test backend
+        working-directory: backend/RadioPad.Api
+        run: dotnet test --no-build
+
+      - name: Install frontend dependencies
+        working-directory: frontend
+        run: pnpm install --frozen-lockfile
+
+      - name: Typecheck frontend
+        working-directory: frontend
+        run: pnpm typecheck
+
+      - name: Build frontend static export
+        working-directory: frontend
+        run: pnpm build
+
+      - name: Upload frontend static export
+        uses: actions/upload-artifact@v4
+        with:
+          name: radiopad-web-beta-${{ inputs.version }}
+          path: frontend/out
+          if-no-files-found: error
+          retention-days: 14

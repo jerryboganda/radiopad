@@ -7,7 +7,7 @@
 - Domain entities + enums.
 - Application services (`AiGateway` policy logic, `FhirDiagnosticReportSerializer`).
 - Validation engine + rulebook YAML parsing.
-- Infrastructure helpers (`AuditLog` chain math, `EnvSecretResolver`).
+- Infrastructure helpers (`AuditLog` chain math, `ProviderSecretResolver`).
 - Frontend pure utilities.
 
 ## Tooling

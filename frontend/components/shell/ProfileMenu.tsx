@@ -2,8 +2,10 @@
 
 import Link from 'next/link';
 import { useEffect, useRef, useState } from 'react';
+import { useRouter } from 'next/navigation';
 import { useTranslations } from 'next-intl';
-import { api } from '@/lib/api';
+import { api, setActiveAuthToken } from '@/lib/api';
+import { clearAuthToken } from '@/lib/secureAuth';
 import LocalePicker from '../LocalePicker';
 
 type Me = { tenant: { displayName: string }; user: { email: string } } | null;
@@ -13,6 +15,7 @@ export default function ProfileMenu() {
   const tNav = useTranslations('nav');
   const tProfile = useTranslations('profile');
   const tSubtle = useTranslations('buttons.subtle');
+  const router = useRouter();
   const [me, setMe] = useState<Me>(null);
   const [open, setOpen] = useState(false);
   const ref = useRef<HTMLDivElement | null>(null);
@@ -40,6 +43,20 @@ export default function ProfileMenu() {
   const initials = me?.user?.email?.slice(0, 1).toUpperCase() ?? '?';
   const email = me?.user?.email ?? tProfile('signedOut');
   const tenant = me?.tenant?.displayName ?? tBar('tagline');
+
+  async function signOut() {
+    setOpen(false);
+    let serverOk = true;
+    try {
+      await api.auth.logout();
+    } catch {
+      serverOk = false;
+    }
+    await clearAuthToken().catch(() => undefined);
+    setActiveAuthToken(null);
+    setMe(null);
+    router.replace(serverOk ? '/login' : '/login?signout=server-error');
+  }
 
   return (
     <div className="rp-profile-menu" ref={ref}>
@@ -72,9 +89,15 @@ export default function ProfileMenu() {
             <LocalePicker ariaLabel={tSubtle('language')} />
           </div>
           <div className="rp-profile-popover-divider" />
-          <Link className="rp-profile-popover-item" role="menuitem" href="/login" onClick={() => setOpen(false)}>
-            {me ? tProfile('signOut') : tNav('signIn')}
-          </Link>
+          {me ? (
+            <button className="rp-profile-popover-item" role="menuitem" type="button" onClick={signOut}>
+              {tProfile('signOut')}
+            </button>
+          ) : (
+            <Link className="rp-profile-popover-item" role="menuitem" href="/login" onClick={() => setOpen(false)}>
+              {tNav('signIn')}
+            </Link>
+          )}
         </div>
       )}
     </div>

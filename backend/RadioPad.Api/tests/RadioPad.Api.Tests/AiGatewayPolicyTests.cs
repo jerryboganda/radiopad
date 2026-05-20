@@ -34,6 +34,30 @@ public class AiGatewayPolicyTests
         Assert.Equal(AuditAction.ProviderBlocked, audit.Events[0].Action);
     }
 
+    [Theory]
+    [InlineData("github-copilot-sdk")]
+    [InlineData("github-copilot-cli")]
+    [InlineData("gemini-cli")]
+    [InlineData("openai-compatible")]
+    public async Task Phi_Request_To_NewSandbox_Provider_Ids_Throws_And_Audits(string adapterId)
+    {
+        var (gw, audit) = BuildGateway();
+        var provider = new ProviderConfig
+        {
+            Id = Guid.NewGuid(),
+            Name = adapterId,
+            Adapter = adapterId,
+            Compliance = ProviderComplianceClass.Sandbox,
+            Enabled = true,
+        };
+        var req = new AiCompletionRequest(provider, "sys", "synthetic patient data", "v1", ContainsPhi: true);
+
+        await Assert.ThrowsAsync<ProviderPolicyException>(() => gw.RouteAsync(Tenant(), req, default));
+
+        Assert.Single(audit.Events);
+        Assert.Equal(AuditAction.ProviderBlocked, audit.Events[0].Action);
+    }
+
     [Fact]
     public async Task Phi_Request_To_PhiApproved_Provider_Succeeds()
     {

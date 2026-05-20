@@ -2,6 +2,8 @@ using System.IdentityModel.Tokens.Jwt;
 using Microsoft.IdentityModel.Protocols;
 using Microsoft.IdentityModel.Protocols.OpenIdConnect;
 using Microsoft.IdentityModel.Tokens;
+using Microsoft.EntityFrameworkCore;
+using RadioPad.Infrastructure.Persistence;
 
 namespace RadioPad.Api.Middleware;
 
@@ -39,7 +41,7 @@ public sealed class OidcBearerMiddleware
         _next = next; _log = log;
     }
 
-    public async Task InvokeAsync(HttpContext ctx)
+    public async Task InvokeAsync(HttpContext ctx, RadioPadDbContext db)
     {
         var authority = Environment.GetEnvironmentVariable("RADIOPAD_OIDC_AUTHORITY");
         var devHeaders = Environment.GetEnvironmentVariable("RADIOPAD_DEV_HEADERS") == "1";
@@ -112,6 +114,22 @@ public sealed class OidcBearerMiddleware
                 }
             }
 
+            var tenant = await db.Tenants.FirstOrDefaultAsync(t => t.Slug == slug, ctx.RequestAborted);
+            if (tenant is null)
+            {
+                ctx.Response.StatusCode = StatusCodes.Status401Unauthorized;
+                await ctx.Response.WriteAsJsonAsync(new { error = "OIDC tenant is not active.", kind = "unauthenticated" });
+                return;
+            }
+
+            var user = await db.Users.FirstOrDefaultAsync(u => u.TenantId == tenant.Id && u.Email == email, ctx.RequestAborted);
+            if (user is null || !user.IsActive || user.LockedUntil > DateTimeOffset.UtcNow)
+            {
+                ctx.Response.StatusCode = StatusCodes.Status401Unauthorized;
+                await ctx.Response.WriteAsJsonAsync(new { error = "OIDC identity is not active.", kind = "unauthenticated" });
+                return;
+            }
+
             // Inject so TenantedController.ResolveContextAsync sees the OIDC identity.
             // Dev headers win when explicitly enabled (test pipeline).
             if (!devHeaders)
@@ -119,6 +137,7 @@ public sealed class OidcBearerMiddleware
                 ctx.Request.Headers["X-RadioPad-Tenant"] = slug;
                 ctx.Request.Headers["X-RadioPad-User"] = email;
             }
+            ctx.Items["RadioPad.Identity.Validated"] = true;
         }
         catch (SecurityTokenException ex)
         {

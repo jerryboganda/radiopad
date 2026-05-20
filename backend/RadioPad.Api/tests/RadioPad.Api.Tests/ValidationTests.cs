@@ -155,6 +155,74 @@ public class ValidationEngineTests
         var v = new ReportValidator().Validate(report, ChestCt());
         Assert.False(v.BlockerPresent);
     }
+
+    [Fact]
+    public void HyphenatedPortalVenousSatisfiesContrastPhaseRule()
+    {
+        var spec = RulebookSpec.FromYaml("""
+            rulebook_id: abdomen_ct_v1
+            name: Abdomen CT
+            version: 1.0.0
+            owner: Test
+            status: approved
+            required_sections: [Technique]
+            rules:
+              - id: contrast_phase_documented
+                severity: info
+                description: Contrast phase required.
+            """);
+        var report = new Report { Technique = "Contrast-enhanced CT, portal-venous phase." };
+        var v = new ReportValidator().Validate(report, spec);
+        Assert.DoesNotContain(v.Findings, f => f.RuleId == "contrast_phase_documented");
+    }
+
+    [Fact]
+    public void NegatedMidlineShiftDoesNotRequireMeasurement()
+    {
+        var spec = RulebookSpec.FromYaml("""
+            rulebook_id: head_ct_trauma_v1
+            name: Head CT Trauma
+            version: 1.0.0
+            owner: Test
+            status: approved
+            required_sections: [Findings]
+            rules:
+              - id: midline_shift_measured
+                severity: info
+                description: Midline shift should be measured.
+            """);
+        var report = new Report { Findings = "No mass effect or midline shift." };
+        var v = new ReportValidator().Validate(report, spec);
+        Assert.DoesNotContain(v.Findings, f => f.RuleId == "midline_shift_measured");
+    }
+
+    [Fact]
+    public void StandaloneTrCategorySatisfiesTiradsRule()
+    {
+        var spec = RulebookSpec.FromYaml("""
+            rulebook_id: thyroid_us_v1
+            name: Thyroid US
+            version: 1.0.0
+            owner: Test
+            status: approved
+            required_sections: [Impression]
+            rules:
+              - id: tirads_category_mandatory
+                severity: info
+                description: TI-RADS category required.
+              - id: follow_up_language_approved
+                severity: info
+                description: Follow-up language required for TR3+ nodules.
+            """);
+        var report = new Report
+        {
+            Impression = "Right thyroid lobe 8 mm spongiform nodule, TR2 (not suspicious).",
+            Recommendations = "No follow-up imaging recommended per ACR TI-RADS for TR2.",
+        };
+        var v = new ReportValidator().Validate(report, spec);
+        Assert.DoesNotContain(v.Findings, f => f.RuleId == "tirads_category_mandatory");
+        Assert.DoesNotContain(v.Findings, f => f.RuleId == "follow_up_language_approved");
+    }
 }
 
 public class FhirSerializerTests
@@ -188,6 +256,28 @@ public class PhiDetectorTests
     public void DateOfBirthTriggersPhi()
     {
         var r = new Report { Findings = "DOB 5/14/1972 — clear lungs." };
+        Assert.True(ReportingService.ContainsPhi(r));
+    }
+
+    [Fact]
+    public void PromptBearingMetadataTriggersPhi()
+    {
+        var r = new Report
+        {
+            Study = new StudyContext
+            {
+                Indication = "Cough",
+                Comparison = "Prior exam for MRN 44556677.",
+            },
+        };
+
+        Assert.True(ReportingService.ContainsPhi(r));
+    }
+
+    [Fact]
+    public void RecommendationsTriggerPhi()
+    {
+        var r = new Report { Recommendations = "Call patient name John Smith for follow-up." };
         Assert.True(ReportingService.ContainsPhi(r));
     }
 

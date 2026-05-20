@@ -1,6 +1,8 @@
 using System.Net;
 using System.Net.Http.Headers;
 using System.Net.Http.Json;
+using System.Security.Cryptography;
+using System.Text;
 using System.Text.Json;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
@@ -1115,6 +1117,71 @@ public class AuthFlowsTests : IClassFixture<RadioPadAppFactory>
         {
             Environment.SetEnvironmentVariable("RADIOPAD_TRUST_FORWARDED_FOR", oldTrustForwarded);
         }
+    }
+
+    [Fact]
+    public async Task MagicLink_Consume_Rejects_Replay()
+    {
+        var raw = $"ml-{Guid.NewGuid():N}";
+        using (var scope = _factory.Services.CreateScope())
+        {
+            var db = scope.ServiceProvider.GetRequiredService<RadioPadDbContext>();
+            db.MagicLinks.Add(new MagicLinkToken
+            {
+                TenantId = _factory.SeedTenant.Id,
+                UserId = _factory.SeedUser.Id,
+                TokenHash = Sha256Hex(raw),
+                ExpiresAt = DateTimeOffset.UtcNow.AddMinutes(5),
+            });
+            await db.SaveChangesAsync();
+        }
+
+        using var c = _factory.CreateTenantClient();
+        var first = await c.PostAsJsonAsync("/api/auth/magic-link/consume", new { token = raw });
+        Assert.Equal(HttpStatusCode.OK, first.StatusCode);
+
+        var replay = await c.PostAsJsonAsync("/api/auth/magic-link/consume", new { token = raw });
+        Assert.Equal(HttpStatusCode.Unauthorized, replay.StatusCode);
+    }
+
+    [Fact]
+    public async Task MagicLink_Consume_Rejects_Inactive_User()
+    {
+        var raw = $"ml-{Guid.NewGuid():N}";
+        var email = $"inactive-magic-{Guid.NewGuid():N}@radiopad.local";
+        using (var scope = _factory.Services.CreateScope())
+        {
+            var db = scope.ServiceProvider.GetRequiredService<RadioPadDbContext>();
+            var user = new User
+            {
+                TenantId = _factory.SeedTenant.Id,
+                Email = email,
+                DisplayName = "Inactive Magic Link Test",
+                Role = UserRole.Radiologist,
+                PasswordHash = "dev",
+                IsActive = false,
+            };
+            db.Users.Add(user);
+            await db.SaveChangesAsync();
+            db.MagicLinks.Add(new MagicLinkToken
+            {
+                TenantId = _factory.SeedTenant.Id,
+                UserId = user.Id,
+                TokenHash = Sha256Hex(raw),
+                ExpiresAt = DateTimeOffset.UtcNow.AddMinutes(5),
+            });
+            await db.SaveChangesAsync();
+        }
+
+        using var c = _factory.CreateTenantClient();
+        var consume = await c.PostAsJsonAsync("/api/auth/magic-link/consume", new { token = raw });
+        Assert.Equal(HttpStatusCode.Unauthorized, consume.StatusCode);
+    }
+
+    private static string Sha256Hex(string s)
+    {
+        var bytes = SHA256.HashData(Encoding.UTF8.GetBytes(s));
+        return Convert.ToHexString(bytes);
     }
 
     [Fact]

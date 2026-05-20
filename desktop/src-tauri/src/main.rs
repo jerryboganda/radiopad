@@ -207,7 +207,6 @@ fn main() {
             copilot_cli::copilot_cli_status,
             copilot_cli::copilot_cli_login_begin,
             copilot_cli::copilot_cli_logout,
-            copilot_cli::copilot_cli_session_run,
             device_pairing::device_fingerprint,
             device_pairing::device_pairing_token_set,
             device_pairing::device_pairing_token_get,

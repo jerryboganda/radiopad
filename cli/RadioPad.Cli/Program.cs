@@ -63,7 +63,7 @@ public static class Program
                     var doc = JsonDocument.Parse(await File.ReadAllTextAsync(file.FullName));
                     var root = doc.RootElement;
                     var report = root.GetProperty("report").GetRawText();
-                    var expected = root.GetProperty("expectedFindings");
+                    _ = ReadExpectedFindingIds(root);
                     var http = NewHttpClient();
                     var resp = await http.PostAsync("/api/reports/golden-case",
                         new StringContent(report, Encoding.UTF8, "application/json"));
@@ -187,9 +187,7 @@ public static class Program
                 var doc = JsonDocument.Parse(s);
                 var name = doc.RootElement.TryGetProperty("name", out var n) ? n.GetString() ?? caseFile.Name : caseFile.Name;
                 var report = ParseReport(doc.RootElement.GetProperty("report"));
-                var expected = doc.RootElement.TryGetProperty("expectFlagged", out var e)
-                    ? e.EnumerateArray().Select(x => x.GetString() ?? "").ToArray()
-                    : Array.Empty<string>();
+                var expected = ReadExpectedFindingIds(doc.RootElement);
                 var v = validator.Validate(report, spec);
                 var actual = v.Findings.Select(f => f.RuleId).Distinct().ToArray();
                 var missing = expected.Except(actual).ToArray();
@@ -208,6 +206,15 @@ public static class Program
             if (passed != total) Environment.ExitCode = 1;
         }, fileArg, casesOpt);
         return cmd;
+    }
+
+    static string[] ReadExpectedFindingIds(JsonElement root)
+    {
+        if (root.TryGetProperty("expectFlagged", out var current) && current.ValueKind == JsonValueKind.Array)
+            return current.EnumerateArray().Select(x => x.GetString() ?? "").ToArray();
+        if (root.TryGetProperty("expectedFindings", out var legacy) && legacy.ValueKind == JsonValueKind.Array)
+            return legacy.EnumerateArray().Select(x => x.GetString() ?? "").ToArray();
+        return Array.Empty<string>();
     }
 
     private static Report ParseReport(JsonElement el)
@@ -609,13 +616,13 @@ public static class Program
         var nameOpt = new Option<string>("--name", "Display name") { IsRequired = true };
         var baseUrlOpt = new Option<string?>("--base-url", "Endpoint URL (optional for openai/anthropic/ollama/mock)");
         var modelOpt = new Option<string>("--model", "Model id") { IsRequired = true };
-        var keyOpt = new Option<string>("--api-key-ref", "Secret reference (e.g. env:OPENAI_API_KEY)") { IsRequired = true };
+        var keyOpt = new Option<string?>("--api-key-ref", "Secret reference (env:<NAME>) when the provider requires one");
         register.AddOption(typeOpt);
         register.AddOption(nameOpt);
         register.AddOption(baseUrlOpt);
         register.AddOption(modelOpt);
         register.AddOption(keyOpt);
-        register.SetHandler(async (string type, string name, string? baseUrl, string model, string keyRef) =>
+        register.SetHandler(async (string type, string name, string? baseUrl, string model, string? keyRef) =>
         {
             Environment.Exit(await ProviderRegister.RegisterAsync(type, name, baseUrl, model, keyRef, default));
         }, typeOpt, nameOpt, baseUrlOpt, modelOpt, keyOpt);

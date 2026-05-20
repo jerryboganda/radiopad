@@ -31,12 +31,16 @@ Defined in `ProviderComplianceClass`:
 
 ## Identity & multi-tenancy
 
-- Tenant + user are conveyed on every HTTP request via the
-  `X-RadioPad-Tenant` and `X-RadioPad-User` headers.
+- Tenant + user are resolved from validated identity. Development and test
+  hosts may use `X-RadioPad-Tenant` and `X-RadioPad-User` directly; production
+  accepts those headers only after `OidcBearerMiddleware` validates a JWT or
+  `RadioPadBearerMiddleware` validates an `rp_` bearer for the same tuple.
 - `TenantedController.ResolveContextAsync` is the single resolution path.
-- Production deployments must front the API with an authenticating reverse
-  proxy (mTLS or OIDC) that maps the authenticated principal onto these
-  headers — direct client trust is **not** acceptable for production.
+- Direct client trust is **not** acceptable for production. Raw dev headers are
+  rejected unless `RADIOPAD_DEV_HEADERS=1` is explicitly set for a controlled
+  production-like test host. Public production exceptions are limited to health
+  checks, billing webhook verification, magic-link request/consume, and RFC
+  8628 device authorize/token bootstrap endpoints.
 
 ## Secrets
 
@@ -54,7 +58,7 @@ Defined in `ProviderComplianceClass`:
 | `RADIOPAD_STRIPE_SECRET_KEY` | Stripe server-side secret used for all Stripe API calls (Checkout, Billing Portal, invoices, refunds, Connect). | **Canonical**. Legacy `STRIPE_SECRET_KEY` is accepted as a fallback for one release; remove before v0.3. |
 | `RADIOPAD_STRIPE_WEBHOOK_SECRET` | HMAC secret for `/api/billing/webhook` signature verification. | **Canonical**. Legacy `STRIPE_WEBHOOK_SECRET` accepted for one release. |
 | `RADIOPAD_BIND` | API bind address. Defaults to `127.0.0.1`. | Remote exposure requires a TLS reverse proxy. |
-| `RADIOPAD_AUTH_SECRET` | HMAC secret used by dev sign-in (`/api/auth/signin`). | Required outside the `Testing` environment. |
+| `RADIOPAD_AUTH_SECRET` | HMAC secret used to sign expiring `rp_` bearer payloads (`iat`, `exp`, `jti`, tenant, user, session epoch). | Required in Production; must be non-default and at least 32 characters. Rotate to invalidate all RadioPad-issued bearers. |
 | `RADIOPAD_OIDC_AUTHORITY` / `RADIOPAD_OIDC_REQUIRE_MFA` | OIDC issuer + MFA `amr` enforcement. | See ADR-0004. |
 | `RADIOPAD_IP_ALLOWLIST` | Comma-separated CIDR list. Empty = no-op. | PRD SEC-007. |
 

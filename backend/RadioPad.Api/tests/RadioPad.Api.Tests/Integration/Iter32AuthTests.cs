@@ -1,9 +1,15 @@
 using System.Net;
 using System.Net.Http.Json;
+using System.Security.Cryptography;
+using System.Security.Cryptography.X509Certificates;
+using System.Security.Cryptography.Xml;
+using System.Text;
 using System.Text.Json;
+using System.Xml;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
 using RadioPad.Api.Auth;
+using RadioPad.Api.Tests.Infrastructure;
 using RadioPad.Application.Abstractions;
 using RadioPad.Domain.Entities;
 using RadioPad.Domain.Enums;
@@ -214,6 +220,7 @@ public class Iter32OidcPresetTests
 /// when no IdP cert is configured and the assertion is invalid; the
 /// metadata endpoint emits well-formed XML containing the SP entity id.
 /// </summary>
+[Collection(EnvironmentVariableCollection.Name)]
 public class Iter32SamlAcsTests : IClassFixture<RadioPadAppFactory>
 {
     private readonly RadioPadAppFactory _factory;
@@ -248,10 +255,12 @@ public class Iter32SamlAcsTests : IClassFixture<RadioPadAppFactory>
         // ONLY way to accept an unsigned assertion in tests.
         var prevCert = Environment.GetEnvironmentVariable("RADIOPAD_SAML_IDP_CERT_PEM");
         var prevInsecure = Environment.GetEnvironmentVariable("RADIOPAD_SAML_DEV_INSECURE");
+        var prevEnvironment = Environment.GetEnvironmentVariable("ASPNETCORE_ENVIRONMENT");
         try
         {
             Environment.SetEnvironmentVariable("RADIOPAD_SAML_IDP_CERT_PEM", null);
             Environment.SetEnvironmentVariable("RADIOPAD_SAML_DEV_INSECURE", "true");
+            Environment.SetEnvironmentVariable("ASPNETCORE_ENVIRONMENT", "Development");
 
             using var scope = _factory.Services.CreateScope();
             var db = scope.ServiceProvider.GetRequiredService<RadioPadDbContext>();
@@ -302,6 +311,7 @@ public class Iter32SamlAcsTests : IClassFixture<RadioPadAppFactory>
         {
             Environment.SetEnvironmentVariable("RADIOPAD_SAML_IDP_CERT_PEM", prevCert);
             Environment.SetEnvironmentVariable("RADIOPAD_SAML_DEV_INSECURE", prevInsecure);
+            Environment.SetEnvironmentVariable("ASPNETCORE_ENVIRONMENT", prevEnvironment);
         }
     }
 
@@ -314,10 +324,12 @@ public class Iter32SamlAcsTests : IClassFixture<RadioPadAppFactory>
         // the fail-open auth bypass flagged by Momus review #1.
         var prevCert = Environment.GetEnvironmentVariable("RADIOPAD_SAML_IDP_CERT_PEM");
         var prevInsecure = Environment.GetEnvironmentVariable("RADIOPAD_SAML_DEV_INSECURE");
+        var prevEnvironment = Environment.GetEnvironmentVariable("ASPNETCORE_ENVIRONMENT");
         try
         {
             Environment.SetEnvironmentVariable("RADIOPAD_SAML_IDP_CERT_PEM", null);
             Environment.SetEnvironmentVariable("RADIOPAD_SAML_DEV_INSECURE", null);
+            Environment.SetEnvironmentVariable("ASPNETCORE_ENVIRONMENT", "Development");
 
             var assertion = $@"<?xml version=""1.0""?>
 <samlp:Response xmlns:samlp=""urn:oasis:names:tc:SAML:2.0:protocol"" xmlns:saml=""urn:oasis:names:tc:SAML:2.0:assertion"">
@@ -346,8 +358,148 @@ public class Iter32SamlAcsTests : IClassFixture<RadioPadAppFactory>
         {
             Environment.SetEnvironmentVariable("RADIOPAD_SAML_IDP_CERT_PEM", prevCert);
             Environment.SetEnvironmentVariable("RADIOPAD_SAML_DEV_INSECURE", prevInsecure);
+                        Environment.SetEnvironmentVariable("ASPNETCORE_ENVIRONMENT", prevEnvironment);
+                }
+        }
+
+        [Theory]
+        [InlineData("ASPNETCORE_ENVIRONMENT")]
+        [InlineData("DOTNET_ENVIRONMENT")]
+        public async Task Acs_FailClosed_InProduction_EvenWithDevInsecureFlag(string environmentVariableName)
+        {
+                var prevCert = Environment.GetEnvironmentVariable("RADIOPAD_SAML_IDP_CERT_PEM");
+                var prevInsecure = Environment.GetEnvironmentVariable("RADIOPAD_SAML_DEV_INSECURE");
+            var prevAspNetEnvironment = Environment.GetEnvironmentVariable("ASPNETCORE_ENVIRONMENT");
+            var prevDotnetEnvironment = Environment.GetEnvironmentVariable("DOTNET_ENVIRONMENT");
+                try
+                {
+                        Environment.SetEnvironmentVariable("RADIOPAD_SAML_IDP_CERT_PEM", null);
+                        Environment.SetEnvironmentVariable("RADIOPAD_SAML_DEV_INSECURE", "true");
+                Environment.SetEnvironmentVariable("ASPNETCORE_ENVIRONMENT", null);
+                Environment.SetEnvironmentVariable("DOTNET_ENVIRONMENT", null);
+                Environment.SetEnvironmentVariable(environmentVariableName, "Production");
+
+                        var assertion = $@"<?xml version=""1.0""?>
+<samlp:Response xmlns:samlp=""urn:oasis:names:tc:SAML:2.0:protocol"" xmlns:saml=""urn:oasis:names:tc:SAML:2.0:assertion"">
+    <saml:Assertion>
+        <saml:Subject>
+            <saml:NameID Format=""urn:oasis:names:tc:SAML:1.1:nameid-format:emailAddress"">attacker@example.com</saml:NameID>
+        </saml:Subject>
+        <saml:AttributeStatement>
+            <saml:Attribute Name=""tenant_slug"">
+                <saml:AttributeValue>{_factory.SeedTenant.Slug}</saml:AttributeValue>
+            </saml:Attribute>
+        </saml:AttributeStatement>
+    </saml:Assertion>
+</samlp:Response>";
+                        var b64 = Convert.ToBase64String(System.Text.Encoding.UTF8.GetBytes(assertion));
+                        var http = _factory.CreateClient();
+                        var form = new FormUrlEncodedContent(new[]
+                        {
+                                new KeyValuePair<string, string>("SAMLResponse", b64),
+                        });
+                        var resp = await http.PostAsync("/saml/acs", form);
+
+                        Assert.Equal(HttpStatusCode.Unauthorized, resp.StatusCode);
+                }
+                finally
+                {
+                        Environment.SetEnvironmentVariable("RADIOPAD_SAML_IDP_CERT_PEM", prevCert);
+                        Environment.SetEnvironmentVariable("RADIOPAD_SAML_DEV_INSECURE", prevInsecure);
+                        Environment.SetEnvironmentVariable("ASPNETCORE_ENVIRONMENT", prevAspNetEnvironment);
+                        Environment.SetEnvironmentVariable("DOTNET_ENVIRONMENT", prevDotnetEnvironment);
         }
     }
+
+        [Fact]
+        public async Task Acs_RejectsSignedAssertion_WhenSignatureReferenceDoesNotCoverAssertion()
+        {
+                var prevCert = Environment.GetEnvironmentVariable("RADIOPAD_SAML_IDP_CERT_PEM");
+                var prevInsecure = Environment.GetEnvironmentVariable("RADIOPAD_SAML_DEV_INSECURE");
+                var prevEnvironment = Environment.GetEnvironmentVariable("ASPNETCORE_ENVIRONMENT");
+                try
+                {
+                        using var rsa = RSA.Create(2048);
+                        var request = new CertificateRequest("CN=RadioPad Test SAML IdP", rsa, HashAlgorithmName.SHA256, RSASignaturePadding.Pkcs1);
+                        using var cert = request.CreateSelfSigned(DateTimeOffset.UtcNow.AddMinutes(-5), DateTimeOffset.UtcNow.AddHours(1));
+
+                        Environment.SetEnvironmentVariable("RADIOPAD_SAML_IDP_CERT_PEM", ExportCertificatePem(cert));
+                        Environment.SetEnvironmentVariable("RADIOPAD_SAML_DEV_INSECURE", null);
+                        Environment.SetEnvironmentVariable("ASPNETCORE_ENVIRONMENT", "Development");
+
+                        var assertion = BuildSignedSamlResponse(
+                                _factory.SeedUser.Email,
+                                _factory.SeedTenant.Slug,
+                                cert,
+                                "#_signed-conditions");
+                        var b64 = Convert.ToBase64String(Encoding.UTF8.GetBytes(assertion));
+                        var http = _factory.CreateClient();
+                        var form = new FormUrlEncodedContent(new[]
+                        {
+                                new KeyValuePair<string, string>("SAMLResponse", b64),
+                        });
+
+                        var resp = await http.PostAsync("/saml/acs", form);
+
+                        Assert.Equal(HttpStatusCode.Unauthorized, resp.StatusCode);
+                }
+                finally
+                {
+                        Environment.SetEnvironmentVariable("RADIOPAD_SAML_IDP_CERT_PEM", prevCert);
+                        Environment.SetEnvironmentVariable("RADIOPAD_SAML_DEV_INSECURE", prevInsecure);
+                        Environment.SetEnvironmentVariable("ASPNETCORE_ENVIRONMENT", prevEnvironment);
+                }
+        }
+
+        private static string BuildSignedSamlResponse(string email, string tenantSlug, X509Certificate2 cert, string referenceUri)
+        {
+                var notBefore = DateTimeOffset.UtcNow.AddMinutes(-1).ToString("O");
+                var notOnOrAfter = DateTimeOffset.UtcNow.AddMinutes(5).ToString("O");
+                var xml = $@"<?xml version=""1.0""?>
+<samlp:Response xmlns:samlp=""urn:oasis:names:tc:SAML:2.0:protocol"" xmlns:saml=""urn:oasis:names:tc:SAML:2.0:assertion"">
+    <saml:Assertion ID=""_assertion"">
+        <saml:Issuer>test-idp</saml:Issuer>
+        <saml:Subject>
+            <saml:NameID Format=""urn:oasis:names:tc:SAML:1.1:nameid-format:emailAddress"">{email}</saml:NameID>
+        </saml:Subject>
+        <saml:Conditions ID=""_signed-conditions"" NotBefore=""{notBefore}"" NotOnOrAfter=""{notOnOrAfter}"">
+            <saml:AudienceRestriction>
+                <saml:Audience>https://radiopad.local/saml</saml:Audience>
+            </saml:AudienceRestriction>
+        </saml:Conditions>
+        <saml:AttributeStatement>
+            <saml:Attribute Name=""tenant_slug"">
+                <saml:AttributeValue>{tenantSlug}</saml:AttributeValue>
+            </saml:Attribute>
+        </saml:AttributeStatement>
+    </saml:Assertion>
+</samlp:Response>";
+
+                var doc = new XmlDocument { PreserveWhitespace = true };
+                doc.LoadXml(xml);
+                var assertion = (XmlElement)doc.GetElementsByTagName("Assertion", "urn:oasis:names:tc:SAML:2.0:assertion")[0]!;
+                var signed = new SignedXml(assertion)
+                {
+                        SigningKey = cert.GetRSAPrivateKey(),
+                };
+                signed.SignedInfo.CanonicalizationMethod = SignedXml.XmlDsigExcC14NTransformUrl;
+                var reference = new Reference(referenceUri);
+                reference.AddTransform(new XmlDsigEnvelopedSignatureTransform());
+                reference.AddTransform(new XmlDsigExcC14NTransform());
+                signed.AddReference(reference);
+                var keyInfo = new KeyInfo();
+                keyInfo.AddClause(new KeyInfoX509Data(cert));
+                signed.KeyInfo = keyInfo;
+                signed.ComputeSignature();
+
+                var importedSignature = doc.ImportNode(signed.GetXml(), true);
+                var issuer = assertion.GetElementsByTagName("Issuer", "urn:oasis:names:tc:SAML:2.0:assertion")[0];
+                assertion.InsertAfter(importedSignature, issuer);
+                return doc.OuterXml;
+        }
+
+        private static string ExportCertificatePem(X509Certificate2 cert) =>
+                PemEncoding.WriteString("CERTIFICATE", cert.Export(X509ContentType.Cert));
 }
 
 /// <summary>

@@ -2,6 +2,11 @@
 
 import { useEffect, useState } from 'react';
 import { api, type CopilotQuotaPolicy, type CopilotSettings, type CopilotStatus, type CopilotUsageSummary } from '@/lib/api';
+import Container from '@/components/shell/Container';
+import PageHeader from '@/components/shell/PageHeader';
+import EmptyState from '@/components/ui/EmptyState';
+import ErrorState from '@/components/ui/ErrorState';
+import Skeleton from '@/components/ui/Skeleton';
 
 const EMPTY_SETTINGS: CopilotSettings = {
   enabled: false,
@@ -37,23 +42,30 @@ export default function CopilotAdminPage() {
   const [quotas, setQuotas] = useState<CopilotQuotaPolicy[]>([]);
   const [usage, setUsage] = useState<CopilotUsageSummary | null>(null);
   const [diagnostics, setDiagnostics] = useState<unknown>(null);
+  const [loading, setLoading] = useState(true);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [info, setInfo] = useState<string | null>(null);
 
   async function refresh() {
-    const [s, st] = await Promise.all([
-      api.copilot.admin.settings(),
-      api.copilot.admin.status(),
-    ]);
-    setSettings({ ...s, gitHubAppPrivateKeySecretRef: '', oAuthClientSecretRef: '' });
-    setStatus(st);
-    const [q, u] = await Promise.all([
-      api.copilot.admin.quotas(),
-      api.copilot.admin.usage(),
-    ]);
-    setQuotas(q);
-    setUsage(u);
+    setLoading(true);
+    try {
+      const [s, st] = await Promise.all([
+        api.copilot.admin.settings(),
+        api.copilot.admin.status(),
+      ]);
+      setSettings({ ...s, gitHubAppPrivateKeySecretRef: '', oAuthClientSecretRef: '' });
+      setStatus(st);
+      const [q, u] = await Promise.all([
+        api.copilot.admin.quotas(),
+        api.copilot.admin.usage(),
+      ]);
+      setQuotas(q);
+      setUsage(u);
+      setError(null);
+    } finally {
+      setLoading(false);
+    }
   }
 
   useEffect(() => {
@@ -109,16 +121,39 @@ export default function CopilotAdminPage() {
     }
   }
 
-  return (
-    <div className="rp-container">
-      <header className="rp-page-header">
-        <div className="rp-page-header-text">
-          <h1 className="rp-page-title">GitHub Copilot administration</h1>
-          <p className="rp-page-sub">
-            Control whether and how your workspace uses GitHub Copilot inside RadioPad. By default, Copilot is off and patient information is never sent to it.
-          </p>
+  if (error && !status) {
+    return (
+      <Container>
+        <PageHeader
+          title="GitHub Copilot administration"
+          description="Control whether and how your workspace uses GitHub Copilot inside RadioPad. By default, Copilot is off and patient information is never sent to it."
+        />
+        <ErrorState title="Couldn't load Copilot administration" message={error} onRetry={() => { void refresh(); }} />
+      </Container>
+    );
+  }
+
+  if (loading && !status) {
+    return (
+      <Container>
+        <PageHeader
+          title="GitHub Copilot administration"
+          description="Control whether and how your workspace uses GitHub Copilot inside RadioPad. By default, Copilot is off and patient information is never sent to it."
+        />
+        <div className="rp-grid-2">
+          <div className="rp-panel"><Skeleton variant="block" height={150} /></div>
+          <div className="rp-panel"><Skeleton variant="block" height={150} /></div>
         </div>
-      </header>
+      </Container>
+    );
+  }
+
+  return (
+    <Container>
+      <PageHeader
+        title="GitHub Copilot administration"
+        description="Control whether and how your workspace uses GitHub Copilot inside RadioPad. By default, Copilot is off and patient information is never sent to it."
+      />
 
       {error && <div className="banner warn">{error}</div>}
       {info && <div className="banner info">{info}</div>}
@@ -222,7 +257,9 @@ export default function CopilotAdminPage() {
           <p className="rp-page-sub">Limits are enforced before any Copilot run starts. Leave the scope key blank to apply to the whole workspace.</p>
           <details className="rp-advanced" open>
             <summary>Show limits (IT team only)</summary>
-          {quotas.map((q, i) => (
+          {quotas.length === 0 ? (
+            <EmptyState title="No quota policies" description="Add a limit to cap Copilot usage by workspace, user, or feature." />
+          ) : quotas.map((q, i) => (
             <div className="section-block" key={`${q.scopeType}-${q.scopeKey}-${q.feature}-${i}`}>
               <div className="rp-grid-2">
                 <label className="rp-field"><span>Scope</span><input className="rp-input" value={q.scopeType} onChange={(e) => setQuotas(quotas.map((row, idx) => idx === i ? { ...row, scopeType: e.target.value } : row))} /></label>
@@ -268,6 +305,6 @@ export default function CopilotAdminPage() {
           </div>
         </aside>
       </div>
-    </div>
+    </Container>
   );
 }

@@ -1,6 +1,6 @@
 # API Documentation
 
-**Status:** Current  ·  **Owner:** Engineering  ·  **Last Updated:** 2026-05-04  ·  **Source of Truth:** [openapi/openapi.yaml](../../openapi/openapi.yaml)
+**Status:** Current  ·  **Owner:** Engineering  ·  **Last Updated:** 2026-05-19  ·  **Source of Truth:** [openapi/openapi.yaml](../../openapi/openapi.yaml)
 
 ## Overview
 
@@ -33,7 +33,7 @@ REST + JSON. RFC-7807 problem details with a stable `kind` field. ISO-8601 times
 - `GET  /api/rulebooks`, `POST /api/rulebooks/save`
 - `POST /api/rulebooks/{id}/approve`, `POST /api/rulebooks/{id}/deprecate`
 - `GET  /api/templates`, `POST /api/templates/save`
-- `GET  /api/providers`, `POST /api/providers/save`
+- `GET  /api/providers`, `POST /api/providers`, `POST /api/providers/{id}/health`
 - `GET  /api/audit`
 
 See [openapi.yaml](../../openapi/openapi.yaml) for full schemas.

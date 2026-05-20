@@ -64,7 +64,9 @@ public sealed class DefaultProcessLauncher : IProcessLauncher
             RedirectStandardError = true,
             UseShellExecute = false,
             CreateNoWindow = true,
+            WorkingDirectory = EnsureWorkingDirectory(),
         };
+        ScrubEnvironment(psi);
         foreach (var a in spec.Arguments) psi.ArgumentList.Add(a);
 
         using var proc = new Process { StartInfo = psi, EnableRaisingEvents = true };
@@ -127,5 +129,44 @@ public sealed class DefaultProcessLauncher : IProcessLauncher
             StandardOutput: stdout.ToString(),
             StandardError: stderr.ToString(),
             ElapsedMs: sw.ElapsedMilliseconds);
+    }
+
+    private static string EnsureWorkingDirectory()
+    {
+        var dir = Path.Combine(Path.GetTempPath(), "radiopad-cli-provider");
+        Directory.CreateDirectory(dir);
+        return dir;
+    }
+
+    private static void ScrubEnvironment(ProcessStartInfo psi)
+    {
+        var names = new HashSet<string>(StringComparer.OrdinalIgnoreCase)
+        {
+            "PATH",
+            "PATHEXT",
+            "SystemRoot",
+            "WINDIR",
+            "HOME",
+            "USERPROFILE",
+            "APPDATA",
+            "LOCALAPPDATA",
+            "TMP",
+            "TEMP",
+        };
+        var extra = Environment.GetEnvironmentVariable("RADIOPAD_CLI_PROVIDER_ENV_ALLOWLIST");
+        if (!string.IsNullOrWhiteSpace(extra))
+        {
+            foreach (var name in extra.Split(new[] { ',', ';' }, StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries))
+            {
+                names.Add(name);
+            }
+        }
+
+        psi.Environment.Clear();
+        foreach (var name in names)
+        {
+            var value = Environment.GetEnvironmentVariable(name);
+            if (!string.IsNullOrEmpty(value)) psi.Environment[name] = value;
+        }
     }
 }

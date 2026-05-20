@@ -67,7 +67,7 @@ export default function SecurityAdminPage() {
   async function refresh() {
     try {
       const settings = await api.tenant.settings.get();
-      const json = (settings as unknown as { ipAllowlistJson?: string }).ipAllowlistJson ?? '';
+      const json = settings.ipAllowlistJson ?? '';
       setAllowlistJson(json);
       setSavedSummary(summarise(json));
       const recent = (await api.audit.query({ take: 200 })) as AuditRow[];
@@ -97,9 +97,7 @@ export default function SecurityAdminPage() {
         const parsed = JSON.parse(allowlistJson);
         if (!Array.isArray(parsed)) throw new Error('Allowlist must be a JSON array of CIDR strings.');
       }
-      await api.tenant.settings.save({
-        ipAllowlistJson: allowlistJson,
-      } as unknown as Parameters<typeof api.tenant.settings.save>[0]);
+      await api.tenant.settings.save({ ipAllowlistJson: allowlistJson });
       setAllowlistDirty(false);
       setSavedSummary(summarise(allowlistJson));
       setInfo('Allowlist saved.');

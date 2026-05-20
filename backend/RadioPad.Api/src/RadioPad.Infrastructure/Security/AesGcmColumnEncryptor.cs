@@ -127,7 +127,14 @@ public static class ColumnEncryptorAccessor
 
     public static IColumnEncryptor Current
     {
-        get => _current ??= new AesGcmColumnEncryptor(SHA256.HashData(Encoding.UTF8.GetBytes("radiopad-dev-column-key/v1")));
+        get
+        {
+            if (_current is not null) return _current;
+            if (string.Equals(Environment.GetEnvironmentVariable("ASPNETCORE_ENVIRONMENT"), "Production", StringComparison.OrdinalIgnoreCase))
+                throw new InvalidOperationException("Column encryption was not initialized before EF model use in Production.");
+            _current = new AesGcmColumnEncryptor(SHA256.HashData(Encoding.UTF8.GetBytes("radiopad-dev-column-key/v1")));
+            return _current;
+        }
         set => _current = value;
     }
 }

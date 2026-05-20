@@ -97,7 +97,7 @@ public class ProviderConfig : Entity
 {
     public Guid TenantId { get; set; }
     public string Name { get; set; } = "";
-    /// <summary>Adapter id: "anthropic", "azure-openai", "ollama", "mock".</summary>
+    /// <summary>Adapter id: "anthropic", "azure-openai", "openai-compatible", "gemini-cli", "mock", etc.</summary>
     public string Adapter { get; set; } = "mock";
     public string Model { get; set; } = "";
     public string EndpointUrl { get; set; } = "";

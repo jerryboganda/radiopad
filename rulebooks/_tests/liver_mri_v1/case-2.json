@@ -8,5 +8,5 @@
     "findings": "Cirrhotic liver. No arterially hyperenhancing observation in segment 5. No washout.",
     "impression": "1. New 18 mm arterially hyperenhancing observation in segment 5 with washout, LR-5.\n2. Recommend multidisciplinary review."
   },
-  "expectFlagged": ["negation_conflict", "measurement_consistency"]
+  "expectFlagged": ["negation_conflict", "measurement_consistency", "critical_result_language"]
 }

@@ -4,6 +4,8 @@ using System.Text;
 using System.Text.Json;
 using Microsoft.AspNetCore.Http;
 using Microsoft.EntityFrameworkCore;
+using RadioPad.Application.Abstractions;
+using RadioPad.Application.Services;
 using RadioPad.Domain.Entities;
 using RadioPad.Domain.Enums;
 using RadioPad.Infrastructure.Persistence;
@@ -145,14 +147,15 @@ public class CopilotService
 {
     private const int MaxMessageChars = 8000;
     private const int MaxContextChars = 12000;
-    private const string DefaultCopilotBinary = "gh";
     private readonly RadioPadDbContext _db;
-    private readonly IProcessLauncher _processLauncher;
+    private readonly IAiGateway? _aiGateway;
+    private readonly IWebHostEnvironment? _env;
 
-    public CopilotService(RadioPadDbContext db, IProcessLauncher? processLauncher = null)
+    public CopilotService(RadioPadDbContext db, IAiGateway? aiGateway = null, IWebHostEnvironment? env = null)
     {
         _db = db;
-        _processLauncher = processLauncher ?? new DefaultProcessLauncher();
+        _aiGateway = aiGateway;
+        _env = env;
     }
 
     public async Task<CopilotIntegrationSettings> GetOrCreateSettingsAsync(Guid tenantId, CancellationToken ct)
@@ -413,6 +416,12 @@ public class CopilotService
         }
 
         var (allowed, reason, source) = EvaluateEntitlement(settings, account, mode);
+        if (allowed && mode == CopilotMode.LocalCli && !ServerCliRuntimeAllowed())
+        {
+            allowed = false;
+            reason = "server_cli_runtime_not_enabled";
+            source = "tenant_policy";
+        }
         entitlement.Allowed = allowed;
         entitlement.Source = source;
         entitlement.GitHubLogin = account?.GitHubLogin ?? "";
@@ -491,6 +500,8 @@ public class CopilotService
             return Error("validation", "Message is required.", Status(settings).RuntimeStatus, requestId, StatusCodes.Status400BadRequest);
         if (request.Message.Length > MaxMessageChars)
             return Error("validation", $"Message must be {MaxMessageChars} characters or less.", Status(settings).RuntimeStatus, requestId, StatusCodes.Status400BadRequest);
+        if (LooksLikeSecret(request.Message))
+            return await BlockAsync(tenantId, userId, requestId, request, settings, preview, "secret_policy", "Secret-bearing prompts are blocked from Copilot runtimes.", ct);
         if (!ModeAllowed(settings, mode))
             return await BlockAsync(tenantId, userId, requestId, request, settings, preview, "mode_not_allowed", "This Copilot mode is not allowed by tenant policy.", ct);
         if (preview.ContainsPhi)
@@ -507,6 +518,19 @@ public class CopilotService
 
         if (mode != CopilotMode.LocalCli || !settings.CliRuntimeEnabled)
             return await BlockAsync(tenantId, userId, requestId, request, settings, preview, "runtime_not_configured", "Only the official local CLI runtime is enabled in this implementation path.", ct);
+        if (!ServerCliRuntimeAllowed())
+            return await BlockAsync(tenantId, userId, requestId, request, settings, preview, "server_cli_runtime_not_enabled", "Server-side Copilot CLI execution is disabled in production unless explicitly enabled by the operator.", ct);
+        if (_aiGateway is null)
+            return await BlockAsync(tenantId, userId, requestId, request, settings, preview, "gateway_not_configured", "Copilot chat must be routed through the AI gateway before runtime execution.", ct);
+
+        var gatewayTenant = await _db.Tenants.FirstAsync(x => x.Id == tenantId, ct);
+        var gatewayProvider = await _db.Providers
+            .Where(x => x.TenantId == tenantId && x.Adapter == GitHubCopilotCliProvider.AdapterId && x.Enabled)
+            .OrderBy(x => x.Priority)
+            .ThenBy(x => x.Name)
+            .FirstOrDefaultAsync(ct);
+        if (gatewayProvider is null)
+            return await BlockAsync(tenantId, userId, requestId, request, settings, preview, "provider_not_configured", "Register an enabled github-copilot-cli provider before starting Copilot chat.", ct);
 
         var session = new CopilotSession
         {
@@ -516,7 +540,7 @@ public class CopilotService
             Feature = Clean(request.ContextKind, 80),
             ContextKind = Clean(request.ContextKind, 80),
             Status = "running",
-            Runtime = "gh-copilot-cli",
+            Runtime = "copilot-cli",
             ContextHash = preview.ContextHash,
             StartedAt = DateTimeOffset.UtcNow,
         };
@@ -532,7 +556,7 @@ public class CopilotService
             Sequence = 1,
             Status = "running",
             InputHash = Hash(request.Message),
-            Model = "gh-copilot",
+            Model = "copilot",
         };
         _db.CopilotMessages.Add(message);
         _db.CopilotUsageEvents.Add(new CopilotUsageEvent
@@ -550,12 +574,19 @@ public class CopilotService
         try
         {
             var prompt = BuildPrompt(request.Message!, preview.Included);
-            var output = await RunLocalCliAsync(prompt, ct);
+            var aiResult = await _aiGateway.RouteAsync(gatewayTenant, new AiCompletionRequest(
+                gatewayProvider,
+                "You are GitHub Copilot running inside RadioPad. Use only the provided non-PHI, redacted context and do not execute commands.",
+                prompt,
+                "copilot-session.v1",
+                preview.ContainsPhi), ct);
+            var output = aiResult.Text;
             sw.Stop();
             session.Status = "completed";
             session.CompletedAt = DateTimeOffset.UtcNow;
             session.UpdatedAt = DateTimeOffset.UtcNow;
             message.Status = "completed";
+            message.Model = aiResult.Model;
             message.OutputHash = Hash(output);
             message.LatencyMs = (int)Math.Min(int.MaxValue, sw.ElapsedMilliseconds);
             message.UpdatedAt = DateTimeOffset.UtcNow;
@@ -597,10 +628,34 @@ public class CopilotService
             await _db.SaveChangesAsync(CancellationToken.None);
             throw;
         }
-        catch (Exception ex) when (ex is ProcessLaunchNotFoundException or ProcessLaunchTimeoutException or InvalidOperationException)
+        catch (ProviderPolicyException ex)
         {
             sw.Stop();
-            var kind = ex is ProcessLaunchNotFoundException ? "cli_not_found" : ex is ProcessLaunchTimeoutException ? "cli_timeout" : "cli_failed";
+            const string kind = "provider_policy";
+            session.Status = "failed";
+            session.CompletedAt = DateTimeOffset.UtcNow;
+            session.LastErrorKind = kind;
+            message.Status = "failed";
+            message.LatencyMs = (int)Math.Min(int.MaxValue, sw.ElapsedMilliseconds);
+            _db.CopilotUsageEvents.Add(new CopilotUsageEvent
+            {
+                TenantId = tenantId,
+                UserId = userId,
+                RequestId = requestId,
+                Feature = session.Feature,
+                Mode = mode.ToString(),
+                Status = "blocked",
+                BlockKind = kind,
+                LatencyMs = message.LatencyMs,
+                InputHash = message.InputHash,
+            });
+            await _db.SaveChangesAsync(ct);
+            return new CopilotSessionResult(new CopilotSessionDto(session.Id, "failed", mode.ToString(), session.Runtime, ex.Message, null, kind, preview, message.LatencyMs), FailClosedChat(settings, requestId, kind, ex.Message), StatusCodes.Status409Conflict);
+        }
+        catch (Exception ex) when (ex is ProviderTransportException or InvalidOperationException)
+        {
+            sw.Stop();
+            var kind = ex is ProviderTransportException ? "provider_transport" : "gateway_failed";
             session.Status = "failed";
             session.CompletedAt = DateTimeOffset.UtcNow;
             session.LastErrorKind = kind;
@@ -670,13 +725,14 @@ public class CopilotService
         var since = DateTimeOffset.UtcNow.AddDays(-7);
         var usage = await _db.CopilotUsageEvents.Where(x => x.TenantId == tenantId && x.CreatedAt >= since).ToArrayAsync(ct);
         var sessions = await _db.CopilotSessions.Where(x => x.TenantId == tenantId && x.Status == "running").CountAsync(ct);
-        var buckets = usage.GroupBy(x => x.Status).Select(g => new CopilotUsageBucketDto(g.Key, g.Count())).OrderBy(x => x.Status).ToArray();
+        var logicalUsage = usage.Where(x => x.Status != "running").ToArray();
+        var buckets = logicalUsage.GroupBy(x => x.Status).Select(g => new CopilotUsageBucketDto(g.Key, g.Count())).OrderBy(x => x.Status).ToArray();
         return new CopilotUsageSummaryDto(
-            usage.Length,
-            usage.Count(x => x.Status == "completed"),
-            usage.Count(x => x.Status == "blocked"),
-            usage.Count(x => x.Status == "failed"),
-            usage.Count(x => x.Status == "cancelled"),
+            logicalUsage.Length,
+            logicalUsage.Count(x => x.Status == "completed"),
+            logicalUsage.Count(x => x.Status == "blocked"),
+            logicalUsage.Count(x => x.Status == "failed"),
+            logicalUsage.Count(x => x.Status == "cancelled"),
             sessions,
             buckets);
     }
@@ -689,7 +745,8 @@ public class CopilotService
         foreach (var policy in applicable)
         {
             var since = DateTimeOffset.UtcNow.AddSeconds(-policy.WindowSeconds);
-            var query = _db.CopilotUsageEvents.Where(x => x.TenantId == tenantId && x.CreatedAt >= since && x.Status != "quota_blocked");
+            var query = _db.CopilotUsageEvents.Where(x => x.TenantId == tenantId && x.CreatedAt >= since &&
+                (x.Status == "completed" || x.Status == "failed" || x.Status == "cancelled"));
             if (policy.ScopeType == "user") query = query.Where(x => x.UserId == userId);
             if (policy.Feature != "*" && !string.IsNullOrWhiteSpace(policy.Feature)) query = query.Where(x => x.Feature == policy.Feature);
             var used = await query.CountAsync(ct);
@@ -765,20 +822,6 @@ public class CopilotService
 
     private static CopilotSessionResult Error(string kind, string message, string runtimeStatus, string requestId, int statusCode, CopilotContextPreviewDto? preview = null) =>
         new(null, new CopilotErrorDto(kind, message, runtimeStatus, requestId), statusCode);
-
-    private async Task<string> RunLocalCliAsync(string prompt, CancellationToken ct)
-    {
-        var bin = ResolveCopilotBinary();
-        EnforceBinaryAllowlist(bin);
-        var result = await _processLauncher.RunAsync(new ProcessLaunchSpec(
-            FileName: bin,
-            Arguments: new[] { "copilot", "suggest", "--type", "explain" },
-            StandardInput: prompt,
-            TimeoutMs: ResolveTimeoutMs()), ct);
-        if (result.ExitCode != 0)
-            throw new InvalidOperationException($"gh copilot exited with code {result.ExitCode}: {Truncate(result.StandardError)}");
-        return result.StandardOutput.TrimEnd();
-    }
 
     private static string BuildPrompt(string message, IReadOnlyList<CopilotContextItemDto> context)
     {
@@ -899,11 +942,15 @@ public class CopilotService
     private static bool LooksLikePhi(string? value)
     {
         var v = value ?? "";
-        return v.Contains("MRN", StringComparison.OrdinalIgnoreCase)
+        return ReportingService.ContainsPhiText(v)
+            || v.Contains("MRN", StringComparison.OrdinalIgnoreCase)
             || v.Contains("DOB", StringComparison.OrdinalIgnoreCase)
             || v.Contains("patient name", StringComparison.OrdinalIgnoreCase)
             || v.Contains("accession", StringComparison.OrdinalIgnoreCase);
     }
+
+    private bool ServerCliRuntimeAllowed() =>
+        _env?.IsProduction() != true || Environment.GetEnvironmentVariable("RADIOPAD_COPILOT_SERVER_CLI_ENABLED") == "1";
 
     private static bool LooksLikeSecret(string value)
     {
@@ -942,28 +989,4 @@ public class CopilotService
             || lower.Contains("\\obj\\", StringComparison.Ordinal);
     }
 
-    private static string ResolveCopilotBinary()
-    {
-        var configured = Environment.GetEnvironmentVariable("RADIOPAD_GH_COPILOT_BIN");
-        return string.IsNullOrWhiteSpace(configured) ? DefaultCopilotBinary : configured.Trim();
-    }
-
-    private static int ResolveTimeoutMs()
-    {
-        var configured = Environment.GetEnvironmentVariable("RADIOPAD_COPILOT_CLI_TIMEOUT_MS")
-            ?? Environment.GetEnvironmentVariable("RADIOPAD_CLI_PROVIDER_TIMEOUT_MS");
-        return int.TryParse(configured, out var ms) && ms > 0 ? ms : 60_000;
-    }
-
-    private static void EnforceBinaryAllowlist(string fileName)
-    {
-        var raw = Environment.GetEnvironmentVariable("RADIOPAD_CLI_PROVIDER_ALLOWED_PATHS");
-        if (string.IsNullOrWhiteSpace(raw)) return;
-        var allowed = raw.Split(';', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
-        var cmp = OperatingSystem.IsWindows() ? StringComparison.OrdinalIgnoreCase : StringComparison.Ordinal;
-        if (!allowed.Any(entry => string.Equals(entry, fileName, cmp)))
-            throw new InvalidOperationException("cli_binary_not_allowed");
-    }
-
-    private static string Truncate(string s) => s.Length > 4096 ? s[..4096] : s;
 }

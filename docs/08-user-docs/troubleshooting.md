@@ -1,6 +1,6 @@
 # Troubleshooting
 
-**Status:** Current  ·  **Owner:** Support  ·  **Last Updated:** 2026-05-04
+**Status:** Current  ·  **Owner:** Support  ·  **Last Updated:** 2026-05-19
 
 > If support contacts you about an error, ask for the **request id** from the banner — every error response includes one.
 
@@ -22,7 +22,7 @@
 ## Backend
 
 ### `dotnet ef database update` fails
-- Connection string wrong; check `RADIOPAD_DB`.
+- Connection string wrong; check `ConnectionStrings__RadioPad` (or legacy `RADIOPAD_DB`).
 - DB not reachable from the API container.
 
 ### 5xx with `kind: "internal"`

@@ -92,13 +92,13 @@ describe('marketplace page', () => {
     }
   });
 
-  it('submit form shows category selector', async () => {
+  it('publish form shows category selector', async () => {
     render(<MarketplacePage />);
     await waitFor(() => {
-      expect(screen.getByText('Submit to Marketplace')).toBeInTheDocument();
+      expect(screen.getByText('Publish something')).toBeInTheDocument();
     });
     // Open the submit form
-    fireEvent.click(screen.getByText('Submit to Marketplace'));
+    fireEvent.click(screen.getByText('Publish something'));
     await waitFor(() => {
       expect(screen.getByTestId('submit-form')).toBeInTheDocument();
     });

@@ -1,9 +1,12 @@
 'use client';
 
-import { useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import { api, COMPLIANCE_LABELS, type Provider, type Report } from '@/lib/api';
 import Container from '@/components/shell/Container';
 import PageHeader from '@/components/shell/PageHeader';
+import EmptyState from '@/components/ui/EmptyState';
+import ErrorState from '@/components/ui/ErrorState';
+import { TableSkeleton } from '@/components/ui/Skeleton';
 
 const SANDBOX_COMPLIANCE = 1;
 const SANDBOX_MODES = ['impression', 'draft', 'concise', 'formal', 'patient_friendly', 'referring_summary'] as const;
@@ -47,10 +50,14 @@ const PRESETS: Preset[] = [
   { id: 'llama-cpp',    label: 'llama.cpp (local)',      patch: { adapter: 'llama-cpp',    endpointUrl: 'http://127.0.0.1:8080',  compliance: 4, model: 'llama-cpp' } },
   { id: 'azure-openai', label: 'Azure OpenAI (PHI-OK)',  patch: { adapter: 'azure-openai', endpointUrl: '',                       compliance: 3, model: 'gpt-4o' } },
   { id: 'aws-bedrock',  label: 'AWS Bedrock (PHI-OK)',   patch: { adapter: 'aws-bedrock',  endpointUrl: '',                       compliance: 3, model: 'anthropic.claude-3-5-sonnet-20241022-v2:0' } },
-  { id: 'google-vertex-ai', label: 'GCP Vertex AI',      patch: { adapter: 'google-vertex-ai', endpointUrl: '',                   compliance: 3, model: 'gemini-1.5-pro' } },
+  { id: 'google-vertex', label: 'GCP Vertex AI',         patch: { adapter: 'google-vertex', endpointUrl: '',                      compliance: 3, model: 'gemini-1.5-pro' } },
   { id: 'anthropic',    label: 'Anthropic (sandbox)',    patch: { adapter: 'anthropic',    endpointUrl: '',                       compliance: 1, model: 'claude-3-5-sonnet-20241022' } },
-  { id: 'openai-direct',label: 'OpenAI direct',          patch: { adapter: 'openai-direct', endpointUrl: '',                      compliance: 1, model: 'gpt-4o-mini' } },
+  { id: 'openai',       label: 'OpenAI direct',          patch: { adapter: 'openai',       endpointUrl: '',                       compliance: 1, model: 'gpt-4o-mini' } },
   { id: 'openai-compatible', label: 'OpenAI-compatible', patch: { adapter: 'openai-compatible', endpointUrl: '',                  compliance: 1, model: '' } },
+  { id: 'github-copilot-sdk', label: 'GitHub Copilot SDK', patch: { adapter: 'github-copilot-sdk', endpointUrl: '',                compliance: 1, model: 'copilot' } },
+  { id: 'github-copilot-cli', label: 'GitHub Copilot CLI', patch: { adapter: 'github-copilot-cli', endpointUrl: '',                compliance: 1, model: 'copilot' } },
+  { id: 'gemini-cli',   label: 'Gemini CLI',             patch: { adapter: 'gemini-cli',   endpointUrl: '',                       compliance: 1, model: '' } },
+  { id: 'codex-cli',    label: 'Codex CLI',              patch: { adapter: 'codex-cli',    endpointUrl: '',                       compliance: 1, model: '' } },
 ];
 
 const EMPTY_DRAFT: Editable = {
@@ -69,16 +76,26 @@ const EMPTY_DRAFT: Editable = {
 export default function ProvidersPage() {
   const [items, setItems] = useState<Provider[]>([]);
   const [error, setError] = useState<string | null>(null);
+  const [loading, setLoading] = useState(true);
   const [draft, setDraft] = useState<Editable | null>(null);
   const [saving, setSaving] = useState(false);
 
-  async function refresh() {
-    setItems(await api.providers.list());
-  }
+  const refresh = useCallback(async () => {
+    setLoading(true);
+    try {
+      const rows = await api.providers.list();
+      setItems(rows);
+      setError(null);
+    } catch (e) {
+      setError((e as Error).message);
+    } finally {
+      setLoading(false);
+    }
+  }, []);
 
   useEffect(() => {
-    api.providers.list().then(setItems).catch((e: Error) => setError(e.message));
-  }, []);
+    void refresh();
+  }, [refresh]);
 
   async function toggleEnabled(p: Provider) {
     await api.providers.save({ ...p, enabled: !p.enabled });
@@ -109,12 +126,14 @@ export default function ProvidersPage() {
 
   const [healthMsg, setHealthMsg] = useState<Record<string, string>>({});
   async function probeHealth(p: Provider) {
-    setHealthMsg((m) => ({ ...m, [p.id]: '…' }));
+    setHealthMsg((m) => ({ ...m, [p.id]: 'Checking' }));
     try {
       const r = await api.providers.health(p.id);
-      setHealthMsg((m) => ({ ...m, [p.id]: r.ok ? 'OK' : `✖ ${r.error ?? 'unreachable'}` }));
+      const httpStatus = 'status' in r && typeof r.status === 'number' ? r.status : null;
+      const detail = httpStatus ? ` (${httpStatus})` : r.note ? ` (${r.note})` : '';
+      setHealthMsg((m) => ({ ...m, [p.id]: r.ok ? `OK${detail}` : `Unavailable${detail}: ${r.error ?? 'not reachable'}` }));
     } catch (e) {
-      setHealthMsg((m) => ({ ...m, [p.id]: `✖ ${(e as Error).message}` }));
+      setHealthMsg((m) => ({ ...m, [p.id]: `Unavailable: ${(e as Error).message}` }));
     }
   }
 
@@ -126,49 +145,63 @@ export default function ProvidersPage() {
         primaryAction={<button className="primary" onClick={newProvider}>+ Add a model</button>}
       />
 
-      {error && <div className="banner warn">{error}</div>}
+      {error && items.length > 0 && <div className="banner warn">{error}</div>}
 
       <div className="rp-panel">
         <div className="rp-panel-title">Available models</div>
-        <table className="rp-table">
-          <thead>
-            <tr>
-              <th>Name</th>
-              <th>Type</th>
-              <th>Model</th>
-              <th>Patient data?</th>
-              <th>On / off</th>
-              <th>API key</th>
-              <th>Connection</th>
-              <th></th>
-            </tr>
-          </thead>
-          <tbody>
-            {items.map((p) => (
-              <tr key={p.id}>
-                <td>{p.name}</td>
-                <td>{p.adapter}</td>
-                <td>{p.model || <span className="rp-faint">(default)</span>}</td>
-                <td>
-                  <span className={`badge ${COMPLIANCE_BADGE[p.compliance] || ''}`}>
-                    {COMPLIANCE_LABELS[p.compliance] || `class ${p.compliance}`}
-                  </span>
-                </td>
-                <td>
-                  <button className="subtle" onClick={() => toggleEnabled(p)}>
-                    {p.enabled ? 'On' : 'Off'}
-                  </button>
-                </td>
-                <td>{p.apiKeyConfigured ? <span className="badge ok">set</span> : <span className="badge warn">missing</span>}</td>
-                <td>
-                  <button className="subtle" onClick={() => probeHealth(p)} title="Check this model is reachable">Test</button>
-                  {healthMsg[p.id] && <span className="rp-faint" style={{ marginLeft: 6 }}>{healthMsg[p.id]}</span>}
-                </td>
-                <td><button className="subtle" onClick={() => editProvider(p)}>Edit</button></td>
+        {loading && items.length === 0 ? (
+          <TableSkeleton rows={6} cols={8} />
+        ) : error && items.length === 0 ? (
+          <ErrorState title="Couldn't load models" message={error} onRetry={() => { void refresh(); }} />
+        ) : items.length === 0 ? (
+          <EmptyState
+            title="No AI models yet"
+            description="Add the first model for this workspace."
+            action={<button className="ghost" onClick={newProvider}>Add model</button>}
+          />
+        ) : (
+          <div style={{ overflowX: 'auto' }}>
+          <table className="rp-table">
+            <thead>
+              <tr>
+                <th>Name</th>
+                <th>Type</th>
+                <th>Model</th>
+                <th>Patient data?</th>
+                <th>On / off</th>
+                <th>Key</th>
+                <th>Connection</th>
+                <th></th>
               </tr>
-            ))}
-          </tbody>
-        </table>
+            </thead>
+            <tbody>
+              {items.map((p) => (
+                <tr key={p.id}>
+                  <td>{p.name}</td>
+                  <td>{p.adapter}</td>
+                  <td>{p.model || <span className="rp-faint">(default)</span>}</td>
+                  <td>
+                    <span className={`badge ${COMPLIANCE_BADGE[p.compliance] || ''}`}>
+                      {COMPLIANCE_LABELS[p.compliance] || 'Unknown'}
+                    </span>
+                  </td>
+                  <td>
+                    <button className="subtle" onClick={() => toggleEnabled(p)}>
+                      {p.enabled ? 'On' : 'Off'}
+                    </button>
+                  </td>
+                  <td>{p.apiKeyConfigured ? <span className="badge ok">Set</span> : <span className="badge warn">Missing</span>}</td>
+                  <td>
+                    <button className="subtle" onClick={() => probeHealth(p)} title="Test connection">Test</button>
+                    {healthMsg[p.id] && <span className="rp-faint" style={{ marginLeft: 6 }}>{healthMsg[p.id]}</span>}
+                  </td>
+                  <td><button className="subtle" onClick={() => editProvider(p)}>Edit</button></td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+          </div>
+        )}
       </div>
 
       <SandboxComparePanel providers={items} />
@@ -205,15 +238,19 @@ export default function ProvidersPage() {
               <select className="rp-input" value={draft.adapter ?? 'mock'} onChange={(e) => setDraft({ ...draft, adapter: e.target.value })}>
                 <option value="mock">mock</option>
                 <option value="anthropic">anthropic</option>
-                <option value="openai-direct">openai-direct</option>
+                <option value="openai">openai</option>
                 <option value="openai-compatible">openai-compatible</option>
                 <option value="azure-openai">azure-openai</option>
                 <option value="aws-bedrock">aws-bedrock</option>
-                <option value="google-vertex-ai">google-vertex-ai</option>
+                <option value="google-vertex">google-vertex</option>
                 <option value="ollama">ollama (legacy /api/generate)</option>
                 <option value="ollama-chat">ollama-chat (iter-32 /api/chat)</option>
                 <option value="vllm">vllm (iter-32 local)</option>
                 <option value="llama-cpp">llama-cpp (iter-32 local)</option>
+                <option value="github-copilot-sdk">github-copilot-sdk</option>
+                <option value="github-copilot-cli">github-copilot-cli</option>
+                <option value="gemini-cli">gemini-cli</option>
+                <option value="codex-cli">codex-cli</option>
               </select>
             </label>
 
@@ -235,7 +272,7 @@ export default function ProvidersPage() {
                 onChange={(e) => setDraft({ ...draft, compliance: Number(e.target.value) })}
               >
                 {Object.entries(COMPLIANCE_LABELS).map(([k, v]) => (
-                  <option key={k} value={k}>{k} — {v}</option>
+                  <option key={k} value={k}>{v}</option>
                 ))}
               </select>
             </label>
@@ -251,12 +288,12 @@ export default function ProvidersPage() {
             </label>
 
             <label className="rp-field">
-              <span>API key secret ref</span>
+              <span>Secret reference</span>
               <input
                 className="rp-input"
                 value={draft.apiKeySecretRef ?? ''}
                 onChange={(e) => setDraft({ ...draft, apiKeySecretRef: e.target.value })}
-                placeholder="env:ANTHROPIC_API_KEY (leave blank to keep existing)"
+                placeholder="Leave blank to keep existing"
               />
             </label>
 
@@ -307,8 +344,8 @@ export default function ProvidersPage() {
 
 /**
  * PRD PROV-005 (iter-34) — sandbox model comparison panel. Only rendered
- * when the tenant has at least two enabled `Sandbox`-class providers. The
- * radiologist picks a draft report + a mode + 2..4 sandbox providers and
+ * when the tenant has at least one enabled `Sandbox`-class provider. The
+ * radiologist picks a draft report + a mode + 1..4 sandbox providers and
  * the backend runs each in series via `POST /api/ai/sandbox/compare`. PHI
  * policy is still enforced inside `AiGateway.EnforcePhiPolicy` — this
  * panel never bypasses it.
@@ -319,6 +356,7 @@ function SandboxComparePanel({ providers }: { providers: Provider[] }) {
     [providers],
   );
   const [reports, setReports] = useState<Report[]>([]);
+  const [reportsLoading, setReportsLoading] = useState(false);
   const [reportId, setReportId] = useState('');
   const [mode, setMode] = useState<SandboxMode>('impression');
   const [selected, setSelected] = useState<string[]>([]);
@@ -327,11 +365,14 @@ function SandboxComparePanel({ providers }: { providers: Provider[] }) {
   const [err, setErr] = useState<string | null>(null);
 
   useEffect(() => {
-    if (sandbox.length < 2) return;
+    if (sandbox.length < 1) return;
+    setReportsLoading(true);
+    setErr(null);
     api.reports
       .list()
       .then((rows) => setReports(rows.filter((r) => r.status === 'Draft' || r.status === 0)))
-      .catch((e: Error) => setErr(e.message));
+      .catch((e: Error) => setErr(e.message))
+      .finally(() => setReportsLoading(false));
   }, [sandbox.length]);
 
   function toggle(id: string) {
@@ -354,32 +395,37 @@ function SandboxComparePanel({ providers }: { providers: Provider[] }) {
     }
   }
 
-  if (sandbox.length < 2) return null;
+  if (sandbox.length < 1) return null;
 
-  const canRun = !!reportId && selected.length >= 2 && !busy;
+  const canRun = !!reportId && selected.length >= 1 && !busy && !reportsLoading;
   const cols = runs && runs.length >= 3 ? 'rp-grid-3' : 'rp-grid-2';
 
   return (
     <div className="rp-panel" style={{ marginTop: 16 }}>
       <div className="rp-panel-title">Sandbox compare</div>
       <p className="rp-page-sub" style={{ marginTop: 0 }}>
-        Run the same prompt across up to four sandbox providers and diff outputs side-by-side.
-        Tenant must have <code>AllowSandboxRulebooks = true</code>; PHI policy is still enforced.
+        Draft outputs stay governed by workspace policy.
       </p>
 
       {err && <div className="banner warn">{err}</div>}
 
-      <label className="rp-field">
-        <span>Draft report</span>
-        <select className="rp-input" value={reportId} onChange={(e) => setReportId(e.target.value)}>
-          <option value="">— select a draft —</option>
-          {reports.map((r) => (
-            <option key={r.id} value={r.id}>
-              {r.study.accessionNumber} · {r.study.modality} {r.study.bodyPart}
-            </option>
-          ))}
-        </select>
-      </label>
+      {reportsLoading ? (
+        <TableSkeleton rows={2} cols={3} />
+      ) : reports.length === 0 ? (
+        <EmptyState title="No draft reports available" description="Create or reopen a draft report before comparing sandbox model output." />
+      ) : (
+        <label className="rp-field">
+          <span>Draft report</span>
+          <select className="rp-input" value={reportId} onChange={(e) => setReportId(e.target.value)}>
+            <option value="">— select a draft —</option>
+            {reports.map((r) => (
+              <option key={r.id} value={r.id}>
+                {r.study.accessionNumber} · {r.study.modality} {r.study.bodyPart}
+              </option>
+            ))}
+          </select>
+        </label>
+      )}
 
       <label className="rp-field">
         <span>Mode</span>
@@ -395,7 +441,7 @@ function SandboxComparePanel({ providers }: { providers: Provider[] }) {
       </label>
 
       <div className="rp-field">
-        <span>Sandbox providers (pick 2–4)</span>
+        <span>Sandbox models</span>
         <div className="rp-row" style={{ flexWrap: 'wrap', gap: 8 }}>
           {sandbox.map((p) => {
             const on = selected.includes(p.id);

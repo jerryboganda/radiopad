@@ -53,6 +53,7 @@ export const Icons = {
   rulebooks: Icon('M5 4h11a3 3 0 013 3v13H8a3 3 0 01-3-3z M8 4v13'),
   templates: Icon('M4 5h16v4H4z M4 13h7v6H4z M14 13h6v6h-6z'),
   prompts: Icon('M5 6h14v10H8l-3 3z'),
+  copilot: Icon('M4 5h16v12H8l-4 4z M8 9h8 M8 13h5'),
   marketplace: Icon('M3 7l1-3h16l1 3 M3 7v13h18V7 M3 7h18 M9 11v4 M15 11v4'),
   terminology: Icon('M4 4h11l5 5v11H4z M14 4v6h6 M8 14h8 M8 17h6'),
   providers: Icon('M3 9l9-6 9 6v11H3z M9 20v-7h6v7'),
@@ -92,6 +93,7 @@ export const navGroups: NavGroup[] = [
     labelKey: 'integrations',
     items: [
       { href: '/providers', labelKey: 'providers', icon: Icons.providers },
+      { href: '/copilot', labelKey: 'copilot', icon: Icons.copilot },
       { href: '/admin/pacs', labelKey: 'pacs', icon: Icons.pacs },
       { href: '/admin/fhir-import', labelKey: 'fhirImport', icon: Icons.fhir },
       { href: '/offline', labelKey: 'offline', icon: Icons.offline },
@@ -102,6 +104,7 @@ export const navGroups: NavGroup[] = [
     items: [
       { href: '/admin/governance', labelKey: 'governance', icon: Icons.governance },
       { href: '/admin/model-eval', labelKey: 'modelEval', icon: Icons.modelEval },
+      { href: '/admin/copilot', labelKey: 'copilotAdmin', icon: Icons.copilot },
       { href: '/admin/security', labelKey: 'security', icon: Icons.security },
       { href: '/admin/feature-flags', labelKey: 'featureFlags', icon: Icons.flags },
       { href: '/admin/billing', labelKey: 'billing', icon: Icons.billing },

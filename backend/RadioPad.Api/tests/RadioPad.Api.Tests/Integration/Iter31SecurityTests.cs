@@ -1,10 +1,13 @@
 using System.Net;
+using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Http;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging.Abstractions;
+using RadioPad.Api.Auth;
 using RadioPad.Api.Middleware;
 using RadioPad.Api.Services;
+using RadioPad.Api.Tests.Infrastructure;
 using RadioPad.Application.Abstractions;
 using RadioPad.Application.Security;
 using RadioPad.Domain.Entities;
@@ -19,6 +22,7 @@ namespace RadioPad.Api.Tests.Integration;
 /// Covers PHI log redaction, anomaly detector burst alerting, and the
 /// per-tenant IP allowlist middleware blocking + audit row.
 /// </summary>
+[Collection(EnvironmentVariableCollection.Name)]
 public class Iter31SecurityTests : IClassFixture<RadioPadAppFactory>
 {
     private readonly RadioPadAppFactory _factory;
@@ -111,6 +115,7 @@ public class Iter31SecurityTests : IClassFixture<RadioPadAppFactory>
             db.TenantSettings.Add(settings);
         }
         settings.IpAllowlistCidr = "10.0.0.0/8";
+        settings.IpAllowlistJson = "";
         await db.SaveChangesAsync();
 
         var middleware = new IpAllowlistMiddleware(_ => Task.CompletedTask, NullLogger<IpAllowlistMiddleware>.Instance);
@@ -144,6 +149,7 @@ public class Iter31SecurityTests : IClassFixture<RadioPadAppFactory>
             db.TenantSettings.Add(settings);
         }
         settings.IpAllowlistCidr = "10.0.0.0/8";
+        settings.IpAllowlistJson = "";
         await db.SaveChangesAsync();
 
         var nextCalled = false;
@@ -157,6 +163,130 @@ public class Iter31SecurityTests : IClassFixture<RadioPadAppFactory>
 
         Assert.True(nextCalled);
         Assert.NotEqual(StatusCodes.Status403Forbidden, ctx.Response.StatusCode);
+    }
+
+    [Theory]
+    [InlineData("not-a-cidr")]
+    [InlineData("203.0.113.7/not-a-prefix")]
+    [InlineData("203.0.113.7/")]
+    [InlineData("203.0.113.7/32/junk")]
+    public async Task IpAllowlistMiddleware_FailsClosed_WhenGlobalAllowlistInvalid(string allowlist)
+    {
+        var previous = Environment.GetEnvironmentVariable("RADIOPAD_IP_ALLOWLIST");
+        try
+        {
+            Environment.SetEnvironmentVariable("RADIOPAD_IP_ALLOWLIST", allowlist);
+
+            using var scope = _factory.Services.CreateScope();
+            var db = scope.ServiceProvider.GetRequiredService<RadioPadDbContext>();
+            var audit = scope.ServiceProvider.GetRequiredService<IAuditLog>();
+            var middleware = new IpAllowlistMiddleware(_ => Task.CompletedTask, NullLogger<IpAllowlistMiddleware>.Instance);
+
+            var ctx = new DefaultHttpContext();
+            ctx.Connection.RemoteIpAddress = IPAddress.Parse("203.0.113.7");
+            ctx.Response.Body = new MemoryStream();
+
+            await middleware.InvokeAsync(ctx, db, audit);
+
+            Assert.Equal(StatusCodes.Status503ServiceUnavailable, ctx.Response.StatusCode);
+        }
+        finally
+        {
+            Environment.SetEnvironmentVariable("RADIOPAD_IP_ALLOWLIST", previous);
+        }
+    }
+
+    [Theory]
+    [InlineData("[\"not-a-cidr\"]")]
+    [InlineData("[\"203.0.113.7/not-a-prefix\"]")]
+    [InlineData("[\"203.0.113.7/\"]")]
+    [InlineData("[\"203.0.113.7/32/junk\"]")]
+    public async Task IpAllowlistMiddleware_FailsClosed_WhenTenantAllowlistInvalid(string allowlistJson)
+    {
+        using var scope = _factory.Services.CreateScope();
+        var db = scope.ServiceProvider.GetRequiredService<RadioPadDbContext>();
+        var audit = scope.ServiceProvider.GetRequiredService<IAuditLog>();
+
+        var settings = await db.TenantSettings.FirstOrDefaultAsync(s => s.TenantId == _factory.SeedTenant.Id);
+        if (settings is null)
+        {
+            settings = new TenantSettings { TenantId = _factory.SeedTenant.Id };
+            db.TenantSettings.Add(settings);
+        }
+        var previousJson = settings.IpAllowlistJson;
+        var previousCidr = settings.IpAllowlistCidr;
+        try
+        {
+            settings.IpAllowlistJson = allowlistJson;
+            settings.IpAllowlistCidr = "";
+            await db.SaveChangesAsync();
+
+            var middleware = new IpAllowlistMiddleware(_ => Task.CompletedTask, NullLogger<IpAllowlistMiddleware>.Instance);
+            var ctx = new DefaultHttpContext();
+            ctx.Connection.RemoteIpAddress = IPAddress.Parse("203.0.113.7");
+            ctx.Request.Headers["X-RadioPad-Tenant"] = _factory.SeedTenant.Slug;
+            ctx.Response.Body = new MemoryStream();
+
+            await middleware.InvokeAsync(ctx, db, audit);
+
+            Assert.Equal(StatusCodes.Status503ServiceUnavailable, ctx.Response.StatusCode);
+        }
+        finally
+        {
+            settings.IpAllowlistJson = previousJson;
+            settings.IpAllowlistCidr = previousCidr;
+            await db.SaveChangesAsync();
+        }
+    }
+
+    [Fact]
+    public async Task IpAllowlistPipeline_UsesAuthenticatedCookieTenant_WhenTenantHeaderMissing()
+    {
+        using var scope = _factory.Services.CreateScope();
+        var db = scope.ServiceProvider.GetRequiredService<RadioPadDbContext>();
+        var audit = scope.ServiceProvider.GetRequiredService<IAuditLog>();
+        var env = scope.ServiceProvider.GetRequiredService<IWebHostEnvironment>();
+
+        var settings = await db.TenantSettings.FirstOrDefaultAsync(s => s.TenantId == _factory.SeedTenant.Id);
+        if (settings is null)
+        {
+            settings = new TenantSettings { TenantId = _factory.SeedTenant.Id };
+            db.TenantSettings.Add(settings);
+        }
+        var previousJson = settings.IpAllowlistJson;
+        var previousCidr = settings.IpAllowlistCidr;
+        try
+        {
+            settings.IpAllowlistCidr = "10.0.0.0/8";
+            settings.IpAllowlistJson = "";
+            await db.SaveChangesAsync();
+
+            var allowlist = new IpAllowlistMiddleware(_ => Task.CompletedTask, NullLogger<IpAllowlistMiddleware>.Instance);
+            var bearer = new RadioPadBearerMiddleware(ctx => allowlist.InvokeAsync(ctx, db, audit), env);
+            var token = RadioPadBearerTokens.Mint(
+                _factory.SeedTenant.Slug,
+                _factory.SeedUser.Email,
+                _factory.SeedUser.SessionEpoch,
+                env,
+                DateTimeOffset.UtcNow.AddMinutes(5));
+
+            var ctx = new DefaultHttpContext();
+            ctx.Request.Path = "/api/reports";
+            ctx.Request.Headers.Cookie = $"{RadioPadSessionCookies.CookieName}={token}";
+            ctx.Connection.RemoteIpAddress = IPAddress.Parse("203.0.113.7");
+            ctx.Response.Body = new MemoryStream();
+
+            await bearer.InvokeAsync(ctx, db);
+
+            Assert.Equal(StatusCodes.Status403Forbidden, ctx.Response.StatusCode);
+            Assert.Equal(_factory.SeedTenant.Slug, ctx.Request.Headers["X-RadioPad-Tenant"].ToString());
+        }
+        finally
+        {
+            settings.IpAllowlistJson = previousJson;
+            settings.IpAllowlistCidr = previousCidr;
+            await db.SaveChangesAsync();
+        }
     }
 
     // ----- SEC-002: column encryptor round-trip -----

@@ -12,13 +12,32 @@
         header_up Host {upstream_hostport}
         header_up X-Real-IP {remote_host}
         header_up X-Forwarded-For {remote_host}
-        # Strip inbound X-RadioPad-* headers; the proxy sets them below.
-        header_up -X-RadioPad-Tenant
-        header_up -X-RadioPad-User
+        header_up X-Forwarded-Proto {scheme}
+        header_up X-Forwarded-Host {host}
+        # Tenant/user headers are validated against the bearer token by the API
+        # in Production. Do not synthesize a default tenant/user at the proxy.
         header_up -X-RadioPad-RequestId
-        # Set trusted headers — replace these with your actual auth values.
-        # In a real deployment these should come from your auth middleware.
-        header_up X-RadioPad-Tenant {$RADIOPAD_DEFAULT_TENANT:-default}
+        header_up X-RadioPad-RequestId {http.request.uuid}
+    }
+
+    # SAML and SCIM callbacks live outside /api for standards compatibility.
+    reverse_proxy /saml/* api:7457 {
+        header_up Host {upstream_hostport}
+        header_up X-Real-IP {remote_host}
+        header_up X-Forwarded-For {remote_host}
+        header_up X-Forwarded-Proto {scheme}
+        header_up X-Forwarded-Host {host}
+        header_up -X-RadioPad-RequestId
+        header_up X-RadioPad-RequestId {http.request.uuid}
+    }
+
+    reverse_proxy /scim/v2/* api:7457 {
+        header_up Host {upstream_hostport}
+        header_up X-Real-IP {remote_host}
+        header_up X-Forwarded-For {remote_host}
+        header_up X-Forwarded-Proto {scheme}
+        header_up X-Forwarded-Host {host}
+        header_up -X-RadioPad-RequestId
         header_up X-RadioPad-RequestId {http.request.uuid}
     }
 

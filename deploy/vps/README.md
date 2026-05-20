@@ -1,5 +1,7 @@
 # RadioPad — VPS Deployment (Nginx Proxy Manager pattern)
 
+**Status:** Current  ·  **Owner:** Operations  ·  **Last Updated:** 2026-05-20
+
 This directory contains the deployment manifests for a VPS that uses
 **Nginx Proxy Manager** (NPM) for TLS termination and domain routing.
 This differs from the root `deploy/` directory which uses Caddy for TLS.
@@ -38,7 +40,19 @@ git clone https://github.com/Sub-organization-maternal-mind/radiopad.git src
 
 # Create secrets file
 cat > .secrets.env << 'EOF'
+RADIOPAD_AUTH_SECRET=<generate-with: openssl rand -base64 48>
+RADIOPAD_PUBLIC_WEB_URL=https://radiopad.your-domain.com
 RADIOPAD_COLUMN_KEK=<generate-with: openssl rand -base64 32>
+RADIOPAD_COLUMN_KEY_WRAPPED=<base64-wrapped-32-byte-data-key>
+# Set these only if API IP allowlists should trust an upstream proxy header.
+# RADIOPAD_TRUST_FORWARDED_FOR=1
+# RADIOPAD_TRUSTED_PROXY_CIDRS=172.16.0.0/12
+# Required for production magic-link login:
+# RADIOPAD_SMTP_HOST=smtp.example.com
+# RADIOPAD_SMTP_PORT=587
+# RADIOPAD_SMTP_USER=<mailbox>
+# RADIOPAD_SMTP_PASS=<app-password-or-secret>
+# RADIOPAD_SMTP_FROM="RadioPad <no-reply@example.com>"
 # Optional: ANTHROPIC_API_KEY=...
 EOF
 chmod 600 .secrets.env
@@ -82,4 +96,7 @@ Add a proxy host in Nginx Proxy Manager:
 ```bash
 curl http://127.0.0.1:8093/api/health
 # Expected: {"status":"ok","service":"radiopad-api","time":"..."}
+
+curl http://127.0.0.1:8093/saml/metadata -I
+# Expected when SAML is configured: API response, not the static web index.
 ```

@@ -176,6 +176,7 @@ public sealed class AwsBedrockProvider : IAiProviderAdapter
             : endpointUrl;
         if (!Uri.TryCreate(raw, UriKind.Absolute, out var uri))
             throw new ProviderTransportException($"{AdapterId}: malformed endpoint URL '{endpointUrl}'.");
+        OpenAiChatHelpers.ValidateHostedEndpoint(raw, AdapterId);
 
         // Host pattern: bedrock-runtime.{region}.amazonaws.com (or bedrock.{region}...)
         var host = uri.Host;

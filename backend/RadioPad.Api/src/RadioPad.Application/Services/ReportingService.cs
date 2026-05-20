@@ -106,12 +106,13 @@ public class ReportingService
             : await _overrides.LoadAsync(tenant.Id, rulebookEntity.RulebookId, ct);
         var (system, instructions, userBody) = BuildPromptForMode(report, rulebook, mode, overrides);
 
+        var containsPhi = ContainsPhi(report) || ContainsPhiText(system, userBody);
         return await _gateway.RouteAsync(tenant, new AiCompletionRequest(
             Provider: provider,
             SystemPrompt: system,
             UserPrompt: userBody,
             PromptVersion: PromptVersion,
-            ContainsPhi: ContainsPhi(report)), ct);
+            ContainsPhi: containsPhi), ct);
     }
 
     internal static (string system, string instructions, string userPrompt) BuildPromptForMode(
@@ -417,10 +418,30 @@ public class ReportingService
     public static bool ContainsPhi(Report r)
     {
         if (!string.IsNullOrWhiteSpace(r.Study.PatientReference)) return true;
-        var blob = string.Join(' ', r.Indication, r.Findings, r.Impression);
-        if (System.Text.RegularExpressions.Regex.IsMatch(blob, @"\bMRN[:\s]*\d{4,}\b", System.Text.RegularExpressions.RegexOptions.IgnoreCase)) return true;
+        return ContainsPhiText(
+            r.Study.AccessionNumber,
+            r.Study.Indication,
+            r.Study.Comparison,
+            r.Study.PriorReportSummary,
+            r.Indication,
+            r.Technique,
+            r.Comparison,
+            r.Findings,
+            r.Impression,
+            r.Recommendations,
+            r.ServiceRequestRef,
+            r.DepartmentTag);
+    }
+
+    public static bool ContainsPhiText(params string?[] values)
+    {
+        var blob = string.Join(' ', values.Where(v => !string.IsNullOrWhiteSpace(v)));
+        if (blob.Length == 0) return false;
+        if (System.Text.RegularExpressions.Regex.IsMatch(blob, @"\bMRN[:#\s-]*[A-Z0-9]{4,}\b", System.Text.RegularExpressions.RegexOptions.IgnoreCase)) return true;
+        if (System.Text.RegularExpressions.Regex.IsMatch(blob, @"\bDOB[:\s]*\d{1,2}/\d{1,2}/\d{2,4}\b", System.Text.RegularExpressions.RegexOptions.IgnoreCase)) return true;
         if (System.Text.RegularExpressions.Regex.IsMatch(blob, @"\b\d{1,2}/\d{1,2}/\d{2,4}\b")) return true;
         if (System.Text.RegularExpressions.Regex.IsMatch(blob, @"\b(Mr|Mrs|Ms|Dr)\.\s+[A-Z][a-z]+\b")) return true;
+        if (System.Text.RegularExpressions.Regex.IsMatch(blob, @"\b(patient\s+name|name)[:\s]+[A-Z][a-z]+\s+[A-Z][a-z]+\b", System.Text.RegularExpressions.RegexOptions.IgnoreCase)) return true;
         return false;
     }
 }

@@ -144,6 +144,7 @@ public sealed class GoogleVertexAiProvider : IAiProviderAdapter
 
         if (!Uri.TryCreate(endpointUrl, UriKind.Absolute, out var uri))
             return ("us-central1", "https://us-central1-aiplatform.googleapis.com");
+        OpenAiChatHelpers.ValidateHostedEndpoint(endpointUrl, AdapterId);
 
         var host = uri.Host;
         var location = "us-central1";

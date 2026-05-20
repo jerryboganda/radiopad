@@ -1,4 +1,5 @@
 using RadioPad.Application.Services;
+using RadioPad.Application.Abstractions;
 using RadioPad.Domain.Enums;
 
 namespace RadioPad.Infrastructure.Providers.Cli;
@@ -10,8 +11,8 @@ namespace RadioPad.Infrastructure.Providers.Cli;
 ///   <item>Default per-process timeout (60s, override via
 ///   <c>RADIOPAD_CLI_PROVIDER_TIMEOUT_MS</c>).</item>
 ///   <item>Binary-path allowlist enforcement
-///   (<c>RADIOPAD_CLI_PROVIDER_ALLOWED_PATHS</c>, semicolon-separated; empty
-///   = allow PATH lookup).</item>
+///   (<c>RADIOPAD_CLI_PROVIDER_ALLOWED_PATHS</c>, semicolon-separated). Empty
+///   allows PATH lookup in development only; production requires an allowlist.</item>
 ///   <item>Prompt sanitation — refuses NUL / control characters that could
 ///   break stdin framing.</item>
 /// </list>
@@ -38,16 +39,19 @@ internal static class CliProviderRunner
     }
 
     /// <summary>
-    /// Default-deny: when <c>RADIOPAD_CLI_PROVIDER_ALLOWED_PATHS</c> is set
-    /// and non-empty, the resolved file name MUST be one of the entries
-    /// (case-insensitive on Windows, ordinal elsewhere). When the env var
-    /// is unset or empty, the bare command name is allowed and resolves
-    /// via PATH.
+    /// Default-deny in production: <c>RADIOPAD_CLI_PROVIDER_ALLOWED_PATHS</c>
+    /// must list the exact binary path. Development may still use PATH lookup
+    /// for local smoke tests.
     /// </summary>
     public static void EnforceBinaryAllowlist(string adapterId, string fileName)
     {
         var raw = Environment.GetEnvironmentVariable("RADIOPAD_CLI_PROVIDER_ALLOWED_PATHS");
-        if (string.IsNullOrWhiteSpace(raw)) return;
+        if (string.IsNullOrWhiteSpace(raw))
+        {
+            if (IsProductionEnvironment())
+                throw new ProviderPolicyException($"{adapterId}: cli_binary_allowlist_required");
+            return;
+        }
         var allowed = raw.Split(';', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
         var cmp = OperatingSystem.IsWindows() ? StringComparison.OrdinalIgnoreCase : StringComparison.Ordinal;
         foreach (var entry in allowed)
@@ -56,6 +60,10 @@ internal static class CliProviderRunner
         }
         throw new ProviderPolicyException($"{adapterId}: cli_binary_not_allowed");
     }
+
+    private static bool IsProductionEnvironment() =>
+        string.Equals(Environment.GetEnvironmentVariable("ASPNETCORE_ENVIRONMENT"), "Production", StringComparison.OrdinalIgnoreCase) ||
+        string.Equals(Environment.GetEnvironmentVariable("DOTNET_ENVIRONMENT"), "Production", StringComparison.OrdinalIgnoreCase);
 
     /// <summary>
     /// Refuses prompts containing control characters that would break stdin
@@ -75,6 +83,25 @@ internal static class CliProviderRunner
         return s;
     }
 
+    public static void EnforceRequestPolicy(string adapterId, AiCompletionRequest request)
+    {
+        if (request.ContainsPhi)
+            throw new ProviderPolicyException($"{adapterId}: phi_not_supported");
+        if (LooksLikeSecret(request.SystemPrompt) || LooksLikeSecret(request.UserPrompt))
+            throw new ProviderPolicyException($"{adapterId}: secret_not_supported");
+    }
+
+    private static bool LooksLikeSecret(string? value)
+    {
+        var v = value ?? string.Empty;
+        return v.Contains("ghp_", StringComparison.Ordinal)
+            || v.Contains("github_pat_", StringComparison.Ordinal)
+            || v.Contains("Authorization:", StringComparison.OrdinalIgnoreCase)
+            || v.Contains("api_key", StringComparison.OrdinalIgnoreCase)
+            || v.Contains("client_secret", StringComparison.OrdinalIgnoreCase)
+            || v.Contains("-----BEGIN", StringComparison.Ordinal);
+    }
+
     public static string Compose(string? systemPrompt, string? userPrompt)
     {
         var sys = (systemPrompt ?? "").Trim();
@@ -90,4 +117,88 @@ internal static class CliProviderRunner
             ProcessLaunchTimeoutException to => new ProviderTransportException($"{adapterId}: {to.Message}", inner: to),
             _ => new ProviderTransportException($"{adapterId}: {inner.Message}", inner: inner),
         };
+
+    public static async Task<AiProviderHealthResult> ProbeBinaryAsync(
+        string adapterId,
+        string fileName,
+        IReadOnlyList<string> arguments,
+        IProcessLauncher launcher,
+        CancellationToken ct)
+    {
+        try
+        {
+            EnforceBinaryAllowlist(adapterId, fileName);
+            var result = await launcher.RunAsync(new ProcessLaunchSpec(
+                FileName: fileName,
+                Arguments: arguments,
+                StandardInput: null,
+                TimeoutMs: Math.Min(ResolveTimeoutMs(), 10_000)), ct);
+
+            if (result.ExitCode == 0)
+            {
+                return new AiProviderHealthResult(
+                    Ok: true,
+                    Note: "cli binary available",
+                    Runtime: fileName);
+            }
+
+            var err = string.IsNullOrWhiteSpace(result.StandardError)
+                ? $"{adapterId}: version probe exited with code {result.ExitCode}."
+                : Truncate(result.StandardError.Trim());
+            return new AiProviderHealthResult(false, err, Runtime: fileName);
+        }
+        catch (ProviderPolicyException ex)
+        {
+            return new AiProviderHealthResult(false, ex.Message, Runtime: fileName);
+        }
+        catch (Exception ex) when (ex is ProcessLaunchNotFoundException or ProcessLaunchTimeoutException)
+        {
+            return new AiProviderHealthResult(false, ToTransport(adapterId, ex).Message, Runtime: fileName);
+        }
+    }
+
+    public static string ExtractTextFromJsonOrRaw(string stdout)
+    {
+        var textOut = stdout ?? string.Empty;
+        var raw = textOut.Trim();
+        if (raw.Length == 0 || raw[0] is not ('{' or '[')) return textOut.TrimEnd();
+
+        try
+        {
+            using var doc = System.Text.Json.JsonDocument.Parse(raw);
+            var root = doc.RootElement;
+            if (root.ValueKind == System.Text.Json.JsonValueKind.Object)
+            {
+                foreach (var key in new[] { "response", "text", "output", "content" })
+                {
+                    if (root.TryGetProperty(key, out var prop) && prop.ValueKind == System.Text.Json.JsonValueKind.String)
+                        return prop.GetString() ?? string.Empty;
+                }
+
+                if (root.TryGetProperty("candidates", out var candidates) &&
+                    candidates.ValueKind == System.Text.Json.JsonValueKind.Array &&
+                    candidates.GetArrayLength() > 0)
+                {
+                    var first = candidates[0];
+                    if (first.TryGetProperty("content", out var content) &&
+                        content.TryGetProperty("parts", out var parts) &&
+                        parts.ValueKind == System.Text.Json.JsonValueKind.Array &&
+                        parts.GetArrayLength() > 0 &&
+                        parts[0].TryGetProperty("text", out var text) &&
+                        text.ValueKind == System.Text.Json.JsonValueKind.String)
+                    {
+                        return text.GetString() ?? string.Empty;
+                    }
+                }
+            }
+        }
+        catch (System.Text.Json.JsonException)
+        {
+            return textOut.TrimEnd();
+        }
+
+        return textOut.TrimEnd();
+    }
+
+    private static string Truncate(string s) => s.Length > 4096 ? s[..4096] : s;
 }

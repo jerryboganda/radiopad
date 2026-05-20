@@ -1,8 +1,8 @@
 # RadioPad — HTTP API reference
 
-**Status:** Current  ·  **Owner:** Engineering  ·  **Last Updated:** 2026-05-05
+**Status:** Current  ·  **Owner:** Engineering  ·  **Last Updated:** 2026-05-20
 > Base URL: `http://127.0.0.1:7457` (development).
-> All endpoints expect the tenant headers below; in production these are issued by the auth proxy.
+> Development endpoints accept the tenant headers below. Production requests require either a validated RadioPad bearer (`Authorization: Bearer rp_...`), the HttpOnly `radiopad_session` cookie issued by browser sign-in flows, or a validated OIDC bearer projected by `OidcBearerMiddleware`; raw dev headers are accepted in production only when `RADIOPAD_DEV_HEADERS=1`. Public production exceptions are limited to health checks, billing webhook, magic-link request/consume, logout, and RFC 8628 device authorize/token bootstrap endpoints.
 
 ## Auth headers (every request)
 
@@ -28,7 +28,7 @@ Controller-handled provider policy failures return 403 `kind:"provider_policy"`.
 
 ## Health
 
-`GET /api/health` → `200 { "ok": true }`.
+`GET /api/health` → `200 { "status": "ok", "service": "radiopad-api", "time": "..." }`.
 `GET /api/health/ready` → `200` when the DB is reachable, `503` otherwise. Use as a Kubernetes / Compose readiness probe.
 
 ## Tenant
@@ -146,8 +146,8 @@ The canonical `kind` enum surfaces in `openapi/openapi.yaml#/components/schemas/
 | Method | Path | Description |
 | --- | --- | --- |
 | GET    | `/api/providers`              | Returns providers without secrets (only `apiKeyConfigured: bool`, plus `quality` 0–1, the operator-supplied compliance class, and the iter-34 PROV-009 `retentionLabel` free-text label). |
-| POST   | `/api/providers`              | Save (create when `id` missing). `apiKeySecretRef` accepts `env:NAME`. New: `quality` (decimal `[0,1]`) feeds the iter-32 composite cost router; `retentionLabel` (string, default `""`) is the iter-34 PROV-009 free-text data-retention tag (e.g. `no-egress`, `30d-soft-delete`, `baa-30d`) — informational, never weakens the PHI policy. |
-| POST   | `/api/providers/{id}/health`  | **Iter-32 AI-011.** Adapter-specific health probe. For `ollama-chat` calls `GET {base}/api/tags`; for `vllm` calls `GET {base}/v1/models`; for `llama-cpp` calls `GET {base}/health`. Other adapters return `{ok:true, note:"no-op"}`. ItAdmin / MedicalDirector only. |
+| POST   | `/api/providers`              | Save (create when `id` missing). `apiKeySecretRef` accepts `env:NAME` only; empty keeps an existing secret ref or configures a no-key provider. OpenAI-compatible endpoints are validated for scheme/private-network safety before save. Provider config saves are audited. |
+| POST   | `/api/providers/{id}/health`  | Adapter-specific health probe. Returns `{ ok, error?, note?, status?, runtime?, probedAt }` and writes an audit row. For `ollama-chat` calls `GET {base}/api/tags`; for `vllm` calls `GET {base}/v1/models`; for `llama-cpp` calls `GET {base}/health`; for `openai-compatible` calls `GET {base}/v1/models` without sending bearer auth and blocks unsafe endpoint targets; for CLI adapters validates the configured binary without sending a prompt; for `github-copilot-sdk` returns unavailable until a reviewed backend SDK transport is enabled. ItAdmin / ReportingAdmin / MedicalDirector only. |
 | POST   | `/api/providers/{id}/oauth/refresh-token`        | **Iter-35 PROV-007.** Save (or replace) the per-provider OAuth refresh token in the encrypted vault. Body `{ refreshToken: string, expiresAt?: string \| null, rotationPolicy?: "never"\|"before_expiry"\|"every_24h" }`. Token is encrypted with AES-256-GCM under a per-token DEK wrapped by the tenant KMS KEK. Returns `204 No Content`. **ItAdmin / BillingAdmin only.** Audited as `OAuthRefreshRotated` with `kind:"saved"`; never logs the token bytes. Returns `503 kind:"kms_unavailable"` when no tenant KEK is configured. |
 | DELETE | `/api/providers/{id}/oauth/refresh-token`        | **Iter-35 PROV-007.** Delete the stored refresh token (clears all four ciphertext columns + timestamps; rotation policy is preserved). `204 No Content`. ItAdmin / BillingAdmin only. Audited as `OAuthRefreshRotated` with `kind:"deleted"`. |
 | GET    | `/api/providers/{id}/oauth/refresh-token/status` | **Iter-35 PROV-007.** Returns `{ hasToken: bool, updatedAt: string\|null, expiresAt: string\|null, rotationPolicy: string }`. **Never** returns the ciphertext, IV, tag, or wrapped DEK. ItAdmin / BillingAdmin only. |
@@ -158,19 +158,45 @@ The provider rows reference an `adapter` id from this fixed catalog. Compliance 
 
 | Adapter id | Kind | Default compliance | Notes |
 | --- | --- | --- | --- |
-| `mock` / `anthropic` / `azure-openai` / `aws-bedrock` / `vertex-ai` / `openai-direct` | HTTP | `Sandbox` | Cloud-vendor adapters (iter-31). |
-| `openai-compatible` | HTTP | `Sandbox` (or `LocalOnly` for `127.0.0.1` / `localhost` / `*.local` hosts) | Generic OpenAI-API-compatible endpoint. **Iter-36:** when `apiKeySecretRef` is set but resolves empty, the adapter throws `ProviderPolicyException("api_key_missing")` instead of letting upstream return 401. |
+| `mock` / `anthropic` / `azure-openai` / `aws-bedrock` / `google-vertex` / `openai` | HTTP | `Sandbox` unless the tenant has a documented `PhiApproved` posture | Cloud-vendor adapters. |
+| `openai-compatible` | HTTP | `Sandbox` (or `LocalOnly` for `127.0.0.1` / `localhost` / `*.local` hosts) | Generic OpenAI-API-compatible endpoint. **Iter-36:** when `apiKeySecretRef` is set but resolves empty, the adapter throws `ProviderPolicyException("api_key_missing")` instead of letting upstream return 401. Private-network endpoints require `LocalOnly`; PHI requires `LocalOnly` or the explicit `RADIOPAD_OPENAI_COMPATIBLE_ALLOW_PHI=1` review flag. |
 | `ollama-chat` / `vllm` / `llama-cpp` | HTTP | `LocalOnly` | In-tenant local servers (iter-32 AI-011). |
-| `github-copilot-cli` | CLI subprocess | `Sandbox` | **Iter-36 AI-012.** Shells out to `gh copilot`. Binary override env `RADIOPAD_GH_COPILOT_BIN` (default `gh`). The binary may call a vendor cloud, so PHI requires an explicit `PhiApproved` provider row. |
-| `gemini-cli` | CLI subprocess | `Sandbox` | **Iter-36 AI-012.** Shells out to `gemini`. Binary override env `RADIOPAD_GEMINI_BIN` (default `gemini`). The binary may call a vendor cloud, so PHI requires an explicit `PhiApproved` provider row. |
-| `codex-cli` | CLI subprocess | `Sandbox` | **Iter-36 AI-012.** Shells out to `codex`. Binary override env `RADIOPAD_CODEX_BIN` (default `codex`). The binary may call a vendor cloud, so PHI requires an explicit `PhiApproved` provider row. |
+| `github-copilot-sdk` | SDK transport, fail-closed | `Sandbox` | First-class provider id for GitHub Copilot SDK policy modeling. Runtime returns `runtime_not_configured` until an official backend-safe SDK transport is installed and reviewed. PHI routing is refused even if a row is misclassified. |
+| `github-copilot-cli` | CLI subprocess | `Sandbox` | **Iter-36 AI-012 / Iter-47 hardening.** Shells out to `copilot` using Copilot CLI's prompt option stream over stdin, keeping prompt text out of process arguments. Binary override env `RADIOPAD_COPILOT_BIN` (default `copilot`). Production server-side execution also requires `RADIOPAD_COPILOT_SERVER_CLI_ENABLED=1`. PHI and secret-like prompts are refused by the adapter even if a row is misclassified. |
+| `gemini-cli` | CLI subprocess | `Sandbox` | **Iter-36 AI-012.** Shells out to `gemini` headless mode with `--output-format json`. Binary override env `RADIOPAD_GEMINI_BIN` (default `gemini`). PHI and secret-like prompts are refused by the adapter even if a row is misclassified. |
+| `codex-cli` | CLI subprocess, fail-closed | `Sandbox` | **Iter-36 AI-012 / Iter-47 hardening.** Shells out to `codex exec --sandbox read-only -` only when `RADIOPAD_CODEX_CLI_ENABLED=1`. Binary override env `RADIOPAD_CODEX_BIN` (default `codex`). The adapter does not opt into `--full-auto`; PHI and secret-like prompts are refused. |
 
 CLI adapters share these guard-rails (`RadioPad.Infrastructure.Providers.Cli.CliProviderRunner`):
 
 - The composed prompt is piped on **stdin**; arguments are passed via `ProcessStartInfo.ArgumentList` so a prompt can never cross a shell boundary.
 - Per-process timeout defaults to **60s**; override with `RADIOPAD_CLI_PROVIDER_TIMEOUT_MS`. Timeout / missing-binary / non-zero exit all surface as `ProviderTransportException`.
-- Optional binary allowlist via `RADIOPAD_CLI_PROVIDER_ALLOWED_PATHS` (semicolon-separated). When set, the resolved binary path must be in the list — otherwise the adapter throws `ProviderPolicyException("cli_binary_not_allowed")`. Empty / unset = allow PATH lookup.
+- Binary allowlist via `RADIOPAD_CLI_PROVIDER_ALLOWED_PATHS` (semicolon-separated). Production API hosts require a non-empty allowlist before CLI providers can execute; missing production allowlists throw `ProviderPolicyException("cli_binary_allowlist_required")`. When set, the resolved binary path must be in the list or the adapter throws `ProviderPolicyException("cli_binary_not_allowed")`. Empty / unset allowlists are development-only and use PATH lookup.
+- The subprocess environment is scrubbed to OS basics (`PATH`, home/config/temp locations). Add only the variables a reviewed CLI needs via `RADIOPAD_CLI_PROVIDER_ENV_ALLOWLIST`.
 - Prompt sanitiser refuses NUL and other C0 control characters (tab / newline / CR are allowed).
+- Adapter-level policy refuses `containsPhi:true` and secret-shaped prompts before process launch.
+
+## Copilot
+
+Copilot endpoints are tenant-scoped and metadata-only in audit rows. Chat/session requests are routed through `IAiGateway` using an enabled tenant-owned `github-copilot-cli` provider; disabled providers are ignored. Secret-shaped prompts and clinical/PHI context are blocked before session rows are created.
+
+| Method | Path | Description |
+| --- | --- | --- |
+| GET | `/api/copilot/status` | Runtime status for the current user. |
+| GET | `/api/copilot/account` | Current user's Copilot account link state. |
+| GET | `/api/copilot/entitlement` | Current user's entitlement decision. |
+| POST | `/api/copilot/account/auth/start` | Begin OAuth/device authorization. |
+| POST | `/api/copilot/account/local-cli` | Link a local CLI-attested Copilot account. |
+| DELETE | `/api/copilot/account` | Revoke current user's Copilot account link. |
+| POST | `/api/copilot/context/preview` | Preview redacted context and policy removals. |
+| POST | `/api/copilot/sessions` | Start a gateway-routed session. Returns `409` with a policy error when blocked. |
+| POST | `/api/copilot/sessions/{sessionId}/cancel` | Cancel a session owned by the current user. |
+| POST | `/api/copilot/chat` | Compatibility one-shot chat endpoint backed by the same session path. |
+| GET/POST | `/api/copilot/admin/settings` | Read or save tenant settings (admin roles). |
+| GET | `/api/copilot/admin/status` | Admin status view. |
+| POST | `/api/copilot/admin/diagnostics` | Run prompt-free diagnostics. |
+| POST | `/api/copilot/admin/features/{featureKey}` | Toggle a tenant feature flag. |
+| GET/POST | `/api/copilot/admin/quotas` | Read or save tenant quota policies. |
+| GET | `/api/copilot/admin/usage` | Tenant Copilot usage summary. |
 
 
 ## AI routing preview
@@ -225,13 +251,23 @@ The `/audit/verify` UI recomputes the chain client-side.
 | POST | `/api/ingest/fhir/servicerequest` | Existing endpoint — now also captures the originating `ServiceRequest.id` into `Report.serviceRequestRef` so the eventual DiagnosticReport can be correlated. |
 | POST | `/api/ingest/fhir/diagnosticreport` | New (Iter-30). Accepts a FHIR R4 `DiagnosticReport` (or `Bundle` containing one). Maps `identifier[0].value`→`accessionNumber`, `code.coding[0].display`/`text`→`modality`, `category[0].text`→`bodyPart`, `conclusion`→`impression`, base64-decoded `presentedForm[0].data`→`findings`, `basedOn[0].reference`→`serviceRequestRef`. Creates a Draft report; audited as `ReportImported`. Same bearer-secret auth as `/order`. |
 
-### Tenant settings — PACS vendor selector (INT-007)
+### Tenant settings — security, integrations, and PACS vendor selector
 
-`GET /api/admin/tenant-settings` now surfaces a `pacs.vendor` field
-(`"sectra" | "visage" | "carestream" | null`). `POST /api/admin/tenant-settings`
-accepts an optional `pacsVendor` body field with the same domain plus the
-empty string (which clears the selection back to `null`). Invalid values
-return `400 { error, kind: "validation" }`. See
+`GET /api/tenant/settings` returns tenant safety settings plus integration
+status blocks for ingest, DICOMweb, PACS, retention, SCIM, CMK, and validation
+strictness. Secret fields are never echoed; the response only includes
+`*Configured` booleans. The response also includes `ipAllowlistJson`, a JSON
+array of CIDR strings used by the per-tenant IP allowlist middleware.
+Malformed allowlist JSON or malformed legacy CIDR values fail closed with
+`503 { kind: "ip_allowlist_invalid" }` instead of disabling enforcement.
+
+`POST /api/tenant/settings` is a partial update for `MedicalDirector`,
+`ReportingAdmin`, and `ItAdmin`. Omitted fields are left unchanged. It accepts
+`ipAllowlistJson`, optional write-only secret fields, and `pacsVendor`
+(`"sectra" | "visage" | "carestream" | "" | null`). The empty string clears
+the PACS vendor selection back to generic DICOMweb. Invalid severity, support
+threshold, retention days, CIDR JSON, or PACS vendor values return
+`400 { error, kind: "validation" }`. See
 [integrations/pacs-vendor-adapters.md](integrations/pacs-vendor-adapters.md)
 for the per-vendor endpoint matrix and credential conventions.
 
@@ -290,22 +326,30 @@ configured or the tenant has no `StripeCustomerId`.
 
 ## Iter-32 Authentication / SSO / MFA
 
-| Method | Path | Description |
-| --- | --- | --- |
-| GET  | /saml/metadata | SAML 2.0 SP descriptor XML. |
-| POST | /saml/acs | SAML 2.0 Assertion Consumer Service. Verifies XML signature against `RADIOPAD_SAML_IDP_CERT_PEM`, maps NameID + tenant attribute, mints a bearer, audits `UserLogin{method:"saml"}`. |
-| POST | /api/auth/webauthn/register-options | Begin WebAuthn / passkey registration. |
-| POST | /api/auth/webauthn/register | Persist a passkey under the current `(tenant, user)`. |
-| POST | /api/auth/webauthn/signin-options | Begin WebAuthn assertion. |
-| POST | /api/auth/webauthn/signin | Complete WebAuthn assertion; mints a bearer; audits `UserLogin{method:"webauthn"}`. |
-| POST | /api/auth/device/authorize | RFC 8628 device flow: body `{ clientId, deviceFingerprint? }`; returns `{ deviceCode, userCode, verificationUri, verificationUriComplete, expiresIn, interval }` for desktop/CLI pairing. |
-| POST | /api/auth/device/token | RFC 8628 polling: body `{ deviceCode, grantType:"urn:ietf:params:oauth:grant-type:device_code" }`; returns `authorization_pending`, `slow_down`, `access_denied`, `expired_token`, or `{ accessToken, tokenType:"Bearer", expiresIn, tenant, user }`. |
+| Method | Path | Auth | Description |
+| --- | --- | --- | --- |
+| GET  | /saml/metadata | public | SAML 2.0 SP descriptor XML. |
+| POST | /saml/acs | public IdP callback | SAML 2.0 Assertion Consumer Service. Verifies XML signature against `RADIOPAD_SAML_IDP_CERT_PEM`, maps NameID + tenant attribute, mints a bearer, audits `UserLogin{method:"saml"}`. |
+| POST | /api/auth/webauthn/register-options | bearer/OIDC | Begin WebAuthn / passkey registration. |
+| POST | /api/auth/webauthn/register | bearer/OIDC | Persist a passkey under the current `(tenant, user)`. |
+| POST | /api/auth/webauthn/signin-options | bearer/OIDC | Begin WebAuthn assertion. |
+| POST | /api/auth/webauthn/signin | bearer/OIDC | Complete WebAuthn assertion; mints a bearer; audits `UserLogin{method:"webauthn"}`. |
+| POST | `/api/auth/magic-link/request` | public | Requests a single-use 15-minute sign-in link. Production requires `RADIOPAD_PUBLIC_WEB_URL` and SMTP configuration; raw dev links are returned only outside Production. Client-supplied callback origins are ignored in Production. |
+| POST | `/api/auth/magic-link/consume` | public | Consumes the magic token, mints an `rp_` bearer, sets the HttpOnly `radiopad_session` cookie for browser sessions, and audits `UserLogin{method:"magic-link"}`. |
+| POST | `/api/auth/logout` | public | Clears the browser `radiopad_session` cookie. Native shells should also clear their secure bearer store. |
+| GET | `/api/auth/oidc/authorize-url` | public | Returns an operator-configured OIDC authorization URL for optional browser SSO bootstrap. Requires `RADIOPAD_OIDC_AUTHORIZE_URL`, `RADIOPAD_OIDC_CLIENT_ID`, and `RADIOPAD_PUBLIC_WEB_URL`; includes `RADIOPAD_OIDC_AUDIENCE` as `audience` when configured. |
+| POST | /api/auth/device/authorize | public | RFC 8628 device flow: body `{ clientId, deviceFingerprint? }`; returns `{ deviceCode, userCode, verificationUri, verificationUriComplete, expiresIn, interval }` for desktop/CLI pairing. |
+| POST | /api/auth/device/token | public | RFC 8628 polling: body `{ deviceCode, grantType:"urn:ietf:params:oauth:grant-type:device_code" }`; returns `authorization_pending`, `slow_down`, `access_denied`, `expired_token`, or `{ accessToken, tokenType:"Bearer", expiresIn, tenant, user }`. |
 | POST | /api/users/{id}/unlock | Compliance / IT-Admin clears `LockedUntil` and resets the failure counter; audits `UserUnlocked`. |
 | POST | /api/users/{id}/revoke-sessions | Compliance / IT-Admin increments `User.SessionEpoch`; every outstanding bearer fails HMAC validation; audits `SessionsRevoked`. |
 
 OIDC presets (`RADIOPAD_OIDC_PRESET=keycloak|auth0|okta`) auto-fill `RADIOPAD_OIDC_TENANT_CLAIM`, `RADIOPAD_OIDC_EMAIL_CLAIM` and `RADIOPAD_OIDC_REQUIRE_MFA` for the IdPs supported in v0.3. Presets never overwrite explicit env values.
 
-Account-lockout policy: 5 failed sign-ins within a 15-minute sliding window flips `User.LockedUntil = now + 15 min` and `IsActive = false`; auto-unlocks once the timer expires or an admin calls `/api/users/{id}/unlock`. Failed and successful sign-ins both flow through `LockoutPolicy` (TOTP verify, password sign-in, magic-link consume).
+OIDC bearer projection validates the external JWT and then re-checks the mapped RadioPad tenant/user row. Missing tenants, inactive users, and locked users are rejected before tenant headers are injected.
+
+SAML ACS is fail-closed when `RADIOPAD_SAML_IDP_CERT_PEM` is not configured. The unsigned-assertion escape hatch `RADIOPAD_SAML_DEV_INSECURE=true` is ignored in Production and is only for local/test IdP harnesses.
+
+Account-lockout policy: 5 failed sign-ins within a 15-minute sliding window flips `User.LockedUntil = now + 15 min` and `IsActive = false`; auto-unlocks once the timer expires or an admin calls `/api/users/{id}/unlock`. TOTP/password-style failures flow through `LockoutPolicy`; magic-link consume uses single-use hashed tokens with expiry and rejects inactive or locked users at session validation.
 
 
 ---

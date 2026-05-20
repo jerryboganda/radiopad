@@ -81,11 +81,11 @@ describe('analytics page', () => {
     expect(screen.getByText('Custom')).toBeInTheDocument();
   });
 
-  it('Product KPIs section renders all 11 tiles', async () => {
+  it('productivity and quality section renders all 11 tiles', async () => {
     analyticsSummaryMock.mockResolvedValue(SAMPLE_SUMMARY);
     render(<AnalyticsPage />);
     await waitFor(() => {
-      expect(screen.getByText('Product KPIs (§18.1)')).toBeInTheDocument();
+      expect(screen.getByText('Productivity & quality')).toBeInTheDocument();
     });
     const kpiLabels = [
       'Draft acceptance rate',
@@ -127,7 +127,7 @@ describe('analytics page', () => {
     analyticsSummaryMock.mockResolvedValue(SAMPLE_SUMMARY);
     const { container } = render(<AnalyticsPage />);
     await waitFor(() => {
-      expect(screen.getByText('Product KPIs (§18.1)')).toBeInTheDocument();
+      expect(screen.getByText('Productivity & quality')).toBeInTheDocument();
     });
 
     // draftAcceptanceRate = 0.85 >= 0.8 → ok

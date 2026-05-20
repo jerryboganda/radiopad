@@ -1,8 +1,10 @@
 #!/bin/sh
 set -e
+TENANT=${RADIOPAD_TENANT_SLUG:-dev}
+EMAIL=${RADIOPAD_DEV_USER_EMAIL:?set RADIOPAD_DEV_USER_EMAIL}
 cat > /tmp/req.json <<'JSONEOF'
-{"tenant":"dev","email":"manwara575@gmail.com"}
 JSONEOF
+printf '{"tenant":"%s","email":"%s"}\n' "$TENANT" "$EMAIL" > /tmp/req.json
 docker cp /tmp/req.json radiopad-api:/tmp/req.json >/dev/null
 echo "--- body ---"
 docker exec radiopad-api cat /tmp/req.json
@@ -16,4 +18,4 @@ docker exec radiopad-api curl -sS \
   -w '\nHTTP=%{http_code}\n' --max-time 60
 echo "--- logs ---"
 sleep 2
-docker logs radiopad-api --since 30s 2>&1 | grep -iE 'smtp|magic|mail|warn|error|gmail' | tail -20
+docker logs radiopad-api --since 30s 2>&1 | grep -iE 'smtp|magic|mail|warn|error' | tail -20

@@ -3,6 +3,7 @@ using System.Text;
 using System.Text.Json;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
+using RadioPad.Api.Auth;
 using RadioPad.Application.Abstractions;
 using RadioPad.Application.Services.WebAuthn;
 using RadioPad.Domain.Entities;
@@ -51,13 +52,15 @@ public class WebAuthnController : TenantedController
     private readonly IAuditLog _audit;
     private readonly RadioPad.Api.Auth.LockoutPolicy _lockout;
     private readonly RadioPad.Application.Services.WebAuthn.IFidoMdsMetadataSource? _mdsRoots;
+    private readonly IWebHostEnvironment _env;
 
     public WebAuthnController(
         RadioPadDbContext db,
         IAuditLog audit,
         RadioPad.Api.Auth.LockoutPolicy lockout,
+        IWebHostEnvironment env,
         RadioPad.Application.Services.WebAuthn.IFidoMdsMetadataSource? mdsRoots = null)
-    { _db = db; _audit = audit; _lockout = lockout; _mdsRoots = mdsRoots; }
+    { _db = db; _audit = audit; _lockout = lockout; _env = env; _mdsRoots = mdsRoots; }
 
     private static string Rp() => Environment.GetEnvironmentVariable("RADIOPAD_WEBAUTHN_RP_ID") ?? "localhost";
     private static string RpName() => Environment.GetEnvironmentVariable("RADIOPAD_WEBAUTHN_RP_NAME") ?? "RadioPad";
@@ -242,12 +245,13 @@ public class WebAuthnController : TenantedController
             DetailsJson = JsonSerializer.Serialize(new { method = "webauthn", credentialId = hash }),
         }, ct);
 
+        var issuedAt = DateTimeOffset.UtcNow;
         return Ok(new
         {
-            token = MagicLinkController.MintBearer(tenant.Slug, user.Email, user.SessionEpoch),
+            token = RadioPadBearerTokens.Mint(tenant.Slug, user.Email, user.SessionEpoch, _env, issuedAt),
             tenant = tenant.Slug,
             user = user.Email,
-            expiresAt = DateTimeOffset.UtcNow.AddHours(12),
+            expiresAt = RadioPadBearerTokens.ExpiresAt(issuedAt),
         });
     }
 

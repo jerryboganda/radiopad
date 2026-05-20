@@ -2,16 +2,18 @@ name: desktop-release
 
 # DESK-001 — Tauri auto-update signed-release pipeline.
 #
-# Trigger: pushing a tag that matches `desktop-v*` (e.g. `desktop-v0.4.2`).
-# This workflow is intentionally tag-gated; it does NOT run on every push
-# and does NOT run on PRs. Signing material is sourced through GitHub OIDC
+# Trigger: manual dispatch by release engineering. It does NOT run on every
+# push and does NOT run on PRs. Signing material is sourced through GitHub OIDC
 # → an AWS IAM role with KMS-decrypt + SSM-read on
 # `/radiopad/desktop/signing/*` and nothing else.
 
 on:
-  push:
-    tags:
-      - "desktop-v*"
+  workflow_dispatch:
+    inputs:
+      signing_role_arn:
+        description: AWS IAM role ARN allowed to read desktop signing material
+        required: true
+        type: string
 
 # OIDC token + read-only checkout. No write permissions.
 permissions:
@@ -42,10 +44,21 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
+      - name: Verify signing role configuration
+        shell: bash
+        env:
+          SIGNING_ROLE_ARN: ${{ inputs.signing_role_arn }}
+        run: |
+          set -euo pipefail
+          if [ -z "$SIGNING_ROLE_ARN" ]; then
+            echo "RADIOPAD_DESKTOP_SIGNING_ROLE_ARN secret is required for desktop releases." >&2
+            exit 1
+          fi
+
       - name: Configure AWS credentials (OIDC)
         uses: aws-actions/configure-aws-credentials@v4
         with:
-          role-to-assume: arn:aws:iam::000000000000:role/radiopad-desktop-signing
+          role-to-assume: ${{ inputs.signing_role_arn }}
           aws-region: us-east-1
           role-session-name: gh-desktop-release-${{ github.run_id }}
 

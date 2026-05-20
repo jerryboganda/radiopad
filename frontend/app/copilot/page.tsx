@@ -9,6 +9,10 @@ import {
   type CopilotSession,
   type CopilotStatus,
 } from '@/lib/api';
+import Container from '@/components/shell/Container';
+import PageHeader from '@/components/shell/PageHeader';
+import ErrorState from '@/components/ui/ErrorState';
+import Skeleton from '@/components/ui/Skeleton';
 
 type TauriInvoke = (cmd: string, args?: Record<string, unknown>) => Promise<unknown>;
 type CliStatus = {
@@ -41,26 +45,33 @@ export default function CopilotPage() {
   const [message, setMessage] = useState('');
   const [preview, setPreview] = useState<CopilotContextPreview | null>(null);
   const [session, setSession] = useState<CopilotSession | null>(null);
+  const [loading, setLoading] = useState(true);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [info, setInfo] = useState<string | null>(null);
 
   async function refresh() {
-    const [s, a, e] = await Promise.all([
-      api.copilot.status(),
-      api.copilot.account(),
-      api.copilot.entitlement(),
-    ]);
-    setStatus(s);
-    setAccount(a);
-    setEntitlement(e);
-    const invoke = tauriInvoke();
-    if (invoke) {
-      try {
-        setCliStatus((await invoke('copilot_cli_status', { host: s.gitHubHost })) as CliStatus);
-      } catch {
-        setCliStatus({ available: false, authenticated: false, copilotAvailable: false, warnings: ['Tauri CLI bridge unavailable'] });
+    setLoading(true);
+    try {
+      const [s, a, e] = await Promise.all([
+        api.copilot.status(),
+        api.copilot.account(),
+        api.copilot.entitlement(),
+      ]);
+      setStatus(s);
+      setAccount(a);
+      setEntitlement(e);
+      setError(null);
+      const invoke = tauriInvoke();
+      if (invoke) {
+        try {
+          setCliStatus((await invoke('copilot_cli_status', { host: s.gitHubHost })) as CliStatus);
+        } catch {
+          setCliStatus({ available: false, authenticated: false, copilotAvailable: false, warnings: ['Tauri CLI bridge unavailable'] });
+        }
       }
+    } finally {
+      setLoading(false);
     }
   }
 
@@ -139,16 +150,43 @@ export default function CopilotPage() {
     }
   }
 
+  if (error && !status) {
+    return (
+      <Container>
+        <PageHeader
+          title="GitHub Copilot"
+          description="Copilot is brokered through RadioPad policy gates. Tokens never enter browser state, localStorage, or IPC payloads."
+        />
+        <ErrorState title="Couldn't load Copilot" message={error} onRetry={() => { void refresh(); }} />
+      </Container>
+    );
+  }
+
+  if (loading && !status) {
+    return (
+      <Container>
+        <PageHeader
+          title="GitHub Copilot"
+          description="Copilot is brokered through RadioPad policy gates. Tokens never enter browser state, localStorage, or IPC payloads."
+        />
+        <div className="rp-grid-2">
+          <div className="rp-panel"><Skeleton variant="block" height={140} /></div>
+          <div className="rp-panel"><Skeleton variant="block" height={140} /></div>
+        </div>
+      </Container>
+    );
+  }
+
   return (
-    <div className="rp-container">
-      <h1 className="rp-page-title">GitHub Copilot</h1>
-      <p className="rp-page-sub">
-        Copilot is brokered through RadioPad policy gates. Tokens never enter browser state, localStorage, or IPC payloads.
-      </p>
+    <Container>
+      <PageHeader
+        title="GitHub Copilot"
+        description="Copilot is brokered through RadioPad policy gates. Tokens never enter browser state, localStorage, or IPC payloads."
+      />
 
       {error && <div className="banner warn">{error}</div>}
       {info && <div className="banner info">{info}</div>}
-      {status?.runtimeStatus !== 'Ready' && (
+      {status && status.runtimeStatus !== 'Ready' && (
         <div className="banner warn">
           Runtime not ready: enable the tenant LocalCli mode and sign in with the official GitHub CLI/Copilot extension.
         </div>
@@ -235,6 +273,6 @@ export default function CopilotPage() {
           ]).map((item) => <li key={item}><span className="badge danger">blocked</span> {item}</li>)}
         </ul>
       </div>
-    </div>
+    </Container>
   );
 }

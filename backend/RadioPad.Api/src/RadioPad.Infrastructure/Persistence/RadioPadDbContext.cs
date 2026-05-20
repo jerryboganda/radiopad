@@ -136,7 +136,10 @@ public class RadioPadDbContext : DbContext
         b.Entity<User>().Property(u => u.MfaSecret).HasConversion(enc);
         // hash columns store one-way digests; encryption-at-rest converter omitted to keep equality lookups working.
         b.Entity<TenantSettings>().Property(s => s.IngestBearerSecret).HasConversion(enc);
+        b.Entity<TenantSettings>().Property(s => s.FhirWebhookSecret).HasConversion(enc);
         b.Entity<TenantSettings>().Property(s => s.DicomWebBearerSecret).HasConversion(enc);
+        b.Entity<TenantSettings>().Property(s => s.ScimBearerSecret).HasConversion(enc);
+        b.Entity<ProviderConfig>().Property(p => p.ApiKeySecretRef).HasConversion(enc);
         b.Entity<CopilotIntegrationSettings>().Property(s => s.GitHubAppPrivateKeySecretRef).HasConversion(enc);
         b.Entity<CopilotIntegrationSettings>().Property(s => s.OAuthClientSecretRef).HasConversion(enc);
         b.Entity<CopilotUserAccount>().Property(a => a.TokenSecretRef).HasConversion(enc);

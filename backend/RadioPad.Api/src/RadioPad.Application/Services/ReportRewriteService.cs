@@ -65,12 +65,13 @@ public sealed class ReportRewriteService : IReportRewriteService
         CancellationToken ct)
     {
         var (system, body) = BuildPrompt(report, mode, sections);
+        var containsPhi = ReportingService.ContainsPhi(report) || ReportingService.ContainsPhiText(system, body);
         var result = await _gateway.RouteAsync(tenant, new AiCompletionRequest(
             Provider: provider,
             SystemPrompt: system,
             UserPrompt: body,
             PromptVersion: PromptVersion,
-            ContainsPhi: ReportingService.ContainsPhi(report)), ct);
+            ContainsPhi: containsPhi), ct);
         return new ReportRewriteResult(
             result.Text, result.Provider, result.Model, result.LatencyMs, result.PromptVersion, mode);
     }

@@ -1,4 +1,5 @@
 using RadioPad.Cli.Commands;
+using RadioPad.Domain.Enums;
 using Xunit;
 
 namespace RadioPad.Api.Tests.Cli;
@@ -25,7 +26,7 @@ public class ProviderRegisterTests
         Assert.Equal("gpt-4o-mini", p["model"]);
         Assert.Equal("https://api.openai.com/v1", p["endpointUrl"]);
         Assert.Equal("env:OPENAI_API_KEY", p["apiKeySecretRef"]);
-        Assert.Equal("Sandbox", p["compliance"]);
+        Assert.Equal((int)ProviderComplianceClass.Sandbox, p["compliance"]);
         Assert.Equal(true, p["enabled"]);
         Assert.Null(p["id"]);
     }
@@ -57,6 +58,22 @@ public class ProviderRegisterTests
             apiKeyRef: "env:AZURE_OPENAI_KEY");
         Assert.Equal("azure-openai", p["adapter"]);
         Assert.Equal("https://contoso.openai.azure.com/openai/deployments/gpt-4o", p["endpointUrl"]);
+    }
+
+    [Theory]
+    [InlineData("gcp-vertex", "google-vertex")]
+    [InlineData("google-vertex-ai", "google-vertex")]
+    [InlineData("openai-direct", "openai")]
+    [InlineData("github-copilot-sdk", "github-copilot-sdk")]
+    [InlineData("github-copilot-cli", "github-copilot-cli")]
+    [InlineData("gemini-cli", "gemini-cli")]
+    [InlineData("codex-cli", "codex-cli")]
+    [InlineData("openai-compatible", "openai-compatible")]
+    public void BuildPayload_UsesCanonicalAdapterIds(string input, string expected)
+    {
+        var p = ProviderRegister.BuildPayload(input, "P", null, "m", "");
+        Assert.Equal(expected, p["adapter"]);
+        Assert.Equal((int)ProviderComplianceClass.Sandbox, p["compliance"]);
     }
 
     [Fact]

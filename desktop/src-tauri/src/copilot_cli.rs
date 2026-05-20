@@ -1,12 +1,11 @@
 use std::process::Stdio;
 use std::time::Duration;
 
-use serde::{Deserialize, Serialize};
+use serde::Serialize;
 use tokio::io::AsyncWriteExt;
 use tokio::process::Command;
 
 const DEFAULT_HOST: &str = "github.com";
-const DEFAULT_TIMEOUT_MS: u64 = 60_000;
 
 #[derive(Serialize)]
 #[serde(rename_all = "camelCase")]
@@ -28,28 +27,6 @@ pub struct CopilotCommandResult {
     pub message: String,
 }
 
-#[derive(Deserialize)]
-#[serde(rename_all = "camelCase")]
-pub struct CopilotCliSessionRequest {
-    pub message: String,
-    pub context: Option<Vec<CopilotCliContextItem>>,
-}
-
-#[derive(Deserialize)]
-#[serde(rename_all = "camelCase")]
-pub struct CopilotCliContextItem {
-    pub kind: String,
-    pub label: String,
-    pub text: String,
-}
-
-#[derive(Serialize)]
-#[serde(rename_all = "camelCase")]
-pub struct CopilotCliSessionResult {
-    pub ok: bool,
-    pub output: String,
-}
-
 fn host_or_default(host: Option<String>) -> String {
     let h = host.unwrap_or_else(|| DEFAULT_HOST.to_string());
     if h.trim().is_empty() {
@@ -59,11 +36,18 @@ fn host_or_default(host: Option<String>) -> String {
     }
 }
 
-fn copilot_binary() -> String {
-    std::env::var("RADIOPAD_GH_COPILOT_BIN")
+fn gh_binary() -> String {
+    std::env::var("RADIOPAD_GH_BIN")
         .ok()
         .filter(|v| !v.trim().is_empty())
         .unwrap_or_else(|| "gh".to_string())
+}
+
+fn copilot_binary() -> String {
+    std::env::var("RADIOPAD_COPILOT_BIN")
+        .ok()
+        .filter(|v| !v.trim().is_empty())
+        .unwrap_or_else(|| "copilot".to_string())
 }
 
 fn env_token_present() -> bool {
@@ -85,7 +69,7 @@ fn scrub(s: &[u8]) -> String {
 }
 
 async fn run_gh(args: &[&str], stdin: Option<String>, timeout_ms: u64) -> Result<(i32, String, String), String> {
-    let mut command = Command::new(copilot_binary());
+    let mut command = Command::new(gh_binary());
     command.args(args);
     command.stdin(if stdin.is_some() { Stdio::piped() } else { Stdio::null() });
     command.stdout(Stdio::piped());
@@ -98,13 +82,37 @@ async fn run_gh(args: &[&str], stdin: Option<String>, timeout_ms: u64) -> Result
             writer
                 .write_all(input.as_bytes())
                 .await
-                .map_err(|e| format!("failed to write Copilot prompt to stdin: {e}"))?;
+                .map_err(|e| format!("failed to write GitHub CLI stdin: {e}"))?;
         }
     }
     let output = tokio::time::timeout(Duration::from_millis(timeout_ms), child.wait_with_output())
         .await
         .map_err(|_| "GitHub CLI command timed out".to_string())?
         .map_err(|e| format!("GitHub CLI command failed: {e}"))?;
+    Ok((output.status.code().unwrap_or(-1), scrub(&output.stdout), scrub(&output.stderr)))
+}
+
+async fn run_copilot(args: &[&str], stdin: Option<String>, timeout_ms: u64) -> Result<(i32, String, String), String> {
+    let mut command = Command::new(copilot_binary());
+    command.args(args);
+    command.stdin(if stdin.is_some() { Stdio::piped() } else { Stdio::null() });
+    command.stdout(Stdio::piped());
+    command.stderr(Stdio::piped());
+    command.kill_on_drop(true);
+
+    let mut child = command.spawn().map_err(|e| format!("GitHub Copilot CLI unavailable: {e}"))?;
+    if let Some(input) = stdin {
+        if let Some(mut writer) = child.stdin.take() {
+            writer
+                .write_all(input.as_bytes())
+                .await
+                .map_err(|e| format!("failed to write Copilot prompt to stdin: {e}"))?;
+        }
+    }
+    let output = tokio::time::timeout(Duration::from_millis(timeout_ms), child.wait_with_output())
+        .await
+        .map_err(|_| "GitHub Copilot CLI command timed out".to_string())?
+        .map_err(|e| format!("GitHub Copilot CLI command failed: {e}"))?;
     Ok((output.status.code().unwrap_or(-1), scrub(&output.stdout), scrub(&output.stderr)))
 }
 
@@ -120,33 +128,6 @@ fn parse_login(output: &str) -> Option<String> {
     None
 }
 
-fn build_prompt(request: CopilotCliSessionRequest) -> Result<String, String> {
-    if request.message.trim().is_empty() || request.message.len() > 8000 {
-        return Err("message is required and must be <= 8000 characters".into());
-    }
-    if request.message.contains('\0') {
-        return Err("message contains a disallowed control character".into());
-    }
-    let mut prompt = String::new();
-    if let Some(items) = request.context {
-        for item in items {
-            if item.text.contains('\0') || item.text.len() > 12000 {
-                continue;
-            }
-            prompt.push_str("--- ");
-            prompt.push_str(&item.kind);
-            prompt.push_str(": ");
-            prompt.push_str(&item.label);
-            prompt.push_str(" ---\n");
-            prompt.push_str(&item.text);
-            prompt.push('\n');
-        }
-    }
-    prompt.push_str("--- user request ---\n");
-    prompt.push_str(request.message.trim());
-    Ok(prompt)
-}
-
 #[tauri::command]
 pub async fn copilot_cli_status(host: Option<String>) -> Result<CopilotCliStatus, String> {
     let host = host_or_default(host);
@@ -155,14 +136,14 @@ pub async fn copilot_cli_status(host: Option<String>) -> Result<CopilotCliStatus
     let auth = run_gh(&["auth", "status", "--hostname", &host], None, 10_000).await;
     let authenticated = auth.as_ref().is_ok_and(|(code, _, _)| *code == 0);
     let auth_text = auth.as_ref().map(|(_, stdout, stderr)| format!("{stdout}\n{stderr}")).unwrap_or_default();
-    let copilot = run_gh(&["copilot", "--help"], None, 10_000).await;
+    let copilot = run_copilot(&["--help"], None, 10_000).await;
     let copilot_available = copilot.as_ref().is_ok_and(|(code, _, _)| *code == 0);
     let mut warnings = Vec::new();
     if env_token_present() {
         warnings.push("Environment token override detected; tenant policy may block this outside dev/CI.".to_string());
     }
     if !copilot_available && available {
-        warnings.push("GitHub CLI is installed, but the Copilot extension is unavailable.".to_string());
+        warnings.push("GitHub CLI is installed, but the Copilot CLI binary is unavailable.".to_string());
     }
     Ok(CopilotCliStatus {
         available,
@@ -196,12 +177,3 @@ pub async fn copilot_cli_logout(host: Option<String>) -> Result<CopilotCommandRe
     Ok(CopilotCommandResult { ok: true, message: if stdout.is_empty() { "GitHub CLI logout completed.".into() } else { stdout } })
 }
 
-#[tauri::command]
-pub async fn copilot_cli_session_run(request: CopilotCliSessionRequest) -> Result<CopilotCliSessionResult, String> {
-    let prompt = build_prompt(request)?;
-    let (code, stdout, stderr) = run_gh(&["copilot", "suggest", "--type", "explain"], Some(prompt), DEFAULT_TIMEOUT_MS).await?;
-    if code != 0 {
-        return Err(format!("GitHub Copilot CLI failed: {stderr}"));
-    }
-    Ok(CopilotCliSessionResult { ok: true, output: stdout })
-}

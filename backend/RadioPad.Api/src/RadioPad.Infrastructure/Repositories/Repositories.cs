@@ -1,6 +1,9 @@
+using System.Collections.Concurrent;
+using System.Data;
 using System.Security.Cryptography;
 using System.Text;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.EntityFrameworkCore.Storage;
 using RadioPad.Application.Abstractions;
 using RadioPad.Domain.Entities;
 using RadioPad.Domain.Enums;
@@ -10,24 +13,48 @@ namespace RadioPad.Infrastructure.Repositories;
 
 public class EfAuditLog : IAuditLog
 {
+    private static readonly ConcurrentDictionary<Guid, SemaphoreSlim> TenantLocks = new();
     private readonly RadioPadDbContext _db;
     public EfAuditLog(RadioPadDbContext db) => _db = db;
 
     public async Task AppendAsync(AuditEvent evt, CancellationToken cancellationToken)
     {
-        // Compute hash chain so log tampering is detectable.
-        var prev = await _db.AuditEvents
-            .Where(e => e.TenantId == evt.TenantId)
-            .OrderByDescending(e => e.CreatedAt)
-            .Select(e => e.IntegrityChain)
-            .FirstOrDefaultAsync(cancellationToken) ?? "";
-        var payload = $"{evt.Id}|{evt.TenantId}|{(int)evt.Action}|{evt.DetailsJson}|{prev}";
-        evt.IntegrityChain = Convert.ToHexString(
-            SHA256.HashData(Encoding.UTF8.GetBytes(payload))).ToLowerInvariant();
-        evt.CreatedAt = DateTimeOffset.UtcNow;
-        evt.UpdatedAt = evt.CreatedAt;
-        _db.AuditEvents.Add(evt);
-        await _db.SaveChangesAsync(cancellationToken);
+        var gate = TenantLocks.GetOrAdd(evt.TenantId, _ => new SemaphoreSlim(1, 1));
+        await gate.WaitAsync(cancellationToken);
+        try
+        {
+            IDbContextTransaction? tx = null;
+            try
+            {
+                if (_db.Database.CurrentTransaction is null)
+                    tx = await _db.Database.BeginTransactionAsync(IsolationLevel.Serializable, cancellationToken);
+
+                var prev = await _db.AuditEvents
+                    .Where(e => e.TenantId == evt.TenantId)
+                    .OrderByDescending(e => e.CreatedAt)
+                    .ThenByDescending(e => e.Id)
+                    .Select(e => e.IntegrityChain)
+                    .FirstOrDefaultAsync(cancellationToken) ?? "";
+                var payload = $"{evt.Id}|{evt.TenantId}|{(int)evt.Action}|{evt.DetailsJson}|{prev}";
+                evt.IntegrityChain = Convert.ToHexString(
+                    SHA256.HashData(Encoding.UTF8.GetBytes(payload))).ToLowerInvariant();
+                evt.CreatedAt = DateTimeOffset.UtcNow;
+                evt.UpdatedAt = evt.CreatedAt;
+                _db.AuditEvents.Add(evt);
+                await _db.SaveChangesAsync(cancellationToken);
+                if (tx is not null)
+                    await tx.CommitAsync(cancellationToken);
+            }
+            finally
+            {
+                if (tx is not null)
+                    await tx.DisposeAsync();
+            }
+        }
+        finally
+        {
+            gate.Release();
+        }
     }
 
     public async Task<IReadOnlyList<AuditEvent>> QueryAsync(
@@ -46,6 +73,7 @@ public class EfAuditLog : IAuditLog
         var events = await _db.AuditEvents.AsNoTracking()
             .Where(e => e.TenantId == tenantId)
             .OrderBy(e => e.CreatedAt)
+            .ThenBy(e => e.Id)
             .ToListAsync(cancellationToken);
 
         var prev = "";

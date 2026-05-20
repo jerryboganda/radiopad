@@ -4,6 +4,8 @@
     "rulebooks": "नियमावली",
     "templates": "टेम्पलेट",
     "providers": "प्रदाता",
+    "copilot": "GitHub Copilot",
+    "copilotAdmin": "Copilot administration",
     "prompts": "प्रॉम्प्ट",
     "marketplace": "मार्केटप्लेस",
     "validation": "सत्यापन",

@@ -6,6 +6,7 @@ using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using MimeKit;
 using MimeKit.Utils;
+using RadioPad.Api.Auth;
 using RadioPad.Api.Middleware;
 using RadioPad.Application.Abstractions;
 using RadioPad.Domain.Entities;
@@ -171,14 +172,15 @@ public class MagicLinkController : ControllerBase
     private readonly RadioPadDbContext _db;
     private readonly IAuditLog _audit;
     private readonly ILogger<MagicLinkController> _log;
-    public MagicLinkController(RadioPadDbContext db, IAuditLog audit, ILogger<MagicLinkController> log)
-    { _db = db; _audit = audit; _log = log; }
+    private readonly IWebHostEnvironment _env;
+    public MagicLinkController(RadioPadDbContext db, IAuditLog audit, ILogger<MagicLinkController> log, IWebHostEnvironment env)
+    { _db = db; _audit = audit; _log = log; _env = env; }
 
     public record RequestDto(string Tenant, string Email, string? CallbackUrl);
     public record ConsumeDto(string Token);
 
     [HttpPost("request")]
-    public async Task<IActionResult> Request([FromBody] RequestDto dto, CancellationToken ct)
+    public async Task<IActionResult> RequestMagicLink([FromBody] RequestDto dto, CancellationToken ct)
     {
         if (string.IsNullOrWhiteSpace(dto.Tenant) || string.IsNullOrWhiteSpace(dto.Email))
             return BadRequest(new { error = "tenant and email required.", kind = "validation" });
@@ -226,6 +228,26 @@ public class MagicLinkController : ControllerBase
             });
         }
 
+        if (_env.IsProduction() && !SmtpConfigured())
+        {
+            _log.LogError("Magic-link SMTP is not configured in Production.");
+            return StatusCode(StatusCodes.Status503ServiceUnavailable, new
+            {
+                error = "Magic-link email is not configured.",
+                kind = "email_unavailable",
+            });
+        }
+
+        if (_env.IsProduction() && string.IsNullOrWhiteSpace(Environment.GetEnvironmentVariable("RADIOPAD_PUBLIC_WEB_URL")))
+        {
+            _log.LogError("RADIOPAD_PUBLIC_WEB_URL is not configured in Production.");
+            return StatusCode(StatusCodes.Status503ServiceUnavailable, new
+            {
+                error = "Public web URL is not configured.",
+                kind = "public_web_url_unconfigured",
+            });
+        }
+
         var t = await _db.Tenants.FirstOrDefaultAsync(x => x.Slug == dto.Tenant, ct);
         if (t is null) return Ok(new { ok = true }); // Don't leak existence.
         var u = await _db.Users.FirstOrDefaultAsync(x => x.TenantId == t.Id && x.Email == dto.Email && x.IsActive, ct);
@@ -242,13 +264,21 @@ public class MagicLinkController : ControllerBase
         });
         await _db.SaveChangesAsync(ct);
 
-        var callback = !string.IsNullOrWhiteSpace(dto.CallbackUrl)
-            ? dto.CallbackUrl!
-            : ResolveDefaultCallback();
-        var link = $"{callback}?magic={Uri.EscapeDataString(raw)}";
+        var callback = ResolveCallback(dto.CallbackUrl);
+        var link = BuildMagicLink(callback, raw);
         var sent = await TrySendAsync(dto.Email, link, ct);
-        // In dev (no SMTP) we surface the link so QA/tests can complete the flow.
-        return Ok(sent ? (object)new { ok = true } : new { ok = true, devLink = link });
+        if (sent) return Ok(new { ok = true });
+        if (_env.IsProduction())
+        {
+            return StatusCode(StatusCodes.Status503ServiceUnavailable, new
+            {
+                error = "Magic-link email could not be sent.",
+                kind = "email_unavailable",
+            });
+        }
+
+        // In non-production (no SMTP) we surface the link so tests and local users can complete the flow.
+        return Ok(new { ok = true, devLink = link });
     }
 
     [HttpPost("consume")]
@@ -257,14 +287,18 @@ public class MagicLinkController : ControllerBase
         if (string.IsNullOrWhiteSpace(dto.Token))
             return BadRequest(new { error = "token required.", kind = "validation" });
         var hash = Sha256Hex(dto.Token);
-        var row = await _db.MagicLinks.FirstOrDefaultAsync(m => m.TokenHash == hash, ct);
-        if (row is null || row.ConsumedAt is not null || row.ExpiresAt < DateTimeOffset.UtcNow)
+        var now = DateTimeOffset.UtcNow;
+        var consumed = await _db.MagicLinks
+            .Where(m => m.TokenHash == hash && m.ConsumedAt == null && m.ExpiresAt >= now)
+            .ExecuteUpdateAsync(updates => updates.SetProperty(m => m.ConsumedAt, now), ct);
+        if (consumed != 1)
             return Unauthorized(new { error = "Invalid or expired link.", kind = "unauthenticated" });
 
-        row.ConsumedAt = DateTimeOffset.UtcNow;
+        var row = await _db.MagicLinks.AsNoTracking().FirstAsync(m => m.TokenHash == hash, ct);
         var tenant = await _db.Tenants.FirstAsync(t => t.Id == row.TenantId, ct);
-        var user = await _db.Users.FirstAsync(u => u.Id == row.UserId, ct);
-        await _db.SaveChangesAsync(ct);
+        var user = await _db.Users.FirstOrDefaultAsync(u => u.Id == row.UserId && u.TenantId == tenant.Id, ct);
+        if (user is null || !user.IsActive || user.LockedUntil > DateTimeOffset.UtcNow)
+            return Unauthorized(new { error = "User is not active.", kind = "unauthenticated" });
 
         await _audit.AppendAsync(new AuditEvent
         {
@@ -274,12 +308,16 @@ public class MagicLinkController : ControllerBase
             DetailsJson = JsonSerializer.Serialize(new { method = "magic-link" }),
         }, ct);
 
+        var issuedAt = DateTimeOffset.UtcNow;
+        var token = RadioPadBearerTokens.Mint(tenant.Slug, user.Email, user.SessionEpoch, _env, issuedAt);
+        var expiresAt = RadioPadBearerTokens.ExpiresAt(issuedAt);
+        RadioPadSessionCookies.Append(Response, HttpContext.Request, token, expiresAt, _env);
         return Ok(new
         {
-            token = MintBearer(tenant.Slug, user.Email, user.SessionEpoch),
+            token,
             tenant = tenant.Slug,
             user = user.Email,
-            expiresAt = DateTimeOffset.UtcNow.AddHours(12),
+            expiresAt,
         });
     }
 
@@ -289,12 +327,12 @@ public class MagicLinkController : ControllerBase
     /// <c>POST /api/users/{id}/revoke-sessions</c> (which increments the
     /// epoch) invalidates every token previously minted for that user.
     /// </summary>
-    internal static string MintBearer(string tenant, string email, int sessionEpoch = 0)
+    private string ResolveCallback(string? requested)
     {
-        var secret = Environment.GetEnvironmentVariable("RADIOPAD_AUTH_SECRET") ?? "dev-only-not-for-production";
-        using var hmac = new HMACSHA256(Encoding.UTF8.GetBytes(secret));
-        var raw = hmac.ComputeHash(Encoding.UTF8.GetBytes($"v1|{tenant}|{email}|{sessionEpoch}"));
-        return "rp_" + Convert.ToBase64String(raw).Replace("+", "-").Replace("/", "_").TrimEnd('=');
+        if (!_env.IsProduction() && TryNormalizeAbsoluteLoginUrl(requested, out var normalized))
+            return normalized;
+
+        return ResolveDefaultCallback();
     }
 
     private string ResolveDefaultCallback()
@@ -308,14 +346,42 @@ public class MagicLinkController : ControllerBase
         var req = HttpContext?.Request;
         if (req is not null)
         {
-            var origin = req.Headers["Origin"].ToString();
-            if (!string.IsNullOrWhiteSpace(origin)) return origin.TrimEnd('/') + "/login";
-            var referer = req.Headers["Referer"].ToString();
-            if (Uri.TryCreate(referer, UriKind.Absolute, out var refUri))
-                return $"{refUri.Scheme}://{refUri.Authority}/login";
+            var proto = req.Headers["X-Forwarded-Proto"].FirstOrDefault();
+            var scheme = string.IsNullOrWhiteSpace(proto) ? req.Scheme : proto;
+            var host = req.Headers["X-Forwarded-Host"].FirstOrDefault();
+            if (string.IsNullOrWhiteSpace(host)) host = req.Host.Value;
+            if (!string.IsNullOrWhiteSpace(host)) return $"{scheme}://{host.TrimEnd('/')}/login";
+
+            if (!_env.IsProduction())
+            {
+                var origin = req.Headers["Origin"].ToString();
+                if (!string.IsNullOrWhiteSpace(origin)) return origin.TrimEnd('/') + "/login";
+                var referer = req.Headers["Referer"].ToString();
+                if (Uri.TryCreate(referer, UriKind.Absolute, out var refUri))
+                    return $"{refUri.Scheme}://{refUri.Authority}/login";
+            }
         }
         return "http://localhost:3000/login";
     }
+
+    private static bool TryNormalizeAbsoluteLoginUrl(string? value, out string normalized)
+    {
+        normalized = string.Empty;
+        if (string.IsNullOrWhiteSpace(value)) return false;
+        if (!Uri.TryCreate(value, UriKind.Absolute, out var uri)) return false;
+        if (uri.Scheme != Uri.UriSchemeHttp && uri.Scheme != Uri.UriSchemeHttps) return false;
+        normalized = uri.ToString().TrimEnd('&', '?');
+        return true;
+    }
+
+    private static string BuildMagicLink(string callback, string rawToken)
+    {
+        var separator = callback.Contains('?', StringComparison.Ordinal) ? '&' : '?';
+        return $"{callback}{separator}magic={Uri.EscapeDataString(rawToken)}";
+    }
+
+    private static bool SmtpConfigured() =>
+        !string.IsNullOrWhiteSpace(Environment.GetEnvironmentVariable("RADIOPAD_SMTP_HOST"));
 
     private async Task<bool> TrySendAsync(string to, string link, CancellationToken ct)
     {
@@ -366,6 +432,12 @@ public class MagicLinkController : ControllerBase
             msg.Body = alt;
 
             using var client = new SmtpClient();
+            // When using an SMTP relay (host != actual SMTP server), TLS cert won't match the relay IP.
+            var tlsHost = Environment.GetEnvironmentVariable("RADIOPAD_SMTP_TLS_HOST");
+            if (!string.IsNullOrEmpty(tlsHost))
+                client.ServerCertificateValidationCallback = (_, cert, _, errors) =>
+                    errors == System.Net.Security.SslPolicyErrors.None
+                    || cert?.Subject?.Contains(tlsHost, StringComparison.OrdinalIgnoreCase) == true;
             await client.ConnectAsync(host, port, MailKit.Security.SecureSocketOptions.StartTlsWhenAvailable, ct);
             if (!string.IsNullOrEmpty(user)) await client.AuthenticateAsync(user, pass, ct);
             await client.SendAsync(msg, ct);
@@ -374,7 +446,7 @@ public class MagicLinkController : ControllerBase
         }
         catch (Exception ex)
         {
-            _log.LogWarning(ex, "Magic-link SMTP send failed; falling back to dev link.");
+            _log.LogWarning(ex, "Magic-link SMTP send failed.");
             return false;
         }
     }
@@ -494,7 +566,8 @@ public class DeviceAuthController : ControllerBase
 {
     private readonly RadioPadDbContext _db;
     private readonly IAuditLog _audit;
-    public DeviceAuthController(RadioPadDbContext db, IAuditLog audit) { _db = db; _audit = audit; }
+    private readonly IWebHostEnvironment _env;
+    public DeviceAuthController(RadioPadDbContext db, IAuditLog audit, IWebHostEnvironment env) { _db = db; _audit = audit; _env = env; }
 
     public record AuthorizeDto(string ClientId, string? DeviceFingerprint = null);
     public record ApproveDto(string Tenant, string Email, string UserCode);
@@ -597,9 +670,10 @@ public class DeviceAuthController : ControllerBase
             DetailsJson = JsonSerializer.Serialize(new { method = "device-flow" }),
         }, ct);
 
+        var issuedAt = DateTimeOffset.UtcNow;
         return Ok(new
         {
-            accessToken = MagicLinkController.MintBearer(tenant.Slug, user.Email, user.SessionEpoch),
+            accessToken = RadioPadBearerTokens.Mint(tenant.Slug, user.Email, user.SessionEpoch, _env, issuedAt),
             tokenType = "Bearer",
             expiresIn = 12 * 3600,
             tenant = tenant.Slug,

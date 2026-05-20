@@ -1,6 +1,6 @@
 # Secrets Management
 
-**Status:** Current  ·  **Owner:** Security + Ops  ·  **Last Updated:** 2026-05-05
+**Status:** Current  ·  **Owner:** Security + Ops  ·  **Last Updated:** 2026-05-19
 
 ## Required secrets
 
@@ -8,7 +8,8 @@
 | --- | --- | --- | --- |
 | Anthropic API key | `ANTHROPIC_API_KEY` | AI gateway routing | 90 days |
 | OpenAI API key (optional) | `OPENAI_API_KEY` | AI gateway routing | 90 days |
-| Database password | embedded in `RADIOPAD_DB` | EF Core | 180 days |
+| Database password | embedded in `ConnectionStrings__RadioPad` (legacy `RADIOPAD_DB` accepted) | EF Core | 180 days |
+| RadioPad bearer signing secret | `RADIOPAD_AUTH_SECRET` | Auth | 180 days |
 | OIDC client secret (Phase 3) | `RADIOPAD_OIDC_CLIENT_SECRET` | Auth | 365 days |
 | Webhook signing key (Phase 2) | `RADIOPAD_WEBHOOK_SECRET` | Outbound webhooks | 365 days |
 
@@ -44,7 +45,7 @@ Provider rows store `ApiKeySecretRef = "env:<NAME>"`. The provider API rejects n
 
 ## CI/CD handling
 
-- Secrets are scoped to specific workflows (e.g. `RADIOPAD_DB` only on integration jobs).
+- Secrets are scoped to specific workflows (e.g. `ConnectionStrings__RadioPad` / `RADIOPAD_DB` only on integration jobs).
 - Secret values are never `echo`'d in logs.
 - PR pipelines do not have access to production secrets.
 

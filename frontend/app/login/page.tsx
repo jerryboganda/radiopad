@@ -11,8 +11,20 @@ const LS_TENANT = 'radiopad.tenant';
 const LS_USER = 'radiopad.user';
 const BUILD_NODE_ENV = process.env.NODE_ENV;
 const DEV_LOGIN_FLAG = process.env.NEXT_PUBLIC_ALLOW_DEV_LOGIN;
+const SSO_FLAG = process.env.NEXT_PUBLIC_ENABLE_SSO;
 
 type SessionResult = { token?: string; tenant?: string; user?: string };
+
+function safeReturnTo(value: string | null | undefined): string {
+  if (!value || !value.startsWith('/') || value.startsWith('//') || value.includes('\\')) return '/';
+  try {
+    const parsed = new URL(value, 'https://radiopad.local');
+    if (parsed.pathname === '/login') return '/';
+    return `${parsed.pathname}${parsed.search}${parsed.hash}`;
+  } catch {
+    return '/';
+  }
+}
 
 function allowDevLogin(): boolean {
   const nodeEnv = publicEnv('NODE_ENV') ?? BUILD_NODE_ENV;
@@ -24,21 +36,24 @@ function LoginContent() {
   const router = useRouter();
   const search = useSearchParams();
   const devLoginEnabled = allowDevLogin();
+  const ssoEnabled = (publicEnv('NEXT_PUBLIC_ENABLE_SSO') ?? SSO_FLAG) === 'true';
   const [tenant, setTenant] = useState('');
   const [user, setUser] = useState('');
   const [busy, setBusy] = useState<string | null>(null);
   const [err, setErr] = useState<string | null>(null);
   const [info, setInfo] = useState<string | null>(null);
   const [secure, setSecure] = useState<boolean | null>(null);
+  const returnToParam = search?.get('returnTo');
+  const returnTo = useMemo(() => safeReturnTo(returnToParam), [returnToParam]);
   const callbackUrl = useMemo(() => {
     if (typeof window === 'undefined') return undefined;
-    return `${window.location.origin}/login`;
-  }, []);
+    return `${window.location.origin}/login?returnTo=${encodeURIComponent(returnTo)}`;
+  }, [returnTo]);
 
   const ssoReturnUrl = useMemo(() => {
     if (typeof window === 'undefined') return undefined;
-    return `${window.location.origin}/`;
-  }, []);
+    return `${window.location.origin}${returnTo}`;
+  }, [returnTo]);
 
   useEffect(() => {
     if (typeof window === 'undefined') return;
@@ -57,12 +72,13 @@ function LoginContent() {
         await setAuthToken(result.token);
         setActiveAuthToken(result.token);
       } else {
-        // Browser production relies on HttpOnly/SameSite cookies set by the
-        // backend. Do not persist bearer tokens to the web localStorage fallback.
-        setActiveAuthToken(null);
+        // Browser production relies on HttpOnly/SameSite cookies for reloads.
+        // Keep the bearer only in memory so the first SPA navigation after the
+        // callback can complete without writing it to web localStorage.
+        setActiveAuthToken(result.token);
       }
     }
-    router.replace('/');
+    router.replace(returnTo);
   }
 
   useEffect(() => {
@@ -158,16 +174,15 @@ function LoginContent() {
       <div className="rp-panel">
         <div className="rp-panel-title">Production sign-in</div>
         <div className="rp-auth-action-list">
-          <button className="primary" type="button" onClick={beginSso} disabled={busy !== null}>
-            {busy === 'sso' ? 'Starting SSO…' : 'Continue with SSO'}
-          </button>
+          {ssoEnabled && (
+            <button className="primary" type="button" onClick={beginSso} disabled={busy !== null}>
+              {busy === 'sso' ? 'Starting SSO…' : 'Continue with SSO'}
+            </button>
+          )}
           <button className="ghost" type="button" onClick={() => router.push('/pair')} disabled={busy !== null}>
             Pair a device
           </button>
         </div>
-        <p className="rp-page-sub rp-mt-sm">
-          SSO uses the enterprise OIDC authorization-code flow with PKCE when configured by the backend.
-        </p>
       </div>
 
       <form className="rp-panel" onSubmit={requestMagicLink}>

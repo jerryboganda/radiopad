@@ -2,6 +2,7 @@ using System.Diagnostics;
 using Microsoft.Extensions.Logging;
 using RadioPad.Application.Abstractions;
 using RadioPad.Application.Services;
+using RadioPad.Domain.Entities;
 using RadioPad.Domain.Enums;
 using RadioPad.Domain.ValueObjects;
 
@@ -16,7 +17,7 @@ namespace RadioPad.Infrastructure.Providers.Cli;
 /// <see cref="ProviderComplianceClass.Sandbox"/> because the CLI may call a
 /// vendor cloud.
 /// </summary>
-public sealed class GeminiCliProvider : IAiProviderAdapter
+public sealed class GeminiCliProvider : IAiProviderAdapter, IAiProviderHealthProbe
 {
     public const string AdapterId = "gemini-cli";
     public const string BinaryEnvVar = "RADIOPAD_GEMINI_BIN";
@@ -34,8 +35,15 @@ public sealed class GeminiCliProvider : IAiProviderAdapter
 
     public string Id => AdapterId;
 
+    public Task<AiProviderHealthResult> ProbeAsync(ProviderConfig provider, CancellationToken cancellationToken)
+    {
+        var bin = CliProviderRunner.ResolveBinary(BinaryEnvVar, DefaultBinary);
+        return CliProviderRunner.ProbeBinaryAsync(AdapterId, bin, new[] { "--version" }, _launcher, cancellationToken);
+    }
+
     public async Task<AiResult> CompleteAsync(AiCompletionRequest request, CancellationToken cancellationToken)
     {
+        CliProviderRunner.EnforceRequestPolicy(AdapterId, request);
         var p = request.Provider;
         var bin = CliProviderRunner.ResolveBinary(BinaryEnvVar, DefaultBinary);
         CliProviderRunner.EnforceBinaryAllowlist(AdapterId, bin);
@@ -43,11 +51,7 @@ public sealed class GeminiCliProvider : IAiProviderAdapter
             CliProviderRunner.Sanitise(AdapterId, request.SystemPrompt),
             CliProviderRunner.Sanitise(AdapterId, request.UserPrompt));
 
-        // D1 — Updated 2025-06: gemini CLI uses `prompt` sub-command with
-        // `--stdin` to read from stdin in non-interactive mode, and `--json`
-        // for machine-readable output.
-        // TODO: Update when vendor publishes stable non-interactive flags
-        var args = new List<string> { "prompt", "--stdin", "--json" };
+        var args = new List<string> { "--output-format", "json" };
         if (!string.IsNullOrWhiteSpace(p.Model))
         {
             args.Add("--model");
@@ -79,7 +83,7 @@ public sealed class GeminiCliProvider : IAiProviderAdapter
         }
 
         return new AiResult(
-            Text: result.StandardOutput.TrimEnd(),
+            Text: CliProviderRunner.ExtractTextFromJsonOrRaw(result.StandardOutput),
             Provider: p.Name,
             Model: string.IsNullOrWhiteSpace(p.Model) ? "gemini" : p.Model,
             LatencyMs: (int)result.ElapsedMs,

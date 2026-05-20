@@ -42,6 +42,7 @@ public sealed class OpenAiDirectProvider : IAiProviderAdapter
             throw new ProviderTransportException($"{AdapterId}: API key secret '{p.ApiKeySecretRef}' did not resolve.");
 
         var baseUrl = string.IsNullOrWhiteSpace(p.EndpointUrl) ? DefaultBaseUrl : p.EndpointUrl.TrimEnd('/');
+        OpenAiChatHelpers.ValidateHostedEndpoint(baseUrl, AdapterId);
         var model = string.IsNullOrWhiteSpace(p.Model) ? "gpt-4o-mini" : p.Model;
         var url = OpenAiChatHelpers.NormalizeChatCompletionsUrl(baseUrl);
 

@@ -49,6 +49,68 @@ The format is based on [Keep a Changelog 1.1.0](https://keepachangelog.com/en/1.
     HTTP 200 on every route post-deploy.
 
 ### Added
+- **Iter-49 — settings/security end-to-end closeout**: tenant settings are now
+  documented and implemented as partial-safe saves with `ipAllowlistJson`, PACS
+  vendor, SCIM, retention, CMK, and validation fields aligned across backend,
+  frontend, OpenAPI, and API docs. Per-tenant and global IP allowlists fail
+  closed on malformed configured CIDRs instead of silently disabling the gate.
+  SAML's unsigned-assertion dev escape hatch is ignored in Production, OIDC
+  authorize URLs include `RADIOPAD_OIDC_AUDIENCE` when configured, provider
+  API-key secret refs now use the column encryption converter, and lexicon CSV
+  import reuses the secure-token auth retry path. Browser login now preserves
+  sanitized `returnTo` targets, and the admin PACS page exposes the tenant PACS
+  vendor selector.
+- **Iter-48 — browser auth / live panel hardening**: magic-link consume now
+  sets an HttpOnly `radiopad_session` cookie while still returning an `rp_`
+  bearer for native shells, production magic-link requests require configured
+  SMTP plus `RADIOPAD_PUBLIC_WEB_URL` and never expose raw `devLink` URLs,
+  client-supplied callback origins are ignored in Production, logout clears
+  the server cookie and local secure token cache, SSO UI is hidden unless
+  explicitly enabled, and Caddy/nginx production configs now proxy SAML/SCIM
+  standards routes to the API. Production Swagger is disabled unless
+  `RADIOPAD_ENABLE_SWAGGER=1`. Production column encryption now fails startup
+  without a configured key ref and wrapped data key, public magic-link requests
+  resolve the request-body tenant for per-tenant IP allowlists, Production
+  `X-Forwarded-For` trust requires trusted proxy CIDRs, OIDC-mapped identities
+  are checked against active/locked RadioPad users, and operational helper
+  scripts no longer contain live mailbox credentials or personal test accounts.
+  Added the missing `TenantSettings.PacsVendor` migration so upgraded SQLite
+  databases no longer 500 on billing/status or PACS-backed settings reads.
+  Browser sign-out now posts to the trailing-slash logout route to avoid the
+  static-export redirect aborting the cookie-clearing request.
+- **Iter-47 — provider/auth/release hardening close-out**: tightened AI provider
+  and auth edges found by the parallel QA pass. Report PHI detection now scans
+  all prompt-bearing report fields and exact prompt bodies; hosted provider
+  endpoint overrides are allowlisted per vendor before credentials are attached;
+  RadioPad `rp_` bearers are signed expiring payloads with `iat` / `exp` / `jti`;
+  CLI providers require binary allowlists in production; Codex now runs through
+  `codex exec --sandbox read-only -`; server-side Copilot CLI execution is
+  production-gated by `RADIOPAD_COPILOT_SERVER_CLI_ENABLED=1`. The Copilot and
+  provider admin pages gained canonical loading/error/empty states and sidebar
+  navigation, golden-case docs/CLI now align on `expectFlagged`, and release
+  workflows no longer contain placeholder AWS account / TODO jobs.
+- **Iter-46 — AI provider catalog hardening**: exposed `github-copilot-sdk`,
+  `github-copilot-cli`, `gemini-cli`, and `openai-compatible` as aligned
+  backend/frontend/CLI/OpenAPI provider options. The Copilot SDK adapter is
+  fail-closed (`runtime_not_configured`) until a reviewed official backend
+  SDK transport is installed and refuses PHI even when misclassified. CLI
+  adapters now have prompt-free health probes, and OpenAI-compatible health
+  probes `/v1/models` without sending clinical content. Copilot session/chat
+  execution now requires a tenant-owned `github-copilot-cli` provider and
+  routes through `IAiGateway` instead of shelling out from the controller
+  service path; the desktop bridge no longer exposes a direct native Copilot
+  session runner.
+- **Iter-46 — provider security completion pass**: production API identity now
+  requires validated OIDC or `rp_` bearer tokens unless `RADIOPAD_DEV_HEADERS=1`
+  is explicitly enabled; Copilot prompts that look like secrets are blocked
+  before session creation; CLI providers refuse PHI/secret-shaped prompts at
+  adapter level, run with a scrubbed environment, and Codex CLI is disabled
+  unless `RADIOPAD_CODEX_CLI_ENABLED=1`. OpenAI-compatible endpoints are
+  validated against SSRF/private-network use unless `LocalOnly`, provider
+  config saves and health checks append audit rows, and provider admin UI now
+  has loading/empty/error states plus test coverage. Copilot quota accounting
+  now counts terminal request rows only so successful sessions are not
+  double-counted.
 - **Iter-36 — Stripe webhook hardening**: `POST /api/billing/webhook` now
   handles `invoice.payment_succeeded` (clears `gracePeriodUntil` +
   `suspendedAt`, sets `subscriptionStatus = "active"`) and
@@ -113,9 +175,9 @@ The format is based on [Keep a Changelog 1.1.0](https://keepachangelog.com/en/1.
 - **Iter-36 — CLI-AI provider adapters**: three new `IAiProviderAdapter`
   implementations under
   [`backend/RadioPad.Api/src/RadioPad.Infrastructure/Providers/Cli/`](backend/RadioPad.Api/src/RadioPad.Infrastructure/Providers/Cli/)
-  shell out to local AI CLI binaries — `github-copilot-cli` (`gh copilot`),
+  shell out to local AI CLI binaries — `github-copilot-cli` (`copilot`),
   `gemini-cli` (`gemini`), and `codex-cli` (`codex`). All three default to
-  `ProviderComplianceClass.LocalOnly`; the AI gateway's PHI policy is
+  `ProviderComplianceClass.Sandbox`; the AI gateway's PHI policy is
   unchanged. The composed prompt is piped on **stdin**; arguments are passed
   via `ProcessStartInfo.ArgumentList` so prompts cannot escape into a shell.
   New `IProcessLauncher` abstraction (`DefaultProcessLauncher` + stub for
@@ -123,7 +185,7 @@ The format is based on [Keep a Changelog 1.1.0](https://keepachangelog.com/en/1.
   (`RADIOPAD_CLI_PROVIDER_TIMEOUT_MS`, default 60s), default-deny binary
   allowlist (`RADIOPAD_CLI_PROVIDER_ALLOWED_PATHS`), and a control-character
   prompt sanitiser (refuses NUL / C0 controls). Per-provider binary override
-  envs: `RADIOPAD_GH_COPILOT_BIN`, `RADIOPAD_GEMINI_BIN`, `RADIOPAD_CODEX_BIN`.
+  envs: `RADIOPAD_COPILOT_BIN`, `RADIOPAD_GEMINI_BIN`, `RADIOPAD_CODEX_BIN`.
   The existing generic `OpenAiCompatibleProvider` (`openai-compatible`) gains
   a missing-API-key guard: when `apiKeySecretRef` is set but resolves empty
   the adapter throws `ProviderPolicyException("api_key_missing")` instead of
@@ -199,7 +261,7 @@ The format is based on [Keep a Changelog 1.1.0](https://keepachangelog.com/en/1.
 - **DESK-001**: Tauri auto-updater signing wired (ed25519, channel-aware endpoints, GitHub OIDC -> KMS signing in `desktop-release.yml`).
 
 ### Security
-- **SAML ACS fail-CLOSED hardening (iter-32 closeout, post-Momus review #1)** — `SamlController.ProcessAcs` previously skipped XML signature verification when `RADIOPAD_SAML_IDP_CERT_PEM` was unset, accepting any forged `SAMLResponse` and minting a 12-hour bearer for the named tenant/user. The control flow is now inverted: unsigned assertions are rejected unless an operator explicitly opts in via `RADIOPAD_SAML_DEV_INSECURE=true`. New regression test `Iter32SamlAcsTests.Acs_FailClosed_When_NoCert_And_No_DevInsecureFlag` asserts a 401 in the default-no-cert configuration.
+- **SAML ACS fail-CLOSED hardening (iter-32 closeout, post-Momus review #1)** — `SamlController.ProcessAcs` previously skipped XML signature verification when `RADIOPAD_SAML_IDP_CERT_PEM` was unset, accepting any forged `SAMLResponse` and minting a 12-hour bearer for the named tenant/user. The control flow is now inverted: unsigned assertions are rejected unless an operator explicitly opts in via `RADIOPAD_SAML_DEV_INSECURE=true`, and that escape hatch is ignored in Production. New regression test `Iter32SamlAcsTests.Acs_FailClosed_When_NoCert_And_No_DevInsecureFlag` asserts a 401 in the default-no-cert configuration.
 
 ### Added
 - **Iteration 32 — Auth / SSO / MFA (Agent A)**

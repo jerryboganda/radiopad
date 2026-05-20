@@ -8,6 +8,7 @@ using RadioPad.Api.Services;
 using RadioPad.Application.Abstractions;
 using RadioPad.Domain.Entities;
 using RadioPad.Domain.Enums;
+using RadioPad.Domain.ValueObjects;
 using RadioPad.Infrastructure.Persistence;
 using RadioPad.Infrastructure.Providers.Cli;
 using Xunit;
@@ -191,12 +192,12 @@ public class CopilotFoundationTests
     }
 
     [Fact]
-    public async Task LocalCli_Link_Enables_Entitlement_And_Session_Uses_Fixed_Cli()
+    public async Task LocalCli_Link_Enables_Entitlement_And_Session_Routes_Through_AiGateway()
     {
         await using var fixture = await CopilotFixture.CreateAsync();
         var audit = new RecordingAudit();
-        var launcher = StubLauncher.Ok("Copilot says use the typed API client.\n");
-        var service = new CopilotService(fixture.Db, launcher);
+        var gateway = StubGateway.Ok("Copilot says use the typed API client.");
+        var service = new CopilotService(fixture.Db, gateway);
         var admin = new CopilotAdminController(fixture.Db, service, audit);
         SetHeaders(admin, fixture.Tenant, fixture.Admin);
 
@@ -222,6 +223,17 @@ public class CopilotFoundationTests
             OAuthClientId: "",
             GitHubAppPrivateKeyConfigured: false,
             OAuthClientSecretConfigured: false), CancellationToken.None);
+        fixture.Db.Providers.Add(new ProviderConfig
+        {
+            TenantId = fixture.Tenant.Id,
+            Name = "Copilot CLI",
+            Adapter = GitHubCopilotCliProvider.AdapterId,
+            Model = "copilot",
+            Compliance = ProviderComplianceClass.Sandbox,
+            Enabled = true,
+            Priority = 10,
+        });
+        await fixture.Db.SaveChangesAsync();
 
         var user = new CopilotController(fixture.Db, service, audit);
         SetHeaders(user, fixture.Tenant, fixture.Radiologist);
@@ -241,11 +253,11 @@ public class CopilotFoundationTests
         Assert.Equal("completed", session.Status);
         Assert.Equal("Copilot says use the typed API client.", session.Output);
 
-        var spec = Assert.Single(launcher.Captured);
-        Assert.Equal("gh", spec.FileName);
-        Assert.Equal(new[] { "copilot", "suggest", "--type", "explain" }, spec.Arguments);
-        Assert.Contains("show how to use the API client", spec.StandardInput);
-        Assert.DoesNotContain(spec.Arguments, a => a.Contains("show how"));
+        var routed = Assert.Single(gateway.Captured);
+        Assert.Equal(fixture.Tenant.Id, routed.Tenant.Id);
+        Assert.Equal(GitHubCopilotCliProvider.AdapterId, routed.Request.Provider.Adapter);
+        Assert.False(routed.Request.ContainsPhi);
+        Assert.Contains("show how to use the API client", routed.Request.UserPrompt);
         Assert.Contains(audit.Events, a => a.Action == AuditAction.CopilotRequestLifecycle);
     }
 
@@ -254,8 +266,8 @@ public class CopilotFoundationTests
     {
         await using var fixture = await CopilotFixture.CreateAsync();
         var audit = new RecordingAudit();
-        var launcher = StubLauncher.Ok("first response");
-        var service = new CopilotService(fixture.Db, launcher);
+        var gateway = StubGateway.Ok("first response");
+        var service = new CopilotService(fixture.Db, gateway);
         var settings = await service.GetOrCreateSettingsAsync(fixture.Tenant.Id, CancellationToken.None);
         service.Apply(settings, new CopilotSettingsDto(
             Enabled: true,
@@ -289,6 +301,16 @@ public class CopilotFoundationTests
             SsoStatus = "local_cli",
             SeatStatus = "cli_enforced",
         });
+        fixture.Db.Providers.Add(new ProviderConfig
+        {
+            TenantId = fixture.Tenant.Id,
+            Name = "Copilot CLI",
+            Adapter = GitHubCopilotCliProvider.AdapterId,
+            Model = "copilot",
+            Compliance = ProviderComplianceClass.Sandbox,
+            Enabled = true,
+            Priority = 10,
+        });
         fixture.Db.CopilotQuotaPolicies.Add(new CopilotQuotaPolicy
         {
             TenantId = fixture.Tenant.Id,
@@ -311,7 +333,184 @@ public class CopilotFoundationTests
         var blocked = Assert.IsType<ObjectResult>(second);
         Assert.Equal((int)HttpStatusCode.Conflict, blocked.StatusCode);
         Assert.Equal("quota_exceeded", Assert.IsType<CopilotErrorDto>(blocked.Value).Kind);
-        Assert.Single(launcher.Captured);
+        Assert.Single(gateway.Captured);
+    }
+
+    [Fact]
+    public async Task Quota_Counts_Completed_Request_Once()
+    {
+        await using var fixture = await CopilotFixture.CreateAsync();
+        var audit = new RecordingAudit();
+        var gateway = StubGateway.Ok("response");
+        var service = new CopilotService(fixture.Db, gateway);
+        var settings = await service.GetOrCreateSettingsAsync(fixture.Tenant.Id, CancellationToken.None);
+        service.Apply(settings, new CopilotSettingsDto(
+            Enabled: true,
+            EmergencyDisabled: false,
+            DefaultMode: "LocalCli",
+            AllowedModes: new[] { "Disabled", "LocalCli" },
+            GitHubEnterpriseSlug: "",
+            GitHubOrganization: "",
+            GitHubHost: "github.com",
+            SdkRuntimeEnabled: false,
+            CliRuntimeEnabled: true,
+            AllowByoAccounts: false,
+            AllowEnvironmentTokenAuth: false,
+            RequireOsKeychainForCli: true,
+            PromptLoggingEnabled: false,
+            ContextLoggingEnabled: false,
+            RetentionPolicy: "metadata_only",
+            PolicyJson: "{}",
+            GitHubAppId: "",
+            GitHubAppInstallationId: "",
+            OAuthClientId: "",
+            GitHubAppPrivateKeyConfigured: false,
+            OAuthClientSecretConfigured: false));
+        fixture.Db.CopilotUserAccounts.Add(new CopilotUserAccount
+        {
+            TenantId = fixture.Tenant.Id,
+            UserId = fixture.Radiologist.Id,
+            Mode = CopilotMode.LocalCli,
+            GitHubLogin = "octocat",
+            TokenStatus = "cli_keychain",
+            SsoStatus = "local_cli",
+            SeatStatus = "cli_enforced",
+        });
+        fixture.Db.Providers.Add(new ProviderConfig
+        {
+            TenantId = fixture.Tenant.Id,
+            Name = "Copilot CLI",
+            Adapter = GitHubCopilotCliProvider.AdapterId,
+            Model = "copilot",
+            Compliance = ProviderComplianceClass.Sandbox,
+            Enabled = true,
+            Priority = 10,
+        });
+        fixture.Db.CopilotQuotaPolicies.Add(new CopilotQuotaPolicy
+        {
+            TenantId = fixture.Tenant.Id,
+            ScopeType = "user",
+            ScopeKey = "",
+            Feature = "chat",
+            WindowSeconds = 3600,
+            MaxRequests = 2,
+            MaxConcurrent = 1,
+            Enabled = true,
+        });
+        await fixture.Db.SaveChangesAsync();
+
+        var controller = new CopilotController(fixture.Db, service, audit);
+        SetHeaders(controller, fixture.Tenant, fixture.Radiologist);
+        var first = await controller.StartSession(new CopilotSessionRequest("first", "LocalCli", "chat", null), CancellationToken.None);
+        Assert.Equal((int)HttpStatusCode.OK, Assert.IsType<ObjectResult>(first).StatusCode);
+
+        var second = await controller.StartSession(new CopilotSessionRequest("second", "LocalCli", "chat", null), CancellationToken.None);
+        Assert.Equal((int)HttpStatusCode.OK, Assert.IsType<ObjectResult>(second).StatusCode);
+
+        var third = await controller.StartSession(new CopilotSessionRequest("third", "LocalCli", "chat", null), CancellationToken.None);
+        var blocked = Assert.IsType<ObjectResult>(third);
+        Assert.Equal((int)HttpStatusCode.Conflict, blocked.StatusCode);
+        Assert.Equal("quota_exceeded", Assert.IsType<CopilotErrorDto>(blocked.Value).Kind);
+        Assert.Equal(2, gateway.Captured.Count);
+
+        var summary = await service.UsageSummaryAsync(fixture.Tenant.Id, CancellationToken.None);
+        Assert.Equal(3, summary.Total);
+        Assert.Equal(2, summary.Completed);
+        Assert.Equal(1, summary.Blocked);
+        Assert.Equal(0, summary.Running);
+        Assert.DoesNotContain(summary.ByStatus, b => b.Status == "running");
+    }
+
+    [Fact]
+    public async Task Secret_Bearing_Message_Blocks_Before_Gateway_And_Session()
+    {
+        await using var fixture = await CopilotFixture.CreateAsync();
+        var audit = new RecordingAudit();
+        var gateway = StubGateway.Ok("should not run");
+        var service = new CopilotService(fixture.Db, gateway);
+        await EnableLocalCliAsync(fixture, service, providerEnabled: true);
+
+        var controller = new CopilotController(fixture.Db, service, audit);
+        SetHeaders(controller, fixture.Tenant, fixture.Radiologist);
+        var action = await controller.StartSession(
+            new CopilotSessionRequest("Authorization: Bearer ghp_exampletoken", "LocalCli", "chat", null),
+            CancellationToken.None);
+
+        var blocked = Assert.IsType<ObjectResult>(action);
+        Assert.Equal((int)HttpStatusCode.Conflict, blocked.StatusCode);
+        Assert.Equal("secret_policy", Assert.IsType<CopilotErrorDto>(blocked.Value).Kind);
+        Assert.Empty(gateway.Captured);
+        Assert.False(await fixture.Db.CopilotSessions.AnyAsync(CancellationToken.None));
+    }
+
+    [Fact]
+    public async Task Disabled_Copilot_Provider_Blocks_Before_Gateway_And_Session()
+    {
+        await using var fixture = await CopilotFixture.CreateAsync();
+        var audit = new RecordingAudit();
+        var gateway = StubGateway.Ok("should not run");
+        var service = new CopilotService(fixture.Db, gateway);
+        await EnableLocalCliAsync(fixture, service, providerEnabled: false);
+
+        var controller = new CopilotController(fixture.Db, service, audit);
+        SetHeaders(controller, fixture.Tenant, fixture.Radiologist);
+        var action = await controller.StartSession(
+            new CopilotSessionRequest("show how to use the API client", "LocalCli", "chat", null),
+            CancellationToken.None);
+
+        var blocked = Assert.IsType<ObjectResult>(action);
+        Assert.Equal((int)HttpStatusCode.Conflict, blocked.StatusCode);
+        Assert.Equal("provider_not_configured", Assert.IsType<CopilotErrorDto>(blocked.Value).Kind);
+        Assert.Empty(gateway.Captured);
+        Assert.False(await fixture.Db.CopilotSessions.AnyAsync(CancellationToken.None));
+    }
+
+    private static async Task EnableLocalCliAsync(CopilotFixture fixture, CopilotService service, bool providerEnabled)
+    {
+        var settings = await service.GetOrCreateSettingsAsync(fixture.Tenant.Id, CancellationToken.None);
+        service.Apply(settings, new CopilotSettingsDto(
+            Enabled: true,
+            EmergencyDisabled: false,
+            DefaultMode: "LocalCli",
+            AllowedModes: new[] { "Disabled", "LocalCli" },
+            GitHubEnterpriseSlug: "",
+            GitHubOrganization: "",
+            GitHubHost: "github.com",
+            SdkRuntimeEnabled: false,
+            CliRuntimeEnabled: true,
+            AllowByoAccounts: false,
+            AllowEnvironmentTokenAuth: false,
+            RequireOsKeychainForCli: true,
+            PromptLoggingEnabled: false,
+            ContextLoggingEnabled: false,
+            RetentionPolicy: "metadata_only",
+            PolicyJson: "{}",
+            GitHubAppId: "",
+            GitHubAppInstallationId: "",
+            OAuthClientId: "",
+            GitHubAppPrivateKeyConfigured: false,
+            OAuthClientSecretConfigured: false));
+        fixture.Db.CopilotUserAccounts.Add(new CopilotUserAccount
+        {
+            TenantId = fixture.Tenant.Id,
+            UserId = fixture.Radiologist.Id,
+            Mode = CopilotMode.LocalCli,
+            GitHubLogin = "octocat",
+            TokenStatus = "cli_keychain",
+            SsoStatus = "local_cli",
+            SeatStatus = "cli_enforced",
+        });
+        fixture.Db.Providers.Add(new ProviderConfig
+        {
+            TenantId = fixture.Tenant.Id,
+            Name = "Copilot CLI",
+            Adapter = GitHubCopilotCliProvider.AdapterId,
+            Model = "copilot",
+            Compliance = ProviderComplianceClass.Sandbox,
+            Enabled = providerEnabled,
+            Priority = 10,
+        });
+        await fixture.Db.SaveChangesAsync();
     }
 
     private static void SetHeaders(ControllerBase controller, Tenant tenant, User user)
@@ -361,24 +560,23 @@ public class CopilotFoundationTests
         }
     }
 
-    private sealed class StubLauncher : IProcessLauncher
+    private sealed class StubGateway : IAiGateway
     {
-        private readonly Func<ProcessLaunchSpec, CancellationToken, Task<ProcessLaunchResult>> _responder;
-        public List<ProcessLaunchSpec> Captured { get; } = new();
+        private readonly string _text;
+        public List<(Tenant Tenant, AiCompletionRequest Request)> Captured { get; } = new();
 
-        private StubLauncher(Func<ProcessLaunchSpec, CancellationToken, Task<ProcessLaunchResult>> responder)
+        private StubGateway(string text)
         {
-            _responder = responder;
+            _text = text;
         }
 
-        public Task<ProcessLaunchResult> RunAsync(ProcessLaunchSpec spec, CancellationToken ct)
+        public Task<AiResult> RouteAsync(Tenant tenant, AiCompletionRequest request, CancellationToken cancellationToken)
         {
-            Captured.Add(spec);
-            return _responder(spec, ct);
+            Captured.Add((tenant, request));
+            return Task.FromResult(new AiResult(_text, request.Provider.Name, request.Provider.Model, 12, 0, 0, request.PromptVersion));
         }
 
-        public static StubLauncher Ok(string stdout) =>
-            new((_, _) => Task.FromResult(new ProcessLaunchResult(0, stdout, "", 12)));
+        public static StubGateway Ok(string text) => new(text);
     }
 
     private sealed class CopilotFixture : IAsyncDisposable

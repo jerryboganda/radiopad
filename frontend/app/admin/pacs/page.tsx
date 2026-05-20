@@ -19,6 +19,15 @@ type PacsPlugin = {
   error?: string | null;
 };
 
+type PacsVendor = 'sectra' | 'visage' | 'carestream' | '';
+
+const PACS_VENDOR_OPTIONS: { value: PacsVendor; label: string }[] = [
+  { value: '', label: 'Generic DICOMweb' },
+  { value: 'sectra', label: 'Sectra IDS7' },
+  { value: 'visage', label: 'Visage 7' },
+  { value: 'carestream', label: 'Carestream Vue' },
+];
+
 /**
  * Iter-32 DESK-007 / INT-007 — PACS bridge admin surface.
  *
@@ -38,6 +47,8 @@ export default function PacsAdminPage() {
   const [health, setHealth] = useState<PacsHealth | null>(null);
   const [plugins, setPlugins] = useState<PacsPlugin[] | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [selectedVendor, setSelectedVendor] = useState<PacsVendor>('');
+  const [savingVendor, setSavingVendor] = useState(false);
 
   async function refresh() {
     try {
@@ -47,6 +58,7 @@ export default function PacsAdminPage() {
         api.pacs.plugins().catch(() => [] as PacsPlugin[]),
       ]);
       setTenant(s);
+      setSelectedVendor((s.pacs.vendor ?? '') as PacsVendor);
       setHealth(h);
       setPlugins(p);
     } catch (e) {
@@ -54,6 +66,19 @@ export default function PacsAdminPage() {
     }
   }
   useEffect(() => { refresh(); /* eslint-disable-line react-hooks/exhaustive-deps */ }, []);
+
+  async function saveVendor() {
+    setSavingVendor(true);
+    setError(null);
+    try {
+      await api.tenant.settings.save({ pacsVendor: selectedVendor });
+      await refresh();
+    } catch (e) {
+      setError((e as Error).message);
+    } finally {
+      setSavingVendor(false);
+    }
+  }
 
   return (
     <div className="rp-container">
@@ -96,6 +121,21 @@ export default function PacsAdminPage() {
                 </span>{' '}
                 · Edit the connection on the <a href="/admin/settings">Workspace settings</a> page (advanced section).
               </p>
+              <label className="rp-field">
+                <span>Vendor adapter</span>
+                <select
+                  className="rp-input"
+                  value={selectedVendor}
+                  onChange={(e) => setSelectedVendor(e.target.value as PacsVendor)}
+                >
+                  {PACS_VENDOR_OPTIONS.map((option) => (
+                    <option key={option.value || 'generic'} value={option.value}>{option.label}</option>
+                  ))}
+                </select>
+              </label>
+              <button className="primary" type="button" onClick={saveVendor} disabled={savingVendor}>
+                {savingVendor ? 'Saving…' : 'Save vendor'}
+              </button>
             </details>
           </>
         )}
