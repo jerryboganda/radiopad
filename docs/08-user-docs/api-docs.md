@@ -8,8 +8,9 @@ REST + JSON. RFC-7807 problem details with a stable `kind` field. ISO-8601 times
 
 ## Authentication
 
-- v0.1: `X-RadioPad-Tenant: <slug>` and `X-RadioPad-User: <email>` headers.
-- Phase 3: `Authorization: Bearer <jwt>`.
+- Production-like API requests use `Authorization: Bearer rp_<opaque>` with tenant/user lookup hints, or a validated OIDC JWT.
+- `X-RadioPad-Tenant` and `X-RadioPad-User` are authoritative only in explicit dev/test mode.
+- SCIM and ingest endpoints use their own tenant-scoped bearer secrets.
 
 ## Base URL
 

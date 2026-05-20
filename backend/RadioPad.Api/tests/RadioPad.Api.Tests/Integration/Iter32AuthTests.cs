@@ -1,4 +1,5 @@
 using System.Net;
+using System.Net.Http.Headers;
 using System.Net.Http.Json;
 using System.Security.Cryptography;
 using System.Security.Cryptography.X509Certificates;
@@ -13,6 +14,7 @@ using RadioPad.Api.Tests.Infrastructure;
 using RadioPad.Application.Abstractions;
 using RadioPad.Domain.Entities;
 using RadioPad.Domain.Enums;
+using RadioPad.Infrastructure.Identity;
 using RadioPad.Infrastructure.Persistence;
 using Xunit;
 
@@ -210,6 +212,618 @@ public class Iter32OidcPresetTests
             Environment.SetEnvironmentVariable("RADIOPAD_OIDC_TENANT_CLAIM", prevTenant);
             Environment.SetEnvironmentVariable("RADIOPAD_OIDC_EMAIL_CLAIM", prevEmail);
             Environment.SetEnvironmentVariable("RADIOPAD_OIDC_REQUIRE_MFA", prevMfa);
+        }
+    }
+}
+
+public class VerifiedTenantAccessContextTests : IClassFixture<RadioPadAppFactory>
+{
+    private readonly RadioPadAppFactory _factory;
+    public VerifiedTenantAccessContextTests(RadioPadAppFactory f) => _factory = f;
+
+    [Fact]
+    public async Task DevHeaders_StillWork_WhenExplicitlyEnabledForTests()
+    {
+        var http = _factory.CreateTenantClient();
+
+        var resp = await http.GetAsync("/api/tenant/me");
+
+        Assert.Equal(HttpStatusCode.OK, resp.StatusCode);
+    }
+
+    [Fact]
+    public async Task HeadersOnly_AreRejected_WhenDevHeadersDisabled()
+    {
+        var factory = new NoDevHeadersFactory();
+        await factory.InitializeAsync();
+        try
+        {
+            var http = factory.CreateClient();
+            http.DefaultRequestHeaders.Add("X-RadioPad-Tenant", factory.SeedTenant.Slug);
+            http.DefaultRequestHeaders.Add("X-RadioPad-User", factory.SeedUser.Email);
+
+            var resp = await http.GetAsync("/api/tenant/me");
+
+            Assert.Equal(HttpStatusCode.Unauthorized, resp.StatusCode);
+        }
+        finally
+        {
+            await factory.DisposeAsync();
+        }
+    }
+
+    [Fact]
+    public async Task ValidRadioPadBearer_ResolvesTenantContext_WhenDevHeadersDisabled()
+    {
+        var factory = new NoDevHeadersFactory();
+        await factory.InitializeAsync();
+        try
+        {
+            var token = await MintSessionBearerAsync(factory, factory.SeedTenant.Slug, factory.SeedUser.Email);
+            var http = factory.CreateClient();
+            http.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", token);
+            http.DefaultRequestHeaders.Add("X-RadioPad-Tenant", factory.SeedTenant.Slug);
+            http.DefaultRequestHeaders.Add("X-RadioPad-User", factory.SeedUser.Email);
+
+            var resp = await http.GetAsync("/api/tenant/me");
+
+            Assert.Equal(HttpStatusCode.OK, resp.StatusCode);
+            var body = await resp.Content.ReadFromJsonAsync<JsonElement>();
+            Assert.Equal(factory.SeedUser.Email, body.GetProperty("user").GetProperty("email").GetString());
+        }
+        finally
+        {
+            await factory.DisposeAsync();
+        }
+    }
+
+    [Fact]
+    public async Task ForgedHeaders_DoNotOverrideValidatedBearer()
+    {
+        var factory = new NoDevHeadersFactory();
+        await factory.InitializeAsync();
+        try
+        {
+            var token = await MintSessionBearerAsync(factory, factory.SeedTenant.Slug, factory.SeedUser.Email);
+            var http = factory.CreateClient();
+            http.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", token);
+            http.DefaultRequestHeaders.Add("X-RadioPad-Tenant", factory.SeedTenant.Slug);
+            http.DefaultRequestHeaders.Add("X-RadioPad-User", factory.SeedAdmin.Email);
+
+            var resp = await http.GetAsync("/api/tenant/me");
+
+            Assert.Equal(HttpStatusCode.Unauthorized, resp.StatusCode);
+        }
+        finally
+        {
+            await factory.DisposeAsync();
+        }
+    }
+
+    [Fact]
+    public async Task CrossTenantBearerReplay_IsRejected()
+    {
+        var factory = new NoDevHeadersFactory();
+        await factory.InitializeAsync();
+        try
+        {
+            var token = await MintSessionBearerAsync(factory, factory.SeedTenant.Slug, factory.SeedUser.Email);
+            const string otherTenantSlug = "it-replay-target";
+            using (var scope = factory.Services.CreateScope())
+            {
+                var db = scope.ServiceProvider.GetRequiredService<RadioPadDbContext>();
+                var otherTenant = new Tenant { Slug = otherTenantSlug, DisplayName = "Replay Target" };
+                db.Tenants.Add(otherTenant);
+                db.Users.Add(new User
+                {
+                    TenantId = otherTenant.Id,
+                    Email = factory.SeedUser.Email,
+                    DisplayName = "Replay Target Radiologist",
+                    Role = UserRole.Radiologist,
+                });
+                await db.SaveChangesAsync();
+            }
+
+            var http = factory.CreateClient();
+            http.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", token);
+            http.DefaultRequestHeaders.Add("X-RadioPad-Tenant", otherTenantSlug);
+            http.DefaultRequestHeaders.Add("X-RadioPad-User", factory.SeedUser.Email);
+
+            var resp = await http.GetAsync("/api/tenant/me");
+
+            Assert.Equal(HttpStatusCode.Unauthorized, resp.StatusCode);
+        }
+        finally
+        {
+            await factory.DisposeAsync();
+        }
+    }
+
+    [Fact]
+    public async Task RevokedSessionEpoch_InvalidatesExistingBearer()
+    {
+        var factory = new NoDevHeadersFactory();
+        await factory.InitializeAsync();
+        try
+        {
+            var token = await MintSessionBearerAsync(factory, factory.SeedTenant.Slug, factory.SeedUser.Email);
+
+            using (var scope = factory.Services.CreateScope())
+            {
+                var db = scope.ServiceProvider.GetRequiredService<RadioPadDbContext>();
+                var user = await db.Users.FirstAsync(u => u.Id == factory.SeedUser.Id);
+                user.SessionEpoch += 1;
+                await db.SaveChangesAsync();
+            }
+
+            var http = factory.CreateClient();
+            http.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", token);
+            http.DefaultRequestHeaders.Add("X-RadioPad-Tenant", factory.SeedTenant.Slug);
+            http.DefaultRequestHeaders.Add("X-RadioPad-User", factory.SeedUser.Email);
+
+            var resp = await http.GetAsync("/api/tenant/me");
+
+            Assert.Equal(HttpStatusCode.Unauthorized, resp.StatusCode);
+        }
+        finally
+        {
+            await factory.DisposeAsync();
+        }
+    }
+
+    [Fact]
+    public async Task RevokedAuthSessionRow_InvalidatesMatchingBearer()
+    {
+        var factory = new NoDevHeadersFactory();
+        await factory.InitializeAsync();
+        try
+        {
+            var token = await MintSessionBearerAsync(factory, factory.SeedTenant.Slug, factory.SeedUser.Email);
+            using (var scope = factory.Services.CreateScope())
+            {
+                var db = scope.ServiceProvider.GetRequiredService<RadioPadDbContext>();
+                var user = await db.Users.FirstAsync(u => u.Id == factory.SeedUser.Id);
+                var session = await EnterpriseIdentityBridge.RecordAuthSessionAsync(
+                    db,
+                    user,
+                    token,
+                    "test",
+                    DateTimeOffset.UtcNow.Add(RadioPadBearerToken.Lifetime),
+                    CancellationToken.None);
+                session.RevokedAt = DateTimeOffset.UtcNow;
+                session.RevocationReason = "test-revoked";
+                await db.SaveChangesAsync();
+            }
+
+            var http = factory.CreateClient();
+            http.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", token);
+            http.DefaultRequestHeaders.Add("X-RadioPad-Tenant", factory.SeedTenant.Slug);
+            http.DefaultRequestHeaders.Add("X-RadioPad-User", factory.SeedUser.Email);
+
+            var resp = await http.GetAsync("/api/tenant/me");
+
+            Assert.Equal(HttpStatusCode.Unauthorized, resp.StatusCode);
+        }
+        finally
+        {
+            await factory.DisposeAsync();
+        }
+    }
+
+    [Fact]
+    public async Task Logout_RevokesCurrentAuthSession_AndClearsSessionCookie()
+    {
+        using var http = _factory.CreateClient();
+        var signIn = await http.PostAsJsonAsync("/api/auth/signin", new
+        {
+            tenant = _factory.SeedTenant.Slug,
+            user = _factory.SeedUser.Email,
+        });
+        Assert.Equal(HttpStatusCode.OK, signIn.StatusCode);
+        Assert.True(signIn.Headers.TryGetValues("Set-Cookie", out var issuedCookies));
+        Assert.Contains(issuedCookies, c => c.Contains("rp_session=", StringComparison.Ordinal));
+
+        var body = await signIn.Content.ReadFromJsonAsync<JsonElement>();
+        var token = body.GetProperty("token").GetString()!;
+
+        using var logoutClient = _factory.CreateClient();
+        logoutClient.DefaultRequestHeaders.Add("Cookie", $"rp_session={token}");
+
+        var logout = await logoutClient.PostAsync("/api/auth/logout", content: null);
+
+        Assert.Equal(HttpStatusCode.OK, logout.StatusCode);
+        Assert.True(logout.Headers.TryGetValues("Set-Cookie", out var clearedCookies));
+        Assert.Contains(clearedCookies, c => c.Contains("rp_session=", StringComparison.Ordinal)
+            && c.Contains("expires=", StringComparison.OrdinalIgnoreCase));
+
+        using var scope = _factory.Services.CreateScope();
+        var db = scope.ServiceProvider.GetRequiredService<RadioPadDbContext>();
+        var tokenHash = EnterpriseIdentityBridge.Sha256Hex(token);
+        var session = await db.AuthSessions.AsNoTracking().SingleAsync(s => s.TokenHash == tokenHash);
+        Assert.NotNull(session.RevokedAt);
+        Assert.Equal("logout", session.RevocationReason);
+    }
+
+    [Fact]
+    public async Task ExpiredRadioPadBearer_IsRejected()
+    {
+        var factory = new NoDevHeadersFactory();
+        await factory.InitializeAsync();
+        try
+        {
+            var issuedAt = DateTimeOffset.UtcNow.Subtract(RadioPadBearerToken.Lifetime).AddMinutes(-1);
+            var token = RadioPadBearerToken.Mint(
+                factory.SeedTenant.Slug,
+                factory.SeedUser.Email,
+                factory.SeedUser.SessionEpoch,
+                issuedAt);
+            var http = factory.CreateClient();
+            http.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", token);
+            http.DefaultRequestHeaders.Add("X-RadioPad-Tenant", factory.SeedTenant.Slug);
+            http.DefaultRequestHeaders.Add("X-RadioPad-User", factory.SeedUser.Email);
+
+            var resp = await http.GetAsync("/api/tenant/me");
+
+            Assert.Equal(HttpStatusCode.Unauthorized, resp.StatusCode);
+        }
+        finally
+        {
+            await factory.DisposeAsync();
+        }
+    }
+
+    [Fact]
+    public async Task InactiveOrLockedUsers_AreRejectedEvenWithPreviouslyValidBearer()
+    {
+        var factory = new NoDevHeadersFactory();
+        await factory.InitializeAsync();
+        try
+        {
+            var token = MintBearer(factory, factory.SeedTenant.Slug, factory.SeedUser.Email);
+
+            using (var scope = factory.Services.CreateScope())
+            {
+                var db = scope.ServiceProvider.GetRequiredService<RadioPadDbContext>();
+                var user = await db.Users.FirstAsync(u => u.Id == factory.SeedUser.Id);
+                user.IsActive = false;
+                user.LockedUntil = DateTimeOffset.UtcNow.AddMinutes(15);
+                await db.SaveChangesAsync();
+            }
+
+            var http = factory.CreateClient();
+            http.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", token);
+            http.DefaultRequestHeaders.Add("X-RadioPad-Tenant", factory.SeedTenant.Slug);
+            http.DefaultRequestHeaders.Add("X-RadioPad-User", factory.SeedUser.Email);
+
+            var resp = await http.GetAsync("/api/tenant/me");
+
+            Assert.Equal(HttpStatusCode.Unauthorized, resp.StatusCode);
+        }
+        finally
+        {
+            await factory.DisposeAsync();
+        }
+    }
+
+    private static string MintBearer(RadioPadAppFactory factory, string tenant, string user) =>
+        RadioPadBearerToken.Mint(tenant, user, factory.SeedUser.SessionEpoch);
+
+    private static async Task<string> MintSessionBearerAsync(RadioPadAppFactory factory, string tenant, string user)
+    {
+        var token = MintBearer(factory, tenant, user);
+        using var scope = factory.Services.CreateScope();
+        var db = scope.ServiceProvider.GetRequiredService<RadioPadDbContext>();
+        var dbTenant = await db.Tenants.FirstAsync(t => t.Slug == tenant);
+        var dbUser = await db.Users.FirstAsync(u => u.TenantId == dbTenant.Id && u.Email == user);
+        await EnterpriseIdentityBridge.RecordAuthSessionAsync(
+            db,
+            dbUser,
+            token,
+            "test",
+            DateTimeOffset.UtcNow.Add(RadioPadBearerToken.Lifetime),
+            CancellationToken.None);
+        return token;
+    }
+
+    private sealed class NoDevHeadersFactory : RadioPadAppFactory
+    {
+        protected override void ConfigureWebHost(IWebHostBuilder builder)
+        {
+            base.ConfigureWebHost(builder);
+            builder.UseSetting("RadioPad:DevHeaders", "false");
+        }
+    }
+}
+
+[Collection("MagicLinkRateLimiter")]
+public class AuthSurfaceHardeningTests
+{
+    [Fact]
+    public async Task DevSignIn_IsRejected_WhenDevHeadersDisabled()
+    {
+        var factory = new NoDevHeadersFactory();
+        await factory.InitializeAsync();
+        try
+        {
+            var http = factory.CreateClient();
+
+            var resp = await http.PostAsJsonAsync("/api/auth/signin", new
+            {
+                tenant = factory.SeedTenant.Slug,
+                user = factory.SeedUser.Email,
+            });
+
+            Assert.Equal(HttpStatusCode.Unauthorized, resp.StatusCode);
+            using var scope = factory.Services.CreateScope();
+            var db = scope.ServiceProvider.GetRequiredService<RadioPadDbContext>();
+            var audit = await db.AuditEvents.AsNoTracking()
+                .AnyAsync(a => a.TenantId == factory.SeedTenant.Id
+                    && a.UserId == factory.SeedUser.Id
+                    && a.Action == AuditAction.PolicyViolation
+                    && a.DetailsJson.Contains("dev_signin_disabled"));
+            Assert.True(audit);
+        }
+        finally
+        {
+            await factory.DisposeAsync();
+        }
+    }
+
+    [Fact]
+    public async Task MfaEnroll_RequiresVerifiedIdentity_WhenDevHeadersDisabled()
+    {
+        var factory = new NoDevHeadersFactory();
+        await factory.InitializeAsync();
+        try
+        {
+            var http = factory.CreateClient();
+
+            var resp = await http.PostAsJsonAsync("/api/auth/mfa/enroll", new
+            {
+                tenant = factory.SeedTenant.Slug,
+                email = factory.SeedUser.Email,
+            });
+
+            Assert.Equal(HttpStatusCode.Unauthorized, resp.StatusCode);
+            using var scope = factory.Services.CreateScope();
+            var db = scope.ServiceProvider.GetRequiredService<RadioPadDbContext>();
+            var user = await db.Users.AsNoTracking().FirstAsync(u => u.Id == factory.SeedUser.Id);
+            Assert.True(string.IsNullOrEmpty(user.MfaSecret));
+        }
+        finally
+        {
+            await factory.DisposeAsync();
+        }
+    }
+
+    [Fact]
+    public async Task DeviceApprove_RequiresVerifiedIdentity_WhenDevHeadersDisabled()
+    {
+        var factory = new NoDevHeadersFactory();
+        await factory.InitializeAsync();
+        try
+        {
+            var http = factory.CreateClient();
+            var auth = await http.PostAsJsonAsync("/api/auth/device/authorize", new { clientId = "test-cli" });
+            Assert.Equal(HttpStatusCode.OK, auth.StatusCode);
+            var authBody = await auth.Content.ReadFromJsonAsync<JsonElement>();
+            var userCode = authBody.GetProperty("userCode").GetString()!;
+
+            var approve = await http.PostAsJsonAsync("/api/auth/device/approve", new
+            {
+                tenant = factory.SeedTenant.Slug,
+                email = factory.SeedUser.Email,
+                userCode,
+            });
+
+            Assert.Equal(HttpStatusCode.Unauthorized, approve.StatusCode);
+            using var scope = factory.Services.CreateScope();
+            var db = scope.ServiceProvider.GetRequiredService<RadioPadDbContext>();
+            var row = await db.DeviceAuth.AsNoTracking().FirstAsync(d => d.UserCode == userCode);
+            Assert.Equal("pending", row.Status);
+        }
+        finally
+        {
+            await factory.DisposeAsync();
+        }
+    }
+
+    [Fact]
+    public async Task MagicLinkRequest_DoesNotReturnDevLink_WhenDevHeadersDisabled()
+    {
+        MagicLinkRateLimiter.ResetForTesting();
+        var factory = new NoDevHeadersFactory();
+        await factory.InitializeAsync();
+        try
+        {
+            var email = $"no-dev-link-{Guid.NewGuid():N}@radiopad.local";
+            using (var scope = factory.Services.CreateScope())
+            {
+                var db = scope.ServiceProvider.GetRequiredService<RadioPadDbContext>();
+                db.Users.Add(new User
+                {
+                    TenantId = factory.SeedTenant.Id,
+                    Email = email,
+                    DisplayName = "No Dev Link",
+                    Role = UserRole.Radiologist,
+                    IsActive = true,
+                });
+                await db.SaveChangesAsync();
+            }
+
+            var http = factory.CreateClient();
+            var resp = await http.PostAsJsonAsync("/api/auth/magic-link/request", new
+            {
+                tenant = factory.SeedTenant.Slug,
+                email,
+            });
+
+            Assert.Equal(HttpStatusCode.OK, resp.StatusCode);
+            var body = await resp.Content.ReadFromJsonAsync<JsonElement>();
+            Assert.False(body.TryGetProperty("devLink", out _));
+        }
+        finally
+        {
+            await factory.DisposeAsync();
+        }
+    }
+
+    [Fact]
+    public async Task MagicLinkConsume_ForInactiveUser_ConsumesLink()
+    {
+        MagicLinkRateLimiter.ResetForTesting();
+        var factory = new RadioPadAppFactory();
+        await factory.InitializeAsync();
+        try
+        {
+            var email = $"inactive-magic-{Guid.NewGuid():N}@radiopad.local";
+            using (var scope = factory.Services.CreateScope())
+            {
+                var db = scope.ServiceProvider.GetRequiredService<RadioPadDbContext>();
+                db.Users.Add(new User
+                {
+                    TenantId = factory.SeedTenant.Id,
+                    Email = email,
+                    DisplayName = "Inactive Magic",
+                    Role = UserRole.Radiologist,
+                    IsActive = true,
+                });
+                await db.SaveChangesAsync();
+            }
+
+            var http = factory.CreateTenantClient();
+            var request = await http.PostAsJsonAsync("/api/auth/magic-link/request", new
+            {
+                tenant = factory.SeedTenant.Slug,
+                email,
+            });
+            Assert.Equal(HttpStatusCode.OK, request.StatusCode);
+            var requestBody = await request.Content.ReadFromJsonAsync<JsonElement>();
+            var url = requestBody.GetProperty("devLink").GetString()!;
+            var token = Microsoft.AspNetCore.WebUtilities.QueryHelpers
+                .ParseQuery(new Uri(url).Query)["magic"].ToString();
+
+            using (var scope = factory.Services.CreateScope())
+            {
+                var db = scope.ServiceProvider.GetRequiredService<RadioPadDbContext>();
+                var user = await db.Users.FirstAsync(u => u.Email == email);
+                user.IsActive = false;
+                await db.SaveChangesAsync();
+            }
+
+            var consume = await http.PostAsJsonAsync("/api/auth/magic-link/consume", new { token });
+
+            Assert.Equal(HttpStatusCode.Unauthorized, consume.StatusCode);
+            using (var scope = factory.Services.CreateScope())
+            {
+                var db = scope.ServiceProvider.GetRequiredService<RadioPadDbContext>();
+                var row = await db.MagicLinks.AsNoTracking().FirstAsync(m => m.TokenHash == MagicLinkController.Sha256Hex(token));
+                Assert.NotNull(row.ConsumedAt);
+            }
+        }
+        finally
+        {
+            await factory.DisposeAsync();
+        }
+    }
+
+    [Fact]
+    public async Task MagicLinkConsume_ConcurrentRequests_OnlyOneSucceeds()
+    {
+        MagicLinkRateLimiter.ResetForTesting();
+        var factory = new RadioPadAppFactory();
+        await factory.InitializeAsync();
+        try
+        {
+            var email = $"single-use-magic-{Guid.NewGuid():N}@radiopad.local";
+            using (var scope = factory.Services.CreateScope())
+            {
+                var db = scope.ServiceProvider.GetRequiredService<RadioPadDbContext>();
+                db.Users.Add(new User
+                {
+                    TenantId = factory.SeedTenant.Id,
+                    Email = email,
+                    DisplayName = "Single Use Magic",
+                    Role = UserRole.Radiologist,
+                    IsActive = true,
+                });
+                await db.SaveChangesAsync();
+            }
+
+            var http = factory.CreateTenantClient();
+            var request = await http.PostAsJsonAsync("/api/auth/magic-link/request", new
+            {
+                tenant = factory.SeedTenant.Slug,
+                email,
+            });
+            Assert.Equal(HttpStatusCode.OK, request.StatusCode);
+            var requestBody = await request.Content.ReadFromJsonAsync<JsonElement>();
+            var url = requestBody.GetProperty("devLink").GetString()!;
+            var token = Microsoft.AspNetCore.WebUtilities.QueryHelpers
+                .ParseQuery(new Uri(url).Query)["magic"].ToString();
+
+            var attempts = await Task.WhenAll(
+                http.PostAsJsonAsync("/api/auth/magic-link/consume", new { token }),
+                http.PostAsJsonAsync("/api/auth/magic-link/consume", new { token }));
+
+            Assert.Equal(1, attempts.Count(r => r.StatusCode == HttpStatusCode.OK));
+            Assert.Equal(1, attempts.Count(r => r.StatusCode == HttpStatusCode.Unauthorized));
+        }
+        finally
+        {
+            await factory.DisposeAsync();
+        }
+    }
+
+    [Fact]
+    public async Task DeviceToken_ConcurrentRequests_OnlyOneSucceeds()
+    {
+        var factory = new RadioPadAppFactory();
+        await factory.InitializeAsync();
+        try
+        {
+            var http = factory.CreateTenantClient();
+            var authorize = await http.PostAsJsonAsync("/api/auth/device/authorize", new { clientId = "test-cli" });
+            Assert.Equal(HttpStatusCode.OK, authorize.StatusCode);
+            var authorizeBody = await authorize.Content.ReadFromJsonAsync<JsonElement>();
+            var deviceCode = authorizeBody.GetProperty("deviceCode").GetString()!;
+            var userCode = authorizeBody.GetProperty("userCode").GetString()!;
+
+            var approve = await http.PostAsJsonAsync("/api/auth/device/approve", new
+            {
+                tenant = factory.SeedTenant.Slug,
+                email = factory.SeedUser.Email,
+                userCode,
+            });
+            Assert.Equal(HttpStatusCode.OK, approve.StatusCode);
+
+            var attempts = await Task.WhenAll(
+                http.PostAsJsonAsync("/api/auth/device/token", new
+                {
+                    grantType = "urn:ietf:params:oauth:grant-type:device_code",
+                    deviceCode,
+                }),
+                http.PostAsJsonAsync("/api/auth/device/token", new
+                {
+                    grantType = "urn:ietf:params:oauth:grant-type:device_code",
+                    deviceCode,
+                }));
+
+            Assert.Equal(1, attempts.Count(r => r.StatusCode == HttpStatusCode.OK));
+            Assert.Equal(1, attempts.Count(r => r.StatusCode == HttpStatusCode.BadRequest));
+        }
+        finally
+        {
+            await factory.DisposeAsync();
+        }
+    }
+
+    private sealed class NoDevHeadersFactory : RadioPadAppFactory
+    {
+        protected override void ConfigureWebHost(IWebHostBuilder builder)
+        {
+            base.ConfigureWebHost(builder);
+            builder.UseSetting("RadioPad:DevHeaders", "false");
         }
     }
 }

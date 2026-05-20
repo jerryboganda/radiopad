@@ -5,6 +5,7 @@ using System.Text;
 using System.Text.Json;
 using Microsoft.EntityFrameworkCore;
 using RadioPad.Application.Abstractions;
+using RadioPad.Api.Auth;
 using RadioPad.Domain.Entities;
 using RadioPad.Domain.Enums;
 using RadioPad.Infrastructure.Persistence;
@@ -231,7 +232,7 @@ public sealed class IpAllowlistMiddleware
         });
     }
 
-    private static string HashIp(IPAddress addr)
+    internal static string HashIp(IPAddress addr)
     {
         var bytes = SHA256.HashData(Encoding.UTF8.GetBytes(addr.ToString()));
         return Convert.ToHexString(bytes, 0, 8).ToLowerInvariant();
@@ -308,7 +309,7 @@ public sealed class IpAllowlistMiddleware
         return true;
     }
 
-    private static bool MatchAny(IPAddress addr, (IPAddress, int)[] ranges)
+    internal static bool MatchAny(IPAddress addr, (IPAddress, int)[] ranges)
     {
         foreach (var (net, prefix) in ranges)
         {

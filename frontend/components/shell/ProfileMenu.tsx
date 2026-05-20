@@ -11,6 +11,7 @@ import LocalePicker from '../LocalePicker';
 type Me = { tenant: { displayName: string }; user: { email: string } } | null;
 
 export default function ProfileMenu() {
+  const router = useRouter();
   const tBar = useTranslations('topbar');
   const tNav = useTranslations('nav');
   const tProfile = useTranslations('profile');
@@ -18,6 +19,8 @@ export default function ProfileMenu() {
   const router = useRouter();
   const [me, setMe] = useState<Me>(null);
   const [open, setOpen] = useState(false);
+  const [signingOut, setSigningOut] = useState(false);
+  const [signOutError, setSignOutError] = useState<string | null>(null);
   const ref = useRef<HTMLDivElement | null>(null);
 
   useEffect(() => {
@@ -85,7 +88,7 @@ export default function ProfileMenu() {
           </Link>
           <div className="rp-profile-popover-divider" />
           <div className="rp-profile-popover-meta">{tProfile('language')}</div>
-          <div style={{ padding: '4px 6px' }}>
+          <div className="rp-profile-locale-slot">
             <LocalePicker ariaLabel={tSubtle('language')} />
           </div>
           <div className="rp-profile-popover-divider" />
@@ -100,6 +103,7 @@ export default function ProfileMenu() {
           )}
         </div>
       )}
+      {signOutError && <div className="rp-profile-signout-error">{signOutError}</div>}
     </div>
   );
 }

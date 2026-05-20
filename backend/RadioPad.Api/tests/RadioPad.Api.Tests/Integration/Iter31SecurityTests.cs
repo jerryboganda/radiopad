@@ -121,6 +121,7 @@ public class Iter31SecurityTests : IClassFixture<RadioPadAppFactory>
         var middleware = new IpAllowlistMiddleware(_ => Task.CompletedTask, NullLogger<IpAllowlistMiddleware>.Instance);
 
         var ctx = new DefaultHttpContext();
+        ctx.RequestServices = _factory.Services;
         ctx.Connection.RemoteIpAddress = IPAddress.Parse("203.0.113.7");
         ctx.Request.Headers["X-RadioPad-Tenant"] = _factory.SeedTenant.Slug;
         ctx.Response.Body = new MemoryStream();
@@ -156,6 +157,7 @@ public class Iter31SecurityTests : IClassFixture<RadioPadAppFactory>
         var middleware = new IpAllowlistMiddleware(_ => { nextCalled = true; return Task.CompletedTask; }, NullLogger<IpAllowlistMiddleware>.Instance);
 
         var ctx = new DefaultHttpContext();
+        ctx.RequestServices = _factory.Services;
         ctx.Connection.RemoteIpAddress = IPAddress.Parse("10.1.2.3");
         ctx.Request.Headers["X-RadioPad-Tenant"] = _factory.SeedTenant.Slug;
 

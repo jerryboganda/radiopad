@@ -1,5 +1,6 @@
 using System.Text.Json;
 using Microsoft.EntityFrameworkCore;
+using RadioPad.Api.Auth;
 using RadioPad.Infrastructure.Persistence;
 
 namespace RadioPad.Api.Middleware;
@@ -11,8 +12,8 @@ namespace RadioPad.Api.Middleware;
 /// health surfaces stay reachable so an operator can recover the tenant.
 ///
 /// Runs after <see cref="IpAllowlistMiddleware"/> and before controllers.
-/// Tenant resolution mirrors the dev-tenant header pattern used by
-/// <c>TenantedController.ResolveContextAsync</c>.
+/// Tenant resolution uses the verified request identity, with explicit
+/// dev/test headers only when configured.
 /// </summary>
 public sealed class SuspensionGuardMiddleware
 {
@@ -45,7 +46,12 @@ public sealed class SuspensionGuardMiddleware
             return;
         }
 
-        var slug = ctx.Request.Headers["X-RadioPad-Tenant"].FirstOrDefault() ?? "dev";
+        var slug = RadioPadRequestIdentity.TenantSlugOrDevHeader(ctx);
+        if (string.IsNullOrWhiteSpace(slug))
+        {
+            await _next(ctx);
+            return;
+        }
 
         var tenant = await db.Tenants.AsNoTracking()
             .FirstOrDefaultAsync(t => t.Slug == slug, ctx.RequestAborted);

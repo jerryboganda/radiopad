@@ -1,4 +1,5 @@
 using System.Diagnostics;
+using RadioPad.Api.Auth;
 using RadioPad.Api.Services;
 
 namespace RadioPad.Api.Middleware;
@@ -7,8 +8,8 @@ namespace RadioPad.Api.Middleware;
 /// Iter-33 PERF-004 — records per-route HTTP request duration on the
 /// <c>radiopad.api.request.duration_ms</c> histogram. Tags:
 /// <c>route</c> (route template, falls back to <c>path</c> when no
-/// route was matched), <c>tenant</c> (the <c>X-RadioPad-Tenant</c>
-/// header or <c>(none)</c>), <c>status</c> (HTTP status code as string).
+/// route was matched), <c>tenant</c> (verified identity or <c>(none)</c>),
+/// <c>status</c> (HTTP status code as string).
 /// </summary>
 public sealed class PerfBudgetMiddleware
 {
@@ -38,7 +39,7 @@ public sealed class PerfBudgetMiddleware
                     ? $"{c}/{a}"
                     : ctx.Request.Path.Value ?? "(unknown)";
             }
-            var tenant = ctx.Request.Headers["X-RadioPad-Tenant"].ToString();
+            var tenant = RadioPadRequestIdentity.TenantSlugOrDevHeader(ctx);
             if (string.IsNullOrEmpty(tenant)) tenant = "(none)";
             PerfBudgets.ApiRequestDurationMs.Record(
                 sw.Elapsed.TotalMilliseconds,

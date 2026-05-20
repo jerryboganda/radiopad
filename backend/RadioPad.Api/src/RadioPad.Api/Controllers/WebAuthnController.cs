@@ -8,6 +8,7 @@ using RadioPad.Application.Abstractions;
 using RadioPad.Application.Services.WebAuthn;
 using RadioPad.Domain.Entities;
 using RadioPad.Domain.Enums;
+using RadioPad.Infrastructure.Identity;
 using RadioPad.Infrastructure.Persistence;
 
 namespace RadioPad.Api.Controllers;

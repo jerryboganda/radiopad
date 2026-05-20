@@ -1,18 +1,33 @@
-# RadioPad — HTTP API reference
+# RadioPad - HTTP API reference
 
 **Status:** Current  ·  **Owner:** Engineering  ·  **Last Updated:** 2026-05-20
 > Base URL: `http://127.0.0.1:7457` (development).
 > Development endpoints accept the tenant headers below. Production requests require either a validated RadioPad bearer (`Authorization: Bearer rp_...`), the HttpOnly `radiopad_session` cookie issued by browser sign-in flows, or a validated OIDC bearer projected by `OidcBearerMiddleware`; raw dev headers are accepted in production only when `RADIOPAD_DEV_HEADERS=1`. Public production exceptions are limited to health checks, billing webhook, magic-link request/consume, logout, and RFC 8628 device authorize/token bootstrap endpoints.
 
-## Auth headers (every request)
+## Auth and context headers
 
 | Header | Required | Notes |
 | --- | --- | --- |
-| `X-RadioPad-Tenant` | yes | Tenant slug (e.g. `dev`). Resolved by `TenantedController.ResolveContextAsync`. |
-| `X-RadioPad-User`   | yes | User email — must already exist in the tenant. |
+| `Authorization: Bearer rp_<opaque>` | production path | 12-hour RadioPad bearer bound to tenant, user, session epoch, and issued-at time. Current middleware also requires tenant/user lookup hints. |
+| `Authorization: Bearer <jwt>` | production path | OIDC JWT accepted when OIDC env configuration is enabled. |
+| `X-RadioPad-Tenant` | dev/test or lookup hint | Tenant slug. Authoritative only when dev/test headers are explicitly enabled. |
+| `X-RadioPad-User`   | dev/test or lookup hint | User email. Authoritative only when dev/test headers are explicitly enabled. |
 | `X-RadioPad-RequestId` | optional | Echoed back; auto-generated when missing. Used for log correlation and the `requestId` field on error responses. |
 
-Errors are RFC 7807 `application/problem+json` for unhandled exceptions. PHI/policy failures from `POST /api/reports/{id}/ai` are converted to a `403 Forbidden` JSON body `{ error, kind: "provider_policy" }` by the controller — the global handler is the safety net for everything else:
+Production login direction is generic OIDC Authorization Code + PKCE with
+magic-link fallback. Web sessions use the current bearer-backed `rp_session`
+HttpOnly/SameSite cookie where implemented, while native desktop/mobile store
+session material in OS secure storage. The web OIDC entry points are
+`GET /api/auth/oidc/authorize` and `GET /api/auth/oidc/callback`.
+
+`POST /api/auth/signin` is **dev/test-only** and fails closed unless explicit
+dev/test headers are enabled. Hosted deployments must use OIDC, magic link,
+SAML/WebAuthn/device flow, or another proof-based flow instead of exchanging a
+public tenant/user tuple.
+
+The enterprise identity foundation is backend-only in this release. `GlobalUser`, `ExternalIdentity`, `TenantMembership`, and `AuthSession` rows do not add public endpoints or response fields; `/api/tenant/me` continues to return the resolved tenant-scoped user.
+
+Errors are RFC 7807 `application/problem+json` for unhandled exceptions. PHI/policy failures from `POST /api/reports/{id}/ai` are converted to a `403 Forbidden` JSON body `{ error, kind: "provider_policy" }` by the controller - the global handler is the safety net for everything else:
 
 ```json
 {
@@ -20,11 +35,11 @@ Errors are RFC 7807 `application/problem+json` for unhandled exceptions. PHI/pol
   "title": "Internal error",
   "status": 500,
   "detail": "(safe summary)",
-  "requestId": "rq-9f2c…"
+  "requestId": "rq-9f2câ€¦"
 }
 ```
 
-Controller-handled provider policy failures return 403 `kind:"provider_policy"`. `ProviderPolicyException` raised outside those controller guards (or any unhandled propagation) is mapped by the global safety net to 409 with `type: policy/provider`. Unhandled exceptions → 500 with `type: internal/unhandled`. The audit log is **never** mutated by error handling.
+Controller-handled provider policy failures return 403 `kind:"provider_policy"`. `ProviderPolicyException` raised outside those controller guards (or any unhandled propagation) is mapped by the global safety net to 409 with `type: policy/provider`. Unhandled exceptions â†’ 500 with `type: internal/unhandled`. The audit log is **never** mutated by error handling.
 
 ## Health
 
@@ -33,14 +48,14 @@ Controller-handled provider policy failures return 403 `kind:"provider_policy"`.
 
 ## Tenant
 
-`GET /api/tenant/me` → resolved tenant + user.
+`GET /api/tenant/me` â†’ resolved tenant + user.
 
 ## Reports
 
 | Method | Path | Description |
 | --- | --- | --- |
-| GET    | `/api/reports`                  | List reports. Query: `modality`, `status` (int), `q`, `skip`, `take` (≤500). Response includes `X-Total-Count` header. |
-| POST   | `/api/reports`                  | Create. Body `CreateReportDto { modality, bodyPart, indication, comparison?, accessionNumber, rulebookId?, templateId? }`. → 201. |
+| GET    | `/api/reports`                  | List reports. Query: `modality`, `status` (int), `q`, `skip`, `take` (â‰¤500). Response includes `X-Total-Count` header. |
+| POST   | `/api/reports`                  | Create. Body `CreateReportDto { modality, bodyPart, indication, comparison?, accessionNumber, rulebookId?, templateId? }`. â†’ 201. |
 | GET    | `/api/reports/{id}`             | Get one. |
 | PATCH  | `/api/reports/{id}`             | Update sections. Each call also appends a `ReportVersion` snapshot. |
 | GET    | `/api/reports/{id}/versions`    | Recent edit history (most-recent 50). |
@@ -72,13 +87,13 @@ Controller-handled provider policy failures return 403 `kind:"provider_policy"`.
 
 ## Validation packs (Iter-35)
 
-Versioned, tenant-scoped bundles of golden test cases (`{report, expectFlagged}`) that a rulebook must pass before promotion. Lifecycle: `Draft` → `Approved` (Medical Director / IT Admin) → `Deprecated` (terminal — re-approval is rejected with `409 kind:"validation_packs"`).
+Versioned, tenant-scoped bundles of golden test cases (`{report, expectFlagged}`) that a rulebook must pass before promotion. Lifecycle: `Draft` â†’ `Approved` (Medical Director / IT Admin) â†’ `Deprecated` (terminal - re-approval is rejected with `409 kind:"validation_packs"`).
 
 | Method | Path | Role | Description |
 | --- | --- | --- | --- |
 | GET    | `/api/validation-packs` | any member | Optional `?rulebookId=`. Returns pack rows with `caseCount`. |
 | POST   | `/api/validation-packs` | MedicalDirector / ItAdmin | Body `{ rulebookId, version, name?, goldenCases: [{name?, report, expectFlagged?}] }`. 409 with `kind:"validation_packs"` on duplicate `(rulebookId, version)`. |
-| POST   | `/api/validation-packs/{id}/approve`   | MedicalDirector / ItAdmin | Promote `Draft → Approved`. Audits `ValidationPackApproved`. |
+| POST   | `/api/validation-packs/{id}/approve`   | MedicalDirector / ItAdmin | Promote `Draft â†’ Approved`. Audits `ValidationPackApproved`. |
 | POST   | `/api/validation-packs/{id}/deprecate` | MedicalDirector / ItAdmin | Mark `Deprecated` (terminal). Audits `ValidationPackDeprecated`. |
 | POST   | `/api/validation-packs/{id}/run`       | Radiologist+ | Execute the pack against the latest matching rulebook. Returns `{passed, failed, totalCases, failures: [{caseId, missing, unexpected}]}`. Audits `ValidationPackRun` with pass/fail counts. |
 | GET    | `/api/validation-packs/{id}/export`    | MedicalDirector / ItAdmin | Canonical export `{id, rulebookId, version, name, status, createdAt, approvedAt, cases}`. |
@@ -111,7 +126,7 @@ Public marketplace catalogue endpoints (`GET /api/marketplace/listings`, `GET /a
 Mutating non-billing `/api/*` endpoints can now return `402 Payment Required` with an RFC-7807 problem body:
 
 ```json
-// AI gateway plan-quota gate (PlanQuotaService → QuotaExceededException)
+// AI gateway plan-quota gate (PlanQuotaService â†’ QuotaExceededException)
 {
   "type": "billing/quota-exceeded",
   "title": "Plan quota exceeded",
@@ -204,7 +219,7 @@ Copilot endpoints are tenant-scoped and metadata-only in audit rows. Chat/sessio
 | Method | Path | Description |
 | --- | --- | --- |
 | GET | `/api/ai/routing/preview?phi=&modality=&input=&output=` | **Iter-32 AI-010.** Explains the gateway's routing decision for a hypothetical `(modality, phi, tokens)` tuple without performing a real AI call. Returns the chosen provider plus a per-candidate `costScore`, `qualityScore`, `latencyScore`, `compositeScore`, `eligible`, and `ineligibleReason`. Weights come from per-tenant `TenantSettings.RoutingWeightsJson` (default `{"cost":0.5,"quality":0.4,"latency":0.1}`). Tie-breaks use P95 24h latency from `AiRequest`. ItAdmin / MedicalDirector only. Audited as `RoutingPreviewQueried`. |
-| POST | `/api/ai/sandbox/compare` | **Iter-34 PROV-005.** Runs the same prompt across up to four sandbox-class providers serially and returns each `output`, `latencyMs`, `inputTokens`, `outputTokens`, plus a generic `error` string when a single provider failed. Body `{ reportId, mode, providerIds[] }` (1–4). Auth: Radiologist / MedicalDirector / ReportingAdmin / ItAdmin. Refuses `409 { kind:"sandbox_required" }` unless `Tenant.AllowSandboxRulebooks=true`; refuses `400 { kind:"providers_not_sandbox" }` when any provider is disabled, cross-tenant, or `Compliance != Sandbox`. PHI policy is still enforced inside `AiGateway.EnforcePhiPolicy` for every dispatch. Audits one wrapper `AiResponse` row with `details: { kind:"sandbox_compare", mode, providerCount }` in addition to the per-call rows the gateway writes. |
+| POST | `/api/ai/sandbox/compare` | **Iter-34 PROV-005.** Runs the same prompt across up to four sandbox-class providers serially and returns each `output`, `latencyMs`, `inputTokens`, `outputTokens`, plus a generic `error` string when a single provider failed. Body `{ reportId, mode, providerIds[] }` (1â€“4). Auth: Radiologist / MedicalDirector / ReportingAdmin / ItAdmin. Refuses `409 { kind:"sandbox_required" }` unless `Tenant.AllowSandboxRulebooks=true`; refuses `400 { kind:"providers_not_sandbox" }` when any provider is disabled, cross-tenant, or `Compliance != Sandbox`. PHI policy is still enforced inside `AiGateway.EnforcePhiPolicy` for every dispatch. Audits one wrapper `AiResponse` row with `details: { kind:"sandbox_compare", mode, providerCount }` in addition to the per-call rows the gateway writes. |
 
 ## Prompt overrides
 
@@ -212,14 +227,14 @@ Copilot endpoints are tenant-scoped and metadata-only in audit rows. Chat/sessio
 | --- | --- | --- |
 | GET    | `/api/prompts/overrides`              | List overrides for the current tenant. |
 | POST   | `/api/prompts/overrides`              | Upsert by `(rulebookId, blockKey)`. **Iter-32 AI-009:** every save lands as `Draft`; the row does not affect AI runtime until approved. MedicalDirector / ReportingAdmin. |
-| POST   | `/api/prompts/overrides/{id}/approve` | **Iter-32 AI-009.** Promote `Draft` → `Approved`. **MedicalDirector only** (separation of duties). Audited as `PromptOverrideApproved` with `bodyHash = sha256(body)`. |
+| POST   | `/api/prompts/overrides/{id}/approve` | **Iter-32 AI-009.** Promote `Draft` â†’ `Approved`. **MedicalDirector only** (separation of duties). Audited as `PromptOverrideApproved` with `bodyHash = sha256(body)`. |
 | DELETE | `/api/prompts/overrides/{id}`         | Delete override. MedicalDirector / ReportingAdmin. |
 
 `EfPromptOverrideStore.LoadAsync` only returns `Status == Approved` rows, so a draft body never reaches the AI gateway.
 
 ## Audit
 
-`GET /api/audit?from=…&to=…&take=200` → audit events (append-only, SHA-256 hash chain). Each event:
+`GET /api/audit?from=â€¦&to=â€¦&take=200` â†’ audit events (append-only, SHA-256 hash chain). Each event:
 
 ```ts
 {
@@ -234,13 +249,13 @@ Copilot endpoints are tenant-scoped and metadata-only in audit rows. Chat/sessio
 
 The `/audit/verify` UI recomputes the chain client-side.
 
-## Iter-30 — Terminology, Bidirectional FHIR, Bulk Invoice Export
+## Iter-30 - Terminology, Bidirectional FHIR, Bulk Invoice Export
 
 ### Terminology (STD-001 RadLex, STD-002 RADS)
 
 | Method | Path | Description |
 | --- | --- | --- |
-| GET | `/api/terminology/radlex/search?q=&take=20` | Prefix search across the curated RadLex® subset bundled with RadioPad. RadLex® is a registered trademark of RSNA. |
+| GET | `/api/terminology/radlex/search?q=&take=20` | Prefix search across the curated RadLexÂ® subset bundled with RadioPad. RadLexÂ® is a registered trademark of RSNA. |
 | GET | `/api/terminology/radlex/CodeSystem` | Minimal FHIR R4 `CodeSystem` resource (`content: "fragment"`). |
 | GET | `/api/terminology/rads?system=` | ACR RADS lookup. Without `system`, lists supported systems; with `system` (`bi_rads`, `li_rads`, `pi_rads`, `lung_rads`, `tirads`, `c_rads`) returns category codes + short labels only. No copyrighted prose; `publicGuidanceUrl` points to ACR. |
 
@@ -248,8 +263,8 @@ The `/audit/verify` UI recomputes the chain client-side.
 
 | Method | Path | Description |
 | --- | --- | --- |
-| POST | `/api/ingest/fhir/servicerequest` | Existing endpoint — now also captures the originating `ServiceRequest.id` into `Report.serviceRequestRef` so the eventual DiagnosticReport can be correlated. |
-| POST | `/api/ingest/fhir/diagnosticreport` | New (Iter-30). Accepts a FHIR R4 `DiagnosticReport` (or `Bundle` containing one). Maps `identifier[0].value`→`accessionNumber`, `code.coding[0].display`/`text`→`modality`, `category[0].text`→`bodyPart`, `conclusion`→`impression`, base64-decoded `presentedForm[0].data`→`findings`, `basedOn[0].reference`→`serviceRequestRef`. Creates a Draft report; audited as `ReportImported`. Same bearer-secret auth as `/order`. |
+| POST | `/api/ingest/fhir/servicerequest` | Existing endpoint - now also captures the originating `ServiceRequest.id` into `Report.serviceRequestRef` so the eventual DiagnosticReport can be correlated. |
+| POST | `/api/ingest/fhir/diagnosticreport` | New (Iter-30). Accepts a FHIR R4 `DiagnosticReport` (or `Bundle` containing one). Maps `identifier[0].value`â†’`accessionNumber`, `code.coding[0].display`/`text`â†’`modality`, `category[0].text`â†’`bodyPart`, `conclusion`â†’`impression`, base64-decoded `presentedForm[0].data`â†’`findings`, `basedOn[0].reference`â†’`serviceRequestRef`. Creates a Draft report; audited as `ReportImported`. Same bearer-secret auth as `/order`. |
 
 ### Tenant settings — security, integrations, and PACS vendor selector
 
@@ -314,7 +329,7 @@ configured or the tenant has no `StripeCustomerId`.
 | --- | --- | --- | --- |
 | POST | `/api/admin/security/test-webhook` | `ItAdmin` / `MedicalDirector` / `ComplianceReviewer` | Sends a synthetic non-PHI `SecurityAlert` payload to `RADIOPAD_SECURITY_WEBHOOK_URL` (or legacy `RADIOPAD_ANOMALY_WEBHOOK_URL`) and signs it with `RADIOPAD_SECURITY_WEBHOOK_SECRET` when present. Returns `{ sent, configured, statusCode }`; returns `{ configured:false, sent:false }` when no webhook is configured. |
 | POST | `/api/admin/observability/slo-alerts` | `ItAdmin` / `MedicalDirector` / `ComplianceReviewer` | Alertmanager (or compatible) webhook receiver. Appends one `SystemAlert` audit row summarising the payload (status, receiver, alert names, payload hash). Never stores PHI. |
-| GET  | `/api/admin/observability/availability` | `ItAdmin` / `ComplianceReviewer` | Iter-35 PERF-004 — last computed snapshot of the in-process synthetic availability monitor: `{ windowSec, totalProbes, errorCount, errorRate, lastCheckedAt, targets[] }`. Burn-rate breaches against `RADIOPAD_AVAILABILITY_BURN_RATE_THRESHOLD` are recorded as append-only `SystemAlert` audit rows with `kind="availability_burn_rate"`. |
+| GET  | `/api/admin/observability/availability` | `ItAdmin` / `ComplianceReviewer` | Iter-35 PERF-004 - last computed snapshot of the in-process synthetic availability monitor: `{ windowSec, totalProbes, errorCount, errorRate, lastCheckedAt, targets[] }`. Burn-rate breaches against `RADIOPAD_AVAILABILITY_BURN_RATE_THRESHOLD` are recorded as append-only `SystemAlert` audit rows with `kind="availability_burn_rate"`. |
 | GET | `/api/siem/status` | `ItAdmin` / `MedicalDirector` / `ComplianceReviewer` | Lists configured SIEM sinks and last-push status. |
 | GET | `/api/audit/siem?format=json\|cef` | `ItAdmin` / `MedicalDirector` / `ComplianceReviewer` | Snapshot export of the append-only audit chain for SIEM ingestion. |
 | GET/POST | `/scim/v2/Users` | `Authorization: Bearer <ScimBearerSecret>` + tenant header | SCIM 2.0 user list/create. Supports `userName eq "x"` filter. `ScimBearerSecret` may be stored as a literal test token or `env:NAME`; inactive users are omitted from list/search responses. |
@@ -343,7 +358,7 @@ configured or the tenant has no `StripeCustomerId`.
 | POST | /api/users/{id}/unlock | Compliance / IT-Admin clears `LockedUntil` and resets the failure counter; audits `UserUnlocked`. |
 | POST | /api/users/{id}/revoke-sessions | Compliance / IT-Admin increments `User.SessionEpoch`; every outstanding bearer fails HMAC validation; audits `SessionsRevoked`. |
 
-OIDC presets (`RADIOPAD_OIDC_PRESET=keycloak|auth0|okta`) auto-fill `RADIOPAD_OIDC_TENANT_CLAIM`, `RADIOPAD_OIDC_EMAIL_CLAIM` and `RADIOPAD_OIDC_REQUIRE_MFA` for the IdPs supported in v0.3. Presets never overwrite explicit env values.
+OIDC presets (`RADIOPAD_OIDC_PRESET=keycloak|auth0|okta`) auto-fill `RADIOPAD_OIDC_TENANT_CLAIM`, `RADIOPAD_OIDC_EMAIL_CLAIM` and `RADIOPAD_OIDC_REQUIRE_MFA` for supported IdP profiles. Presets never overwrite explicit env values. Production policy is generic OIDC Authorization Code + PKCE; provider-specific presets are configuration shortcuts, not separate auth architectures.
 
 OIDC bearer projection validates the external JWT and then re-checks the mapped RadioPad tenant/user row. Missing tenants, inactive users, and locked users are rejected before tenant headers are injected.
 

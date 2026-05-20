@@ -11,6 +11,7 @@ using RadioPad.Api.Auth;
 using RadioPad.Application.Abstractions;
 using RadioPad.Domain.Entities;
 using RadioPad.Domain.Enums;
+using RadioPad.Infrastructure.Identity;
 using RadioPad.Infrastructure.Persistence;
 
 namespace RadioPad.Api.Controllers;

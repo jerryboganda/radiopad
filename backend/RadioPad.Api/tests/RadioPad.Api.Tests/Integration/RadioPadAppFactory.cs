@@ -4,6 +4,7 @@ using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
 using RadioPad.Domain.Entities;
 using RadioPad.Domain.Enums;
+using RadioPad.Infrastructure.Identity;
 using RadioPad.Infrastructure.Persistence;
 using Xunit;
 
@@ -29,6 +30,7 @@ public class RadioPadAppFactory : WebApplicationFactory<Program>, IAsyncLifetime
     {
         builder.UseEnvironment("Testing");
         builder.UseSetting("ConnectionStrings:RadioPad", $"Data Source={DbPath}");
+        builder.UseSetting("RadioPad:DevHeaders", "true");
     }
 
     public async Task InitializeAsync()
@@ -86,6 +88,7 @@ public class RadioPadAppFactory : WebApplicationFactory<Program>, IAsyncLifetime
         };
         db.Providers.Add(MockProvider);
         await db.SaveChangesAsync();
+        await EnterpriseIdentityBridge.EnsureForAllUsersAsync(db, CancellationToken.None);
     }
 
     public new Task DisposeAsync()

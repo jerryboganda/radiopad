@@ -16,7 +16,11 @@ servers:
     description: Hosted (planned)
 
 security:
-  - TenantHeader: []
+  - RadioPadBearer: []
+    TenantHeader: []
+    UserHeader: []
+  - BearerJwt: []
+  - RadioPadSessionCookie: []
 
 components:
   securitySchemes:
@@ -24,10 +28,21 @@ components:
       type: apiKey
       in: header
       name: X-RadioPad-Tenant
+      description: Tenant slug. Authoritative only in explicit dev/test mode; used as a lookup hint for current rp_ bearers.
     UserHeader:
       type: apiKey
       in: header
       name: X-RadioPad-User
+      description: User email. Authoritative only in explicit dev/test mode; used as a lookup hint for current rp_ bearers.
+    RadioPadBearer:
+      type: http
+      scheme: bearer
+      bearerFormat: rp_ opaque HMAC bearer
+    RadioPadSessionCookie:
+      type: apiKey
+      in: cookie
+      name: rp_session
+      description: HttpOnly/SameSite bearer-backed web session cookie set by current auth flows.
     BearerJwt:
       type: http
       scheme: bearer
@@ -212,6 +227,18 @@ components:
             - ip_allowlist_unavailable
         traceId: { type: string }
 
+    AuthSession:
+      type: object
+      required: [id, method, issuedAt, expiresAt, revokedAt, revocationReason, isCurrent]
+      properties:
+        id: { type: string, format: uuid }
+        method: { type: string }
+        issuedAt: { type: string, format: date-time }
+        expiresAt: { type: string, format: date-time }
+        revokedAt: { type: string, format: date-time, nullable: true }
+        revocationReason: { type: string, nullable: true }
+        isCurrent: { type: boolean }
+
     ReportStatus:
       type: integer
       description: 0=Draft, 1=Validated, 2=Acknowledged, 3=Exported
@@ -245,7 +272,7 @@ components:
     BillingStatus:
       type: object
       description: |
-        PRD BILL-002/004 — current subscription + lifecycle state. Surfaces
+        PRD BILL-002/004 - current subscription + lifecycle state. Surfaces
         only the tenant plan/lifecycle fields needed by the admin UI. Raw
         Stripe customer/subscription identifiers are never returned here.
       properties:
@@ -253,7 +280,7 @@ components:
         subscriptionStatus:
           type: string
           nullable: true
-          description: Stripe subscription status (`trialing`, `active`, `past_due`, `canceled`, …) when present.
+          description: Stripe subscription status (`trialing`, `active`, `past_due`, `canceled`, â€¦) when present.
         trialEndsAt: { type: string, format: date-time, nullable: true }
         currentPeriodEnd: { type: string, format: date-time, nullable: true }
         gracePeriodUntil: { type: string, format: date-time, nullable: true, description: "Mutating endpoints continue to work until this instant after a failed payment; expired grace is treated as suspended." }
@@ -263,7 +290,7 @@ components:
     BillingCredits:
       type: object
       description: |
-        PRD BILL-002 / BILL-007 — month-to-date AI credit balance against
+        PRD BILL-002 / BILL-007 - month-to-date AI credit balance against
         the tenant's plan limits, plus the Trial-end timestamp. Mirrors the
         numbers `PlanQuotaService` evaluates inside the AI gateway, so the
         admin UI shows the same totals that gate live requests.
@@ -271,7 +298,7 @@ components:
       properties:
         plan: { type: string, enum: [Trial, Team, Enterprise] }
         periodStart: { type: string, format: date-time, description: "Start of the current billing month (UTC)." }
-        periodEnd: { type: string, format: date-time, description: "Reset instant — start of the next billing month (UTC)." }
+        periodEnd: { type: string, format: date-time, description: "Reset instant - start of the next billing month (UTC)." }
         used:
           type: object
           required: [calls, inputTokens, outputTokens]
@@ -314,7 +341,7 @@ components:
       type: object
       required: [paymentIntentId]
       properties:
-        paymentIntentId: { type: string, description: "Stripe PaymentIntent id (`pi_…`) to refund." }
+        paymentIntentId: { type: string, description: "Stripe PaymentIntent id (`pi_â€¦`) to refund." }
         amountCents: { type: integer, nullable: true, minimum: 1, description: "Optional partial-refund amount in the smallest currency unit. Omit for a full refund." }
         reason:
           type: string
@@ -324,7 +351,7 @@ components:
     MarketplaceConnectStatus:
       type: object
       description: |
-        PRD MKT-006 — Stripe Connect onboarding state for the active tenant
+        PRD MKT-006 - Stripe Connect onboarding state for the active tenant
         (the publisher). Buyer-side checkout is gated on `chargesEnabled`.
       properties:
         onboarded: { type: boolean }
@@ -447,7 +474,7 @@ components:
             Iter-34 PROV-009 — operator-supplied free-text data-retention label
             shown alongside `compliance`. Examples: `no-egress`,
             `30d-soft-delete`, `vendor-controlled-zdr`, `baa-30d`,
-            `local-only-no-retention`. Informational only — never weakens the
+            `local-only-no-retention`. Informational only - never weakens the
             PHI policy enforced in `AiGateway.EnforcePhiPolicy`.
           default: ""
           example: "baa-30d"
@@ -657,9 +684,9 @@ paths:
       parameters: [{ in: path, name: id, required: true, schema: { type: string, format: uuid } }]
       responses:
         "200":
-          description: Acknowledged (Validated → Acknowledged)
+          description: Acknowledged (Validated â†’ Acknowledged)
         "409":
-          description: Conflict — not in Validated state (`kind=report_state`) or strict tenant validation still has blockers (`kind=validation_blockers`).
+          description: Conflict - not in Validated state (`kind=report_state`) or strict tenant validation still has blockers (`kind=validation_blockers`).
           content:
             application/problem+json:
               schema: { $ref: "#/components/schemas/Problem" }
@@ -680,7 +707,7 @@ paths:
             text/plain:
               schema: { type: string }
         "409":
-          description: Conflict — report is not Acknowledged/Exported (kind=report_state). Preview text export is the only draft-safe export path.
+          description: Conflict - report is not Acknowledged/Exported (kind=report_state). Preview text export is the only draft-safe export path.
           content:
             application/problem+json:
               schema: { $ref: "#/components/schemas/Problem" }
@@ -696,7 +723,7 @@ paths:
             application/json:
               schema: { type: object }
         "409":
-          description: Conflict — report is not Acknowledged/Exported (kind=report_state).
+          description: Conflict - report is not Acknowledged/Exported (kind=report_state).
           content:
             application/problem+json:
               schema: { $ref: "#/components/schemas/Problem" }
@@ -712,7 +739,7 @@ paths:
             application/fhir+json:
               schema: { type: object }
         "409":
-          description: Conflict — report is not Acknowledged/Exported (kind=report_state).
+          description: Conflict - report is not Acknowledged/Exported (kind=report_state).
           content:
             application/problem+json:
               schema: { $ref: "#/components/schemas/Problem" }
@@ -784,8 +811,8 @@ paths:
   /api/rulebooks/{id}/rollback:
     post:
       summary: |
-        PRD RB-008 — roll back to a prior approved version. Materialises a
-        new approved rulebook row whose version carries a `+rollback-…`
+        PRD RB-008 - roll back to a prior approved version. Materialises a
+        new approved rulebook row whose version carries a `+rollback-â€¦`
         suffix; existing rows are never mutated.
       parameters: [{ in: path, name: id, required: true, schema: { type: string, format: uuid } }]
       requestBody:
@@ -1056,7 +1083,7 @@ paths:
 
   /api/providers/{id}/oauth/refresh-token:
     post:
-      summary: Iter-35 PROV-007 — save (or replace) the per-provider OAuth refresh token in the encrypted vault. ItAdmin / BillingAdmin only. Audited as `OAuthRefreshRotated` with `kind:"saved"`; never returns or logs ciphertext.
+      summary: Iter-35 PROV-007 - save (or replace) the per-provider OAuth refresh token in the encrypted vault. ItAdmin / BillingAdmin only. Audited as `OAuthRefreshRotated` with `kind:"saved"`; never returns or logs ciphertext.
       parameters: [{ in: path, name: id, required: true, schema: { type: string, format: uuid } }]
       requestBody:
         required: true
@@ -1075,13 +1102,13 @@ paths:
       responses:
         "204": { description: Token saved. }
         "403":
-          description: RBAC failure — caller is not ItAdmin / BillingAdmin.
+          description: RBAC failure - caller is not ItAdmin / BillingAdmin.
           content:
             application/problem+json:
               schema: { $ref: "#/components/schemas/Problem" }
         "404": { description: Provider not found in the active tenant. }
         "503":
-          description: KMS unavailable — tenant has no `CmkKeyRef` and `RADIOPAD_TENANT_KEK_DEFAULT` is unset.
+          description: KMS unavailable - tenant has no `CmkKeyRef` and `RADIOPAD_TENANT_KEK_DEFAULT` is unset.
           content:
             application/json:
               schema:
@@ -1090,7 +1117,7 @@ paths:
                   error: { type: string }
                   kind: { type: string, enum: [kms_unavailable] }
     delete:
-      summary: Iter-35 PROV-007 — delete the stored OAuth refresh token. Clears all ciphertext columns; rotation policy is preserved. ItAdmin / BillingAdmin only. Audited as `OAuthRefreshRotated` with `kind:"deleted"`.
+      summary: Iter-35 PROV-007 - delete the stored OAuth refresh token. Clears all ciphertext columns; rotation policy is preserved. ItAdmin / BillingAdmin only. Audited as `OAuthRefreshRotated` with `kind:"deleted"`.
       parameters: [{ in: path, name: id, required: true, schema: { type: string, format: uuid } }]
       responses:
         "204": { description: Token deleted. }
@@ -1099,7 +1126,7 @@ paths:
 
   /api/providers/{id}/oauth/refresh-token/status:
     get:
-      summary: Iter-35 PROV-007 — non-secret status of the refresh-token vault. NEVER returns ciphertext, IV, tag, or wrapped DEK. ItAdmin / BillingAdmin only.
+      summary: Iter-35 PROV-007 - non-secret status of the refresh-token vault. NEVER returns ciphertext, IV, tag, or wrapped DEK. ItAdmin / BillingAdmin only.
       parameters: [{ in: path, name: id, required: true, schema: { type: string, format: uuid } }]
       responses:
         "200":
@@ -1120,7 +1147,7 @@ paths:
 
   /api/ai/routing/preview:
     get:
-      summary: Iter-32 AI-010 — explain the gateway's composite routing decision for a hypothetical request without performing a real AI call. ItAdmin / MedicalDirector only.
+      summary: Iter-32 AI-010 - explain the gateway's composite routing decision for a hypothetical request without performing a real AI call. ItAdmin / MedicalDirector only.
       parameters:
         - in: query
           name: phi
@@ -1176,7 +1203,7 @@ paths:
   /api/ai/sandbox/compare:
     post:
       summary: |
-        PRD PROV-005 (iter-34) — run the same prompt across up to four sandbox-class providers and return each output side-by-side.
+        PRD PROV-005 (iter-34) - run the same prompt across up to four sandbox-class providers and return each output side-by-side.
         Auth: Radiologist | MedicalDirector | ReportingAdmin | ItAdmin.
         Refuses with `409 { kind: "sandbox_required" }` when `Tenant.AllowSandboxRulebooks` is false.
         Refuses with `400 { kind: "providers_not_sandbox" }` when any provider is disabled, not tenant-owned, or not `ProviderComplianceClass.Sandbox`.
@@ -1198,7 +1225,7 @@ paths:
 
   /api/prompts/overrides:
     get:
-      summary: Iter-31/32 AI-009 — list prompt-block overrides (Draft + Approved) for the current tenant.
+      summary: Iter-31/32 AI-009 - list prompt-block overrides (Draft + Approved) for the current tenant.
       responses:
         "200":
           description: OK
@@ -1217,7 +1244,7 @@ paths:
                     approvedByUserId: { type: string, format: uuid, nullable: true }
                     approvedAt: { type: string, format: date-time, nullable: true }
     post:
-      summary: Upsert a prompt override. Iter-32 AI-009 — every save lands as `Draft` and never reaches the AI runtime until approved.
+      summary: Upsert a prompt override. Iter-32 AI-009 - every save lands as `Draft` and never reaches the AI runtime until approved.
       requestBody:
         required: true
         content:
@@ -1243,7 +1270,7 @@ paths:
 
   /api/prompts/overrides/{id}/approve:
     post:
-      summary: Iter-32 AI-009 — promote a Draft override to Approved. **MedicalDirector only** (separation of duties). Audited as `PromptOverrideApproved`.
+      summary: Iter-32 AI-009 - promote a Draft override to Approved. **MedicalDirector only** (separation of duties). Audited as `PromptOverrideApproved`.
       parameters: [{ in: path, name: id, required: true, schema: { type: string, format: uuid } }]
       responses:
         "200":
@@ -1363,7 +1390,7 @@ paths:
   /api/audit/verify:
     get:
       summary: |
-        PRD §13.2 / AUTH-006 — re-compute the SHA-256 integrity chain across
+        PRD §13.2 / AUTH-006 - re-compute the SHA-256 integrity chain across
         every audit event for the active tenant. Restricted to compliance /
         IT roles (kind=forbidden otherwise).
       responses:
@@ -1419,7 +1446,7 @@ paths:
                     type: number
                     format: double
                     description: |
-                      Iter-34 BILL-005 — total USD cost for the window, summed
+                      Iter-34 BILL-005 - total USD cost for the window, summed
                       across `byProvider[].costTotalUsd`. Zero when no current
                       `ProviderConfig` matches any historical `AiRequest.Provider`.
                   byProvider:
@@ -1458,7 +1485,7 @@ paths:
   /api/tenant/settings:
     get:
       summary: |
-        PRD AI-007 + BILL-001 — read tenant-level admin settings
+        PRD AI-007 + BILL-001 - read tenant-level admin settings
         (hallucination detector, plan, feature flags). Auto-creates a default
         row on first read.
       responses:
@@ -1558,7 +1585,7 @@ paths:
 
   /api/reports/{id}/export/pdf:
     get:
-      summary: PRD RPT-011 — PDF export (RPT-012 gated; requires Status>=Acknowledged)
+      summary: PRD RPT-011 - PDF export (RPT-012 gated; requires Status>=Acknowledged)
       parameters: [{ in: path, name: id, required: true, schema: { type: string, format: uuid } }]
       responses:
         "200":
@@ -1572,7 +1599,7 @@ paths:
 
   /api/reports/{id}/export/docx:
     get:
-      summary: PRD RPT-011 — DOCX export (RPT-012 gated; requires Status>=Acknowledged)
+      summary: PRD RPT-011 - DOCX export (RPT-012 gated; requires Status>=Acknowledged)
       parameters: [{ in: path, name: id, required: true, schema: { type: string, format: uuid } }]
       responses:
         "200":
@@ -1587,7 +1614,7 @@ paths:
   /api/billing/checkout:
     post:
       summary: |
-        PRD BILL-001 — start a Stripe Checkout session.
+        PRD BILL-001 - start a Stripe Checkout session.
         Returns the URL to redirect the browser to.
       requestBody:
         required: true
@@ -1615,7 +1642,7 @@ paths:
 
   /api/billing/portal:
     post:
-      summary: PRD BILL-006 — open the Stripe Billing Portal for the tenant.
+      summary: PRD BILL-006 - open the Stripe Billing Portal for the tenant.
       requestBody:
         required: true
         content:
@@ -1643,7 +1670,7 @@ paths:
         accepted for one release) and updates `TenantSettings`. Events are
         deduplicated against `StripeWebhookEvents` by `(Source, EventId)` so
         retried deliveries are idempotent without colliding with marketplace
-        webhook events. UNAUTHENTICATED — security comes from signature
+        webhook events. UNAUTHENTICATED - security comes from signature
         verification.
 
         Iter-36 supported event types: `checkout.session.completed`,
@@ -1694,7 +1721,7 @@ paths:
   /api/billing/status:
     get:
       summary: |
-        PRD BILL-002/004 — current plan, subscription status, trial / grace /
+        PRD BILL-002/004 - current plan, subscription status, trial / grace /
         suspended timestamps, and whether the tenant has a Stripe customer.
         Read-only; tenant-scoped.
       responses:
@@ -1707,7 +1734,7 @@ paths:
   /api/billing/credits:
     get:
       summary: |
-        PRD BILL-002 / BILL-007 — month-to-date AI credit balance (calls +
+        PRD BILL-002 / BILL-007 - month-to-date AI credit balance (calls +
         input/output tokens) against the tenant's plan limits, plus the
         Trial-end timestamp when the tenant is still on the Trial plan.
         Reuses `PlanQuotaService` so the values shown in the admin UI
@@ -1722,7 +1749,7 @@ paths:
   /api/billing/invoices:
     get:
       summary: |
-        PRD BILL-005 — list Stripe invoices for the tenant's customer record.
+        PRD BILL-005 - list Stripe invoices for the tenant's customer record.
         Returns at most 20 invoices, newest first.
       responses:
         "200":
@@ -1738,7 +1765,7 @@ paths:
   /api/billing/refund:
     post:
       summary: |
-        PRD BILL-007 — issue a refund against a tenant payment. RBAC-gated
+        PRD BILL-007 - issue a refund against a tenant payment. RBAC-gated
         (`BillingAdmin` / `ItAdmin`). Validates amount/reason locally and
         verifies the PaymentIntent belongs to the current tenant before issuing
         the refund. Carries a deterministic `Idempotency-Key`; audited as
@@ -1818,7 +1845,7 @@ paths:
   /api/marketplace/connect/status:
     get:
       summary: |
-        PRD MKT-006 — Stripe Connect onboarding state for the active tenant
+        PRD MKT-006 - Stripe Connect onboarding state for the active tenant
         (the publisher). When `chargesEnabled` is false, buyer checkout
         against any of this tenant's listings returns 409
         `kind:"connect_not_ready"`.
@@ -1834,7 +1861,7 @@ paths:
   /api/marketplace/purchases/{id}/refund:
     post:
       summary: |
-        PRD MKT-006 — refund a marketplace purchase. RBAC-gated
+        PRD MKT-006 - refund a marketplace purchase. RBAC-gated
         (`MedicalDirector` / `ItAdmin`). Reverses both the platform fee and
         the publisher transfer. Idempotency-Key on every Stripe call;
         audited as `BillingChanged` with PII hashed.
@@ -1877,7 +1904,7 @@ paths:
   /api/ingest/order:
     post:
       summary: |
-        PRD INT-001..004 — inbound HL7/FHIR order webhook. Authenticates with
+        PRD INT-001..004 - inbound HL7/FHIR order webhook. Authenticates with
         `X-RadioPad-Tenant: <slug>` + `Authorization: Bearer <secret>`; the
         bearer is compared in constant time to
         `TenantSettings.IngestBearerSecret`. Idempotent on `accessionNumber`.
@@ -1914,7 +1941,7 @@ paths:
   /api/reports/{id}/dicom-context:
     get:
       summary: |
-        PRD DCM-001..006 — fetch DICOMweb study context for the report's
+        PRD DCM-001..006 - fetch DICOMweb study context for the report's
         accession number using the tenant-configured PACS. Always returns 200;
         `study` is null when DICOMweb is not configured or the study is not
         found. Audited as `DicomContextFetched`.
@@ -1942,7 +1969,7 @@ paths:
   /api/reports/{id}/dicom-context/instance:
     get:
       summary: |
-        PRD STD-004 / iter-31 — WADO-RS instance metadata (DICOM JSON Model)
+        PRD STD-004 / iter-31 - WADO-RS instance metadata (DICOM JSON Model)
         for a specific (study, series, instance) tuple. Returns 200 with
         `configured: false` when DICOMweb is not configured. Audited as
         `DicomContextFetched` with `details.scope = "instance"`.
@@ -1975,7 +2002,7 @@ paths:
   /api/reports/{id}/compare-prior:
     get:
       summary: |
-        PRD RPT-009 / iter-31 — side-by-side section diff between the
+        PRD RPT-009 / iter-31 - side-by-side section diff between the
         current report and the most recent prior report for the same body
         part within the tenant. `prior` is null when no prior exists.
         Each `sections[i].changed` is true when the trimmed section bodies
@@ -2017,7 +2044,7 @@ paths:
   /api/ingest/fhir/servicerequest:
     post:
       summary: |
-        PRD INT-002 — accept a FHIR R4 `ServiceRequest` resource (or a
+        PRD INT-002 - accept a FHIR R4 `ServiceRequest` resource (or a
         `Bundle` containing one) and translate it into the same Draft report
         as `/api/ingest/order`. Same authentication. Accession is taken from
         `identifier[0].value`; modality from `code.coding[0].display` or
@@ -2028,7 +2055,7 @@ paths:
           name: X-RadioPad-Signature
           required: false
           description: |
-            Iter-31 INT-005 — HMAC-SHA256 of the raw body, hex-encoded,
+            Iter-31 INT-005 - HMAC-SHA256 of the raw body, hex-encoded,
             prefixed with `sha256=`. Required only when the tenant has set
             `FhirWebhookSecret`. When set, both this signature AND the bearer
             must validate; mismatches return 401 and audit `PolicyViolation`
@@ -2057,6 +2084,8 @@ paths:
 
   /api/auth/signin:
     post:
+      x-radiopad-environment: dev-test-only
+      x-radiopad-auth-note: Hosted deployments must use OIDC, magic-link, SAML, WebAuthn, device flow, or another proof-based flow; this tuple exchange is disabled unless explicit dev/test headers are enabled.
       summary: |
         PRD AUTH-001 (dev tier) — exchange a tenant slug + user email for an
         opaque bearer token and set the HttpOnly `radiopad_session` cookie for
@@ -2094,7 +2123,121 @@ paths:
       responses:
         "204": { description: Session cookie cleared. }
         "400": { description: Missing tenant/user. }
-        "401": { description: Unknown tenant or user not a member. }
+        "401": { description: Dev sign-in disabled, unknown tenant, or user not a member. }
+
+  /api/auth/oidc/authorize:
+    get:
+      summary: Start generic OIDC Authorization Code + PKCE sign-in.
+      description: Redirects to the configured IdP authorization endpoint. Requires `RADIOPAD_OIDC_AUTHORITY` and `RADIOPAD_OIDC_CLIENT_ID` or `RADIOPAD_OIDC_AUDIENCE`.
+      parameters:
+        - in: query
+          name: returnUrl
+          required: false
+          schema: { type: string }
+          description: Same-origin or relative app URL to return to after callback; unsafe values fall back to `/`.
+      responses:
+        "302": { description: Redirect to IdP authorization endpoint. }
+        "503": { description: OIDC is not configured. }
+
+  /api/auth/oidc/callback:
+    get:
+      summary: Complete generic OIDC Authorization Code + PKCE sign-in.
+      description: Exchanges the authorization code, validates issuer/audience/lifetime/signature and tenant/email/MFA claims, mints a RadioPad session, appends `rp_session`, and redirects back to the safe return URL.
+      parameters:
+        - in: query
+          name: code
+          required: false
+          schema: { type: string }
+        - in: query
+          name: state
+          required: false
+          schema: { type: string }
+        - in: query
+          name: error
+          required: false
+          schema: { type: string }
+      responses:
+        "302": { description: Session created and browser redirected to the app. }
+        "401": { description: Invalid state, token, tenant/user membership, or MFA claim. }
+        "503": { description: OIDC is not configured. }
+
+  /api/auth/session:
+    get:
+      summary: Return the current bearer/cookie session inventory row.
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [tenant, user, session]
+                properties:
+                  tenant:
+                    type: object
+                    properties:
+                      slug: { type: string }
+                      displayName: { type: string }
+                  user:
+                    type: object
+                    properties:
+                      email: { type: string, format: email }
+                      displayName: { type: string }
+                      role: { type: integer }
+                  session:
+                    nullable: true
+                    allOf:
+                      - $ref: "#/components/schemas/AuthSession"
+        "401": { description: Missing bearer/cookie session or invalid identity. }
+
+  /api/auth/sessions:
+    get:
+      summary: List active, unexpired sessions for the current tenant user.
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [sessions]
+                properties:
+                  sessions:
+                    type: array
+                    items:
+                      $ref: "#/components/schemas/AuthSession"
+
+  /api/auth/sessions/{sessionId}/revoke:
+    post:
+      summary: Revoke one current-user session inventory row; audits `SessionsRevoked`.
+      x-radiopad-step-up-mfa: required-in-production
+      parameters:
+        - { in: path, name: sessionId, required: true, schema: { type: string, format: uuid } }
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  ok: { type: boolean }
+                  revoked: { type: boolean }
+        "404": { description: Session not found for the current user. }
+
+  /api/auth/logout:
+    post:
+      summary: Clear the `rp_session` cookie and revoke the current session when present.
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  ok: { type: boolean }
+                  revoked: { type: boolean }
 
   /api/auth/oidc/authorize-url:
     get:
@@ -2126,7 +2269,7 @@ paths:
   /api/usage/analytics:
     get:
       summary: |
-        PRD §18 — aggregated product + governance KPIs for the Analytics
+        PRD §18 - aggregated product + governance KPIs for the Analytics
         dashboard. Tenant-scoped. Default window is the last 30 days.
       parameters:
         - in: query
@@ -2169,7 +2312,7 @@ paths:
   /api/reports/{id}/export/hl7:
     get:
       summary: |
-        PRD §19.1 / Beta — HL7 v2.5 ORU^R01 export of an acknowledged report.
+        PRD §19.1 / Beta - HL7 v2.5 ORU^R01 export of an acknowledged report.
         Subject to RPT-012 gating: returns 409 unless the report is at least
         `Acknowledged`. Audits `ReportExported` with `format:"hl7"`.
       parameters:
@@ -2189,7 +2332,7 @@ paths:
   /api/audit/siem:
     get:
       summary: |
-        PRD §19 / Beta — SIEM log export. Streams the tenant audit chain in
+        PRD §19 / Beta - SIEM log export. Streams the tenant audit chain in
         either NDJSON (`format=json`) or ArcSight CEF (`format=cef`) for
         ingestion into Splunk / Elastic / QRadar / Sentinel. Restricted to
         Compliance / IT / Medical Director roles. PHI minimisation: only ids,
@@ -2246,7 +2389,7 @@ paths:
         - TenantHeader: []
           ScimBearer: []
       summary: |
-        PRD AUTH-005 — SCIM 2.0 list users (RFC 7644). Tenant-scoped via
+        PRD AUTH-005 - SCIM 2.0 list users (RFC 7644). Tenant-scoped via
         `X-RadioPad-Tenant` + `Authorization: Bearer <ScimBearerSecret>`.
         Supports the minimal `userName eq "x"` filter used by Okta /
         Azure AD provisioning agents.
@@ -2305,14 +2448,15 @@ paths:
           ScimBearer: []
       summary: |
         SCIM 2.0 patch user. Supports `replace` of `active`, `displayName`,
-        and `name.formatted`. Used by Okta / Azure AD on deprovision.
+        and
+ame.formatted`. Used by Okta / Azure AD on deprovision.
       responses:
         "200": { description: Patched. }
     delete:
       security:
         - TenantHeader: []
           ScimBearer: []
-      summary: SCIM 2.0 delete user (soft-delete — sets active=false).
+      summary: SCIM 2.0 delete user (soft-delete - sets active=false).
       responses:
         "204": { description: No content. }
 
@@ -2322,7 +2466,7 @@ paths:
         - TenantHeader: []
           ScimBearer: []
       summary: |
-        PRD AUTH-005 — SCIM 2.0 list groups (RFC 7644). Tenant-scoped via
+        PRD AUTH-005 - SCIM 2.0 list groups (RFC 7644). Tenant-scoped via
         `X-RadioPad-Tenant` + `Authorization: Bearer <ScimBearerSecret>`.
         Supports the minimal `displayName eq "x"` filter used by Okta /
         Azure AD provisioning agents.
@@ -2418,14 +2562,14 @@ paths:
   /api/tenant/settings/kms/verify:
     post:
       summary: |
-        PRD SEC-003 — verify the configured customer-managed key (CMK) by
+        PRD SEC-003 - verify the configured customer-managed key (CMK) by
         performing a real wrap+unwrap round-trip of a 32-byte probe.
         Stamps `cmk.lastVerifiedAt` on a successful round-trip. Restricted
         to IT / Compliance / Medical Director roles. Schemes: `env:`,
         `local:`, `aws:`, `azkv:`, `gcp:`.
       responses:
         "200":
-          description: OK — round-trip succeeded.
+          description: OK - round-trip succeeded.
           content:
             application/json:
               schema:
@@ -2454,7 +2598,7 @@ paths:
   /api/tenant/settings/locale:
     get:
       summary: |
-        Iter-35 i18n — read the tenant default UI locale and the locked
+        Iter-35 i18n - read the tenant default UI locale and the locked
         supported set. Affects chrome only; clinical content is never
         translated.
       responses:
@@ -2471,7 +2615,7 @@ paths:
                     items: { type: string, enum: [en, es, de, fr, pt, hi] }
     put:
       summary: |
-        Iter-35 i18n — set the tenant default UI locale. Restricted to
+        Iter-35 i18n - set the tenant default UI locale. Restricted to
         ``ItAdmin`` and ``MedicalDirector``. Returns 400 ``kind:"validation"``
         when the body locale is not in the supported set.
       requestBody:
@@ -2506,9 +2650,10 @@ paths:
   /api/users/me/locale:
     put:
       summary: |
-        Iter-35 i18n — set or clear the per-user locale override on
+        Iter-35 i18n - set or clear the per-user locale override on
         ``User.PreferredLocale``. Any tenant member may write their own
-        override; ``null`` clears the override and the UI falls back to
+        override; `
+ull`` clears the override and the UI falls back to
         the tenant default.
       requestBody:
         required: true
@@ -2539,7 +2684,7 @@ paths:
 
   /api/auth/mfa/enroll:
     post:
-      summary: PRD AUTH-003 — begin TOTP enrollment. Returns base32 secret + otpauth URI.
+      summary: PRD AUTH-003 - begin TOTP enrollment. Returns base32 secret + otpauth URI.
       responses:
         "200": { description: OK }
         "404": { description: User not found. }
@@ -2588,7 +2733,7 @@ paths:
         "200": { description: OK }
         "400": { description: Pending or rejected per RFC 8628. }
 
-  # --- PRD AUTH-001 / INT-002 — SAML 2.0 SP (iter-32) ---
+  # --- PRD AUTH-001 / INT-002 - SAML 2.0 SP (iter-32) ---
   /saml/metadata:
     get:
       summary: SAML 2.0 Service Provider metadata document.
@@ -2614,7 +2759,7 @@ paths:
         "400": { description: Malformed assertion. }
         "401": { description: Signature invalid or tenant/user not found. }
 
-  # --- PRD AUTH-001 — WebAuthn / passkeys (iter-32) ---
+  # --- PRD AUTH-001 - WebAuthn / passkeys (iter-32) ---
   /api/auth/webauthn/register-options:
     post:
       summary: Begin WebAuthn registration; returns PublicKeyCredentialCreationOptions.
@@ -2638,9 +2783,11 @@ paths:
         "200": { description: OK }
         "401": { description: Assertion invalid. }
 
-  # --- PRD AUTH-006 — emergency lockout / session revocation (iter-32) ---
+  # --- PRD AUTH-006 - emergency lockout / session revocation (iter-32) ---
   /api/users/{id}/unlock:
     post:
+      x-radiopad-permission: users.manage
+      x-radiopad-step-up-mfa: required-in-production
       summary: Compliance / IT-Admin clears `LockedUntil` and resets the failure counter; audits `UserUnlocked`.
       parameters:
         - { in: path, name: id, required: true, schema: { type: string, format: uuid } }
@@ -2648,13 +2795,15 @@ paths:
         "204": { description: Unlocked. }
   /api/users/{id}/revoke-sessions:
     post:
+      x-radiopad-permission: users.revoke_sessions
+      x-radiopad-step-up-mfa: required-in-production
       summary: Compliance / IT-Admin increments `User.SessionEpoch`; all outstanding bearers immediately fail HMAC validation. Audits `SessionsRevoked`.
       parameters:
         - { in: path, name: id, required: true, schema: { type: string, format: uuid } }
       responses:
         "204": { description: Sessions revoked. }
 
-  # --- PRD MOB-007 — mobile push device registration ---
+  # --- PRD MOB-007 - mobile push device registration ---
   /api/push/devices:
     post:
       summary: Register an APNs (iOS) / FCM (Android) device token for the current (tenant, user). Idempotent on (tenant, user, token).
@@ -2696,7 +2845,7 @@ paths:
         "404": { description: No such device for this user. }
   /api/push/test:
     post:
-      summary: Admin-only — send a generic "RadioPad / You have a new notification" test push to the calling user's most-recent registered device.
+      summary: Admin-only - send a generic "RadioPad / You have a new notification" test push to the calling user's most-recent registered device.
       responses:
         "200":
           description: Push enqueued.
@@ -2728,7 +2877,7 @@ paths:
   # --- Iter-30 — Report rewrite (RPT-007) ---
   /api/reports/{id}/rewrite:
     post:
-      summary: Rewrite a report in one of four modes — concise, formal, patient_friendly, referring_summary. Audited as AiRequest. PHI policy enforced inside the gateway.
+      summary: Rewrite a report in one of four modes - concise, formal, patient_friendly, referring_summary. Audited as AiRequest. PHI policy enforced inside the gateway.
       parameters:
         - in: path
           name: id
@@ -2759,7 +2908,7 @@ paths:
         '404': { description: Report not found in the calling tenant. }
         '503': { description: No enabled AI provider available. }
 
-  # --- Iter-30 — Multi-radiologist sign-off + addendum ---
+  # --- Iter-30 - Multi-radiologist sign-off + addendum ---
   /api/reports/{id}/sign:
     post:
       summary: Append a signature. First signature must be Primary; CoSigner / Addendum are only allowed after a Primary signature exists.
@@ -2837,10 +2986,10 @@ paths:
                   $ref: '#/components/schemas/ReportSignature'
         '404': { description: Report not found. }
 
-  # --- Iter-30 — Standards / Terminology (STD-001 RadLex, STD-002 RADS) ---
+  # --- Iter-30 - Standards / Terminology (STD-001 RadLex, STD-002 RADS) ---
   /api/terminology/radlex/search:
     get:
-      summary: STD-001 — RadLex prefix search across the curated subset bundled with RadioPad. RadLex is a registered trademark of RSNA.
+      summary: STD-001 - RadLex prefix search across the curated subset bundled with RadioPad. RadLex is a registered trademark of RSNA.
       parameters:
         - in: query
           name: q
@@ -2861,7 +3010,7 @@ paths:
         '400': { description: q is required. }
   /api/terminology/radlex/CodeSystem:
     get:
-      summary: STD-001 — minimal FHIR R4 CodeSystem fragment for the bundled RadLex subset.
+      summary: STD-001 - minimal FHIR R4 CodeSystem fragment for the bundled RadLex subset.
       responses:
         '200':
           description: FHIR CodeSystem JSON (content=fragment).
@@ -2871,7 +3020,7 @@ paths:
                 type: object
   /api/terminology/rads:
     get:
-      summary: STD-002 — ACR RADS lookup. Without ?system, returns a list of supported systems; with ?system=bi_rads etc. returns the category list. Codes + short labels only — no copyrighted prose.
+      summary: STD-002 - ACR RADS lookup. Without ?system, returns a list of supported systems; with ?system=bi_rads etc. returns the category list. Codes + short labels only - no copyrighted prose.
       parameters:
         - in: query
           name: system
@@ -2887,10 +3036,10 @@ paths:
                   - $ref: '#/components/schemas/RadsSystemDefinition'
         '404': { description: Unknown RADS system. }
 
-  # --- Iter-30 — Bidirectional FHIR ingest ---
+  # --- Iter-30 - Bidirectional FHIR ingest ---
   /api/ingest/fhir/diagnosticreport:
     post:
-      summary: Iter-30 — accept a FHIR R4 DiagnosticReport (or Bundle containing one) and create a draft Report keyed by tenant. basedOn[0].reference is captured as serviceRequestRef. Audited as ReportImported.
+      summary: Iter-30 - accept a FHIR R4 DiagnosticReport (or Bundle containing one) and create a draft Report keyed by tenant. basedOn[0].reference is captured as serviceRequestRef. Audited as ReportImported.
       requestBody:
         required: true
         content:
@@ -2912,10 +3061,10 @@ paths:
         '401': { description: Bad / missing tenant or bearer. }
         '503': { description: Tenant has no ingest secret configured. }
 
-  # --- Iter-30 — Enterprise invoice bulk export (BILL-003) ---
+  # --- Iter-30 - Enterprise invoice bulk export (BILL-003) ---
   /api/billing/invoices/export:
     get:
-      summary: Iter-30 — bulk export invoices as CSV (default) or ZIP (CSV + per-invoice PDFs + manifest.txt with SHA-256 hashes). RBAC BillingAdmin/ItAdmin/MedicalDirector. Audited as BillingChanged action=bulk_export.
+      summary: Iter-30 - bulk export invoices as CSV (default) or ZIP (CSV + per-invoice PDFs + manifest.txt with SHA-256 hashes). RBAC BillingAdmin/ItAdmin/MedicalDirector. Audited as BillingChanged action=bulk_export.
       parameters:
         - in: query
           name: from
@@ -2935,10 +3084,10 @@ paths:
         '403': { description: RBAC denied. }
         '503': { description: Stripe not configured or tenant missing customer. }
 
-  # --- Iter-35 — PERF-004 synthetic availability monitor ---
+  # --- Iter-35 - PERF-004 synthetic availability monitor ---
   /api/admin/observability/availability:
     get:
-      summary: Iter-35 PERF-004 — last computed snapshot of the in-process synthetic availability monitor (5-minute rolling window). RBAC ItAdmin / ComplianceReviewer. Burn-rate breaches against `RADIOPAD_AVAILABILITY_BURN_RATE_THRESHOLD` are recorded as append-only `SystemAlert` audit rows with `kind="availability_burn_rate"`.
+      summary: Iter-35 PERF-004 - last computed snapshot of the in-process synthetic availability monitor (5-minute rolling window). RBAC ItAdmin / ComplianceReviewer. Burn-rate breaches against `RADIOPAD_AVAILABILITY_BURN_RATE_THRESHOLD` are recorded as append-only `SystemAlert` audit rows with `kind="availability_burn_rate"`.
       responses:
         '200':
           description: Current rolling snapshot.
@@ -2957,11 +3106,11 @@ paths:
                     items: { type: string }
         '403': { description: RBAC denied (not ItAdmin / ComplianceReviewer). }
 
-  # --- Iter-35 � Versioned clinical validation packs (rulebook golden suites) ---
+  # --- Iter-35 ï¿½ Versioned clinical validation packs (rulebook golden suites) ---
   /api/validation-packs:
     get:
       summary: |
-        Iter-35 � list validation packs for the current tenant. Optionally
+        Iter-35 ï¿½ list validation packs for the current tenant. Optionally
         filtered by `rulebookId`. Any tenant member may read.
       parameters:
         - in: query
@@ -2989,7 +3138,7 @@ paths:
                     caseCount: { type: integer }
     post:
       summary: |
-        Iter-35 � create a new pack from an in-memory payload. RBAC
+        Iter-35 ï¿½ create a new pack from an in-memory payload. RBAC
         MedicalDirector / ItAdmin. Returns 409 with `kind:"validation_packs"`
         when (rulebookId, version) already exists for the tenant.
       requestBody:
@@ -3025,7 +3174,7 @@ paths:
   /api/validation-packs/{id}/approve:
     post:
       summary: |
-        Iter-35 � promote Draft ? Approved. RBAC MedicalDirector / ItAdmin.
+        Iter-35 ï¿½ promote Draft ? Approved. RBAC MedicalDirector / ItAdmin.
         Re-approving a Deprecated pack returns 409 with
         `kind:"validation_packs"`. Audits `ValidationPackApproved`.
       parameters:
@@ -3041,8 +3190,8 @@ paths:
   /api/validation-packs/{id}/deprecate:
     post:
       summary: |
-        Iter-35 � mark a pack as Deprecated. RBAC MedicalDirector / ItAdmin.
-        Terminal � a deprecated pack cannot be re-approved. Audits
+        Iter-35 ï¿½ mark a pack as Deprecated. RBAC MedicalDirector / ItAdmin.
+        Terminal ï¿½ a deprecated pack cannot be re-approved. Audits
         `ValidationPackDeprecated`.
       parameters:
         - in: path
@@ -3056,7 +3205,7 @@ paths:
   /api/validation-packs/{id}/run:
     post:
       summary: |
-        Iter-35 � execute the pack's golden cases against the latest
+        Iter-35 ï¿½ execute the pack's golden cases against the latest
         rulebook with the matching `rulebookId` in this tenant. Returns
         `{passed, failed, totalCases, failures}`. Audits
         `ValidationPackRun` with pass/fail counts. RBAC Radiologist+.
@@ -3089,7 +3238,7 @@ paths:
   /api/validation-packs/{id}/export:
     get:
       summary: |
-        Iter-35 � export the pack body (metadata + canonical golden cases).
+        Iter-35 ï¿½ export the pack body (metadata + canonical golden cases).
         RBAC MedicalDirector / ItAdmin.
       parameters:
         - in: path
@@ -3114,10 +3263,10 @@ paths:
                   cases: { type: array, items: { type: object } }
         '404': { description: Pack not found in this tenant. }
 
-  # --- Iter-31 TMP-005..008 — template lifecycle + analytics ---
+  # --- Iter-31 TMP-005..008 - template lifecycle + analytics ---
   /api/templates/{id}/approve:
     post:
-      summary: Iter-31 TMP-005 — approve a template for production use. RBAC MedicalDirector / ReportingAdmin / ItAdmin. Audited as `TemplateApproved`.
+      summary: Iter-31 TMP-005 - approve a template for production use. RBAC MedicalDirector / ReportingAdmin / ItAdmin. Audited as `TemplateApproved`.
       parameters:
         - { in: path, name: id, required: true, schema: { type: string, format: uuid } }
       responses:
@@ -3131,7 +3280,7 @@ paths:
 
   /api/templates/{id}/submit-review:
     post:
-      summary: Iter-32 TMP-005 — submit a draft template for review. Any role may submit; Deprecated templates are rejected.
+      summary: Iter-32 TMP-005 - submit a draft template for review. Any role may submit; Deprecated templates are rejected.
       parameters:
         - { in: path, name: id, required: true, schema: { type: string, format: uuid } }
       responses:
@@ -3145,7 +3294,7 @@ paths:
 
   /api/templates/{id}/deprecate:
     post:
-      summary: Iter-32 TMP-005 — deprecate a template. RBAC MedicalDirector / ReportingAdmin / ItAdmin. Audited as `TemplateDeprecated`.
+      summary: Iter-32 TMP-005 - deprecate a template. RBAC MedicalDirector / ReportingAdmin / ItAdmin. Audited as `TemplateDeprecated`.
       parameters:
         - { in: path, name: id, required: true, schema: { type: string, format: uuid } }
       responses:
@@ -3159,7 +3308,7 @@ paths:
 
   /api/templates/{id}/usage:
     get:
-      summary: Iter-32 TMP-006 — template usage analytics. Returns request counts for the last 7 / 30 / 90 days, broken down by user and modality.
+      summary: Iter-32 TMP-006 - template usage analytics. Returns request counts for the last 7 / 30 / 90 days, broken down by user and modality.
       parameters:
         - { in: path, name: id, required: true, schema: { type: string, format: uuid } }
       responses:
@@ -3201,7 +3350,7 @@ paths:
 
   /api/templates/{id}/preview:
     get:
-      summary: Iter-31 TMP-008 — render a preview of the template sections, optionally merged with a specific report.
+      summary: Iter-31 TMP-008 - render a preview of the template sections, optionally merged with a specific report.
       parameters:
         - { in: path, name: id, required: true, schema: { type: string, format: uuid } }
         - in: query
@@ -3250,7 +3399,7 @@ paths:
 
   /api/users/{id}/lockout:
     post:
-      summary: Iter-31 AUTH-006 — soft-lock a user (sets active=false). RBAC MedicalDirector / ItAdmin. Audited as `UserLockedOut`.
+      summary: Iter-31 AUTH-006 - soft-lock a user (sets active=false). RBAC MedicalDirector / ItAdmin. Audited as `UserLockedOut`.
       parameters:
         - { in: path, name: id, required: true, schema: { type: string, format: uuid } }
       responses:
@@ -3270,7 +3419,7 @@ paths:
 
   /api/devices:
     get:
-      summary: Iter-31 AUTH-007 — list device-auth pairings (approved/consumed/denied) for the tenant. RBAC ItAdmin / MedicalDirector.
+      summary: Iter-31 AUTH-007 - list device-auth pairings (approved/consumed/denied) for the tenant. RBAC ItAdmin / MedicalDirector.
       responses:
         '200':
           description: OK
@@ -3301,7 +3450,7 @@ paths:
         '403': { description: RBAC denied. }
         '404': { description: Device auth not found. }
 
-  # --- Prompt overrides — delete ---
+  # --- Prompt overrides - delete ---
   /api/prompts/overrides/{id}:
     delete:
       summary: Delete a prompt override. RBAC MedicalDirector / ReportingAdmin.
@@ -3315,7 +3464,7 @@ paths:
   # --- Audit search ---
   /api/audit/search:
     get:
-      summary: PRD §19.2 — advanced audit search with filters on action, user, report, and substring.
+      summary: PRD §19.2 - advanced audit search with filters on action, user, report, and substring.
       parameters:
         - { in: query, name: action, schema: { type: string } }
         - { in: query, name: userId, schema: { type: string, format: uuid } }
@@ -3365,7 +3514,7 @@ paths:
   # --- Lexicon bulk import/export ---
   /api/lexicon/export:
     get:
-      summary: Iter-31 STD-005/STD-006 — bulk export of the tenant lexicon as JSON (default) or YAML. Audited as `LexiconExported`. RBAC MedicalDirector / ReportingAdmin.
+      summary: Iter-31 STD-005/STD-006 - bulk export of the tenant lexicon as JSON (default) or YAML. Audited as `LexiconExported`. RBAC MedicalDirector / ReportingAdmin.
       parameters:
         - in: query
           name: format
@@ -3381,7 +3530,7 @@ paths:
 
   /api/lexicon/import:
     post:
-      summary: Iter-31 STD-005/STD-006 — bulk upsert of lexicon entries. Audited as `LexiconImported`. RBAC MedicalDirector / ReportingAdmin.
+      summary: Iter-31 STD-005/STD-006 - bulk upsert of lexicon entries. Audited as `LexiconImported`. RBAC MedicalDirector / ReportingAdmin.
       requestBody:
         required: true
         content:
@@ -3415,7 +3564,7 @@ paths:
 
   /api/lexicon/import-csv:
     post:
-      summary: Iter-32 STD-006 — bulk import from CSV (header `term,forbidden,replacement,note`). RBAC MedicalDirector / ReportingAdmin. Audited as `LexiconImported`.
+      summary: Iter-32 STD-006 - bulk import from CSV (header `term,forbidden,replacement,note`). RBAC MedicalDirector / ReportingAdmin. Audited as `LexiconImported`.
       parameters:
         - in: query
           name: replaceAll
@@ -3441,7 +3590,7 @@ paths:
   # --- Billing features ---
   /api/billing/features:
     get:
-      summary: PRD §11.4 — declarative plan-feature flags. Frontend gates UI surfaces on these flags so a Trial tenant cannot walk into an enterprise-only flow.
+      summary: PRD §11.4 - declarative plan-feature flags. Frontend gates UI surfaces on these flags so a Trial tenant cannot walk into an enterprise-only flow.
       responses:
         '200':
           description: OK
@@ -3540,7 +3689,7 @@ paths:
   # --- Report additional endpoints ---
   /api/reports/{id}/quality:
     get:
-      summary: PRD §18.4 — heuristic report quality score in [0..100]. Read-only; never persisted nor gating export.
+      summary: PRD §18.4 - heuristic report quality score in [0..100]. Read-only; never persisted nor gating export.
       parameters:
         - { in: path, name: id, required: true, schema: { type: string, format: uuid } }
       responses:
@@ -3560,7 +3709,7 @@ paths:
 
   /api/reports/{id}/dictation/cleanup:
     post:
-      summary: Iter-31 AI-001 — runs the dictation cleanup pipeline. Routes through AiGateway so PHI + audit apply. RBAC Radiologist / MedicalDirector.
+      summary: Iter-31 AI-001 - runs the dictation cleanup pipeline. Routes through AiGateway so PHI + audit apply. RBAC Radiologist / MedicalDirector.
       parameters:
         - { in: path, name: id, required: true, schema: { type: string, format: uuid } }
       requestBody:
@@ -3598,7 +3747,7 @@ paths:
 
   /api/reports/{id}/followup-suggestions:
     get:
-      summary: Iter-31 AI-008 — up to three suggested follow-up phrases for a report's recommendations section.
+      summary: Iter-31 AI-008 - up to three suggested follow-up phrases for a report's recommendations section.
       parameters:
         - { in: path, name: id, required: true, schema: { type: string, format: uuid } }
       responses:
@@ -3617,7 +3766,7 @@ paths:
 
   /api/reports/{id}/measurements:
     get:
-      summary: PRD Beta #7 — extract structured measurements from report text.
+      summary: PRD Beta #7 - extract structured measurements from report text.
       parameters:
         - { in: path, name: id, required: true, schema: { type: string, format: uuid } }
       responses:
@@ -3639,7 +3788,7 @@ paths:
 
   /api/reports/import/fhir:
     post:
-      summary: Iter-30 — session-authenticated FHIR DiagnosticReport import. RBAC Radiologist / MedicalDirector / ReportingAdmin / ItAdmin. Audited as `ReportImported`.
+      summary: Iter-30 - session-authenticated FHIR DiagnosticReport import. RBAC Radiologist / MedicalDirector / ReportingAdmin / ItAdmin. Audited as `ReportImported`.
       requestBody:
         required: true
         content:
@@ -3664,7 +3813,7 @@ paths:
   # --- PACS bridge proxy ---
   /api/pacs/studies:
     get:
-      summary: Iter-32 DESK-007 — QIDO-RS study search proxy. Forwards accession / patientId / studyDate / modality queries through the tenant DICOMweb base URL.
+      summary: Iter-32 DESK-007 - QIDO-RS study search proxy. Forwards accession / patientId / studyDate / modality queries through the tenant DICOMweb base URL.
       parameters:
         - { in: query, name: accession, schema: { type: string } }
         - { in: query, name: patientId, schema: { type: string } }
@@ -3684,7 +3833,7 @@ paths:
                   studies: { type: array, items: { type: object } }
         '403': { description: RBAC denied. }
     post:
-      summary: Iter-32 — STOW-RS store proxy. Body must be DICOM bytes (multipart/related). RBAC Radiologist / MedicalDirector / ItAdmin.
+      summary: Iter-32 - STOW-RS store proxy. Body must be DICOM bytes (multipart/related). RBAC Radiologist / MedicalDirector / ItAdmin.
       requestBody:
         required: true
         content:
@@ -3708,7 +3857,7 @@ paths:
 
   /api/pacs/health:
     get:
-      summary: Iter-32 — PACS + Orthanc health probe. Returns reachability for the tenant's DICOMweb base URL and optional bundled Orthanc.
+      summary: Iter-32 - PACS + Orthanc health probe. Returns reachability for the tenant's DICOMweb base URL and optional bundled Orthanc.
       responses:
         '200':
           description: OK
@@ -3732,7 +3881,7 @@ paths:
   # --- MCP tool registry ---
   /api/mcp/tools:
     get:
-      summary: Iter-31/32 MCP-001 — list registered MCP tools for the current tenant.
+      summary: Iter-31/32 MCP-001 - list registered MCP tools for the current tenant.
       responses:
         '200':
           description: OK
@@ -3761,7 +3910,7 @@ paths:
                       items: { type: string }
                     createdAt: { type: string, format: date-time }
     post:
-      summary: Iter-31/32 MCP-001 — register a new MCP tool. RBAC ReportingAdmin / MedicalDirector / ItAdmin. Audited as `McpToolRegistered`.
+      summary: Iter-31/32 MCP-001 - register a new MCP tool. RBAC ReportingAdmin / MedicalDirector / ItAdmin. Audited as `McpToolRegistered`.
       requestBody:
         required: true
         content:
@@ -3806,7 +3955,7 @@ paths:
 
   /api/mcp/tools/{id}/approve:
     post:
-      summary: Iter-31 MCP-002 — approve a tool (Submitted→Approved). RBAC MedicalDirector / ItAdmin. Audited as `McpToolApproved`.
+      summary: Iter-31 MCP-002 - approve a tool (Submittedâ†’Approved). RBAC MedicalDirector / ItAdmin. Audited as `McpToolApproved`.
       parameters:
         - { in: path, name: id, required: true, schema: { type: string, format: uuid } }
       responses:
@@ -3816,7 +3965,7 @@ paths:
 
   /api/mcp/tools/{id}/block:
     post:
-      summary: Iter-32 MCP-002 — block a tool (any→Blocked). RBAC MedicalDirector / ItAdmin. Audited as `McpToolBlocked`.
+      summary: Iter-32 MCP-002 - block a tool (anyâ†’Blocked). RBAC MedicalDirector / ItAdmin. Audited as `McpToolBlocked`.
       parameters:
         - { in: path, name: id, required: true, schema: { type: string, format: uuid } }
       requestBody:
@@ -3843,7 +3992,7 @@ paths:
 
   /api/mcp/tools/{id}/invoke:
     post:
-      summary: Iter-31 MCP-004 — invoke an approved MCP tool. Subject to scope policy, lifecycle gate, and external-mcp gate. Audited in the invocation ledger.
+      summary: Iter-31 MCP-004 - invoke an approved MCP tool. Subject to scope policy, lifecycle gate, and external-mcp gate. Audited in the invocation ledger.
       parameters:
         - { in: path, name: id, required: true, schema: { type: string, format: uuid } }
       requestBody:
@@ -3875,7 +4024,7 @@ paths:
 
   /api/mcp/tools/{id}/test:
     post:
-      summary: Iter-32 MCP-006 — sandboxed test-run for an admin. 5s wall-clock, 256 MiB soft cap, BelowNormal priority. RBAC MedicalDirector / ItAdmin / ReportingAdmin.
+      summary: Iter-32 MCP-006 - sandboxed test-run for an admin. 5s wall-clock, 256 MiB soft cap, BelowNormal priority. RBAC MedicalDirector / ItAdmin / ReportingAdmin.
       parameters:
         - { in: path, name: id, required: true, schema: { type: string, format: uuid } }
       requestBody:
@@ -3907,7 +4056,7 @@ paths:
   # --- SIEM status ---
   /api/siem/status:
     get:
-      summary: Iter-32 INT-010 — surfaces the in-process status of each configured SIEM push sink. RBAC ItAdmin / MedicalDirector / ComplianceReviewer.
+      summary: Iter-32 INT-010 - surfaces the in-process status of each configured SIEM push sink. RBAC ItAdmin / MedicalDirector / ComplianceReviewer.
       responses:
         '200':
           description: OK
@@ -3932,7 +4081,7 @@ paths:
   # --- Observability: SLO alerts ---
   /api/admin/observability/slo-alerts:
     post:
-      summary: Iter-33 — ingest an Alertmanager-format SLO alert payload. Audited as `SystemAlert`. RBAC ItAdmin / MedicalDirector / ComplianceReviewer.
+      summary: Iter-33 - ingest an Alertmanager-format SLO alert payload. Audited as `SystemAlert`. RBAC ItAdmin / MedicalDirector / ComplianceReviewer.
       requestBody:
         required: true
         content:
@@ -3953,7 +4102,7 @@ paths:
   # --- Orthanc bridge ---
   /api/integrations/orthanc/study-stable:
     post:
-      summary: Iter-33 — Orthanc Lua `OnStableStudy` callback. Bearer-authenticated via `RADIOPAD_BRIDGE_TOKEN`. Audited as `StudyReceived`.
+      summary: Iter-33 - Orthanc Lua `OnStableStudy` callback. Bearer-authenticated via `RADIOPAD_BRIDGE_TOKEN`. Audited as `StudyReceived`.
       security:
         - BearerJwt: []
       requestBody:
@@ -3975,7 +4124,7 @@ paths:
 
   /api/integrations/orthanc/sr-stored:
     post:
-      summary: Iter-33 — Orthanc Lua `OnStoredInstance` callback for structured reports (SR). Converts DICOM SR JSON to a RadioPad report. Bearer-authenticated.
+      summary: Iter-33 - Orthanc Lua `OnStoredInstance` callback for structured reports (SR). Converts DICOM SR JSON to a RadioPad report. Bearer-authenticated.
       security:
         - BearerJwt: []
       requestBody:
@@ -4020,7 +4169,7 @@ paths:
 
   /api/marketplace/listings/{id}/submit:
     post:
-      summary: Submit a draft listing for review (draft→submitted).
+      summary: Submit a draft listing for review (draftâ†’submitted).
       parameters:
         - { in: path, name: id, required: true, schema: { type: string, format: uuid } }
       responses:
@@ -4030,7 +4179,7 @@ paths:
 
   /api/marketplace/listings/{id}/approve:
     post:
-      summary: Approve a submitted listing (submitted→approved). RBAC MedicalDirector / ItAdmin. Creates a Stripe Price for paid items. Audited as `RulebookApproved`.
+      summary: Approve a submitted listing (submittedâ†’approved). RBAC MedicalDirector / ItAdmin. Creates a Stripe Price for paid items. Audited as `RulebookApproved`.
       parameters:
         - { in: path, name: id, required: true, schema: { type: string, format: uuid } }
       responses:
@@ -4049,7 +4198,7 @@ paths:
 
   /api/marketplace/listings/{id}/reject:
     post:
-      summary: Reject a listing (submitted→rejected). RBAC MedicalDirector / ItAdmin.
+      summary: Reject a listing (submittedâ†’rejected). RBAC MedicalDirector / ItAdmin.
       parameters:
         - { in: path, name: id, required: true, schema: { type: string, format: uuid } }
       requestBody:
@@ -4086,7 +4235,7 @@ paths:
 
   /api/marketplace/connect/onboarding:
     post:
-      summary: PRD MKT-006 — start Stripe Connect Express onboarding for the active tenant (publisher). RBAC BillingAdmin / ItAdmin.
+      summary: PRD MKT-006 - start Stripe Connect Express onboarding for the active tenant (publisher). RBAC BillingAdmin / ItAdmin.
       parameters:
         - { in: query, name: returnUrl, required: true, schema: { type: string, format: uri } }
       responses:
@@ -4104,7 +4253,7 @@ paths:
   # --- WebAuthn additional endpoints ---
   /api/auth/webauthn/credentials:
     get:
-      summary: Iter-32 AUTH-001 — list WebAuthn credentials for the current (tenant, user).
+      summary: Iter-32 AUTH-001 - list WebAuthn credentials for the current (tenant, user).
       responses:
         '200':
           description: OK
@@ -4124,7 +4273,7 @@ paths:
 
   /api/auth/webauthn/credentials/{id}:
     delete:
-      summary: Iter-32 AUTH-001 — delete a WebAuthn credential.
+      summary: Iter-32 AUTH-001 - delete a WebAuthn credential.
       parameters:
         - { in: path, name: id, required: true, schema: { type: string, format: uuid } }
       responses:

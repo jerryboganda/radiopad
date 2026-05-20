@@ -1,10 +1,13 @@
+using Microsoft.AspNetCore.HttpOverrides;
 using Microsoft.AspNetCore.RateLimiting;
 using Microsoft.EntityFrameworkCore;
 using OpenTelemetry.Metrics;
+using RadioPad.Api.Auth;
 using RadioPad.Api.Middleware;
 using RadioPad.Application.Abstractions;
 using RadioPad.Application.Providers;
 using RadioPad.Application.Services;
+using RadioPad.Infrastructure.Identity;
 using RadioPad.Infrastructure.Persistence;
 using RadioPad.Infrastructure.Repositories;
 using RadioPad.Infrastructure.Seeding;
@@ -18,6 +21,23 @@ var builder = WebApplication.CreateBuilder(args);
 RadioPad.Api.Auth.OidcProfiles.ApplyToEnvironment(
     Environment.GetEnvironmentVariable("RADIOPAD_OIDC_PRESET"));
 RadioPad.Api.Auth.RadioPadBearerTokens.ValidateStartupSecret(builder.Environment);
+
+if (!builder.Environment.IsDevelopment()
+    && !builder.Environment.IsEnvironment("Testing")
+    && RadioPadBearerToken.UsesDefaultSecret)
+{
+    throw new InvalidOperationException(
+        "RADIOPAD_AUTH_SECRET must be set outside Development/Testing so RadioPad bearer tokens are not signed with the default secret.");
+}
+
+if (!builder.Environment.IsDevelopment()
+    && !builder.Environment.IsEnvironment("Testing")
+    && (string.IsNullOrWhiteSpace(Environment.GetEnvironmentVariable("RADIOPAD_COLUMN_KEY_REF"))
+        || string.IsNullOrWhiteSpace(Environment.GetEnvironmentVariable("RADIOPAD_COLUMN_KEY_WRAPPED"))))
+{
+    throw new InvalidOperationException(
+        "RADIOPAD_COLUMN_KEY_REF and RADIOPAD_COLUMN_KEY_WRAPPED must be set outside Development/Testing so encrypted columns do not use the dev fallback key.");
+}
 
 // Bind to localhost by default (safety boundary §local-trust).
 var bindUrl = Environment.GetEnvironmentVariable("RADIOPAD_BIND") ?? "http://127.0.0.1:7457";
@@ -79,6 +99,7 @@ builder.Services.AddSingleton<IAiProviderAdapter, RadioPad.Infrastructure.Provid
 builder.Services.AddSingleton<IAiProviderAdapter, RadioPad.Infrastructure.Providers.Cli.CodexCliProvider>();
 
 builder.Services.AddScoped<IAuditLog, EfAuditLog>();
+builder.Services.AddSingleton<RadioPad.Application.Security.IPermissionService, RadioPad.Application.Security.RolePermissionService>();
 builder.Services.AddScoped<RadioPad.Api.Auth.LockoutPolicy>();
 builder.Services.AddScoped<IRulebookStore, EfRulebookStore>();
 builder.Services.AddScoped<IAiUsageStore, EfAiUsageStore>();
@@ -338,8 +359,8 @@ builder.Services.AddRateLimiter(opts =>
     opts.RejectionStatusCode = StatusCodes.Status429TooManyRequests;
     opts.AddPolicy("ai", context =>
     {
-        var tenant = context.Request.Headers["X-RadioPad-Tenant"].ToString();
-        if (string.IsNullOrEmpty(tenant)) tenant = "dev";
+        var tenant = RadioPadRequestIdentity.TenantSlugOrDevHeader(context);
+        if (string.IsNullOrEmpty(tenant)) tenant = "__no_tenant";
         return System.Threading.RateLimiting.RateLimitPartition.GetFixedWindowLimiter(tenant,
             _ => new System.Threading.RateLimiting.FixedWindowRateLimiterOptions
             {
@@ -423,6 +444,20 @@ if (!app.Environment.IsEnvironment("Testing"))
         rulebooksDir = Path.GetFullPath(rulebooksDir);
         await DevSeed.EnsureSeededAsync(db, rulebooksDir, default);
     }
+}
+
+if (!app.Environment.IsDevelopment() && !app.Environment.IsEnvironment("Testing"))
+{
+    var forwardedHeaders = new ForwardedHeadersOptions
+    {
+        ForwardedHeaders = ForwardedHeaders.XForwardedFor
+            | ForwardedHeaders.XForwardedHost
+            | ForwardedHeaders.XForwardedProto,
+        ForwardLimit = 2,
+    };
+    forwardedHeaders.KnownNetworks.Clear();
+    forwardedHeaders.KnownProxies.Clear();
+    app.UseForwardedHeaders(forwardedHeaders);
 }
 
 app.UseMiddleware<RequestCorrelationMiddleware>();

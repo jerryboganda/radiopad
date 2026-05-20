@@ -2,6 +2,7 @@ using System.Text.Json;
 using Microsoft.AspNetCore.Mvc;
 using RadioPad.Api.Services;
 using RadioPad.Application.Abstractions;
+using RadioPad.Application.Security;
 using RadioPad.Domain.Entities;
 using RadioPad.Domain.Enums;
 using RadioPad.Infrastructure.Persistence;
@@ -38,7 +39,7 @@ public class ObservabilityController : TenantedController
     public async Task<IActionResult> IngestSloAlert([FromBody] JsonElement payload, CancellationToken ct)
     {
         var (tenant, user) = await ResolveContextAsync(_db, ct);
-        var deny = RequireRole(user, UserRole.ItAdmin, UserRole.MedicalDirector, UserRole.ComplianceReviewer);
+        var deny = RequirePermission(user, RbacPermission.SecurityManage);
         if (deny is not null) return deny;
 
         // Extract a small, non-PII summary for the audit row. The full payload is hashed.
@@ -97,7 +98,7 @@ public class ObservabilityController : TenantedController
     public async Task<IActionResult> GetAvailability(CancellationToken ct)
     {
         var (_, user) = await ResolveContextAsync(_db, ct);
-        var deny = RequireRole(user, UserRole.ItAdmin, UserRole.ComplianceReviewer);
+        var deny = RequirePermission(user, RbacPermission.SecurityManage);
         if (deny is not null) return deny;
 
         var snap = _availability.Current;

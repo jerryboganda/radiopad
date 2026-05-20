@@ -1,4 +1,5 @@
 using System.Threading.RateLimiting;
+using RadioPad.Api.Auth;
 
 namespace RadioPad.Api.Middleware;
 
@@ -11,8 +12,8 @@ namespace RadioPad.Api.Middleware;
 ///   <item><description>Per-IP: 100 req / minute (default; override with
 ///     <c>RADIOPAD_RATE_LIMIT_IP_PER_MIN</c>).</description></item>
 ///   <item><description>Per-tenant: 5000 req / minute (default; override with
-///     <c>RADIOPAD_RATE_LIMIT_TENANT_PER_MIN</c>). Tenant key is the
-///     <c>X-RadioPad-Tenant</c> header; absent header falls into a
+///     <c>RADIOPAD_RATE_LIMIT_TENANT_PER_MIN</c>). Tenant key comes from the
+///     verified request identity; absent identity falls into a
 ///     <c>__no_tenant</c> partition.</description></item>
 /// </list>
 ///
@@ -44,7 +45,8 @@ public sealed class RateLimitMiddleware : IDisposable
 
         _ipLimiter = PartitionedRateLimiter.Create<HttpContext, string>(ctx =>
         {
-            var ip = IpAllowlistMiddleware.ResolveRemoteIp(ctx)?.ToString() ?? "__no_ip";
+            var ip = IpAllowlistMiddleware.ResolveRemoteIp(ctx)?.ToString()
+                ?? $"__no_ip:{ctx.TraceIdentifier}";
             return RateLimitPartition.GetFixedWindowLimiter(ip, _ => new FixedWindowRateLimiterOptions
             {
                 PermitLimit = ipPerMin,
@@ -56,7 +58,7 @@ public sealed class RateLimitMiddleware : IDisposable
 
         _tenantLimiter = PartitionedRateLimiter.Create<HttpContext, string>(ctx =>
         {
-            var tenant = ctx.Request.Headers["X-RadioPad-Tenant"].FirstOrDefault();
+            var tenant = RadioPadRequestIdentity.TenantSlugOrDevHeader(ctx);
             if (string.IsNullOrWhiteSpace(tenant)) tenant = "__no_tenant";
             return RateLimitPartition.GetFixedWindowLimiter(tenant, _ => new FixedWindowRateLimiterOptions
             {

@@ -3,6 +3,7 @@ using System.Text;
 using System.Text.Json;
 using Microsoft.AspNetCore.Mvc;
 using RadioPad.Application.Abstractions;
+using RadioPad.Application.Security;
 using RadioPad.Domain.Entities;
 using RadioPad.Domain.Enums;
 using RadioPad.Infrastructure.Persistence;
@@ -32,7 +33,7 @@ public class SecurityController : TenantedController
     public async Task<IActionResult> TestSecurityWebhook(CancellationToken ct)
     {
         var (tenant, user) = await ResolveContextAsync(_db, ct);
-        var deny = RequireRole(user, UserRole.ItAdmin, UserRole.MedicalDirector, UserRole.ComplianceReviewer);
+        var deny = RequirePermission(user, RbacPermission.SecurityManage);
         if (deny is not null) return deny;
 
         var url = Environment.GetEnvironmentVariable("RADIOPAD_SECURITY_WEBHOOK_URL")

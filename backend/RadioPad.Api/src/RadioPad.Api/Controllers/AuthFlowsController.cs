@@ -260,7 +260,7 @@ public class MagicLinkController : ControllerBase
             TenantId = t.Id,
             UserId = u.Id,
             TokenHash = Sha256Hex(raw),
-            ExpiresAt = DateTimeOffset.UtcNow.AddMinutes(15),
+            ExpiresAt = DateTimeOffset.UtcNow.AddMinutes(60),
         });
         await _db.SaveChangesAsync(ct);
 

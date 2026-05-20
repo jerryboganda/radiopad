@@ -18,7 +18,9 @@
 - **Local dev:** `.env` file, gitignored. Use `.env.example` as the template.
 - **CI:** GitHub Actions secrets; never echoed.
 - **Hosted:** Cloud-secret-manager (AWS Secrets Manager / GCP Secret Manager / Azure Key Vault) injected as env vars.
+- **VPS production:** provider secret store or OS-level secret manager; inject `RADIOPAD_DB`, OIDC, SMTP, Stripe, KMS, and webhook secrets as environment variables readable only by the RadioPad service account. Do not bake secrets into compose files or images.
 - **On-prem:** Customer's secret manager or `/etc/radiopad/secrets/*.env` with `chmod 600`.
+- **VPS compose:** `/opt/radiopad/.secrets.env` with `chmod 600`; see `deploy/vps/README.md`. Do not commit this file or copy it into the source tree.
 
 ## In-code reference
 
@@ -37,11 +39,25 @@ Provider rows store `ApiKeySecretRef = "env:<NAME>"`. The provider API rejects n
 4. Redeploy without the old env var.
 5. Verify with a `radiopad provider test`.
 
+For auth secrets:
+
+- Rotate `RADIOPAD_AUTH_SECRET` during a maintenance window because all current `rp_` bearers become invalid.
+- Rotate OIDC client secrets at the IdP first, deploy the new secret, then validate Authorization Code + PKCE login and magic-link fallback.
+- Rotate SMTP credentials by sending a test magic link; production responses must not expose `devLink`.
+- Postgres password rotation must include application restart/reload and a readiness check against `/api/health/ready`.
+
+For `RADIOPAD_AUTH_SECRET`, rotate during a maintenance window because existing
+RadioPad-issued bearer tokens will be invalidated. For
+`RADIOPAD_COLUMN_KEY_REF` / `RADIOPAD_COLUMN_KEY_WRAPPED`, rotate only with a
+tested rewrap/backfill plan so existing encrypted columns remain decryptable.
+Production must provide these env vars; the deterministic development fallback
+is not acceptable for hosted, VPS, or on-prem production.
+
 ## Local dev handling
 
 - `.env` is per-developer; never commit.
 - `cp .env.example .env` and fill in only the providers you actually test.
-- Use the **Mock provider** for the default flow — no secret required.
+- Use the **Mock provider** for the default flow - no secret required.
 
 ## CI/CD handling
 

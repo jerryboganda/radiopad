@@ -44,6 +44,7 @@ public class Iter32NetworkDefenseTests : IClassFixture<RadioPadAppFactory>
         var middleware = new IpAllowlistMiddleware(_ => { nextCalled = true; return Task.CompletedTask; }, NullLogger<IpAllowlistMiddleware>.Instance);
 
         var ctx = new DefaultHttpContext();
+        ctx.RequestServices = _factory.Services;
         ctx.Connection.RemoteIpAddress = IPAddress.Parse("10.42.0.7");
         ctx.Request.Headers["X-RadioPad-Tenant"] = _factory.SeedTenant.Slug;
 
@@ -68,6 +69,7 @@ public class Iter32NetworkDefenseTests : IClassFixture<RadioPadAppFactory>
         var middleware = new IpAllowlistMiddleware(_ => Task.CompletedTask, NullLogger<IpAllowlistMiddleware>.Instance);
 
         var ctx = new DefaultHttpContext();
+        ctx.RequestServices = _factory.Services;
         ctx.Connection.RemoteIpAddress = IPAddress.Parse("2400:cb00::1");
         ctx.Request.Headers["X-RadioPad-Tenant"] = _factory.SeedTenant.Slug;
         ctx.Response.Body = new MemoryStream();
@@ -93,6 +95,7 @@ public class Iter32NetworkDefenseTests : IClassFixture<RadioPadAppFactory>
         var middleware = new IpAllowlistMiddleware(_ => { nextCalled = true; return Task.CompletedTask; }, NullLogger<IpAllowlistMiddleware>.Instance);
 
         var ctx = new DefaultHttpContext();
+        ctx.RequestServices = _factory.Services;
         ctx.Connection.RemoteIpAddress = IPAddress.Parse("2001:db8:0:1::42");
         ctx.Request.Headers["X-RadioPad-Tenant"] = _factory.SeedTenant.Slug;
 
@@ -116,6 +119,7 @@ public class Iter32NetworkDefenseTests : IClassFixture<RadioPadAppFactory>
         var middleware = new IpAllowlistMiddleware(_ => { nextCalled = true; return Task.CompletedTask; }, NullLogger<IpAllowlistMiddleware>.Instance);
 
         var ctx = new DefaultHttpContext();
+        ctx.RequestServices = _factory.Services;
         ctx.Connection.RemoteIpAddress = IPAddress.Loopback;
         ctx.Request.Headers["X-RadioPad-Tenant"] = _factory.SeedTenant.Slug;
         await middleware.InvokeAsync(ctx, db, audit);
@@ -123,6 +127,7 @@ public class Iter32NetworkDefenseTests : IClassFixture<RadioPadAppFactory>
 
         nextCalled = false;
         ctx = new DefaultHttpContext();
+        ctx.RequestServices = _factory.Services;
         ctx.Connection.RemoteIpAddress = IPAddress.IPv6Loopback;
         ctx.Request.Headers["X-RadioPad-Tenant"] = _factory.SeedTenant.Slug;
         await middleware.InvokeAsync(ctx, db, audit);

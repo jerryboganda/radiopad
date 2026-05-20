@@ -3,6 +3,7 @@ using System.Text.Json;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using RadioPad.Application.Abstractions;
+using RadioPad.Application.Security;
 using RadioPad.Domain.Entities;
 using RadioPad.Domain.Enums;
 using RadioPad.Infrastructure.Persistence;
@@ -32,7 +33,9 @@ public class TemplatesController : TenantedController
     [HttpPost]
     public async Task<IActionResult> Save([FromBody] SaveTemplateDto dto, CancellationToken ct)
     {
-        var (tenant, _) = await ResolveContextAsync(_db, ct);
+        var (tenant, user) = await ResolveContextAsync(_db, ct);
+        var deny = RequirePermission(user, RbacPermission.TemplatesManage);
+        if (deny is not null) return deny;
         var existing = await _db.Templates.FirstOrDefaultAsync(t => t.TenantId == tenant.Id && t.TemplateId == dto.TemplateId, ct);
         if (existing is null)
         {
@@ -64,7 +67,7 @@ public class TemplatesController : TenantedController
     public async Task<IActionResult> Approve(Guid id, CancellationToken ct)
     {
         var (tenant, user) = await ResolveContextAsync(_db, ct);
-        var deny = RequireRole(user, UserRole.MedicalDirector, UserRole.ReportingAdmin, UserRole.ItAdmin);
+        var deny = RequirePermission(user, RbacPermission.TemplatesApprove);
         if (deny is not null) return deny;
         var t = await _db.Templates.FirstOrDefaultAsync(x => x.Id == id && x.TenantId == tenant.Id, ct);
         if (t is null) return NotFound();
@@ -122,7 +125,7 @@ public class TemplatesController : TenantedController
     public async Task<IActionResult> Deprecate(Guid id, CancellationToken ct)
     {
         var (tenant, user) = await ResolveContextAsync(_db, ct);
-        var deny = RequireRole(user, UserRole.MedicalDirector, UserRole.ReportingAdmin, UserRole.ItAdmin);
+        var deny = RequirePermission(user, RbacPermission.TemplatesApprove);
         if (deny is not null) return deny;
         var t = await _db.Templates.FirstOrDefaultAsync(x => x.Id == id && x.TenantId == tenant.Id, ct);
         if (t is null) return NotFound();
@@ -270,7 +273,9 @@ public class ProvidersController : TenantedController
     [HttpGet]
     public async Task<IActionResult> List(CancellationToken ct)
     {
-        var (tenant, _) = await ResolveContextAsync(_db, ct);
+        var (tenant, user) = await ResolveContextAsync(_db, ct);
+        var deny = RequirePermission(user, RbacPermission.ProvidersRead);
+        if (deny is not null) return deny;
         var providers = await _db.Providers.Where(p => p.TenantId == tenant.Id).ToListAsync(ct);
         // Never return secret material to clients.
         return Ok(providers.Select(p => new
@@ -296,7 +301,7 @@ public class ProvidersController : TenantedController
     public async Task<IActionResult> Save([FromBody] SaveProviderDto dto, CancellationToken ct)
     {
         var (tenant, user) = await ResolveContextAsync(_db, ct);
-        var deny = RequireRole(user, UserRole.ItAdmin, UserRole.ReportingAdmin);
+        var deny = RequirePermission(user, RbacPermission.ProvidersManage);
         if (deny is not null) return deny;
         if (!string.IsNullOrEmpty(dto.ApiKeySecretRef) &&
             !dto.ApiKeySecretRef.StartsWith("env:", StringComparison.OrdinalIgnoreCase))
@@ -585,7 +590,9 @@ public class AuditController : TenantedController
     [HttpGet]
     public async Task<IActionResult> Query([FromQuery] DateTimeOffset? from, [FromQuery] DateTimeOffset? to, [FromQuery] int take = 200, CancellationToken ct = default)
     {
-        var (tenant, _) = await ResolveContextAsync(_db, ct);
+        var (tenant, user) = await ResolveContextAsync(_db, ct);
+        var deny = RequirePermission(user, RbacPermission.AuditRead);
+        if (deny is not null) return deny;
         var events = await _audit.QueryAsync(tenant.Id, from, to, take, ct);
         return Ok(events);
     }
@@ -607,7 +614,9 @@ public class AuditController : TenantedController
         [FromQuery] int take = 200,
         CancellationToken ct = default)
     {
-        var (tenant, _) = await ResolveContextAsync(_db, ct);
+        var (tenant, user) = await ResolveContextAsync(_db, ct);
+        var deny = RequirePermission(user, RbacPermission.AuditRead);
+        if (deny is not null) return deny;
         take = Math.Clamp(take, 1, 1000);
 
         var query = _db.AuditEvents.Where(a => a.TenantId == tenant.Id);
@@ -637,7 +646,7 @@ public class AuditController : TenantedController
     public async Task<IActionResult> Verify(CancellationToken ct)
     {
         var (tenant, user) = await ResolveContextAsync(_db, ct);
-        var deny = RequireRole(user, UserRole.ComplianceReviewer, UserRole.ItAdmin, UserRole.MedicalDirector);
+        var deny = RequirePermission(user, RbacPermission.AuditVerify);
         if (deny is not null) return deny;
         var result = await _audit.VerifyChainAsync(tenant.Id, ct);
         if (!result.Intact)
@@ -677,7 +686,7 @@ public class AuditController : TenantedController
         CancellationToken ct = default)
     {
         var (tenant, user) = await ResolveContextAsync(_db, ct);
-        var deny = RequireRole(user, UserRole.ComplianceReviewer, UserRole.ItAdmin, UserRole.MedicalDirector);
+        var deny = RequirePermission(user, RbacPermission.AuditExport);
         if (deny is not null) return deny;
         if (take is < 1 or > 50000) take = 5000;
 
@@ -1541,6 +1550,9 @@ public class TenantSettingsController : TenantedController
     [HttpGet]
     public async Task<IActionResult> Get(CancellationToken ct)
     {
+        // Intentionally readable by all authenticated tenant users: the
+        // response only exposes non-secret settings and "*Configured" booleans
+        // for secret-backed integrations.
         var (tenant, _) = await ResolveContextAsync(_db, ct);
         var s = await _db.TenantSettings.FirstOrDefaultAsync(x => x.TenantId == tenant.Id, ct);
         if (s is null)
@@ -1641,7 +1653,7 @@ public class TenantSettingsController : TenantedController
     public async Task<IActionResult> Save([FromBody] SaveTenantSettingsDto dto, CancellationToken ct)
     {
         var (tenant, user) = await ResolveContextAsync(_db, ct);
-        var deny = RequireRole(user, UserRole.MedicalDirector, UserRole.ReportingAdmin, UserRole.ItAdmin);
+        var deny = RequirePermission(user, RbacPermission.TenantSettingsManage);
         if (deny is not null) return deny;
 
         if (dto.HallucinationMinSupport is < 0d or > 1d)
@@ -1751,10 +1763,12 @@ public class TenantSettingsController : TenantedController
     [HttpPost("kms/verify")]
     public async Task<IActionResult> VerifyKms(CancellationToken ct)
     {
-        var (tenant, _user) = await ResolveContextAsync(_db, ct);
-        // Verify is read-only (probe round-trip) and stamps an audit timestamp;
-        // any authenticated tenant member may invoke it. Authoring the keyRef
-        // itself is restricted via the settings PUT endpoint.
+        var (tenant, user) = await ResolveContextAsync(_db, ct);
+        var deny = RequirePermission(user, RbacPermission.SecurityManage);
+        if (deny is not null) return deny;
+        // Verify performs a probe round-trip and stamps an audit timestamp, so
+        // it follows the same tenant security-management permission as keyRef
+        // authoring.
         var s = await _db.TenantSettings.FirstOrDefaultAsync(x => x.TenantId == tenant.Id, ct);
         if (s is null || string.IsNullOrEmpty(s.CmkKeyRef))
             return BadRequest(new { kind = "validation", error = "No CMK keyRef configured." });

@@ -1,4 +1,5 @@
 using Microsoft.AspNetCore.Mvc;
+using RadioPad.Application.Security;
 using RadioPad.Application.Services.Siem;
 using RadioPad.Domain.Enums;
 using RadioPad.Infrastructure.Persistence;
@@ -31,7 +32,7 @@ public class SiemController : TenantedController
     public async Task<IActionResult> Status(CancellationToken ct)
     {
         var (_, user) = await ResolveContextAsync(_db, ct);
-        var deny = RequireRole(user, UserRole.ItAdmin, UserRole.MedicalDirector, UserRole.ComplianceReviewer);
+        var deny = RequirePermission(user, RbacPermission.AuditExport);
         if (deny is not null) return deny;
 
         var snapshot = _status.Snapshot();

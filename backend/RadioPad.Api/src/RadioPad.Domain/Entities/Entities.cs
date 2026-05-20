@@ -93,6 +93,77 @@ public class User : Entity
     public string? PreferredLocale { get; set; }
 }
 
+/// <summary>
+/// Enterprise identity root. It is account metadata only; tenant authorization
+/// continues to resolve through <see cref="TenantMembership"/> and the legacy
+/// tenant-scoped <see cref="User"/> row.
+/// </summary>
+public class GlobalUser : Entity
+{
+    public string PrimaryEmail { get; set; } = "";
+    public string NormalizedEmail { get; set; } = "";
+    public string DisplayName { get; set; } = "";
+    public bool IsActive { get; set; } = true;
+    public DateTimeOffset? LastLoginAt { get; set; }
+}
+
+/// <summary>
+/// Stable external login subject linked to a global account. Email is stored
+/// as a snapshot only; provider + issuer + subject is the unique identifier.
+/// </summary>
+public class ExternalIdentity : Entity
+{
+    public Guid GlobalUserId { get; set; }
+    public string ProviderKey { get; set; } = "";
+    public string Issuer { get; set; } = "";
+    public string Subject { get; set; } = "";
+    public string Email { get; set; } = "";
+    public string NormalizedEmail { get; set; } = "";
+    public string DisplayName { get; set; } = "";
+    public string ClaimsJson { get; set; } = "{}";
+    public DateTimeOffset? LastSeenAt { get; set; }
+    public DateTimeOffset? RevokedAt { get; set; }
+}
+
+/// <summary>
+/// Bridge from global identity into the existing tenant-local user model. This
+/// slice keeps <see cref="User"/> authoritative for role, lockout, and clinical
+/// actor ids.
+/// </summary>
+public class TenantMembership : Entity
+{
+    public Guid GlobalUserId { get; set; }
+    public Guid TenantId { get; set; }
+    public Guid UserId { get; set; }
+    public string Status { get; set; } = "active";
+    public bool IsDefault { get; set; } = true;
+    public DateTimeOffset JoinedAt { get; set; } = DateTimeOffset.UtcNow;
+    public DateTimeOffset? RemovedAt { get; set; }
+    public int SessionEpoch { get; set; }
+}
+
+/// <summary>
+/// Durable inventory row for issued RadioPad sessions. Token material is never
+/// stored; <see cref="TokenHash"/> is a one-way digest.
+/// </summary>
+public class AuthSession : Entity
+{
+    public Guid GlobalUserId { get; set; }
+    public Guid? TenantMembershipId { get; set; }
+    public Guid? TenantId { get; set; }
+    public Guid? UserId { get; set; }
+    public string TokenHash { get; set; } = "";
+    public string Method { get; set; } = "";
+    public DateTimeOffset IssuedAt { get; set; } = DateTimeOffset.UtcNow;
+    public DateTimeOffset ExpiresAt { get; set; }
+    public DateTimeOffset? RevokedAt { get; set; }
+    public string RevocationReason { get; set; } = "";
+    public string DeviceFingerprintHash { get; set; } = "";
+    public string IpHash { get; set; } = "";
+    public string UserAgentHash { get; set; } = "";
+    public int SessionEpochAtIssue { get; set; }
+}
+
 public class ProviderConfig : Entity
 {
     public Guid TenantId { get; set; }

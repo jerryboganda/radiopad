@@ -11,6 +11,10 @@ public class RadioPadDbContext : DbContext
 
     public DbSet<Tenant> Tenants => Set<Tenant>();
     public DbSet<User> Users => Set<User>();
+    public DbSet<GlobalUser> GlobalUsers => Set<GlobalUser>();
+    public DbSet<ExternalIdentity> ExternalIdentities => Set<ExternalIdentity>();
+    public DbSet<TenantMembership> TenantMemberships => Set<TenantMembership>();
+    public DbSet<AuthSession> AuthSessions => Set<AuthSession>();
     public DbSet<ProviderConfig> Providers => Set<ProviderConfig>();
     public DbSet<CopilotIntegrationSettings> CopilotIntegrationSettings => Set<CopilotIntegrationSettings>();
     public DbSet<CopilotFeatureFlag> CopilotFeatureFlags => Set<CopilotFeatureFlag>();
@@ -61,6 +65,17 @@ public class RadioPadDbContext : DbContext
     {
         b.Entity<Tenant>().HasIndex(x => x.Slug).IsUnique();
         b.Entity<User>().HasIndex(x => new { x.TenantId, x.Email }).IsUnique();
+        b.Entity<GlobalUser>().HasIndex(x => x.NormalizedEmail);
+        b.Entity<ExternalIdentity>().HasIndex(x => new { x.ProviderKey, x.Issuer, x.Subject }).IsUnique();
+        b.Entity<ExternalIdentity>().HasIndex(x => new { x.GlobalUserId, x.ProviderKey });
+        b.Entity<ExternalIdentity>().HasIndex(x => x.NormalizedEmail);
+        b.Entity<TenantMembership>().HasIndex(x => new { x.TenantId, x.UserId }).IsUnique();
+        b.Entity<TenantMembership>().HasIndex(x => new { x.GlobalUserId, x.TenantId }).IsUnique();
+        b.Entity<TenantMembership>().HasIndex(x => new { x.TenantId, x.Status });
+        b.Entity<AuthSession>().HasIndex(x => x.TokenHash).IsUnique();
+        b.Entity<AuthSession>().HasIndex(x => new { x.GlobalUserId, x.ExpiresAt });
+        b.Entity<AuthSession>().HasIndex(x => new { x.TenantId, x.UserId, x.ExpiresAt });
+        b.Entity<AuthSession>().HasIndex(x => new { x.RevokedAt, x.ExpiresAt });
         b.Entity<Rulebook>().HasIndex(x => new { x.TenantId, x.RulebookId, x.Version }).IsUnique();
         b.Entity<ReportTemplate>().HasIndex(x => new { x.TenantId, x.TemplateId }).IsUnique();
         b.Entity<ProviderConfig>().HasIndex(x => new { x.TenantId, x.Name }).IsUnique();
@@ -77,6 +92,9 @@ public class RadioPadDbContext : DbContext
         b.Entity<CopilotDiagnosticRun>().HasIndex(x => new { x.TenantId, x.CreatedAt });
         b.Entity<TenantLexicon>().HasIndex(x => new { x.TenantId, x.Term }).IsUnique();
         b.Entity<TenantSettings>().HasIndex(x => x.TenantId).IsUnique();
+        b.Entity<MagicLinkToken>().HasIndex(x => x.TokenHash).IsUnique();
+        b.Entity<DeviceAuthRequest>().HasIndex(x => x.DeviceCodeHash).IsUnique();
+        b.Entity<DeviceAuthRequest>().HasIndex(x => x.UserCode).IsUnique();
         b.Entity<StripeWebhookEvent>().HasIndex(e => new { e.Source, e.EventId }).IsUnique();
         b.Entity<PushDevice>().HasIndex(x => new { x.TenantId, x.UserId, x.Token }).IsUnique();
         b.Entity<PushDevice>().HasIndex(x => new { x.TenantId, x.UserId, x.LastSeenAt });
