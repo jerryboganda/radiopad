@@ -164,7 +164,8 @@ public sealed class RadioPadBearerMiddlewareTests
             db,
             new NoopAuditLog(),
             NullLogger<MagicLinkController>.Instance,
-            new TestHostEnvironment("Production"))
+            new TestHostEnvironment("Production"),
+            new NoopEmailSender())
         {
             ControllerContext = new ControllerContext { HttpContext = new DefaultHttpContext() },
         };
@@ -229,5 +230,10 @@ public sealed class RadioPadBearerMiddlewareTests
 
         public Task<AuditChainVerification> VerifyChainAsync(Guid tenantId, CancellationToken cancellationToken = default) =>
             Task.FromResult(new AuditChainVerification(0, true, null, null));
+    }
+
+    private sealed class NoopEmailSender : IEmailSender
+    {
+        public Task<bool> SendAsync(EmailMessage message, CancellationToken ct) => Task.FromResult(true);
     }
 }

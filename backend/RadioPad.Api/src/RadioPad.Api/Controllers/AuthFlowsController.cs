@@ -1,11 +1,8 @@
 using System.Security.Cryptography;
 using System.Text;
 using System.Text.Json;
-using MailKit.Net.Smtp;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
-using MimeKit;
-using MimeKit.Utils;
 using RadioPad.Api.Auth;
 using RadioPad.Api.Middleware;
 using RadioPad.Application.Abstractions;
@@ -188,8 +185,9 @@ public class MagicLinkController : ControllerBase
     private readonly IAuditLog _audit;
     private readonly ILogger<MagicLinkController> _log;
     private readonly IWebHostEnvironment _env;
-    public MagicLinkController(RadioPadDbContext db, IAuditLog audit, ILogger<MagicLinkController> log, IWebHostEnvironment env)
-    { _db = db; _audit = audit; _log = log; _env = env; }
+    private readonly IEmailSender _email;
+    public MagicLinkController(RadioPadDbContext db, IAuditLog audit, ILogger<MagicLinkController> log, IWebHostEnvironment env, IEmailSender email)
+    { _db = db; _audit = audit; _log = log; _env = env; _email = email; }
 
     public record RequestDto(string Tenant, string Email, string? CallbackUrl);
     public record ConsumeDto(string Token);
@@ -243,9 +241,9 @@ public class MagicLinkController : ControllerBase
             });
         }
 
-        if (_env.IsProduction() && !SmtpConfigured())
+        if (_env.IsProduction() && !EmailConfigured())
         {
-            _log.LogError("Magic-link SMTP is not configured in Production.");
+            _log.LogError("Magic-link email is not configured in Production.");
             return StatusCode(StatusCodes.Status503ServiceUnavailable, new
             {
                 error = "Magic-link email is not configured.",
@@ -408,75 +406,24 @@ public class MagicLinkController : ControllerBase
         return $"{callback}{separator}magic={Uri.EscapeDataString(rawToken)}";
     }
 
-    private static bool SmtpConfigured() =>
-        !string.IsNullOrWhiteSpace(Environment.GetEnvironmentVariable("RADIOPAD_SMTP_HOST"));
+    private static bool EmailConfigured() =>
+        !string.IsNullOrWhiteSpace(Environment.GetEnvironmentVariable("RADIOPAD_EMAIL_API_KEY"))
+        || !string.IsNullOrWhiteSpace(Environment.GetEnvironmentVariable("RADIOPAD_SMTP_HOST"));
 
     private async Task<bool> TrySendAsync(string to, string link, CancellationToken ct)
     {
-        var host = Environment.GetEnvironmentVariable("RADIOPAD_SMTP_HOST");
-        if (string.IsNullOrWhiteSpace(host)) return false;
-        try
-        {
-            int port = int.TryParse(Environment.GetEnvironmentVariable("RADIOPAD_SMTP_PORT"), out var p) ? p : 587;
-            var user = Environment.GetEnvironmentVariable("RADIOPAD_SMTP_USER");
-            var pass = Environment.GetEnvironmentVariable("RADIOPAD_SMTP_PASS");
-            var fromRaw = Environment.GetEnvironmentVariable("RADIOPAD_SMTP_FROM") ?? "no-reply@radiopad.local";
-            var replyToRaw = Environment.GetEnvironmentVariable("RADIOPAD_SMTP_REPLY_TO");
+        var plain = "Hi,\r\n\r\nUse this secure link to sign in to RadioPad. It expires in 15 minutes and can be used once:\r\n\r\n"
+            + link
+            + "\r\n\r\nIf you did not request this, you can safely ignore this email.\r\n\r\n-- RadioPad\r\n";
+        var html = BuildMagicLinkHtml(link);
 
-            // For Gmail-relayed mail the From address MUST match the authenticated
-            // mailbox or Gmail rewrites the header / treats it as spam. Normalise
-            // the address part to the SMTP user while preserving the display name.
-            var from = MailboxAddress.Parse(fromRaw);
-            var isGmail = host.Equals("smtp.gmail.com", StringComparison.OrdinalIgnoreCase);
-            if (isGmail && !string.IsNullOrEmpty(user) && user.Contains('@')
-                && !string.Equals(from.Address, user, StringComparison.OrdinalIgnoreCase))
-            {
-                from = new MailboxAddress(from.Name, user);
-            }
+        var message = new EmailMessage(
+            To: to,
+            Subject: "Your RadioPad sign-in link",
+            HtmlBody: html,
+            PlainBody: plain);
 
-            var msg = new MimeMessage();
-            msg.From.Add(from);
-            msg.To.Add(MailboxAddress.Parse(to));
-            if (!string.IsNullOrWhiteSpace(replyToRaw))
-            {
-                msg.ReplyTo.Add(MailboxAddress.Parse(replyToRaw));
-            }
-            msg.Subject = "Your RadioPad sign-in link";
-            msg.MessageId = MimeUtils.GenerateMessageId(from.Domain);
-            msg.Headers.Add("Auto-Submitted", "auto-generated");
-            msg.Headers.Add("X-Auto-Response-Suppress", "All");
-            msg.Headers.Add("X-Entity-Ref-ID", Guid.NewGuid().ToString("N"));
-
-            var plain = "Hi,\r\n\r\nUse this secure link to sign in to RadioPad. It expires in 15 minutes and can be used once:\r\n\r\n"
-                + link
-                + "\r\n\r\nIf you did not request this, you can safely ignore this email.\r\n\r\n-- RadioPad\r\n";
-            var html = BuildMagicLinkHtml(link);
-
-            var alt = new MultipartAlternative
-            {
-                new TextPart("plain") { Text = plain },
-                new TextPart("html") { Text = html },
-            };
-            msg.Body = alt;
-
-            using var client = new SmtpClient();
-            // When using an SMTP relay (host != actual SMTP server), TLS cert won't match the relay IP.
-            var tlsHost = Environment.GetEnvironmentVariable("RADIOPAD_SMTP_TLS_HOST");
-            if (!string.IsNullOrEmpty(tlsHost))
-                client.ServerCertificateValidationCallback = (_, cert, _, errors) =>
-                    errors == System.Net.Security.SslPolicyErrors.None
-                    || cert?.Subject?.Contains(tlsHost, StringComparison.OrdinalIgnoreCase) == true;
-            await client.ConnectAsync(host, port, MailKit.Security.SecureSocketOptions.StartTlsWhenAvailable, ct);
-            if (!string.IsNullOrEmpty(user)) await client.AuthenticateAsync(user, pass, ct);
-            await client.SendAsync(msg, ct);
-            await client.DisconnectAsync(true, ct);
-            return true;
-        }
-        catch (Exception ex)
-        {
-            _log.LogWarning(ex, "Magic-link SMTP send failed.");
-            return false;
-        }
+        return await _email.SendAsync(message, ct);
     }
 
     private static string BuildMagicLinkHtml(string link)

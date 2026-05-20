@@ -215,3 +215,22 @@ public interface IPlanQuotaStore
 }
 
 public sealed record PlanQuotaUsage(int AiCalls, long InputTokens, long OutputTokens);
+
+/// <summary>
+/// Transactional email sender abstraction. Implementations may use HTTPS
+/// REST APIs (Resend, SendGrid, Mailgun) or SMTP as a fallback.
+/// DigitalOcean blocks SMTP ports so the primary implementation should be
+/// an HTTPS-based provider for guaranteed deliverability.
+/// </summary>
+public interface IEmailSender
+{
+    Task<bool> SendAsync(EmailMessage message, CancellationToken ct);
+}
+
+public sealed record EmailMessage(
+    string To,
+    string Subject,
+    string HtmlBody,
+    string? PlainBody = null,
+    string? From = null,
+    string? ReplyTo = null);

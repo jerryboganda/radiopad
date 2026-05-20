@@ -63,6 +63,10 @@ builder.Services.AddDbContext<RadioPadDbContext>(opt =>
 });
 
 builder.Services.AddHttpClient();
+// Transactional email via HTTPS REST API (Resend/SendGrid/Mailgun).
+// Bypasses DigitalOcean SMTP port block for guaranteed deliverability.
+builder.Services.AddHttpClient<RadioPad.Infrastructure.Email.HttpEmailSender>();
+builder.Services.AddSingleton<IEmailSender, RadioPad.Infrastructure.Email.HttpEmailSender>();
 // Iter-31 — shared HttpClient pool for production AI provider adapters
 // (Azure OpenAI, AWS Bedrock, Vertex AI, OpenAI direct, OpenAI-compatible).
 // Per-adapter timeout is 60 s; overrideable via RADIOPAD_AI_HTTP_TIMEOUT_SEC.
