@@ -16,7 +16,6 @@ export default function ProfileMenu() {
   const tNav = useTranslations('nav');
   const tProfile = useTranslations('profile');
   const tSubtle = useTranslations('buttons.subtle');
-  const router = useRouter();
   const [me, setMe] = useState<Me>(null);
   const [open, setOpen] = useState(false);
   const [signingOut, setSigningOut] = useState(false);
