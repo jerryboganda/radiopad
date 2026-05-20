@@ -1,8 +1,12 @@
 using System.Security.Cryptography;
+using System.Text;
 using System.Text.Json;
 using System.IdentityModel.Tokens.Jwt;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.IdentityModel.Protocols;
+using Microsoft.IdentityModel.Protocols.OpenIdConnect;
+using Microsoft.IdentityModel.Tokens;
 using RadioPad.Api.Auth;
 using RadioPad.Application.Abstractions;
 using RadioPad.Domain.Entities;
@@ -40,9 +44,11 @@ public class AuthController : TenantedController
     private readonly RadioPadDbContext _db;
     private readonly IAuditLog _audit;
     private readonly IWebHostEnvironment _env;
-    public AuthController(RadioPadDbContext db, IAuditLog audit, IWebHostEnvironment env)
+    private readonly IHttpClientFactory _http;
+
+    public AuthController(RadioPadDbContext db, IAuditLog audit, IWebHostEnvironment env, IHttpClientFactory http)
     {
-        _db = db; _audit = audit; _env = env;
+        _db = db; _audit = audit; _env = env; _http = http;
     }
 
     public record SignInDto(string Tenant, string User);
@@ -78,6 +84,15 @@ public class AuthController : TenantedController
         var issuedAt = DateTimeOffset.UtcNow;
         var token = RadioPadBearerTokens.Mint(tenant.Slug, dto.User, user.SessionEpoch, _env, issuedAt);
         var expiresAt = RadioPadBearerTokens.ExpiresAt(issuedAt);
+        await EnterpriseIdentityBridge.RecordAuthSessionAsync(
+            _db,
+            user,
+            token,
+            "dev-header",
+            expiresAt,
+            ct,
+            ip: HttpContext.Connection.RemoteIpAddress?.ToString(),
+            userAgent: HttpContext.Request.Headers.UserAgent.FirstOrDefault());
         RadioPadSessionCookies.Append(Response, Request, token, expiresAt, _env);
 
         await _audit.AppendAsync(new AuditEvent
@@ -95,13 +110,6 @@ public class AuthController : TenantedController
             user = dto.User,
             expiresAt,
         });
-    }
-
-    [HttpPost("logout")]
-    public IActionResult Logout()
-    {
-        RadioPadSessionCookies.Delete(Response, Request, _env);
-        return NoContent();
     }
 
     [HttpGet("oidc/authorize-url")]
@@ -299,12 +307,13 @@ public class AuthController : TenantedController
             return Unauthorized(new { error = "Account locked.", kind = "unauthenticated", until = user.LockedUntil });
         }
 
-        var token = RadioPadBearerToken.Mint(tenant.Slug, user.Email, user.SessionEpoch);
-        var expiresAt = DateTimeOffset.UtcNow.Add(RadioPadBearerToken.Lifetime);
+        var issuedAt = DateTimeOffset.UtcNow;
+        var token = RadioPadBearerTokens.Mint(tenant.Slug, user.Email, user.SessionEpoch, _env, issuedAt);
+        var expiresAt = RadioPadBearerTokens.ExpiresAt(issuedAt);
         await EnterpriseIdentityBridge.RecordAuthSessionAsync(_db, user, token, "oidc-code", expiresAt, ct,
             ip: HttpContext.Connection.RemoteIpAddress?.ToString(),
             userAgent: HttpContext.Request.Headers.UserAgent.FirstOrDefault());
-        RadioPadSessionCookies.Append(HttpContext, token, expiresAt);
+        RadioPadSessionCookies.Append(Response, Request, token, expiresAt, _env);
         await _audit.AppendAsync(new AuditEvent
         {
             TenantId = tenant.Id,
@@ -408,45 +417,57 @@ public class AuthController : TenantedController
         var token = RadioPadSessionCookies.ExtractBearer(Request);
         var revoked = false;
 
-        if (!string.IsNullOrWhiteSpace(token) && RadioPadRequestIdentity.TryGet(HttpContext, out var identity))
+        if (!string.IsNullOrWhiteSpace(token))
         {
-            var tenant = await _db.Tenants.AsNoTracking()
-                .FirstOrDefaultAsync(t => t.Slug == identity.TenantSlug, ct);
-            if (tenant is not null)
+            var now = DateTimeOffset.UtcNow;
+            var tokenHash = EnterpriseIdentityBridge.Sha256Hex(token);
+            var session = await _db.AuthSessions.AsNoTracking()
+                .Where(s => s.TokenHash == tokenHash)
+                .Select(s => new { s.TenantId, s.UserId })
+                .FirstOrDefaultAsync(ct);
+            if (session?.TenantId is Guid tenantId && session.UserId is Guid userId)
             {
-                var user = await _db.Users.AsNoTracking()
-                    .FirstOrDefaultAsync(u => u.TenantId == tenant.Id && u.Email == identity.UserEmail, ct);
-                if (user is not null)
-                {
-                    var now = DateTimeOffset.UtcNow;
-                    var tokenHash = EnterpriseIdentityBridge.Sha256Hex(token);
-                    var updated = await _db.AuthSessions
-                        .Where(s => s.TokenHash == tokenHash
-                            && s.TenantId == tenant.Id
-                            && s.UserId == user.Id
-                            && s.RevokedAt == null)
-                        .ExecuteUpdateAsync(setters => setters
-                            .SetProperty(s => s.RevokedAt, now)
-                            .SetProperty(s => s.RevocationReason, "logout")
-                            .SetProperty(s => s.UpdatedAt, now), ct);
-                    revoked = updated > 0;
+                var updated = await _db.AuthSessions
+                    .Where(s => s.TokenHash == tokenHash && s.RevokedAt == null)
+                    .ExecuteUpdateAsync(setters => setters
+                        .SetProperty(s => s.RevokedAt, now)
+                        .SetProperty(s => s.RevocationReason, "logout")
+                        .SetProperty(s => s.UpdatedAt, now), ct);
+                revoked = updated > 0;
 
-                    if (revoked)
+                if (revoked)
+                {
+                    await _audit.AppendAsync(new AuditEvent
                     {
-                        await _audit.AppendAsync(new AuditEvent
-                        {
-                            TenantId = tenant.Id,
-                            UserId = user.Id,
-                            Action = AuditAction.SessionsRevoked,
-                            DetailsJson = JsonSerializer.Serialize(new { scope = "current-session", reason = "logout" }),
-                        }, ct);
-                    }
+                        TenantId = tenantId,
+                        UserId = userId,
+                        Action = AuditAction.SessionsRevoked,
+                        DetailsJson = JsonSerializer.Serialize(new { scope = "current-session", reason = "logout" }),
+                    }, ct);
                 }
             }
         }
 
-        RadioPadSessionCookies.Clear(HttpContext);
+        RadioPadSessionCookies.Delete(Response, Request, _env);
         return Ok(new { ok = true, revoked });
+    }
+
+    private async Task AuditBlockedDevSignInAsync(SignInDto dto, CancellationToken ct)
+    {
+        var tenant = await _db.Tenants.AsNoTracking().FirstOrDefaultAsync(t => t.Slug == dto.Tenant, ct);
+        if (tenant is null) return;
+
+        var user = await _db.Users.AsNoTracking()
+            .FirstOrDefaultAsync(u => u.TenantId == tenant.Id && u.Email == dto.User, ct);
+        if (user is null) return;
+
+        await _audit.AppendAsync(new AuditEvent
+        {
+            TenantId = tenant.Id,
+            UserId = user.Id,
+            Action = AuditAction.PolicyViolation,
+            DetailsJson = JsonSerializer.Serialize(new { reason = "dev_signin_disabled" }),
+        }, ct);
     }
 
     private string? CurrentBearerHash()

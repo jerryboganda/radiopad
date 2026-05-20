@@ -10,9 +10,11 @@ using System.Xml;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
 using RadioPad.Api.Auth;
+using RadioPad.Api.Controllers;
 using RadioPad.Api.Tests.Infrastructure;
 using RadioPad.Application.Abstractions;
 using RadioPad.Domain.Entities;
+using Microsoft.AspNetCore.Hosting;
 using RadioPad.Domain.Enums;
 using RadioPad.Infrastructure.Identity;
 using RadioPad.Infrastructure.Persistence;
@@ -421,19 +423,19 @@ public class VerifiedTenantAccessContextTests : IClassFixture<RadioPadAppFactory
         });
         Assert.Equal(HttpStatusCode.OK, signIn.StatusCode);
         Assert.True(signIn.Headers.TryGetValues("Set-Cookie", out var issuedCookies));
-        Assert.Contains(issuedCookies, c => c.Contains("rp_session=", StringComparison.Ordinal));
+        Assert.Contains(issuedCookies, c => c.Contains($"{RadioPadSessionCookies.CookieName}=", StringComparison.Ordinal));
 
         var body = await signIn.Content.ReadFromJsonAsync<JsonElement>();
         var token = body.GetProperty("token").GetString()!;
 
         using var logoutClient = _factory.CreateClient();
-        logoutClient.DefaultRequestHeaders.Add("Cookie", $"rp_session={token}");
+        logoutClient.DefaultRequestHeaders.Add("Cookie", $"{RadioPadSessionCookies.CookieName}={token}");
 
         var logout = await logoutClient.PostAsync("/api/auth/logout", content: null);
 
         Assert.Equal(HttpStatusCode.OK, logout.StatusCode);
         Assert.True(logout.Headers.TryGetValues("Set-Cookie", out var clearedCookies));
-        Assert.Contains(clearedCookies, c => c.Contains("rp_session=", StringComparison.Ordinal)
+        Assert.Contains(clearedCookies, c => c.Contains($"{RadioPadSessionCookies.CookieName}=", StringComparison.Ordinal)
             && c.Contains("expires=", StringComparison.OrdinalIgnoreCase));
 
         using var scope = _factory.Services.CreateScope();
@@ -451,12 +453,12 @@ public class VerifiedTenantAccessContextTests : IClassFixture<RadioPadAppFactory
         await factory.InitializeAsync();
         try
         {
-            var issuedAt = DateTimeOffset.UtcNow.Subtract(RadioPadBearerToken.Lifetime).AddMinutes(-1);
-            var token = RadioPadBearerToken.Mint(
+            var issuedAt = DateTimeOffset.UtcNow.AddHours(-13);
+            var token = RadioPadBearerTokens.Mint(
                 factory.SeedTenant.Slug,
                 factory.SeedUser.Email,
                 factory.SeedUser.SessionEpoch,
-                issuedAt);
+                now: issuedAt);
             var http = factory.CreateClient();
             http.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", token);
             http.DefaultRequestHeaders.Add("X-RadioPad-Tenant", factory.SeedTenant.Slug);
@@ -506,7 +508,7 @@ public class VerifiedTenantAccessContextTests : IClassFixture<RadioPadAppFactory
     }
 
     private static string MintBearer(RadioPadAppFactory factory, string tenant, string user) =>
-        RadioPadBearerToken.Mint(tenant, user, factory.SeedUser.SessionEpoch);
+        RadioPadBearerTokens.Mint(tenant, user, factory.SeedUser.SessionEpoch);
 
     private static async Task<string> MintSessionBearerAsync(RadioPadAppFactory factory, string tenant, string user)
     {
@@ -520,7 +522,7 @@ public class VerifiedTenantAccessContextTests : IClassFixture<RadioPadAppFactory
             dbUser,
             token,
             "test",
-            DateTimeOffset.UtcNow.Add(RadioPadBearerToken.Lifetime),
+            RadioPadBearerTokens.ExpiresAt(DateTimeOffset.UtcNow),
             CancellationToken.None);
         return token;
     }

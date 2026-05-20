@@ -162,12 +162,11 @@ public sealed class IpAllowlistMiddleware
 
     private static async Task<string?> ResolveTenantSlugAsync(HttpContext ctx)
     {
-        var header = ctx.Request.Headers["X-RadioPad-Tenant"].FirstOrDefault();
-        if (!string.IsNullOrWhiteSpace(header)) return header;
-
         if (!ctx.Request.Path.StartsWithSegments("/api/auth/magic-link/request") ||
             !HttpMethods.IsPost(ctx.Request.Method))
-            return null;
+        {
+            return ctx.Request.Headers["X-RadioPad-Tenant"].FirstOrDefault();
+        }
 
         if (ctx.Request.ContentLength is > 8192) return null;
 
@@ -238,7 +237,7 @@ public sealed class IpAllowlistMiddleware
         return Convert.ToHexString(bytes, 0, 8).ToLowerInvariant();
     }
 
-    private static AllowlistRanges ResolveRanges(string? raw)
+    internal static AllowlistRanges ResolveRanges(string? raw)
     {
         if (string.IsNullOrWhiteSpace(raw)) return AllowlistRanges.Unconfigured;
         if (!string.Equals(raw, _cachedRaw, StringComparison.Ordinal)) { _ranges = ParseCsvRanges(raw); _cachedRaw = raw; }
@@ -280,7 +279,7 @@ public sealed class IpAllowlistMiddleware
         }
     }
 
-    private readonly record struct AllowlistRanges(
+    internal readonly record struct AllowlistRanges(
         bool Configured,
         bool Valid,
         (IPAddress, int)[] Ranges)

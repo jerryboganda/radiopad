@@ -1,4 +1,5 @@
 using Microsoft.AspNetCore.Http;
+using Microsoft.Extensions.DependencyInjection;
 
 namespace RadioPad.Api.Auth;
 
@@ -28,6 +29,27 @@ public static class RadioPadSessionCookies
         {
             HttpOnly = true,
             Secure = env.IsProduction() || request.IsHttps,
+            SameSite = SameSiteMode.Lax,
+            Path = "/",
+        });
+    }
+
+    public static string? ExtractBearer(HttpRequest request)
+    {
+        var auth = request.Headers.Authorization.FirstOrDefault();
+        if (!string.IsNullOrWhiteSpace(auth) && auth.StartsWith("Bearer ", StringComparison.OrdinalIgnoreCase))
+            return auth["Bearer ".Length..].Trim();
+
+        return request.Cookies[CookieName];
+    }
+
+    public static void Clear(HttpContext ctx)
+    {
+        var env = ctx.RequestServices.GetService<IHostEnvironment>();
+        ctx.Response.Cookies.Delete(CookieName, new CookieOptions
+        {
+            HttpOnly = true,
+            Secure = env?.IsProduction() == true || ctx.Request.IsHttps,
             SameSite = SameSiteMode.Lax,
             Path = "/",
         });

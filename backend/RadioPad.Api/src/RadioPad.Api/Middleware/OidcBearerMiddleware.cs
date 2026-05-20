@@ -3,6 +3,7 @@ using Microsoft.IdentityModel.Protocols;
 using Microsoft.IdentityModel.Protocols.OpenIdConnect;
 using Microsoft.IdentityModel.Tokens;
 using Microsoft.EntityFrameworkCore;
+using RadioPad.Api.Auth;
 using RadioPad.Infrastructure.Persistence;
 
 namespace RadioPad.Api.Middleware;
@@ -130,10 +131,15 @@ public sealed class OidcBearerMiddleware
 
             // Inject so TenantedController.ResolveContextAsync sees the OIDC identity.
             // Dev headers win when explicitly enabled (test pipeline).
-            if (!devHeaders)
+            var devHeaders = RadioPadRequestIdentity.DevHeadersEnabled(ctx);
+            var devHeaderIdentity = devHeaders
+                && !string.IsNullOrWhiteSpace(ctx.Request.Headers["X-RadioPad-Tenant"].FirstOrDefault())
+                && !string.IsNullOrWhiteSpace(ctx.Request.Headers["X-RadioPad-User"].FirstOrDefault());
+            if (!devHeaderIdentity)
             {
                 ctx.Request.Headers["X-RadioPad-Tenant"] = slug;
                 ctx.Request.Headers["X-RadioPad-User"] = email;
+                RadioPadRequestIdentity.Set(ctx, slug, email, "oidc");
             }
             ctx.Items["RadioPad.Identity.Validated"] = true;
         }

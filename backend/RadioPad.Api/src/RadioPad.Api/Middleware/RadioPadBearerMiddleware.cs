@@ -1,5 +1,6 @@
 using Microsoft.EntityFrameworkCore;
 using RadioPad.Api.Auth;
+using RadioPad.Infrastructure.Identity;
 using RadioPad.Infrastructure.Persistence;
 
 namespace RadioPad.Api.Middleware;
@@ -81,8 +82,30 @@ public sealed class RadioPadBearerMiddleware
                 return;
             }
 
+            var tokenHash = EnterpriseIdentityBridge.Sha256Hex(token);
+            var session = await db.AuthSessions.AsNoTracking()
+                .Where(s => s.TokenHash == tokenHash && s.TenantId == tenant.Id && s.UserId == user.Id)
+                .Select(s => new { s.ExpiresAt, s.RevokedAt, s.SessionEpochAtIssue })
+                .FirstOrDefaultAsync(ctx.RequestAborted);
+            if (session is not null)
+            {
+                if (session.RevokedAt is not null)
+                {
+                    await RejectAsync(ctx, "revoked_auth_session", "Bearer session has been revoked.");
+                    return;
+                }
+
+                if (session.ExpiresAt <= DateTimeOffset.UtcNow || session.SessionEpochAtIssue != user.SessionEpoch)
+                {
+                    await RejectAsync(ctx, "expired_auth_session", "Bearer session is expired.");
+                    return;
+                }
+            }
+
             ctx.Request.Headers["X-RadioPad-Tenant"] = slug;
             ctx.Request.Headers["X-RadioPad-User"] = email;
+            RadioPadRequestIdentity.Set(ctx, slug, email, "rp-bearer");
+            ctx.Items["RadioPad.Identity.Validated"] = true;
             await _next(ctx);
             return;
         }

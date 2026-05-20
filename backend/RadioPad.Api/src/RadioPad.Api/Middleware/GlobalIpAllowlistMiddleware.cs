@@ -21,14 +21,30 @@ public sealed class GlobalIpAllowlistMiddleware
     public async Task InvokeAsync(HttpContext ctx)
     {
         var ranges = IpAllowlistMiddleware.ResolveRanges(Environment.GetEnvironmentVariable("RADIOPAD_IP_ALLOWLIST"));
-        if (ranges is not { Length: > 0 })
+        if (ranges.Configured && !ranges.Valid)
+        {
+            _log.LogError("Global IP allowlist is configured but invalid; failing closed before auth.");
+            ctx.Response.StatusCode = StatusCodes.Status503ServiceUnavailable;
+            ctx.Response.ContentType = "application/problem+json";
+            await ctx.Response.WriteAsJsonAsync(new
+            {
+                type = "https://radiopad.dev/errors/ip-allowlist-invalid",
+                title = "IP allowlist is invalid",
+                status = 503,
+                kind = "ip_allowlist_invalid",
+                scope = "global",
+            });
+            return;
+        }
+
+        if (ranges.Ranges.Length == 0)
         {
             await _next(ctx);
             return;
         }
 
         var remote = IpAllowlistMiddleware.ResolveRemoteIp(ctx);
-        if (remote is null || IPAddress.IsLoopback(remote) || IpAllowlistMiddleware.MatchAny(remote, ranges))
+        if (remote is null || IPAddress.IsLoopback(remote) || IpAllowlistMiddleware.MatchAny(remote, ranges.Ranges))
         {
             await _next(ctx);
             return;

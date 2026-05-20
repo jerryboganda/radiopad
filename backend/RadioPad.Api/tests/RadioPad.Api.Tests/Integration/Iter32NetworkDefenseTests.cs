@@ -21,6 +21,7 @@ namespace RadioPad.Api.Tests.Integration;
 /// <see cref="AnomalyDetector"/>'s new <see cref="AuditAction.SecurityAlert"/>
 /// emitters.
 /// </summary>
+[Collection(EnvironmentVariableCollection.Name)]
 public class Iter32NetworkDefenseTests : IClassFixture<RadioPadAppFactory>
 {
     private readonly RadioPadAppFactory _factory;
@@ -157,6 +158,39 @@ public class Iter32NetworkDefenseTests : IClassFixture<RadioPadAppFactory>
         ctx.Request.ContentType = "application/json";
         ctx.Request.ContentLength = body.Length;
         ctx.Request.Body = new MemoryStream(body);
+        ctx.Response.Body = new MemoryStream();
+
+        await middleware.InvokeAsync(ctx, db, audit);
+
+        Assert.False(nextCalled);
+        Assert.Equal(StatusCodes.Status403Forbidden, ctx.Response.StatusCode);
+        Assert.Equal(0, ctx.Request.Body.Position);
+    }
+
+    [Fact]
+    public async Task IpAllowlist_MagicLinkBodyTenantWinsOverSpoofedHeader()
+    {
+        using var scope = _factory.Services.CreateScope();
+        var db = scope.ServiceProvider.GetRequiredService<RadioPadDbContext>();
+        var audit = scope.ServiceProvider.GetRequiredService<IAuditLog>();
+
+        var s = await EnsureSettings(db);
+        s.IpAllowlistJson = "[\"198.51.100.0/24\"]";
+        s.IpAllowlistCidr = "";
+        await db.SaveChangesAsync();
+
+        var nextCalled = false;
+        var middleware = new IpAllowlistMiddleware(_ => { nextCalled = true; return Task.CompletedTask; }, NullLogger<IpAllowlistMiddleware>.Instance);
+
+        var body = System.Text.Encoding.UTF8.GetBytes($"{{\"tenant\":\"{_factory.SeedTenant.Slug}\",\"email\":\"it-radiologist@radiopad.local\"}}");
+        var ctx = new DefaultHttpContext();
+        ctx.Connection.RemoteIpAddress = IPAddress.Parse("203.0.113.7");
+        ctx.Request.Method = HttpMethods.Post;
+        ctx.Request.Path = "/api/auth/magic-link/request";
+        ctx.Request.ContentType = "application/json";
+        ctx.Request.ContentLength = body.Length;
+        ctx.Request.Body = new MemoryStream(body);
+        ctx.Request.Headers["X-RadioPad-Tenant"] = "spoofed-tenant";
         ctx.Response.Body = new MemoryStream();
 
         await middleware.InvokeAsync(ctx, db, audit);
