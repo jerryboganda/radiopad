@@ -407,7 +407,8 @@ public class MagicLinkController : ControllerBase
     }
 
     private static bool EmailConfigured() =>
-        !string.IsNullOrWhiteSpace(Environment.GetEnvironmentVariable("RADIOPAD_EMAIL_API_KEY"))
+        !string.IsNullOrWhiteSpace(Environment.GetEnvironmentVariable("RADIOPAD_GMAIL_REFRESH_TOKEN"))
+        || !string.IsNullOrWhiteSpace(Environment.GetEnvironmentVariable("RADIOPAD_EMAIL_API_KEY"))
         || !string.IsNullOrWhiteSpace(Environment.GetEnvironmentVariable("RADIOPAD_SMTP_HOST"));
 
     private async Task<bool> TrySendAsync(string to, string link, CancellationToken ct)
