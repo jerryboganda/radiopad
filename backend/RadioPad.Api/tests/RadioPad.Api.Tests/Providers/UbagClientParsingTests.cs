@@ -87,7 +87,7 @@ public class UbagClientParsingTests
     {
         // The real /v1/targets shape carries no readiness field and no ok-status value —
         // every target comes back Ready=false. True readiness is derived separately by
-        // cross-referencing /v1/browser/contexts (see UbagProviderAdapter.IsTargetReady).
+        // cross-referencing /v1/browser/contexts via MergeTargetReadiness.
         var sut = BuildClient(StubHandler.Json(HttpStatusCode.OK, RealTargetsJson));
         var targets = await sut.ListTargetsAsync(CancellationToken.None);
 

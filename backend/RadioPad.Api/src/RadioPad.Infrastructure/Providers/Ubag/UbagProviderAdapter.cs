@@ -80,16 +80,6 @@ public sealed class UbagProviderAdapter : IAiProviderAdapter, IAiProviderHealthP
     }
 
     /// <summary>
-    /// Returns true when the browser context for <paramref name="targetId"/> is authenticated.
-    /// Used by <see cref="ProbeAsync"/> to determine per-target readiness.
-    /// </summary>
-    public static bool IsTargetReady(string targetId, IReadOnlyList<UbagBrowserContext> contexts)
-    {
-        var ctx = contexts.FirstOrDefault(c => string.Equals(c.TargetId, targetId, StringComparison.OrdinalIgnoreCase));
-        return ctx?.Authenticated == true;
-    }
-
-    /// <summary>
     /// Merges browser-context readiness into a target list in a single pass (no double-scan).
     /// For each target, finds the matching context by id (case-insensitive) once, then sets
     /// <c>Ready</c> from <c>ctx.Authenticated</c> and <c>Status</c> from <c>ctx.LoginState</c>.

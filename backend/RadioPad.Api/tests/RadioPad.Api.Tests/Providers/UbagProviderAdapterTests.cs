@@ -141,32 +141,6 @@ public class UbagProviderAdapterTests
         Assert.Equal(UbagProviderAdapter.AdapterId, result.Runtime);
     }
 
-    // ── IsTargetReady helper ──────────────────────────────────────────────────
-
-    [Theory]
-    [InlineData("authenticated", true)]
-    [InlineData("unknown", false)]
-    [InlineData("logged_out", false)]
-    public void IsTargetReady_MatchesByLoginState(string loginState, bool expectedReady)
-    {
-        var contexts = new[] { new UbagBrowserContext("gemini_web", loginState) };
-        Assert.Equal(expectedReady, UbagProviderAdapter.IsTargetReady("gemini_web", contexts));
-    }
-
-    [Fact]
-    public void IsTargetReady_CaseInsensitiveTargetIdMatch()
-    {
-        var contexts = new[] { new UbagBrowserContext("Gemini_Web", "authenticated") };
-        Assert.True(UbagProviderAdapter.IsTargetReady("gemini_web", contexts));
-    }
-
-    [Fact]
-    public void IsTargetReady_ReturnsFalse_WhenNoMatchingContext()
-    {
-        var contexts = new[] { new UbagBrowserContext("deepseek_web", "authenticated") };
-        Assert.False(UbagProviderAdapter.IsTargetReady("gemini_web", contexts));
-    }
-
     // ── MergeTargetReadiness ──────────────────────────────────────────────────
 
     [Fact]
