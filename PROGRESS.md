@@ -13,11 +13,22 @@
   `desktop/src-tauri/Cargo.lock` (previously absent). Pinned the Tauri CLI to
   `2.11.3` in `desktop-release.yml`, `tauri-updater.yml`, and
   `scripts/build-radiopad-desktop-windows.ps1`.
-- **One source fix:** the existing v2 plugin API call sites (`StoreExt`,
-  global-shortcut, clipboard) compiled clean, but `backend_health.rs` needed an
-  explicit closure return type (`-> Result<(String, u16), String>`) — the newer
-  deps added more `From<_> for String` impls, making a previously-inferable error
-  type ambiguous (E0282/E0283).
+- **Two fixes the bump required:**
+  1. `backend_health.rs` needed an explicit closure return type
+     (`-> Result<(String, u16), String>`) — the newer deps added more
+     `From<_> for String` impls, making a previously-inferable error type
+     ambiguous (E0282/E0283). (Compile-time.)
+  2. `tauri.conf.json` plugins block: removed the empty `"dialog": {}`,
+     `"clipboard-manager": {}`, and `"store": {}` config maps. The newer
+     plugins (e.g. dialog 2.7) deserialize their config section as *unit* and
+     reject an empty map, panicking at startup with
+     `PluginInitialization("dialog", ... invalid type: map, expected unit)`.
+     This only surfaces at runtime (the build succeeds), so it was caught by a
+     launch smoke-test, not by `cargo build`. Plugins remain initialized in
+     `main.rs`; they just use defaults now.
+- **End-to-end verified:** release bundle produces `RadioPad_0.1.0_x64-setup.exe`
+  (NSIS) + `RadioPad_0.1.0_x64_en-US.msi`; the built app launches, opens the
+  RadioPad window, and initializes WebView2.
 
 ---
 

@@ -75,9 +75,6 @@
   },
   "plugins": {
     "shell": { "open": false },
-    "dialog": {},
-    "clipboard-manager": {},
-    "store": {},
     "updater": {
       "endpoints": [
         "https://updates.radiopad.local/{{target}}/{{arch}}/{{current_version}}"
