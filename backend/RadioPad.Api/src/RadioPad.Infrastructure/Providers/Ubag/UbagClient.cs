@@ -98,11 +98,13 @@ public sealed class UbagClient : IUbagClient
 
     public async Task<UbagWorkflow> CreateWorkflowAsync(UbagWorkflowRequest request, string idempotencyKey, CancellationToken ct)
     {
+        // NOTE: the gateway's POST /v1/workflows schema is {api_version, name, steps[]}
+        // and its decoder rejects unknown top-level fields. A `client` envelope (accepted
+        // by /v1/jobs) is NOT valid here and yields UBAG-VALIDATION-JSON-001, so it is omitted.
         var body = new
         {
             api_version = ApiVersion(),
             name = request.Name,
-            client = ClientEnvelope(request.ClientRequestId),
             steps = request.Steps.Select(s => new
             {
                 id = s.Id,
@@ -122,15 +124,83 @@ public sealed class UbagClient : IUbagClient
     public async Task<UbagWorkflowRun> RunWorkflowAsync(string workflowId, string idempotencyKey, CancellationToken ct)
     {
         var body = new { api_version = ApiVersion() };
-        using var doc = await SendAsync(HttpMethod.Post, $"/v1/workflows/{Uri.EscapeDataString(workflowId)}/runs", body, idempotencyKey, ct);
-        return ParseRun(doc.RootElement, workflowId);
+        UbagWorkflowRun run;
+        List<UbagStepRef> steps;
+        using (var doc = await SendAsync(HttpMethod.Post, $"/v1/workflows/{Uri.EscapeDataString(workflowId)}/runs", body, idempotencyKey, ct))
+        {
+            run = ParseRun(doc.RootElement, workflowId);
+            steps = ExtractSteps(doc.RootElement);
+        }
+        return await EnrichRunOutputAsync(run, steps, ct);
     }
 
     public async Task<UbagWorkflowRun> GetWorkflowRunAsync(string runId, CancellationToken ct)
     {
-        using var doc = await SendAsync(HttpMethod.Get, $"/v1/workflows/runs/{Uri.EscapeDataString(runId)}", null, null, ct);
-        return ParseRun(doc.RootElement, "");
+        UbagWorkflowRun run;
+        List<UbagStepRef> steps;
+        using (var doc = await SendAsync(HttpMethod.Get, $"/v1/workflows/runs/{Uri.EscapeDataString(runId)}", null, null, ct))
+        {
+            run = ParseRun(doc.RootElement, "");
+            steps = ExtractSteps(doc.RootElement);
+        }
+        return await EnrichRunOutputAsync(run, steps, ct);
     }
+
+    // The gateway marks a workflow run terminal as soon as its steps are DISPATCHED;
+    // the live browser jobs finish later, and the run response carries only per-step
+    // job ids (no answer text). So derive true completion + output from the step JOBS:
+    // keep the run non-terminal until every step job is itself terminal, and aggregate
+    // each step's text (result.output.text). The frontend auto-polls until terminal.
+    private async Task<UbagWorkflowRun> EnrichRunOutputAsync(UbagWorkflowRun run, IReadOnlyList<UbagStepRef> steps, CancellationToken ct)
+    {
+        if (steps.Count == 0)
+            return run;
+        var parts = new List<string>();
+        string? manual = null;
+        string? error = null;
+        var allDone = true;
+        foreach (var step in steps)
+        {
+            if (string.IsNullOrWhiteSpace(step.JobId)) { allDone = false; continue; }
+            UbagJob job;
+            try { job = await GetJobAsync(step.JobId, ct); }
+            catch (ProviderTransportException) { allDone = false; continue; }
+            var stepDone = job.Terminal || !string.IsNullOrWhiteSpace(job.ManualAction);
+            if (!stepDone) allDone = false;
+            if (manual is null && !string.IsNullOrWhiteSpace(job.ManualAction)) manual = job.ManualAction;
+            if (error is null && !string.IsNullOrWhiteSpace(job.Error)) error = $"{step.StepId}: {job.Error}";
+            if (!string.IsNullOrWhiteSpace(job.Output))
+            {
+                var label = string.IsNullOrWhiteSpace(step.StepId) ? job.Target : step.StepId;
+                parts.Add($"### {label}\n{job.Output}");
+            }
+        }
+        return run with
+        {
+            Output = parts.Count > 0 ? string.Join("\n\n", parts) : run.Output,
+            Terminal = run.Terminal && allDone,
+            ManualAction = run.ManualAction ?? manual,
+            Error = run.Error ?? error,
+        };
+    }
+
+    private static List<UbagStepRef> ExtractSteps(JsonElement root)
+    {
+        var list = new List<UbagStepRef>();
+        if (TryProperty(root, "steps", out var steps) && steps.ValueKind == JsonValueKind.Array)
+        {
+            foreach (var s in steps.EnumerateArray())
+            {
+                list.Add(new UbagStepRef(
+                    ReadString(s, "step_id") ?? ReadString(s, "id") ?? "",
+                    ReadString(s, "state") ?? ReadString(s, "status") ?? "",
+                    ReadString(s, "job_id") ?? ReadString(s, "jobId") ?? ""));
+            }
+        }
+        return list;
+    }
+
+    private readonly record struct UbagStepRef(string StepId, string State, string JobId);
 
     private async Task<JsonDocument> SendAsync(HttpMethod method, string path, object? body, string? idempotencyKey, CancellationToken ct)
     {
@@ -138,6 +208,7 @@ public sealed class UbagClient : IUbagClient
         using var req = new HttpRequestMessage(method, path);
         if (!string.IsNullOrWhiteSpace(idempotencyKey))
             req.Headers.TryAddWithoutValidation("Idempotency-Key", idempotencyKey);
+        req.Headers.TryAddWithoutValidation("Ubag-Api-Version", ApiVersion());
         ApplyAuth(req);
         if (body is not null)
         {
@@ -171,7 +242,6 @@ public sealed class UbagClient : IUbagClient
         app_id = "radiopad",
         app_version = "0.1.0",
         sdk = new { name = "radiopad-ubag-client", version = "1.0.0" },
-        request_id = clientRequestId,
     };
 
     private static string ApiVersion()
@@ -251,29 +321,47 @@ public sealed class UbagClient : IUbagClient
 
     private static string? ExtractOutput(JsonElement root)
     {
+        // The gateway returns completed-job text at result.output.text (two levels deep),
+        // so descend recursively rather than only one level.
         foreach (var key in new[] { "output", "text", "final", "result" })
         {
             if (!TryProperty(root, key, out var prop)) continue;
-            if (prop.ValueKind == JsonValueKind.String) return prop.GetString();
-            if (prop.ValueKind == JsonValueKind.Object)
+            var found = TextFrom(prop, depth: 0);
+            if (!string.IsNullOrWhiteSpace(found)) return found;
+        }
+        return null;
+    }
+
+    private static string? TextFrom(JsonElement el, int depth)
+    {
+        if (el.ValueKind == JsonValueKind.String) return el.GetString();
+        if (el.ValueKind != JsonValueKind.Object || depth > 4) return null;
+        foreach (var nested in new[] { "text", "plain_text", "markdown", "html", "final", "content", "value" })
+        {
+            var v = ReadString(el, nested);
+            if (!string.IsNullOrWhiteSpace(v)) return v;
+        }
+        foreach (var container in new[] { "output", "result", "data", "message" })
+        {
+            if (TryProperty(el, container, out var child))
             {
-                foreach (var nested in new[] { "text", "plain_text", "markdown", "output" })
-                {
-                    var v = ReadString(prop, nested);
-                    if (!string.IsNullOrWhiteSpace(v)) return v;
-                }
+                var v = TextFrom(child, depth + 1);
+                if (!string.IsNullOrWhiteSpace(v)) return v;
             }
         }
         return null;
     }
 
+    // Gateway terminal statuses (jobs + workflow runs). "failed_retryable" is intentionally
+    // NOT terminal so polling continues until it resolves or the caller's timeout fires.
+    private static readonly string[] TerminalStatuses =
+    {
+        "completed", "complete", "completed_with_warnings", "succeeded",
+        "failed", "failed_terminal", "dead_letter", "cancelled", "canceled", "timed_out",
+    };
+
     private static bool IsTerminal(string status)
-        => status.Equals("completed", StringComparison.OrdinalIgnoreCase)
-            || status.Equals("complete", StringComparison.OrdinalIgnoreCase)
-            || status.Equals("succeeded", StringComparison.OrdinalIgnoreCase)
-            || status.Equals("failed", StringComparison.OrdinalIgnoreCase)
-            || status.Equals("cancelled", StringComparison.OrdinalIgnoreCase)
-            || status.Equals("canceled", StringComparison.OrdinalIgnoreCase);
+        => TerminalStatuses.Any(s => status.Equals(s, StringComparison.OrdinalIgnoreCase));
 
     private static bool IsOkStatus(string status)
         => status.Equals("ok", StringComparison.OrdinalIgnoreCase)

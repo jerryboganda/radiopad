@@ -169,7 +169,14 @@ public class UbagController : TenantedController
         }, ct);
     }
 
-    private static IReadOnlyList<string> OrderedTargets() => new[] { "chatgpt_web", "gemini_web", "deepseek_web" };
+    private static IReadOnlyList<string> OrderedTargets()
+    {
+        // Configurable ordered web-chain. Defaults to the targets that are logged in
+        // (gemini_web, deepseek_web); chatgpt_web is excluded unless explicitly enabled.
+        var raw = Environment.GetEnvironmentVariable("RADIOPAD_UBAG_ORDERED_TARGETS");
+        if (string.IsNullOrWhiteSpace(raw)) raw = "gemini_web,deepseek_web";
+        return raw.Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
+    }
 
     private static bool LooksLikeSecret(string? value)
     {
