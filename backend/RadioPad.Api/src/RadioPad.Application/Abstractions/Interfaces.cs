@@ -87,6 +87,7 @@ public interface IUbagClient
     Task<UbagHealth> GetHealthAsync(CancellationToken ct);
     Task<UbagBrowserSummary> GetBrowserSummaryAsync(CancellationToken ct);
     Task<IReadOnlyList<UbagTarget>> ListTargetsAsync(CancellationToken ct);
+    Task<IReadOnlyList<UbagBrowserContext>> ListBrowserContextsAsync(CancellationToken ct);
     Task<UbagJob> CreateJobAsync(UbagJobRequest request, string idempotencyKey, CancellationToken ct);
     Task<UbagJob> GetJobAsync(string jobId, CancellationToken ct);
     Task<UbagWorkflow> CreateWorkflowAsync(UbagWorkflowRequest request, string idempotencyKey, CancellationToken ct);
@@ -109,6 +110,16 @@ public sealed record UbagTarget(
     string Status,
     bool Ready,
     string? Url);
+
+/// <summary>
+/// A browser context returned by <c>GET /v1/browser/contexts</c>.
+/// <see cref="Authenticated"/> is true when <see cref="LoginState"/> equals
+/// "authenticated" (case-insensitive) — used to determine per-target readiness.
+/// </summary>
+public sealed record UbagBrowserContext(string TargetId, string LoginState)
+{
+    public bool Authenticated => string.Equals(LoginState, "authenticated", StringComparison.OrdinalIgnoreCase);
+}
 
 public sealed record UbagJobRequest(
     string Target,

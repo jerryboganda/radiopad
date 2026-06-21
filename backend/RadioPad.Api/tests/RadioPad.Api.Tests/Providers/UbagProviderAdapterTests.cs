@@ -86,6 +86,9 @@ public class UbagProviderAdapterTests
                 new UbagTarget("gemini_web", "Gemini", "ready", true, null),
             });
 
+        public Task<IReadOnlyList<UbagBrowserContext>> ListBrowserContextsAsync(CancellationToken ct) =>
+            Task.FromResult<IReadOnlyList<UbagBrowserContext>>(Array.Empty<UbagBrowserContext>());
+
         public Task<UbagJob> CreateJobAsync(UbagJobRequest request, string idempotencyKey, CancellationToken ct)
         {
             CreatedTarget = request.Target;

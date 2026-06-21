@@ -50,24 +50,77 @@ public sealed class UbagClient : IUbagClient
     {
         using var doc = await SendAsync(HttpMethod.Get, "/v1/targets", null, null, ct);
         var root = doc.RootElement;
+
+        // Real gateway (api-version 2026-05-22) wraps the list in {"data":[...]}.
+        // Fall back to a legacy root array, then a legacy {"targets":[...]} envelope.
         var array = root.ValueKind == JsonValueKind.Array
             ? root
-            : TryProperty(root, "targets", out var targets) && targets.ValueKind == JsonValueKind.Array
-                ? targets
-                : default;
+            : TryProperty(root, "data", out var dataArr) && dataArr.ValueKind == JsonValueKind.Array
+                ? dataArr
+                : TryProperty(root, "targets", out var legacyArr) && legacyArr.ValueKind == JsonValueKind.Array
+                    ? legacyArr
+                    : default;
         if (array.ValueKind != JsonValueKind.Array) return Array.Empty<UbagTarget>();
 
         var rows = new List<UbagTarget>();
         foreach (var item in array.EnumerateArray())
         {
-            var id = ReadString(item, "id") ?? ReadString(item, "target") ?? ReadString(item, "name") ?? "unknown";
-            var status = ReadString(item, "status") ?? ReadString(item, "state") ?? "unknown";
+            // Real gateway uses "key" as the canonical id; legacy shapes used "id", "target", or "name".
+            var id = ReadString(item, "key")
+                     ?? ReadString(item, "adapter_key")
+                     ?? ReadString(item, "id")
+                     ?? ReadString(item, "target")
+                     ?? ReadString(item, "name")
+                     ?? "unknown";
+
+            var name = ReadString(item, "display_name") ?? ReadString(item, "name") ?? id;
+
+            // Real gateway has no readiness field on /v1/targets — readiness comes from
+            // /v1/browser/contexts. If a status/state field is present (legacy) use it;
+            // otherwise record "listed" so callers know the target exists but isn't probed.
+            var status = ReadString(item, "status") ?? ReadString(item, "state") ?? "listed";
+
+            // "ready" bool wins if present (legacy); otherwise derive from status string only
+            // when the status is recognisably-ok, else false (do not assume readiness here).
+            var ready = ReadBool(item, "ready") ?? (status != "listed" && IsOkStatus(status));
+
             rows.Add(new UbagTarget(
                 Id: id,
-                Name: ReadString(item, "name") ?? id,
+                Name: name,
                 Status: status,
-                Ready: ReadBool(item, "ready") ?? IsOkStatus(status),
+                Ready: ready,
                 Url: ReadString(item, "url")));
+        }
+        return rows;
+    }
+
+    public async Task<IReadOnlyList<UbagBrowserContext>> ListBrowserContextsAsync(CancellationToken ct)
+    {
+        using var doc = await SendAsync(HttpMethod.Get, "/v1/browser/contexts", null, null, ct);
+        var root = doc.RootElement;
+
+        // Gateway returns {"data":[...]} envelope; fall back to a root array.
+        var array = root.ValueKind == JsonValueKind.Array
+            ? root
+            : TryProperty(root, "data", out var dataArr) && dataArr.ValueKind == JsonValueKind.Array
+                ? dataArr
+                : default;
+        if (array.ValueKind != JsonValueKind.Array) return Array.Empty<UbagBrowserContext>();
+
+        var rows = new List<UbagBrowserContext>();
+        foreach (var item in array.EnumerateArray())
+        {
+            var targetId = ReadString(item, "target_id")
+                           ?? ReadString(item, "targetId")
+                           ?? ReadString(item, "target");
+            if (string.IsNullOrWhiteSpace(targetId)) continue;
+
+            var loginState = ReadString(item, "login_state")
+                             ?? ReadString(item, "loginState")
+                             ?? ReadString(item, "state")
+                             ?? "unknown";
+
+            rows.Add(new UbagBrowserContext(targetId, loginState));
         }
         return rows;
     }
