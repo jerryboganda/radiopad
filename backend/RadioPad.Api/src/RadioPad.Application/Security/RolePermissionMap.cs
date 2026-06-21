@@ -128,6 +128,74 @@ public static class RolePermissionMap
                 RbacPermission.UsersRead,
                 RbacPermission.BillingRead,
                 RbacPermission.BillingManage),
+
+            // Iter-0c (AUTH-002) — trainee: draft/edit/validate, but NEVER sign
+            // or export a final report (attending signs). Aligns with the
+            // never-auto-sign safety boundary applied to human roles too.
+            [UserRole.Resident] = Set(
+                RbacPermission.ReportsRead,
+                RbacPermission.ReportsDraft,
+                RbacPermission.ReportsEdit,
+                RbacPermission.ReportsValidate,
+                RbacPermission.RulebooksRead,
+                RbacPermission.TemplatesRead,
+                RbacPermission.ValidationPacksRead,
+                RbacPermission.ValidationPacksRun,
+                RbacPermission.McpToolsInvoke),
+
+            // Iter-0c (AUTH-002) — senior trainee: as Resident plus export of
+            // preliminary reports; final sign still reserved for attendings.
+            [UserRole.Fellow] = Set(
+                RbacPermission.ReportsRead,
+                RbacPermission.ReportsDraft,
+                RbacPermission.ReportsEdit,
+                RbacPermission.ReportsValidate,
+                RbacPermission.ReportsExport,
+                RbacPermission.RulebooksRead,
+                RbacPermission.TemplatesRead,
+                RbacPermission.ValidationPacksRead,
+                RbacPermission.ValidationPacksRun,
+                RbacPermission.McpToolsInvoke),
+
+            // Iter-0c (AUTH-002) — attending subspecialist: full reporting
+            // authority, identical to a general Radiologist.
+            [UserRole.Subspecialist] = Set(
+                RbacPermission.ReportsRead,
+                RbacPermission.ReportsDraft,
+                RbacPermission.ReportsEdit,
+                RbacPermission.ReportsValidate,
+                RbacPermission.ReportsSign,
+                RbacPermission.ReportsExport,
+                RbacPermission.RulebooksRead,
+                RbacPermission.TemplatesRead,
+                RbacPermission.ValidationPacksRead,
+                RbacPermission.ValidationPacksRun,
+                RbacPermission.McpToolsInvoke,
+                RbacPermission.BillingRead,
+                RbacPermission.UsersRead,
+                RbacPermission.AuditRead),
+
+            // Iter-0c (AUTH-002) — research user: read-only access to
+            // de-identified reporting artifacts. No sign/edit/export of PHI.
+            [UserRole.Researcher] = Set(
+                RbacPermission.ReportsRead,
+                RbacPermission.RulebooksRead,
+                RbacPermission.TemplatesRead,
+                RbacPermission.ValidationPacksRead),
+
+            // Iter-0c (AUTH-002) — read-only auditor: read everything + audit
+            // verify/export; no mutations anywhere.
+            [UserRole.Auditor] = Set(
+                RbacPermission.ReportsRead,
+                RbacPermission.RulebooksRead,
+                RbacPermission.TemplatesRead,
+                RbacPermission.ProvidersRead,
+                RbacPermission.ValidationPacksRead,
+                RbacPermission.UsersRead,
+                RbacPermission.BillingRead,
+                RbacPermission.AuditRead,
+                RbacPermission.AuditVerify,
+                RbacPermission.AuditExport),
         };
 
     public static IReadOnlySet<RbacPermission> ForRole(UserRole role) =>

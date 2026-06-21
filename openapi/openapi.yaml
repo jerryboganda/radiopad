@@ -193,6 +193,106 @@ components:
               inputTokens: { type: integer }
               outputTokens: { type: integer }
               error: { type: string, nullable: true }
+    UbagHealth:
+      type: object
+      required: [ok, status]
+      properties:
+        ok: { type: boolean }
+        status: { type: string }
+        version: { type: string, nullable: true }
+        error: { type: string, nullable: true }
+    UbagBrowserSummary:
+      type: object
+      required: [instances, contexts, tabs]
+      properties:
+        instances: { type: integer }
+        contexts: { type: integer }
+        tabs: { type: integer }
+        status: { type: string, nullable: true }
+        rawStatus: { type: string, nullable: true }
+    UbagTarget:
+      type: object
+      required: [id, name, status, ready]
+      properties:
+        id: { type: string }
+        name: { type: string }
+        status: { type: string }
+        ready: { type: boolean }
+        url: { type: string, nullable: true }
+    UbagStatus:
+      type: object
+      required: [health, browser, targets, allowedTargets, orderedTargets]
+      properties:
+        health: { $ref: "#/components/schemas/UbagHealth" }
+        browser: { $ref: "#/components/schemas/UbagBrowserSummary" }
+        targets:
+          type: array
+          items: { $ref: "#/components/schemas/UbagTarget" }
+        allowedTargets:
+          type: array
+          items: { type: string }
+        orderedTargets:
+          type: array
+          items: { type: string, enum: [chatgpt_web, gemini_web, deepseek_web] }
+    UbagJob:
+      type: object
+      required: [id, target, status, terminal, rawJson]
+      properties:
+        id: { type: string }
+        target: { type: string }
+        status: { type: string }
+        terminal: { type: boolean }
+        output: { type: string, nullable: true }
+        error: { type: string, nullable: true }
+        manualAction: { type: string, nullable: true }
+        latencyMs: { type: integer, nullable: true }
+        rawJson: { type: string }
+    UbagWorkflow:
+      type: object
+      required: [id, status, rawJson]
+      properties:
+        id: { type: string }
+        status: { type: string }
+        rawJson: { type: string }
+    UbagWorkflowRun:
+      type: object
+      required: [id, workflowId, status, terminal, rawJson]
+      properties:
+        id: { type: string }
+        workflowId: { type: string }
+        status: { type: string }
+        terminal: { type: boolean }
+        output: { type: string, nullable: true }
+        error: { type: string, nullable: true }
+        manualAction: { type: string, nullable: true }
+        rawJson: { type: string }
+    UbagSubmitJobRequest:
+      type: object
+      required: [target, prompt]
+      properties:
+        target: { type: string, enum: [chatgpt_web, gemini_web, deepseek_web, mock] }
+        prompt:
+          type: string
+          maxLength: 20000
+          description: Non-PHI, non-secret prompt only.
+    UbagRunWorkflowRequest:
+      type: object
+      required: [prompt]
+      properties:
+        prompt:
+          type: string
+          maxLength: 20000
+          description: Non-PHI, non-secret prompt run through ChatGPT -> Gemini -> DeepSeek.
+        name: { type: string, nullable: true }
+    UbagRunWorkflowResponse:
+      type: object
+      required: [workflow, run, orderedTargets]
+      properties:
+        workflow: { $ref: "#/components/schemas/UbagWorkflow" }
+        run: { $ref: "#/components/schemas/UbagWorkflowRun" }
+        orderedTargets:
+          type: array
+          items: { type: string, enum: [chatgpt_web, gemini_web, deepseek_web] }
     Problem:
       type: object
       required: [type, title, status]
@@ -221,6 +321,9 @@ components:
             - connect_not_ready
             - sandbox_required
             - providers_not_sandbox
+            - target_not_allowed
+            - secret_not_supported
+            - phi_not_supported
             - validation_blockers
             - ip_not_allowed
             - ip_allowlist_invalid
@@ -454,7 +557,7 @@ components:
       properties:
         id: { type: string, format: uuid }
         name: { type: string }
-        adapter: { type: string, enum: [mock, anthropic, openai, openai-compatible, azure-openai, aws-bedrock, google-vertex, ollama, ollama-chat, vllm, llama-cpp, github-copilot-sdk, github-copilot-cli, gemini-cli, codex-cli] }
+        adapter: { type: string, enum: [mock, anthropic, openai, openai-compatible, azure-openai, aws-bedrock, google-vertex, ollama, ollama-chat, vllm, llama-cpp, github-copilot-sdk, github-copilot-cli, gemini-cli, codex-cli, ubag] }
         model: { type: string }
         endpointUrl: { type: string }
         compliance: { $ref: "#/components/schemas/ProviderComplianceClass" }
@@ -486,7 +589,7 @@ components:
       properties:
         id: { type: string, format: uuid, nullable: true }
         name: { type: string }
-        adapter: { type: string, enum: [mock, anthropic, openai, openai-compatible, azure-openai, aws-bedrock, google-vertex, ollama, ollama-chat, vllm, llama-cpp, github-copilot-sdk, github-copilot-cli, gemini-cli, codex-cli] }
+        adapter: { type: string, enum: [mock, anthropic, openai, openai-compatible, azure-openai, aws-bedrock, google-vertex, ollama, ollama-chat, vllm, llama-cpp, github-copilot-sdk, github-copilot-cli, gemini-cli, codex-cli, ubag] }
         model: { type: string }
         endpointUrl: { type: string }
         apiKeySecretRef:
@@ -1222,6 +1325,83 @@ paths:
         "400": { description: Validation failed., content: { application/json: { schema: { $ref: '#/components/schemas/Problem' } } } }
         "404": { description: Report not found., content: { application/json: { schema: { $ref: '#/components/schemas/Problem' } } } }
         "409": { description: Tenant has not opted in to sandbox runs., content: { application/json: { schema: { $ref: '#/components/schemas/Problem' } } } }
+
+  /api/ubag/status:
+    get:
+      summary: UBAG gateway, browser topology, and target readiness. Non-PHI automation only.
+      responses:
+        "200":
+          description: UBAG status summary.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/UbagStatus" }
+        "403": { description: Forbidden., content: { application/json: { schema: { $ref: '#/components/schemas/Problem' } } } }
+
+  /api/ubag/jobs:
+    post:
+      summary: Submit a single non-PHI UBAG browser automation job.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/UbagSubmitJobRequest" }
+      responses:
+        "200":
+          description: Created UBAG job.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/UbagJob" }
+        "400": { description: Validation failed., content: { application/json: { schema: { $ref: '#/components/schemas/Problem' } } } }
+        "409": { description: Prompt contains PHI or secret-shaped material., content: { application/json: { schema: { $ref: '#/components/schemas/Problem' } } } }
+
+  /api/ubag/jobs/{id}:
+    get:
+      summary: Fetch current status for a UBAG job.
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema: { type: string }
+      responses:
+        "200":
+          description: UBAG job status.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/UbagJob" }
+        "403": { description: Forbidden., content: { application/json: { schema: { $ref: '#/components/schemas/Problem' } } } }
+
+  /api/ubag/workflows/ordered-web-chain:
+    post:
+      summary: Start the fixed ChatGPT -> Gemini -> DeepSeek non-PHI workflow.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/UbagRunWorkflowRequest" }
+      responses:
+        "200":
+          description: Created workflow and started run.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/UbagRunWorkflowResponse" }
+        "400": { description: Validation failed or ordered targets not allowed., content: { application/json: { schema: { $ref: '#/components/schemas/Problem' } } } }
+        "409": { description: Prompt contains PHI or secret-shaped material., content: { application/json: { schema: { $ref: '#/components/schemas/Problem' } } } }
+
+  /api/ubag/workflows/runs/{id}:
+    get:
+      summary: Fetch current status for a UBAG workflow run.
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema: { type: string }
+      responses:
+        "200":
+          description: UBAG workflow run status.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/UbagWorkflowRun" }
+        "403": { description: Forbidden., content: { application/json: { schema: { $ref: '#/components/schemas/Problem' } } } }
 
   /api/prompts/overrides:
     get:

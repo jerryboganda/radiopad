@@ -17,19 +17,66 @@ namespace RadioPad.Infrastructure.Providers;
 /// </summary>
 public static class OpenAiChatHelpers
 {
-    public static object BuildChatBody(string model, string systemPrompt, string userPrompt, int? maxTokens = null)
+    public static object BuildChatBody(
+        string model,
+        string systemPrompt,
+        string userPrompt,
+        int? maxTokens = null,
+        double temperature = AiCompletionRequest.DefaultTemperature,
+        string? outputSchema = null)
     {
+        var messages = new object[]
+        {
+            new { role = "system", content = systemPrompt },
+            new { role = "user", content = userPrompt },
+        };
+
+        // Iter-0b (AI-015 / RB-005) — when a rulebook binds a JSON Schema and it
+        // parses, request structured output. A malformed schema is ignored
+        // (free text) rather than failing the run.
+        if (!string.IsNullOrWhiteSpace(outputSchema) &&
+            TryParseSchema(outputSchema, out var schemaElement))
+        {
+            return new
+            {
+                model,
+                messages,
+                // Iter-0b (AI-014) — temperature already clamped to [0, 0.4] upstream.
+                temperature,
+                max_tokens = maxTokens ?? 1024,
+                stream = false,
+                response_format = new
+                {
+                    type = "json_schema",
+                    json_schema = new { name = "radiopad_structured_output", schema = schemaElement, strict = true },
+                },
+            };
+        }
+
         return new
         {
             model,
-            messages = new object[]
-            {
-                new { role = "system", content = systemPrompt },
-                new { role = "user", content = userPrompt },
-            },
+            messages,
+            temperature,
             max_tokens = maxTokens ?? 1024,
             stream = false,
         };
+    }
+
+    /// <summary>Iter-0b — parse a JSON-Schema string into a JsonElement; false when malformed.</summary>
+    private static bool TryParseSchema(string schema, out JsonElement element)
+    {
+        try
+        {
+            using var doc = JsonDocument.Parse(schema);
+            element = doc.RootElement.Clone();
+            return element.ValueKind == JsonValueKind.Object;
+        }
+        catch (JsonException)
+        {
+            element = default;
+            return false;
+        }
     }
 
     public static string NormalizeChatCompletionsUrl(string baseOrFullUrl)

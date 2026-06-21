@@ -49,6 +49,16 @@ The format is based on [Keep a Changelog 1.1.0](https://keepachangelog.com/en/1.
     HTTP 200 on every route post-deploy.
 
 ### Added
+- **Iter-50 - UBAG governed automation hub**: added `ubag` as a sandbox-only
+  provider adapter and a backend-only automation hub for production UBAG
+  (`RADIOPAD_UBAG_BASE_URL`, API version `2026-05-22`). New `/api/ubag/*`
+  admin endpoints expose gateway/browser/target readiness, single non-PHI job
+  submission, job polling, and the fixed ordered workflow
+  `chatgpt_web -> gemini_web -> deepseek_web`. The adapter and Hub reject PHI
+  and secret-shaped prompts, send idempotency keys, audit only metadata and
+  hashes, and do not automate provider login, CAPTCHA, 2FA, consent, cookies,
+  or credentials. Frontend adds `/admin/ubag`, sidebar navigation, API client
+  types, and a UBAG provider preset (`Sandbox`, default target `gemini_web`).
 - **Iter-49 — settings/security end-to-end closeout**: tenant settings are now
   documented and implemented as partial-safe saves with `ipAllowlistJson`, PACS
   vendor, SCIM, retention, CMK, and validation fields aligned across backend,

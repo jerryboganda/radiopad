@@ -46,7 +46,7 @@ public sealed class VLlmProvider : IAiProviderAdapter
         if (!string.IsNullOrEmpty(apiKey))
             client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", apiKey);
 
-        var body = OpenAiChatHelpers.BuildChatBody(model, request.SystemPrompt ?? "", request.UserPrompt ?? "");
+        var body = OpenAiChatHelpers.BuildChatBody(model, request.SystemPrompt ?? "", request.UserPrompt ?? "", temperature: request.Temperature, outputSchema: request.OutputSchema);
         var (text, pt, ctok, ms) = await OpenAiChatHelpers.SendChatAsync(client, url, body, AdapterId, cancellationToken);
 
         return new AiResult(

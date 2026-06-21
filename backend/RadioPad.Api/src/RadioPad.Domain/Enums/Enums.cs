@@ -47,6 +47,17 @@ public enum UserRole
     ComplianceReviewer = 3,
     ItAdmin = 4,
     BillingAdmin = 5,
+    // Iter-0c (PRD AUTH-002) — the remaining canonical RBAC roles.
+    /// <summary>Trainee radiologist: draft/edit/validate but never signs or exports a final report.</summary>
+    Resident = 6,
+    /// <summary>Senior trainee: as Resident, plus may export; final sign still reserved for attending roles.</summary>
+    Fellow = 7,
+    /// <summary>Attending subspecialty radiologist: full reporting authority (same as Radiologist).</summary>
+    Subspecialist = 8,
+    /// <summary>Research user: read-only access to de-identified reporting artifacts.</summary>
+    Researcher = 9,
+    /// <summary>Read-only auditor: read + audit verify/export across the tenant; no mutations.</summary>
+    Auditor = 10,
 }
 
 public enum RbacPermission

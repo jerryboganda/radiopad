@@ -58,6 +58,7 @@ const PRESETS: Preset[] = [
   { id: 'github-copilot-cli', label: 'GitHub Copilot CLI', patch: { adapter: 'github-copilot-cli', endpointUrl: '',                compliance: 1, model: 'copilot' } },
   { id: 'gemini-cli',   label: 'Gemini CLI',             patch: { adapter: 'gemini-cli',   endpointUrl: '',                       compliance: 1, model: '' } },
   { id: 'codex-cli',    label: 'Codex CLI',              patch: { adapter: 'codex-cli',    endpointUrl: '',                       compliance: 1, model: '' } },
+  { id: 'ubag',         label: 'UBAG automation hub',     patch: { adapter: 'ubag',         endpointUrl: '',                       compliance: 1, model: 'gemini_web', retentionLabel: 'non-phi-browser-automation' } },
 ];
 
 const EMPTY_DRAFT: Editable = {
@@ -251,6 +252,7 @@ export default function ProvidersPage() {
                 <option value="github-copilot-cli">github-copilot-cli</option>
                 <option value="gemini-cli">gemini-cli</option>
                 <option value="codex-cli">codex-cli</option>
+                <option value="ubag">ubag</option>
               </select>
             </label>
 

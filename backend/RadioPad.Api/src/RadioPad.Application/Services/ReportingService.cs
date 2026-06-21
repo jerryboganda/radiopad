@@ -112,7 +112,12 @@ public class ReportingService
             SystemPrompt: system,
             UserPrompt: userBody,
             PromptVersion: PromptVersion,
-            ContainsPhi: containsPhi), ct);
+            ContainsPhi: containsPhi)
+        {
+            // Iter-0b (RB-009 / AI-012) — bind rulebook provenance to the audit + usage trail.
+            RulebookId = rulebookEntity?.Id,
+            RulebookVersion = rulebookEntity?.Version,
+        }, ct);
     }
 
     internal static (string system, string instructions, string userPrompt) BuildPromptForMode(
@@ -228,12 +233,21 @@ public class ReportingService
         var extra = new List<ValidationFinding>(baseResult.Findings);
         foreach (var c in claims)
         {
+            // Iter-0b (AI-028 / §16.5 / RPT-026) — anchor the unsupported-claim
+            // finding to the exact char span of the offending sentence in the
+            // Impression so the "Why this suggestion?" panel + span-attested
+            // guardrail can highlight it. Null span when the sentence cannot be located.
+            var idx = string.IsNullOrEmpty(c.Sentence)
+                ? -1
+                : (report.Impression ?? string.Empty).IndexOf(c.Sentence, StringComparison.Ordinal);
             extra.Add(new ValidationFinding(
                 RuleId: "ai:unsupported_claim",
                 Severity: c.Severity,
                 Message: $"Impression sentence is not clearly supported by Findings/StudyContext (support={c.SupportFraction:P0}).",
                 Section: "Impression",
-                Snippet: c.Sentence));
+                Snippet: c.Sentence,
+                StartIndex: idx >= 0 ? idx : null,
+                EndIndex: idx >= 0 ? idx + c.Sentence.Length : null));
         }
         var blocker = extra.Any(f => string.Equals(f.Severity, nameof(Domain.Enums.ValidationSeverity.Blocker), StringComparison.OrdinalIgnoreCase));
         var blockerCount = extra.Count(f => string.Equals(f.Severity, nameof(Domain.Enums.ValidationSeverity.Blocker), StringComparison.OrdinalIgnoreCase));
@@ -316,7 +330,11 @@ public class ReportingService
             SystemPrompt: system,
             UserPrompt: userPrompt,
             PromptVersion: PromptVersion,
-            ContainsPhi: ContainsPhi(report)), ct);
+            ContainsPhi: ContainsPhi(report))
+        {
+            RulebookId = rulebookEntity?.Id,
+            RulebookVersion = rulebookEntity?.Version,
+        }, ct);
 
         var lines = (result.Text ?? string.Empty)
             .Split('\n', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)

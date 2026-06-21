@@ -25,6 +25,7 @@ Secrets are always referenced as `ApiKeySecretRef = "env:<NAME>"`. Literal API k
 | `github-copilot-cli` | CLI subprocess | `Sandbox` | `RADIOPAD_COPILOT_BIN` (default `copilot`) | Prompt is supplied through Copilot CLI's stdin option stream. PHI and secret-like prompts are refused before launch. |
 | `gemini-cli` | CLI subprocess | `Sandbox` | `RADIOPAD_GEMINI_BIN` (default `gemini`) | Prompt is piped on stdin in headless mode with `--output-format json`. JSON stdout is parsed when present; PHI and secret-like prompts are refused before launch. |
 | `codex-cli` | CLI subprocess, fail-closed | `Sandbox` | `RADIOPAD_CODEX_BIN` (default `codex`), `RADIOPAD_CODEX_CLI_ENABLED=1` | Prompt is piped on stdin via `codex exec --sandbox read-only -`. The adapter never opts into full-auto mode; PHI and secret-like prompts are refused before launch. |
+| `ubag` | HTTPS automation gateway | `Sandbox` | `RADIOPAD_UBAG_BASE_URL`, optional server-only auth env ref | Routes non-PHI, non-secret prompts to production UBAG. `ProviderConfig.Model` selects `chatgpt_web`, `gemini_web`, `deepseek_web`, or `mock`; default preset uses `gemini_web`. PHI is refused even if a row is misclassified. |
 
 Production CLI providers require `RADIOPAD_CLI_PROVIDER_ALLOWED_PATHS`; empty/unset allowlists are accepted only in development. Server-side GitHub Copilot CLI execution in production also requires `RADIOPAD_COPILOT_SERVER_CLI_ENABLED=1`.
 
@@ -36,6 +37,19 @@ Production CLI providers require `RADIOPAD_CLI_PROVIDER_ALLOWED_PATHS`; empty/un
 - `openai-compatible` probes `GET /v1/models` without bearer auth and blocks unsafe endpoint targets before the request.
 - CLI providers verify the configured binary without passing a prompt.
 - `github-copilot-sdk` reports unavailable until an official backend-safe SDK transport is installed and reviewed.
+- `ubag` checks UBAG `/v1/health` plus target readiness without sending a prompt.
+
+## UBAG Guardrails
+
+UBAG is for governed browser AI automation only. RadioPad's backend is the only
+component that may call UBAG; the frontend never stores UBAG auth material.
+
+- Default `RADIOPAD_UBAG_BASE_URL`: `https://ubag.polytronx.com`.
+- Default API version: `2026-05-22`.
+- Default allowed targets: `chatgpt_web,gemini_web,deepseek_web,mock`.
+- The fixed ordered workflow is `chatgpt_web -> gemini_web -> deepseek_web`.
+- UBAG adapter calls and Hub submissions reject PHI and secret-shaped prompts.
+- Operator login, CAPTCHA, 2FA, consent, cookie, and credential handling remain manual inside UBAG Browser Sessions.
 
 ## Adding A Provider
 

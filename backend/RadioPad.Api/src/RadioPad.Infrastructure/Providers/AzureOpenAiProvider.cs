@@ -51,7 +51,7 @@ public sealed class AzureOpenAiProvider : IAiProviderAdapter
         client.DefaultRequestHeaders.Remove("api-key");
         client.DefaultRequestHeaders.Add("api-key", apiKey);
 
-        var body = OpenAiChatHelpers.BuildChatBody(deployment, request.SystemPrompt, request.UserPrompt);
+        var body = OpenAiChatHelpers.BuildChatBody(deployment, request.SystemPrompt, request.UserPrompt, temperature: request.Temperature, outputSchema: request.OutputSchema);
         var (text, pt, ctok, ms) = await OpenAiChatHelpers.SendChatAsync(client, url, body, AdapterId, cancellationToken);
 
         return new AiResult(

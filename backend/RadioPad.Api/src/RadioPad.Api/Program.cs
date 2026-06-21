@@ -75,6 +75,13 @@ builder.Services.AddHttpClient("ai", c =>
     var sec = int.TryParse(Environment.GetEnvironmentVariable("RADIOPAD_AI_HTTP_TIMEOUT_SEC"), out var t) && t > 0 ? t : 60;
     c.Timeout = TimeSpan.FromSeconds(sec);
 }).ConfigurePrimaryHttpMessageHandler(() => new HttpClientHandler { AllowAutoRedirect = false });
+builder.Services.AddHttpClient(RadioPad.Infrastructure.Providers.Ubag.UbagClient.HttpClientName, c =>
+{
+    var baseUrl = Environment.GetEnvironmentVariable("RADIOPAD_UBAG_BASE_URL") ?? "https://ubag.polytronx.com";
+    c.BaseAddress = new Uri(baseUrl.TrimEnd('/') + "/");
+    var ms = int.TryParse(Environment.GetEnvironmentVariable("RADIOPAD_UBAG_TIMEOUT_MS"), out var t) && t > 0 ? t : 120_000;
+    c.Timeout = TimeSpan.FromMilliseconds(ms);
+}).ConfigurePrimaryHttpMessageHandler(() => new HttpClientHandler { AllowAutoRedirect = false });
 
 // AI provider adapters
 builder.Services.AddSingleton<IAiProviderAdapter, MockAiAdapter>();
@@ -101,6 +108,8 @@ builder.Services.AddSingleton<RadioPad.Infrastructure.Providers.Cli.IProcessLaun
 builder.Services.AddSingleton<IAiProviderAdapter, RadioPad.Infrastructure.Providers.Cli.GitHubCopilotCliProvider>();
 builder.Services.AddSingleton<IAiProviderAdapter, RadioPad.Infrastructure.Providers.Cli.GeminiCliProvider>();
 builder.Services.AddSingleton<IAiProviderAdapter, RadioPad.Infrastructure.Providers.Cli.CodexCliProvider>();
+builder.Services.AddSingleton<IUbagClient, RadioPad.Infrastructure.Providers.Ubag.UbagClient>();
+builder.Services.AddSingleton<IAiProviderAdapter, RadioPad.Infrastructure.Providers.Ubag.UbagProviderAdapter>();
 
 builder.Services.AddScoped<IAuditLog, EfAuditLog>();
 builder.Services.AddSingleton<RadioPad.Application.Security.IPermissionService, RadioPad.Application.Security.RolePermissionService>();

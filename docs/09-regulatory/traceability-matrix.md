@@ -4,6 +4,8 @@
 
 This matrix maps every functional requirement id from the [Enterprise PRD](../../RadioPad%20%E2%80%94%20Enterprise%20PRD%20_%20Project%20Requirement%20Detail%20Document.md) to its implementation, tests, verification status, and IEC 62304 lifecycle clause. It is the single source of truth for "what is shipped vs deferred" at iteration 35 PRD-complete close-out.
 
+> **PRD v2 note (Iteration 51+):** the larger **Enterprise PRD v2** gap-closure programme is tracked separately in [prd-v2-traceability-matrix.md](prd-v2-traceability-matrix.md). That document is the v2 superset; this matrix remains the v1 source of truth.
+
 ## Iteration 35 summary
 
 | Status | Iter 30 | Iter 31 | Iter 32 | Iter 33 | Iter 34 | Iter 35 |

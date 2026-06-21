@@ -134,6 +134,10 @@ public class AiGateway : IAiGateway
                     adapter = request.Provider.Adapter,
                     model = request.Provider.Model,
                     promptVersion = request.PromptVersion,
+                    // Iter-0b (RB-009 / AI-012) — rulebook provenance on every AI event.
+                    rulebookId = request.RulebookId,
+                    rulebookVersion = request.RulebookVersion,
+                    temperature = request.Temperature,
                     inputHash,
                     outputHash,
                     latencyMs = sw.ElapsedMilliseconds,
@@ -200,6 +204,9 @@ public class AiGateway : IAiGateway
                 Mode = "ai",
                 ContainsPhi = request.ContainsPhi,
                 PromptVersion = request.PromptVersion,
+                // Iter-0b (RB-009) — rulebook provenance on the usage ledger row.
+                RulebookId = request.RulebookId,
+                RulebookVersion = request.RulebookVersion ?? "",
                 InputHash = inputHash,
                 OutputHash = outputHash,
                 LatencyMs = latencyMs,

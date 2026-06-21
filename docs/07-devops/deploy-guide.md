@@ -67,6 +67,13 @@ All knobs are environment variables:
 | `RADIOPAD_CODEX_CLI_ENABLED` | optional | Defaults `0`; must be `1` before `codex-cli` executes. |
 | `RADIOPAD_OPENAI_COMPATIBLE_ALLOW_PHI` | optional | Defaults `0`; set only after reviewed approval for a remote OpenAI-compatible PHI endpoint. |
 | `RADIOPAD_GITHUB_COPILOT_SDK_ENABLED` | optional | Defaults `false`. The SDK provider remains fail-closed until a reviewed official backend-safe transport is installed. |
+| `RADIOPAD_UBAG_BASE_URL` | optional | Defaults to production UBAG `https://ubag.polytronx.com`. RadioPad backend only; never expose this as a frontend public env var. |
+| `RADIOPAD_UBAG_API_VERSION` | optional | Defaults `2026-05-22`; sent in UBAG job/workflow envelopes. |
+| `RADIOPAD_UBAG_TIMEOUT_MS` | optional | Defaults `120000`; HTTP timeout and adapter polling budget. |
+| `RADIOPAD_UBAG_ALLOWED_TARGETS` | optional | Defaults `chatgpt_web,gemini_web,deepseek_web,mock`; comma-separated allowlist for UBAG provider jobs. |
+| `RADIOPAD_UBAG_AUTH_SECRET_REF` | optional | Preferred UBAG auth reference, e.g. `env:RADIOPAD_UBAG_TOKEN`; resolved server-side only. |
+| `RADIOPAD_UBAG_AUTH_SECRET` | optional | Direct server-side UBAG auth fallback when no secret ref is used. Do not commit it or return it in JSON. |
+| `RADIOPAD_UBAG_AUTH_SCHEME` / `RADIOPAD_UBAG_AUTH_HEADER` | optional | Defaults `Bearer` / `Authorization`; use only when UBAG production auth requires a different scheme/header. |
 
 Secrets are **never** stored in the database — only the `env:NAME` reference is.
 
@@ -75,6 +82,11 @@ Browser sign-in sets an HttpOnly `radiopad_session` cookie in addition to return
 Public magic-link requests still participate in per-tenant IP allowlists: the API resolves the tenant slug from the JSON request body before the controller runs. Keep helper scripts environment-driven; never commit real mailbox credentials, app passwords, or personal account addresses.
 
 CLI providers default to `Sandbox` because the local binary may call a vendor cloud. They refuse PHI and secret-shaped prompts before launch; do not rely on provider-row promotion to bypass that boundary.
+
+UBAG also defaults to `Sandbox`. It is approved only for de-identified,
+non-secret prompts in this release. ChatGPT, Gemini, and DeepSeek provider
+logins remain manual through UBAG Browser Sessions; RadioPad must not automate
+login, CAPTCHA, 2FA, consent, cookie extraction, or credential collection.
 
 ## 4. Database
 

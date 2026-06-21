@@ -30,6 +30,10 @@ public class RadioPadDbContext : DbContext
     public DbSet<Report> Reports => Set<Report>();
     public DbSet<ReportVersion> ReportVersions => Set<ReportVersion>();
     public DbSet<ReportSignature> ReportSignatures => Set<ReportSignature>();
+    /// <summary>Iter-0a (PRD §14.12, RADS-001) — first-class structured RADS assessments per report.</summary>
+    public DbSet<RadsAssessment> RadsAssessments => Set<RadsAssessment>();
+    /// <summary>Iter-0a (PRD RPT-003, RADS-005) — first-class structured measurements per report.</summary>
+    public DbSet<ReportMeasurement> ReportMeasurements => Set<ReportMeasurement>();
     public DbSet<AiRequest> AiRequests => Set<AiRequest>();
     public DbSet<AuditEvent> AuditEvents => Set<AuditEvent>();
     public DbSet<TenantLexicon> Lexicons => Set<TenantLexicon>();
@@ -135,6 +139,20 @@ public class RadioPadDbContext : DbContext
         b.Entity<Report>().HasMany(x => x.Versions).WithOne().HasForeignKey(v => v.ReportId);
         b.Entity<Report>().HasMany(x => x.Signatures).WithOne().HasForeignKey(s => s.ReportId);
         b.Entity<ReportSignature>().HasIndex(s => new { s.TenantId, s.ReportId, s.Role });
+
+        // Iter-0a (PRD §14.12 / RPT-003 / RADS-001) — structured report data model.
+        // RADS assessments + measurements are first-class children of a report so the
+        // RADS engine, contradiction guard, lesion tracker, and analytics can query
+        // them by family/category/lesion across reports without parsing a JSON blob.
+        b.Entity<Report>().HasMany(x => x.RadsAssessments).WithOne().HasForeignKey(r => r.ReportId);
+        b.Entity<Report>().HasMany(x => x.Measurements).WithOne().HasForeignKey(m => m.ReportId);
+        // RADS analytics (RADS-008) scans by (tenant, family, category); contradiction
+        // guard + report load scan by (tenant, report).
+        b.Entity<RadsAssessment>().HasIndex(x => new { x.TenantId, x.ReportId });
+        b.Entity<RadsAssessment>().HasIndex(x => new { x.TenantId, x.Family, x.Category });
+        // Lesion tracking (COMP-003/004) follows a lesion by (tenant, lesion key).
+        b.Entity<ReportMeasurement>().HasIndex(x => new { x.TenantId, x.ReportId });
+        b.Entity<ReportMeasurement>().HasIndex(x => new { x.TenantId, x.LesionKey });
 
         // Make AuditEvent effectively append-only at the model level: no
         // navigation back-references and a unique IntegrityChain prefix.

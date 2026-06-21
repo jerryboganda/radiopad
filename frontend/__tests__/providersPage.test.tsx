@@ -45,7 +45,7 @@ describe('providers page', () => {
     reportsListMock.mockResolvedValue([]);
   });
 
-  it('offers Copilot, Gemini, and OpenAI-compatible presets', async () => {
+  it('offers Copilot, Gemini, UBAG, and OpenAI-compatible presets', async () => {
     render(<ProvidersPage />);
 
     await waitFor(() => expect(screen.getByText('Available models')).toBeInTheDocument());
@@ -57,16 +57,20 @@ describe('providers page', () => {
     expect(presetLabels).toContain('GitHub Copilot SDK');
     expect(presetLabels).toContain('GitHub Copilot CLI');
     expect(presetLabels).toContain('Gemini CLI');
+    expect(presetLabels).toContain('UBAG automation hub');
     expect(presetLabels).toContain('OpenAI-compatible');
   });
 
-  it.each([
+  const sandboxPresetCases: Array<{ preset: string; name: string; adapter: string; model: string }> = [
     { preset: 'github-copilot-sdk', name: 'Copilot SDK', adapter: 'github-copilot-sdk', model: 'copilot' },
     { preset: 'github-copilot-cli', name: 'Copilot CLI', adapter: 'github-copilot-cli', model: 'copilot' },
     { preset: 'gemini-cli', name: 'Gemini CLI', adapter: 'gemini-cli', model: '' },
     { preset: 'codex-cli', name: 'Codex CLI', adapter: 'codex-cli', model: '' },
     { preset: 'openai-compatible', name: 'OpenAI-compatible', adapter: 'openai-compatible', model: '' },
-  ])('applies sandbox defaults for $name and saves through the API client', async ({ preset, name, adapter, model }) => {
+    { preset: 'ubag', name: 'UBAG', adapter: 'ubag', model: 'gemini_web' },
+  ];
+
+  it.each(sandboxPresetCases)('applies sandbox defaults for $name and saves through the API client', async ({ preset, name, adapter, model }) => {
     render(<ProvidersPage />);
 
     await waitFor(() => expect(screen.getByText('Available models')).toBeInTheDocument());
@@ -105,6 +109,7 @@ describe('providers page', () => {
     expect(values).toContain('github-copilot-sdk');
     expect(values).toContain('github-copilot-cli');
     expect(values).toContain('gemini-cli');
+    expect(values).toContain('ubag');
     expect(values).not.toContain('openai-direct');
     expect(values).not.toContain('google-vertex-ai');
   });

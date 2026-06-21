@@ -1,12 +1,22 @@
 namespace RadioPad.Domain.ValueObjects;
 
 /// <summary>Outcome of a single rulebook check applied to a report.</summary>
+/// <remarks>
+/// Iter-0b (PRD AI-021/028, §16.3/16.5, RPT-026) — <see cref="StartIndex"/> /
+/// <see cref="EndIndex"/> are optional char-offset span anchors into the named
+/// <see cref="Section"/> text. They carry source-span provenance so the
+/// "Why this suggestion?" panel and the span-attested hallucination guard can
+/// highlight the exact text a finding refers to. Null when a finding is not
+/// span-anchored.
+/// </remarks>
 public sealed record ValidationFinding(
     string RuleId,
     string Severity,
     string Message,
     string? Section = null,
-    string? Snippet = null);
+    string? Snippet = null,
+    int? StartIndex = null,
+    int? EndIndex = null);
 
 public sealed record ValidationResult(
     bool BlockerPresent,

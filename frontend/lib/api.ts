@@ -264,6 +264,66 @@ export type Provider = {
   retentionLabel?: string;
 };
 
+export type UbagHealth = {
+  ok: boolean;
+  status: string;
+  version?: string | null;
+  error?: string | null;
+};
+
+export type UbagBrowserSummary = {
+  instances: number;
+  contexts: number;
+  tabs: number;
+  status?: string | null;
+  rawStatus?: string | null;
+};
+
+export type UbagTarget = {
+  id: string;
+  name: string;
+  status: string;
+  ready: boolean;
+  url?: string | null;
+};
+
+export type UbagJob = {
+  id: string;
+  target: string;
+  status: string;
+  terminal: boolean;
+  output?: string | null;
+  error?: string | null;
+  manualAction?: string | null;
+  latencyMs?: number | null;
+  rawJson: string;
+};
+
+export type UbagWorkflow = {
+  id: string;
+  status: string;
+  rawJson: string;
+};
+
+export type UbagWorkflowRun = {
+  id: string;
+  workflowId: string;
+  status: string;
+  terminal: boolean;
+  output?: string | null;
+  error?: string | null;
+  manualAction?: string | null;
+  rawJson: string;
+};
+
+export type UbagStatus = {
+  health: UbagHealth;
+  browser: UbagBrowserSummary;
+  targets: UbagTarget[];
+  allowedTargets: string[];
+  orderedTargets: string[];
+};
+
 export type CopilotSettings = {
   enabled: boolean;
   emergencyDisabled: boolean;
@@ -913,6 +973,19 @@ export const api = {
           error: string | null;
         }>;
       }>('/api/ai/sandbox/compare', { method: 'POST', body: JSON.stringify(body) }),
+  },
+  ubag: {
+    status: () => request<UbagStatus>('/api/ubag/status'),
+    submitJob: (body: { target: string; prompt: string }) =>
+      request<UbagJob>('/api/ubag/jobs', { method: 'POST', body: JSON.stringify(body) }),
+    getJob: (id: string) => request<UbagJob>(`/api/ubag/jobs/${encodeURIComponent(id)}`),
+    runOrderedWorkflow: (body: { prompt: string; name?: string | null }) =>
+      request<{ workflow: UbagWorkflow; run: UbagWorkflowRun; orderedTargets: string[] }>(
+        '/api/ubag/workflows/ordered-web-chain',
+        { method: 'POST', body: JSON.stringify(body) },
+      ),
+    getWorkflowRun: (id: string) =>
+      request<UbagWorkflowRun>(`/api/ubag/workflows/runs/${encodeURIComponent(id)}`),
   },
   promptOverrides: {
     list: () =>

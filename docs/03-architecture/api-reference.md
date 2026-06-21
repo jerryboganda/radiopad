@@ -180,6 +180,7 @@ The provider rows reference an `adapter` id from this fixed catalog. Compliance 
 | `github-copilot-cli` | CLI subprocess | `Sandbox` | **Iter-36 AI-012 / Iter-47 hardening.** Shells out to `copilot` using Copilot CLI's prompt option stream over stdin, keeping prompt text out of process arguments. Binary override env `RADIOPAD_COPILOT_BIN` (default `copilot`). Production server-side execution also requires `RADIOPAD_COPILOT_SERVER_CLI_ENABLED=1`. PHI and secret-like prompts are refused by the adapter even if a row is misclassified. |
 | `gemini-cli` | CLI subprocess | `Sandbox` | **Iter-36 AI-012.** Shells out to `gemini` headless mode with `--output-format json`. Binary override env `RADIOPAD_GEMINI_BIN` (default `gemini`). PHI and secret-like prompts are refused by the adapter even if a row is misclassified. |
 | `codex-cli` | CLI subprocess, fail-closed | `Sandbox` | **Iter-36 AI-012 / Iter-47 hardening.** Shells out to `codex exec --sandbox read-only -` only when `RADIOPAD_CODEX_CLI_ENABLED=1`. Binary override env `RADIOPAD_CODEX_BIN` (default `codex`). The adapter does not opt into `--full-auto`; PHI and secret-like prompts are refused. |
+| `ubag` | HTTPS automation gateway | `Sandbox` | **Iter-50.** Routes non-PHI, non-secret prompts to production UBAG through the RadioPad backend. `model` selects the UBAG target (`gemini_web`, `deepseek_web`, `chatgpt_web`, or `mock`); default UI preset uses `gemini_web`. The adapter refuses PHI even if a row is misclassified. Ordered ChatGPT -> Gemini -> DeepSeek runs use `/api/ubag/workflows/ordered-web-chain`, not report drafting. |
 
 CLI adapters share these guard-rails (`RadioPad.Infrastructure.Providers.Cli.CliProviderRunner`):
 
@@ -189,6 +190,39 @@ CLI adapters share these guard-rails (`RadioPad.Infrastructure.Providers.Cli.Cli
 - The subprocess environment is scrubbed to OS basics (`PATH`, home/config/temp locations). Add only the variables a reviewed CLI needs via `RADIOPAD_CLI_PROVIDER_ENV_ALLOWLIST`.
 - Prompt sanitiser refuses NUL and other C0 control characters (tab / newline / CR are allowed).
 - Adapter-level policy refuses `containsPhi:true` and secret-shaped prompts before process launch.
+
+## UBAG Hub
+
+UBAG is a governed browser-automation gateway for non-PHI work. RadioPad never
+calls UBAG from the browser; the frontend calls RadioPad's `/api/ubag/*`
+endpoints, and the backend calls production UBAG with server-only auth.
+
+Required posture:
+
+- UBAG provider rows must remain `Sandbox`.
+- PHI and secret-shaped prompts are rejected before dispatch.
+- Generated output is draft material and is rendered with `.ai-mark` until reviewed.
+- Provider login, CAPTCHA, 2FA, consent, cookies, and credentials remain manual in UBAG Browser Sessions.
+
+Configuration:
+
+| Variable | Default | Notes |
+| --- | --- | --- |
+| `RADIOPAD_UBAG_BASE_URL` | `https://ubag.polytronx.com` | Production UBAG base URL. |
+| `RADIOPAD_UBAG_API_VERSION` | `2026-05-22` | Sent in UBAG job/workflow envelopes. |
+| `RADIOPAD_UBAG_TIMEOUT_MS` | `120000` | HTTP timeout and adapter polling budget. |
+| `RADIOPAD_UBAG_ALLOWED_TARGETS` | `chatgpt_web,gemini_web,deepseek_web,mock` | Comma-separated allowlist for single jobs/provider adapter use. |
+| `RADIOPAD_UBAG_AUTH_SECRET_REF` / `RADIOPAD_UBAG_AUTH_SECRET` | empty | Optional server-only auth. Prefer `env:NAME` in `RADIOPAD_UBAG_AUTH_SECRET_REF`. |
+| `RADIOPAD_UBAG_AUTH_SCHEME` | `Bearer` | `Bearer`, `Basic`, or `Raw`. |
+| `RADIOPAD_UBAG_AUTH_HEADER` | `Authorization` | Optional custom header name. |
+
+| Method | Path | Description |
+| --- | --- | --- |
+| GET | `/api/ubag/status` | Health, browser summary, target readiness, allowed targets, and ordered-chain targets. Roles: ItAdmin / ReportingAdmin / MedicalDirector / ComplianceReviewer. |
+| POST | `/api/ubag/jobs` | Submit one non-PHI job. Body `{ target, prompt }`. Roles: ItAdmin / ReportingAdmin / MedicalDirector. Audits `AiResponse` metadata with hashes only. |
+| GET | `/api/ubag/jobs/{id}` | Poll a UBAG job. |
+| POST | `/api/ubag/workflows/ordered-web-chain` | Create and run the fixed `chatgpt_web -> gemini_web -> deepseek_web` workflow. Body `{ prompt, name? }`. |
+| GET | `/api/ubag/workflows/runs/{id}` | Poll a UBAG workflow run. |
 
 ## Copilot
 

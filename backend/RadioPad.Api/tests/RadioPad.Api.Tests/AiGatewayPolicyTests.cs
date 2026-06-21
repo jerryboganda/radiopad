@@ -39,6 +39,7 @@ public class AiGatewayPolicyTests
     [InlineData("github-copilot-cli")]
     [InlineData("gemini-cli")]
     [InlineData("openai-compatible")]
+    [InlineData("ubag")]
     public async Task Phi_Request_To_NewSandbox_Provider_Ids_Throws_And_Audits(string adapterId)
     {
         var (gw, audit) = BuildGateway();

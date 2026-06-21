@@ -57,6 +57,7 @@ export const Icons = {
   marketplace: Icon('M3 7l1-3h16l1 3 M3 7v13h18V7 M3 7h18 M9 11v4 M15 11v4'),
   terminology: Icon('M4 4h11l5 5v11H4z M14 4v6h6 M8 14h8 M8 17h6'),
   providers: Icon('M3 9l9-6 9 6v11H3z M9 20v-7h6v7'),
+  ubag: Icon('M4 8h16 M8 4v8 M16 4v8 M6 16h12 M10 12v8 M14 12v8'),
   pacs: Icon('M4 6h16v6H4z M4 14h16v4H4z M8 9h.01 M8 16h.01'),
   fhir: Icon('M12 2v8m0 0l-3-3m3 3l3-3 M4 14v6h16v-6'),
   offline: Icon('M5 12a7 7 0 0114 0 M9 16a3 3 0 016 0 M3 3l18 18'),
@@ -93,6 +94,7 @@ export const navGroups: NavGroup[] = [
     labelKey: 'integrations',
     items: [
       { href: '/providers', labelKey: 'providers', icon: Icons.providers },
+      { href: '/admin/ubag', labelKey: 'ubag', icon: Icons.ubag },
       { href: '/copilot', labelKey: 'copilot', icon: Icons.copilot },
       { href: '/admin/pacs', labelKey: 'pacs', icon: Icons.pacs },
       { href: '/admin/fhir-import', labelKey: 'fhirImport', icon: Icons.fhir },

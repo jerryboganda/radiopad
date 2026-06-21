@@ -443,6 +443,16 @@ public class Report : Entity
     public string AiHighlightsJson { get; set; } = "{}";
 
     /// <summary>
+    /// Iter-0a (PRD §14.12 / RPT-003) — flexible, template-bound structured
+    /// data: numeric fields, table rows, and key/value common-data-elements
+    /// that don't warrant their own column. The shape is governed by the bound
+    /// <see cref="ReportTemplate.SectionsJson"/>. Queryable clinical data
+    /// (RADS, measurements) lives in first-class child entities instead — see
+    /// <see cref="RadsAssessments"/> and <see cref="Measurements"/>.
+    /// </summary>
+    public string StructuredFieldsJson { get; set; } = "{}";
+
+    /// <summary>
     /// Iter-30 (Bidirectional FHIR) — when this report was created from an
     /// inbound FHIR <c>ServiceRequest</c>, this carries the resource
     /// reference (e.g. <c>"ServiceRequest/abc-123"</c>) so downstream
@@ -459,6 +469,12 @@ public class Report : Entity
 
     public List<ReportVersion> Versions { get; set; } = new();
     public List<ReportSignature> Signatures { get; set; } = new();
+
+    /// <summary>Iter-0a — first-class RADS assessments derived for / assigned to this report.</summary>
+    public List<RadsAssessment> RadsAssessments { get; set; } = new();
+
+    /// <summary>Iter-0a — first-class structured measurements (lesion-ready, cross-study linkable).</summary>
+    public List<ReportMeasurement> Measurements { get; set; } = new();
 }
 
 public class ReportVersion : Entity
@@ -498,6 +514,67 @@ public class ReportSignature : Entity
     public string Hash { get; set; } = "";
 }
 
+/// <summary>
+/// Iter-0a (PRD §14.11/§14.12, RADS-001..008) — a single structured RADS
+/// assessment attached to a report. Stored first-class (not in a JSON blob) so
+/// the RADS engine, contradiction guard, and RADS analytics can query by
+/// family/category across reports. One report may carry several assessments
+/// (e.g. multiple breast lesions each with a BI-RADS category), so this is a
+/// child collection rather than a single column.
+/// </summary>
+public class RadsAssessment : Entity
+{
+    public Guid TenantId { get; set; }
+    public Guid ReportId { get; set; }
+    /// <summary>RADS family, e.g. "BI-RADS", "LI-RADS", "PI-RADS", "Lung-RADS", "TI-RADS", "O-RADS", "NI-RADS", "C-RADS".</summary>
+    public string Family { get; set; } = "";
+    /// <summary>Assigned category as authored, e.g. "4A", "3", "PI-RADS 5". Free text so each family's grammar is preserved.</summary>
+    public string Category { get; set; } = "";
+    /// <summary>Optional numeric score where the family is point-based (TI-RADS / O-RADS); null for categorical families.</summary>
+    public int? Score { get; set; }
+    /// <summary>True when the category was auto-derived by the RADS engine from structured inputs; false when a human assigned it.</summary>
+    public bool IsDerived { get; set; }
+    /// <summary>Optional anatomical scope / lesion this assessment refers to (e.g. "right breast UOQ"); links to <see cref="ReportMeasurement.LesionKey"/> when set.</summary>
+    public string? LesionKey { get; set; }
+    /// <summary>Human- or engine-supplied rationale for the category (feeds the "Why this category?" panel, RADS-003/012).</summary>
+    public string Rationale { get; set; } = "";
+}
+
+/// <summary>
+/// Iter-0a (PRD RPT-003, RADS-005, COMP-003/004) — a single structured
+/// measurement attached to a report. First-class and queryable so longitudinal
+/// lesion tracking and response-criteria engines (RECIST/iRECIST/Lugano) can
+/// follow a lesion across studies via <see cref="LesionKey"/>. Generalises the
+/// transient <see cref="RadioPad.Domain.ValueObjects.ExtractedMeasurement"/>
+/// NLP value object into a persisted record.
+/// </summary>
+public class ReportMeasurement : Entity
+{
+    public Guid TenantId { get; set; }
+    public Guid ReportId { get; set; }
+    /// <summary>Human label for the measured object, e.g. "Segment VII lesion".</summary>
+    public string Label { get; set; } = "";
+    /// <summary>Primary axis value.</summary>
+    public double Value { get; set; }
+    /// <summary>Unit of measure (mm, cm, HU, SUV, ADC, ...).</summary>
+    public string Unit { get; set; } = "mm";
+    /// <summary>Second axis for bi-/tri-axial measurements (null otherwise).</summary>
+    public double? SecondValue { get; set; }
+    /// <summary>Third axis for tri-axial measurements (null otherwise).</summary>
+    public double? ThirdValue { get; set; }
+    public string AnatomicalLocation { get; set; } = "";
+    /// <summary>"left" | "right" | "bilateral" | "" (unspecified).</summary>
+    public string Laterality { get; set; } = "";
+    /// <summary>Report section the measurement was authored in, e.g. "Findings".</summary>
+    public string Section { get; set; } = "";
+    /// <summary>Stable per-lesion key used to correlate the same lesion across studies/reports (null for one-off measurements).</summary>
+    public string? LesionKey { get; set; }
+    /// <summary>Optional reference to the originating study/accession for cross-study tracking.</summary>
+    public string? StudyReference { get; set; }
+    /// <summary>"manual" (radiologist-entered) | "extracted" (NLP) | "imported".</summary>
+    public string Source { get; set; } = "manual";
+}
+
 public enum SignatureRole
 {
     Primary = 0,
@@ -511,6 +588,10 @@ public class AiRequest : Entity
     public Guid UserId { get; set; }
     public Guid? ReportId { get; set; }
     public string PromptVersion { get; set; } = "";
+    /// <summary>Iter-0b (RB-009 / AI-012) — rulebook entity id bound to the run (audit provenance), or null.</summary>
+    public Guid? RulebookId { get; set; }
+    /// <summary>Iter-0b (RB-009) — rulebook semantic version bound to the run (audit provenance).</summary>
+    public string RulebookVersion { get; set; } = "";
     public string Provider { get; set; } = "";
     public string Model { get; set; } = "";
     public string Mode { get; set; } = "draft";
@@ -642,6 +723,22 @@ public class TenantSettings : Entity
     public int RetentionDays { get; set; } = 0;
     public bool HashOnlyAuditMode { get; set; } = false;
     public bool LegalHold { get; set; } = false;
+
+    // Iter-0c (PRD §0.6 policy scaffold) — per-tenant security/clinical policy
+    // fields. Persisted now so later iterations (Phase 2 access-control, Phase 3
+    // critical results) enforce them without another migration. Defaults preserve
+    // current behaviour (no enforcement) until the enforcing iteration lands.
+
+    /// <summary>AUTH-004 — when true, every interactive sign-in for this tenant must complete MFA. Enforced in Phase 2 (Iter 2a/2f).</summary>
+    public bool RequireMfa { get; set; } = false;
+    /// <summary>AUTH-009 — idle session timeout in minutes; 0 = no idle timeout. Enforced in Phase 2 (Iter 2a).</summary>
+    public int IdleTimeoutMinutes { get; set; } = 0;
+    /// <summary>AUTH-009 — max concurrent active sessions per user; 0 = unlimited. Enforced in Phase 2 (Iter 2a).</summary>
+    public int MaxConcurrentSessions { get; set; } = 0;
+    /// <summary>§17.3 — JSON map of data class → retention days, e.g. {"audit":2555,"draft":90}. Empty {} = fall back to <see cref="RetentionDays"/>. Enforced in Phase 2 (Iter 2d).</summary>
+    public string RetentionByClassJson { get; set; } = "{}";
+    /// <summary>CR-002 — JSON array of criticality classes + SLAs, e.g. [{"name":"critical","ackMinutes":30}]. Empty [] = built-in defaults. Consumed in Phase 3 (Iter 3a).</summary>
+    public string CriticalityClassesJson { get; set; } = "[]";
 
     // PRD AUTH-005 — SCIM 2.0 bearer token for the IdP's provisioning agent.
     // Stored as the env-var name of the secret (e.g. "env:RADIOPAD_SCIM_BEARER")

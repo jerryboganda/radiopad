@@ -37,7 +37,121 @@ public sealed record AiCompletionRequest(
     string SystemPrompt,
     string UserPrompt,
     string PromptVersion,
-    bool ContainsPhi);
+    bool ContainsPhi)
+{
+    /// <summary>PRD AI-014 — clinically conservative default sampling temperature.</summary>
+    public const double DefaultTemperature = 0.2;
+
+    /// <summary>
+    /// PRD AI-014 — clinical-conservatism ceiling. No clinical AI run may exceed
+    /// this sampling temperature; <see cref="Temperature"/> is clamped to
+    /// <c>[0, MaxTemperature]</c> on assignment so the ceiling cannot be bypassed
+    /// by any caller or rulebook override.
+    /// </summary>
+    public const double MaxTemperature = 0.4;
+
+    private readonly double _temperature = DefaultTemperature;
+
+    /// <summary>
+    /// Iter-0b (AI-014) — sampling temperature, auto-clamped to
+    /// <c>[0, <see cref="MaxTemperature"/>]</c>. Defaults to
+    /// <see cref="DefaultTemperature"/> (0.2) so every existing call site stays
+    /// conservative without change.
+    /// </summary>
+    public double Temperature
+    {
+        get => _temperature;
+        init => _temperature = Math.Clamp(value, 0.0, MaxTemperature);
+    }
+
+    /// <summary>
+    /// Iter-0b (RB-009 / AI-012) — the rulebook entity id bound to this AI run,
+    /// recorded on every AI audit + usage row for compliance provenance. Null
+    /// when no rulebook is bound.
+    /// </summary>
+    public Guid? RulebookId { get; init; }
+
+    /// <summary>Iter-0b (RB-009) — the rulebook semantic version bound to this run (audit provenance).</summary>
+    public string? RulebookVersion { get; init; }
+
+    /// <summary>
+    /// Iter-0b (AI-015 / RB-005) — optional JSON Schema (as a JSON string) that
+    /// the model output must conform to. When set and valid, OpenAI-family
+    /// adapters request structured output via <c>response_format</c>. Null = free text.
+    /// </summary>
+    public string? OutputSchema { get; init; }
+}
+
+public interface IUbagClient
+{
+    Task<UbagHealth> GetHealthAsync(CancellationToken ct);
+    Task<UbagBrowserSummary> GetBrowserSummaryAsync(CancellationToken ct);
+    Task<IReadOnlyList<UbagTarget>> ListTargetsAsync(CancellationToken ct);
+    Task<UbagJob> CreateJobAsync(UbagJobRequest request, string idempotencyKey, CancellationToken ct);
+    Task<UbagJob> GetJobAsync(string jobId, CancellationToken ct);
+    Task<UbagWorkflow> CreateWorkflowAsync(UbagWorkflowRequest request, string idempotencyKey, CancellationToken ct);
+    Task<UbagWorkflowRun> RunWorkflowAsync(string workflowId, string idempotencyKey, CancellationToken ct);
+    Task<UbagWorkflowRun> GetWorkflowRunAsync(string runId, CancellationToken ct);
+}
+
+public sealed record UbagHealth(bool Ok, string Status, string? Version, string? Error);
+
+public sealed record UbagBrowserSummary(
+    int Instances,
+    int Contexts,
+    int Tabs,
+    string? Status,
+    string? RawStatus);
+
+public sealed record UbagTarget(
+    string Id,
+    string Name,
+    string Status,
+    bool Ready,
+    string? Url);
+
+public sealed record UbagJobRequest(
+    string Target,
+    string Prompt,
+    string CommandType = "submit",
+    string ReturnMode = "final",
+    string? ClientRequestId = null);
+
+public sealed record UbagJob(
+    string Id,
+    string Target,
+    string Status,
+    bool Terminal,
+    string? Output,
+    string? Error,
+    string? ManualAction,
+    int? LatencyMs,
+    string RawJson);
+
+public sealed record UbagWorkflowRequest(
+    string Name,
+    IReadOnlyList<UbagWorkflowStep> Steps,
+    string? ClientRequestId = null);
+
+public sealed record UbagWorkflowStep(
+    string Id,
+    string Target,
+    string Prompt);
+
+public sealed record UbagWorkflow(
+    string Id,
+    string Status,
+    string RawJson);
+
+public sealed record UbagWorkflowRun(
+    string Id,
+    string WorkflowId,
+    string Status,
+    bool Terminal,
+    string? Output,
+    string? Error,
+    string? ManualAction,
+    string RawJson);
 
 public interface IAiGateway
 {
