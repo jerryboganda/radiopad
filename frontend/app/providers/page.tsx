@@ -8,6 +8,8 @@ import EmptyState from '@/components/ui/EmptyState';
 import ErrorState from '@/components/ui/ErrorState';
 import { TableSkeleton } from '@/components/ui/Skeleton';
 
+const UBAG_FALLBACK_TARGETS = ['gemini_web', 'deepseek_web', 'mock'];
+
 const SANDBOX_COMPLIANCE = 1;
 const SANDBOX_MODES = ['impression', 'draft', 'concise', 'formal', 'patient_friendly', 'referring_summary'] as const;
 type SandboxMode = (typeof SANDBOX_MODES)[number];
@@ -80,6 +82,27 @@ export default function ProvidersPage() {
   const [loading, setLoading] = useState(true);
   const [draft, setDraft] = useState<Editable | null>(null);
   const [saving, setSaving] = useState(false);
+  const [ubagTargets, setUbagTargets] = useState<string[]>(UBAG_FALLBACK_TARGETS);
+
+  // Lazily fetch allowed UBAG targets when the modal is open with adapter=ubag.
+  // Swallow errors — non-admin callers get a 403 and the fallback list is used.
+  useEffect(() => {
+    if (draft?.adapter !== 'ubag') return;
+    let cancelled = false;
+    api.ubag.status().then((s) => {
+      if (cancelled) return;
+      const list = s.allowedTargets?.length ? s.allowedTargets : UBAG_FALLBACK_TARGETS;
+      setUbagTargets(list);
+      // If the current model is not in the fetched list, keep it (extra option);
+      // if model is empty, default to first option.
+      setDraft((prev) => {
+        if (!prev) return prev;
+        if (!prev.model) return { ...prev, model: list[0] };
+        return prev;
+      });
+    }).catch(() => { /* swallow — use fallback */ });
+    return () => { cancelled = true; };
+  }, [draft?.adapter]);
 
   const refresh = useCallback(async () => {
     setLoading(true);
@@ -258,7 +281,23 @@ export default function ProvidersPage() {
 
             <label className="rp-field">
               <span>Model</span>
-              <input className="rp-input" value={draft.model ?? ''} onChange={(e) => setDraft({ ...draft, model: e.target.value })} placeholder="claude-3-5-sonnet-20241022 / llama3.1 / …" />
+              {draft.adapter === 'ubag' ? (
+                <select
+                  className="rp-input"
+                  value={draft.model ?? ''}
+                  onChange={(e) => setDraft({ ...draft, model: e.target.value })}
+                >
+                  {/* Include saved model as extra option if it is not in the fetched list */}
+                  {draft.model && !ubagTargets.includes(draft.model) && (
+                    <option key={draft.model} value={draft.model}>{draft.model}</option>
+                  )}
+                  {ubagTargets.map((t) => (
+                    <option key={t} value={t}>{t}</option>
+                  ))}
+                </select>
+              ) : (
+                <input className="rp-input" value={draft.model ?? ''} onChange={(e) => setDraft({ ...draft, model: e.target.value })} placeholder="claude-3-5-sonnet-20241022 / llama3.1 / …" />
+              )}
             </label>
 
             <label className="rp-field">
