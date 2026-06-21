@@ -1,7 +1,7 @@
 # UBAG provider integration — selectable targets + Gemini fix
 
 **Date:** 2026-06-22
-**Status:** Approved design (pending spec review)
+**Status:** ✅ Implemented & verified (PR #1 merged to main; UBAG worker fix committed `fb659f9e`)
 **Scope:** RadioPad (`D:\Projects\Radiopad.com`, prod `/opt/radiopad`) **and** UBAG (`/opt/ubag`, compose project `ubag-small`). Both projects are owned by the same operator; full authority granted.
 
 ---
@@ -98,3 +98,23 @@ Parse the `data[]` array (in addition to the legacy `targets[]`/root-array fallb
 - chatgpt_web / claude_web / other UBAG targets (not enabled in prod `ALLOWED_TARGETS`).
 - Report-drafting-time model picker UI beyond the existing provider selection (each UBAG target is a distinct provider row).
 - Any PHI routing to UBAG (UBAG remains non-PHI / Sandbox by policy).
+
+---
+
+## 7. Outcome (2026-06-22)
+
+**Track A (RadioPad) — done, merged via PR #1, CI green (backend+cli+frontend):**
+- `UbagClient.ListTargetsAsync` now parses the real `data[]`/`key` shape; `ListBrowserContextsAsync` added; `UbagBrowserContext.Authenticated` readiness.
+- `ProbeAsync` + `UbagController.Status` derive readiness from `/v1/browser/contexts` login state; probe hardened against `ProviderPolicyException`.
+- Providers config UI: adapter `ubag` → **Model dropdown** of allowed targets (live + fallback, model seeded on switch).
+
+**Track B (UBAG worker `/opt/ubag`, commit `fb659f9e`) — root cause + fix:**
+- The Gemini browser tab had been parked on `accounts.google.com/chrome/blank.html` since a browser-viewer restart; re-navigating to `gemini.google.com/app` restored the (still-valid) logged-in session. The worker navigates per job, so it self-heals as long as the Google session persists (manual re-login via noVNC `:7900` if Google logs out — automated login is forbidden by UBAG policy).
+- Real bug: `GEMINI_WEB.response_container` selectors (`*.model-response-text`, `data-response-index`) had drifted to zero matches → worker hung to the 2-min hard timeout. Fixed to `message-content` / `.markdown` / `model-response`. Also rewrote `page_driver.stream_response` to complete on a **non-empty, settled** answer (Gemini exposes no detectable streaming indicator) instead of breaking on the first read.
+- Deployed live into the running gateway container (image bakes the file; not rebuilt to avoid baking unrelated WIP in `/opt/ubag`). A future clean rebuild bakes it.
+
+**Verified end-to-end (live gateway jobs through RadioPad's exact job API):**
+- `gemini_web` ✅ "The capital of France is Paris." (was a 2-min timeout before)
+- `deepseek_web` ✅ (unregressed) · `mock` ✅
+
+**Known follow-ups (non-blocking):** Gemini session can expire → needs manual noVNC re-login; the gateway can report a stale `login_state: authenticated` for a parked tab; UBAG gateway image should be rebuilt from a clean tree to bake the worker fix permanently.
