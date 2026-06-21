@@ -71,7 +71,7 @@ if (Get-Command 'cargo-tauri' -ErrorAction SilentlyContinue) {
 } elseif ($SkipTauriCliInstall) {
     throw 'cargo-tauri not found and -SkipTauriCliInstall was specified.'
 } else {
-    & cargo install tauri-cli --locked
+    & cargo install tauri-cli --version 2.11.3 --locked
 }
 Write-Host ''
 

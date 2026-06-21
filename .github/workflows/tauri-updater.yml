@@ -50,7 +50,7 @@ jobs:
 
       - name: Install Tauri CLI
         if: steps.gate.outputs.secrets_present == '1'
-        run: npm i -g @tauri-apps/cli@^2
+        run: npm i -g @tauri-apps/cli@2.11.3
 
       - name: Resolve tag + assets
         if: steps.gate.outputs.secrets_present == '1'
@@ -87,7 +87,7 @@ jobs:
           echo "{\"version\":\"${TAG#v}\",\"notes\":\"RadioPad ${TAG}\",\"pub_date\":\"$(date -u +%Y-%m-%dT%H:%M:%SZ)\",\"platforms\":{}}" > "$MANIFEST"
           for plat in "${!platforms[@]}"; do
             for f in dist/${platforms[$plat]}; do
-              SIG=$(npx --yes @tauri-apps/cli signer sign --no-confirm \
+              SIG=$(npx --yes @tauri-apps/cli@2.11.3 signer sign --no-confirm \
                 --private-key "$TAURI_PRIVATE_KEY" \
                 --password "${TAURI_KEY_PASSWORD:-}" "$f" | tail -n1)
               URL="${MANIFEST_URL%/}/$(basename "$f")"

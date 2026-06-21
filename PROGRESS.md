@@ -4,6 +4,23 @@
 
 ---
 
+## Maintenance — 2026-06-22 — Tauri 2.x dependency refresh
+
+- **Scope:** Desktop shell (`desktop/src-tauri/`) was already on Tauri 2; pinned
+  it to the newest 2.x point releases for a reproducible toolchain. `tauri` 2.0→
+  **2.11.3**, `tauri-build` →**2.6.3**, plugins (shell/dialog/clipboard-manager/
+  global-shortcut/store/updater) to their latest 2.x. Generated and committed
+  `desktop/src-tauri/Cargo.lock` (previously absent). Pinned the Tauri CLI to
+  `2.11.3` in `desktop-release.yml`, `tauri-updater.yml`, and
+  `scripts/build-radiopad-desktop-windows.ps1`.
+- **One source fix:** the existing v2 plugin API call sites (`StoreExt`,
+  global-shortcut, clipboard) compiled clean, but `backend_health.rs` needed an
+  explicit closure return type (`-> Result<(String, u16), String>`) — the newer
+  deps added more `From<_> for String` impls, making a previously-inferable error
+  type ambiguous (E0282/E0283).
+
+---
+
 ## Iteration 52 — PRD v2 gap-closure: Iter 0c RBAC roles, policy scaffold, traceability seed
 
 - **Date:** 2026-06-19

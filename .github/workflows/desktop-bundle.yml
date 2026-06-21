@@ -58,6 +58,9 @@ jobs:
         with:
           workspaces: desktop/src-tauri
 
+      - name: Install tauri-cli
+        run: cargo install tauri-cli --version 2.11.3 --locked
+
       - name: Setup .NET
         uses: actions/setup-dotnet@v4
         with:

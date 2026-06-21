@@ -5,6 +5,8 @@ out/
 publish/
 desktop/src-tauri/binaries/
 desktop/src-tauri/target/
+# Tauri-generated ACL/permission schemas (regenerated every build).
+desktop/src-tauri/gen/
 bin/
 obj/
 **/bin/

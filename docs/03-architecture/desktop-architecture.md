@@ -1,10 +1,13 @@
 # Desktop Architecture
 
-**Status:** Current  ·  **Owner:** Engineering  ·  **Last Updated:** 2026-05-16
+**Status:** Current  ·  **Owner:** Engineering  ·  **Last Updated:** 2026-06-22
 
 ## Framework
 
 Tauri 2 (Rust core + WebView2/WKWebView). Source under `desktop/src-tauri/`.
+Pinned to the Tauri 2.11.x baseline (`tauri` 2.11.3, `tauri-build` 2.6.3, plugins
+at their latest 2.x) with a committed `desktop/src-tauri/Cargo.lock` for
+reproducible builds.
 
 ## Process model
 
