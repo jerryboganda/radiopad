@@ -60,7 +60,7 @@ jobs:
           done
 
   frontend:
-    name: frontend (typecheck + build)
+    name: frontend (lint + typecheck + build)
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -73,6 +73,9 @@ jobs:
           cache: pnpm
       - name: Install
         run: pnpm install --frozen-lockfile=false
+      - name: Lint
+        working-directory: frontend
+        run: pnpm lint
       - name: Typecheck
         working-directory: frontend
         run: pnpm typecheck

@@ -25,6 +25,22 @@ If a UI requirement cannot be met with the existing tokens/components, stop and 
 
 ---
 
+## 0.5. MISSION-CRITICAL: CPU-INTENSIVE WORK RUNS ON GITHUB ACTIONS (not locally)
+
+> **All heavy, CPU/RAM-intensive tasks for this project — full builds, full test suites, linting, type-checking, static analysis/security scans, bundling, desktop/mobile packaging, Docker image builds, and coverage — are performed by GitHub Actions CI, NOT on a developer's or agent's local/VPS machine.** This is a permanent project rule.
+
+Why: the production server (`/opt/radiopad`) hosts many tenants and the local dev box is shared; saturating either with compiler/test/lint jobs risks the live site and wastes time. CI runners are disposable, parallel, and free for this purpose.
+
+Rules for every AI agent and contributor:
+
+1. **Do not run full builds, full test suites, or lint/type-check sweeps locally or on the VPS** as part of normal work. Push your branch and let GitHub Actions do it. Read the run result with `gh run watch` / `gh run view --log-failed`.
+2. **Allowed locally:** focused, cheap feedback only — editing files, reading code, a single targeted unit test (`dotnet test --filter <Name>`), a quick type-check of one changed file, running the app to manually verify a change. Anything that compiles the whole solution, the whole frontend, or runs the whole suite belongs in CI.
+3. **Production VPS is for running the app only.** Never invoke `dotnet build/test`, `pnpm build/lint`, `cargo build`, or `docker compose build` on the VPS for development. Deploys pull pre-built images produced by CI (or, when a manual rebuild is unavoidable, it is an explicit operator action — not routine agent behaviour).
+4. **Every workflow that gates merge must live in `.github/workflows/`** — backend build+test, frontend typecheck+lint+build, CLI, and the desktop/mobile packaging jobs. If a heavy task is not yet covered by a workflow, add the workflow in the same PR rather than running it by hand.
+5. **The PR checklist (§7) is satisfied by green CI, not by local output.** "It builds on my machine" is not evidence; a passing Actions run is.
+
+---
+
 ## 1. Project at a glance
 
 RadioPad is an AI-assisted radiology reporting platform delivered as Web (Next.js), Backend (ASP.NET Core 8), Desktop (Tauri), Mobile (Capacitor), and CLI (.NET global tool). See [PRD.md](PRD.md) for the engineering PRD and [PROGRESS.md](PROGRESS.md) for the Ralph-loop build log.
@@ -88,10 +104,14 @@ cargo tauri build          # in desktop/ after `pnpm build` in frontend/
 npx cap copy android       # in mobile/
 ```
 
-After any code change:
-1. `dotnet build` for backend changes.
-2. `dotnet test` if you touched Validation, Application, or Domain.
-3. `pnpm typecheck` for frontend changes.
+> **The commands above are for local *focused* feedback only (one targeted test, a quick run). Full builds, full test runs, and lint/type-check sweeps are CI's job — see §0.5. Do not run them locally or on the VPS.**
+
+After any code change, validation is done by **GitHub Actions** on push/PR:
+1. Backend build + `dotnet test` (Validation / Application / Domain).
+2. Frontend `pnpm typecheck` + lint + `pnpm build`.
+3. CLI + desktop/mobile packaging jobs.
+
+Locally, at most run a single targeted test for the thing you changed (`dotnet test --filter <Name>`), then push and watch CI: `gh run watch` / `gh run view --log-failed`.
 
 ---
 
