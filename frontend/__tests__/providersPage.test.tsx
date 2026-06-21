@@ -187,6 +187,26 @@ describe('providers page', () => {
     expect(screen.getByLabelText('Model').tagName).toBe('INPUT');
   });
 
+  it('seeds model to fallback first entry when ubag status fetch rejects (e.g. 403)', async () => {
+    ubagStatusMock.mockRejectedValueOnce(new Error('403'));
+
+    render(<ProvidersPage />);
+
+    await waitFor(() => expect(screen.getByText('Available models')).toBeInTheDocument());
+    fireEvent.click(screen.getByText('+ Add a model'));
+
+    // Switch adapter to ubag without applying a preset (draft.model starts as '')
+    fireEvent.change(screen.getByLabelText('Adapter'), { target: { value: 'ubag' } });
+
+    // Even though status() rejected, the synchronous seed should have fired
+    await waitFor(() => {
+      const modelEl = screen.getByLabelText('Model');
+      expect(modelEl.tagName).toBe('SELECT');
+    });
+
+    expect((screen.getByLabelText('Model') as HTMLSelectElement).value).toBe('gemini_web');
+  });
+
   it('shows provider health status returned by the API', async () => {
     providersListMock.mockResolvedValueOnce([
       {

@@ -89,20 +89,17 @@ export default function ProvidersPage() {
   useEffect(() => {
     if (draft?.adapter !== 'ubag') return;
     let cancelled = false;
+    // Seed model synchronously so the controlled <select> and draft.model agree
+    // even if the status fetch fails (e.g. 403 for non-admins).
+    setDraft((prev) => (prev && !prev.model ? { ...prev, model: ubagTargets[0] } : prev));
     api.ubag.status().then((s) => {
       if (cancelled) return;
       const list = s.allowedTargets?.length ? s.allowedTargets : UBAG_FALLBACK_TARGETS;
       setUbagTargets(list);
-      // If the current model is not in the fetched list, keep it (extra option);
-      // if model is empty, default to first option.
-      setDraft((prev) => {
-        if (!prev) return prev;
-        if (!prev.model) return { ...prev, model: list[0] };
-        return prev;
-      });
-    }).catch(() => { /* swallow — use fallback */ });
+      setDraft((prev) => (prev && !prev.model ? { ...prev, model: list[0] } : prev));
+    }).catch(() => { /* swallow — use fallback list */ });
     return () => { cancelled = true; };
-  }, [draft?.adapter]);
+  }, [draft?.adapter]); // do NOT add ubagTargets to deps
 
   const refresh = useCallback(async () => {
     setLoading(true);
