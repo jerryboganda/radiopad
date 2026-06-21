@@ -56,23 +56,38 @@ public sealed class UbagProviderAdapter : IAiProviderAdapter, IAiProviderHealthP
         try
         {
             var health = await _client.GetHealthAsync(cancellationToken);
-            var targets = await _client.ListTargetsAsync(cancellationToken);
-            var target = ResolveTarget(provider);
-            var match = targets.FirstOrDefault(t => string.Equals(t.Id, target, StringComparison.OrdinalIgnoreCase));
             if (!health.Ok)
                 return new AiProviderHealthResult(false, health.Error ?? health.Status, Runtime: AdapterId);
+
+            var target = ResolveTarget(provider);
+            var targets = await _client.ListTargetsAsync(cancellationToken);
+            var match = targets.FirstOrDefault(t => string.Equals(t.Id, target, StringComparison.OrdinalIgnoreCase));
             if (match is null)
                 return new AiProviderHealthResult(false, $"target_not_found:{target}", Runtime: AdapterId);
-            return new AiProviderHealthResult(
-                Ok: match.Ready,
-                Error: match.Ready ? null : $"target_not_ready:{target}",
-                Note: match.Status,
-                Runtime: target);
+
+            var contexts = await _client.ListBrowserContextsAsync(cancellationToken);
+            var ctx = contexts.FirstOrDefault(c => string.Equals(c.TargetId, target, StringComparison.OrdinalIgnoreCase));
+            if (ctx is null)
+                return new AiProviderHealthResult(false, $"context_not_found:{target}", Runtime: target);
+            if (ctx.Authenticated)
+                return new AiProviderHealthResult(true, null, Note: ctx.LoginState, Runtime: target);
+            return new AiProviderHealthResult(false, $"login_required:{target}", Note: ctx.LoginState, Runtime: target);
         }
         catch (Exception ex) when (ex is ProviderTransportException or HttpRequestException or TaskCanceledException)
         {
             return new AiProviderHealthResult(false, ex.Message, Runtime: AdapterId);
         }
+    }
+
+    /// <summary>
+    /// Returns true when the browser context for <paramref name="targetId"/> is authenticated.
+    /// Used by both <see cref="ProbeAsync"/> and the UBAG Hub status endpoint so they agree
+    /// on the same readiness rule.
+    /// </summary>
+    public static bool IsTargetReady(string targetId, IReadOnlyList<UbagBrowserContext> contexts)
+    {
+        var ctx = contexts.FirstOrDefault(c => string.Equals(c.TargetId, targetId, StringComparison.OrdinalIgnoreCase));
+        return ctx?.Authenticated == true;
     }
 
     internal static void EnforceRequestPolicy(AiCompletionRequest request)

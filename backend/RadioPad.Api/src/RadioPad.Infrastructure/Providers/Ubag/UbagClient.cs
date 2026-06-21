@@ -80,9 +80,11 @@ public sealed class UbagClient : IUbagClient
             // otherwise record "listed" so callers know the target exists but isn't probed.
             var status = ReadString(item, "status") ?? ReadString(item, "state") ?? "listed";
 
-            // "ready" bool wins if present (legacy); otherwise derive from status string only
-            // when the status is recognisably-ok, else false (do not assume readiness here).
-            var ready = ReadBool(item, "ready") ?? (status != "listed" && IsOkStatus(status));
+            // "ready" bool wins if present (legacy); otherwise derive from status string.
+            // IsOkStatus("listed") is already false, so no need to guard against it separately.
+            // Note: the real /v1/targets shape has no readiness field — readiness is derived
+            // from /v1/browser/contexts instead (see UbagProviderAdapter.IsTargetReady).
+            var ready = ReadBool(item, "ready") ?? IsOkStatus(status);
 
             rows.Add(new UbagTarget(
                 Id: id,

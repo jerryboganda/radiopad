@@ -59,6 +59,116 @@ public class UbagProviderAdapterTests
         Assert.StartsWith("radiopad-ai-", fake.IdempotencyKey, StringComparison.Ordinal);
     }
 
+    // ── ProbeAsync context-based readiness ────────────────────────────────────
+
+    [Fact]
+    public async Task ProbeAsync_Authenticated_Context_ReturnsOkTrue()
+    {
+        using var env = EnvVarScope.Set("RADIOPAD_UBAG_ALLOWED_TARGETS", "gemini_web");
+        var fake = new FakeUbagClient(
+            targets: new[] { new UbagTarget("gemini_web", "Gemini", "listed", false, null) },
+            contexts: new[] { new UbagBrowserContext("gemini_web", "authenticated") });
+        var adapter = new UbagProviderAdapter(fake);
+
+        var result = await adapter.ProbeAsync(Provider("gemini_web"), default);
+
+        Assert.True(result.Ok);
+        Assert.Equal("authenticated", result.Note);
+        Assert.Equal("gemini_web", result.Runtime);
+    }
+
+    [Fact]
+    public async Task ProbeAsync_Unknown_Context_ReturnsLoginRequired()
+    {
+        using var env = EnvVarScope.Set("RADIOPAD_UBAG_ALLOWED_TARGETS", "chatgpt_web");
+        var fake = new FakeUbagClient(
+            targets: new[] { new UbagTarget("chatgpt_web", "ChatGPT", "listed", false, null) },
+            contexts: new[] { new UbagBrowserContext("chatgpt_web", "unknown") });
+        var adapter = new UbagProviderAdapter(fake);
+
+        var result = await adapter.ProbeAsync(Provider("chatgpt_web"), default);
+
+        Assert.False(result.Ok);
+        Assert.Contains("login_required:chatgpt_web", result.Error);
+        Assert.Equal("unknown", result.Note);
+    }
+
+    [Fact]
+    public async Task ProbeAsync_No_Context_ReturnsContextNotFound()
+    {
+        using var env = EnvVarScope.Set("RADIOPAD_UBAG_ALLOWED_TARGETS", "gemini_web");
+        var fake = new FakeUbagClient(
+            targets: new[] { new UbagTarget("gemini_web", "Gemini", "listed", false, null) },
+            contexts: Array.Empty<UbagBrowserContext>());
+        var adapter = new UbagProviderAdapter(fake);
+
+        var result = await adapter.ProbeAsync(Provider("gemini_web"), default);
+
+        Assert.False(result.Ok);
+        Assert.Contains("context_not_found:gemini_web", result.Error);
+    }
+
+    [Fact]
+    public async Task ProbeAsync_Target_Not_In_List_ReturnsTargetNotFound()
+    {
+        using var env = EnvVarScope.Set("RADIOPAD_UBAG_ALLOWED_TARGETS", "gemini_web");
+        // No targets returned at all — probe must surface target_not_found.
+        var fake = new FakeUbagClient(
+            targets: Array.Empty<UbagTarget>(),
+            contexts: Array.Empty<UbagBrowserContext>());
+        var adapter = new UbagProviderAdapter(fake);
+
+        var result = await adapter.ProbeAsync(Provider("gemini_web"), default);
+
+        Assert.False(result.Ok);
+        Assert.Contains("target_not_found:gemini_web", result.Error);
+    }
+
+    [Fact]
+    public async Task ProbeAsync_Unhealthy_Gateway_ReturnsOkFalse_BeforeTargetLookup()
+    {
+        using var env = EnvVarScope.Set("RADIOPAD_UBAG_ALLOWED_TARGETS", "gemini_web");
+        var fake = new FakeUbagClient(
+            targets: new[] { new UbagTarget("gemini_web", "Gemini", "listed", false, null) },
+            contexts: new[] { new UbagBrowserContext("gemini_web", "authenticated") },
+            health: new UbagHealth(false, "degraded", null, "gateway_down"));
+        var adapter = new UbagProviderAdapter(fake);
+
+        var result = await adapter.ProbeAsync(Provider("gemini_web"), default);
+
+        Assert.False(result.Ok);
+        Assert.Equal("gateway_down", result.Error);
+        Assert.Equal(UbagProviderAdapter.AdapterId, result.Runtime);
+    }
+
+    // ── IsTargetReady helper ──────────────────────────────────────────────────
+
+    [Theory]
+    [InlineData("authenticated", true)]
+    [InlineData("unknown", false)]
+    [InlineData("logged_out", false)]
+    public void IsTargetReady_MatchesByLoginState(string loginState, bool expectedReady)
+    {
+        var contexts = new[] { new UbagBrowserContext("gemini_web", loginState) };
+        Assert.Equal(expectedReady, UbagProviderAdapter.IsTargetReady("gemini_web", contexts));
+    }
+
+    [Fact]
+    public void IsTargetReady_CaseInsensitiveTargetIdMatch()
+    {
+        var contexts = new[] { new UbagBrowserContext("Gemini_Web", "authenticated") };
+        Assert.True(UbagProviderAdapter.IsTargetReady("gemini_web", contexts));
+    }
+
+    [Fact]
+    public void IsTargetReady_ReturnsFalse_WhenNoMatchingContext()
+    {
+        var contexts = new[] { new UbagBrowserContext("deepseek_web", "authenticated") };
+        Assert.False(UbagProviderAdapter.IsTargetReady("gemini_web", contexts));
+    }
+
+    // ── helpers ───────────────────────────────────────────────────────────────
+
     private static ProviderConfig Provider(string model) => new()
     {
         Id = Guid.NewGuid(),
@@ -74,20 +184,38 @@ public class UbagProviderAdapterTests
         public string? CreatedTarget { get; private set; }
         public string? IdempotencyKey { get; private set; }
 
+        private readonly UbagHealth _health;
+        private readonly IReadOnlyList<UbagTarget> _targets;
+        private readonly IReadOnlyList<UbagBrowserContext> _contexts;
+
+        /// <summary>Default constructor — healthy gateway, gemini_web target, empty contexts.</summary>
+        public FakeUbagClient()
+            : this(
+                targets: new[] { new UbagTarget("gemini_web", "Gemini", "ready", true, null) },
+                contexts: Array.Empty<UbagBrowserContext>())
+        { }
+
+        public FakeUbagClient(
+            IReadOnlyList<UbagTarget> targets,
+            IReadOnlyList<UbagBrowserContext> contexts,
+            UbagHealth? health = null)
+        {
+            _health = health ?? new UbagHealth(true, "ok", "2026-05-22", null);
+            _targets = targets;
+            _contexts = contexts;
+        }
+
         public Task<UbagHealth> GetHealthAsync(CancellationToken ct) =>
-            Task.FromResult(new UbagHealth(true, "ok", "2026-05-22", null));
+            Task.FromResult(_health);
 
         public Task<UbagBrowserSummary> GetBrowserSummaryAsync(CancellationToken ct) =>
             Task.FromResult(new UbagBrowserSummary(1, 3, 3, "ready", "{}"));
 
         public Task<IReadOnlyList<UbagTarget>> ListTargetsAsync(CancellationToken ct) =>
-            Task.FromResult<IReadOnlyList<UbagTarget>>(new[]
-            {
-                new UbagTarget("gemini_web", "Gemini", "ready", true, null),
-            });
+            Task.FromResult(_targets);
 
         public Task<IReadOnlyList<UbagBrowserContext>> ListBrowserContextsAsync(CancellationToken ct) =>
-            Task.FromResult<IReadOnlyList<UbagBrowserContext>>(Array.Empty<UbagBrowserContext>());
+            Task.FromResult(_contexts);
 
         public Task<UbagJob> CreateJobAsync(UbagJobRequest request, string idempotencyKey, CancellationToken ct)
         {
