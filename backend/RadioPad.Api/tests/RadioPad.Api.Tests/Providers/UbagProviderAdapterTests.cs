@@ -167,6 +167,47 @@ public class UbagProviderAdapterTests
         Assert.False(UbagProviderAdapter.IsTargetReady("gemini_web", contexts));
     }
 
+    // ── MergeTargetReadiness ──────────────────────────────────────────────────
+
+    [Fact]
+    public void MergeTargetReadiness_AuthenticatedContext_SetsReadyTrueAndStatusAuthenticated()
+    {
+        var targets = new[] { new UbagTarget("gemini_web", "Gemini", "listed", false, null) };
+        var contexts = new[] { new UbagBrowserContext("gemini_web", "authenticated") };
+
+        var result = UbagProviderAdapter.MergeTargetReadiness(targets, contexts);
+
+        Assert.Single(result);
+        Assert.True(result[0].Ready);
+        Assert.Equal("authenticated", result[0].Status);
+    }
+
+    [Fact]
+    public void MergeTargetReadiness_UnknownContext_SetsReadyFalseAndStatusFromLoginState()
+    {
+        var targets = new[] { new UbagTarget("chatgpt_web", "ChatGPT", "listed", false, null) };
+        var contexts = new[] { new UbagBrowserContext("chatgpt_web", "unknown") };
+
+        var result = UbagProviderAdapter.MergeTargetReadiness(targets, contexts);
+
+        Assert.Single(result);
+        Assert.False(result[0].Ready);
+        Assert.Equal("unknown", result[0].Status);
+    }
+
+    [Fact]
+    public void MergeTargetReadiness_NoMatchingContext_PreservesOriginalStatus()
+    {
+        var targets = new[] { new UbagTarget("deepseek_web", "DeepSeek", "listed", false, null) };
+        var contexts = Array.Empty<UbagBrowserContext>();
+
+        var result = UbagProviderAdapter.MergeTargetReadiness(targets, contexts);
+
+        Assert.Single(result);
+        Assert.False(result[0].Ready);
+        Assert.Equal("listed", result[0].Status);
+    }
+
     // ── helpers ───────────────────────────────────────────────────────────────
 
     private static ProviderConfig Provider(string model) => new()

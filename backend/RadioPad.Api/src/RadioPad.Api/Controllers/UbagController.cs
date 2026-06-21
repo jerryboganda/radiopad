@@ -48,15 +48,7 @@ public class UbagController : TenantedController
         var contexts = await _ubag.ListBrowserContextsAsync(ct);
         // Derive per-target readiness from browser contexts (login_state == "authenticated").
         // /v1/targets carries no readiness field; the source of truth is /v1/browser/contexts.
-        var mergedTargets = targets
-            .Select(t =>
-            {
-                var ctx = contexts.FirstOrDefault(c => string.Equals(c.TargetId, t.Id, StringComparison.OrdinalIgnoreCase));
-                var ready = UbagProviderAdapter.IsTargetReady(t.Id, contexts);
-                var status = ctx is not null ? ctx.LoginState : t.Status;
-                return t with { Ready = ready, Status = status };
-            })
-            .ToList();
+        var mergedTargets = UbagProviderAdapter.MergeTargetReadiness(targets, contexts);
         return Ok(new UbagStatusDto(
             health,
             browser,

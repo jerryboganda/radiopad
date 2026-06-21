@@ -81,13 +81,37 @@ public sealed class UbagProviderAdapter : IAiProviderAdapter, IAiProviderHealthP
 
     /// <summary>
     /// Returns true when the browser context for <paramref name="targetId"/> is authenticated.
-    /// Used by both <see cref="ProbeAsync"/> and the UBAG Hub status endpoint so they agree
-    /// on the same readiness rule.
+    /// Used by <see cref="ProbeAsync"/> to determine per-target readiness.
     /// </summary>
     public static bool IsTargetReady(string targetId, IReadOnlyList<UbagBrowserContext> contexts)
     {
         var ctx = contexts.FirstOrDefault(c => string.Equals(c.TargetId, targetId, StringComparison.OrdinalIgnoreCase));
         return ctx?.Authenticated == true;
+    }
+
+    /// <summary>
+    /// Merges browser-context readiness into a target list in a single pass (no double-scan).
+    /// For each target, finds the matching context by id (case-insensitive) once, then sets
+    /// <c>Ready</c> from <c>ctx.Authenticated</c> and <c>Status</c> from <c>ctx.LoginState</c>.
+    /// When no context matches the target's original <c>Status</c> is preserved and
+    /// <c>Ready</c> is <c>false</c>.
+    /// Pure function — safe to unit-test without HTTP.
+    /// </summary>
+    public static IReadOnlyList<UbagTarget> MergeTargetReadiness(
+        IReadOnlyList<UbagTarget> targets,
+        IReadOnlyList<UbagBrowserContext> contexts)
+    {
+        var result = new List<UbagTarget>(targets.Count);
+        foreach (var t in targets)
+        {
+            var ctx = contexts.FirstOrDefault(c => string.Equals(c.TargetId, t.Id, StringComparison.OrdinalIgnoreCase));
+            result.Add(t with
+            {
+                Ready = ctx?.Authenticated == true,
+                Status = ctx is not null ? ctx.LoginState : t.Status,
+            });
+        }
+        return result;
     }
 
     internal static void EnforceRequestPolicy(AiCompletionRequest request)
