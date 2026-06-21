@@ -45,10 +45,14 @@ public class UbagController : TenantedController
         var health = await _ubag.GetHealthAsync(ct);
         var browser = await _ubag.GetBrowserSummaryAsync(ct);
         var targets = await _ubag.ListTargetsAsync(ct);
+        var contexts = await _ubag.ListBrowserContextsAsync(ct);
+        // Derive per-target readiness from browser contexts (login_state == "authenticated").
+        // /v1/targets carries no readiness field; the source of truth is /v1/browser/contexts.
+        var mergedTargets = UbagProviderAdapter.MergeTargetReadiness(targets, contexts);
         return Ok(new UbagStatusDto(
             health,
             browser,
-            targets,
+            mergedTargets,
             UbagProviderAdapter.ResolveAllowedTargets(),
             OrderedTargets()));
     }

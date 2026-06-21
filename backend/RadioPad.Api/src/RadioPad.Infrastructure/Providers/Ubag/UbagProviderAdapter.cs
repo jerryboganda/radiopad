@@ -56,23 +56,52 @@ public sealed class UbagProviderAdapter : IAiProviderAdapter, IAiProviderHealthP
         try
         {
             var health = await _client.GetHealthAsync(cancellationToken);
-            var targets = await _client.ListTargetsAsync(cancellationToken);
-            var target = ResolveTarget(provider);
-            var match = targets.FirstOrDefault(t => string.Equals(t.Id, target, StringComparison.OrdinalIgnoreCase));
             if (!health.Ok)
                 return new AiProviderHealthResult(false, health.Error ?? health.Status, Runtime: AdapterId);
+
+            var target = ResolveTarget(provider);
+            var targets = await _client.ListTargetsAsync(cancellationToken);
+            var match = targets.FirstOrDefault(t => string.Equals(t.Id, target, StringComparison.OrdinalIgnoreCase));
             if (match is null)
                 return new AiProviderHealthResult(false, $"target_not_found:{target}", Runtime: AdapterId);
-            return new AiProviderHealthResult(
-                Ok: match.Ready,
-                Error: match.Ready ? null : $"target_not_ready:{target}",
-                Note: match.Status,
-                Runtime: target);
+
+            var contexts = await _client.ListBrowserContextsAsync(cancellationToken);
+            var ctx = contexts.FirstOrDefault(c => string.Equals(c.TargetId, target, StringComparison.OrdinalIgnoreCase));
+            if (ctx is null)
+                return new AiProviderHealthResult(false, $"context_not_found:{target}", Runtime: target);
+            if (ctx.Authenticated)
+                return new AiProviderHealthResult(true, null, Note: ctx.LoginState, Runtime: target);
+            return new AiProviderHealthResult(false, $"login_required:{target}", Note: ctx.LoginState, Runtime: target);
         }
         catch (Exception ex) when (ex is ProviderTransportException or HttpRequestException or TaskCanceledException)
         {
             return new AiProviderHealthResult(false, ex.Message, Runtime: AdapterId);
         }
+    }
+
+    /// <summary>
+    /// Merges browser-context readiness into a target list in a single pass (no double-scan).
+    /// For each target, finds the matching context by id (case-insensitive) once, then sets
+    /// <c>Ready</c> from <c>ctx.Authenticated</c> and <c>Status</c> from <c>ctx.LoginState</c>.
+    /// When no context matches the target's original <c>Status</c> is preserved and
+    /// <c>Ready</c> is <c>false</c>.
+    /// Pure function — safe to unit-test without HTTP.
+    /// </summary>
+    public static IReadOnlyList<UbagTarget> MergeTargetReadiness(
+        IReadOnlyList<UbagTarget> targets,
+        IReadOnlyList<UbagBrowserContext> contexts)
+    {
+        var result = new List<UbagTarget>(targets.Count);
+        foreach (var t in targets)
+        {
+            var ctx = contexts.FirstOrDefault(c => string.Equals(c.TargetId, t.Id, StringComparison.OrdinalIgnoreCase));
+            result.Add(t with
+            {
+                Ready = ctx?.Authenticated == true,
+                Status = ctx is not null ? ctx.LoginState : t.Status,
+            });
+        }
+        return result;
     }
 
     internal static void EnforceRequestPolicy(AiCompletionRequest request)

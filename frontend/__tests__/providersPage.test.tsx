@@ -7,6 +7,7 @@ const providersSaveMock = vi.fn();
 const providersHealthMock = vi.fn();
 const reportsListMock = vi.fn();
 const sandboxCompareMock = vi.fn();
+const ubagStatusMock = vi.fn();
 
 vi.mock('@/lib/api', () => ({
   COMPLIANCE_LABELS: {
@@ -28,6 +29,9 @@ vi.mock('@/lib/api', () => ({
     ai: {
       sandboxCompare: (...args: unknown[]) => sandboxCompareMock(...args),
     },
+    ubag: {
+      status: () => ubagStatusMock(),
+    },
   },
 }));
 
@@ -40,9 +44,17 @@ describe('providers page', () => {
     providersHealthMock.mockReset();
     reportsListMock.mockReset();
     sandboxCompareMock.mockReset();
+    ubagStatusMock.mockReset();
     providersListMock.mockResolvedValue([]);
     providersSaveMock.mockResolvedValue({ id: 'provider-1' });
     reportsListMock.mockResolvedValue([]);
+    ubagStatusMock.mockResolvedValue({
+      health: { ok: true, status: 'ok' },
+      browser: { instances: 1, contexts: 1, tabs: 1 },
+      targets: [],
+      allowedTargets: ['gemini_web', 'deepseek_web', 'mock'],
+      orderedTargets: ['gemini_web', 'deepseek_web', 'mock'],
+    });
   });
 
   it('offers Copilot, Gemini, UBAG, and OpenAI-compatible presets', async () => {
@@ -81,7 +93,9 @@ describe('providers page', () => {
 
     expect((screen.getByLabelText('Adapter') as HTMLSelectElement).value).toBe(adapter);
     expect((screen.getByLabelText('Compliance class') as HTMLSelectElement).value).toBe('1');
-    expect((screen.getByLabelText('Model') as HTMLInputElement).value).toBe(model);
+    // For ubag, Model is a <select>; for other adapters it is a text <input>.
+    // Both expose .value so we cast to the union type.
+    expect((screen.getByLabelText('Model') as HTMLInputElement | HTMLSelectElement).value).toBe(model);
 
     fireEvent.click(screen.getByText('Save'));
 
@@ -134,6 +148,63 @@ describe('providers page', () => {
     fireEvent.click(screen.getByText('Try again'));
     await waitFor(() => expect(screen.getByText('No AI models yet')).toBeInTheDocument());
     expect(providersListMock).toHaveBeenCalledTimes(2);
+  });
+
+  it('renders a select of UBAG targets when adapter is ubag', async () => {
+    render(<ProvidersPage />);
+
+    await waitFor(() => expect(screen.getByText('Available models')).toBeInTheDocument());
+    fireEvent.click(screen.getByText('+ Add a model'));
+
+    // Switch to ubag adapter
+    fireEvent.change(screen.getByLabelText('Adapter'), { target: { value: 'ubag' } });
+
+    // Wait for the ubag status fetch + re-render
+    await waitFor(() => {
+      const modelEl = screen.getByLabelText('Model');
+      expect(modelEl.tagName).toBe('SELECT');
+    });
+
+    const modelSelect = screen.getByLabelText('Model') as HTMLSelectElement;
+    const optionValues = Array.from(modelSelect.options).map((o) => o.value);
+    expect(optionValues).toContain('gemini_web');
+    expect(optionValues).toContain('deepseek_web');
+    expect(optionValues).toContain('mock');
+  });
+
+  it('renders a text input for Model when adapter is not ubag', async () => {
+    render(<ProvidersPage />);
+
+    await waitFor(() => expect(screen.getByText('Available models')).toBeInTheDocument());
+    fireEvent.click(screen.getByText('+ Add a model'));
+
+    // Default adapter is 'mock' — Model should be a plain text input
+    const modelEl = screen.getByLabelText('Model');
+    expect(modelEl.tagName).toBe('INPUT');
+
+    // Switch to anthropic — still a text input
+    fireEvent.change(screen.getByLabelText('Adapter'), { target: { value: 'anthropic' } });
+    expect(screen.getByLabelText('Model').tagName).toBe('INPUT');
+  });
+
+  it('seeds model to fallback first entry when ubag status fetch rejects (e.g. 403)', async () => {
+    ubagStatusMock.mockRejectedValueOnce(new Error('403'));
+
+    render(<ProvidersPage />);
+
+    await waitFor(() => expect(screen.getByText('Available models')).toBeInTheDocument());
+    fireEvent.click(screen.getByText('+ Add a model'));
+
+    // Switch adapter to ubag without applying a preset (draft.model starts as '')
+    fireEvent.change(screen.getByLabelText('Adapter'), { target: { value: 'ubag' } });
+
+    // Even though status() rejected, the synchronous seed should have fired
+    await waitFor(() => {
+      const modelEl = screen.getByLabelText('Model');
+      expect(modelEl.tagName).toBe('SELECT');
+    });
+
+    expect((screen.getByLabelText('Model') as HTMLSelectElement).value).toBe('gemini_web');
   });
 
   it('shows provider health status returned by the API', async () => {
