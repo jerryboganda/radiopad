@@ -60,7 +60,7 @@ jobs:
           done
 
   frontend:
-    name: frontend (lint + typecheck + build)
+    name: frontend (typecheck + build)
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -73,9 +73,9 @@ jobs:
           cache: pnpm
       - name: Install
         run: pnpm install --frozen-lockfile=false
-      - name: Lint
-        working-directory: frontend
-        run: pnpm lint
+      # NOTE: ESLint is intentionally NOT wired up yet. This repo is on Next.js 16
+      # (which removed `next lint`) and has no ESLint config/deps. When linting is
+      # set up, add a `- name: Lint` step here so it runs on CI per AGENTS.md §0.5.
       - name: Typecheck
         working-directory: frontend
         run: pnpm typecheck
