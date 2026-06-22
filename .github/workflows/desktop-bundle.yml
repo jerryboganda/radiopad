@@ -155,6 +155,32 @@ jobs:
         run: |
           cargo tauri build --config '{"bundle":{"createUpdaterArtifacts":false}}'
 
+      # Launch the built shell and fail the build if it panics on startup
+      # (e.g. PluginInitialization config errors). Tolerates a clean early exit
+      # caused by the runner's headless webview so it does not false-fail.
+      - name: Smoke-test desktop binary (no-panic launch)
+        if: matrix.os == 'windows-latest'
+        shell: pwsh
+        run: |
+          $exe = "desktop/src-tauri/target/release/radiopad-desktop.exe"
+          if (-not (Test-Path $exe)) { Write-Error "built exe not found: $exe"; exit 1 }
+          $err = "$env:RUNNER_TEMP\smoke_err.txt"
+          Write-Host "Launching $exe ..."
+          $p = Start-Process -FilePath $exe -RedirectStandardError $err -PassThru
+          Start-Sleep -Seconds 12
+          $stderr = (Get-Content $err -Raw -ErrorAction SilentlyContinue)
+          if ($p.HasExited) {
+            Write-Host "Process exited early. ExitCode=$($p.ExitCode)"
+            Write-Host "STDERR:`n$stderr"
+            if ($stderr -match 'panicked|PluginInitialization|error while running') {
+              Write-Error "Desktop shell PANICKED on launch"; exit 1
+            }
+            Write-Host "Exited without a panic (likely headless webview on the runner); not failing."
+          } else {
+            Write-Host "Desktop shell stayed alive 12s with no panic - launch OK."
+            Stop-Process -Id $p.Id -Force -ErrorAction SilentlyContinue
+          }
+
       - name: Upload artefacts
         uses: actions/upload-artifact@v4
         with:
