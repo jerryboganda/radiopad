@@ -146,7 +146,12 @@ jobs:
           APPLE_ID: ${{ secrets.APPLE_NOTARIZE_APPLE_ID }}
           APPLE_PASSWORD: ${{ secrets.APPLE_NOTARIZE_PASSWORD }}
           APPLE_TEAM_ID: ${{ secrets.APPLE_NOTARIZE_TEAM_ID }}
-        run: cargo tauri build
+        # Unsigned bundle: do not emit updater artifacts. Tauri requires
+        # TAURI_SIGNING_PRIVATE_KEY to sign them, which this pipeline does not
+        # provide (the signed pipeline is desktop-release.yml). createUpdaterArtifacts
+        # stays enabled in tauri.conf.json for that signed release path.
+        run: |
+          cargo tauri build --config '{"bundle":{"createUpdaterArtifacts":false}}'
 
       - name: Upload artefacts
         uses: actions/upload-artifact@v4
