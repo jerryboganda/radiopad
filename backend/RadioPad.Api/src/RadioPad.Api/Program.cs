@@ -451,6 +451,12 @@ if (!app.Environment.IsEnvironment("Testing"))
     // including auth flows (MagicLinkToken, DeviceAuthRequest), retention,
     // CMK and SCIM additions.
     await db.Database.MigrateAsync();
+    // The enterprise-identity tables (GlobalUsers / ExternalIdentities /
+    // TenantMemberships / AuthSessions) are not materialised by an EF migration;
+    // EnsureSchemaAsync creates them on SQLite (no-op on Postgres). This must run
+    // before seeding or serving traffic, since both DevSeed and the runtime
+    // sign-in path (RecordAuthSessionAsync) query these tables.
+    await EnterpriseIdentityBridge.EnsureSchemaAsync(db, default);
     if (app.Environment.IsDevelopment() || Environment.GetEnvironmentVariable("RADIOPAD_DEV_SEED") == "1")
     {
         var rulebooksDir = Path.Combine(AppContext.BaseDirectory, "..", "..", "..", "..", "..", "..", "..", "rulebooks");

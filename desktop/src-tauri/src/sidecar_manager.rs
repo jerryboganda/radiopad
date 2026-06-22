@@ -3,7 +3,7 @@ use std::sync::Arc;
 use std::time::Duration;
 
 use serde::Serialize;
-use tauri::{AppHandle, Emitter};
+use tauri::{AppHandle, Emitter, Manager};
 use tauri_plugin_shell::process::CommandEvent;
 use tauri_plugin_shell::ShellExt;
 
@@ -65,6 +65,19 @@ fn spawn_health_loop(app: AppHandle, bind: String, stop: Arc<AtomicBool>, restar
     });
 }
 
+/// Resolve a per-user writable SQLite connection string for the bundled
+/// sidecar. The desktop install lives under a read-only location (e.g.
+/// `C:\Program Files\RadioPad`), so the API must not fall back to its
+/// CWD-relative default DB, which would be unwritable for a non-elevated user.
+fn sidecar_db_conn(app: &AppHandle) -> Option<String> {
+    let dir = app.path().app_local_data_dir().ok()?;
+    if let Err(e) = std::fs::create_dir_all(&dir) {
+        tracing::warn!("radiopad-api: could not create data dir {dir:?}: {e}");
+        return None;
+    }
+    Some(format!("Data Source={}", dir.join("radiopad.db").display()))
+}
+
 pub fn start(app: AppHandle) {
     if std::env::var("RADIOPAD_NO_SIDECAR").ok().as_deref() == Some("1") {
         emit_status(&app, "disabled", None, 0);
@@ -78,6 +91,7 @@ pub fn start(app: AppHandle) {
 
 async fn supervise(app: AppHandle) {
     let bind = backend_url();
+    let db_conn = sidecar_db_conn(&app);
     let mut restart_count = 0;
 
     loop {
@@ -95,7 +109,19 @@ async fn supervise(app: AppHandle) {
             }
         };
 
-        let (mut rx, child) = match sidecar.env("RADIOPAD_BIND", &bind).spawn() {
+        // The bundled sidecar is a single-user, loopback-only instance. Run it
+        // in the local "Development" profile so it uses built-in local defaults
+        // instead of demanding cloud production secrets (RADIOPAD_AUTH_SECRET /
+        // RADIOPAD_COLUMN_KEY_*) and seeds the local workspace. The environment
+        // is scoped to this child process only — it does not touch machine env.
+        let mut command = sidecar
+            .env("RADIOPAD_BIND", &bind)
+            .env("ASPNETCORE_ENVIRONMENT", "Development");
+        if let Some(ref conn) = db_conn {
+            command = command.env("RADIOPAD_DB", conn);
+        }
+
+        let (mut rx, child) = match command.spawn() {
             Ok(spawned) => spawned,
             Err(e) => {
                 emit_status(
