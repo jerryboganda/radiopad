@@ -24,6 +24,19 @@ public class EndpointPermissionRbacTests : IClassFixture<RadioPadAppFactory>
         using var allowed = _factory.CreateAdminClient();
         var allowedResp = await allowed.PostAsJsonAsync("/api/providers", ProviderPayload("Allowed Provider"));
         Assert.Equal(HttpStatusCode.OK, allowedResp.StatusCode);
+
+        // Regression guard: a successful provider save audits as the routine
+        // ProviderConfigChanged action, NOT PolicyViolation. It was previously
+        // mis-tagged, which surfaced normal admin edits as "Policy violation" in the
+        // activity log and inflated the governance policy-violation count.
+        using var scope = _factory.Services.CreateScope();
+        var db = scope.ServiceProvider.GetRequiredService<RadioPadDbContext>();
+        var saveEvent = await db.AuditEvents
+            .Where(a => a.TenantId == _factory.SeedTenant.Id && a.DetailsJson.Contains("provider_config_saved"))
+            .OrderByDescending(a => a.CreatedAt)
+            .FirstOrDefaultAsync();
+        Assert.NotNull(saveEvent);
+        Assert.Equal(AuditAction.ProviderConfigChanged, saveEvent!.Action);
     }
 
     [Fact]

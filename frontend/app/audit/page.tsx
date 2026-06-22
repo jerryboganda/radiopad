@@ -25,6 +25,7 @@ const ACTION_LABEL: Record<number, string> = {
   7: 'Rulebook deprecated',
   8: 'User login',
   9: 'Policy violation',
+  54: 'Provider configured',
 };
 
 export default function AuditPage() {

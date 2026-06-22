@@ -348,7 +348,7 @@ public class ProvidersController : TenantedController
         {
             TenantId = tenant.Id,
             UserId = user.Id,
-            Action = AuditAction.PolicyViolation,
+            Action = AuditAction.ProviderConfigChanged,
             DetailsJson = JsonSerializer.Serialize(new
             {
                 eventType = "provider_config_saved",

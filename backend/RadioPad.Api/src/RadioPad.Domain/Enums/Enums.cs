@@ -200,6 +200,10 @@ public enum AuditAction
     CopilotDiagnosticsRun = 52,
     /// <summary>Enterprise Copilot — request lifecycle event (start/complete/fail/cancel) recorded without prompt/code bodies.</summary>
     CopilotRequestLifecycle = 53,
+    /// <summary>An AI provider configuration was created or updated by an admin
+    /// (POST /api/providers). A routine admin action — NOT a policy violation
+    /// (it was previously mis-tagged as <see cref="PolicyViolation"/>).</summary>
+    ProviderConfigChanged = 54,
 }
 
 public enum CopilotMode

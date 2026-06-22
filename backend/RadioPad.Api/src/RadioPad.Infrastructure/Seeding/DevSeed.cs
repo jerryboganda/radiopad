@@ -143,25 +143,34 @@ public static class DevSeed
         {
             foreach (var path in Directory.EnumerateFiles(rulebooksDir, "*.yaml"))
             {
-                var yaml = await File.ReadAllTextAsync(path, ct);
-                var spec = RadioPad.Validation.Rulebook.RulebookSpec.FromYaml(yaml);
-                if (string.IsNullOrEmpty(spec.RulebookId)) continue;
-                var existing = await db.Rulebooks.FirstOrDefaultAsync(
-                    r => r.TenantId == tenant.Id && r.RulebookId == spec.RulebookId && r.Version == spec.Version, ct);
-                if (existing is not null) continue;
-                db.Rulebooks.Add(new Rulebook
+                // Per-file resilience: a single malformed bundled rulebook must never
+                // abort seeding (and thereby crash sidecar startup). Skip + continue.
+                try
                 {
-                    TenantId = tenant.Id,
-                    RulebookId = spec.RulebookId,
-                    Name = spec.Name,
-                    Version = spec.Version,
-                    Owner = spec.Owner,
-                    Status = ParseStatus(spec.Status),
-                    SourceYaml = yaml,
-                    CompiledJson = System.Text.Json.JsonSerializer.Serialize(spec),
-                    AppliesToModalities = string.Join(',', spec.AppliesTo.Modalities),
-                    AppliesToBodyParts = string.Join(',', spec.AppliesTo.BodyParts),
-                });
+                    var yaml = await File.ReadAllTextAsync(path, ct);
+                    var spec = RadioPad.Validation.Rulebook.RulebookSpec.FromYaml(yaml);
+                    if (string.IsNullOrEmpty(spec.RulebookId)) continue;
+                    var existing = await db.Rulebooks.FirstOrDefaultAsync(
+                        r => r.TenantId == tenant.Id && r.RulebookId == spec.RulebookId && r.Version == spec.Version, ct);
+                    if (existing is not null) continue;
+                    db.Rulebooks.Add(new Rulebook
+                    {
+                        TenantId = tenant.Id,
+                        RulebookId = spec.RulebookId,
+                        Name = spec.Name,
+                        Version = spec.Version,
+                        Owner = spec.Owner,
+                        Status = ParseStatus(spec.Status),
+                        SourceYaml = yaml,
+                        CompiledJson = System.Text.Json.JsonSerializer.Serialize(spec),
+                        AppliesToModalities = string.Join(',', spec.AppliesTo.Modalities),
+                        AppliesToBodyParts = string.Join(',', spec.AppliesTo.BodyParts),
+                    });
+                }
+                catch
+                {
+                    // Malformed/unsupported rulebook file — skip it, keep seeding the rest.
+                }
             }
         }
 

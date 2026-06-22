@@ -474,8 +474,17 @@ if (!app.Environment.IsEnvironment("Testing"))
     await EnterpriseIdentityBridge.EnsureSchemaAsync(db, default);
     if (app.Environment.IsDevelopment() || Environment.GetEnvironmentVariable("RADIOPAD_DEV_SEED") == "1")
     {
-        var rulebooksDir = Path.Combine(AppContext.BaseDirectory, "..", "..", "..", "..", "..", "..", "..", "rulebooks");
-        rulebooksDir = Path.GetFullPath(rulebooksDir);
+        // Prefer the app-relative bundle layout (the Tauri desktop ships rulebooks/
+        // alongside radiopad-api.exe under C:\Program Files\RadioPad\); fall back to
+        // the repo-relative path used by `dotnet run`. The old 7-levels-up-only path
+        // never resolved on the desktop, so the bundled starter rulebooks were never
+        // seeded (Rulebooks/Prompt-studio showed empty).
+        var rulebooksDir = Path.Combine(AppContext.BaseDirectory, "rulebooks");
+        if (!Directory.Exists(rulebooksDir))
+        {
+            rulebooksDir = Path.GetFullPath(
+                Path.Combine(AppContext.BaseDirectory, "..", "..", "..", "..", "..", "..", "..", "rulebooks"));
+        }
         await DevSeed.EnsureSeededAsync(db, rulebooksDir, default);
     }
 }

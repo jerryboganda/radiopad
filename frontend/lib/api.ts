@@ -142,7 +142,12 @@ async function fetchOnce(url: string, init: RequestInit, headers: Headers): Prom
   const isDesktop = typeof window !== 'undefined' && '__TAURI__' in window;
   const method = (init.method || 'GET').toUpperCase();
   const retriable = isDesktop && (method === 'GET' || method === 'HEAD');
-  const maxAttempts = retriable ? 10 : 1;
+  // ~18s budget (30 x 600ms). A FRESH sidecar process (relaunch / first run) does
+  // migrate + schema-bridge + dev-seed + hosted-service startup before it binds the
+  // port; that cold boot was observed to exceed the old 6s budget, stranding the
+  // webview at "Signed out / backend not ready" and causing transient 500s on the
+  // first page loads. 18s comfortably bridges it; web/test stay single-shot.
+  const maxAttempts = retriable ? 30 : 1;
   let lastErr: unknown;
   for (let attempt = 0; attempt < maxAttempts; attempt++) {
     try {
