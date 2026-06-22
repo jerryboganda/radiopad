@@ -101,13 +101,12 @@ public static class DevSeed
                 // URL + bearer from the RADIOPAD_UBAG_* environment.
                 //
                 // Gemini is the unattended PRIMARY: end-to-end QA (2026-06) showed
-                // gemini_web returns clean, final radiology impressions, whereas the
-                // gateway's deepseek_web extractor returns the reasoner's chain-of-
-                // thought ("The user asks for…") instead of the answer — unusable as a
-                // draft until the gateway scraper is fixed. DeepSeek stays enabled as a
-                // secondary fallback but is deliberately ranked below Gemini. The router
-                // (EfProviderRouter) is Quality/Cost weighted and only uses Priority as a
-                // tie-break, so Quality is set explicitly to make Gemini win outright.
+                // gemini_web returns clean, final radiology impressions. DeepSeek Web is
+                // an enabled secondary (its gateway extractor was fixed 2026-06-22) but is
+                // deliberately ranked just below Gemini. The router (EfProviderRouter) is
+                // Quality/Cost weighted and only uses Priority as a tie-break, so Quality
+                // is set explicitly to make Gemini win the unattended route outright while
+                // both remain selectable.
                 new ProviderConfig
                 {
                     TenantId = tenant.Id,
@@ -126,18 +125,16 @@ public static class DevSeed
                     Adapter = "ubag",
                     Model = "deepseek_web",
                     Compliance = ProviderComplianceClass.Sandbox,
-                    // DISABLED on purpose: the gateway's deepseek_web extractor returns
-                    // the reasoner's chain-of-thought ("The user asks for…") instead of
-                    // the final answer, so any draft/job routed to it is unusable. We
-                    // keep the row (so the model is visible and trivially re-enabled once
-                    // the gateway is fixed) but Enabled=false removes it from the report
-                    // editor's provider picker, the sandbox-compare gate, and the router,
-                    // so no surface can accidentally dispatch a draft to it. The desktop
-                    // launcher also drops deepseek_web from RADIOPAD_UBAG_ALLOWED_TARGETS /
-                    // _ORDERED_TARGETS so the UBAG Hub single-job dropdown and the ordered
-                    // web-chain are Gemini-only too.
-                    Enabled = false,
-                    Quality = 0.3m,
+                    // ENABLED: the gateway's deepseek_web extractor was fixed 2026-06-22.
+                    // The worker now targets div.ds-markdown.ds-assistant-message-main-content
+                    // (the answer pane) instead of the R1 reasoner's thinking pane, and
+                    // honours options.return_mode="final"; verified 2/2 returning clean
+                    // final answers ("391"; "No acute cardiopulmonary abnormality identified.").
+                    // DeepSeek is now a fully usable secondary, ranked just below Gemini via a
+                    // slightly lower Quality so the unattended router still prefers Gemini while
+                    // both are selectable in the editor picker and the UBAG Hub.
+                    Enabled = true,
+                    Quality = 0.85m,
                     Priority = 2,
                 });
         }

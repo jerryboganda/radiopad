@@ -59,9 +59,17 @@ public class ReportsLifecycleController : TenantedController
         }
 
         var providerQuery = _db.Providers.Where(p => p.TenantId == tenant.Id && p.Enabled);
+        // When no provider is pinned, default to the highest-Quality enabled provider
+        // (Priority as the tie-break) so rewrite agrees with the drafting router's
+        // Quality-first intent — e.g. Gemini (Quality 0.9) wins over DeepSeek (0.85) —
+        // instead of a raw Priority sort that could diverge if priorities change. PHI
+        // compliance is still enforced downstream in the rewrite service, unchanged.
         ProviderConfig? provider = dto.ProviderId is { } pid && pid != Guid.Empty
             ? await providerQuery.FirstOrDefaultAsync(p => p.Id == pid, ct)
-            : await providerQuery.OrderBy(p => p.Priority).FirstOrDefaultAsync(ct);
+            // Order in memory (like EfProviderRouter): SQLite stores decimal as TEXT and
+            // cannot ORDER BY it server-side, so Quality must be ranked client-side.
+            : (await providerQuery.ToListAsync(ct))
+                .OrderByDescending(p => p.Quality).ThenBy(p => p.Priority).FirstOrDefault();
         if (provider is null)
             return StatusCode(StatusCodes.Status503ServiceUnavailable,
                 new { error = "No enabled AI provider available for this tenant.", kind = "provider_unavailable" });

@@ -110,6 +110,15 @@ builder.Services.AddSingleton<IAiProviderAdapter, RadioPad.Infrastructure.Provid
 builder.Services.AddSingleton<IAiProviderAdapter, RadioPad.Infrastructure.Providers.Cli.CodexCliProvider>();
 builder.Services.AddSingleton<IUbagClient, RadioPad.Infrastructure.Providers.Ubag.UbagClient>();
 builder.Services.AddSingleton<IAiProviderAdapter, RadioPad.Infrastructure.Providers.Ubag.UbagProviderAdapter>();
+// Dynamic UBAG provider auto-discovery: keeps each tenant's UBAG provider rows in sync
+// with the gateway's live target catalog + login state, so any web AI the operator logs
+// into via the UBAG Chromium session appears in the picker automatically (no dev needed).
+builder.Services.AddScoped<RadioPad.Infrastructure.Providers.Ubag.UbagProviderDiscoveryService>();
+// The background sweeper is skipped under the Testing environment (like DevSeed) so it
+// never contends on a per-fixture SQLite database during integration tests; the on-demand
+// POST /api/ubag/refresh-targets path still uses the scoped service above.
+if (!builder.Environment.IsEnvironment("Testing"))
+    builder.Services.AddHostedService<RadioPad.Infrastructure.Providers.Ubag.UbagProviderDiscoveryHostedService>();
 
 builder.Services.AddScoped<IAuditLog, EfAuditLog>();
 builder.Services.AddSingleton<RadioPad.Application.Security.IPermissionService, RadioPad.Application.Security.RolePermissionService>();

@@ -2,6 +2,7 @@ using System.Security.Cryptography;
 using System.Text;
 using System.Text.Json;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.EntityFrameworkCore;
 using RadioPad.Application.Abstractions;
 using RadioPad.Domain.Entities;
 using RadioPad.Domain.Enums;
@@ -17,12 +18,14 @@ public class UbagController : TenantedController
     private readonly RadioPadDbContext _db;
     private readonly IUbagClient _ubag;
     private readonly IAuditLog _audit;
+    private readonly UbagProviderDiscoveryService _discovery;
 
-    public UbagController(RadioPadDbContext db, IUbagClient ubag, IAuditLog audit)
+    public UbagController(RadioPadDbContext db, IUbagClient ubag, IAuditLog audit, UbagProviderDiscoveryService discovery)
     {
         _db = db;
         _ubag = ubag;
         _audit = audit;
+        _discovery = discovery;
     }
 
     public record UbagStatusDto(
@@ -49,12 +52,43 @@ public class UbagController : TenantedController
         // Derive per-target readiness from browser contexts (login_state == "authenticated").
         // /v1/targets carries no readiness field; the source of truth is /v1/browser/contexts.
         var mergedTargets = UbagProviderAdapter.MergeTargetReadiness(targets, contexts);
+        // AllowedTargets reflects the LIVE catalog (capped only if the operator set an
+        // explicit RADIOPAD_UBAG_ALLOWED_TARGETS), so the Hub dropdown and the provider
+        // admin page automatically list every web AI the gateway can drive — including
+        // ones the operator just logged into.
+        var cap = UbagProviderAdapter.ResolveAllowedTargetCap();
+        var allowedTargets = (cap is null
+                ? mergedTargets.Select(t => t.Id)
+                : mergedTargets.Where(t => cap.Contains(t.Id, StringComparer.OrdinalIgnoreCase)).Select(t => t.Id))
+            .ToList();
         return Ok(new UbagStatusDto(
             health,
             browser,
             mergedTargets,
-            UbagProviderAdapter.ResolveAllowedTargets(),
+            allowedTargets,
             OrderedTargets()));
+    }
+
+    /// <summary>
+    /// Force an immediate reconciliation of this tenant's UBAG provider rows against the
+    /// live gateway login state. Lets an operator who just logged a new web AI into the
+    /// UBAG Chromium session make it appear in the picker instantly, without waiting for
+    /// the background discovery sweep.
+    /// </summary>
+    [HttpPost("refresh-targets")]
+    public async Task<IActionResult> RefreshTargets(CancellationToken ct)
+    {
+        var (tenant, user) = await ResolveContextAsync(_db, ct);
+        var deny = RequireRole(user, UserRole.ItAdmin, UserRole.ReportingAdmin, UserRole.MedicalDirector);
+        if (deny is not null) return deny;
+
+        var changed = await _discovery.SyncAsync(tenant.Id, ct);
+        var providers = await _db.Providers
+            .Where(p => p.TenantId == tenant.Id && p.Adapter == UbagProviderAdapter.AdapterId)
+            .OrderBy(p => p.Priority)
+            .Select(p => new { p.Name, p.Model, p.Enabled })
+            .ToListAsync(ct);
+        return Ok(new { refreshed = changed, providers });
     }
 
     [HttpPost("jobs")]
@@ -86,8 +120,7 @@ public class UbagController : TenantedController
         if (validation is not null) return validation;
 
         var targets = OrderedTargets();
-        var allowed = UbagProviderAdapter.ResolveAllowedTargets();
-        var blocked = targets.Where(t => !allowed.Contains(t, StringComparer.OrdinalIgnoreCase)).ToArray();
+        var blocked = targets.Where(t => !UbagProviderAdapter.IsTargetAllowed(t)).ToArray();
         if (blocked.Length > 0)
             return BadRequest(new { error = "Ordered workflow contains targets outside RADIOPAD_UBAG_ALLOWED_TARGETS.", kind = "target_not_allowed", targets = blocked });
 
@@ -129,7 +162,7 @@ public class UbagController : TenantedController
         if (prompt.Length > 20_000)
             return BadRequest(new { error = "Prompt must be 20,000 characters or fewer.", kind = "validation" });
         if (!string.Equals(target, "ordered:web-chain", StringComparison.OrdinalIgnoreCase)
-            && !UbagProviderAdapter.ResolveAllowedTargets().Contains(target ?? "", StringComparer.OrdinalIgnoreCase))
+            && !UbagProviderAdapter.IsTargetAllowed(target ?? ""))
             return BadRequest(new { error = "Target is not allowed.", kind = "target_not_allowed" });
         if (LooksLikeSecret(prompt))
             return Conflict(new { error = "UBAG prompts must not contain secrets.", kind = "secret_not_supported" });

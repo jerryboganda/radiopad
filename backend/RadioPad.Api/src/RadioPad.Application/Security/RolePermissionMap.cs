@@ -61,6 +61,12 @@ public static class RolePermissionMap
                 RbacPermission.TemplatesManage,
                 RbacPermission.TemplatesApprove,
                 RbacPermission.ProvidersRead,
+                // The bundled desktop runs as a single MedicalDirector operator who is
+                // also the local admin; ProvidersManage lets them add/edit/enable AI
+                // providers (incl. UBAG targets) from the AI-models page without a
+                // developer. MedicalDirector already holds UsersManage/SecurityManage/
+                // TenantSettingsManage, so this is consistent with the role's admin scope.
+                RbacPermission.ProvidersManage,
                 RbacPermission.AuditRead,
                 RbacPermission.AuditVerify,
                 RbacPermission.AuditExport,

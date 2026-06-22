@@ -127,14 +127,15 @@ async fn supervise(app: AppHandle) {
             // scoped proxy token (baked at build time from a CI secret — never in
             // source). If the token wasn't baked in, UBAG simply stays unconfigured.
             .env("RADIOPAD_UBAG_BASE_URL", "https://radiopad.polytronx.com/api/ubag-gw")
-            // Gemini-only on the desktop. QA showed gemini_web returns clean final
-            // impressions while the gateway's deepseek_web extractor returns the reasoner's
-            // chain-of-thought instead of the answer — unusable as a draft. Dropping
-            // deepseek_web from BOTH the allow-list and the ordered chain means no UBAG
-            // surface (single job, ordered web-chain, report draft) can dispatch to it and
-            // surface that broken output. Re-add it once the gateway extractor is fixed.
-            .env("RADIOPAD_UBAG_ALLOWED_TARGETS", "gemini_web,mock")
-            .env("RADIOPAD_UBAG_ORDERED_TARGETS", "gemini_web")
+            // Desktop AI targets. The gateway's deepseek_web extractor was fixed
+            // 2026-06-22 (it now returns clean final answers, not the R1 thinking pane),
+            // so DeepSeek is a first-class target again alongside Gemini. We deliberately
+            // do NOT set RADIOPAD_UBAG_ALLOWED_TARGETS: with no cap the backend allows any
+            // live UBAG catalog target, so any provider the operator logs into via the
+            // UBAG Chromium session is usable immediately and surfaces in the picker
+            // automatically (UbagProviderDiscoveryService). The ordered web-chain runs the
+            // two curated primaries.
+            .env("RADIOPAD_UBAG_ORDERED_TARGETS", "gemini_web,deepseek_web")
             .env("RADIOPAD_UBAG_API_VERSION", "2026-05-22");
         if let Some(token) = option_env!("RADIOPAD_DESKTOP_PROXY_TOKEN") {
             // Strip a UTF-8 BOM (U+FEFF) and surrounding whitespace. A CI secret

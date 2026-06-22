@@ -117,18 +117,47 @@ public sealed class UbagProviderAdapter : IAiProviderAdapter, IAiProviderHealthP
     internal static string ResolveTarget(ProviderConfig provider)
     {
         var target = string.IsNullOrWhiteSpace(provider.Model) ? "gemini_web" : provider.Model.Trim();
-        var allowed = ResolveAllowedTargets();
-        if (!allowed.Contains(target, StringComparer.OrdinalIgnoreCase))
+        if (!IsTargetAllowed(target))
             throw new ProviderPolicyException($"{AdapterId}: target_not_allowed:{target}");
         return target;
     }
 
-    public static IReadOnlyList<string> ResolveAllowedTargets()
+    // Full set of UBAG web targets the gateway can drive today. Used only as the
+    // display fallback when no explicit operator cap is configured; the live source of
+    // truth for what is *selectable* is the per-tenant ProviderConfig rows that
+    // UbagProviderDiscoveryService keeps in sync with the gateway login state.
+    private static readonly string[] KnownCatalog =
+    {
+        "gemini_web", "deepseek_web", "chatgpt_web", "claude_web",
+        "mistral_lechat", "perplexity_web", "mock",
+    };
+
+    /// <summary>
+    /// The explicit operator allow-list from <c>RADIOPAD_UBAG_ALLOWED_TARGETS</c>, or
+    /// <c>null</c> when unset/blank — meaning "no cap": any live UBAG catalog target is
+    /// permitted, so a provider the operator logs into works with zero configuration.
+    /// </summary>
+    public static IReadOnlyList<string>? ResolveAllowedTargetCap()
     {
         var raw = Environment.GetEnvironmentVariable("RADIOPAD_UBAG_ALLOWED_TARGETS");
-        if (string.IsNullOrWhiteSpace(raw)) raw = "chatgpt_web,gemini_web,deepseek_web,mock";
+        if (string.IsNullOrWhiteSpace(raw)) return null;
         return raw.Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
     }
+
+    /// <summary>True when no cap is configured, or the cap explicitly lists the target.</summary>
+    public static bool IsTargetAllowed(string target)
+    {
+        var cap = ResolveAllowedTargetCap();
+        return cap is null || cap.Contains(target, StringComparer.OrdinalIgnoreCase);
+    }
+
+    /// <summary>
+    /// Back-compat concrete list for callers that need one. When no operator cap is
+    /// configured this returns the full known catalog rather than a hardcoded subset,
+    /// so newly logged-in providers are never gated out.
+    /// </summary>
+    public static IReadOnlyList<string> ResolveAllowedTargets()
+        => ResolveAllowedTargetCap() ?? KnownCatalog;
 
     private async Task<UbagJob> WaitForJobAsync(UbagJob initial, CancellationToken ct)
     {
