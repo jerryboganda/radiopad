@@ -85,6 +85,31 @@ public static class DevSeed
                     Compliance = ProviderComplianceClass.LocalOnly,
                     Enabled = false,
                     Priority = 10,
+                },
+                // UBAG browser-automation AI gateway. The desktop reaches it via the
+                // web-server passthrough (RADIOPAD_UBAG_BASE_URL -> /api/ubag-gw);
+                // EndpointUrl/ApiKeySecretRef stay empty — UbagClient gets the base
+                // URL + bearer from the RADIOPAD_UBAG_* environment. DeepSeek is the
+                // unattended primary; Gemini is secondary (may need a one-time login).
+                new ProviderConfig
+                {
+                    TenantId = tenant.Id,
+                    Name = "UBAG (DeepSeek Web)",
+                    Adapter = "ubag",
+                    Model = "deepseek_web",
+                    Compliance = ProviderComplianceClass.Sandbox,
+                    Enabled = true,
+                    Priority = 1,
+                },
+                new ProviderConfig
+                {
+                    TenantId = tenant.Id,
+                    Name = "UBAG (Gemini Web)",
+                    Adapter = "ubag",
+                    Model = "gemini_web",
+                    Compliance = ProviderComplianceClass.Sandbox,
+                    Enabled = true,
+                    Priority = 2,
                 });
         }
 

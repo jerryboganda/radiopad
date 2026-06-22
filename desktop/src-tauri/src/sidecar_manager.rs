@@ -119,7 +119,22 @@ async fn supervise(app: AppHandle) {
         let mut command = sidecar
             .env("RADIOPAD_BIND", &bind)
             .env("ASPNETCORE_ENVIRONMENT", "Development")
-            .env("RADIOPAD_DEV_HEADERS", "1");
+            .env("RADIOPAD_DEV_HEADERS", "1")
+            // UBAG AI via the web-server passthrough. The internal UBAG gateway is
+            // unreachable from a clinician's machine, so the sidecar's UbagClient is
+            // pointed at the radiopad.polytronx.com /api/ubag-gw passthrough, which
+            // injects the real UBAG secret server-side. The desktop only carries a
+            // scoped proxy token (baked at build time from a CI secret — never in
+            // source). If the token wasn't baked in, UBAG simply stays unconfigured.
+            .env("RADIOPAD_UBAG_BASE_URL", "https://radiopad.polytronx.com/api/ubag-gw")
+            .env("RADIOPAD_UBAG_ALLOWED_TARGETS", "deepseek_web,gemini_web,mock")
+            .env("RADIOPAD_UBAG_ORDERED_TARGETS", "deepseek_web,gemini_web")
+            .env("RADIOPAD_UBAG_API_VERSION", "2026-05-22");
+        if let Some(token) = option_env!("RADIOPAD_DESKTOP_PROXY_TOKEN") {
+            if !token.is_empty() {
+                command = command.env("RADIOPAD_UBAG_AUTH_SECRET", token);
+            }
+        }
         if let Some(ref conn) = db_conn {
             command = command.env("RADIOPAD_DB", conn);
         }
