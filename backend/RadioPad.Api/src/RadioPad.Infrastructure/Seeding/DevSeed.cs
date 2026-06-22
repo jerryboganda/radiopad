@@ -89,18 +89,16 @@ public static class DevSeed
                 // UBAG browser-automation AI gateway. The desktop reaches it via the
                 // web-server passthrough (RADIOPAD_UBAG_BASE_URL -> /api/ubag-gw);
                 // EndpointUrl/ApiKeySecretRef stay empty — UbagClient gets the base
-                // URL + bearer from the RADIOPAD_UBAG_* environment. DeepSeek is the
-                // unattended primary; Gemini is secondary (may need a one-time login).
-                new ProviderConfig
-                {
-                    TenantId = tenant.Id,
-                    Name = "UBAG (DeepSeek Web)",
-                    Adapter = "ubag",
-                    Model = "deepseek_web",
-                    Compliance = ProviderComplianceClass.Sandbox,
-                    Enabled = true,
-                    Priority = 1,
-                },
+                // URL + bearer from the RADIOPAD_UBAG_* environment.
+                //
+                // Gemini is the unattended PRIMARY: end-to-end QA (2026-06) showed
+                // gemini_web returns clean, final radiology impressions, whereas the
+                // gateway's deepseek_web extractor returns the reasoner's chain-of-
+                // thought ("The user asks for…") instead of the answer — unusable as a
+                // draft until the gateway scraper is fixed. DeepSeek stays enabled as a
+                // secondary fallback but is deliberately ranked below Gemini. The router
+                // (EfProviderRouter) is Quality/Cost weighted and only uses Priority as a
+                // tie-break, so Quality is set explicitly to make Gemini win outright.
                 new ProviderConfig
                 {
                     TenantId = tenant.Id,
@@ -109,6 +107,18 @@ public static class DevSeed
                     Model = "gemini_web",
                     Compliance = ProviderComplianceClass.Sandbox,
                     Enabled = true,
+                    Quality = 0.9m,
+                    Priority = 1,
+                },
+                new ProviderConfig
+                {
+                    TenantId = tenant.Id,
+                    Name = "UBAG (DeepSeek Web)",
+                    Adapter = "ubag",
+                    Model = "deepseek_web",
+                    Compliance = ProviderComplianceClass.Sandbox,
+                    Enabled = true,
+                    Quality = 0.3m,
                     Priority = 2,
                 });
         }

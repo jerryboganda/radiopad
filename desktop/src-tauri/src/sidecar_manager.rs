@@ -127,8 +127,11 @@ async fn supervise(app: AppHandle) {
             // scoped proxy token (baked at build time from a CI secret — never in
             // source). If the token wasn't baked in, UBAG simply stays unconfigured.
             .env("RADIOPAD_UBAG_BASE_URL", "https://radiopad.polytronx.com/api/ubag-gw")
-            .env("RADIOPAD_UBAG_ALLOWED_TARGETS", "deepseek_web,gemini_web,mock")
-            .env("RADIOPAD_UBAG_ORDERED_TARGETS", "deepseek_web,gemini_web")
+            .env("RADIOPAD_UBAG_ALLOWED_TARGETS", "gemini_web,deepseek_web,mock")
+            // Gemini first: QA showed gemini_web returns clean final impressions while
+            // the gateway's deepseek_web extractor returns the reasoner's chain-of-thought
+            // instead of the answer. DeepSeek stays as an ordered fallback.
+            .env("RADIOPAD_UBAG_ORDERED_TARGETS", "gemini_web,deepseek_web")
             .env("RADIOPAD_UBAG_API_VERSION", "2026-05-22");
         if let Some(token) = option_env!("RADIOPAD_DESKTOP_PROXY_TOKEN") {
             // Strip a UTF-8 BOM (U+FEFF) and surrounding whitespace. A CI secret

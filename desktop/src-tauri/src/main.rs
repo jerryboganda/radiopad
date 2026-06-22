@@ -141,6 +141,20 @@ fn main() {
     log_redactor::init();
 
     tauri::Builder::default()
+        // Single-instance guard MUST be the first plugin registered. When the user
+        // launches RadioPad again while it is already running, this fires in the
+        // EXISTING process instead of letting a second process boot — that second
+        // process would spawn its own sidecar, fail to bind the already-held loopback
+        // port (7457), crash-loop, and raise a false "backend sidecar exited
+        // repeatedly" banner even though the app is perfectly healthy. Here we simply
+        // surface and focus the running window.
+        .plugin(tauri_plugin_single_instance::init(|app, _argv, _cwd| {
+            if let Some(win) = app.get_webview_window("main") {
+                let _ = win.unminimize();
+                let _ = win.show();
+                let _ = win.set_focus();
+            }
+        }))
         .plugin(tauri_plugin_shell::init())
         .plugin(tauri_plugin_dialog::init())
         .plugin(tauri_plugin_clipboard_manager::init())
