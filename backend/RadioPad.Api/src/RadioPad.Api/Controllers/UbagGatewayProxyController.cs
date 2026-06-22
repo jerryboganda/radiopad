@@ -23,7 +23,7 @@ namespace RadioPad.Api.Controllers;
 [Route("api/ubag-gw")]
 public sealed class UbagGatewayProxyController : ControllerBase
 {
-    private static readonly string[] AllowedPrefixes = { "v1/health", "v1/targets", "v1/jobs", "v1/workflows" };
+    private static readonly string[] AllowedPrefixes = { "v1/health", "v1/targets", "v1/browser", "v1/jobs", "v1/workflows" };
     private readonly IHttpClientFactory _http;
 
     public UbagGatewayProxyController(IHttpClientFactory http) => _http = http;
