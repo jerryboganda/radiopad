@@ -260,7 +260,16 @@ public sealed class UbagClient : IUbagClient
     private async Task<JsonDocument> SendAsync(HttpMethod method, string path, object? body, string? idempotencyKey, CancellationToken ct)
     {
         var client = _http.CreateClient(HttpClientName);
-        using var req = new HttpRequestMessage(method, path);
+        // Build an absolute URL that preserves any base-URL PATH segment. A
+        // leading-slash relative path ("/v1/health") against a BaseAddress that
+        // itself has a path (e.g. the desktop web-server proxy at
+        // https://host/api/ubag-gw) would resolve to the host root and silently
+        // drop the prefix. Combining base + path explicitly keeps both the direct
+        // internal gateway (no base path) and the proxy working.
+        var requestUri = client.BaseAddress is { } baseAddr
+            ? new Uri($"{baseAddr.ToString().TrimEnd('/')}/{path.TrimStart('/')}")
+            : new Uri(path, UriKind.RelativeOrAbsolute);
+        using var req = new HttpRequestMessage(method, requestUri);
         if (!string.IsNullOrWhiteSpace(idempotencyKey))
             req.Headers.TryAddWithoutValidation("Idempotency-Key", idempotencyKey);
         req.Headers.TryAddWithoutValidation("Ubag-Api-Version", ApiVersion());

@@ -62,7 +62,7 @@ public sealed class UbagGatewayProxyController : ControllerBase
                 fwd.Content.Headers.TryAddWithoutValidation("Content-Type", Request.ContentType);
         }
         fwd.Headers.TryAddWithoutValidation("Authorization", $"Bearer {secret}");
-        foreach (var h in new[] { "Idempotency-Key", "X-Ubag-Api-Version" })
+        foreach (var h in new[] { "Idempotency-Key", "Ubag-Api-Version" })
             if (Request.Headers.TryGetValue(h, out var v))
                 fwd.Headers.TryAddWithoutValidation(h, v.ToString());
 
