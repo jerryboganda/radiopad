@@ -29,7 +29,12 @@ function safeReturnTo(value: string | null | undefined): string {
 function allowDevLogin(): boolean {
   const nodeEnv = publicEnv('NODE_ENV') ?? BUILD_NODE_ENV;
   const flag = publicEnv('NEXT_PUBLIC_ALLOW_DEV_LOGIN') ?? DEV_LOGIN_FLAG;
-  return nodeEnv !== 'production' && flag === 'true';
+  // The Tauri desktop shell is an inherently local, single-user context whose
+  // intended sign-in is the passwordless dev/local session (the bundled backend
+  // gates it with RADIOPAD_DEV_HEADERS). Its frontend is a production `next build`,
+  // so the NODE_ENV guard alone would always disable dev login; allow it inside Tauri.
+  const isDesktop = typeof window !== 'undefined' && '__TAURI__' in window;
+  return isDesktop || (nodeEnv !== 'production' && flag === 'true');
 }
 
 function LoginContent() {

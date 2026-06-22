@@ -112,11 +112,14 @@ async fn supervise(app: AppHandle) {
         // The bundled sidecar is a single-user, loopback-only instance. Run it
         // in the local "Development" profile so it uses built-in local defaults
         // instead of demanding cloud production secrets (RADIOPAD_AUTH_SECRET /
-        // RADIOPAD_COLUMN_KEY_*) and seeds the local workspace. The environment
+        // RADIOPAD_COLUMN_KEY_*) and seeds the local workspace. RADIOPAD_DEV_HEADERS
+        // enables the passwordless dev/local sign-in endpoint (Development alone
+        // does not — the gate checks for "Testing" or this flag). The environment
         // is scoped to this child process only — it does not touch machine env.
         let mut command = sidecar
             .env("RADIOPAD_BIND", &bind)
-            .env("ASPNETCORE_ENVIRONMENT", "Development");
+            .env("ASPNETCORE_ENVIRONMENT", "Development")
+            .env("RADIOPAD_DEV_HEADERS", "1");
         if let Some(ref conn) = db_conn {
             command = command.env("RADIOPAD_DB", conn);
         }
