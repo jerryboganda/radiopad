@@ -44,7 +44,16 @@ public static class DevSeed
                 TenantId = tenant.Id,
                 Email = "radiologist@radiopad.local",
                 DisplayName = "Dev Radiologist",
-                Role = UserRole.Radiologist,
+                // MedicalDirector, not plain Radiologist: the bundled desktop is a
+                // single-user, loopback-only instance where the one operator is BOTH
+                // the reporting clinician and the local admin. MedicalDirector is the
+                // only role that grants the complete workflow — ReportsEdit + ReportsSign
+                // (draft and sign) AND membership in the UBAG admin role set
+                // ({ItAdmin, ReportingAdmin, MedicalDirector, ComplianceReviewer}) that
+                // gates GET /api/ubag/status and POST /api/ubag/jobs, plus ProvidersRead
+                // and AuditRead. A plain Radiologist is NOT in that set, so the UBAG Hub
+                // would 403 on a fresh install.
+                Role = UserRole.MedicalDirector,
                 PasswordHash = "dev",
             });
         }
