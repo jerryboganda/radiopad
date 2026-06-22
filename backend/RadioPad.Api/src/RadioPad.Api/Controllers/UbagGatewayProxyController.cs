@@ -37,10 +37,12 @@ public sealed class UbagGatewayProxyController : ControllerBase
             return StatusCode(StatusCodes.Status503ServiceUnavailable, new { error = "Desktop UBAG proxy is not configured.", kind = "proxy_unconfigured" });
 
         var auth = Request.Headers.Authorization.ToString();
-        var presented = auth.StartsWith("Bearer ", StringComparison.OrdinalIgnoreCase) ? auth["Bearer ".Length..].Trim() : string.Empty;
-        Console.Error.WriteLine($"[ubag-gw] DIAG incoming path='{path}' presentedLen={presented.Length} expectedLen={expected.Length} ua='{Request.Headers.UserAgent}'");
+        // Tolerate a stray UTF-8 BOM / whitespace around either token.
+        var presented = (auth.StartsWith("Bearer ", StringComparison.OrdinalIgnoreCase) ? auth["Bearer ".Length..] : string.Empty)
+            .Trim().Trim('﻿');
+        var want = expected.Trim().Trim('﻿');
         if (presented.Length == 0 ||
-            !CryptographicOperations.FixedTimeEquals(Encoding.UTF8.GetBytes(presented), Encoding.UTF8.GetBytes(expected)))
+            !CryptographicOperations.FixedTimeEquals(Encoding.UTF8.GetBytes(presented), Encoding.UTF8.GetBytes(want)))
             return Unauthorized(new { error = "Invalid desktop proxy token.", kind = "unauthenticated" });
 
         var p = (path ?? string.Empty).TrimStart('/');

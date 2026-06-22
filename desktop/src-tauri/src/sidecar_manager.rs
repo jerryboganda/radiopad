@@ -131,6 +131,11 @@ async fn supervise(app: AppHandle) {
             .env("RADIOPAD_UBAG_ORDERED_TARGETS", "deepseek_web,gemini_web")
             .env("RADIOPAD_UBAG_API_VERSION", "2026-05-22");
         if let Some(token) = option_env!("RADIOPAD_DESKTOP_PROXY_TOKEN") {
+            // Strip a UTF-8 BOM (U+FEFF) and surrounding whitespace. A CI secret
+            // set via a BOM-prepending pipe bakes the BOM into the literal, which
+            // corrupts the Authorization header (U+FEFF is invalid in HTTP header
+            // values) and silently breaks every UBAG call.
+            let token = token.trim_matches(|c: char| c == '\u{feff}' || c.is_whitespace());
             if !token.is_empty() {
                 command = command.env("RADIOPAD_UBAG_AUTH_SECRET", token);
             }
