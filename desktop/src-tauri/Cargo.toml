@@ -40,6 +40,11 @@ tracing-subscriber = { version = "0.3", default-features = false, features = [
     "fmt",
     "registry",
 ] }
+# Pin the transitive `time` crate away from 0.3.50, whose lib fails to build
+# (`error[E0432]: unresolved import time_macros::timestamp`). There is no
+# committed Cargo.lock, so CI resolves fresh and otherwise picks the broken
+# latest. 0.3.36+ keeps the Rust 1.80 fix; <0.3.50 avoids the regression.
+time = { version = ">=0.3.36, <0.3.50", default-features = false }
 
 [features]
 custom-protocol = ["tauri/custom-protocol"]
