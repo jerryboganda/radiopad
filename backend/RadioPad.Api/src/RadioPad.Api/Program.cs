@@ -354,7 +354,13 @@ builder.Services.AddHostedService<RadioPad.Api.Services.SiemPushService>();
 }
 
 builder.Services.AddCors(o => o.AddDefaultPolicy(p => p
-    .WithOrigins("http://localhost:3000", "http://127.0.0.1:3000", "tauri://localhost", "capacitor://localhost")
+    // Tauri serves the desktop webview from tauri://localhost on macOS/Linux but
+    // from http(s)://tauri.localhost on Windows — the latter must be allow-listed
+    // or the bundled desktop shell's fetches are blocked by CORS ("Failed to fetch").
+    .WithOrigins(
+        "http://localhost:3000", "http://127.0.0.1:3000",
+        "tauri://localhost", "capacitor://localhost",
+        "http://tauri.localhost", "https://tauri.localhost")
     .AllowAnyHeader().AllowAnyMethod().AllowCredentials()));
 
 builder.Services.AddControllers().AddJsonOptions(o =>
