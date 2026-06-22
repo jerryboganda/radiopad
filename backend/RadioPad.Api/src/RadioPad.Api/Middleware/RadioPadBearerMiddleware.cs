@@ -127,6 +127,9 @@ public sealed class RadioPadBearerMiddleware
 
     private static bool IsPublicApi(PathString path) =>
         path.StartsWithSegments("/api/health") ||
+        // Desktop UBAG passthrough — self-authenticated via RADIOPAD_DESKTOP_PROXY_TOKEN
+        // in the controller, so it must bypass the Production bearer/OIDC requirement.
+        path.StartsWithSegments("/api/ubag-gw") ||
         path.StartsWithSegments("/api/auth/logout") ||
         path.StartsWithSegments("/api/auth/oidc/authorize-url") ||
         path.StartsWithSegments("/api/auth/magic-link/request") ||
