@@ -1,0 +1,52 @@
+name: publish-release
+
+# Publishes the Windows MSI produced by desktop-bundle as a GitHub Release
+# asset, entirely server-side (no local download needed). Manual dispatch.
+
+on:
+  workflow_dispatch:
+    inputs:
+      run_id:
+        description: Run ID of the desktop-bundle run that produced radiopad-windows-latest
+        required: true
+        default: "27936051463"
+      tag:
+        description: Release tag
+        required: true
+        default: "v0.1.1"
+
+permissions:
+  contents: write
+  actions: read
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Download Windows bundle artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: radiopad-windows-latest
+          run-id: ${{ inputs.run_id }}
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          path: dist
+
+      - name: List artifact contents
+        run: find dist -type f -printf '%p  (%s bytes)\n'
+
+      - name: Publish release with MSI
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set -euo pipefail
+          MSI=$(find dist -name '*.msi' | head -1)
+          if [ -z "$MSI" ]; then echo "No .msi found in artifact" >&2; exit 1; fi
+          echo "Publishing: $MSI"
+          gh release delete "${{ inputs.tag }}" --repo "${{ github.repository }}" --yes --cleanup-tag || true
+          gh release create "${{ inputs.tag }}" "$MSI" \
+            --repo "${{ github.repository }}" \
+            --target "${{ github.sha }}" \
+            --title "RadioPad ${{ inputs.tag }} — desktop" \
+            --notes "Windows desktop installer (MSI). Fixes the crash-looping backend sidecar: the bundled .NET API now runs in local mode and creates the enterprise-identity tables on first launch. Installing upgrades 0.1.0 in place."
+          echo "Asset URL:"
+          gh release view "${{ inputs.tag }}" --repo "${{ github.repository }}" --json assets --jq '.assets[].url'
