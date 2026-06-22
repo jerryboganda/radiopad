@@ -126,7 +126,17 @@ public static class DevSeed
                     Adapter = "ubag",
                     Model = "deepseek_web",
                     Compliance = ProviderComplianceClass.Sandbox,
-                    Enabled = true,
+                    // DISABLED on purpose: the gateway's deepseek_web extractor returns
+                    // the reasoner's chain-of-thought ("The user asks for…") instead of
+                    // the final answer, so any draft/job routed to it is unusable. We
+                    // keep the row (so the model is visible and trivially re-enabled once
+                    // the gateway is fixed) but Enabled=false removes it from the report
+                    // editor's provider picker, the sandbox-compare gate, and the router,
+                    // so no surface can accidentally dispatch a draft to it. The desktop
+                    // launcher also drops deepseek_web from RADIOPAD_UBAG_ALLOWED_TARGETS /
+                    // _ORDERED_TARGETS so the UBAG Hub single-job dropdown and the ordered
+                    // web-chain are Gemini-only too.
+                    Enabled = false,
                     Quality = 0.3m,
                     Priority = 2,
                 });

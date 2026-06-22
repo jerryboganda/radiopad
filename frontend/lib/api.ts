@@ -125,15 +125,47 @@ async function hydrateAuthTokenFromSecureStore(): Promise<boolean> {
   }
 }
 
+/**
+ * fetch() but tolerant of a backend that is briefly unreachable. On the bundled
+ * desktop the Next.js webview boots a few seconds before the .NET sidecar has
+ * finished binding 127.0.0.1:7457 (cold start runs EF migrations + dev seed), so
+ * the very first me()/reports requests would otherwise throw "Failed to fetch"
+ * and strand the app on a "Backend not reachable / Signed out" screen until a
+ * manual reload. A thrown error means no response was received, so for
+ * idempotent reads (GET/HEAD) we retry with a short backoff to bridge that boot
+ * gap. Mutating verbs are never retried here (no risk of a double-submit).
+ */
+async function fetchOnce(url: string, init: RequestInit, headers: Headers): Promise<Response> {
+  // Only the bundled desktop has the webview-vs-sidecar boot race; the hosted web
+  // API is always up. Scoping the retry to the desktop keeps web/test behaviour
+  // (a single fetch that fails fast) unchanged.
+  const isDesktop = typeof window !== 'undefined' && '__TAURI__' in window;
+  const method = (init.method || 'GET').toUpperCase();
+  const retriable = isDesktop && (method === 'GET' || method === 'HEAD');
+  const maxAttempts = retriable ? 10 : 1;
+  let lastErr: unknown;
+  for (let attempt = 0; attempt < maxAttempts; attempt++) {
+    try {
+      return await fetch(url, { ...init, headers });
+    } catch (e) {
+      // A network/connection failure surfaces as TypeError ("Failed to fetch").
+      lastErr = e;
+      if (attempt === maxAttempts - 1 || !(e instanceof TypeError)) throw e;
+      await new Promise((r) => setTimeout(r, 600));
+    }
+  }
+  throw lastErr;
+}
+
 async function fetchWithAuthRetry(
   url: string,
   init: RequestInit,
   headers: Headers,
 ): Promise<Response> {
-  let res = await fetch(url, { ...init, headers });
+  let res = await fetchOnce(url, init, headers);
   if ((res.status === 401 || res.status === 403) && !cachedAuthToken && await hydrateAuthTokenFromSecureStore()) {
     applyAuthHeader(headers);
-    res = await fetch(url, { ...init, headers });
+    res = await fetchOnce(url, init, headers);
   }
   return res;
 }
