@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState, useCallback, useMemo } from 'react';
+import { useEffect, useState, useCallback, useMemo, useRef } from 'react';
 import { useRouter } from 'next/navigation';
 import {
   api,
@@ -76,6 +76,16 @@ export default function ReportPage() {
   const [voiceCommandPills, setVoiceCommandPills] = useState<Array<{ id: number; command: VoiceCommand }>>([]);
   const voicePillIdRef = { current: 0 };
 
+  // Latest-value refs. AI actions can fire from the toolbar button (fresh
+  // closure), but also from a desktop menu/keyboard event or a voice command
+  // whose handler captured an older render. Reading the live editor state from
+  // refs keeps the pre-AI flush (see `flushEdits`) correct on every path and
+  // avoids ever PATCHing stale text back over newer content.
+  const reportRef = useRef<Report | null>(report);
+  reportRef.current = report;
+  const aiHighlightsRef = useRef(aiHighlights);
+  aiHighlightsRef.current = aiHighlights;
+
   useEffect(() => {
     setId(readQueryParam('id'));
   }, []);
@@ -107,6 +117,31 @@ export default function ReportPage() {
     }
   }, [report]);
 
+  /**
+   * HANDOFF gotcha #3 — section textareas only persist on blur, but the AI
+   * endpoints (`runAi`) read the report from the DB. Clicking "Generate
+   * impression" straight from typing the Findings would otherwise race the
+   * blur save and the model would draft from stale/empty server state ("No
+   * findings were provided…"). Flush the on-screen editor state with one
+   * PATCH before any AI call. Reads come from refs (not closures) so this is
+   * correct even when triggered from the window-event / voice-command paths,
+   * which would otherwise overwrite the DB with outdated text.
+   */
+  const flushEdits = useCallback(async () => {
+    const current = reportRef.current;
+    if (!current) return;
+    const next = await api.reports.patch(current.id, {
+      indication: current.indication,
+      technique: current.technique,
+      comparison: current.comparison,
+      findings: current.findings,
+      impression: current.impression,
+      recommendations: current.recommendations,
+      aiHighlightsJson: JSON.stringify(aiHighlightsRef.current),
+    });
+    setReport(next);
+  }, []);
+
   async function refreshSignatures() {
     if (!report) return;
     try { setSignatures(await api.reports.signatures(report.id)); } catch { /* noop */ }
@@ -117,8 +152,10 @@ export default function ReportPage() {
     setAiBusy(true);
     setError(null);
     try {
+      // Persist unsaved edits first so the AI drafts from what's on screen.
+      await flushEdits();
       const out = await api.reports.runAi(report.id, { mode: mode as 'impression', providerId });
-      const nextHighlights = { ...aiHighlights, impression: true };
+      const nextHighlights = { ...aiHighlightsRef.current, impression: true };
       setAiHighlights(nextHighlights);
       await update({ impression: out.text, aiHighlightsJson: JSON.stringify(nextHighlights) });
     } catch (e) {

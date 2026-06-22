@@ -6,6 +6,17 @@ The format is based on [Keep a Changelog 1.1.0](https://keepachangelog.com/en/1.
 
 ## [Unreleased]
 
+### Fixed
+- **Report editor — "Generate impression" no longer drafts from empty findings.**
+  Section textareas persist on blur, but the AI endpoint
+  (`POST /api/reports/{id}/ai`) reads findings from the DB, so clicking
+  *Generate impression* straight from typing raced the save and the model
+  replied "No findings were provided…". `frontend/app/reports/[id]/ReportClient.tsx`
+  now flushes the on-screen editor state with a synchronous PATCH (reading the
+  live value from refs, so the desktop-event/voice-command paths can't clobber
+  newer text) before any AI call. Covered by
+  `frontend/__tests__/reportGenerateFlush.test.tsx`.
+
 ### Changed
 - **Iter-45 — Radiologist-friendly UI sweep**: project-wide rewrite of
   user-facing copy and a layout fix so admin/settings surfaces fill widescreen
