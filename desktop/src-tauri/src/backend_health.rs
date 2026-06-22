@@ -24,7 +24,7 @@ fn parse_backend_endpoint(url: &str) -> Result<BackendEndpoint, String> {
         .unwrap_or("127.0.0.1:7457");
     let (host, port) = authority
         .rsplit_once(':')
-        .map(|(h, p)| {
+        .map(|(h, p)| -> Result<(String, u16), String> {
             let port = p.parse::<u16>().map_err(|_| "invalid backend port".to_string())?;
             Ok((h.trim_matches(&['[', ']'][..]).to_string(), port))
         })

@@ -132,7 +132,9 @@ jobs:
           rm "$RUNNER_TEMP/cert.p12"
 
       - name: Install tauri-cli
-        run: cargo install tauri-cli --version "^2" --locked
+        uses: taiki-e/install-action@v2
+        with:
+          tool: tauri-cli
 
       - name: Build Tauri bundle
         working-directory: desktop
