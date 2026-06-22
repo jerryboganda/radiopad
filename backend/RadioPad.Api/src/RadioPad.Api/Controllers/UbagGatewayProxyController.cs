@@ -38,6 +38,7 @@ public sealed class UbagGatewayProxyController : ControllerBase
 
         var auth = Request.Headers.Authorization.ToString();
         var presented = auth.StartsWith("Bearer ", StringComparison.OrdinalIgnoreCase) ? auth["Bearer ".Length..].Trim() : string.Empty;
+        Console.Error.WriteLine($"[ubag-gw] DIAG incoming path='{path}' presentedLen={presented.Length} expectedLen={expected.Length} ua='{Request.Headers.UserAgent}'");
         if (presented.Length == 0 ||
             !CryptographicOperations.FixedTimeEquals(Encoding.UTF8.GetBytes(presented), Encoding.UTF8.GetBytes(expected)))
             return Unauthorized(new { error = "Invalid desktop proxy token.", kind = "unauthenticated" });
