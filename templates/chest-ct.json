@@ -1,15 +1,16 @@
 {
-  "templateId": "chest-ct",
+  "id": "chest-ct",
   "name": "Chest CT (default)",
   "modality": "CT",
   "bodyPart": "Chest",
   "subspecialty": "Thoracic",
+  "rulebookId": "chest_ct_v1",
   "sections": [
-    { "key": "Indication", "required": true, "placeholder": "Reason for exam" },
-    { "key": "Technique", "required": true, "default": "Helical CT of the chest acquired with IV contrast." },
-    { "key": "Comparison", "required": false, "placeholder": "Date and description of priors" },
-    { "key": "Findings", "required": true, "structured": ["Lungs", "Pleura", "Mediastinum", "Heart", "Bones", "Soft tissues"] },
-    { "key": "Impression", "required": true, "format": "bullets", "maxBullets": 5 },
-    { "key": "Recommendations", "required": false }
+    { "id": "indication",      "label": "Indication",      "placeholder": "Clinical question / reason for exam." },
+    { "id": "technique",       "label": "Technique",       "placeholder": "Helical CT of the chest acquired with IV contrast." },
+    { "id": "comparison",      "label": "Comparison",      "placeholder": "Date and description of prior chest imaging, if available." },
+    { "id": "findings",        "label": "Findings",        "placeholder": "Lungs: ...\nPleura: ...\nMediastinum: ...\nHeart: ...\nBones: ...\nSoft tissues: ..." },
+    { "id": "impression",      "label": "Impression",      "placeholder": "Concise bulleted impression (max 5)." },
+    { "id": "recommendations", "label": "Recommendations", "placeholder": "Follow-up imaging or clinical correlation, if indicated." }
   ]
 }

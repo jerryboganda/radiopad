@@ -1,15 +1,16 @@
 {
-  "templateId": "brain-mri",
+  "id": "brain-mri",
   "name": "Brain MRI (default)",
   "modality": "MR",
   "bodyPart": "Brain",
   "subspecialty": "Neuro",
+  "rulebookId": "brain_mri_v1",
   "sections": [
-    { "key": "Indication", "required": true },
-    { "key": "Technique", "required": true, "default": "Multiplanar, multisequence MRI of the brain without IV contrast." },
-    { "key": "Comparison", "required": false },
-    { "key": "Findings", "required": true, "structured": ["Parenchyma", "Ventricles", "Vessels", "Skull base", "Sinuses"] },
-    { "key": "Impression", "required": true, "format": "bullets", "maxBullets": 4 },
-    { "key": "Recommendations", "required": false }
+    { "id": "indication",      "label": "Indication",      "placeholder": "Clinical question / referring concern." },
+    { "id": "technique",       "label": "Technique",       "placeholder": "Multiplanar, multisequence MRI of the brain without IV contrast." },
+    { "id": "comparison",      "label": "Comparison",      "placeholder": "Prior brain imaging, if available." },
+    { "id": "findings",        "label": "Findings",        "placeholder": "Parenchyma: ...\nVentricles: ...\nVessels: ...\nSkull base: ...\nSinuses: ..." },
+    { "id": "impression",      "label": "Impression",      "placeholder": "Concise bulleted impression (max 4)." },
+    { "id": "recommendations", "label": "Recommendations", "placeholder": "Follow-up imaging or clinical correlation, if indicated." }
   ]
 }
