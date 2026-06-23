@@ -95,6 +95,28 @@ async fn supervise(app: AppHandle) {
     let mut restart_count = 0;
 
     loop {
+        // Adopt an already-healthy sidecar instead of spawning a conflicting one.
+        // If a previous shell exited abruptly (crash / force-quit / OS kill), the OS
+        // may leave its sidecar child running and still bound to the loopback port.
+        // A freshly launched shell that blindly spawns a *second* sidecar would fail
+        // to bind that port, crash-loop to MAX_RESTARTS, and raise a false "backend
+        // sidecar exited repeatedly" danger banner — even though the window reads live
+        // data fine off the surviving sidecar. Detect that case and monitor the
+        // existing backend instead of fighting it. (Only RadioPad serves
+        // /api/health/ready with 200 on this port, so this won't adopt a stranger.)
+        if backend_health::check_ready_async(&bind).await.is_ok() {
+            emit_status(&app, "ready", None, restart_count);
+            loop {
+                tokio::time::sleep(Duration::from_millis(1500)).await;
+                if backend_health::check_ready_async(&bind).await.is_err() {
+                    break;
+                }
+            }
+            // The adopted backend went away — reset and fall through to (re)spawn ours.
+            restart_count = 0;
+            continue;
+        }
+
         emit_status(&app, "starting", None, restart_count);
         let sidecar = match app.shell().sidecar("radiopad-api") {
             Ok(sidecar) => sidecar,
