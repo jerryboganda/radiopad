@@ -43,6 +43,8 @@ public class DevSeedTemplateTests
         return dir;
     }
 
+    // The "templateId" schema (chest-ct.json / brain-mri.json): templateId + subspecialty,
+    // sections keyed by "key".
     private static Task WriteTemplateAsync(string dir, string file, string id) =>
         File.WriteAllTextAsync(Path.Combine(dir, file), $$"""
             {
@@ -54,6 +56,24 @@ public class DevSeedTemplateTests
               "sections": [
                 { "key": "Indication", "required": true },
                 { "key": "Impression", "required": true, "format": "bullets" }
+              ]
+            }
+            """);
+
+    // The "id" schema (abdomen-us.json / knee-xray.json / lumbar-spine-mri.json): the
+    // identifier is "id" (no "templateId"), no "subspecialty", sections shaped
+    // { id, label, placeholder } — exactly what the editor's applyTemplate consumes.
+    private static Task WriteIdSchemaTemplateAsync(string dir, string file, string id) =>
+        File.WriteAllTextAsync(Path.Combine(dir, file), $$"""
+            {
+              "id": "{{id}}",
+              "name": "Template {{id}}",
+              "modality": "US",
+              "bodyPart": "Abdomen",
+              "rulebookId": "{{id}}_v1",
+              "sections": [
+                { "id": "indication", "label": "Indication", "placeholder": "Clinical question." },
+                { "id": "impression", "label": "Impression", "placeholder": "Concise impression." }
               ]
             }
             """);
@@ -79,6 +99,26 @@ public class DevSeedTemplateTests
         // and the editor scaffolding dropdown list every template regardless.
         Assert.Equal(TemplateStatus.Draft, t.Status);
         Assert.Equal(TemplateVariant.Normal, t.Variant);
+    }
+
+    [Fact]
+    public async Task Seeds_legacy_id_schema_template_using_id_as_the_identifier()
+    {
+        var dir = NewTemplatesDir();
+        await WriteIdSchemaTemplateAsync(dir, "abdomen-us.json", "abdomen-us");
+        using var db = await NewDbAsync();
+
+        await SeedAsync(db, dir);
+
+        // Three of the five bundled templates use "id" instead of "templateId"; they
+        // must still seed (and their id/label/placeholder sections preserved verbatim).
+        var t = await db.Templates.SingleAsync(x => x.TemplateId == "abdomen-us");
+        Assert.Equal("Template abdomen-us", t.Name);
+        Assert.Equal("US", t.Modality);
+        Assert.Equal("Abdomen", t.BodyPart);
+        Assert.Equal("", t.Subspecialty); // absent in this schema → entity default
+        Assert.Contains("indication", t.SectionsJson);
+        Assert.Contains("placeholder", t.SectionsJson);
     }
 
     [Fact]

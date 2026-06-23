@@ -180,6 +180,10 @@ public static class DevSeed
         // POST handler), and per-file try/catch so one malformed template can't abort
         // sidecar startup. The whole `sections` array is preserved verbatim as the
         // SectionsJson blob the editor consumes.
+        //
+        // The bundled set carries two historical shapes: chest-ct/brain-mri use
+        // "templateId" + "subspecialty", while abdomen-us/knee-xray/lumbar-spine-mri use
+        // "id" (no subspecialty). Accept either identifier so every bundled template seeds.
         if (Directory.Exists(templatesDir))
         {
             foreach (var path in Directory.EnumerateFiles(templatesDir, "*.json"))
@@ -190,18 +194,19 @@ public static class DevSeed
                     using var doc = System.Text.Json.JsonDocument.Parse(json);
                     var root = doc.RootElement;
                     if (root.ValueKind != System.Text.Json.JsonValueKind.Object) continue;
-                    if (!root.TryGetProperty("templateId", out var idEl) ||
-                        idEl.ValueKind != System.Text.Json.JsonValueKind.String) continue;
-                    var templateId = idEl.GetString();
-                    if (string.IsNullOrEmpty(templateId)) continue;
-                    var existing = await db.Templates.FirstOrDefaultAsync(
-                        t => t.TenantId == tenant.Id && t.TemplateId == templateId, ct);
-                    if (existing is not null) continue;
 
                     string Str(string name) =>
                         root.TryGetProperty(name, out var e) && e.ValueKind == System.Text.Json.JsonValueKind.String
                             ? e.GetString()!
                             : "";
+
+                    var templateId = Str("templateId");
+                    if (string.IsNullOrEmpty(templateId)) templateId = Str("id");
+                    if (string.IsNullOrEmpty(templateId)) continue;
+
+                    var existing = await db.Templates.FirstOrDefaultAsync(
+                        t => t.TenantId == tenant.Id && t.TemplateId == templateId, ct);
+                    if (existing is not null) continue;
 
                     db.Templates.Add(new ReportTemplate
                     {
