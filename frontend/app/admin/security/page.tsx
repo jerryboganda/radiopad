@@ -1,5 +1,7 @@
 'use client';
 
+import PermissionGate from '@/components/ui/PermissionGate';
+
 import { useEffect, useState } from 'react';
 import { api } from '@/lib/api';
 
@@ -45,6 +47,14 @@ const SAMPLE_PLACEHOLDER = `[
  * which sinks are active and their last-push outcome.
  */
 export default function SecurityAdminPage() {
+  return (
+    <PermissionGate permission="security.manage" title="Security">
+      <SecurityAdminPageInner />
+    </PermissionGate>
+  );
+}
+
+function SecurityAdminPageInner() {
   const [sinks, setSinks] = useState<SinkStatus[] | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [info, setInfo] = useState<string | null>(null);

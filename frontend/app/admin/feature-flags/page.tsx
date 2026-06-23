@@ -1,5 +1,7 @@
 'use client';
 
+import PermissionGate from '@/components/ui/PermissionGate';
+
 /**
  * BILL-006 — Plan feature-flags page. Read-only view of
  * `GET /api/billing/features` (already typed in `api.ts`) plus a panel
@@ -64,6 +66,14 @@ function describe(flag: string): { label: string; gates: string } {
 }
 
 export default function FeatureFlagsPage() {
+  return (
+    <PermissionGate permission="billing.read" title="Feature flags">
+      <FeatureFlagsPageInner />
+    </PermissionGate>
+  );
+}
+
+function FeatureFlagsPageInner() {
   const [data, setData] = useState<FeatureMap | null>(null);
   const [error, setError] = useState<string | null>(null);
 

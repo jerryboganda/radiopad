@@ -73,7 +73,9 @@ public class McpToolRegistryController : TenantedController
     [HttpGet]
     public async Task<IActionResult> List(CancellationToken ct)
     {
-        var (tenant, _) = await ResolveContextAsync(_db, ct);
+        var (tenant, user) = await ResolveContextAsync(_db, ct);
+        var deny = RequirePermission(user, RbacPermission.McpToolsInvoke);
+        if (deny is not null) return deny;
         var rows = await _db.McpTools.AsNoTracking()
             .Where(t => t.TenantId == tenant.Id)
             .OrderBy(t => t.Name)
@@ -84,7 +86,9 @@ public class McpToolRegistryController : TenantedController
     [HttpGet("{id:guid}")]
     public async Task<IActionResult> Get(Guid id, CancellationToken ct)
     {
-        var (tenant, _) = await ResolveContextAsync(_db, ct);
+        var (tenant, user) = await ResolveContextAsync(_db, ct);
+        var deny = RequirePermission(user, RbacPermission.McpToolsInvoke);
+        if (deny is not null) return deny;
         var tool = await _db.McpTools.AsNoTracking()
             .FirstOrDefaultAsync(t => t.TenantId == tenant.Id && t.Id == id, ct);
         if (tool is null) return NotFound();
@@ -263,6 +267,8 @@ public class McpToolRegistryController : TenantedController
     public async Task<IActionResult> Invoke(Guid id, [FromBody] InvokeDto dto, CancellationToken ct)
     {
         var (tenant, user) = await ResolveContextAsync(_db, ct);
+        var deny = RequirePermission(user, RbacPermission.McpToolsInvoke);
+        if (deny is not null) return deny;
         var tool = await _db.McpTools.FirstOrDefaultAsync(t => t.TenantId == tenant.Id && t.Id == id, ct);
         if (tool is null) return NotFound();
 

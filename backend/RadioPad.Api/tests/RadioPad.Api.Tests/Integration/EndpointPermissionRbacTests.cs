@@ -2,6 +2,7 @@ using System.Net;
 using System.Net.Http.Json;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
+using RadioPad.Application.Security;
 using RadioPad.Domain.Entities;
 using RadioPad.Domain.Enums;
 using RadioPad.Infrastructure.Persistence;
@@ -111,9 +112,46 @@ public class EndpointPermissionRbacTests : IClassFixture<RadioPadAppFactory>
         var deniedResp = await denied.PostAsJsonAsync("/api/prompts/overrides", PromptPayload());
         Assert.Equal(HttpStatusCode.Forbidden, deniedResp.StatusCode);
 
+        // Least-privilege (2026-06-23): PromptOverridesManage moved off ReportingAdmin to
+        // ItAdmin to preserve manage/approve separation-of-duties. ReportingAdmin is now
+        // denied; ItAdmin manages.
         using var reportingAdmin = await CreateRoleClientAsync(UserRole.ReportingAdmin);
-        var allowedResp = await reportingAdmin.PostAsJsonAsync("/api/prompts/overrides", PromptPayload());
+        var reportingResp = await reportingAdmin.PostAsJsonAsync("/api/prompts/overrides", PromptPayload());
+        Assert.Equal(HttpStatusCode.Forbidden, reportingResp.StatusCode);
+
+        using var itAdmin = await CreateRoleClientAsync(UserRole.ItAdmin);
+        var allowedResp = await itAdmin.PostAsJsonAsync("/api/prompts/overrides", PromptPayload());
         Assert.Equal(HttpStatusCode.OK, allowedResp.StatusCode);
+    }
+
+    [Fact]
+    public async Task TenantMe_Surfaces_EffectivePermissionKeys_ForClientGating()
+    {
+        // The client builds its permission-accurate UI from /api/tenant/me's
+        // permission keys; they must equal the server's RolePermissionMap for the role.
+        using var radiologist = _factory.CreateTenantClient();
+        var radDoc = await (await radiologist.GetAsync("/api/tenant/me"))
+            .Content.ReadFromJsonAsync<System.Text.Json.JsonElement>();
+        var radPerms = radDoc.GetProperty("user").GetProperty("permissions")
+            .EnumerateArray().Select(e => e.GetString()!).ToHashSet();
+        var expectedRad = RolePermissionMap.ForRole(UserRole.Radiologist)
+            .Select(p => PermissionCatalog.Get(p).Key).ToHashSet();
+        Assert.Equal(expectedRad, radPerms);
+        // A Radiologist must NOT be told it can manage providers/security.
+        Assert.DoesNotContain("providers.manage", radPerms);
+        Assert.DoesNotContain("security.manage", radPerms);
+        // ...but DOES sign reports.
+        Assert.Contains("reports.sign", radPerms);
+
+        using var admin = _factory.CreateAdminClient();
+        var adminDoc = await (await admin.GetAsync("/api/tenant/me"))
+            .Content.ReadFromJsonAsync<System.Text.Json.JsonElement>();
+        var adminUser = adminDoc.GetProperty("user");
+        var adminPerms = adminUser.GetProperty("permissions")
+            .EnumerateArray().Select(e => e.GetString()!).ToHashSet();
+        Assert.Contains("providers.manage", adminPerms);
+        Assert.Contains("security.manage", adminPerms);
+        Assert.False(string.IsNullOrWhiteSpace(adminUser.GetProperty("roleName").GetString()));
     }
 
     private async Task<HttpClient> CreateRoleClientAsync(UserRole role)

@@ -825,7 +825,9 @@ public class SecurityWebhookAdminTests : IClassFixture<RadioPadAppFactory>
         {
             Environment.SetEnvironmentVariable("RADIOPAD_SECURITY_WEBHOOK_URL", null);
             Environment.SetEnvironmentVariable("RADIOPAD_ANOMALY_WEBHOOK_URL", null);
-            using var c = _factory.CreateComplianceClient();
+            // SecurityManage is ItAdmin/MedicalDirector only (least-privilege 2026-06-23);
+            // ComplianceReviewer reviews + audits but no longer owns security infra.
+            using var c = _factory.CreateAdminClient();
             var resp = await c.PostAsync("/api/admin/security/test-webhook", null);
             Assert.Equal(HttpStatusCode.OK, resp.StatusCode);
             var doc = await JsonDocument.ParseAsync(await resp.Content.ReadAsStreamAsync());
@@ -848,7 +850,8 @@ public class SecurityWebhookAdminTests : IClassFixture<RadioPadAppFactory>
         {
             Environment.SetEnvironmentVariable("RADIOPAD_SECURITY_WEBHOOK_URL", "http://127.0.0.1:1/radiopad-security-test");
             Environment.SetEnvironmentVariable("RADIOPAD_ANOMALY_WEBHOOK_URL", null);
-            using var c = _factory.CreateComplianceClient();
+            // SecurityManage is ItAdmin/MedicalDirector only (least-privilege 2026-06-23).
+            using var c = _factory.CreateAdminClient();
             var resp = await c.PostAsync("/api/admin/security/test-webhook", null);
             Assert.Equal(HttpStatusCode.OK, resp.StatusCode);
             var doc = await JsonDocument.ParseAsync(await resp.Content.ReadAsStreamAsync());

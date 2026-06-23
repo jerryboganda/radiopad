@@ -7,6 +7,7 @@ import { useEffect } from 'react';
 import { navGroups, isActive } from './nav.config';
 import { useShell } from './ShellContext';
 import ProfileMenu from './ProfileMenu';
+import { usePermissions, type PermissionKey } from '@/lib/permissions';
 
 export default function Sidebar() {
   const tNav = useTranslations('nav');
@@ -14,6 +15,16 @@ export default function Sidebar() {
   const tBar = useTranslations('topbar');
   const pathname = usePathname() ?? '/';
   const { collapsed, toggleCollapsed, drawerOpen, closeDrawer } = useShell();
+  const { can, loading: permsLoading } = usePermissions();
+
+  // Show every item until the permission set resolves (avoids a flash of an
+  // empty sidebar), then hide items whose required permission the user lacks.
+  // The backend still enforces RBAC; this is purely which links we surface.
+  const visible = (permission?: PermissionKey) =>
+    permsLoading || !permission || can(permission);
+  const groups = navGroups
+    .map((g) => ({ ...g, items: g.items.filter((it) => visible(it.permission)) }))
+    .filter((g) => g.items.length > 0);
 
   // Close mobile drawer on route change.
   useEffect(() => {
@@ -48,7 +59,7 @@ export default function Sidebar() {
       </button>
 
       <nav className="rp-sidebar-nav">
-        {navGroups.map((group) => (
+        {groups.map((group) => (
           <div key={group.labelKey} className="rp-sidebar-group">
             <div className="rp-sidebar-group-label">{tGroups(group.labelKey)}</div>
             {group.items.map((item) => {

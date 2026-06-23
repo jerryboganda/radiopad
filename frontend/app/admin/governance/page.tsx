@@ -30,7 +30,8 @@ import {
   type Rulebook,
   type UsageSummary,
 } from '@/lib/api';
-import { canViewGovernance, ROLE_LABELS } from '@/lib/roles';
+import { ROLE_LABELS } from '@/lib/roles';
+import { can } from '@/lib/permissions';
 
 type Me = Awaited<ReturnType<typeof api.me>>;
 type AnalyticsSummary = Awaited<ReturnType<typeof api.analytics.summary>>;
@@ -124,7 +125,10 @@ export default function AdminGovernancePage() {
   }
 
   const role = me?.user.role;
-  if (!canViewGovernance(role)) {
+  // Gate on the audit-oversight permission (Medical Director / Compliance
+  // Reviewer / IT Admin / Auditor) rather than hard-coded role numbers, so new
+  // roles inherit access from the same RolePermissionMap the backend enforces.
+  if (!can(me?.user.permissions, 'audit.verify')) {
     return (
       <div className="rp-container">
         <h1 className="rp-page-title">Governance</h1>

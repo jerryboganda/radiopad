@@ -100,6 +100,8 @@ public class TemplatesController : TenantedController
     public async Task<IActionResult> SubmitForReview(Guid id, CancellationToken ct)
     {
         var (tenant, user) = await ResolveContextAsync(_db, ct);
+        var deny = RequirePermission(user, RbacPermission.TemplatesManage);
+        if (deny is not null) return deny;
         var t = await _db.Templates.FirstOrDefaultAsync(x => x.Id == id && x.TenantId == tenant.Id, ct);
         if (t is null) return NotFound();
         if (t.Status == TemplateStatus.Deprecated)
@@ -151,7 +153,9 @@ public class TemplatesController : TenantedController
     [HttpGet("{id:guid}/usage")]
     public async Task<IActionResult> Usage(Guid id, CancellationToken ct)
     {
-        var (tenant, _) = await ResolveContextAsync(_db, ct);
+        var (tenant, user) = await ResolveContextAsync(_db, ct);
+        var deny = RequirePermission(user, RbacPermission.TemplatesRead);
+        if (deny is not null) return deny;
         var t = await _db.Templates.FirstOrDefaultAsync(x => x.Id == id && x.TenantId == tenant.Id, ct);
         if (t is null) return NotFound();
 
@@ -200,7 +204,9 @@ public class TemplatesController : TenantedController
     [HttpGet("{id:guid}/preview")]
     public async Task<IActionResult> Preview(Guid id, [FromQuery] Guid? reportId, CancellationToken ct)
     {
-        var (tenant, _) = await ResolveContextAsync(_db, ct);
+        var (tenant, user) = await ResolveContextAsync(_db, ct);
+        var deny = RequirePermission(user, RbacPermission.TemplatesRead);
+        if (deny is not null) return deny;
         var t = await _db.Templates.FirstOrDefaultAsync(x => x.Id == id && x.TenantId == tenant.Id, ct);
         if (t is null) return NotFound();
         Report? report = null;
@@ -756,10 +762,26 @@ public class TenantController : TenantedController
     public async Task<IActionResult> Me(CancellationToken ct)
     {
         var (tenant, user) = await ResolveContextAsync(_db, ct);
+        // Surface the user's effective permission KEYS so the client can render a
+        // permission-accurate UI (hide controls the user cannot use). Computed from
+        // the same RolePermissionMap the backend enforces with — the client mirror
+        // can never drift, and any role (incl. trainee/research/auditor) is covered.
+        var permissions = RolePermissionMap.ForRole(user.Role)
+            .Select(p => PermissionCatalog.Get(p).Key)
+            .OrderBy(k => k, StringComparer.Ordinal)
+            .ToArray();
         return Ok(new
         {
             tenant = new { tenant.Id, tenant.Slug, tenant.DisplayName, tenant.RequirePhiApprovedProvider },
-            user = new { user.Id, user.Email, user.DisplayName, user.Role },
+            user = new
+            {
+                user.Id,
+                user.Email,
+                user.DisplayName,
+                user.Role,
+                roleName = user.Role.ToString(),
+                permissions,
+            },
         });
     }
 }

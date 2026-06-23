@@ -27,7 +27,8 @@ import {
   type Report,
   type Rulebook,
 } from '@/lib/api';
-import { canPromoteRulebook, canViewModelEval, ROLE_LABELS } from '@/lib/roles';
+import { ROLE_LABELS } from '@/lib/roles';
+import { can } from '@/lib/permissions';
 
 type Me = Awaited<ReturnType<typeof api.me>>;
 type ValidationPackRow = Awaited<ReturnType<typeof api.validationPacks.list>>[number];
@@ -166,7 +167,9 @@ export default function AdminModelEvalPage() {
   }
 
   const role = me?.user.role;
-  if (!canViewModelEval(role)) {
+  // Oversight dashboard — gate on audit.verify (Medical Director / Compliance
+  // Reviewer / IT Admin / Auditor) from the backend-authoritative permission set.
+  if (!can(me?.user.permissions, 'audit.verify')) {
     return (
       <div className="rp-container">
         <h1 className="rp-page-title">Model evaluation</h1>
@@ -179,7 +182,8 @@ export default function AdminModelEvalPage() {
     );
   }
 
-  const canPromote = canPromoteRulebook(role);
+  // Promotion to production requires the rulebook-approve permission (Medical Director).
+  const canPromote = can(me?.user.permissions, 'rulebooks.approve');
   const canRun =
     !running &&
     selectedProviders.length > 0 &&

@@ -36,13 +36,16 @@ public static class RolePermissionMap
                 RbacPermission.TemplatesManage,
                 RbacPermission.TemplatesApprove,
                 RbacPermission.ProvidersRead,
-                RbacPermission.ProvidersManage,
+                // Least-privilege (2026-06-23): system-level integration perms
+                // (ProvidersManage / McpToolsManage / PromptOverridesManage) are
+                // reserved for ItAdmin + MedicalDirector. ReportingAdmin keeps the
+                // reporting-content perms (rulebooks/templates/prompts read, validate,
+                // tenant settings) but no longer manages AI provider configs or MCP
+                // tool integrations or drafts prompt overrides.
                 RbacPermission.TenantSettingsManage,
                 RbacPermission.ValidationPacksRead,
                 RbacPermission.ValidationPacksRun,
                 RbacPermission.McpToolsInvoke,
-                RbacPermission.McpToolsManage,
-                RbacPermission.PromptOverridesManage,
                 RbacPermission.BillingRead,
                 RbacPermission.UsersRead,
                 RbacPermission.AuditRead),
@@ -95,7 +98,9 @@ public static class RolePermissionMap
                 RbacPermission.UsersRead,
                 RbacPermission.UsersRevokeSessions,
                 RbacPermission.BillingRead,
-                RbacPermission.SecurityManage,
+                // Least-privilege (2026-06-23): SecurityManage (KMS / webhooks /
+                // observability / SIEM config) is an IT/MedicalDirector responsibility;
+                // a ComplianceReviewer reviews + audits but does not own security infra.
                 RbacPermission.ValidationPacksRead),
 
             [UserRole.ItAdmin] = Set(
@@ -126,7 +131,11 @@ public static class RolePermissionMap
                 RbacPermission.ValidationPacksManage,
                 RbacPermission.ValidationPacksRun,
                 RbacPermission.McpToolsInvoke,
-                RbacPermission.McpToolsManage),
+                RbacPermission.McpToolsManage,
+                // Gains PromptOverridesManage (moved off ReportingAdmin) so the
+                // manage/approve separation-of-duties survives: ItAdmin manages prompt
+                // overrides, MedicalDirector approves them.
+                RbacPermission.PromptOverridesManage),
 
             [UserRole.BillingAdmin] = Set(
                 RbacPermission.ProvidersRead,

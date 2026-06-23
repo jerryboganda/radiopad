@@ -55,6 +55,23 @@ public static class EndpointPermissionMatrix
             Define("GET", "/api/reports/{id}/export/pdf", RbacPermission.ReportsExport, "Export report as PDF."),
             Define("GET", "/api/reports/{id}/export/docx", RbacPermission.ReportsExport, "Export report as DOCX."),
             Define("GET", "/api/reports/{id}/export/hl7", RbacPermission.ReportsExport, "Export report as HL7."),
+
+            // Core report lifecycle (added 2026-06-23 RBAC hardening — previously ungated).
+            Define("GET", "/api/reports", RbacPermission.ReportsRead, "List tenant reports."),
+            Define("POST", "/api/reports", RbacPermission.ReportsDraft, "Create a draft report."),
+            Define("GET", "/api/reports/{id}", RbacPermission.ReportsRead, "Read a report."),
+            Define("PATCH", "/api/reports/{id}", RbacPermission.ReportsEdit, "Edit report fields."),
+            Define("POST", "/api/reports/{id}/validate", RbacPermission.ReportsValidate, "Run rulebook validation."),
+            Define("POST", "/api/reports/{id}/acknowledge", RbacPermission.ReportsEdit, "Acknowledge AI-generated text."),
+
+            Define("POST", "/api/mcp/tools/{id}/invoke", RbacPermission.McpToolsInvoke, "Invoke a registered MCP tool."),
+            Define("POST", "/api/prompts/test-golden", RbacPermission.PromptOverridesManage, "Run a golden-set test of a prompt override."),
+            Define("GET", "/api/prompts/overrides", RbacPermission.PromptOverridesManage, "List prompt overrides."),
+            Define("POST", "/api/templates/{id}/submit-review", RbacPermission.TemplatesManage, "Submit a template for review."),
+            Define("GET", "/api/billing/status", RbacPermission.BillingRead, "Read billing status."),
+            Define("GET", "/api/billing/features", RbacPermission.BillingRead, "Read plan features/entitlements."),
+            Define("GET", "/api/billing/credits", RbacPermission.BillingRead, "Read AI credit usage."),
+            Define("GET", "/api/validation-packs", RbacPermission.ValidationPacksRead, "List validation packs."),
         };
 
     public static IReadOnlyCollection<EndpointPermissionDefinition> All => Entries;

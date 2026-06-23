@@ -1,5 +1,7 @@
 'use client';
 
+import PermissionGate from '@/components/ui/PermissionGate';
+
 import { useEffect, useMemo, useState } from 'react';
 import { api } from '@/lib/api';
 
@@ -19,6 +21,14 @@ const STATUS_BADGE: Record<Pack['status'], string> = {
  * history server-side via AuditAction.ValidationPackRun).
  */
 export default function ValidationPacksPage() {
+  return (
+    <PermissionGate permission="validation_packs.read" title="Validation packs">
+      <ValidationPacksPageInner />
+    </PermissionGate>
+  );
+}
+
+function ValidationPacksPageInner() {
   const [packs, setPacks] = useState<Pack[]>([]);
   const [filter, setFilter] = useState('');
   const [error, setError] = useState<string | null>(null);

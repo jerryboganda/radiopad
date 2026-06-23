@@ -18,6 +18,7 @@ import { detectCommand, stripCommand, type VoiceCommand, type CommandMatch } fro
 import RewriteStylePanel from './RewriteStylePanel';
 import PriorComparePanel from './PriorComparePanel';
 import CopyToRisButton from './CopyToRisButton';
+import { usePermissions } from '@/lib/permissions';
 
 const SECTIONS: Array<{ key: keyof Report; label: string; cls?: string }> = [
   { key: 'indication', label: 'Indication' },
@@ -47,6 +48,10 @@ type RewriteState = {
 
 export default function ReportPage() {
   const router = useRouter();
+  // RBAC mirror — hide editing/signing/exporting affordances a read-only viewer
+  // (e.g. Researcher, Auditor) or a trainee who cannot sign should never see.
+  // The backend still enforces each action.
+  const { can: canDo } = usePermissions();
   const [id, setId] = useState<string | null>(null);
   const [report, setReport] = useState<Report | null>(null);
   const [providers, setProviders] = useState<Provider[]>([]);
@@ -403,6 +408,11 @@ export default function ReportPage() {
   const blockers = findings.filter((f) => f.severity === 'Blocker' || (f.severity as unknown as number) === 2).length;
   const exportAllowed = statusLabel(report.status) === 'Acknowledged' || statusLabel(report.status) === 'Exported';
   const exportTitle = exportAllowed ? undefined : 'Acknowledge report before exporting';
+  // Permission mirror (backend enforces; this only governs what we render).
+  const canEdit = canDo('reports.edit');
+  const canValidate = canDo('reports.validate');
+  const canSign = canDo('reports.sign');
+  const canExport = canDo('reports.export');
 
   return (
     <div className="rp-container">
@@ -471,10 +481,13 @@ export default function ReportPage() {
         {/* Editor */}
         <div>
           <div className="rp-toolbar">
+            {canEdit && (
             <button className="primary" disabled={aiBusy || !providerId} onClick={() => runAi('impression')}>
               {aiBusy ? '…' : 'Generate impression'}
             </button>
+            )}
 
+            {canEdit && (
             <div className="rp-rewrite-menu">
               <button
                 className="primary-ghost"
@@ -514,7 +527,9 @@ export default function ReportPage() {
                 </div>
               )}
             </div>
+            )}
 
+            {canEdit && (
             <button
               className="primary-ghost"
               onClick={() => setStylePanelOpen((v) => !v)}
@@ -522,10 +537,11 @@ export default function ReportPage() {
             >
               {stylePanelOpen ? 'Close style rewrite' : 'Rewrite in my style'}
             </button>
+            )}
             <button className="ghost" onClick={() => setShowPrior((v) => !v)} aria-expanded={showPrior}>
               {showPrior ? 'Hide prior' : 'Compare prior'}
             </button>
-            <button className="ghost" onClick={validate}>Validate</button>
+            {canValidate && <button className="ghost" onClick={validate}>Validate</button>}
             <button
               className="ghost"
               onClick={() => setVoiceCommandMode((v) => !v)}
@@ -540,14 +556,20 @@ export default function ReportPage() {
               </span>
             ))}
             <CopyToRisButton reportId={report.id} />
+            {canExport && (
+            <>
             <button className="ghost" disabled={!exportAllowed} title={exportTitle} onClick={exportText}>Export text</button>
             <button className="ghost" disabled={!exportAllowed} title={exportTitle} onClick={exportJson}>Export JSON</button>
             <button className="ghost" disabled={!exportAllowed} title={exportTitle} onClick={exportFhir}>Export FHIR</button>
             <button className="ghost" disabled={!exportAllowed} title={exportTitle} onClick={exportPdf}>Export PDF</button>
             <button className="ghost" disabled={!exportAllowed} title={exportTitle} onClick={exportDocx}>Export DOCX</button>
+            </>
+            )}
+            {canEdit && (
             <button className="primary-ghost" disabled={blockers > 0} onClick={acknowledge}>
               Acknowledge & lock
             </button>
+            )}
           </div>
 
           {Object.values(aiHighlights).some(Boolean) && (
@@ -725,7 +747,7 @@ export default function ReportPage() {
               )}
             </div>
 
-            {!primarySigned ? (
+            {canSign && (!primarySigned ? (
               <>
                 <div className="section-block">
                   <label>Note (optional)</label>
@@ -785,7 +807,7 @@ export default function ReportPage() {
                   </div>
                 )}
               </>
-            )}
+            ))}
 
             <ul className="rp-list rp-mt-sm">
               <li className="rp-row between rp-divider-row">

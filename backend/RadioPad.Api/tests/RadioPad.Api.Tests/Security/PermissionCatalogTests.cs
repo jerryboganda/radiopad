@@ -64,8 +64,10 @@ public class PermissionCatalogTests
     [Fact]
     public void RoleMappings_PreserveSecurityAndAuditSemantics()
     {
-        AssertAllowed(RbacPermission.SecurityManage, UserRole.ItAdmin, UserRole.MedicalDirector, UserRole.ComplianceReviewer);
-        AssertDenied(RbacPermission.SecurityManage, UserRole.Radiologist, UserRole.ReportingAdmin, UserRole.BillingAdmin);
+        // 2026-06-23 least-privilege: SecurityManage is ItAdmin/MedicalDirector only
+        // (ComplianceReviewer reviews + audits, does not own security infra).
+        AssertAllowed(RbacPermission.SecurityManage, UserRole.ItAdmin, UserRole.MedicalDirector);
+        AssertDenied(RbacPermission.SecurityManage, UserRole.Radiologist, UserRole.ReportingAdmin, UserRole.BillingAdmin, UserRole.ComplianceReviewer);
 
         AssertAllowed(RbacPermission.TenantSettingsManage, UserRole.ReportingAdmin, UserRole.MedicalDirector, UserRole.ItAdmin);
         AssertDenied(RbacPermission.TenantSettingsManage, UserRole.Radiologist, UserRole.ComplianceReviewer, UserRole.BillingAdmin);
@@ -77,8 +79,10 @@ public class PermissionCatalogTests
     [Fact]
     public void RoleMappings_PreservePromptOverrideSeparationOfDuties()
     {
-        AssertAllowed(RbacPermission.PromptOverridesManage, UserRole.ReportingAdmin, UserRole.MedicalDirector);
-        AssertDenied(RbacPermission.PromptOverridesManage, UserRole.Radiologist, UserRole.ComplianceReviewer, UserRole.ItAdmin, UserRole.BillingAdmin);
+        // 2026-06-23 least-privilege: PromptOverridesManage moved off ReportingAdmin to
+        // ItAdmin (keeps the manage/approve SoD: ItAdmin manages, MedicalDirector approves).
+        AssertAllowed(RbacPermission.PromptOverridesManage, UserRole.ItAdmin, UserRole.MedicalDirector);
+        AssertDenied(RbacPermission.PromptOverridesManage, UserRole.Radiologist, UserRole.ComplianceReviewer, UserRole.ReportingAdmin, UserRole.BillingAdmin);
 
         AssertAllowed(RbacPermission.PromptOverridesApprove, UserRole.MedicalDirector);
         AssertDenied(RbacPermission.PromptOverridesApprove, UserRole.Radiologist, UserRole.ReportingAdmin, UserRole.ComplianceReviewer, UserRole.ItAdmin, UserRole.BillingAdmin);
@@ -113,7 +117,8 @@ public class PermissionCatalogTests
         Assert.Equal("providers.manage", decision.PermissionKey);
         Assert.Equal(UserRole.Radiologist, decision.UserRole);
         Assert.Contains(UserRole.ItAdmin, decision.CompatibleRoles);
-        Assert.Contains(UserRole.ReportingAdmin, decision.CompatibleRoles);
+        // ProvidersManage is ItAdmin/MedicalDirector only (least-privilege 2026-06-23).
+        Assert.Contains(UserRole.MedicalDirector, decision.CompatibleRoles);
     }
 
     private static void AssertAllowed(RbacPermission permission, params UserRole[] roles)

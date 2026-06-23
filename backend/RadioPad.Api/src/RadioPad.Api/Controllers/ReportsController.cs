@@ -109,7 +109,9 @@ public class ReportsController : TenantedController
         [FromQuery] int take = 100,
         CancellationToken ct = default)
     {
-        var (tenant, _) = await ResolveContextAsync(_db, ct);
+        var (tenant, user) = await ResolveContextAsync(_db, ct);
+        var deny = RequirePermission(user, RbacPermission.ReportsRead);
+        if (deny is not null) return deny;
         take = Math.Clamp(take, 1, 500);
         skip = Math.Max(0, skip);
 
@@ -140,6 +142,8 @@ public class ReportsController : TenantedController
     public async Task<IActionResult> Create([FromBody] CreateReportDto dto, CancellationToken ct)
     {
         var (tenant, user) = await ResolveContextAsync(_db, ct);
+        var deny = RequirePermission(user, RbacPermission.ReportsDraft);
+        if (deny is not null) return deny;
 
         // Iter-32 TMP-005 — gate non-Approved templates the same way RB-010
         // gates rulebooks. Tenants that opt in to AllowSandboxRulebooks may
@@ -185,7 +189,9 @@ public class ReportsController : TenantedController
     [HttpGet("{id:guid}")]
     public async Task<IActionResult> Get(Guid id, CancellationToken ct)
     {
-        var (tenant, _) = await ResolveContextAsync(_db, ct);
+        var (tenant, user) = await ResolveContextAsync(_db, ct);
+        var deny = RequirePermission(user, RbacPermission.ReportsRead);
+        if (deny is not null) return deny;
         var report = await _db.Reports.FirstOrDefaultAsync(r => r.Id == id && r.TenantId == tenant.Id, ct);
         if (report is null) return NotFound();
         var signatures = await _db.ReportSignatures
@@ -233,6 +239,8 @@ public class ReportsController : TenantedController
     public async Task<IActionResult> Patch(Guid id, [FromBody] PatchReportDto dto, CancellationToken ct)
     {
         var (tenant, user) = await ResolveContextAsync(_db, ct);
+        var deny = RequirePermission(user, RbacPermission.ReportsEdit);
+        if (deny is not null) return deny;
         var report = await _db.Reports.FirstOrDefaultAsync(r => r.Id == id && r.TenantId == tenant.Id, ct);
         if (report is null) return NotFound();
         if (dto.Indication is not null) report.Indication = dto.Indication;
@@ -270,7 +278,9 @@ public class ReportsController : TenantedController
     [HttpPost("{id:guid}/validate")]
     public async Task<IActionResult> Validate(Guid id, CancellationToken ct)
     {
-        var (tenant, _) = await ResolveContextAsync(_db, ct);
+        var (tenant, user) = await ResolveContextAsync(_db, ct);
+        var deny = RequirePermission(user, RbacPermission.ReportsValidate);
+        if (deny is not null) return deny;
         var report = await _db.Reports.FirstOrDefaultAsync(r => r.Id == id && r.TenantId == tenant.Id, ct);
         if (report is null) return NotFound();
         var lexicon = await _db.Lexicons.Where(l => l.TenantId == tenant.Id).ToListAsync(ct);
@@ -305,7 +315,9 @@ public class ReportsController : TenantedController
     [HttpGet("{id:guid}/quality")]
     public async Task<IActionResult> Quality(Guid id, CancellationToken ct)
     {
-        var (tenant, _) = await ResolveContextAsync(_db, ct);
+        var (tenant, user) = await ResolveContextAsync(_db, ct);
+        var deny = RequirePermission(user, RbacPermission.ReportsRead);
+        if (deny is not null) return deny;
         var report = await _db.Reports.FirstOrDefaultAsync(r => r.Id == id && r.TenantId == tenant.Id, ct);
         if (report is null) return NotFound();
 
@@ -341,7 +353,9 @@ public class ReportsController : TenantedController
     [HttpGet("{id:guid}/compare-prior")]
     public async Task<IActionResult> ComparePrior(Guid id, CancellationToken ct)
     {
-        var (tenant, _) = await ResolveContextAsync(_db, ct);
+        var (tenant, user) = await ResolveContextAsync(_db, ct);
+        var deny = RequirePermission(user, RbacPermission.ReportsRead);
+        if (deny is not null) return deny;
         var report = await _db.Reports.FirstOrDefaultAsync(r => r.Id == id && r.TenantId == tenant.Id, ct);
         if (report is null) return NotFound();
 
@@ -449,6 +463,8 @@ public class ReportsController : TenantedController
     public async Task<IActionResult> Acknowledge(Guid id, CancellationToken ct)
     {
         var (tenant, user) = await ResolveContextAsync(_db, ct);
+        var deny = RequirePermission(user, RbacPermission.ReportsEdit);
+        if (deny is not null) return deny;
         var report = await _db.Reports.FirstOrDefaultAsync(r => r.Id == id && r.TenantId == tenant.Id, ct);
         if (report is null) return NotFound();
 
@@ -628,7 +644,9 @@ public class ReportsController : TenantedController
     [HttpGet("{id:guid}/versions")]
     public async Task<IActionResult> Versions(Guid id, CancellationToken ct)
     {
-        var (tenant, _) = await ResolveContextAsync(_db, ct);
+        var (tenant, user) = await ResolveContextAsync(_db, ct);
+        var deny = RequirePermission(user, RbacPermission.ReportsRead);
+        if (deny is not null) return deny;
         var report = await _db.Reports.FirstOrDefaultAsync(r => r.Id == id && r.TenantId == tenant.Id, ct);
         if (report is null) return NotFound();
         var versions = await _db.ReportVersions
@@ -647,7 +665,9 @@ public class ReportsController : TenantedController
     [HttpGet("{id:guid}/prior")]
     public async Task<IActionResult> Prior(Guid id, CancellationToken ct)
     {
-        var (tenant, _) = await ResolveContextAsync(_db, ct);
+        var (tenant, user) = await ResolveContextAsync(_db, ct);
+        var deny = RequirePermission(user, RbacPermission.ReportsRead);
+        if (deny is not null) return deny;
         var report = await _db.Reports.FirstOrDefaultAsync(r => r.Id == id && r.TenantId == tenant.Id, ct);
         if (report is null) return NotFound();
         var prior = await _db.Reports
@@ -684,6 +704,8 @@ public class ReportsController : TenantedController
         CancellationToken ct)
     {
         var (tenant, user) = await ResolveContextAsync(_db, ct);
+        var deny = RequirePermission(user, RbacPermission.ReportsRead);
+        if (deny is not null) return deny;
         var report = await _db.Reports.FirstOrDefaultAsync(r => r.Id == id && r.TenantId == tenant.Id, ct);
         if (report is null) return NotFound();
         var settings = await _db.TenantSettings.FirstOrDefaultAsync(s => s.TenantId == tenant.Id, ct);
@@ -816,6 +838,8 @@ public class ReportsController : TenantedController
     public async Task<IActionResult> FollowUpSuggestions(Guid id, CancellationToken ct)
     {
         var (tenant, user) = await ResolveContextAsync(_db, ct);
+        var deny = RequirePermission(user, RbacPermission.ReportsRead);
+        if (deny is not null) return deny;
         var report = await _db.Reports.FirstOrDefaultAsync(r => r.Id == id && r.TenantId == tenant.Id, ct);
         if (report is null) return NotFound();
         try
@@ -836,7 +860,9 @@ public class ReportsController : TenantedController
         [FromServices] MeasurementExtractionService extraction,
         CancellationToken ct)
     {
-        var (tenant, _) = await ResolveContextAsync(_db, ct);
+        var (tenant, user) = await ResolveContextAsync(_db, ct);
+        var deny = RequirePermission(user, RbacPermission.ReportsRead);
+        if (deny is not null) return deny;
         var report = await _db.Reports.FirstOrDefaultAsync(r => r.Id == id && r.TenantId == tenant.Id, ct);
         if (report is null) return NotFound();
 

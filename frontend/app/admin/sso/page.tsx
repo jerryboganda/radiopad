@@ -1,5 +1,7 @@
 'use client';
 
+import PermissionGate from '@/components/ui/PermissionGate';
+
 import { useEffect, useState } from 'react';
 import { api, type WebAuthnCredentialRow } from '@/lib/api';
 
@@ -45,6 +47,14 @@ const PRESETS: Profile[] = [
 ];
 
 export default function SsoAdminPage() {
+  return (
+    <PermissionGate permission="security.manage" title="Single sign-on">
+      <SsoAdminPageInner />
+    </PermissionGate>
+  );
+}
+
+function SsoAdminPageInner() {
   const [selected, setSelected] = useState<string>('keycloak');
   const [creds, setCreds] = useState<Credential[]>([]);
   const [error, setError] = useState<string | null>(null);

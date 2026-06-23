@@ -731,7 +731,11 @@ export type MarketplaceSubmission = {
 
 export const api = {
   health: () => request<{ status: string }>('/api/health'),
-  me: () => request<{ tenant: { slug: string; displayName: string }; user: { email: string; role: number } }>('/api/tenant/me'),
+  me: () =>
+    request<{
+      tenant: { slug: string; displayName: string };
+      user: { email: string; role: number; roleName?: string; permissions: string[] };
+    }>('/api/tenant/me'),
   reports: {
     list: () => request<Report[]>('/api/reports'),
     listPaged: (params: { modality?: string; status?: number; q?: string; skip?: number; take?: number } = {}) => {

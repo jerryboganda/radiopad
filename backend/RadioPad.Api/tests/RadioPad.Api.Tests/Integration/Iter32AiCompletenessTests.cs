@@ -193,8 +193,10 @@ public class Iter32AiCompletenessTests : IClassFixture<RadioPadAppFactory>
     [Fact]
     public async Task PromptOverride_Save_Lands_In_Draft()
     {
-        await EnsureMedicalDirectorAsync();
-        using var client = AdminClient(UserRole.ReportingAdmin);
+        // PromptOverridesManage is ItAdmin/MedicalDirector (least-privilege 2026-06-23,
+        // moved off ReportingAdmin to keep manage/approve separation-of-duties).
+        await EnsureItAdminAsync();
+        using var client = AdminClient(UserRole.ItAdmin);
         var save = await client.PostAsJsonAsync("/api/prompts/overrides", new
         {
             rulebookId = "iter32_followup_rb",
@@ -210,9 +212,12 @@ public class Iter32AiCompletenessTests : IClassFixture<RadioPadAppFactory>
     public async Task PromptOverride_Approve_Requires_MedicalDirector()
     {
         await EnsureMedicalDirectorAsync();
+        await EnsureItAdminAsync();
 
-        using var raClient = AdminClient(UserRole.ReportingAdmin);
-        var save = await raClient.PostAsJsonAsync("/api/prompts/overrides", new
+        // Separation-of-duties (2026-06-23): ItAdmin MANAGES prompt overrides (save),
+        // but only MedicalDirector may APPROVE them.
+        using var itClient = AdminClient(UserRole.ItAdmin);
+        var save = await itClient.PostAsJsonAsync("/api/prompts/overrides", new
         {
             rulebookId = "iter32_followup_rb",
             blockKey = "approve_test_block",
@@ -222,9 +227,14 @@ public class Iter32AiCompletenessTests : IClassFixture<RadioPadAppFactory>
         using var sdoc = await JsonDocument.ParseAsync(await save.Content.ReadAsStreamAsync());
         var id = sdoc.RootElement.GetProperty("id").GetGuid();
 
-        // ReportingAdmin attempt → 403.
-        var deny = await raClient.PostAsync($"/api/prompts/overrides/{id}/approve", null);
+        // ItAdmin can manage but NOT approve → 403.
+        var deny = await itClient.PostAsync($"/api/prompts/overrides/{id}/approve", null);
         Assert.Equal(HttpStatusCode.Forbidden, deny.StatusCode);
+
+        // ReportingAdmin (no manage, no approve) is also denied approval.
+        using var raClient = AdminClient(UserRole.ReportingAdmin);
+        var denyRa = await raClient.PostAsync($"/api/prompts/overrides/{id}/approve", null);
+        Assert.Equal(HttpStatusCode.Forbidden, denyRa.StatusCode);
 
         // MedicalDirector → 200, audit row written.
         using var mdClient = AdminClient(UserRole.MedicalDirector);

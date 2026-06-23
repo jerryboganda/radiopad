@@ -110,6 +110,10 @@ public class MarketplaceController : TenantedController
     public async Task<IActionResult> Create([FromBody] ListingDto dto, CancellationToken ct)
     {
         var (tenant, user) = await ResolveContextAsync(_db, ct);
+        // Open to any authenticated tenant member: marketplace publish/install is
+        // low-risk (submissions require admin Approve/Reject before going live; an
+        // install lands as a Draft that still goes through normal approval). The
+        // governance gates live on Approve/Reject/Checkout, not here.
         if (string.IsNullOrWhiteSpace(dto.Name) || string.IsNullOrWhiteSpace(dto.ArtifactBody))
             return BadRequest(new { error = "name and artifact body required.", kind = "validation" });
         var row = new MarketplaceListing
@@ -132,6 +136,10 @@ public class MarketplaceController : TenantedController
     public async Task<IActionResult> Submit(Guid id, CancellationToken ct)
     {
         var (tenant, _) = await ResolveContextAsync(_db, ct);
+        // Open to any authenticated tenant member: marketplace publish/install is
+        // low-risk (submissions require admin Approve/Reject before going live; an
+        // install lands as a Draft that still goes through normal approval). The
+        // governance gates live on Approve/Reject/Checkout, not here.
         var row = await _db.MarketplaceListings.FirstOrDefaultAsync(l => l.Id == id && l.PublisherTenantId == tenant.Id, ct);
         if (row is null) return NotFound(new { error = "listing", kind = "not_found" });
         if (row.Status != "draft") return BadRequest(new { error = $"Cannot submit while {row.Status}.", kind = "validation" });
@@ -209,6 +217,8 @@ public class MarketplaceController : TenantedController
     public async Task<IActionResult> Checkout(Guid id, [FromQuery] string returnUrl, CancellationToken ct)
     {
         var (tenant, user) = await ResolveContextAsync(_db, ct);
+        var deny = RequireRole(user, UserRole.BillingAdmin, UserRole.MedicalDirector, UserRole.ItAdmin);
+        if (deny is not null) return deny;
         var row = await _db.MarketplaceListings.FirstOrDefaultAsync(l => l.Id == id && l.Status == "approved", ct);
         if (row is null) return NotFound(new { error = "listing", kind = "not_found" });
 
@@ -484,6 +494,10 @@ public class MarketplaceController : TenantedController
     public async Task<IActionResult> SubmitForReview([FromBody] SubmissionDto dto, CancellationToken ct)
     {
         var (tenant, user) = await ResolveContextAsync(_db, ct);
+        // Open to any authenticated tenant member: marketplace publish/install is
+        // low-risk (submissions require admin Approve/Reject before going live; an
+        // install lands as a Draft that still goes through normal approval). The
+        // governance gates live on Approve/Reject/Checkout, not here.
         if (string.IsNullOrWhiteSpace(dto.Category) || string.IsNullOrWhiteSpace(dto.SourceId))
             return BadRequest(new { error = "category and sourceId are required.", kind = "validation" });
 
@@ -668,6 +682,10 @@ public class MarketplaceController : TenantedController
     public async Task<IActionResult> Install(Guid id, CancellationToken ct)
     {
         var (tenant, user) = await ResolveContextAsync(_db, ct);
+        // Open to any authenticated tenant member: marketplace publish/install is
+        // low-risk (submissions require admin Approve/Reject before going live; an
+        // install lands as a Draft that still goes through normal approval). The
+        // governance gates live on Approve/Reject/Checkout, not here.
         var row = await _db.MarketplaceListings.FirstOrDefaultAsync(l => l.Id == id && l.Status == "approved", ct);
         if (row is null) return NotFound(new { error = "listing", kind = "not_found" });
 

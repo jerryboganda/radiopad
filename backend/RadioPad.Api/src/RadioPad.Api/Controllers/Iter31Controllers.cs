@@ -30,7 +30,9 @@ public class PromptOverridesController : TenantedController
     [HttpGet]
     public async Task<IActionResult> List(CancellationToken ct)
     {
-        var (tenant, _) = await ResolveContextAsync(_db, ct);
+        var (tenant, user) = await ResolveContextAsync(_db, ct);
+        var deny = RequirePermission(user, RbacPermission.PromptOverridesManage);
+        if (deny is not null) return deny;
         var rows = await _db.PromptOverrides
             .Where(p => p.TenantId == tenant.Id)
             .OrderBy(p => p.RulebookId).ThenBy(p => p.BlockKey)
@@ -144,7 +146,9 @@ public class PromptOverridesController : TenantedController
     [HttpGet("{id:guid}/versions")]
     public async Task<IActionResult> ListVersions(Guid id, CancellationToken ct)
     {
-        var (tenant, _) = await ResolveContextAsync(_db, ct);
+        var (tenant, user) = await ResolveContextAsync(_db, ct);
+        var deny = RequirePermission(user, RbacPermission.PromptOverridesManage);
+        if (deny is not null) return deny;
         var row = await _db.PromptOverrides.FirstOrDefaultAsync(
             p => p.Id == id && p.TenantId == tenant.Id, ct);
         if (row is null) return NotFound();
@@ -169,7 +173,9 @@ public class PromptOverridesController : TenantedController
     [HttpGet("{id:guid}/diff")]
     public async Task<IActionResult> Diff(Guid id, [FromQuery] int v1, [FromQuery] int v2, CancellationToken ct)
     {
-        var (tenant, _) = await ResolveContextAsync(_db, ct);
+        var (tenant, user) = await ResolveContextAsync(_db, ct);
+        var deny = RequirePermission(user, RbacPermission.PromptOverridesManage);
+        if (deny is not null) return deny;
         var row = await _db.PromptOverrides.FirstOrDefaultAsync(
             p => p.Id == id && p.TenantId == tenant.Id, ct);
         if (row is null) return NotFound();
@@ -200,7 +206,9 @@ public class PromptStudioController : TenantedController
     [HttpPost("test-golden")]
     public async Task<IActionResult> TestGolden([FromBody] TestGoldenDto dto, CancellationToken ct)
     {
-        var (tenant, _) = await ResolveContextAsync(_db, ct);
+        var (tenant, user) = await ResolveContextAsync(_db, ct);
+        var deny = RequirePermission(user, RbacPermission.PromptOverridesManage);
+        if (deny is not null) return deny;
 
         // Find validation packs for this rulebook
         var packs = await _db.ValidationPacks

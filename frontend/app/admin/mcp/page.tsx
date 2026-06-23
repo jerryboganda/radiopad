@@ -1,5 +1,7 @@
 'use client';
 
+import PermissionGate from '@/components/ui/PermissionGate';
+
 import { useEffect, useState } from 'react';
 import { api, type McpToolRow } from '@/lib/api';
 
@@ -17,6 +19,14 @@ function isDangerous(scopeString: string): boolean {
 }
 
 export default function McpAdminPage() {
+  return (
+    <PermissionGate permission="mcp_tools.manage" title="MCP tools">
+      <McpAdminPageInner />
+    </PermissionGate>
+  );
+}
+
+function McpAdminPageInner() {
   const [tools, setTools] = useState<McpToolRow[]>([]);
   const [error, setError] = useState<string | null>(null);
   const [info, setInfo] = useState<string | null>(null);

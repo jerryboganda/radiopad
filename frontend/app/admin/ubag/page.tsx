@@ -1,5 +1,7 @@
 'use client';
 
+import PermissionGate from '@/components/ui/PermissionGate';
+
 import { useEffect, useMemo, useState } from 'react';
 import Container from '@/components/shell/Container';
 import PageHeader from '@/components/shell/PageHeader';
@@ -26,6 +28,14 @@ function isBlockedPrompt(prompt: string): string | null {
 }
 
 export default function UbagHubPage() {
+  return (
+    <PermissionGate permission="mcp_tools.invoke" title="UBAG Hub">
+      <UbagHubPageInner />
+    </PermissionGate>
+  );
+}
+
+function UbagHubPageInner() {
   const [status, setStatus] = useState<UbagStatus | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);

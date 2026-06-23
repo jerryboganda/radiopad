@@ -90,7 +90,9 @@ public class BillingController : TenantedController
     [HttpGet("features")]
     public async Task<IActionResult> Features(CancellationToken ct)
     {
-        var (tenant, _) = await ResolveContextAsync(_db, ct);
+        var (tenant, user) = await ResolveContextAsync(_db, ct);
+        var deny = RequirePermission(user, RbacPermission.BillingRead);
+        if (deny is not null) return deny;
         var settings = await _db.TenantSettings.FirstOrDefaultAsync(s => s.TenantId == tenant.Id, ct);
         var plan = settings?.Plan ?? TenantPlan.Trial;
         return Ok(new
@@ -473,7 +475,9 @@ public class BillingController : TenantedController
     [HttpGet("status")]
     public async Task<IActionResult> Status(CancellationToken ct)
     {
-        var (tenant, _) = await ResolveContextAsync(_db, ct);
+        var (tenant, user) = await ResolveContextAsync(_db, ct);
+        var deny = RequirePermission(user, RbacPermission.BillingRead);
+        if (deny is not null) return deny;
         var settings = await _db.TenantSettings.FirstOrDefaultAsync(s => s.TenantId == tenant.Id, ct);
         var plan = settings?.Plan ?? TenantPlan.Trial;
         return Ok(new
@@ -498,7 +502,9 @@ public class BillingController : TenantedController
     [HttpGet("credits")]
     public async Task<IActionResult> Credits(CancellationToken ct)
     {
-        var (tenant, _) = await ResolveContextAsync(_db, ct);
+        var (tenant, user) = await ResolveContextAsync(_db, ct);
+        var deny = RequirePermission(user, RbacPermission.BillingRead);
+        if (deny is not null) return deny;
         var settings = await _db.TenantSettings.FirstOrDefaultAsync(s => s.TenantId == tenant.Id, ct)
             ?? new TenantSettings { TenantId = tenant.Id, Plan = TenantPlan.Trial };
 

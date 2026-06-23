@@ -29,7 +29,9 @@ public class ValidationPacksController : TenantedController
     [HttpGet]
     public async Task<IActionResult> List([FromQuery] string? rulebookId, CancellationToken ct)
     {
-        var (tenant, _) = await ResolveContextAsync(_db, ct);
+        var (tenant, user) = await ResolveContextAsync(_db, ct);
+        var deny = RequirePermission(user, RbacPermission.ValidationPacksRead);
+        if (deny is not null) return deny;
         var query = _db.ValidationPacks.AsNoTracking().Where(p => p.TenantId == tenant.Id);
         if (!string.IsNullOrWhiteSpace(rulebookId))
             query = query.Where(p => p.RulebookId == rulebookId);
@@ -156,7 +158,9 @@ public class ValidationPacksController : TenantedController
     [HttpGet("{id:guid}/export")]
     public async Task<IActionResult> Export(Guid id, CancellationToken ct)
     {
-        var (tenant, _) = await ResolveContextAsync(_db, ct);
+        var (tenant, user) = await ResolveContextAsync(_db, ct);
+        var deny = RequirePermission(user, RbacPermission.ValidationPacksRead);
+        if (deny is not null) return deny;
         try
         {
             var body = await _service.ExportAsync(tenant, id, ct);

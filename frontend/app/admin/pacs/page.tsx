@@ -1,5 +1,7 @@
 'use client';
 
+import PermissionGate from '@/components/ui/PermissionGate';
+
 import { useEffect, useState } from 'react';
 import { api } from '@/lib/api';
 
@@ -43,6 +45,14 @@ const PACS_VENDOR_OPTIONS: { value: PacsVendor; label: string }[] = [
  * Locked design tokens / classes only.
  */
 export default function PacsAdminPage() {
+  return (
+    <PermissionGate permission="tenant_settings.manage" title="PACS integration">
+      <PacsAdminPageInner />
+    </PermissionGate>
+  );
+}
+
+function PacsAdminPageInner() {
   const [tenant, setTenant] = useState<Awaited<ReturnType<typeof api.tenant.settings.get>> | null>(null);
   const [health, setHealth] = useState<PacsHealth | null>(null);
   const [plugins, setPlugins] = useState<PacsPlugin[] | null>(null);

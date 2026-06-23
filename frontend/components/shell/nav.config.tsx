@@ -4,6 +4,7 @@
  */
 
 import type { ComponentType, SVGProps } from 'react';
+import type { PermissionKey } from '@/lib/permissions';
 
 export type NavIcon = ComponentType<SVGProps<SVGSVGElement>>;
 
@@ -14,6 +15,11 @@ export interface NavItem {
   icon: NavIcon;
   /** Treat any path starting with this prefix as active. Defaults to exact + `/${href}/`. */
   matchPrefix?: string;
+  /**
+   * Permission key required to SEE this item. Omitted → always visible to any
+   * signed-in user. Gating mirrors the backend RBAC (server still enforces).
+   */
+  permission?: PermissionKey;
 }
 
 export interface NavGroup {
@@ -74,18 +80,18 @@ export const navGroups: NavGroup[] = [
   {
     labelKey: 'workspace',
     items: [
-      { href: '/', labelKey: 'reports', icon: Icons.reports },
-      { href: '/validation', labelKey: 'validation', icon: Icons.validation },
-      { href: '/audit', labelKey: 'audit', icon: Icons.audit },
-      { href: '/analytics', labelKey: 'analytics', icon: Icons.analytics },
+      { href: '/', labelKey: 'reports', icon: Icons.reports, permission: 'reports.read' },
+      { href: '/validation', labelKey: 'validation', icon: Icons.validation, permission: 'validation_packs.read' },
+      { href: '/audit', labelKey: 'audit', icon: Icons.audit, permission: 'audit.read' },
+      { href: '/analytics', labelKey: 'analytics', icon: Icons.analytics, permission: 'reports.read' },
     ],
   },
   {
     labelKey: 'library',
     items: [
-      { href: '/rulebooks', labelKey: 'rulebooks', icon: Icons.rulebooks },
-      { href: '/templates', labelKey: 'templates', icon: Icons.templates },
-      { href: '/prompts', labelKey: 'prompts', icon: Icons.prompts },
+      { href: '/rulebooks', labelKey: 'rulebooks', icon: Icons.rulebooks, permission: 'rulebooks.read' },
+      { href: '/templates', labelKey: 'templates', icon: Icons.templates, permission: 'templates.read' },
+      { href: '/prompts', labelKey: 'prompts', icon: Icons.prompts, permission: 'prompt_overrides.manage' },
       { href: '/marketplace', labelKey: 'marketplace', icon: Icons.marketplace },
       { href: '/terminology', labelKey: 'terminology', icon: Icons.terminology },
     ],
@@ -93,25 +99,25 @@ export const navGroups: NavGroup[] = [
   {
     labelKey: 'integrations',
     items: [
-      { href: '/providers', labelKey: 'providers', icon: Icons.providers },
-      { href: '/admin/ubag', labelKey: 'ubag', icon: Icons.ubag },
+      { href: '/providers', labelKey: 'providers', icon: Icons.providers, permission: 'providers.read' },
+      { href: '/admin/ubag', labelKey: 'ubag', icon: Icons.ubag, permission: 'mcp_tools.invoke' },
       { href: '/copilot', labelKey: 'copilot', icon: Icons.copilot },
-      { href: '/admin/pacs', labelKey: 'pacs', icon: Icons.pacs },
-      { href: '/admin/fhir-import', labelKey: 'fhirImport', icon: Icons.fhir },
+      { href: '/admin/pacs', labelKey: 'pacs', icon: Icons.pacs, permission: 'tenant_settings.manage' },
+      { href: '/admin/fhir-import', labelKey: 'fhirImport', icon: Icons.fhir, permission: 'reports.draft' },
       { href: '/offline', labelKey: 'offline', icon: Icons.offline },
     ],
   },
   {
     labelKey: 'admin',
     items: [
-      { href: '/admin/governance', labelKey: 'governance', icon: Icons.governance },
-      { href: '/admin/model-eval', labelKey: 'modelEval', icon: Icons.modelEval },
-      { href: '/admin/copilot', labelKey: 'copilotAdmin', icon: Icons.copilot },
-      { href: '/admin/security', labelKey: 'security', icon: Icons.security },
-      { href: '/admin/feature-flags', labelKey: 'featureFlags', icon: Icons.flags },
-      { href: '/admin/billing', labelKey: 'billing', icon: Icons.billing },
-      { href: '/admin/usage', labelKey: 'usage', icon: Icons.usage },
-      { href: '/admin/settings', labelKey: 'settings', icon: Icons.settings },
+      { href: '/admin/governance', labelKey: 'governance', icon: Icons.governance, permission: 'audit.verify' },
+      { href: '/admin/model-eval', labelKey: 'modelEval', icon: Icons.modelEval, permission: 'audit.verify' },
+      { href: '/admin/copilot', labelKey: 'copilotAdmin', icon: Icons.copilot, permission: 'prompt_overrides.manage' },
+      { href: '/admin/security', labelKey: 'security', icon: Icons.security, permission: 'security.manage' },
+      { href: '/admin/feature-flags', labelKey: 'featureFlags', icon: Icons.flags, permission: 'billing.read' },
+      { href: '/admin/billing', labelKey: 'billing', icon: Icons.billing, permission: 'billing.read' },
+      { href: '/admin/usage', labelKey: 'usage', icon: Icons.usage, permission: 'audit.read' },
+      { href: '/admin/settings', labelKey: 'settings', icon: Icons.settings, permission: 'tenant_settings.manage' },
     ],
   },
 ];

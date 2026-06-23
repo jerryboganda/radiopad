@@ -1,5 +1,7 @@
 'use client';
 
+import PermissionGate from '@/components/ui/PermissionGate';
+
 import { useEffect, useState } from 'react';
 import { api, type CopilotQuotaPolicy, type CopilotSettings, type CopilotStatus, type CopilotUsageSummary } from '@/lib/api';
 import Container from '@/components/shell/Container';
@@ -37,6 +39,14 @@ const EMPTY_SETTINGS: CopilotSettings = {
 const MODES = ['Disabled', 'EnterpriseManaged', 'BringYourOwnAccount', 'LocalCli', 'Byok'];
 
 export default function CopilotAdminPage() {
+  return (
+    <PermissionGate permission="prompt_overrides.manage" title="Copilot admin">
+      <CopilotAdminPageInner />
+    </PermissionGate>
+  );
+}
+
+function CopilotAdminPageInner() {
   const [settings, setSettings] = useState<CopilotSettings>(EMPTY_SETTINGS);
   const [status, setStatus] = useState<CopilotStatus | null>(null);
   const [quotas, setQuotas] = useState<CopilotQuotaPolicy[]>([]);

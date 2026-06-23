@@ -510,7 +510,10 @@ public class BillingHardeningTests : IClassFixture<RadioPadAppFactory>
             Environment.SetEnvironmentVariable("RADIOPAD_STRIPE_SECRET_KEY", "sk_test_fake");
             Stripe.StripeConfiguration.ApiKey = "sk_test_fake";
 
-            using var client = _factory.CreateTenantClient();
+            // Marketplace checkout spends tenant funds → restricted to billing-capable
+            // roles (BillingAdmin/MedicalDirector/ItAdmin) as of the 2026-06-23 RBAC
+            // hardening; a BillingAdmin still exercises the connect-not-ready money guard.
+            using var client = _factory.CreateBillingAdminClient();
             var resp = await client.PostAsync(
                 $"/api/marketplace/listings/{listingId}/checkout?returnUrl=https://example.com/r",
                 content: null);
