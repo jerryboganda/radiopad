@@ -485,7 +485,18 @@ if (!app.Environment.IsEnvironment("Testing"))
             rulebooksDir = Path.GetFullPath(
                 Path.Combine(AppContext.BaseDirectory, "..", "..", "..", "..", "..", "..", "..", "rulebooks"));
         }
-        await DevSeed.EnsureSeededAsync(db, rulebooksDir, default);
+        // Same resolution as rulebooks: prefer the app-relative bundle layout the
+        // Tauri desktop ships (templates/ next to radiopad-api.exe), fall back to
+        // the repo-relative path used by `dotnet run`. Without this the bundled
+        // report templates were never seeded (Templates page empty; the editor's
+        // "apply scaffolding" dropdown offered only "— none —").
+        var templatesDir = Path.Combine(AppContext.BaseDirectory, "templates");
+        if (!Directory.Exists(templatesDir))
+        {
+            templatesDir = Path.GetFullPath(
+                Path.Combine(AppContext.BaseDirectory, "..", "..", "..", "..", "..", "..", "..", "templates"));
+        }
+        await DevSeed.EnsureSeededAsync(db, rulebooksDir, templatesDir, default);
     }
 }
 

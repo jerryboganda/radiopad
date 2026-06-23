@@ -7,10 +7,11 @@ using RadioPad.Infrastructure.Persistence;
 namespace RadioPad.Infrastructure.Seeding;
 
 /// <summary>Seeds a dev tenant, dev radiologist, sandbox + mock providers,
-/// and a starter rulebook so a freshly cloned repo runs out of the box.</summary>
+/// the bundled starter rulebooks and report templates so a freshly cloned repo
+/// (and the bundled desktop) runs out of the box.</summary>
 public static class DevSeed
 {
-    public static async Task EnsureSeededAsync(RadioPadDbContext db, string rulebooksDir, CancellationToken ct)
+    public static async Task EnsureSeededAsync(RadioPadDbContext db, string rulebooksDir, string templatesDir, CancellationToken ct)
     {
         // Apply migrations when present; fall back to EnsureCreated for the
         // dev-friendly path before the first migration is added.
@@ -170,6 +171,54 @@ public static class DevSeed
                 catch
                 {
                     // Malformed/unsupported rulebook file — skip it, keep seeding the rest.
+                }
+            }
+        }
+
+        // Bundled report templates (templates/*.json). Mirrors the rulebook loop:
+        // idempotent (only-when-missing, keyed on TemplateId like the /api/templates
+        // POST handler), and per-file try/catch so one malformed template can't abort
+        // sidecar startup. The whole `sections` array is preserved verbatim as the
+        // SectionsJson blob the editor consumes.
+        if (Directory.Exists(templatesDir))
+        {
+            foreach (var path in Directory.EnumerateFiles(templatesDir, "*.json"))
+            {
+                try
+                {
+                    var json = await File.ReadAllTextAsync(path, ct);
+                    using var doc = System.Text.Json.JsonDocument.Parse(json);
+                    var root = doc.RootElement;
+                    if (root.ValueKind != System.Text.Json.JsonValueKind.Object) continue;
+                    if (!root.TryGetProperty("templateId", out var idEl) ||
+                        idEl.ValueKind != System.Text.Json.JsonValueKind.String) continue;
+                    var templateId = idEl.GetString();
+                    if (string.IsNullOrEmpty(templateId)) continue;
+                    var existing = await db.Templates.FirstOrDefaultAsync(
+                        t => t.TenantId == tenant.Id && t.TemplateId == templateId, ct);
+                    if (existing is not null) continue;
+
+                    string Str(string name) =>
+                        root.TryGetProperty(name, out var e) && e.ValueKind == System.Text.Json.JsonValueKind.String
+                            ? e.GetString()!
+                            : "";
+
+                    db.Templates.Add(new ReportTemplate
+                    {
+                        TenantId = tenant.Id,
+                        TemplateId = templateId,
+                        Name = Str("name"),
+                        Modality = Str("modality"),
+                        BodyPart = Str("bodyPart"),
+                        Subspecialty = Str("subspecialty"),
+                        SectionsJson = root.TryGetProperty("sections", out var sEl)
+                            ? sEl.GetRawText()
+                            : "[]",
+                    });
+                }
+                catch
+                {
+                    // Malformed/unsupported template file — skip it, keep seeding the rest.
                 }
             }
         }
