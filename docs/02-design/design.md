@@ -222,6 +222,25 @@ focus → `--accent` border + 3px `--accent-soft` halo. Always render labels
 as small caps muted text above the field (see `.section-block label` in
 the legacy CSS).
 
+#### 3.3.1 Searchable combobox (`.rp-combobox*`)
+
+A filterable replacement for a native `<select>` when the option list is long
+enough to want type-to-filter (e.g. the report editor's 20+-entry Rulebook
+picker). Component: `components/ui/SearchableSelect.tsx`; classes in
+`globals.css`. Anatomy: a `.rp-combobox-trigger` button (restating the input
+shell — `--border`, 6px radius, white panel, `--accent`/`--accent-soft` focus
+ring — since a `<button>` doesn't inherit the element rules) with a
+`.rp-combobox-value` (faint when `[data-placeholder]`) + `.rp-combobox-caret`,
+opening a `.rp-combobox-panel` popover (`--bg-elevated`, `--shadow-md`,
+`--radius`, mirrors `.rp-profile-popover`) that holds a `.rp-combobox-search`
+input (inherits the input shell) over a `.rp-combobox-list` of
+`.rp-combobox-option` rows (`hover`/`.is-active` → `--bg-subtle`;
+`[aria-selected]` → `--accent-strong`; `[aria-disabled]` muted) and a
+`.rp-combobox-empty` no-match state. Click-outside + Escape close it (the
+ProfileMenu popover pattern). Use it ONLY where filtering helps — keep native
+`<select>` elsewhere. Containers must not `overflow: hidden` around it or the
+popover is clipped (see §4.16 — the inspector is `overflow: visible` for this).
+
 ### 3.4 Messages (chat & report sections)
 
 `.msg`, `.msg.user`, `.msg.assistant`, `.msg.error`. AI-drafted content

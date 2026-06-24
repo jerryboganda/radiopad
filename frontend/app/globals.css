@@ -155,6 +155,70 @@ input:focus, textarea:focus, select:focus {
 select { padding-right: 24px; }
 textarea { resize: vertical; font-family: inherit; }
 
+/* -------- Searchable combobox -------------------------------------- */
+/* A filterable replacement for a native <select> (trigger button +
+   popover with a search input + option list). See SearchableSelect.tsx
+   and docs/02-design/design.md. The search <input> inherits the input
+   rules above; the <button> trigger must restate them. */
+.rp-combobox { position: relative; display: inline-block; width: 100%; }
+.rp-combobox-trigger {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  width: 100%;
+  text-align: left;
+  font: inherit;
+  color: var(--text);
+  background: var(--bg-panel);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  padding: 7px 10px;
+  cursor: pointer;
+  transition: border-color 120ms ease, box-shadow 120ms ease;
+}
+.rp-combobox-trigger:focus-visible {
+  outline: none;
+  border-color: var(--accent);
+  box-shadow: 0 0 0 3px var(--accent-soft);
+}
+.rp-combobox-trigger:disabled { opacity: 0.5; cursor: not-allowed; }
+.rp-combobox-value { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.rp-combobox-value[data-placeholder="true"] { color: var(--text-faint); }
+.rp-combobox-caret { flex: none; color: var(--text-muted); font-size: 10px; }
+
+.rp-combobox-panel {
+  position: absolute;
+  top: calc(100% + 4px);
+  left: 0;
+  min-width: 100%;
+  z-index: 50;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 6px;
+  background: var(--bg-elevated);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  box-shadow: var(--shadow-md);
+}
+.rp-combobox-search { box-sizing: border-box; }
+.rp-combobox-list { list-style: none; margin: 0; padding: 0; max-height: 260px; overflow-y: auto; }
+.rp-combobox-option {
+  padding: 7px 10px;
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+  color: var(--text);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.rp-combobox-option:hover,
+.rp-combobox-option.is-active { background: var(--bg-subtle); }
+.rp-combobox-option[aria-selected="true"] { color: var(--accent-strong); font-weight: 600; }
+.rp-combobox-option[aria-disabled="true"] { color: var(--text-faint); cursor: not-allowed; background: transparent; }
+.rp-combobox-empty { padding: 10px; text-align: center; color: var(--text-faint); font-size: 12px; }
+
 code {
   font-family: var(--mono);
   background: var(--bg-subtle);

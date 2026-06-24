@@ -59,6 +59,13 @@ function ensureStorage(prop: 'localStorage' | 'sessionStorage') {
 ensureStorage('localStorage');
 ensureStorage('sessionStorage');
 
+// jsdom doesn't implement scrollIntoView; components that scroll an active
+// list item into view (e.g. SearchableSelect keyboard nav) would otherwise throw.
+if (typeof Element !== 'undefined') {
+  // eslint-disable-next-line @typescript-eslint/no-empty-function
+  Element.prototype.scrollIntoView = function () {};
+}
+
 afterEach(() => {
   cleanup();
   vi.restoreAllMocks();

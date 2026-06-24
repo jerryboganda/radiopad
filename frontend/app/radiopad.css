@@ -472,6 +472,7 @@
   color: var(--text-faint);
 }
 .rp-ribbon-field > select { width: 190px; min-width: 190px; }
+.rp-ribbon-field > .rp-ribbon-combobox { width: 190px; min-width: 190px; }
 
 /* Body grid: document + inspector */
 .rp-report-body {
@@ -502,7 +503,10 @@
   border: 1px solid var(--border);
   border-radius: var(--radius);
   box-shadow: var(--shadow-xs);
-  overflow: hidden;
+  /* visible (not hidden) so a SearchableSelect popover inside the inspector
+     — e.g. the Template picker — isn't clipped at the card edge. The card's
+     rounded corners are preserved by border-radius on the background. */
+  overflow: visible;
   min-width: 0;
 }
 @media (max-width: 960px) {

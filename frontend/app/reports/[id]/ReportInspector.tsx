@@ -4,7 +4,9 @@
 // stacked right-pane panels (study context, validation, sign & addendum) into
 // one persistent panel with Context / Checks / Sign-off tabs so they never sit
 // at uneven heights. Purely presentational — state + handlers come from props.
+import { useState } from 'react';
 import type { Report, ValidationFinding, ReportTemplate, ReportSignature } from '@/lib/api';
+import SearchableSelect from '@/components/ui/SearchableSelect';
 import {
   groupBySeverity,
   normalizeRole,
@@ -82,6 +84,9 @@ export default function ReportInspector(p: ReportInspectorProps) {
 }
 
 function ContextPanel(p: ReportInspectorProps) {
+  // "Apply template" is an action, not a sticky selection: snap back to the
+  // placeholder after firing so re-picking the same template re-applies.
+  const [tplPick, setTplPick] = useState<string | null>(null);
   return (
     <div className="rp-panel">
       <div className="rp-panel-title">Study context</div>
@@ -99,12 +104,22 @@ function ContextPanel(p: ReportInspectorProps) {
       </div>
       <div className="section-block">
         <label>Template (apply scaffolding)</label>
-        <select className="rp-input" defaultValue="" onChange={(e) => p.onApplyTemplate(e.target.value)}>
-          <option value="">— none —</option>
-          {p.templates.map((t) => (
-            <option key={t.id} value={t.id}>{t.name}</option>
-          ))}
-        </select>
+        <SearchableSelect
+          ariaLabel="Apply template scaffolding"
+          value={tplPick}
+          onChange={(v) => {
+            setTplPick(v);
+            if (v) p.onApplyTemplate(v);
+            setTplPick(null);
+          }}
+          placeholder="— none —"
+          searchPlaceholder="Search templates…"
+          options={p.templates.map((t) => ({
+            value: t.id,
+            label: t.name,
+            searchText: `${t.modality} ${t.bodyPart}`,
+          }))}
+        />
       </div>
     </div>
   );

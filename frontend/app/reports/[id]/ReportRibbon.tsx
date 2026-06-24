@@ -7,6 +7,7 @@
 // every control is hidden for the current role is not rendered.
 import type { Report, Provider, Rulebook, RewriteMode } from '@/lib/api';
 import CopyToRisButton from './CopyToRisButton';
+import SearchableSelect from '@/components/ui/SearchableSelect';
 import { REWRITE_MODES, REWRITABLE_KEYS, SECTIONS } from './reportShared';
 
 export type RibbonTab = 'home' | 'review' | 'export' | 'finalize';
@@ -117,30 +118,38 @@ function HomeTab(p: ReportRibbonProps) {
         <div className="rp-ribbon-group-controls">
           <div className="rp-ribbon-field">
             <label htmlFor="rp-ribbon-provider">AI provider</label>
-            <select
+            <SearchableSelect
               id="rp-ribbon-provider"
-              className="rp-input"
+              className="rp-ribbon-combobox"
               value={p.providerId}
-              onChange={(e) => p.onProviderChange(e.target.value)}
-            >
-              {p.providers.map((pr) => (
-                <option key={pr.id} value={pr.id} disabled={!pr.enabled}>{pr.name}</option>
-              ))}
-            </select>
+              onChange={(v) => p.onProviderChange(v ?? '')}
+              placeholder="Select provider…"
+              searchPlaceholder="Search providers…"
+              options={p.providers.map((pr) => ({
+                value: pr.id,
+                label: pr.name,
+                searchText: `${pr.adapter} ${pr.model}`,
+                disabled: !pr.enabled,
+              }))}
+            />
           </div>
           <div className="rp-ribbon-field">
             <label htmlFor="rp-ribbon-rulebook">Rulebook</label>
-            <select
+            <SearchableSelect
               id="rp-ribbon-rulebook"
-              className="rp-input"
-              value={p.rulebookId || ''}
-              onChange={(e) => p.onRulebookChange(e.target.value || null)}
-            >
-              <option value="">— none —</option>
-              {p.rulebooks.map((rb) => (
-                <option key={rb.id} value={rb.id}>{rb.name} ({rb.version})</option>
-              ))}
-            </select>
+              className="rp-ribbon-combobox"
+              value={p.rulebookId}
+              onChange={p.onRulebookChange}
+              includeNone
+              noneLabel="— none —"
+              placeholder="— none —"
+              searchPlaceholder="Search rulebooks…"
+              options={p.rulebooks.map((rb) => ({
+                value: rb.id,
+                label: `${rb.name} (${rb.version})`,
+                searchText: `${rb.appliesToModalities} ${rb.appliesToBodyParts}`,
+              }))}
+            />
           </div>
         </div>
         <div className="rp-ribbon-group-label">Setup</div>
