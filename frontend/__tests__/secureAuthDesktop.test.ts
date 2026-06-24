@@ -1,5 +1,10 @@
 import { describe, it, expect, vi, afterEach } from 'vitest';
 
+// A working in-memory `localStorage` is installed centrally in
+// `__tests__/setup.ts` (jsdom here is launched with a broken
+// `--localstorage-file` flag, so the built-in Storage methods are missing).
+// The secureAuth web fallback below relies on it.
+
 afterEach(() => {
   vi.resetModules();
   delete (window as typeof window & { __TAURI__?: unknown }).__TAURI__;

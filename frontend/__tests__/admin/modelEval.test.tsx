@@ -46,10 +46,29 @@ vi.mock('@/lib/api', () => ({
 
 import AdminModelEvalPage from '@/app/admin/model-eval/page';
 
+// The page gates UI off the backend-authoritative permission set returned by
+// `api.me()` (`user.permissions`), via `can(...)` from @/lib/permissions:
+//   - dashboard visibility  → 'audit.verify'
+//   - promote-to-production → 'rulebooks.approve'
+// Mirror the real RolePermissionMap so each role exercises the right branch:
+//   role 2 = MedicalDirector    → audit.verify + rulebooks.approve (full)
+//   role 3 = ComplianceReviewer → audit.verify, NO rulebooks.approve (read-only)
+//   role 0 = Radiologist        → neither (forbidden banner)
+function permissionsForRole(role: number): string[] {
+  switch (role) {
+    case 2: // MedicalDirector — oversight + can promote rulebooks
+      return ['audit.verify', 'audit.read', 'rulebooks.read', 'rulebooks.approve', 'validation_packs.read', 'validation_packs.run'];
+    case 3: // ComplianceReviewer — oversight only, cannot promote
+      return ['audit.verify', 'audit.read', 'rulebooks.read', 'validation_packs.read', 'validation_packs.run'];
+    default: // Radiologist (0) and others — no oversight access
+      return ['reports.read', 'reports.draft', 'reports.edit'];
+  }
+}
+
 function seed(role: number) {
   meMock.mockResolvedValue({
     tenant: { slug: 'it', displayName: 'IT' },
-    user: { email: 'u@radiopad.local', role },
+    user: { email: 'u@radiopad.local', role, permissions: permissionsForRole(role) },
   });
   providersListMock.mockResolvedValue([
     {

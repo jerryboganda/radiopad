@@ -6,9 +6,21 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { render, fireEvent, waitFor, act } from '@testing-library/react';
 
+// A working in-memory `localStorage` is installed centrally in
+// `__tests__/setup.ts` (jsdom here is launched with a broken
+// `--localstorage-file` flag, so the built-in Storage methods are missing).
+// The page restores/saves offline dictation drafts through it.
+
 const pushMock = vi.fn();
 vi.mock('next/navigation', () => ({
-  useRouter: () => ({ push: pushMock }),
+  useRouter: () => ({
+    push: pushMock,
+    replace: vi.fn(),
+    prefetch: vi.fn(),
+    back: vi.fn(),
+    forward: vi.fn(),
+    refresh: vi.fn(),
+  }),
 }));
 
 const appendFindings = vi.fn(async (_id: string, _transcript: string) => ({ id: 'rpt-1' }));

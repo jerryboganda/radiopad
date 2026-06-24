@@ -17,8 +17,29 @@ const previewContextMock = vi.fn();
 const startSessionMock = vi.fn();
 const chatMock = vi.fn();
 
+// Full permission catalog (from frontend/lib/permissions.ts PermissionKey union).
+// CopilotAdminPage wraps its content in <PermissionGate permission="prompt_overrides.manage">,
+// and components on both pages call usePermissions() -> api.me(). Grant every key so the
+// admin gate opens and the user page's permission probe resolves cleanly.
+const ALL_PERMISSIONS = [
+  'reports.read', 'reports.draft', 'reports.edit', 'reports.validate', 'reports.sign', 'reports.export',
+  'rulebooks.read', 'rulebooks.manage', 'rulebooks.approve',
+  'templates.read', 'templates.manage', 'templates.approve',
+  'providers.read', 'providers.manage',
+  'audit.read', 'audit.verify', 'audit.export',
+  'users.read', 'users.manage', 'users.revoke_sessions',
+  'billing.read', 'billing.manage',
+  'security.manage', 'tenant_settings.manage',
+  'validation_packs.read', 'validation_packs.manage', 'validation_packs.run',
+  'mcp_tools.invoke', 'mcp_tools.manage',
+  'prompt_overrides.manage', 'prompt_overrides.approve',
+];
+
 vi.mock('@/lib/api', () => ({
   api: {
+    me: vi.fn(async () => ({
+      user: { permissions: ALL_PERMISSIONS, role: 0, roleName: 'MedicalDirector' },
+    })),
     copilot: {
       status: () => statusMock(),
       account: () => accountMock(),

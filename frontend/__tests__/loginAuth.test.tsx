@@ -3,13 +3,24 @@ import { render, screen } from '@testing-library/react';
 import * as React from 'react';
 import LoginPage from '@/app/login/page';
 
+// A working in-memory `localStorage` is installed centrally in
+// `__tests__/setup.ts` (jsdom here is launched with a broken
+// `--localstorage-file` flag, so the built-in Storage methods are missing).
+
 const { replace, push } = vi.hoisted(() => ({
   replace: vi.fn(),
   push: vi.fn(),
 }));
 
 vi.mock('next/navigation', () => ({
-  useRouter: () => ({ replace, push }),
+  useRouter: () => ({
+    replace,
+    push,
+    prefetch: vi.fn(),
+    back: vi.fn(),
+    forward: vi.fn(),
+    refresh: vi.fn(),
+  }),
   useSearchParams: () => new URLSearchParams(''),
 }));
 
@@ -42,6 +53,11 @@ beforeEach(() => {
 
 describe('LoginPage auth choices', () => {
   it('hides the dev tenant/user bearer form by default', () => {
+    // The "Continue with SSO" button only renders when SSO is enabled
+    // (NEXT_PUBLIC_ENABLE_SSO=true); enable it here so the production sign-in
+    // option is asserted. The dev bearer form stays hidden regardless.
+    vi.stubEnv('NEXT_PUBLIC_ENABLE_SSO', 'true');
+
     render(<LoginPage />);
 
     expect(screen.getByRole('heading', { name: 'Sign in' })).toBeInTheDocument();

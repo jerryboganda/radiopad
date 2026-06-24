@@ -79,10 +79,46 @@ const SAMPLE_ANALYTICS = {
   governance: { phiViolationsBlocked: 3 },
 };
 
+// The governance page gates on `can(me.user.permissions, 'audit.verify')`
+// (via lib/permissions.ts → usePermissions → api.me). The mocked api.me()
+// must therefore return a `permissions` array matching the role under test:
+// the oversight roles (Medical Director / Compliance Reviewer / IT Admin)
+// carry `audit.verify` and see the panels; the Radiologist does not and is
+// shown the forbidden banner.
+const PERMISSIONS_BY_ROLE: Record<number, string[]> = {
+  // Radiologist (0): drafting only — NO audit.verify → forbidden banner.
+  0: ['reports.read', 'reports.draft', 'reports.edit'],
+  // Medical Director (2): full oversight + reporting authority.
+  2: [
+    'reports.read', 'reports.draft', 'reports.edit', 'reports.validate', 'reports.sign', 'reports.export',
+    'rulebooks.read', 'rulebooks.manage', 'rulebooks.approve',
+    'templates.read', 'templates.manage', 'templates.approve',
+    'providers.read', 'audit.read', 'audit.verify', 'audit.export',
+    'validation_packs.read', 'validation_packs.run',
+    'prompt_overrides.manage', 'prompt_overrides.approve',
+  ],
+  // Compliance Reviewer (3): read-only oversight — has audit.verify but no mutation perms.
+  3: [
+    'reports.read', 'rulebooks.read', 'templates.read', 'providers.read',
+    'audit.read', 'audit.verify', 'audit.export', 'validation_packs.read',
+  ],
+};
+
+const ROLE_NAMES: Record<number, string> = {
+  0: 'Radiologist',
+  2: 'MedicalDirector',
+  3: 'ComplianceReviewer',
+};
+
 function seedHappyPath(role = 2 /* MedicalDirector */) {
   meMock.mockResolvedValue({
     tenant: { slug: 'it', displayName: 'IT' },
-    user: { email: 'md@radiopad.local', role },
+    user: {
+      email: 'md@radiopad.local',
+      role,
+      roleName: ROLE_NAMES[role],
+      permissions: PERMISSIONS_BY_ROLE[role] ?? [],
+    },
   });
   providersListMock.mockResolvedValue([
     {

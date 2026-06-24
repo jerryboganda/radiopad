@@ -92,6 +92,17 @@ vi.mock('@/lib/api', () => {
     },
     rulebooks: { list: vi.fn(async () => []) },
     templates: { list: vi.fn(async () => []) },
+    // RBAC mirror (added in the per-controller RBAC pass): ReportClient calls
+    // usePermissions() → api.me() to decide which actions to render. Grant the
+    // full reporting permission set so editor affordances (Generate impression,
+    // etc.) are shown.
+    me: vi.fn(async () => ({
+      user: {
+        permissions: ['reports.read', 'reports.draft', 'reports.edit', 'reports.validate', 'reports.sign', 'reports.export'],
+        role: 0,
+        roleName: 'MedicalDirector',
+      },
+    })),
   };
   return { api };
 });

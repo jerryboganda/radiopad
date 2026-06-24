@@ -3,15 +3,21 @@ import { render, screen, fireEvent, waitFor } from '@testing-library/react';
 import * as React from 'react';
 import ProfileMenu from '@/components/shell/ProfileMenu';
 
-const { push, logout, setActiveAuthToken, clearAuthToken } = vi.hoisted(() => ({
-  push: vi.fn(),
-  logout: vi.fn(),
-  setActiveAuthToken: vi.fn(),
-  clearAuthToken: vi.fn(),
-}));
+const { push, replace, prefetch, back, forward, refresh, logout, setActiveAuthToken, clearAuthToken } =
+  vi.hoisted(() => ({
+    push: vi.fn(),
+    replace: vi.fn(),
+    prefetch: vi.fn(),
+    back: vi.fn(),
+    forward: vi.fn(),
+    refresh: vi.fn(),
+    logout: vi.fn(),
+    setActiveAuthToken: vi.fn(),
+    clearAuthToken: vi.fn(),
+  }));
 
 vi.mock('next/navigation', () => ({
-  useRouter: () => ({ push }),
+  useRouter: () => ({ push, replace, prefetch, back, forward, refresh }),
 }));
 
 vi.mock('next/link', () => ({
@@ -54,6 +60,11 @@ vi.mock('@/lib/secureAuth', () => ({
 
 beforeEach(() => {
   push.mockClear();
+  replace.mockClear();
+  prefetch.mockClear();
+  back.mockClear();
+  forward.mockClear();
+  refresh.mockClear();
   logout.mockReset();
   setActiveAuthToken.mockClear();
   clearAuthToken.mockReset();
@@ -71,7 +82,7 @@ describe('ProfileMenu sign-out', () => {
     await waitFor(() => expect(logout).toHaveBeenCalledTimes(1));
     await waitFor(() => expect(clearAuthToken).toHaveBeenCalledTimes(1));
     expect(setActiveAuthToken).toHaveBeenCalledWith(null);
-    expect(push).toHaveBeenCalledWith('/login');
+    await waitFor(() => expect(replace).toHaveBeenCalledWith('/login'));
   });
 
   it('still clears local auth when logout endpoint is unavailable', async () => {
@@ -84,6 +95,6 @@ describe('ProfileMenu sign-out', () => {
 
     await waitFor(() => expect(clearAuthToken).toHaveBeenCalledTimes(1));
     expect(setActiveAuthToken).toHaveBeenCalledWith(null);
-    expect(push).toHaveBeenCalledWith('/login?signout=local');
+    await waitFor(() => expect(replace).toHaveBeenCalledWith('/login?signout=server-error'));
   });
 });
