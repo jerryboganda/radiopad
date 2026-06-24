@@ -1,0 +1,56 @@
+name: web-deploy-images
+
+# Builds the production web + api Docker images in GitHub Actions (NOT on the
+# CPU-capped VPS) and uploads them as a single saved-image artifact. The VPS
+# then `gh run download`s the artifact and `docker load`s it — no registry and
+# no package-scope credentials required (the VPS gh token only has `repo`).
+#
+# Deploy flow on the VPS after a green run:
+#   gh run download <run_id> --repo jerryboganda/radiopad -n radiopad-images -D /tmp/rpimg
+#   gunzip -c /tmp/rpimg/radiopad-images.tar.gz | docker load
+#   cd /opt/radiopad && docker compose up -d        # compose uses image: + pull_policy: never
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'backend/**'
+      - 'frontend/**'
+      - 'rulebooks/**'
+      - 'templates/**'
+      - 'deploy/vps/**'
+      - 'package.json'
+      - 'pnpm-lock.yaml'
+      - 'pnpm-workspace.yaml'
+      - '.github/workflows/web-deploy-images.yml'
+  workflow_dispatch:
+
+concurrency:
+  group: web-deploy-images-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Build api image
+        run: docker build -f deploy/vps/api.Dockerfile -t radiopad-api:latest .
+
+      - name: Build web image
+        run: docker build -f deploy/vps/web.Dockerfile -t radiopad-web:latest .
+
+      - name: Save + compress images
+        run: |
+          docker image ls radiopad-api radiopad-web
+          docker save radiopad-api:latest radiopad-web:latest | gzip > radiopad-images.tar.gz
+          ls -lh radiopad-images.tar.gz
+
+      - name: Upload images artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: radiopad-images
+          path: radiopad-images.tar.gz
+          retention-days: 7
+          compression-level: 0 # already gzipped
