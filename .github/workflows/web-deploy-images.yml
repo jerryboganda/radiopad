@@ -43,7 +43,7 @@ jobs:
 
       - name: Save + compress images
         run: |
-          docker image ls radiopad-api radiopad-web
+          docker image ls | grep -E 'radiopad-(api|web)' || true
           docker save radiopad-api:latest radiopad-web:latest | gzip > radiopad-images.tar.gz
           ls -lh radiopad-images.tar.gz
 
