@@ -27,5 +27,7 @@
          Models are NOT bundled — downloaded to %LOCALAPPDATA% on first run. -->
     <PackageReference Include="org.k2fsa.sherpa.onnx" Version="1.13.3" />
     <PackageReference Include="org.k2fsa.sherpa.onnx.runtime.win-x64" Version="1.13.3" />
+    <!-- Phase 1 activation — extract the .tar.bz2 model bundle downloaded on first run. -->
+    <PackageReference Include="SharpZipLib" Version="1.4.2" />
   </ItemGroup>
 </Project>

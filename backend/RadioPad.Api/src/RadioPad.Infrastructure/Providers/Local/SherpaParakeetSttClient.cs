@@ -62,11 +62,11 @@ public sealed class SherpaParakeetSttClient : ILocalSttClient, IDisposable
 
         _modelName = Environment.GetEnvironmentVariable("RADIOPAD_STT_MODEL") is { Length: > 0 } m
             ? m.Trim()
-            : "parakeet-tdt-0.6b-v3";
+            : LocalSttModels.DefaultModelName;
 
-        _modelDir = ResolveModelDir(_modelName);
-        if (_enabled && _modelDir != null)
-            ResolveModelFiles(_modelDir);
+        // Resolved lazily (see EnsureFilesResolved) so a model that finishes
+        // downloading AFTER startup activates without a process restart.
+        _modelDir = LocalSttModels.ResolveModelDir(_modelName);
     }
 
     /// <summary>
@@ -74,14 +74,17 @@ public sealed class SherpaParakeetSttClient : ILocalSttClient, IDisposable
     /// model bundle is present and not already known-bad. <see cref="ITranscriptionService"/>
     /// checks this before routing — false means "use the cloud path".
     /// </summary>
-    public bool Available =>
-        _enabled
-        && !_loadFailed
-        && _decoder.Available
-        && _encoder is not null
-        && _decoderModel is not null
-        && _joiner is not null
-        && _tokens is not null;
+    public bool Available
+    {
+        get
+        {
+            if (!_enabled || _loadFailed || !_decoder.Available || _modelDir is null)
+                return false;
+            EnsureFilesResolved();
+            return _encoder is not null && _decoderModel is not null
+                && _joiner is not null && _tokens is not null;
+        }
+    }
 
     public async Task<TranscriptionResult> TranscribeAsync(Stream audio, string contentType, CancellationToken ct)
     {
@@ -161,49 +164,27 @@ public sealed class SherpaParakeetSttClient : ILocalSttClient, IDisposable
         return Math.Clamp(Environment.ProcessorCount - 1, 1, 4);
     }
 
-    private static string? ResolveModelDir(string modelName)
+    /// <summary>
+    /// Lazily resolve the model files from <see cref="_modelDir"/>, re-checking
+    /// until the bundle is present (so a first-run download that completes after
+    /// startup is picked up on the next dictation — no restart needed). Cheap
+    /// once resolved; the directory scan only runs while still incomplete.
+    /// </summary>
+    private void EnsureFilesResolved()
     {
-        var explicitDir = Environment.GetEnvironmentVariable("RADIOPAD_STT_MODEL_DIR");
-        if (!string.IsNullOrWhiteSpace(explicitDir))
-            return explicitDir.Trim();
+        if (_encoder is not null && _decoderModel is not null
+            && _joiner is not null && _tokens is not null)
+            return;
 
-        // Default to the desktop app's per-user local data dir. On non-Windows
-        // hosts (the Linux web server) this resolves but is never used because the
-        // engine stays disabled there.
-        var localAppData = Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData);
-        if (string.IsNullOrEmpty(localAppData))
-            return null;
-        return Path.Combine(localAppData, "com.radiopad.desktop", "models", modelName);
-    }
-
-    private void ResolveModelFiles(string dir)
-    {
-        try
+        lock (_gate)
         {
-            if (!Directory.Exists(dir))
-            {
-                _log.LogInformation("on-device STT model dir not present yet: {Dir}", dir);
-                return;
-            }
-
-            _encoder = PickModel(dir, "encoder");
-            _decoderModel = PickModel(dir, "decoder");
-            _joiner = PickModel(dir, "joiner");
-            var tokens = Path.Combine(dir, "tokens.txt");
-            _tokens = File.Exists(tokens) ? tokens : null;
+            if (_modelDir is null) return;
+            var (enc, dec, join, tok) = LocalSttModels.ResolveFiles(_modelDir);
+            _encoder = enc;
+            _decoderModel = dec;
+            _joiner = join;
+            _tokens = tok;
         }
-        catch (Exception ex)
-        {
-            _log.LogWarning(ex, "resolving on-device STT model files failed in {Dir}", dir);
-        }
-    }
-
-    /// <summary>Pick the <paramref name="part"/> ONNX (prefer the INT8 variant).</summary>
-    private static string? PickModel(string dir, string part)
-    {
-        var matches = Directory.GetFiles(dir, $"*{part}*.onnx");
-        return matches.FirstOrDefault(f => f.Contains("int8", StringComparison.OrdinalIgnoreCase))
-            ?? matches.FirstOrDefault();
     }
 
     public void Dispose()
