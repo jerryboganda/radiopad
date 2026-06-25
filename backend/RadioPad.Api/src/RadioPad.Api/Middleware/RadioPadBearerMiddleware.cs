@@ -136,6 +136,10 @@ public sealed class RadioPadBearerMiddleware
         path.StartsWithSegments("/api/auth/magic-link/consume") ||
         path.StartsWithSegments("/api/auth/device/authorize") ||
         path.StartsWithSegments("/api/auth/device/token") ||
+        // Self-serve SaaS onboarding — creating a brand-new organization happens
+        // before any tenant/user exists, so it cannot carry a bearer. Gated
+        // separately by RADIOPAD_ALLOW_SELF_SIGNUP inside the controller.
+        path.StartsWithSegments("/api/registration/create-organization") ||
         path.StartsWithSegments("/api/billing/webhook");
 
     private static async Task RejectAsync(HttpContext ctx, string kind, string message)

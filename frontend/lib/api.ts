@@ -1452,6 +1452,27 @@ export const api = {
       return requestBlob(`/api/billing/invoices/export?${sp.toString()}`);
     },
   },
+  registration: {
+    /**
+     * Self-serve SaaS onboarding — creates a brand-new tenant (organization) and
+     * its first admin user, then emails a passwordless setup link. The admin
+     * finishes via the existing magic-link consume flow. `devLink` is returned
+     * only in non-production responses. Surfaces typed `kind`s on the error body:
+     * `signup_disabled` (403), `validation` (400), `slug_taken` (409),
+     * `rate-limit` (429), `email_unavailable` (503).
+     */
+    createOrganization: (body: {
+      organizationName: string;
+      slug?: string;
+      adminEmail: string;
+      adminName?: string;
+      callbackUrl?: string;
+    }) =>
+      request<{ ok: boolean; slug: string; devLink?: string }>(
+        '/api/registration/create-organization',
+        { method: 'POST', body: JSON.stringify(body) },
+      ),
+  },
   auth: {
     oidcAuthorizeUrl: (returnUrl?: string) => {
       const q = returnUrl ? `?returnUrl=${encodeURIComponent(returnUrl)}` : '';

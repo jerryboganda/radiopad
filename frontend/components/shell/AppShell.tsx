@@ -29,6 +29,7 @@ function ShellRoot({ children }: { children: ReactNode }) {
 export default function AppShell({ children }: { children: ReactNode }) {
   const pathname = usePathname();
   const publicAuthRoute = pathname === '/login' || pathname?.startsWith('/login/')
+    || pathname === '/register' || pathname?.startsWith('/register/')
     || pathname === '/pair' || pathname?.startsWith('/pair/');
 
   if (publicAuthRoute) {

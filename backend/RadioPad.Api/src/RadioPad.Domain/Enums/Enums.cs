@@ -209,6 +209,10 @@ public enum AuditAction
     /// record provider/target/artifact metadata and the SHA-256 of the
     /// transcript only — never the transcript text or audio bytes.</summary>
     AudioTranscribed = 55,
+    /// <summary>Self-serve SaaS onboarding — a new tenant (organization) and its
+    /// first admin user were created via <c>POST /api/registration/create-organization</c>.
+    /// Details record the slug and admin email; no secrets are stored.</summary>
+    OrganizationCreated = 56,
 }
 
 public enum CopilotMode
