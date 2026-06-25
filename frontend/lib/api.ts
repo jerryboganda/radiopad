@@ -867,7 +867,11 @@ export const api = {
     // exactly like the text dictation/cleanup path — no separate gate.
     transcribe: (id: string, audio: Blob) => {
       const form = new FormData();
-      form.append('audio', audio, 'dictation.webm');
+      // Desktop converts to 16 kHz mono WAV for the on-device engine; web sends
+      // the original webm. Name the part by type so the backend content-type
+      // check sees the right format (it keys off the blob's MIME type).
+      const name = audio.type.includes('wav') ? 'dictation.wav' : 'dictation.webm';
+      form.append('audio', audio, name);
       return requestForm<{ transcript: string; provider: string; model: string; latencyMs: number }>(
         `/api/reports/${id}/dictation/transcribe`,
         form,

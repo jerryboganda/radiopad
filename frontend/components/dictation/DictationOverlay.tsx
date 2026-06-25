@@ -16,6 +16,7 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import { startFocusTracking, getLastFocusedEditable } from '@/lib/dictation/focusTracker';
 import { insertAtCursor } from '@/lib/dictation/insertText';
 import { formatDictation } from '@/lib/dictation/medicalFormat';
+import { blobToWav16kMono } from '@/lib/dictation/wavEncode';
 import {
   getSpeechRecognitionCtor,
   parseSpeechResults,
@@ -102,7 +103,20 @@ export default function DictationOverlay() {
     if (!reportId || !target || blob.size === 0) return;
     setTranscribing(true);
     try {
-      const res = await api.reports.transcribe(reportId, blob);
+      // Desktop runs an on-device STT engine that needs 16 kHz mono WAV; the
+      // WebView2 Chromium engine has the Opus codec, so convert here and the
+      // server decodes WAV in-process (no ffmpeg). The web keeps the original
+      // recording (cloud transcription accepts it). If conversion fails, send the
+      // original and let the backend fall back to the cloud path.
+      let payload = blob;
+      if (typeof window !== 'undefined' && '__TAURI__' in window) {
+        try {
+          payload = await blobToWav16kMono(blob);
+        } catch {
+          payload = blob;
+        }
+      }
+      const res = await api.reports.transcribe(reportId, payload);
       if (res.transcript) insertAtCursor(target, formatDictation(res.transcript));
     } catch {
       // Any provider/policy error surfaces as a non-2xx; the editor handles the
