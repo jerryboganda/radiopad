@@ -97,4 +97,21 @@ describe('ProfileMenu sign-out', () => {
     expect(setActiveAuthToken).toHaveBeenCalledWith(null);
     await waitFor(() => expect(replace).toHaveBeenCalledWith('/login?signout=server-error'));
   });
+
+  it('lets the end user toggle the dual-engine cross-check from the options menu', async () => {
+    window.localStorage.removeItem('radiopad:stt-mode');
+    render(<ProfileMenu />);
+    fireEvent.click(await screen.findByRole('button', { name: /reader@example.com/i }));
+
+    const checkbox = screen.getByRole('checkbox') as HTMLInputElement;
+    expect(checkbox.checked).toBe(false); // default: off (single / auto)
+
+    fireEvent.click(checkbox);
+    expect(checkbox.checked).toBe(true);
+    expect(window.localStorage.getItem('radiopad:stt-mode')).toBe('ensemble');
+
+    fireEvent.click(checkbox);
+    expect(checkbox.checked).toBe(false);
+    expect(window.localStorage.getItem('radiopad:stt-mode')).toBe('single');
+  });
 });

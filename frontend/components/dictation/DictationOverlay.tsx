@@ -23,18 +23,11 @@ import {
   type SpeechRecognitionLike,
 } from '@/lib/dictation/speech';
 import { api, type SttMode, type SttSpan } from '@/lib/api';
+import { STT_MODES, useSttMode } from '@/lib/dictation/sttMode';
 import { readQueryParam } from '@/lib/browserParams';
 
 const DICTATE_EVENT = 'radiopad:dictate';
 const CLEANUP_EVENT = 'radiopad:dictation-cleanup';
-const MODE_STORAGE_KEY = 'radiopad:stt-mode';
-const STT_MODES: SttMode[] = ['auto', 'single', 'ensemble'];
-
-function readStoredMode(): SttMode {
-  if (typeof window === 'undefined') return 'auto';
-  const v = window.localStorage.getItem(MODE_STORAGE_KEY);
-  return v === 'single' || v === 'ensemble' ? v : 'auto';
-}
 
 export default function DictationOverlay() {
   const [supported, setSupported] = useState(false);
@@ -54,22 +47,10 @@ export default function DictationOverlay() {
   const audioChunksRef = useRef<Blob[]>([]);
   const audioStreamRef = useRef<MediaStream | null>(null);
 
-  // On-device engine mode picker + the ensemble's flagged review spans.
-  const [mode, setMode] = useState<SttMode>('auto');
+  // On-device engine mode — shared with the profile-menu dual-check toggle so
+  // the two controls stay in sync — plus the ensemble's flagged review spans.
+  const [mode, setMode] = useSttMode();
   const [reviewSpans, setReviewSpans] = useState<SttSpan[]>([]);
-
-  useEffect(() => {
-    setMode(readStoredMode());
-  }, []);
-
-  const changeMode = useCallback((next: SttMode) => {
-    setMode(next);
-    try {
-      window.localStorage.setItem(MODE_STORAGE_KEY, next);
-    } catch {
-      /* storage unavailable — keep the in-memory choice */
-    }
-  }, []);
 
   useEffect(() => {
     setSupported(getSpeechRecognitionCtor() !== null);
@@ -273,7 +254,7 @@ export default function DictationOverlay() {
           aria-label="On-device transcription engine mode"
           title="On-device engine: Auto, Single (Parakeet) or Ensemble (Parakeet + Whisper, cross-checked)"
           value={mode}
-          onChange={(e) => changeMode(e.target.value as SttMode)}
+          onChange={(e) => setMode(e.target.value as SttMode)}
         >
           {STT_MODES.map((m) => (
             <option key={m} value={m}>
