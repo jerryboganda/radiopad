@@ -1,0 +1,58 @@
+name: desktop-stt-smoke
+
+# Validates the REAL on-device STT engine on Windows: loads the sherpa-onnx
+# native library + the downloaded NVIDIA Parakeet model and transcribes the
+# model bundle's own sample WAV via SherpaParakeetSttClient. The model (~465 MB)
+# is cached by its SHA-256 so only the first run pays the download.
+#
+# The gating test (SttEngineSmokeTests) is a no-op in the normal Linux CI (no
+# model, no win-x64 native lib); it only runs here, where the model dir is set.
+
+on:
+  workflow_dispatch:
+  push:
+    paths:
+      - 'backend/RadioPad.Api/src/RadioPad.Infrastructure/Providers/Local/**'
+      - 'backend/RadioPad.Api/src/RadioPad.Infrastructure/Audio/**'
+      - 'backend/RadioPad.Api/tests/RadioPad.Api.Tests/Providers/SttEngineSmokeTests.cs'
+      - '.github/workflows/desktop-stt-smoke.yml'
+
+permissions:
+  contents: read
+
+jobs:
+  smoke:
+    name: on-device STT engine smoke (windows)
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '8.0.x'
+
+      - name: Cache Parakeet model
+        id: model
+        uses: actions/cache@v4
+        with:
+          path: stt-model
+          key: stt-parakeet-tdt-0.6b-v3-int8-5793d0fd
+
+      - name: Download + verify + extract model
+        if: steps.model.outputs.cache-hit != 'true'
+        shell: bash
+        run: |
+          set -euo pipefail
+          url="https://github.com/k2-fsa/sherpa-onnx/releases/download/asr-models/sherpa-onnx-nemo-parakeet-tdt-0.6b-v3-int8.tar.bz2"
+          curl -fL "$url" -o model.tar.bz2
+          echo "5793d0fd397c5778d2cf2126994d58e9d56b1be7c04d13c7a15bb1b4eafb16bf  model.tar.bz2" | sha256sum -c -
+          mkdir -p stt-model
+          tar -xf model.tar.bz2 -C stt-model
+
+      - name: Run on-device engine smoke (real native lib + model)
+        shell: bash
+        working-directory: backend/RadioPad.Api
+        env:
+          RADIOPAD_STT_SMOKE_MODEL_DIR: ${{ github.workspace }}\stt-model
+        run: |
+          dotnet test --filter "FullyQualifiedName~SttEngineSmokeTests" -c Release

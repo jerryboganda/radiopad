@@ -158,7 +158,13 @@ async fn supervise(app: AppHandle) {
             // automatically (UbagProviderDiscoveryService). The ordered web-chain runs the
             // two curated primaries.
             .env("RADIOPAD_UBAG_ORDERED_TARGETS", "gemini_web,deepseek_web")
-            .env("RADIOPAD_UBAG_API_VERSION", "2026-05-22");
+            .env("RADIOPAD_UBAG_API_VERSION", "2026-05-22")
+            // On-device, offline STT (NVIDIA Parakeet via sherpa-onnx). The sidecar
+            // downloads the model to %LOCALAPPDATA% on first run and decodes the
+            // desktop's 16 kHz mono WAV in-process — no ffmpeg. Dictation falls back
+            // to the cloud path until the model is present, then flips to on-device
+            // automatically. Web/server builds never set this, so they stay on cloud.
+            .env("RADIOPAD_LOCAL_STT_ENABLED", "1");
         if let Some(token) = option_env!("RADIOPAD_DESKTOP_PROXY_TOKEN") {
             // Strip a UTF-8 BOM (U+FEFF) and surrounding whitespace. A CI secret
             // set via a BOM-prepending pipe bakes the BOM into the literal, which
