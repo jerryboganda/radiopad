@@ -19,10 +19,9 @@ namespace RadioPad.Application.Services;
 /// <item>Poll the job to terminal; the transcript is the job output text.</item>
 /// </list>
 /// Provider selection mirrors <see cref="DictationCleanupService"/> (cheapest
-/// matching provider via <see cref="IProviderRouter"/>), and the
-/// de-identified-audio PHI gate (<see cref="AiGateway.EnforceTranscriptionPolicy"/>)
-/// runs before any bytes leave the process. Only the SHA-256 of the transcript
-/// is ever persisted — never the transcript itself.
+/// matching provider via <see cref="IProviderRouter"/>), so PHI routing is
+/// enforced exactly like the existing text dictation path — no extra gate. Only
+/// the SHA-256 of the transcript is ever persisted — never the transcript itself.
 /// </summary>
 public sealed class TranscriptionService : ITranscriptionService
 {
@@ -65,7 +64,6 @@ public sealed class TranscriptionService : ITranscriptionService
         string fileName,
         long sizeBytes,
         string contentType,
-        bool deidentifiedAck,
         CancellationToken ct)
     {
         if (audio is null)
@@ -75,15 +73,16 @@ public sealed class TranscriptionService : ITranscriptionService
         if (sizeBytes > MaxAudioBytes)
             throw new ArgumentException($"Audio payload exceeds the {MaxAudioBytes} byte limit.", nameof(sizeBytes));
 
-        // PHI detection mirrors DictationCleanupService: report content drives it.
+        // PHI routing mirrors DictationCleanupService exactly: report content
+        // drives provider selection, and the router refuses to hand PHI content to
+        // a non-PHI-approved provider (returning null -> the throw below). There is
+        // deliberately NO extra audio-specific gate: the spoken dictation is the
+        // radiologist's de-identified findings, handled like every other AI call.
         var containsPhi = ReportingService.ContainsPhi(report);
 
         var provider = await _router.SelectAsync(tenant, containsPhi, ct)
             ?? throw new ProviderPolicyException(
                 "No enabled provider matches the tenant's PHI / compliance requirements.");
-
-        // Phase B PHI gate — additive, independent of the text-completion path.
-        AiGateway.EnforceTranscriptionPolicy(provider, containsPhi, deidentifiedAck);
 
         var target = ResolveTarget(provider);
         var idempotencyKey = BuildIdempotencyKey(tenant.Id, report.Id, fileName, sizeBytes);
@@ -149,7 +148,6 @@ public sealed class TranscriptionService : ITranscriptionService
                 sizeBytes,
                 transcriptSha256 = Sha256(transcript),
                 latencyMs,
-                deidentifiedAck,
             }),
         }, ct);
 

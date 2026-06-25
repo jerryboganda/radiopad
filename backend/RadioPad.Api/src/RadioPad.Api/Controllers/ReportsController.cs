@@ -845,7 +845,6 @@ public class ReportsController : TenantedController
     public async Task<IActionResult> DictationTranscribe(
         Guid id,
         [FromForm] IFormFile? audio,
-        [FromForm] bool deidentifiedAck,
         [FromServices] Application.Abstractions.ITranscriptionService service,
         CancellationToken ct)
     {
@@ -870,7 +869,7 @@ public class ReportsController : TenantedController
             await using var stream = audio.OpenReadStream();
             var result = await service.TranscribeAsync(
                 tenant, user, report, stream, audio.FileName ?? "dictation.webm",
-                audio.Length, contentType, deidentifiedAck, ct);
+                audio.Length, contentType, ct);
             return Ok(new
             {
                 transcript = result.Text,

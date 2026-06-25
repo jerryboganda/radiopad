@@ -863,12 +863,11 @@ export const api = {
       }),
     // High-accuracy transcription: upload the recorded dictation audio; the
     // backend routes it through UBAG (audio attached into a chat model) and
-    // returns the transcript. `deidentifiedAck` is the explicit "this audio is
-    // de-identified" confirmation gating the PHI path (default-off backend).
-    transcribe: (id: string, audio: Blob, deidentifiedAck = false) => {
+    // returns the transcript. PHI routing is handled by the provider router,
+    // exactly like the text dictation/cleanup path — no separate gate.
+    transcribe: (id: string, audio: Blob) => {
       const form = new FormData();
       form.append('audio', audio, 'dictation.webm');
-      form.append('deidentifiedAck', deidentifiedAck ? 'true' : 'false');
       return requestForm<{ transcript: string; provider: string; model: string; latencyMs: number }>(
         `/api/reports/${id}/dictation/transcribe`,
         form,

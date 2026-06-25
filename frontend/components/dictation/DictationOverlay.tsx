@@ -105,8 +105,8 @@ export default function DictationOverlay() {
       const res = await api.reports.transcribe(reportId, blob);
       if (res.transcript) insertAtCursor(target, formatDictation(res.transcript));
     } catch {
-      // Backend surfaces 403 audio_requires_deidentified / policy errors; left
-      // as a no-op insert here (the error envelope is handled by the editor).
+      // Any provider/policy error surfaces as a non-2xx; the editor handles the
+      // error envelope. Insert nothing on failure.
     } finally {
       setTranscribing(false);
     }

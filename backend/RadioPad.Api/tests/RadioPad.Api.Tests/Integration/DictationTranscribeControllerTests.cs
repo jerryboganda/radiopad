@@ -20,13 +20,12 @@ public class DictationTranscribeControllerTests : IClassFixture<RadioPadAppFacto
     private readonly RadioPadAppFactory _factory;
     public DictationTranscribeControllerTests(RadioPadAppFactory factory) => _factory = factory;
 
-    private static MultipartFormDataContent AudioForm(byte[] bytes, string contentType, bool ack)
+    private static MultipartFormDataContent AudioForm(byte[] bytes, string contentType)
     {
         var form = new MultipartFormDataContent();
         var file = new ByteArrayContent(bytes);
         file.Headers.ContentType = new MediaTypeHeaderValue(contentType);
         form.Add(file, "audio", "dictation.webm");
-        form.Add(new StringContent(ack ? "true" : "false"), "deidentifiedAck");
         return form;
     }
 
@@ -52,7 +51,7 @@ public class DictationTranscribeControllerTests : IClassFixture<RadioPadAppFacto
         var reportId = await CreateReportAsync(radClient);
 
         using var adminClient = _factory.CreateAdminClient();
-        using var form = AudioForm(new byte[] { 1, 2, 3, 4 }, "audio/webm", ack: false);
+        using var form = AudioForm(new byte[] { 1, 2, 3, 4 }, "audio/webm");
         var resp = await adminClient.PostAsync($"/api/reports/{reportId}/dictation/transcribe", form);
 
         Assert.Equal(HttpStatusCode.Forbidden, resp.StatusCode);
@@ -64,8 +63,8 @@ public class DictationTranscribeControllerTests : IClassFixture<RadioPadAppFacto
         using var client = _factory.CreateTenantClient();
         var reportId = await CreateReportAsync(client);
 
-        // Form with the ack flag but no audio file part.
-        using var form = new MultipartFormDataContent { { new StringContent("false"), "deidentifiedAck" } };
+        // Valid multipart form with no audio file part.
+        using var form = new MultipartFormDataContent { { new StringContent("x"), "note" } };
         var resp = await client.PostAsync($"/api/reports/{reportId}/dictation/transcribe", form);
 
         Assert.Equal(HttpStatusCode.BadRequest, resp.StatusCode);
@@ -79,7 +78,7 @@ public class DictationTranscribeControllerTests : IClassFixture<RadioPadAppFacto
         using var client = _factory.CreateTenantClient();
         var reportId = await CreateReportAsync(client);
 
-        using var form = AudioForm(Encoding.UTF8.GetBytes("not audio"), "text/plain", ack: false);
+        using var form = AudioForm(Encoding.UTF8.GetBytes("not audio"), "text/plain");
         var resp = await client.PostAsync($"/api/reports/{reportId}/dictation/transcribe", form);
 
         Assert.Equal(HttpStatusCode.BadRequest, resp.StatusCode);
@@ -91,7 +90,7 @@ public class DictationTranscribeControllerTests : IClassFixture<RadioPadAppFacto
     public async Task Unknown_Report_Returns_404()
     {
         using var client = _factory.CreateTenantClient();
-        using var form = AudioForm(new byte[] { 1, 2, 3, 4 }, "audio/webm", ack: false);
+        using var form = AudioForm(new byte[] { 1, 2, 3, 4 }, "audio/webm");
         var resp = await client.PostAsync($"/api/reports/{Guid.NewGuid()}/dictation/transcribe", form);
 
         Assert.Equal(HttpStatusCode.NotFound, resp.StatusCode);

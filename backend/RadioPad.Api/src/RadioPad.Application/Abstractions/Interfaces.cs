@@ -192,7 +192,6 @@ public interface ITranscriptionService
         string fileName,
         long sizeBytes,
         string contentType,
-        bool deidentifiedAck,
         CancellationToken ct);
 }
 

@@ -248,44 +248,6 @@ public class AiGateway : IAiGateway
         }
     }
 
-    /// <summary>
-    /// Phase B (dictation transcription) — PHI gate for audio transcription
-    /// over UBAG. This is ADDITIVE and independent of <see cref="EnforcePhiPolicy"/>
-    /// (the text-completion path) and of
-    /// <c>UbagProviderAdapter.EnforceRequestPolicy</c>'s <c>phi_not_supported</c>
-    /// throw, neither of which is altered.
-    ///
-    /// Rules:
-    /// <list type="bullet">
-    /// <item>De-identified audio (<paramref name="containsPhi"/> == false) is
-    /// always allowed on UBAG.</item>
-    /// <item>PHI-bearing audio is rejected with
-    /// <c>ubag: audio_requires_deidentified</c> UNLESS all three hold:
-    /// the operator opt-in <c>RADIOPAD_ALLOW_PHI_AUDIO_TRANSCRIPTION=1</c> is set,
-    /// the caller passed an explicit de-identification acknowledgement
-    /// (<paramref name="deidentifiedAck"/> == true), AND the selected
-    /// <paramref name="provider"/>'s compliance is PhiApproved or LocalOnly.</item>
-    /// </list>
-    /// </summary>
-    public static void EnforceTranscriptionPolicy(ProviderConfig provider, bool containsPhi, bool deidentifiedAck)
-    {
-        if (!provider.Enabled)
-            throw new ProviderPolicyException($"Provider '{provider.Name}' is disabled.");
-        if (provider.Compliance == ProviderComplianceClass.Blocked)
-            throw new ProviderPolicyException($"Provider '{provider.Name}' is blocked by tenant policy.");
-
-        if (!containsPhi)
-            return; // De-identified audio is allowed on UBAG.
-
-        var phiAudioAllowed =
-            Environment.GetEnvironmentVariable("RADIOPAD_ALLOW_PHI_AUDIO_TRANSCRIPTION") == "1"
-            && deidentifiedAck
-            && provider.Compliance is ProviderComplianceClass.PhiApproved or ProviderComplianceClass.LocalOnly;
-
-        if (!phiAudioAllowed)
-            throw new ProviderPolicyException("ubag: audio_requires_deidentified");
-    }
-
     private static string Sha256(string s)
     {
         var bytes = SHA256.HashData(Encoding.UTF8.GetBytes(s ?? ""));

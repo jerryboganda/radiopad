@@ -1,5 +1,4 @@
 using Microsoft.Extensions.Logging.Abstractions;
-using RadioPad.Api.Tests.Infrastructure;
 using RadioPad.Application.Abstractions;
 using RadioPad.Application.Services;
 using RadioPad.Domain.Entities;
@@ -10,16 +9,14 @@ namespace RadioPad.Api.Tests;
 
 /// <summary>
 /// Phase B (dictation transcription) — unit tests for
-/// <see cref="TranscriptionService"/>. Covers the happy path (de-identified
-/// audio allowed on UBAG) and the PHI gate
-/// (<see cref="AiGateway.EnforceTranscriptionPolicy"/>): PHI audio is rejected
-/// without the env opt-in + ack + compliant provider, and only allowed when all
-/// three hold. UBAG + router + audit are faked; no network is touched.
+/// <see cref="TranscriptionService"/>. Provider selection (and therefore PHI
+/// routing) is delegated to <see cref="IProviderRouter"/>, exactly like the text
+/// dictation/cleanup path — there is no separate audio gate. A de-identified
+/// report transcribes on UBAG; when the router returns no compliant provider the
+/// call is rejected. UBAG + router + audit are faked; no network is touched.
 /// </summary>
 public class TranscriptionServiceTests
 {
-    private const string PhiAudioEnv = "RADIOPAD_ALLOW_PHI_AUDIO_TRANSCRIPTION";
-
     private static Tenant Tenant() =>
         new() { Id = Guid.NewGuid(), Slug = "t1", DisplayName = "T1", RequirePhiApprovedProvider = true };
 
@@ -30,10 +27,6 @@ public class TranscriptionServiceTests
     private static Report CleanReport() =>
         new() { Id = Guid.NewGuid(), Study = new StudyContext { Modality = "CT", BodyPart = "Chest" } };
 
-    /// <summary>A report whose study carries a patient reference → PHI.</summary>
-    private static Report PhiReport() =>
-        new() { Id = Guid.NewGuid(), Study = new StudyContext { Modality = "CT", PatientReference = "patient-abc-123" } };
-
     private static ProviderConfig Provider(ProviderComplianceClass cls, string model = "gemini_web") =>
         new() { Id = Guid.NewGuid(), Name = "UBAG", Adapter = "ubag", Model = model, Compliance = cls, Enabled = true };
 
@@ -42,10 +35,8 @@ public class TranscriptionServiceTests
 
     private static MemoryStream Audio() => new(new byte[] { 1, 2, 3, 4 });
 
-    // ── de-identified happy path ───────────────────────────────────────────────
-
     [Fact]
-    public async Task Deidentified_Audio_Is_Transcribed_On_Ubag()
+    public async Task Dictation_Audio_Is_Transcribed_On_Ubag()
     {
         var ubag = new FakeUbag();
         var audit = new RecordingAudit();
@@ -53,7 +44,7 @@ public class TranscriptionServiceTests
 
         var result = await svc.TranscribeAsync(
             Tenant(), User(), CleanReport(), Audio(), "dictation.webm", 4, "audio/webm",
-            deidentifiedAck: false, CancellationToken.None);
+            CancellationToken.None);
 
         Assert.Equal("transcript text", result.Text);
         Assert.Equal("UBAG", result.Provider);
@@ -74,7 +65,7 @@ public class TranscriptionServiceTests
 
         await svc.TranscribeAsync(
             Tenant(), User(), CleanReport(), Audio(), "dictation.webm", 4, "audio/webm",
-            false, CancellationToken.None);
+            CancellationToken.None);
 
         var evt = Assert.Single(audit.Events);
         Assert.Equal(AuditAction.AudioTranscribed, evt.Action);
@@ -83,71 +74,16 @@ public class TranscriptionServiceTests
         Assert.Contains("transcriptSha256", evt.DetailsJson);
     }
 
-    // ── PHI gate ───────────────────────────────────────────────────────────────
-
-    [Fact]
-    public async Task Phi_Audio_Rejected_When_Env_Not_Set()
-    {
-        using var env = EnvVarScope.Set(PhiAudioEnv, null);
-        var svc = Build(Provider(ProviderComplianceClass.PhiApproved), new FakeUbag(), new RecordingAudit());
-
-        var ex = await Assert.ThrowsAsync<ProviderPolicyException>(() => svc.TranscribeAsync(
-            Tenant(), User(), PhiReport(), Audio(), "dictation.webm", 4, "audio/webm",
-            deidentifiedAck: true, CancellationToken.None));
-
-        Assert.Contains("audio_requires_deidentified", ex.Message);
-    }
-
-    [Fact]
-    public async Task Phi_Audio_Rejected_When_Ack_Missing()
-    {
-        using var env = EnvVarScope.Set(PhiAudioEnv, "1");
-        var svc = Build(Provider(ProviderComplianceClass.PhiApproved), new FakeUbag(), new RecordingAudit());
-
-        var ex = await Assert.ThrowsAsync<ProviderPolicyException>(() => svc.TranscribeAsync(
-            Tenant(), User(), PhiReport(), Audio(), "dictation.webm", 4, "audio/webm",
-            deidentifiedAck: false, CancellationToken.None));
-
-        Assert.Contains("audio_requires_deidentified", ex.Message);
-    }
-
-    [Fact]
-    public async Task Phi_Audio_Rejected_When_Provider_Not_Compliant()
-    {
-        using var env = EnvVarScope.Set(PhiAudioEnv, "1");
-        var svc = Build(Provider(ProviderComplianceClass.Sandbox), new FakeUbag(), new RecordingAudit());
-
-        var ex = await Assert.ThrowsAsync<ProviderPolicyException>(() => svc.TranscribeAsync(
-            Tenant(), User(), PhiReport(), Audio(), "dictation.webm", 4, "audio/webm",
-            deidentifiedAck: true, CancellationToken.None));
-
-        Assert.Contains("audio_requires_deidentified", ex.Message);
-    }
-
-    [Theory]
-    [InlineData(ProviderComplianceClass.PhiApproved)]
-    [InlineData(ProviderComplianceClass.LocalOnly)]
-    public async Task Phi_Audio_Allowed_When_Env_And_Ack_And_Compliant(ProviderComplianceClass cls)
-    {
-        using var env = EnvVarScope.Set(PhiAudioEnv, "1");
-        var ubag = new FakeUbag();
-        var svc = Build(Provider(cls), ubag, new RecordingAudit());
-
-        var result = await svc.TranscribeAsync(
-            Tenant(), User(), PhiReport(), Audio(), "dictation.webm", 4, "audio/webm",
-            deidentifiedAck: true, CancellationToken.None);
-
-        Assert.Equal("transcript text", result.Text);
-    }
-
     [Fact]
     public async Task No_Matching_Provider_Throws_ProviderPolicyException()
     {
+        // The router refusing to select a compliant provider (returns null) is the
+        // single PHI/compliance gate — identical to the text dictation path.
         var svc = Build(selected: null, new FakeUbag(), new RecordingAudit());
 
         await Assert.ThrowsAsync<ProviderPolicyException>(() => svc.TranscribeAsync(
             Tenant(), User(), CleanReport(), Audio(), "dictation.webm", 4, "audio/webm",
-            false, CancellationToken.None));
+            CancellationToken.None));
     }
 
     [Fact]
@@ -157,7 +93,7 @@ public class TranscriptionServiceTests
 
         await Assert.ThrowsAsync<ArgumentException>(() => svc.TranscribeAsync(
             Tenant(), User(), CleanReport(), Audio(), "dictation.webm",
-            TranscriptionService.MaxAudioBytes + 1, "audio/webm", false, CancellationToken.None));
+            TranscriptionService.MaxAudioBytes + 1, "audio/webm", CancellationToken.None));
     }
 
     // ── fakes ────────────────────────────────────────────────────────────────
