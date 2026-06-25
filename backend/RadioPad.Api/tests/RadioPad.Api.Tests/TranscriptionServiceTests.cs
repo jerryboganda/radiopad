@@ -33,6 +33,9 @@ public class TranscriptionServiceTests
     private static TranscriptionService Build(ProviderConfig? selected, FakeUbag ubag, RecordingAudit audit) =>
         new(ubag, new FakeRouter(selected), audit, NullLogger<TranscriptionService>.Instance);
 
+    private static TranscriptionService Build(ProviderConfig? selected, FakeUbag ubag, RecordingAudit audit, ILocalSttClient localStt) =>
+        new(ubag, new FakeRouter(selected), audit, NullLogger<TranscriptionService>.Instance, localStt);
+
     private static MemoryStream Audio() => new(new byte[] { 1, 2, 3, 4 });
 
     [Fact]
@@ -96,7 +99,72 @@ public class TranscriptionServiceTests
             TranscriptionService.MaxAudioBytes + 1, "audio/webm", CancellationToken.None));
     }
 
+    [Fact]
+    public async Task Local_Engine_When_Available_Transcribes_Offline_And_Skips_Ubag()
+    {
+        // Desktop: an on-device engine is ready, so transcription runs fully
+        // offline and the cloud (UBAG) flow is never reached — even though a
+        // cloud provider is selectable.
+        var ubag = new FakeUbag();
+        var audit = new RecordingAudit();
+        var local = new FakeLocalStt(new TranscriptionResult("on-device transcript", "local", "parakeet-tdt-0.6b-v3", 12));
+        var svc = Build(Provider(ProviderComplianceClass.Sandbox), ubag, audit, local);
+
+        var result = await svc.TranscribeAsync(
+            Tenant(), User(), CleanReport(), Audio(), "dictation.webm", 4, "audio/webm",
+            CancellationToken.None);
+
+        Assert.Equal("on-device transcript", result.Text);
+        Assert.Equal("local", result.Provider);
+        Assert.Equal("parakeet-tdt-0.6b-v3", result.Model);
+        Assert.Equal(1, local.Calls);
+
+        // The cloud path must be completely untouched.
+        Assert.Null(ubag.UploadedKey);
+        Assert.Null(ubag.CreatedSignature);
+
+        // Still audited — provenance + SHA-256 only, never the transcript text.
+        var evt = Assert.Single(audit.Events);
+        Assert.Equal(AuditAction.AudioTranscribed, evt.Action);
+        Assert.DoesNotContain("on-device transcript", evt.DetailsJson);
+        Assert.Contains("transcriptSha256", evt.DetailsJson);
+        Assert.Contains("\"provider\":\"local\"", evt.DetailsJson);
+    }
+
+    [Fact]
+    public async Task Local_Engine_Unavailable_Falls_Through_To_Ubag()
+    {
+        // Web/server (or a desktop without the model): the engine reports
+        // unavailable, so the existing UBAG cloud flow handles transcription.
+        var ubag = new FakeUbag();
+        var audit = new RecordingAudit();
+        var local = new FakeLocalStt(result: null); // Available == false
+        var svc = Build(Provider(ProviderComplianceClass.Sandbox), ubag, audit, local);
+
+        var result = await svc.TranscribeAsync(
+            Tenant(), User(), CleanReport(), Audio(), "dictation.webm", 4, "audio/webm",
+            CancellationToken.None);
+
+        Assert.Equal("transcript text", result.Text);
+        Assert.Equal("UBAG", result.Provider);
+        Assert.Equal("dictation.webm", ubag.UploadedKey);
+        Assert.Equal(0, local.Calls);
+    }
+
     // ── fakes ────────────────────────────────────────────────────────────────
+
+    private sealed class FakeLocalStt : ILocalSttClient
+    {
+        private readonly TranscriptionResult? _result;
+        public int Calls { get; private set; }
+        public FakeLocalStt(TranscriptionResult? result) => _result = result;
+        public bool Available => _result is not null;
+        public Task<TranscriptionResult> TranscribeAsync(Stream audio, string contentType, CancellationToken ct)
+        {
+            Calls++;
+            return Task.FromResult(_result!);
+        }
+    }
 
     private sealed class FakeRouter : IProviderRouter
     {

@@ -174,6 +174,29 @@ public sealed record UbagArtifact(
     string Checksum);
 
 /// <summary>
+/// Phase 1 (local STT) — an on-device, fully-offline speech-to-text engine
+/// (e.g. sherpa-onnx Parakeet or Whisper.net). When <see cref="Available"/> is
+/// true, <see cref="ITranscriptionService"/> routes dictation audio here and the
+/// bytes never leave the machine — replacing the cloud (UBAG) path on desktop.
+/// Implementations self-disable (<see cref="Available"/> == false) when the
+/// engine is not configured or the model is absent, so non-desktop builds fall
+/// through to the cloud flow transparently.
+/// </summary>
+public interface ILocalSttClient
+{
+    /// <summary>True when the engine is configured, the model is present, and it
+    /// can actually run. Checked before every routing decision.</summary>
+    bool Available { get; }
+
+    /// <summary>
+    /// Transcribe a complete recorded-audio buffer entirely on-device. The
+    /// returned <see cref="TranscriptionResult.Provider"/> identifies the local
+    /// engine; only the SHA-256 of the text is ever persisted by the caller.
+    /// </summary>
+    Task<TranscriptionResult> TranscribeAsync(Stream audio, string contentType, CancellationToken ct);
+}
+
+/// <summary>
 /// Phase B (dictation transcription) — orchestrates the four-call UBAG flow
 /// (create <c>medical_transcription</c> job → upload audio artifact → worker
 /// scrapes → poll to terminal) for a single report's dictation audio. Routes
