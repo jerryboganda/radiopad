@@ -242,6 +242,16 @@ public class UbagProviderAdapterTests
         public Task<UbagJob> GetJobAsync(string jobId, CancellationToken ct) =>
             Task.FromResult(new UbagJob(jobId, "gemini_web", "completed", true, "ubag response", null, null, 25, "{}"));
 
+        public Task<UbagJob> CreateTranscriptionJobAsync(UbagTranscriptionRequest request, string idempotencyKey, CancellationToken ct)
+        {
+            CreatedTarget = request.Target;
+            IdempotencyKey = idempotencyKey;
+            return Task.FromResult(new UbagJob("job_tx_1", request.Target, "completed", true, "transcript text", null, null, 30, "{}"));
+        }
+
+        public Task<UbagArtifact> UploadJobArtifactAsync(string jobId, string key, Stream content, string contentType, long contentLength, string idempotencyKey, CancellationToken ct) =>
+            Task.FromResult(new UbagArtifact(jobId, key, contentType, contentLength, "sha256:stub"));
+
         public Task<UbagWorkflow> CreateWorkflowAsync(UbagWorkflowRequest request, string idempotencyKey, CancellationToken ct) =>
             Task.FromResult(new UbagWorkflow("wf_1", "created", "{}"));
 

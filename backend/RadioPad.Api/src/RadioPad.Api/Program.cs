@@ -147,6 +147,11 @@ builder.Services.AddScoped<RadioPad.Application.Services.ITerminologyAdapter, Ra
 builder.Services.AddScoped<IPromptOverrideStore, EfPromptOverrideStore>();
 builder.Services.AddScoped<RadioPad.Application.Abstractions.IDictationCleanupService,
     RadioPad.Application.Services.DictationCleanupService>();
+// Phase B (dictation transcription) — audio → transcript via the UBAG
+// medical_transcription flow. Uses the existing "ubag" named HttpClient
+// (IUbagClient) — no new client/config needed.
+builder.Services.AddScoped<RadioPad.Application.Abstractions.ITranscriptionService,
+    RadioPad.Application.Services.TranscriptionService>();
 // PRD BILL-001..006 — billing helpers (audit + plan quota + subscription lifecycle).
 builder.Services.AddScoped<IPlanQuotaStore, EfPlanQuotaStore>();
 builder.Services.AddScoped<RadioPad.Application.Services.IBillingAudit, RadioPad.Application.Services.BillingAudit>();

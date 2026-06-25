@@ -145,6 +145,42 @@ public sealed class UbagClient : IUbagClient
         return ParseJob(doc.RootElement, request.Target);
     }
 
+    public async Task<UbagJob> CreateTranscriptionJobAsync(UbagTranscriptionRequest request, string idempotencyKey, CancellationToken ct)
+    {
+        // Phase B — the job is created FIRST and references an audio artifact by
+        // key; the worker waits for that artifact (uploaded separately via
+        // UploadJobArtifactAsync) before scraping. No temperature is sent — the
+        // transcription model is governed by the gateway, not RadioPad sampling.
+        var body = new
+        {
+            api_version = ApiVersion(),
+            client = ClientEnvelope(request.ClientRequestId),
+            job = new
+            {
+                target = request.Target,
+                command_type = "medical_transcription",
+                input = new { prompt = request.Prompt, audio_artifact_key = request.AudioArtifactKey },
+                options = new { return_mode = request.ReturnMode, wait_for_artifacts = new[] { request.AudioArtifactKey } },
+            },
+        };
+        using var doc = await SendAsync(HttpMethod.Post, "/v1/jobs", body, idempotencyKey, ct);
+        return ParseJob(doc.RootElement, request.Target);
+    }
+
+    public async Task<UbagArtifact> UploadJobArtifactAsync(
+        string jobId, string key, Stream content, string contentType, long contentLength, string idempotencyKey, CancellationToken ct)
+    {
+        var path = $"/v1/jobs/{Uri.EscapeDataString(jobId)}/artifacts/{Uri.EscapeDataString(key)}";
+        using var doc = await SendBinaryAsync(path, content, contentType, contentLength, idempotencyKey, ct);
+        var root = doc.RootElement;
+        return new UbagArtifact(
+            JobId: ReadString(root, "job_id") ?? ReadString(root, "jobId") ?? jobId,
+            Key: ReadString(root, "key") ?? ReadString(root, "artifact_key") ?? key,
+            ContentType: ReadString(root, "content_type") ?? ReadString(root, "contentType") ?? contentType,
+            SizeBytes: ReadLong(root, "size_bytes") ?? ReadLong(root, "sizeBytes") ?? ReadLong(root, "size") ?? contentLength,
+            Checksum: ReadString(root, "checksum") ?? ReadString(root, "sha256") ?? ReadString(root, "digest") ?? "");
+    }
+
     public async Task<UbagJob> GetJobAsync(string jobId, CancellationToken ct)
     {
         using var doc = await SendAsync(HttpMethod.Get, $"/v1/jobs/{Uri.EscapeDataString(jobId)}", null, null, ct);
@@ -279,6 +315,48 @@ public sealed class UbagClient : IUbagClient
             var json = JsonSerializer.Serialize(body, JsonOptions);
             req.Content = new StringContent(json, Encoding.UTF8, "application/json");
         }
+
+        using var res = await client.SendAsync(req, HttpCompletionOption.ResponseHeadersRead, ct);
+        var text = await res.Content.ReadAsStringAsync(ct);
+        if (!res.IsSuccessStatusCode)
+        {
+            throw new ProviderTransportException(
+                $"ubag: HTTP {(int)res.StatusCode}",
+                statusCode: (int)res.StatusCode,
+                responseBody: Truncate(text));
+        }
+
+        try
+        {
+            return JsonDocument.Parse(string.IsNullOrWhiteSpace(text) ? "{}" : text);
+        }
+        catch (JsonException ex)
+        {
+            _log.LogWarning(ex, "UBAG returned non-JSON response for {Path}", path);
+            throw new ProviderTransportException("ubag: malformed JSON response", inner: ex);
+        }
+    }
+
+    private async Task<JsonDocument> SendBinaryAsync(
+        string path, Stream content, string contentType, long contentLength, string? idempotencyKey, CancellationToken ct)
+    {
+        var client = _http.CreateClient(HttpClientName);
+        // Reuse the SAME absolute-URL builder as SendAsync so a base-URL PATH
+        // segment (e.g. the desktop proxy at https://host/api/ubag-gw) is
+        // preserved for binary uploads exactly as it is for JSON calls.
+        var requestUri = client.BaseAddress is { } baseAddr
+            ? new Uri($"{baseAddr.ToString().TrimEnd('/')}/{path.TrimStart('/')}")
+            : new Uri(path, UriKind.RelativeOrAbsolute);
+        using var req = new HttpRequestMessage(HttpMethod.Put, requestUri);
+        if (!string.IsNullOrWhiteSpace(idempotencyKey))
+            req.Headers.TryAddWithoutValidation("Idempotency-Key", idempotencyKey);
+        req.Headers.TryAddWithoutValidation("Ubag-Api-Version", ApiVersion());
+        ApplyAuth(req);
+
+        var body = new StreamContent(content);
+        body.Headers.ContentType = new MediaTypeHeaderValue(contentType);
+        body.Headers.ContentLength = contentLength;
+        req.Content = body;
 
         using var res = await client.SendAsync(req, HttpCompletionOption.ResponseHeadersRead, ct);
         var text = await res.Content.ReadAsStringAsync(ct);
@@ -460,6 +538,9 @@ public sealed class UbagClient : IUbagClient
 
     private static int? ReadInt(JsonElement root, string name)
         => TryProperty(root, name, out var value) && value.TryGetInt32(out var n) ? n : null;
+
+    private static long? ReadLong(JsonElement root, string name)
+        => TryProperty(root, name, out var value) && value.TryGetInt64(out var n) ? n : null;
 
     private static bool? ReadBool(JsonElement root, string name)
         => TryProperty(root, name, out var value) && value.ValueKind is JsonValueKind.True or JsonValueKind.False
