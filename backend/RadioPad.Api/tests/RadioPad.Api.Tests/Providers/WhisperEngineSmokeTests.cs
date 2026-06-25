@@ -31,6 +31,10 @@ public class WhisperEngineSmokeTests
         // pipeline doesn't throw. Fall back to silence when none is provided.
         var wavPath = Environment.GetEnvironmentVariable("RADIOPAD_STT_SMOKE_WAV");
         var haveSpeech = !string.IsNullOrWhiteSpace(wavPath) && File.Exists(wavPath);
+        // When the CI job demands a real run, refuse to quietly fall back to
+        // silence — a missing speech WAV must fail, not pass on an empty assertion.
+        if (!haveSpeech && SttSmokeGate.IsRequired())
+            Assert.Fail($"RADIOPAD_STT_SMOKE_WAV unset or missing ('{wavPath}') but RADIOPAD_STT_SMOKE_REQUIRE=1.");
         var wav = haveSpeech ? await File.ReadAllBytesAsync(wavPath!) : BuildSilentWav(seconds: 1.0);
 
         var result = await engine.RecognizeAsync(wav, CancellationToken.None);

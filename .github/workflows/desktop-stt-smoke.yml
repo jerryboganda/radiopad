@@ -57,10 +57,13 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          wav="$(find stt-model -iname '*.wav' | head -n1)"
+          root="$(pwd)/stt-model"
+          # Prefer an English sample (Whisper is forced to en); else any WAV.
+          wav="$(find "$root" -iname 'en*.wav' | head -n1)"
+          test -n "$wav" || wav="$(find "$root" -iname '*.wav' | head -n1)"
           test -n "$wav" || { echo "no sample WAV in Parakeet bundle"; exit 1; }
           echo "RADIOPAD_STT_SMOKE_WAV=$(cygpath -w "$wav")" >> "$GITHUB_ENV"
-          echo "using sample WAV: $wav"
+          echo "using sample WAV (absolute): $wav"
 
       - name: Cache Whisper model
         id: whisper

@@ -31,7 +31,8 @@ internal static class SttSmokeGate
         return null;
     }
 
-    private static bool IsRequired()
+    /// <summary>True when the CI job demands a real on-device run (no silent fallbacks).</summary>
+    public static bool IsRequired()
     {
         var f = Environment.GetEnvironmentVariable("RADIOPAD_STT_SMOKE_REQUIRE");
         return string.Equals(f, "1", StringComparison.Ordinal)
