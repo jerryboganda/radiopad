@@ -1,0 +1,137 @@
+using RadioPad.Application.Stt;
+using Xunit;
+
+namespace RadioPad.Api.Tests;
+
+/// <summary>
+/// Phase 2 — unit tests for the ROVER reconciler: word-alignment + calibrated
+/// confidence voting + disagreement / safety flagging. The "counter-detect"
+/// mechanism that turns two engines into one reviewed transcript.
+/// </summary>
+public class SttReconcilerTests
+{
+    private static SttToken T(string w, double c) => new(w, c);
+
+    private static EngineTranscript Eng(string id, params SttToken[] tokens) => new(id, tokens);
+
+    [Fact]
+    public void Identical_Confident_Hypotheses_Produce_No_Flags()
+    {
+        var a = Eng("parakeet", T("lungs", 0.95), T("are", 0.95), T("clear", 0.95));
+        var b = Eng("whisper", T("lungs", 0.92), T("are", 0.92), T("clear", 0.92));
+
+        var r = SttReconciler.Reconcile(a, b);
+
+        Assert.Equal("lungs are clear", r.Text);
+        Assert.Equal(0, r.FlaggedCount);
+        Assert.All(r.Spans, s => Assert.Equal("both", s.Source));
+    }
+
+    [Fact]
+    public void Confident_WideMargin_Disagreement_Picks_Winner_Unflagged()
+    {
+        var a = Eng("parakeet", T("lung", 0.95));
+        var b = Eng("whisper", T("long", 0.60));
+
+        var r = SttReconciler.Reconcile(a, b);
+
+        Assert.Equal("lung", r.Text);
+        Assert.False(r.Spans[0].Flagged);
+        Assert.Equal("parakeet", r.Spans[0].Source);
+    }
+
+    [Fact]
+    public void Narrow_Disagreement_Is_Flagged()
+    {
+        var a = Eng("parakeet", T("lung", 0.70));
+        var b = Eng("whisper", T("long", 0.65));
+
+        var r = SttReconciler.Reconcile(a, b);
+
+        Assert.Equal("lung", r.Text);
+        Assert.True(r.Spans[0].Flagged);
+        Assert.Equal("disagreement", r.Spans[0].Reason);
+    }
+
+    [Fact]
+    public void Insertion_Deletion_Is_Flagged()
+    {
+        var a = Eng("parakeet", T("the", 0.9), T("lung", 0.9));
+        var b = Eng("whisper", T("the", 0.9));
+
+        var r = SttReconciler.Reconcile(a, b);
+
+        Assert.Equal("the lung", r.Text);
+        Assert.Equal(1, r.FlaggedCount);
+        var flagged = Assert.Single(r.Spans, s => s.Flagged);
+        Assert.Equal("lung", flagged.Text);
+        Assert.Equal("insert-delete", flagged.Reason);
+    }
+
+    [Fact]
+    public void Safety_Token_Is_Flagged_Even_When_Engines_Agree()
+    {
+        var a = Eng("parakeet", T("left", 0.97));
+        var b = Eng("whisper", T("left", 0.97));
+
+        var r = SttReconciler.Reconcile(a, b);
+
+        Assert.True(r.Spans[0].Flagged);
+        Assert.Equal("safety", r.Spans[0].Reason);
+    }
+
+    [Fact]
+    public void Numeric_Measurement_Is_Flagged()
+    {
+        var a = Eng("parakeet", T("1.2", 0.95), T("cm", 0.95));
+        var b = Eng("whisper", T("1.2", 0.95), T("cm", 0.95));
+
+        var r = SttReconciler.Reconcile(a, b);
+
+        Assert.Equal(1, r.FlaggedCount);
+        Assert.Equal("safety", r.Spans[0].Reason); // "1.2"
+        Assert.False(r.Spans[1].Flagged);           // "cm"
+    }
+
+    [Fact]
+    public void Low_Confidence_Agreement_Is_Flagged()
+    {
+        var a = Eng("parakeet", T("haze", 0.40));
+        var b = Eng("whisper", T("haze", 0.45));
+
+        var r = SttReconciler.Reconcile(a, b);
+
+        Assert.True(r.Spans[0].Flagged);
+        Assert.Equal("low-confidence", r.Spans[0].Reason);
+    }
+
+    [Fact]
+    public void EngineScale_Calibration_Can_Flip_The_Winner()
+    {
+        // Raw: parakeet 0.9 > whisper 0.8. With a 0.5 scale on the (over-confident)
+        // transducer, calibrated parakeet 0.45 < whisper 0.8 -> whisper wins.
+        var a = Eng("parakeet", T("alpha", 0.9));
+        var b = Eng("whisper", T("beta", 0.8));
+        var opts = new ReconcileOptions
+        {
+            EngineScale = new Dictionary<string, double> { ["parakeet"] = 0.5 },
+        };
+
+        var r = SttReconciler.Reconcile(a, b, opts);
+
+        Assert.Equal("beta", r.Text);
+        Assert.Equal("whisper", r.Spans[0].Source);
+    }
+
+    [Fact]
+    public void Word_Equality_Ignores_Case_And_Punctuation()
+    {
+        var a = Eng("parakeet", T("Clear.", 0.9));
+        var b = Eng("whisper", T("clear", 0.9));
+
+        var r = SttReconciler.Reconcile(a, b);
+
+        Assert.False(r.Spans[0].Flagged);
+        Assert.Equal("both", r.Spans[0].Source);
+    }
+}
