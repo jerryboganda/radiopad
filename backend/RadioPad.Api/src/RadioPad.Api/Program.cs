@@ -152,6 +152,15 @@ builder.Services.AddScoped<RadioPad.Application.Abstractions.IDictationCleanupSe
 // (IUbagClient) — no new client/config needed.
 builder.Services.AddScoped<RadioPad.Application.Abstractions.ITranscriptionService,
     RadioPad.Application.Services.TranscriptionService>();
+// Phase 1 (local STT) — fully on-device, offline transcription. Registered
+// always; ILocalSttClient.Available stays false (so TranscriptionService keeps
+// the UBAG cloud path) UNLESS the desktop build sets RADIOPAD_LOCAL_STT_ENABLED
+// and ships the model + ffmpeg. The recognizer loads the native model once, so
+// it is a singleton; the ffmpeg-backed decoder is stateless.
+builder.Services.AddSingleton<RadioPad.Infrastructure.Audio.IAudioDecoder,
+    RadioPad.Infrastructure.Audio.FfmpegAudioDecoder>();
+builder.Services.AddSingleton<RadioPad.Application.Abstractions.ILocalSttClient,
+    RadioPad.Infrastructure.Providers.Local.SherpaParakeetSttClient>();
 // PRD BILL-001..006 — billing helpers (audit + plan quota + subscription lifecycle).
 builder.Services.AddScoped<IPlanQuotaStore, EfPlanQuotaStore>();
 builder.Services.AddScoped<RadioPad.Application.Services.IBillingAudit, RadioPad.Application.Services.BillingAudit>();

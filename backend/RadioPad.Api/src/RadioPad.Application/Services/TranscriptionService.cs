@@ -43,17 +43,20 @@ public sealed class TranscriptionService : ITranscriptionService
     private readonly IProviderRouter _router;
     private readonly IAuditLog _audit;
     private readonly ILogger<TranscriptionService> _log;
+    private readonly ILocalSttClient? _localStt;
 
     public TranscriptionService(
         IUbagClient ubag,
         IProviderRouter router,
         IAuditLog audit,
-        ILogger<TranscriptionService> log)
+        ILogger<TranscriptionService> log,
+        ILocalSttClient? localStt = null)
     {
         _ubag = ubag;
         _router = router;
         _audit = audit;
         _log = log;
+        _localStt = localStt;
     }
 
     public async Task<TranscriptionResult> TranscribeAsync(
@@ -72,6 +75,27 @@ public sealed class TranscriptionService : ITranscriptionService
             throw new ArgumentException("Audio payload is empty.", nameof(sizeBytes));
         if (sizeBytes > MaxAudioBytes)
             throw new ArgumentException($"Audio payload exceeds the {MaxAudioBytes} byte limit.", nameof(sizeBytes));
+
+        // Local-first STT: when an on-device engine is configured and ready (the
+        // desktop bundle sets RADIOPAD_LOCAL_STT_ENABLED and ships the model),
+        // transcribe FULLY OFFLINE and never touch the cloud router/UBAG. The
+        // spoken dictation is the radiologist's de-identified findings handled
+        // entirely on-device — strictly safer than any remote provider — so
+        // locality itself satisfies the PHI gate. Web/server builds leave the
+        // engine unconfigured (Available == false) and fall through to UBAG below.
+        if (_localStt is { Available: true })
+        {
+            var local = await _localStt.TranscribeAsync(audio, contentType, ct);
+
+            _log.LogInformation(
+                "Transcribed dictation audio for report {ReportId} via {Provider}/{Model} (on-device, {SizeBytes} bytes, {LatencyMs} ms)",
+                report.Id, local.Provider, local.Model, sizeBytes, local.LatencyMs);
+
+            await AppendTranscriptionAuditAsync(
+                tenant, user, report, local.Provider, local.Model, sizeBytes, local.Text, local.LatencyMs, ct);
+
+            return local;
+        }
 
         // PHI routing mirrors DictationCleanupService exactly: report content
         // drives provider selection, and the router refuses to hand PHI content to
@@ -134,6 +158,26 @@ public sealed class TranscriptionService : ITranscriptionService
             report.Id, provider.Name, target, sizeBytes, latencyMs);
 
         // Audit — store the SHA-256 of the transcript, NEVER the transcript text.
+        await AppendTranscriptionAuditAsync(
+            tenant, user, report, provider.Name, target, sizeBytes, transcript, latencyMs, ct);
+
+        return new TranscriptionResult(
+            Text: transcript,
+            Provider: provider.Name,
+            Model: target,
+            LatencyMs: latencyMs);
+    }
+
+    /// <summary>
+    /// Appends the <see cref="AuditAction.AudioTranscribed"/> event for both the
+    /// cloud (UBAG) and on-device paths. Persists provenance + the transcript
+    /// SHA-256 ONLY — never the transcript text (PHI-free by construction).
+    /// </summary>
+    private async Task AppendTranscriptionAuditAsync(
+        Tenant tenant, User user, Report report,
+        string provider, string target, long sizeBytes, string transcript, long latencyMs,
+        CancellationToken ct)
+    {
         await _audit.AppendAsync(new AuditEvent
         {
             TenantId = tenant.Id,
@@ -142,7 +186,7 @@ public sealed class TranscriptionService : ITranscriptionService
             Action = AuditAction.AudioTranscribed,
             DetailsJson = System.Text.Json.JsonSerializer.Serialize(new
             {
-                provider = provider.Name,
+                provider,
                 target,
                 artifactKey = AudioArtifactKey,
                 sizeBytes,
@@ -150,12 +194,6 @@ public sealed class TranscriptionService : ITranscriptionService
                 latencyMs,
             }),
         }, ct);
-
-        return new TranscriptionResult(
-            Text: transcript,
-            Provider: provider.Name,
-            Model: target,
-            LatencyMs: latencyMs);
     }
 
     /// <summary>
