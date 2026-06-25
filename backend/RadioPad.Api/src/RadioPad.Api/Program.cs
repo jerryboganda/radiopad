@@ -158,7 +158,7 @@ builder.Services.AddScoped<RadioPad.Application.Abstractions.ITranscriptionServi
 // and ships the model + ffmpeg. The recognizer loads the native model once, so
 // it is a singleton; the ffmpeg-backed decoder is stateless.
 builder.Services.AddSingleton<RadioPad.Infrastructure.Audio.IAudioDecoder,
-    RadioPad.Infrastructure.Audio.FfmpegAudioDecoder>();
+    RadioPad.Infrastructure.Audio.WavAudioDecoder>();
 builder.Services.AddSingleton<RadioPad.Application.Abstractions.ILocalSttClient,
     RadioPad.Infrastructure.Providers.Local.SherpaParakeetSttClient>();
 // First-run download of the on-device STT model. The hosted service is a no-op
