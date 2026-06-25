@@ -13,7 +13,6 @@ import {
   type ReportSignature,
 } from '@/lib/api';
 import { readQueryParam } from '@/lib/browserParams';
-import { mobileDictateHref } from '@/lib/routes';
 import { detectCommand, stripCommand, type VoiceCommand, type CommandMatch } from '@/lib/voiceCommands';
 import RewriteStylePanel from './RewriteStylePanel';
 import PriorComparePanel from './PriorComparePanel';
@@ -285,6 +284,50 @@ export default function ReportPage() {
     }
   }
 
+  /**
+   * "Fix everything" from the dictation overlay — runs the report's dictated
+   * prose through the UBAG-routed cleanup pipeline and applies the structured
+   * medical sections it returns. AI-touched sections wear `.ai-mark` until the
+   * radiologist acknowledges them (CLAUDE.md rule 3).
+   */
+  async function runDictationCleanup() {
+    if (!report) return;
+    setAiBusy(true);
+    setError(null);
+    try {
+      await flushEdits();
+      const current = reportRef.current;
+      if (!current) return;
+      const raw = [
+        current.indication, current.technique, current.comparison,
+        current.findings, current.impression, current.recommendations,
+      ]
+        .map((s) => (s ?? '').trim())
+        .filter(Boolean)
+        .join('\n');
+      if (!raw) return;
+      const res = await api.reports.cleanupDictation(current.id, raw);
+      const cs = res.cleanedSections;
+      const patch: Partial<Report> = {};
+      const nextHighlights = { ...aiHighlightsRef.current };
+      (['indication', 'technique', 'findings', 'impression', 'recommendations'] as const).forEach((k) => {
+        const v = cs[k];
+        if (v && v.trim()) {
+          (patch as Record<string, unknown>)[k] = v;
+          nextHighlights[k] = true;
+        }
+      });
+      if (Object.keys(patch).length === 0) return;
+      setAiHighlights(nextHighlights);
+      await update({ ...patch, aiHighlightsJson: JSON.stringify(nextHighlights) } as Partial<Report>);
+    } catch (e) {
+      const err = e as { body?: { error?: string }; message: string };
+      setError(err.body?.error || err.message);
+    } finally {
+      setAiBusy(false);
+    }
+  }
+
   async function signAsPrimary() {
     if (!report) return;
     setSignBusy(true);
@@ -368,20 +411,20 @@ export default function ReportPage() {
     if (typeof window === 'undefined') return;
     const generate = () => { void runAi('impression'); };
     const rewrite = () => setRewriteOpen(true);
-    const dictate = () => {
-      const reportId = report?.id ?? id;
-      if (reportId) router.push(mobileDictateHref(reportId));
-    };
+    // Dictation is now a global floating overlay (see DictationOverlay). The
+    // editor only reacts to the overlay's "Fix" action, which cleans the
+    // dictated prose into structured medical sections via UBAG.
+    const cleanup = () => { void runDictationCleanup(); };
 
     window.addEventListener('radiopad:generate-impression', generate);
     window.addEventListener('radiopad:rewrite', rewrite);
-    window.addEventListener('radiopad:dictate', dictate);
+    window.addEventListener('radiopad:dictation-cleanup', cleanup);
     return () => {
       window.removeEventListener('radiopad:generate-impression', generate);
       window.removeEventListener('radiopad:rewrite', rewrite);
-      window.removeEventListener('radiopad:dictate', dictate);
+      window.removeEventListener('radiopad:dictation-cleanup', cleanup);
     };
-  }, [id, report?.id, providerId, router]);
+  }, [id, report?.id, providerId]);
 
   const primarySigned = useMemo(
     () => signatures.some((s) => normalizeRole(s.role) === 'Primary'),
@@ -436,7 +479,7 @@ export default function ReportPage() {
         onRewrite={runRewrite}
         stylePanelOpen={stylePanelOpen}
         onToggleStylePanel={() => setStylePanelOpen((v) => !v)}
-        onDictate={() => router.push(mobileDictateHref(report.id))}
+        onDictate={() => window.dispatchEvent(new CustomEvent('radiopad:dictate'))}
         voiceCommandMode={voiceCommandMode}
         onToggleVoiceCommand={() => setVoiceCommandMode((v) => !v)}
         voiceCommandPills={voiceCommandPills}
