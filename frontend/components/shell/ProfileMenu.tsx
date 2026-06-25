@@ -6,6 +6,7 @@ import { useRouter } from 'next/navigation';
 import { useTranslations } from 'next-intl';
 import { api, setActiveAuthToken } from '@/lib/api';
 import { clearAuthToken } from '@/lib/secureAuth';
+import { useSttMode } from '@/lib/dictation/sttMode';
 import LocalePicker from '../LocalePicker';
 
 type Me = { tenant: { displayName: string }; user: { email: string } } | null;
@@ -18,6 +19,7 @@ export default function ProfileMenu() {
   const tSubtle = useTranslations('buttons.subtle');
   const [me, setMe] = useState<Me>(null);
   const [open, setOpen] = useState(false);
+  const [dictMode, setDictMode] = useSttMode();
   const [signingOut, setSigningOut] = useState(false);
   const [signOutError, setSignOutError] = useState<string | null>(null);
   const ref = useRef<HTMLDivElement | null>(null);
@@ -85,6 +87,20 @@ export default function ProfileMenu() {
           <Link className="rp-profile-popover-item" role="menuitem" href="/admin/billing" onClick={() => setOpen(false)}>
             {tNav('billing')}
           </Link>
+          <div className="rp-profile-popover-divider" />
+          <div className="rp-profile-popover-meta">Dictation</div>
+          <label
+            className="rp-profile-popover-item"
+            data-testid="profile-dual-check"
+            title="Cross-check dictation with a second on-device engine (Parakeet + Whisper) and flag disagreements for review. Doubles CPU/RAM."
+          >
+            <input
+              type="checkbox"
+              checked={dictMode === 'ensemble'}
+              onChange={(e) => setDictMode(e.target.checked ? 'ensemble' : 'single')}
+            />{' '}
+            Dual-engine cross-check
+          </label>
           <div className="rp-profile-popover-divider" />
           <div className="rp-profile-popover-meta">{tProfile('language')}</div>
           <div className="rp-profile-locale-slot">
