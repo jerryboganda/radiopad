@@ -161,6 +161,11 @@ builder.Services.AddSingleton<RadioPad.Infrastructure.Audio.IAudioDecoder,
     RadioPad.Infrastructure.Audio.FfmpegAudioDecoder>();
 builder.Services.AddSingleton<RadioPad.Application.Abstractions.ILocalSttClient,
     RadioPad.Infrastructure.Providers.Local.SherpaParakeetSttClient>();
+// First-run download of the on-device STT model. The hosted service is a no-op
+// unless RADIOPAD_LOCAL_STT_ENABLED is set (desktop), so web/server are unaffected.
+builder.Services.AddSingleton<RadioPad.Infrastructure.Providers.Local.SttModelProvisioner>();
+if (!builder.Environment.IsEnvironment("Testing"))
+    builder.Services.AddHostedService<RadioPad.Infrastructure.Providers.Local.SttModelProvisionHostedService>();
 // PRD BILL-001..006 — billing helpers (audit + plan quota + subscription lifecycle).
 builder.Services.AddScoped<IPlanQuotaStore, EfPlanQuotaStore>();
 builder.Services.AddScoped<RadioPad.Application.Services.IBillingAudit, RadioPad.Application.Services.BillingAudit>();
