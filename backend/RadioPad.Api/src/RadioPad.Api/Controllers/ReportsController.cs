@@ -876,6 +876,15 @@ public class ReportsController : TenantedController
                 provider = result.Provider,
                 model = result.Model,
                 latencyMs = result.LatencyMs,
+                // Phase 2 ensemble — per-word review spans (null for single-engine /
+                // cloud paths). Flagged spans are rendered as .ai-mark review marks.
+                spans = result.Spans?.Select(s => new
+                {
+                    text = s.Text,
+                    flagged = s.Flagged,
+                    reason = s.Reason,
+                    source = s.Source,
+                }),
             });
         }
         catch (Application.Services.ProviderPolicyException pex)

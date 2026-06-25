@@ -1,3 +1,4 @@
+using RadioPad.Application.Stt;
 using RadioPad.Domain.Entities;
 using RadioPad.Domain.ValueObjects;
 
@@ -227,7 +228,8 @@ public sealed record TranscriptionResult(
     string Text,
     string Provider,
     string Model,
-    long LatencyMs);
+    long LatencyMs,
+    IReadOnlyList<ReconciledSpan>? Spans = null);
 
 public sealed record UbagJob(
     string Id,

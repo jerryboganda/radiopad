@@ -161,9 +161,11 @@ builder.Services.AddSingleton<RadioPad.Infrastructure.Audio.IAudioDecoder,
     RadioPad.Infrastructure.Audio.WavAudioDecoder>();
 builder.Services.AddSingleton<RadioPad.Infrastructure.Providers.Local.SherpaParakeetSttClient>();
 builder.Services.AddSingleton<RadioPad.Infrastructure.Providers.Local.WhisperNetSttClient>();
-builder.Services.AddSingleton<RadioPad.Application.Abstractions.ILocalSttClient>(
-    sp => sp.GetRequiredService<RadioPad.Infrastructure.Providers.Local.SherpaParakeetSttClient>());
-// Both engines also register as ILocalSttEngine for the ensemble orchestrator (Phase 2c).
+// The ensemble orchestrator is the ILocalSttClient: it reconciles both engines
+// when RADIOPAD_STT_ENSEMBLE is on (≥2 available), else transcribes single-engine.
+builder.Services.AddSingleton<RadioPad.Application.Abstractions.ILocalSttClient,
+    RadioPad.Infrastructure.Providers.Local.LocalSttEnsemble>();
+// Both engines register as ILocalSttEngine for the orchestrator to consume.
 builder.Services.AddSingleton<RadioPad.Application.Abstractions.ILocalSttEngine>(
     sp => sp.GetRequiredService<RadioPad.Infrastructure.Providers.Local.SherpaParakeetSttClient>());
 builder.Services.AddSingleton<RadioPad.Application.Abstractions.ILocalSttEngine>(
