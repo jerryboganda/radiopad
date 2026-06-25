@@ -693,6 +693,79 @@
   font-style: italic;
 }
 
+/* ============================================================
+   Dictation overlay — global floating mic that replaces the old
+   full-screen /mobile/dictate navigation. Fixed bottom-right, above
+   app chrome. Locked tokens only; the recording state borrows the
+   red family like .rp-mic-btn. See components/dictation/DictationOverlay.tsx.
+   ============================================================ */
+.rp-dictation {
+  position: fixed;
+  right: 20px;
+  bottom: 20px;
+  z-index: 70;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 8px;
+  pointer-events: none;
+}
+.rp-dictation-controls {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  pointer-events: auto;
+}
+.rp-dictation-fab {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 16px;
+  border-radius: 999px;
+  border: 1px solid var(--border);
+  background: var(--bg-panel);
+  color: var(--text-strong);
+  font: 600 13px/1 var(--sans);
+  box-shadow: var(--shadow-xs);
+  cursor: pointer;
+}
+.rp-dictation-fab:hover:not(:disabled) {
+  background: var(--bg-subtle);
+  border-color: var(--border-strong);
+}
+.rp-dictation-fab:disabled { opacity: 0.55; cursor: not-allowed; }
+.rp-dictation-fab.recording {
+  background: var(--red-bg);
+  color: var(--red);
+  border-color: var(--red-border);
+}
+.rp-dictation-dot {
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  background: var(--text-faint);
+}
+.rp-dictation-fab.recording .rp-dictation-dot { background: var(--red); }
+.rp-dictation-fix {
+  border-radius: 999px;
+  padding: 10px 14px;
+  font: 600 13px/1 var(--sans);
+  box-shadow: var(--shadow-xs);
+  pointer-events: auto;
+}
+.rp-dictation-interim {
+  max-width: 320px;
+  padding: 8px 12px;
+  border-radius: var(--radius);
+  border: 1px solid var(--border);
+  background: var(--bg-panel);
+  color: var(--text-muted);
+  font: italic 400 14px/1.45 var(--serif);
+  box-shadow: var(--shadow-xs);
+  pointer-events: none;
+  white-space: pre-wrap;
+}
+
 /* Collapsible section panel used by the mobile editor. The summary
    row is the tap target (44 px high for touch) and respects the
    locked panel idiom. */

@@ -60,7 +60,7 @@ jobs:
           done
 
   frontend:
-    name: frontend (typecheck + build)
+    name: frontend (typecheck + test + build)
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -79,6 +79,9 @@ jobs:
       - name: Typecheck
         working-directory: frontend
         run: pnpm typecheck
+      - name: Test (vitest)
+        working-directory: frontend
+        run: pnpm test
       - name: Build (static export)
         working-directory: frontend
         run: pnpm build
