@@ -906,3 +906,164 @@
 
 /* ----------- Banner OK variant (admin settings/security) -------------- */
 .banner.ok { background: var(--green-bg); color: var(--green); border-color: var(--green-soft); }
+
+/* ============================================================
+   Prompt Studio (/prompts) — authoring + test/review workspace.
+   Composes locked tokens only (--mono, --bg-subtle, --border,
+   semantic families); no new colours, radii, or shadows.
+   See docs/02-design/design.md §4.17 "Prompt Studio".
+   ============================================================ */
+
+/* Two-pane studio grid: editor (left, slightly wider) + workspace (right). */
+.rp-studio-grid {
+  grid-template-columns: minmax(0, 1.05fr) minmax(0, 0.95fr);
+  align-items: start;
+}
+@media (max-width: 980px) { .rp-studio-grid { grid-template-columns: 1fr; } }
+
+/* Context bar — rulebook selector + status + unsaved indicator. */
+.rp-context-bar { align-items: flex-end; }
+.rp-context-field { display: flex; flex-direction: column; gap: 6px; min-width: 280px; }
+.rp-context-field .rp-combobox,
+.rp-context-field .rp-combobox-trigger { width: 100%; }
+.rp-context-label {
+  font: 600 11px/1 var(--sans);
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--text-muted);
+}
+.rp-context-spacer { flex: 1; }
+.rp-chip-dirty { background: var(--amber-bg); color: var(--amber); border-color: rgba(178, 98, 0, 0.25); }
+
+/* Count pill on a panel title (e.g. "Prompt blocks 4"). */
+.rp-panel-count {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 18px;
+  height: 18px;
+  padding: 0 6px;
+  margin-left: 6px;
+  border-radius: var(--radius-pill);
+  background: var(--bg-muted);
+  color: var(--text-muted);
+  font: 600 11px/1 var(--sans);
+}
+
+/* Left pane — prompt block editor. */
+.rp-block-panel { display: flex; flex-direction: column; }
+.rp-block-list { display: flex; flex-direction: column; gap: 12px; }
+
+/* Inline add-block row (replaces the old window.prompt()). */
+.rp-add-block {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 12px;
+  padding: 12px;
+  border: 1px dashed var(--border-strong);
+  border-radius: var(--radius-sm);
+  background: var(--bg-subtle);
+}
+.rp-add-block-input { flex: 1; min-width: 160px; font-family: var(--mono); font-size: 12.5px; }
+.rp-add-block-suggest { display: flex; flex-wrap: wrap; gap: 6px; flex-basis: 100%; }
+
+/* Block card — one prompt block (title, key, role description, editor, footer). */
+.rp-block-card {
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: var(--bg-panel);
+  padding: 14px;
+  box-shadow: var(--shadow-xs);
+}
+.rp-block-head { display: flex; align-items: flex-start; justify-content: space-between; gap: 10px; }
+.rp-block-headings { display: flex; align-items: baseline; gap: 8px; flex-wrap: wrap; min-width: 0; }
+.rp-block-title { font: 600 14px/1.3 var(--sans); color: var(--text-strong); }
+.rp-block-key { font: 400 11.5px/1 var(--mono); color: var(--text-muted); }
+.rp-block-desc { margin: 6px 0 10px; font: 400 12.5px/1.45 var(--sans); color: var(--text-muted); }
+
+/* Monospace prompt editor. No `.rp-textarea` class exists — the box, border,
+   and focus ring come from the element baseline in globals.css. */
+.rp-prompt-textarea {
+  width: 100%;
+  font-family: var(--mono);
+  font-size: 12.5px;
+  line-height: 1.5;
+  min-height: 120px;
+  resize: vertical;
+}
+.rp-prompt-textarea.findings { min-height: 168px; }
+
+.rp-block-footer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  margin-top: 8px;
+  padding-top: 8px;
+  border-top: 1px solid var(--border-soft);
+}
+.rp-block-count { font: 400 11.5px/1 var(--mono); color: var(--text-muted); }
+.rp-block-saved { font: 400 11.5px/1 var(--sans); color: var(--text-faint); }
+.rp-block-actions { display: flex; gap: 8px; }
+
+/* Right pane — test/review workspace. */
+.rp-studio-workspace { display: flex; flex-direction: column; }
+.rp-tab-count {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 16px;
+  height: 16px;
+  padding: 0 5px;
+  margin-left: 6px;
+  border-radius: var(--radius-pill);
+  background: var(--amber-bg);
+  color: var(--amber);
+  font: 600 10px/1 var(--sans);
+}
+.rp-tab-body { margin-top: 4px; }
+.rp-tab-intro { margin: 0 0 12px; font: 400 12.5px/1.5 var(--sans); color: var(--text-muted); }
+
+/* Scorecard / summary strip — wraps `.rp-stat-tile`s. */
+.rp-stat-strip { display: flex; flex-wrap: wrap; gap: 10px; }
+.rp-stat-strip .rp-stat-tile { flex: 1 1 120px; }
+.rp-stat-strip .rp-stat-value { display: flex; align-items: baseline; gap: 8px; }
+
+/* Output diff — version controls, legend, and mono diff panel. */
+.rp-diff-controls { display: flex; flex-wrap: wrap; align-items: flex-end; gap: 12px; margin-bottom: 12px; }
+.rp-diff-controls .section-block { margin-bottom: 0; }
+.rp-diff-legend { display: flex; gap: 14px; margin-bottom: 6px; font: 500 11.5px/1 var(--sans); }
+.rp-diff-legend-item.added { color: var(--green); }
+.rp-diff-legend-item.removed { color: var(--red); }
+.rp-diff-panel {
+  font: 400 12px/1.5 var(--mono);
+  background: var(--bg-subtle);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  padding: 8px 0;
+  overflow: auto;
+  max-height: 420px;
+}
+.rp-diff-line { display: flex; gap: 8px; padding: 0 12px; white-space: pre-wrap; word-break: break-word; }
+.rp-diff-gutter { flex: none; width: 1ch; color: var(--text-faint); user-select: none; }
+.rp-diff-line code { padding: 0; background: none; }
+
+/* Approval — drafts-first rows with status + approve gate. */
+.rp-approval-list { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 8px; }
+.rp-approval-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 12px 14px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  background: var(--bg-panel);
+}
+.rp-approval-headings { display: flex; align-items: baseline; gap: 8px; flex-wrap: wrap; }
+.rp-approval-title { font: 600 13px/1.2 var(--sans); color: var(--text-strong); }
+.rp-approval-meta { margin-top: 4px; font: 400 12px/1.3 var(--sans); color: var(--text-muted); }
+.rp-approval-actions { display: flex; align-items: center; gap: 10px; flex: none; }
+.rp-approval-note { font: 400 12px/1.3 var(--sans); color: var(--text-muted); }

@@ -2,6 +2,7 @@ using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using RadioPad.Application.Abstractions;
 using RadioPad.Application.Security;
+using RadioPad.Application.Services;
 using RadioPad.Domain.Entities;
 using RadioPad.Domain.Enums;
 using RadioPad.Infrastructure.Persistence;
@@ -194,9 +195,50 @@ public class PromptOverridesController : TenantedController
 public class PromptStudioController : TenantedController
 {
     private readonly RadioPadDbContext _db;
-    public PromptStudioController(RadioPadDbContext db) { _db = db; }
+    private readonly ReportingService _reporting;
+    public PromptStudioController(RadioPadDbContext db, ReportingService reporting)
+    {
+        _db = db;
+        _reporting = reporting;
+    }
 
     public record TestGoldenDto(string RulebookId, Guid? PromptOverrideId);
+
+    public record TestValidateDto(Guid RulebookId, string? Findings, string? Impression, Guid? PromptOverrideId);
+
+    /// <summary>
+    /// POST /api/prompts/validate — dry-run validation for the Prompt Studio
+    /// Test Runner. Validates the supplied sample findings against the selected
+    /// rulebook using a TRANSIENT, in-memory report that is never added to the
+    /// DbContext and never saved — no report row is created or modified.
+    /// Returns the same ValidationResult shape as
+    /// <c>POST /api/reports/{id}/validate</c>.
+    /// </summary>
+    [HttpPost("validate")]
+    public async Task<IActionResult> Validate([FromBody] TestValidateDto dto, CancellationToken ct)
+    {
+        var (tenant, user) = await ResolveContextAsync(_db, ct);
+        var deny = RequirePermission(user, RbacPermission.PromptOverridesManage);
+        if (deny is not null) return deny;
+
+        // Transient report — bound to the selected rulebook (resolved by GUID),
+        // carrying the sample findings. Built in memory; never persisted.
+        var report = new Report
+        {
+            TenantId = tenant.Id,
+            CreatedByUserId = user.Id,
+            RulebookId = dto.RulebookId,
+            Status = ReportStatus.Draft,
+            Findings = dto.Findings ?? string.Empty,
+            Impression = dto.Impression ?? string.Empty,
+            Study = new StudyContext(),
+        };
+
+        var lexicon = await _db.Lexicons.Where(l => l.TenantId == tenant.Id).ToListAsync(ct);
+        var settings = await _db.TenantSettings.FirstOrDefaultAsync(s => s.TenantId == tenant.Id, ct);
+        var result = await _reporting.ValidateAsync(tenant, report, lexicon, settings, ct);
+        return Ok(result);
+    }
 
     /// <summary>
     /// POST /api/prompts/test-golden — run golden cases from the validation
