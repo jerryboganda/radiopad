@@ -49,10 +49,35 @@ jobs:
           mkdir -p stt-model
           tar -xf model.tar.bz2 -C stt-model
 
-      - name: Run on-device engine smoke (real native lib + model)
+      - name: Run Parakeet engine smoke (real native lib + model)
         shell: bash
         working-directory: backend/RadioPad.Api
         env:
           RADIOPAD_STT_SMOKE_MODEL_DIR: ${{ github.workspace }}\stt-model
         run: |
           dotnet test --filter "FullyQualifiedName~SttEngineSmokeTests" -c Release
+
+      - name: Cache Whisper model
+        id: whisper
+        uses: actions/cache@v4
+        with:
+          path: stt-whisper
+          key: stt-whisper-large-v3-turbo-q5_0-39422170
+
+      - name: Download + verify Whisper model
+        if: steps.whisper.outputs.cache-hit != 'true'
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p stt-whisper
+          url="https://huggingface.co/ggerganov/whisper.cpp/resolve/main/ggml-large-v3-turbo-q5_0.bin"
+          curl -fL "$url" -o stt-whisper/ggml-large-v3-turbo-q5_0.bin
+          echo "394221709cd5ad1f40c46e6031ca61bce88931e6e088c188294c6d5a55ffa7e2  stt-whisper/ggml-large-v3-turbo-q5_0.bin" | sha256sum -c -
+
+      - name: Run Whisper engine smoke (real native lib + model)
+        shell: bash
+        working-directory: backend/RadioPad.Api
+        env:
+          RADIOPAD_STT_WHISPER_SMOKE_DIR: ${{ github.workspace }}\stt-whisper
+        run: |
+          dotnet test --filter "FullyQualifiedName~WhisperEngineSmokeTests" -c Release

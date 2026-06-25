@@ -67,6 +67,25 @@ public class SttModelProvisionerTests
     }
 
     [Fact]
+    public async Task EnsureFileInDir_ShortCircuits_When_File_Present()
+    {
+        var dir = TempDir();
+        Directory.CreateDirectory(dir);
+        try
+        {
+            File.WriteAllText(Path.Combine(dir, "ggml-test.bin"), "x");
+            var prov = new SttModelProvisioner(NullLogger<SttModelProvisioner>.Instance);
+            var spec = new LocalSttModels.FileSpec(
+                Name: "t", FileName: "ggml-test.bin",
+                Url: "https://invalid.invalid/should-never-be-fetched.bin",
+                SizeBytes: 0, Sha256: "deadbeef");
+
+            Assert.True(await prov.EnsureFileInDirAsync(spec, dir, CancellationToken.None));
+        }
+        finally { Directory.Delete(dir, recursive: true); }
+    }
+
+    [Fact]
     public async Task EnsureInDir_ShortCircuits_Without_Downloading_When_Model_Present()
     {
         var dir = TempDir();

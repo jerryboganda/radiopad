@@ -23,6 +23,23 @@ public static class LocalSttModels
 
     public sealed record ModelSpec(string Name, string Url, long SizeBytes, string Sha256);
 
+    public const string WhisperModelName = "whisper-large-v3-turbo-q5_0";
+
+    /// <summary>
+    /// OpenAI Whisper large-v3-turbo q5_0 GGML for whisper.cpp / Whisper.net
+    /// (~547 MB). MIT (weights + whisper.cpp). SHA-256 from the HuggingFace LFS
+    /// pointer. The architecturally-decorrelated second engine for the ensemble.
+    /// </summary>
+    public static readonly FileSpec Whisper = new(
+        Name: WhisperModelName,
+        FileName: "ggml-large-v3-turbo-q5_0.bin",
+        Url: "https://huggingface.co/ggerganov/whisper.cpp/resolve/main/ggml-large-v3-turbo-q5_0.bin",
+        SizeBytes: 574041195L,
+        Sha256: "394221709cd5ad1f40c46e6031ca61bce88931e6e088c188294c6d5a55ffa7e2");
+
+    /// <summary>A single downloadable model file (no archive extraction).</summary>
+    public sealed record FileSpec(string Name, string FileName, string Url, long SizeBytes, string Sha256);
+
     /// <summary>True when the desktop build has opted the on-device engine in
     /// via <c>RADIOPAD_LOCAL_STT_ENABLED</c>. Web/server builds leave it unset.</summary>
     public static bool IsEnabled()
@@ -48,6 +65,22 @@ public static class LocalSttModels
         if (string.IsNullOrEmpty(localAppData))
             return null;
         return Path.Combine(localAppData, "com.radiopad.desktop", "models", modelName);
+    }
+
+    /// <summary>Resolve the Whisper GGML model file under its model dir, or null when absent.</summary>
+    public static string? ResolveWhisperBin()
+    {
+        var dir = ResolveModelDir(WhisperModelName);
+        if (dir is null || !Directory.Exists(dir)) return null;
+        return Directory.GetFiles(dir, "*.bin", SearchOption.AllDirectories).FirstOrDefault();
+    }
+
+    /// <summary>True when multi-engine ensemble mode is on (<c>RADIOPAD_STT_ENSEMBLE</c>).</summary>
+    public static bool IsEnsembleEnabled()
+    {
+        var flag = Environment.GetEnvironmentVariable("RADIOPAD_STT_ENSEMBLE");
+        return string.Equals(flag, "1", StringComparison.Ordinal)
+            || string.Equals(flag, "true", StringComparison.OrdinalIgnoreCase);
     }
 
     /// <summary>

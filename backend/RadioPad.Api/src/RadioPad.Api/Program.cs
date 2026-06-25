@@ -159,8 +159,15 @@ builder.Services.AddScoped<RadioPad.Application.Abstractions.ITranscriptionServi
 // it is a singleton; the ffmpeg-backed decoder is stateless.
 builder.Services.AddSingleton<RadioPad.Infrastructure.Audio.IAudioDecoder,
     RadioPad.Infrastructure.Audio.WavAudioDecoder>();
-builder.Services.AddSingleton<RadioPad.Application.Abstractions.ILocalSttClient,
-    RadioPad.Infrastructure.Providers.Local.SherpaParakeetSttClient>();
+builder.Services.AddSingleton<RadioPad.Infrastructure.Providers.Local.SherpaParakeetSttClient>();
+builder.Services.AddSingleton<RadioPad.Infrastructure.Providers.Local.WhisperNetSttClient>();
+builder.Services.AddSingleton<RadioPad.Application.Abstractions.ILocalSttClient>(
+    sp => sp.GetRequiredService<RadioPad.Infrastructure.Providers.Local.SherpaParakeetSttClient>());
+// Both engines also register as ILocalSttEngine for the ensemble orchestrator (Phase 2c).
+builder.Services.AddSingleton<RadioPad.Application.Abstractions.ILocalSttEngine>(
+    sp => sp.GetRequiredService<RadioPad.Infrastructure.Providers.Local.SherpaParakeetSttClient>());
+builder.Services.AddSingleton<RadioPad.Application.Abstractions.ILocalSttEngine>(
+    sp => sp.GetRequiredService<RadioPad.Infrastructure.Providers.Local.WhisperNetSttClient>());
 // First-run download of the on-device STT model. The hosted service is a no-op
 // unless RADIOPAD_LOCAL_STT_ENABLED is set (desktop), so web/server are unaffected.
 builder.Services.AddSingleton<RadioPad.Infrastructure.Providers.Local.SttModelProvisioner>();
