@@ -1,9 +1,10 @@
 'use client';
 
 import { Suspense, useEffect, useMemo, useState } from 'react';
+import Link from 'next/link';
 import { useRouter, useSearchParams } from 'next/navigation';
-import Container from '@/components/shell/Container';
-import PageHeader from '@/components/shell/PageHeader';
+import AuthScaffold from '@/components/auth/AuthScaffold';
+import CheckYourEmail from '@/components/auth/CheckYourEmail';
 import { api, publicEnv, setActiveAuthToken } from '@/lib/api';
 import { setAuthToken, isAuthTokenSecure } from '@/lib/secureAuth';
 
@@ -48,6 +49,7 @@ function LoginContent() {
   const [err, setErr] = useState<string | null>(null);
   const [info, setInfo] = useState<string | null>(null);
   const [secure, setSecure] = useState<boolean | null>(null);
+  const [magicSent, setMagicSent] = useState<{ email: string; devLink?: string } | null>(null);
   const returnToParam = search?.get('returnTo');
   const returnTo = useMemo(() => safeReturnTo(returnToParam), [returnToParam]);
   const callbackUrl = useMemo(() => {
@@ -59,6 +61,8 @@ function LoginContent() {
     if (typeof window === 'undefined') return undefined;
     return `${window.location.origin}${returnTo}`;
   }, [returnTo]);
+
+  const consuming = busy === 'magic-consume';
 
   useEffect(() => {
     if (typeof window === 'undefined') return;
@@ -139,9 +143,10 @@ function LoginContent() {
     setInfo(null);
     try {
       const result = await api.auth.magicLinkRequest(tenant.trim(), user.trim(), callbackUrl);
-      setInfo(result.devLink && devLoginEnabled
-        ? `Magic link requested. Dev link: ${result.devLink}`
-        : 'If the account is eligible, a sign-in link has been sent.');
+      setMagicSent({
+        email: user.trim(),
+        devLink: result.devLink && devLoginEnabled ? result.devLink : undefined,
+      });
     } catch (e) {
       const ex = e as { body?: { error?: string }; message?: string };
       setErr(ex.body?.error || ex.message || 'The magic link request failed.');
@@ -166,73 +171,114 @@ function LoginContent() {
     }
   }
 
+  if (magicSent) {
+    return (
+      <AuthScaffold variant="signin">
+        <CheckYourEmail
+          email={magicSent.email}
+          devLink={magicSent.devLink}
+          onBack={() => { setMagicSent(null); setErr(null); }}
+        />
+      </AuthScaffold>
+    );
+  }
+
   return (
-    <Container className="rp-auth-shell">
-      <PageHeader
-        title="Sign in"
-        description="Use your organization identity provider or request a passwordless email link. Browser sessions are cookie-based in production; native desktop and mobile shells use secure OS storage."
-      />
+    <AuthScaffold variant="signin">
+      <div className="rp-auth-head">
+        <div className="rp-auth-eyebrow">Welcome back</div>
+        <h1 className="rp-auth-title">Sign in to RadioPad</h1>
+        <p className="rp-auth-sub">
+          Use your organization identity provider or request a passwordless email link.
+        </p>
+      </div>
 
-      {err && <div className="banner warn">{err}</div>}
-      {info && <div className="banner ok">{info}</div>}
+      {err && <div className="banner danger" role="alert">{err}</div>}
+      {info && <div className="banner info" role="status">{info}</div>}
+      {consuming && <div className="banner info" role="status" aria-live="polite">Signing you in…</div>}
 
-      <div className="rp-panel">
-        <div className="rp-panel-title">Production sign-in</div>
-        <div className="rp-auth-action-list">
-          {ssoEnabled && (
+      {ssoEnabled && (
+        <>
+          <div className="rp-auth-actions">
             <button className="primary" type="button" onClick={beginSso} disabled={busy !== null}>
               {busy === 'sso' ? 'Starting SSO…' : 'Continue with SSO'}
             </button>
-          )}
-          <button className="ghost" type="button" onClick={() => router.push('/pair')} disabled={busy !== null}>
-            Pair a device
-          </button>
-        </div>
-      </div>
+          </div>
+          <div className="rp-auth-divider">or continue with email</div>
+        </>
+      )}
 
-      <form className="rp-panel" onSubmit={requestMagicLink}>
-        <div className="rp-panel-title">Email magic link</div>
+      <form className="rp-auth-form" onSubmit={requestMagicLink}>
         <div className="section-block">
-          <label>Tenant slug</label>
-          <input value={tenant} onChange={(e) => setTenant(e.target.value)} required autoComplete="organization" />
+          <label htmlFor="login-tenant">Organization (tenant slug)</label>
+          <input
+            id="login-tenant"
+            value={tenant}
+            onChange={(e) => setTenant(e.target.value)}
+            required
+            autoComplete="organization"
+            placeholder="acme-radiology"
+          />
         </div>
         <div className="section-block">
-          <label>Work email</label>
-          <input type="email" value={user} onChange={(e) => setUser(e.target.value)} required autoComplete="email" />
+          <label htmlFor="login-email">Work email</label>
+          <input
+            id="login-email"
+            type="email"
+            value={user}
+            onChange={(e) => setUser(e.target.value)}
+            required
+            autoComplete="email"
+            placeholder="you@hospital.org"
+          />
         </div>
-        <div className="rp-auth-action-list">
+        <div className="rp-auth-actions">
           <button className="primary" type="submit" disabled={busy !== null}>
-            {busy === 'magic' ? 'Requesting link…' : 'Email me a sign-in link'}
+            {busy === 'magic' ? 'Sending link…' : 'Email me a sign-in link'}
           </button>
         </div>
-        <p className="rp-page-sub rp-mt-sm">
-          Passkey sign-in remains disabled until the backend challenge store and assertion verification hardening land.
+        <p className="rp-auth-hint">
+          Trouble signing in? Re-enter your email above to request a fresh link, or ask your
+          administrator for an invitation. Passkey sign-in is coming soon.
         </p>
       </form>
 
+      <div className="rp-auth-divider">other options</div>
+      <div className="rp-auth-actions">
+        <button className="ghost" type="button" onClick={() => router.push('/pair')} disabled={busy !== null}>
+          Pair a device
+        </button>
+      </div>
+
       {devLoginEnabled && (
-        <form className="rp-panel" onSubmit={saveDevSession}>
-          <div className="rp-panel-title">Dev/test bearer sign-in</div>
-          <p className="rp-page-sub rp-mb-md">
-            Enabled only because <code>NEXT_PUBLIC_ALLOW_DEV_LOGIN=true</code> in a non-production frontend.
-            The bearer is stored in {secure === null ? 'secure storage when available' : secure ? 'OS-level secure storage' : 'browser-local storage for preview'}.
-          </p>
-          <div className="section-block">
-            <label>Tenant slug</label>
-            <input value={tenant} onChange={(e) => setTenant(e.target.value)} required />
-          </div>
-          <div className="section-block">
-            <label>User email</label>
-            <input type="email" value={user} onChange={(e) => setUser(e.target.value)} required />
-          </div>
-          <div className="rp-row">
-            <button className="primary" type="submit" disabled={busy !== null}>
-              {busy === 'dev' ? 'Signing in…' : 'Continue with dev session'}
-            </button>
-          </div>
-        </form>
+        <details className="rp-advanced">
+          <summary>Dev / test bearer sign-in</summary>
+          <form onSubmit={saveDevSession}>
+            <p className="rp-auth-hint" style={{ marginTop: 0 }}>
+              Enabled because <code>NEXT_PUBLIC_ALLOW_DEV_LOGIN=true</code> in a non-production
+              frontend. The bearer is stored in {secure === null ? 'secure storage when available' : secure ? 'OS-level secure storage' : 'browser-local storage for preview'}.
+            </p>
+            <div className="section-block">
+              <label htmlFor="dev-tenant">Tenant slug</label>
+              <input id="dev-tenant" value={tenant} onChange={(e) => setTenant(e.target.value)} required />
+            </div>
+            <div className="section-block">
+              <label htmlFor="dev-email">User email</label>
+              <input id="dev-email" type="email" value={user} onChange={(e) => setUser(e.target.value)} required />
+            </div>
+            <div className="rp-auth-actions">
+              <button className="primary-ghost" type="submit" disabled={busy !== null}>
+                {busy === 'dev' ? 'Signing in…' : 'Continue with dev session'}
+              </button>
+            </div>
+          </form>
+        </details>
       )}
-    </Container>
+
+      <div className="rp-auth-foot">
+        New to RadioPad? <Link className="rp-auth-link" href="/register">Create an organization</Link>
+      </div>
+    </AuthScaffold>
   );
 }
 
@@ -240,12 +286,13 @@ export default function LoginPage() {
   return (
     <Suspense
       fallback={(
-        <Container className="rp-auth-shell">
-          <PageHeader
-            title="Sign in"
-            description="Use your organization identity provider or request a passwordless email link."
-          />
-        </Container>
+        <AuthScaffold variant="signin">
+          <div className="rp-auth-head">
+            <div className="rp-auth-eyebrow">Welcome back</div>
+            <h1 className="rp-auth-title">Sign in to RadioPad</h1>
+            <p className="rp-auth-sub">Loading sign-in options…</p>
+          </div>
+        </AuthScaffold>
       )}
     >
       <LoginContent />

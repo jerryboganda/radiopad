@@ -726,3 +726,50 @@ Prompt blocks are parsed with the canonical `yamlToRulebookEditor().prompt_block
 it calls `POST /api/prompts/validate` (a transient, never-persisted report) instead
 of overwriting a real report's findings.
 
+### 4.18 Auth entrance (`/login`, `/register`, `/pair`)
+
+The product's front door. These are the only routes that bypass the sidebar
+shell: `AppShell` detects them and renders children inside
+`.rp-public-auth-content` (now a full-height flex host, no padding). All three
+pages share `components/auth/AuthScaffold.tsx`, a split-screen layout — a branded
+showcase **aside** on the left and the focused auth **card** on the right.
+
+New classes (all in `radiopad.css`, composing locked tokens only; the aside's
+tint gradient and concentric "signal" ring motif reuse `--accent-tint` /
+`--accent-soft` via `color-mix`, the same precedent as `.entry-brand-mark` — no
+new colours, no dark mode):
+
+- **Split shell** — `.rp-auth-split`, `.rp-auth-aside` (hidden ≤ 880px),
+  `.rp-auth-aside-motif` (decorative rings), `.rp-auth-main`, `.rp-auth-card`
+  (max-width 408px, with a `rp-auth-rise` entrance animation gated by
+  `prefers-reduced-motion`).
+- **Aside content** — `.rp-auth-brand` (reuses the sidebar `.brand-mark` +
+  `.brand-mark-letter`), `.rp-auth-headline` (serif), `.rp-auth-tagline`,
+  `.rp-auth-features`/`-feature`/`-feature-icon`/`-feature-text`/`-feature-title`/
+  `-feature-sub`, `.rp-auth-aside-foot`.
+- **Card chrome** — `.rp-auth-mobile-brand` (shown only when the aside is hidden),
+  `.rp-auth-head`/`-eyebrow`/`-title`/`-sub`, `.rp-auth-form`, `.rp-auth-actions`
+  (full-width stacked buttons), `.rp-auth-divider` (labelled "or"-style rule),
+  `.rp-auth-hint`, `.rp-field-hint`(`.rp-field-error`), `.rp-auth-foot` +
+  `.rp-auth-link`. The dev/test bearer block is tucked into the existing
+  `.rp-advanced` `<details>` (§3.1 chrome).
+- **Check-your-email** — shared `components/auth/CheckYourEmail.tsx`:
+  `.rp-auth-success`/`-icon`/`-title`/`-sub` and `.rp-auth-devlink`(`-label`) for
+  the non-production dev link. Used by both magic-link request and registration.
+- **Device-pairing rail** — `.rp-pair-steps`/`.rp-pair-step`(`.active`/`.done`)/
+  `-dot`/`-label`, a three-step progress rail over the existing `.rp-pair-code` /
+  `.rp-pair-code-tile` chip (now tinted with `--accent-tint`).
+
+**Buttons / icons.** Buttons use the locked `.primary` / `.primary-ghost` /
+`.ghost` variants. Feature and step icons are inline 1.7-stroke `currentColor`
+SVGs (no emoji-as-icon, per §8).
+
+**Functional model (passwordless).** Sign-in offers SSO (when
+`NEXT_PUBLIC_ENABLE_SSO=true`), the email magic link (primary), device pairing,
+and the dev bearer (when `NEXT_PUBLIC_ALLOW_DEV_LOGIN=true`). "Register" is
+self-serve organization creation: `POST /api/registration/create-organization`
+creates a tenant + first MedicalDirector admin + `TenantSettings`, emails a magic
+link, and is gated by `RADIOPAD_ALLOW_SELF_SIGNUP` (off by default in Production).
+There is no password and no password-reset surface; "Trouble signing in?" simply
+re-requests a link.
+

@@ -17,6 +17,7 @@
 
 import { useEffect, useRef, useState } from 'react';
 import { useRouter } from 'next/navigation';
+import AuthScaffold from '@/components/auth/AuthScaffold';
 import { api, setActiveAuthToken } from '@/lib/api';
 import { setAuthToken } from '@/lib/secureAuth';
 
@@ -31,6 +32,34 @@ function tauriInvoke(): undefined | ((cmd: string, args?: any) => Promise<any>) 
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const t: any = (window as any).__TAURI__;
   return t?.core?.invoke || t?.invoke;
+}
+
+function StepRail({ step, complete }: { step: 1 | 2 | 3; complete: boolean }) {
+  const steps: Array<{ n: 1 | 2 | 3; label: string }> = [
+    { n: 1, label: 'Request code' },
+    { n: 2, label: 'Approve in browser' },
+    { n: 3, label: 'Done' },
+  ];
+  return (
+    <div className="rp-pair-steps">
+      {steps.map((s) => {
+        const done = complete || s.n < step;
+        const state = done ? 'done' : s.n === step ? 'active' : '';
+        return (
+          <div key={s.n} className={`rp-pair-step ${state}`}>
+            <span className="rp-pair-step-dot">
+              {done ? (
+                <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
+                  <path d="m5 12 5 5L20 7" />
+                </svg>
+              ) : s.n}
+            </span>
+            <span className="rp-pair-step-label">{s.label}</span>
+          </div>
+        );
+      })}
+    </div>
+  );
 }
 
 export default function PairPage() {
@@ -141,87 +170,88 @@ export default function PairPage() {
     router.push('/');
   }
 
+  const step: 1 | 2 | 3 = phase === 'paired'
+    ? 3
+    : phase === 'awaiting' || (phase === 'error' && userCode)
+      ? 2
+      : 1;
+
   return (
-    <div className="rp-container rp-pair-shell">
-      <h1 className="rp-page-title">Pair this device</h1>
-      <p className="rp-page-sub">
-        RadioPad uses the OAuth 2.0 device authorization grant (RFC 8628) to bind this
-        desktop install to a tenant and user. The pairing token is stored in the OS
-        keyring; this device never sees a password.
-      </p>
+    <AuthScaffold variant="pair">
+      <div className="rp-auth-head">
+        <div className="rp-auth-eyebrow">Device pairing</div>
+        <h1 className="rp-auth-title">Pair this device</h1>
+        <p className="rp-auth-sub">
+          RadioPad binds this desktop install to a tenant and user with a one-time code
+          (RFC 8628). The pairing token is stored in the OS keyring — this device never sees a password.
+        </p>
+      </div>
 
-      {err && <div className="banner danger">{err}</div>}
+      <StepRail step={step} complete={phase === 'paired'} />
 
-      {phase === 'idle' && (
-        <div className="rp-panel">
-          <p>
-            Click <strong>Request pairing code</strong> below, then approve the code on a
-            web browser already signed in to RadioPad.
+      {err && <div className="banner danger" role="alert">{err}</div>}
+
+      {(phase === 'idle' || phase === 'requesting') && (
+        <>
+          <p className="rp-auth-sub" style={{ marginBottom: 16 }}>
+            Click <strong>Request pairing code</strong>, then approve the code from a browser
+            already signed in to RadioPad.
           </p>
-          <div className="rp-row">
-            <button className="primary" type="button" onClick={startPairing}>
-              Request pairing code →
+          <div className="rp-auth-actions">
+            <button className="primary" type="button" onClick={startPairing} disabled={phase === 'requesting'}>
+              {phase === 'requesting' ? 'Requesting code…' : 'Request pairing code'}
             </button>
           </div>
-        </div>
-      )}
-
-      {phase === 'requesting' && (
-        <div className="rp-panel">
-          <p>Requesting code…</p>
-        </div>
+        </>
       )}
 
       {phase === 'awaiting' && userCode && (
-        <div className="rp-panel">
-          <p className="rp-page-sub">
-            On a signed-in browser, open{' '}
-            <code>{verificationUri}</code> and enter:
+        <>
+          <p className="rp-auth-sub">
+            On a signed-in browser, open <code>{verificationUri}</code> and enter this code:
           </p>
           <div className="section-block rp-pair-code-tile">
             <code className="rp-pair-code">{userCode}</code>
           </div>
-          <p className="rp-page-sub">
-            Code expires in <code>{secondsLeft}s</code>. Polling for approval…
+          <p className="rp-auth-hint" aria-live="polite" style={{ marginTop: 0 }}>
+            Code expires in <code>{secondsLeft}s</code>. Waiting for approval…
           </p>
-          <div className="rp-row">
+          <div className="rp-auth-actions">
             <button
               className="ghost"
               type="button"
-              onClick={() => {
-                clearPoll();
-                setPhase('idle');
-                setUserCode(null);
-              }}
+              onClick={() => { clearPoll(); setPhase('idle'); setUserCode(null); }}
             >
               Cancel
             </button>
           </div>
-        </div>
+        </>
       )}
 
       {phase === 'paired' && paired && (
-        <div className="rp-panel">
-          <div className="banner info">
+        <>
+          <div className="banner ok" role="status">
             Paired as <code>{paired.user}</code> in tenant <code>{paired.tenant}</code>.
           </div>
-          <div className="rp-row">
+          <div className="rp-auth-actions">
             <button className="primary" type="button" onClick={done}>
-              Continue →
+              Continue
             </button>
           </div>
-        </div>
+        </>
       )}
 
       {phase === 'error' && (
-        <div className="rp-panel">
-          <div className="rp-row">
-            <button className="primary" type="button" onClick={startPairing}>
-              Try again →
-            </button>
-          </div>
+        <div className="rp-auth-actions">
+          <button className="primary" type="button" onClick={startPairing}>
+            Try again
+          </button>
         </div>
       )}
-    </div>
+
+      <div className="rp-auth-foot">
+        Prefer email? <a className="rp-auth-link" href="/login">Back to sign in</a>
+      </div>
+    </AuthScaffold>
   );
 }
