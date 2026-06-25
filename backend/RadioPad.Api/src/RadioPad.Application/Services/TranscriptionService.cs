@@ -3,6 +3,7 @@ using System.Text;
 using Microsoft.Extensions.Logging;
 using RadioPad.Application.Abstractions;
 using RadioPad.Domain.Entities;
+using RadioPad.Domain.Enums;
 
 namespace RadioPad.Application.Services;
 

@@ -1,14 +1,18 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import { render, fireEvent, screen, waitFor, act } from '@testing-library/react';
 
-const transcribeMock = vi.fn(async () => ({
+const transcribeMock = vi.fn(async (_id: string, _audio: Blob, _ack?: boolean) => ({
   transcript: 'lungs are clear full stop',
   provider: 'UBAG',
   model: 'gemini_web',
   latencyMs: 10,
 }));
 vi.mock('@/lib/api', () => ({
-  api: { reports: { transcribe: (...args: unknown[]) => transcribeMock(...args) } },
+  api: {
+    reports: {
+      transcribe: (id: string, audio: Blob, ack?: boolean) => transcribeMock(id, audio, ack),
+    },
+  },
 }));
 vi.mock('@/lib/browserParams', () => ({ readQueryParam: () => 'rpt-1' }));
 
