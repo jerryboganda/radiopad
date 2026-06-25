@@ -1,12 +1,14 @@
 name: desktop-stt-smoke
 
-# Validates the REAL on-device STT engine on Windows: loads the sherpa-onnx
-# native library + the downloaded NVIDIA Parakeet model and transcribes the
-# model bundle's own sample WAV via SherpaParakeetSttClient. The model (~465 MB)
-# is cached by its SHA-256 so only the first run pays the download.
+# Validates the REAL on-device STT engines on Windows: loads the sherpa-onnx
+# native library + the downloaded NVIDIA Parakeet model AND whisper.cpp
+# (Whisper.net) + its GGML model, transcribes a real speech WAV, and reconciles
+# both via the ROVER ensemble. Models are cached by SHA-256 so only the first run
+# pays the download.
 #
-# The gating test (SttEngineSmokeTests) is a no-op in the normal Linux CI (no
-# model, no win-x64 native lib); it only runs here, where the model dir is set.
+# The gating tests no-op in normal Linux CI (no model, no win-x64 native lib).
+# Here every job sets RADIOPAD_STT_SMOKE_REQUIRE=1, so a mis-wired model path
+# FAILS the job instead of silently passing as a skipped no-op.
 
 on:
   workflow_dispatch:
@@ -14,7 +16,7 @@ on:
     paths:
       - 'backend/RadioPad.Api/src/RadioPad.Infrastructure/Providers/Local/**'
       - 'backend/RadioPad.Api/src/RadioPad.Infrastructure/Audio/**'
-      - 'backend/RadioPad.Api/tests/RadioPad.Api.Tests/Providers/SttEngineSmokeTests.cs'
+      - 'backend/RadioPad.Api/tests/RadioPad.Api.Tests/Providers/**'
       - '.github/workflows/desktop-stt-smoke.yml'
 
 permissions:
@@ -24,6 +26,12 @@ jobs:
   smoke:
     name: on-device STT engine smoke (windows)
     runs-on: windows-latest
+    env:
+      RADIOPAD_STT_SMOKE_REQUIRE: '1'
+      # Exercise the OPTIMIZED config end-to-end (these are also the code defaults).
+      RADIOPAD_STT_DECODING: modified_beam_search
+      RADIOPAD_STT_MAX_ACTIVE_PATHS: '4'
+      RADIOPAD_STT_WHISPER_BEAM: '5'
     steps:
       - uses: actions/checkout@v4
 
@@ -49,13 +57,17 @@ jobs:
           mkdir -p stt-model
           tar -xf model.tar.bz2 -C stt-model
 
-      - name: Run Parakeet engine smoke (real native lib + model)
+      - name: Locate a real speech WAV from the bundle
         shell: bash
-        working-directory: backend/RadioPad.Api
-        env:
-          RADIOPAD_STT_SMOKE_MODEL_DIR: ${{ github.workspace }}\stt-model
         run: |
-          dotnet test --filter "FullyQualifiedName~SttEngineSmokeTests" -c Release
+          set -euo pipefail
+          root="$(pwd)/stt-model"
+          # Prefer an English sample (Whisper is forced to en); else any WAV.
+          wav="$(find "$root" -iname 'en*.wav' | head -n1)"
+          test -n "$wav" || wav="$(find "$root" -iname '*.wav' | head -n1)"
+          test -n "$wav" || { echo "no sample WAV in Parakeet bundle"; exit 1; }
+          echo "RADIOPAD_STT_SMOKE_WAV=$(cygpath -w "$wav")" >> "$GITHUB_ENV"
+          echo "using sample WAV (absolute): $wav"
 
       - name: Cache Whisper model
         id: whisper
@@ -74,10 +86,48 @@ jobs:
           curl -fL "$url" -o stt-whisper/ggml-large-v3-turbo-q5_0.bin
           echo "394221709cd5ad1f40c46e6031ca61bce88931e6e088c188294c6d5a55ffa7e2  stt-whisper/ggml-large-v3-turbo-q5_0.bin" | sha256sum -c -
 
-      - name: Run Whisper engine smoke (real native lib + model)
+      - name: Build a combined model dir for the ensemble
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p stt-both
+          cp -r stt-model/. stt-both/
+          cp stt-whisper/ggml-large-v3-turbo-q5_0.bin stt-both/
+          echo "RADIOPAD_STT_ENSEMBLE_DIR=$(cygpath -w "$(pwd)/stt-both")" >> "$GITHUB_ENV"
+
+      - name: Wire radiology hotwords if the bundle ships a BPE vocab
+        shell: bash
+        run: |
+          set -euo pipefail
+          vocab="$(find stt-model -iname 'bpe.vocab' -o -iname '*.vocab' | head -n1 || true)"
+          hot="$(pwd)/backend/RadioPad.Api/src/RadioPad.Infrastructure/Providers/Local/radiology-hotwords.txt"
+          if [ -n "$vocab" ]; then
+            echo "RADIOPAD_STT_HOTWORDS_FILE=$(cygpath -w "$hot")" >> "$GITHUB_ENV"
+            echo "hotword biasing wired (BPE vocab: $vocab)"
+          else
+            echo "no BPE vocab in Parakeet bundle -> hotwords skipped; beam search still verified"
+          fi
+
+      - name: Run Parakeet engine smoke (real native lib + model)
+        shell: bash
+        working-directory: backend/RadioPad.Api
+        env:
+          RADIOPAD_STT_SMOKE_MODEL_DIR: ${{ github.workspace }}\stt-model
+        run: |
+          dotnet test --filter "FullyQualifiedName~SttEngineSmokeTests" -c Release
+
+      - name: Run Whisper engine smoke (real native lib + model + real speech)
         shell: bash
         working-directory: backend/RadioPad.Api
         env:
           RADIOPAD_STT_WHISPER_SMOKE_DIR: ${{ github.workspace }}\stt-whisper
         run: |
           dotnet test --filter "FullyQualifiedName~WhisperEngineSmokeTests" -c Release
+
+      - name: Run REAL ensemble smoke (Parakeet + Whisper + ROVER)
+        shell: bash
+        working-directory: backend/RadioPad.Api
+        env:
+          RADIOPAD_STT_ENSEMBLE_SMOKE_DIR: ${{ env.RADIOPAD_STT_ENSEMBLE_DIR }}
+        run: |
+          dotnet test --filter "FullyQualifiedName~LocalSttEnsembleSmokeTests" -c Release

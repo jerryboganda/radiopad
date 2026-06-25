@@ -17,9 +17,9 @@ public class SttEngineSmokeTests
     [Fact]
     public async Task Engine_Transcribes_Sample_Wav_OnDevice()
     {
-        var modelDir = Environment.GetEnvironmentVariable("RADIOPAD_STT_SMOKE_MODEL_DIR");
-        if (string.IsNullOrWhiteSpace(modelDir) || !Directory.Exists(modelDir))
-            return; // not configured (normal CI) — skip
+        var modelDir = SttSmokeGate.DirOrSkip("RADIOPAD_STT_SMOKE_MODEL_DIR");
+        if (modelDir is null)
+            return; // not configured (normal CI) — skip; fails loudly if REQUIRE=1
 
         Environment.SetEnvironmentVariable("RADIOPAD_LOCAL_STT_ENABLED", "1");
         Environment.SetEnvironmentVariable("RADIOPAD_STT_MODEL_DIR", modelDir);
