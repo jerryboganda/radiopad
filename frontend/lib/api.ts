@@ -234,6 +234,28 @@ async function requestBlob(path: string): Promise<Blob> {
   return await res.blob();
 }
 
+async function requestForm<T>(path: string, form: FormData): Promise<T> {
+  // Multipart upload: deliberately do NOT set Content-Type — the browser adds
+  // the multipart boundary. Tenant + auth headers still apply.
+  const headers = new Headers();
+  applyTenantHeaders(headers);
+  applyAuthHeader(headers);
+  const base = await apiBase();
+  const res = await fetchWithAuthRetry(`${base}${path}`, {
+    method: 'POST',
+    body: form,
+    credentials: requestCredentials(base),
+  }, headers);
+  if (!res.ok) {
+    let body: unknown = null;
+    try { body = await res.json(); } catch { body = await res.text(); }
+    throw Object.assign(new Error(`API ${res.status} ${res.statusText}`), { status: res.status, body });
+  }
+  const ct = res.headers.get('content-type') || '';
+  if (ct.includes('application/json')) return (await res.json()) as T;
+  return (await res.text()) as unknown as T;
+}
+
 export type Report = {
   id: string;
   tenantId: string;
@@ -839,6 +861,19 @@ export const api = {
         method: 'POST',
         body: JSON.stringify({ rawDictation }),
       }),
+    // High-accuracy transcription: upload the recorded dictation audio; the
+    // backend routes it through UBAG (audio attached into a chat model) and
+    // returns the transcript. `deidentifiedAck` is the explicit "this audio is
+    // de-identified" confirmation gating the PHI path (default-off backend).
+    transcribe: (id: string, audio: Blob, deidentifiedAck = false) => {
+      const form = new FormData();
+      form.append('audio', audio, 'dictation.webm');
+      form.append('deidentifiedAck', deidentifiedAck ? 'true' : 'false');
+      return requestForm<{ transcript: string; provider: string; model: string; latencyMs: number }>(
+        `/api/reports/${id}/dictation/transcribe`,
+        form,
+      );
+    },
     signatures: (id: string) =>
       request<ReportSignature[]>(`/api/reports/${id}/signatures`),
     sign: (id: string, body: { role: 'Primary' | 'CoSigner'; note?: string }) =>

@@ -829,6 +829,63 @@ public class ReportsController : TenantedController
     }
 
     /// <summary>
+    /// Phase B (dictation transcription) — accepts a dictation audio file
+    /// (multipart form, field <c>audio</c>) and returns a free-text transcript
+    /// scraped via the UBAG <c>medical_transcription</c> flow. Mirrors
+    /// <see cref="DictationCleanup"/>: RBAC is <see cref="UserRole.Radiologist"/>
+    /// or <see cref="UserRole.MedicalDirector"/>, the "ai" rate limit applies,
+    /// and a <see cref="Application.Services.ProviderPolicyException"/> maps to a
+    /// 403 with the same <c>kind=provider_policy</c> envelope the frontend
+    /// already handles. The request body is capped at 32 MiB.
+    /// </summary>
+    [HttpPost("{id:guid}/dictation/transcribe")]
+    [Microsoft.AspNetCore.RateLimiting.EnableRateLimiting("ai")]
+    [RequestSizeLimit(33_554_432)]
+    [RequestFormLimits(MultipartBodyLengthLimit = 33_554_432)]
+    public async Task<IActionResult> DictationTranscribe(
+        Guid id,
+        [FromForm] IFormFile? audio,
+        [FromForm] bool deidentifiedAck,
+        [FromServices] Application.Abstractions.ITranscriptionService service,
+        CancellationToken ct)
+    {
+        var (tenant, user) = await ResolveContextAsync(_db, ct);
+        var deny = RequireRole(user, UserRole.Radiologist, UserRole.MedicalDirector);
+        if (deny is not null) return deny;
+        var report = await _db.Reports.FirstOrDefaultAsync(r => r.Id == id && r.TenantId == tenant.Id, ct);
+        if (report is null) return NotFound();
+
+        if (audio is null || audio.Length <= 0)
+            return BadRequest(new { error = "audio file is required.", kind = "validation" });
+        if (audio.Length > 33_554_432)
+            return BadRequest(new { error = "audio file exceeds the 32 MiB limit.", kind = "validation" });
+
+        var allowedTypes = new[] { "audio/webm", "audio/wav", "audio/mpeg", "audio/mp4", "audio/ogg" };
+        var contentType = (audio.ContentType ?? string.Empty).Split(';')[0].Trim();
+        if (!allowedTypes.Contains(contentType, StringComparer.OrdinalIgnoreCase))
+            return BadRequest(new { error = $"unsupported audio content type '{audio.ContentType}'.", kind = "validation" });
+
+        try
+        {
+            await using var stream = audio.OpenReadStream();
+            var result = await service.TranscribeAsync(
+                tenant, user, report, stream, audio.FileName ?? "dictation.webm",
+                audio.Length, contentType, deidentifiedAck, ct);
+            return Ok(new
+            {
+                transcript = result.Text,
+                provider = result.Provider,
+                model = result.Model,
+                latencyMs = result.LatencyMs,
+            });
+        }
+        catch (Application.Services.ProviderPolicyException pex)
+        {
+            return StatusCode(StatusCodes.Status403Forbidden, new { error = pex.Message, kind = "provider_policy" });
+        }
+    }
+
+    /// <summary>
     /// Iter-31 AI-008 — up to three suggested follow-up phrases for a report's
     /// recommendations section. Routes through the auto-router (cheapest
     /// matching provider). Returns an empty list when no provider is wired.

@@ -93,6 +93,26 @@ public interface IUbagClient
     Task<UbagWorkflow> CreateWorkflowAsync(UbagWorkflowRequest request, string idempotencyKey, CancellationToken ct);
     Task<UbagWorkflowRun> RunWorkflowAsync(string workflowId, string idempotencyKey, CancellationToken ct);
     Task<UbagWorkflowRun> GetWorkflowRunAsync(string runId, CancellationToken ct);
+
+    /// <summary>
+    /// Phase B (dictation transcription) — create a <c>medical_transcription</c>
+    /// job whose worker scrapes a transcript from an audio artifact uploaded
+    /// separately via <see cref="UploadJobArtifactAsync"/>. The job is created
+    /// FIRST (so the worker can wait on the named artifact) and the audio is
+    /// uploaded SECOND. Mirrors <see cref="CreateJobAsync"/> but carries an
+    /// <c>audio_artifact_key</c> input and a <c>wait_for_artifacts</c> option
+    /// rather than a free-text prompt only.
+    /// </summary>
+    Task<UbagJob> CreateTranscriptionJobAsync(UbagTranscriptionRequest request, string idempotencyKey, CancellationToken ct);
+
+    /// <summary>
+    /// Phase B (dictation transcription) — PUT raw audio bytes to
+    /// <c>/v1/jobs/{jobId}/artifacts/{key}</c> with the supplied content type
+    /// and length. <paramref name="key"/> must be a single path segment
+    /// (no '/', '\', '%'); the payload must be &#8804; 32 MiB. Returns the
+    /// artifact descriptor parsed from the gateway's 201 response.
+    /// </summary>
+    Task<UbagArtifact> UploadJobArtifactAsync(string jobId, string key, Stream content, string contentType, long contentLength, string idempotencyKey, CancellationToken ct);
 }
 
 public sealed record UbagHealth(bool Ok, string Status, string? Version, string? Error);
@@ -127,6 +147,65 @@ public sealed record UbagJobRequest(
     string CommandType = "submit",
     string ReturnMode = "final",
     string? ClientRequestId = null);
+
+/// <summary>
+/// Phase B (dictation transcription) — request to create a
+/// <c>medical_transcription</c> job. The worker waits for the audio artifact
+/// named <see cref="AudioArtifactKey"/> (uploaded separately) and scrapes a
+/// free-text transcript. <see cref="Prompt"/> steers the transcription model.
+/// </summary>
+public sealed record UbagTranscriptionRequest(
+    string Target,
+    string AudioArtifactKey,
+    string Prompt,
+    string ReturnMode = "final",
+    string? ClientRequestId = null);
+
+/// <summary>
+/// Phase B (dictation transcription) — descriptor returned by the gateway for
+/// an uploaded job artifact (the audio file). <see cref="Checksum"/> is the
+/// server-computed content hash; never carries audio bytes.
+/// </summary>
+public sealed record UbagArtifact(
+    string JobId,
+    string Key,
+    string ContentType,
+    long SizeBytes,
+    string Checksum);
+
+/// <summary>
+/// Phase B (dictation transcription) — orchestrates the four-call UBAG flow
+/// (create <c>medical_transcription</c> job → upload audio artifact → worker
+/// scrapes → poll to terminal) for a single report's dictation audio. Routes
+/// provider selection through <see cref="IProviderRouter"/> and enforces the
+/// de-identified-audio PHI gate before any bytes leave the process. The
+/// resulting transcript is free text the editor can adopt; only its SHA-256
+/// is ever persisted to the audit log.
+/// </summary>
+public interface ITranscriptionService
+{
+    Task<TranscriptionResult> TranscribeAsync(
+        Tenant tenant,
+        User user,
+        Report report,
+        Stream audio,
+        string fileName,
+        long sizeBytes,
+        string contentType,
+        bool deidentifiedAck,
+        CancellationToken ct);
+}
+
+/// <summary>
+/// Phase B (dictation transcription) — result of a single audio-transcription
+/// run. <see cref="Text"/> is the free-text transcript; the remaining fields
+/// carry provider/model provenance and latency for the editor + audit trail.
+/// </summary>
+public sealed record TranscriptionResult(
+    string Text,
+    string Provider,
+    string Model,
+    long LatencyMs);
 
 public sealed record UbagJob(
     string Id,

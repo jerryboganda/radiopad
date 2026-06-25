@@ -204,6 +204,11 @@ public enum AuditAction
     /// (POST /api/providers). A routine admin action — NOT a policy violation
     /// (it was previously mis-tagged as <see cref="PolicyViolation"/>).</summary>
     ProviderConfigChanged = 54,
+    /// <summary>Phase B (dictation transcription) — a dictation audio file was
+    /// transcribed via the UBAG <c>medical_transcription</c> flow. Details
+    /// record provider/target/artifact metadata and the SHA-256 of the
+    /// transcript only — never the transcript text or audio bytes.</summary>
+    AudioTranscribed = 55,
 }
 
 public enum CopilotMode
