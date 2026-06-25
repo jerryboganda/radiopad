@@ -35,7 +35,8 @@ public class LocalSttEnsembleSmokeTests
 
         var parakeet = new SherpaParakeetSttClient(
             new WavAudioDecoder(), NullLogger<SherpaParakeetSttClient>.Instance);
-        var whisper = new WhisperNetSttClient(NullLogger<WhisperNetSttClient>.Instance);
+        var whisper = new WhisperNetSttClient(
+            new WavAudioDecoder(), NullLogger<WhisperNetSttClient>.Instance);
 
         Assert.True(parakeet.Available, "Parakeet should be Available in the combined model dir");
         Assert.True(whisper.Available, "Whisper should be Available in the combined model dir");

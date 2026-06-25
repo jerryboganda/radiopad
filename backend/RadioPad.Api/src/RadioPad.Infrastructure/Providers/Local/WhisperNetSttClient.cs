@@ -1,6 +1,7 @@
 using Microsoft.Extensions.Logging;
 using RadioPad.Application.Abstractions;
 using RadioPad.Application.Stt;
+using RadioPad.Infrastructure.Audio;
 using Whisper.net;
 
 namespace RadioPad.Infrastructure.Providers.Local;
@@ -19,6 +20,7 @@ public sealed class WhisperNetSttClient : ILocalSttEngine, IDisposable
 {
     public const string EngineName = "whisper";
 
+    private readonly IAudioDecoder _decoder;
     private readonly ILogger<WhisperNetSttClient> _log;
     private readonly bool _enabled;
     private readonly object _gate = new();
@@ -26,8 +28,9 @@ public sealed class WhisperNetSttClient : ILocalSttEngine, IDisposable
     private WhisperFactory? _factory;
     private volatile bool _loadFailed;
 
-    public WhisperNetSttClient(ILogger<WhisperNetSttClient> log)
+    public WhisperNetSttClient(IAudioDecoder decoder, ILogger<WhisperNetSttClient> log)
     {
+        _decoder = decoder;
         _log = log;
         _enabled = LocalSttModels.IsEnabled();
         _binPath = LocalSttModels.ResolveWhisperBin();
@@ -50,13 +53,19 @@ public sealed class WhisperNetSttClient : ILocalSttEngine, IDisposable
         if (!Available)
             throw new InvalidOperationException("whisper engine is not available");
 
+        // Decode + resample to 16 kHz mono first. Whisper.net's WAV reader only
+        // accepts exactly 16 kHz, so feeding raw mic audio (44.1/48 kHz) straight
+        // in throws NotSupportedWaveException. Going through the shared decoder (as
+        // the Parakeet engine does) makes the engine accept any input rate.
+        var samples = await _decoder.DecodeAsync(
+            new MemoryStream(wavBytes, writable: false), "audio/wav", ct);
+
         var factory = GetFactory();
         var tokens = new List<SttToken>();
         try
         {
             using var processor = factory.CreateBuilder().WithLanguage("en").Build();
-            using var ms = new MemoryStream(wavBytes, writable: false);
-            await foreach (var seg in processor.ProcessAsync(ms, ct))
+            await foreach (var seg in processor.ProcessAsync(samples, ct))
             {
                 var conf = NormalizeProbability(seg.Probability);
                 foreach (var t in SttText.Tokenize(seg.Text, conf))

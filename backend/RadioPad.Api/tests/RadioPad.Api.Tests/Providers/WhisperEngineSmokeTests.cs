@@ -1,4 +1,5 @@
 using Microsoft.Extensions.Logging.Abstractions;
+using RadioPad.Infrastructure.Audio;
 using RadioPad.Infrastructure.Providers.Local;
 using Xunit;
 
@@ -23,7 +24,8 @@ public class WhisperEngineSmokeTests
         Environment.SetEnvironmentVariable("RADIOPAD_LOCAL_STT_ENABLED", "1");
         Environment.SetEnvironmentVariable("RADIOPAD_STT_MODEL_DIR", dir);
 
-        var engine = new WhisperNetSttClient(NullLogger<WhisperNetSttClient>.Instance);
+        var engine = new WhisperNetSttClient(
+            new WavAudioDecoder(), NullLogger<WhisperNetSttClient>.Instance);
         Assert.True(engine.Available, "whisper engine should be Available with the model present");
 
         // Prefer a REAL speech WAV (set by the CI job to a sample from the Parakeet
