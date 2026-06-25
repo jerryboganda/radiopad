@@ -28,6 +28,10 @@ jobs:
     runs-on: windows-latest
     env:
       RADIOPAD_STT_SMOKE_REQUIRE: '1'
+      # Exercise the OPTIMIZED config end-to-end (these are also the code defaults).
+      RADIOPAD_STT_DECODING: modified_beam_search
+      RADIOPAD_STT_MAX_ACTIVE_PATHS: '4'
+      RADIOPAD_STT_WHISPER_BEAM: '5'
     steps:
       - uses: actions/checkout@v4
 
@@ -90,6 +94,19 @@ jobs:
           cp -r stt-model/. stt-both/
           cp stt-whisper/ggml-large-v3-turbo-q5_0.bin stt-both/
           echo "RADIOPAD_STT_ENSEMBLE_DIR=$(cygpath -w "$(pwd)/stt-both")" >> "$GITHUB_ENV"
+
+      - name: Wire radiology hotwords if the bundle ships a BPE vocab
+        shell: bash
+        run: |
+          set -euo pipefail
+          vocab="$(find stt-model -iname 'bpe.vocab' -o -iname '*.vocab' | head -n1 || true)"
+          hot="$(pwd)/backend/RadioPad.Api/src/RadioPad.Infrastructure/Providers/Local/radiology-hotwords.txt"
+          if [ -n "$vocab" ]; then
+            echo "RADIOPAD_STT_HOTWORDS_FILE=$(cygpath -w "$hot")" >> "$GITHUB_ENV"
+            echo "hotword biasing wired (BPE vocab: $vocab)"
+          else
+            echo "no BPE vocab in Parakeet bundle -> hotwords skipped; beam search still verified"
+          fi
 
       - name: Run Parakeet engine smoke (real native lib + model)
         shell: bash

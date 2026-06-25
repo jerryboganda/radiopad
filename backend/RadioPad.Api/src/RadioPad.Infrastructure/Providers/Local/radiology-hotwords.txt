@@ -1,0 +1,39 @@
+pneumothorax
+pleural effusion
+pulmonary embolism
+ground-glass opacity
+consolidation
+atelectasis
+cardiomegaly
+mediastinum
+lymphadenopathy
+hepatomegaly
+splenomegaly
+cholelithiasis
+nephrolithiasis
+hydronephrosis
+diverticulitis
+appendicitis
+pancreatitis
+hemorrhage
+infarction
+ischemia
+edema
+stenosis
+aneurysm
+metastasis
+lesion
+nodule
+opacity
+effusion
+fracture
+osseous
+vertebral
+intracranial
+subdural
+epidural
+ventricle
+parenchyma
+bronchiectasis
+emphysema
+fibrosis

@@ -167,29 +167,45 @@ public sealed class SherpaParakeetSttClient : ILocalSttClient, ILocalSttEngine, 
             config.ModelConfig.Transducer.Decoder = _decoderModel!;
             config.ModelConfig.Transducer.Joiner = _joiner!;
             config.ModelConfig.Tokens = _tokens!;
-            config.ModelConfig.NumThreads = ResolveThreads();
-            config.ModelConfig.Provider = "cpu";
+            config.ModelConfig.NumThreads = LocalSttModels.ResolveThreads();
+            config.ModelConfig.Provider = LocalSttModels.ResolveProvider();
             config.ModelConfig.Debug = 0;
-            // greedy_search keeps Phase 1 robust; Phase 2 switches to
-            // modified_beam_search + a radiology hotwords ContextGraph.
-            config.DecodingMethod = "greedy_search";
+
+            // Beam search (default) lifts accuracy over greedy and is the
+            // prerequisite for hotword biasing.
+            var method = LocalSttModels.ResolveDecodingMethod();
+            config.DecodingMethod = method;
+            config.MaxActivePaths = LocalSttModels.ResolveMaxActivePaths();
+
+            // Radiology hotword biasing needs modified_beam_search AND a BPE vocab
+            // the bundle may not ship. Enable only when both are present; otherwise
+            // degrade gracefully to plain beam search (never break the engine).
+            var hotwords = LocalSttModels.ResolveHotwordsFile();
+            var bpeVocab = _modelDir is null ? null : LocalSttModels.ResolveBpeVocab(_modelDir);
+            if (method == "modified_beam_search" && hotwords is not null && bpeVocab is not null)
+            {
+                config.ModelConfig.ModelingUnit = "bpe";
+                config.ModelConfig.BpeVocab = bpeVocab;
+                config.HotwordsFile = hotwords;
+                config.HotwordsScore = LocalSttModels.ResolveHotwordsScore();
+                _log.LogInformation(
+                    "Parakeet hotword biasing ON ({Hotwords}, score {Score}, vocab {Vocab})",
+                    hotwords, config.HotwordsScore, bpeVocab);
+            }
+            else if (hotwords is not null)
+            {
+                _log.LogInformation(
+                    "Parakeet hotwords requested but unusable (method={Method}, bpeVocab={Vocab}); " +
+                    "running {Method} without bias", method, bpeVocab ?? "<none>", method);
+            }
 
             _log.LogInformation(
-                "Loading on-device STT model '{Model}' from {Dir} ({Threads} threads)",
-                _modelName, _modelDir, config.ModelConfig.NumThreads);
+                "Loading on-device STT model '{Model}' from {Dir} ({Threads} threads, {Method}, {Provider})",
+                _modelName, _modelDir, config.ModelConfig.NumThreads, method, config.ModelConfig.Provider);
 
             _recognizer = new OfflineRecognizer(config);
             return _recognizer;
         }
-    }
-
-    private static int ResolveThreads()
-    {
-        if (int.TryParse(Environment.GetEnvironmentVariable("RADIOPAD_STT_THREADS"), out var n) && n > 0)
-            return n;
-        // Leave headroom on the clinical workstation; cap so a many-core box
-        // doesn't oversubscribe on a single utterance.
-        return Math.Clamp(Environment.ProcessorCount - 1, 1, 4);
     }
 
     /// <summary>

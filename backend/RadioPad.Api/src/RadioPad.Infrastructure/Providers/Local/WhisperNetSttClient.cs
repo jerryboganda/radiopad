@@ -64,7 +64,24 @@ public sealed class WhisperNetSttClient : ILocalSttEngine, IDisposable
         var tokens = new List<SttToken>();
         try
         {
-            using var processor = factory.CreateBuilder().WithLanguage("en").Build();
+            // Optimized decode: multi-threaded, beam search (accuracy over the
+            // default greedy), real token probabilities (so the reconciler gets a
+            // usable confidence signal), and a radiology priming prompt to bias
+            // domain vocabulary.
+            var builder = factory.CreateBuilder()
+                .WithLanguage("en")
+                .WithThreads(LocalSttModels.ResolveThreads())
+                .WithProbabilities();
+
+            var beam = LocalSttModels.ResolveWhisperBeamSize();
+            if (beam > 1)
+                builder = builder.WithBeamSearchSamplingStrategy(c => c.WithBeamSize(beam));
+
+            var prompt = LocalSttModels.ResolveWhisperPrompt();
+            if (!string.IsNullOrWhiteSpace(prompt))
+                builder = builder.WithPrompt(prompt);
+
+            using var processor = builder.Build();
             await foreach (var seg in processor.ProcessAsync(samples, ct))
             {
                 var conf = NormalizeProbability(seg.Probability);

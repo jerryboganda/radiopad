@@ -40,6 +40,74 @@ public static class LocalSttModels
     /// <summary>A single downloadable model file (no archive extraction).</summary>
     public sealed record FileSpec(string Name, string FileName, string Url, long SizeBytes, string Sha256);
 
+    // ── Tuning knobs (env-overridable; safe defaults) ──────────────────────
+    // All default to the *optimized* setting so a stock desktop build benefits
+    // without configuration; env vars exist for per-site tuning + CI coverage.
+
+    /// <summary>Parakeet decoding. Beam search beats greedy on WER and is the
+    /// prerequisite for hotword biasing. Override: <c>RADIOPAD_STT_DECODING</c>.</summary>
+    public const string DefaultDecodingMethod = "modified_beam_search";
+
+    /// <summary>Default radiology priming prompt for Whisper (biases domain
+    /// vocabulary). Override: <c>RADIOPAD_STT_WHISPER_PROMPT</c>.</summary>
+    public const string DefaultWhisperPrompt =
+        "Radiology report dictation. Findings: lungs, pleura, mediastinum, " +
+        "cardiac silhouette. Impression:";
+
+    public static string ResolveDecodingMethod()
+        => Env("RADIOPAD_STT_DECODING") is { Length: > 0 } v ? v : DefaultDecodingMethod;
+
+    /// <summary>sherpa-onnx execution provider (cpu/cuda/directml). CPU by default;
+    /// GPU is opt-in and requires the matching native runtime on the box.</summary>
+    public static string ResolveProvider()
+        => (Env("RADIOPAD_STT_PROVIDER") ?? "cpu").ToLowerInvariant();
+
+    /// <summary>Decode threads, leaving headroom on the clinical workstation and
+    /// capping so a many-core box doesn't oversubscribe on a single utterance.</summary>
+    public static int ResolveThreads()
+        => int.TryParse(Env("RADIOPAD_STT_THREADS"), out var n) && n > 0
+            ? n
+            : Math.Clamp(Environment.ProcessorCount - 1, 1, 4);
+
+    public static int ResolveMaxActivePaths()
+        => int.TryParse(Env("RADIOPAD_STT_MAX_ACTIVE_PATHS"), out var n) && n > 0 ? n : 4;
+
+    public static int ResolveWhisperBeamSize()
+        => int.TryParse(Env("RADIOPAD_STT_WHISPER_BEAM"), out var n) && n >= 1 ? n : 5;
+
+    public static string? ResolveWhisperPrompt()
+        => Env("RADIOPAD_STT_WHISPER_PROMPT") is { Length: > 0 } v ? v : DefaultWhisperPrompt;
+
+    /// <summary>Explicit hotwords file (one phrase per line); null when unset/missing.</summary>
+    public static string? ResolveHotwordsFile()
+        => Env("RADIOPAD_STT_HOTWORDS_FILE") is { Length: > 0 } v && File.Exists(v) ? v : null;
+
+    public static float ResolveHotwordsScore()
+        => float.TryParse(Env("RADIOPAD_STT_HOTWORDS_SCORE"),
+               System.Globalization.NumberStyles.Float,
+               System.Globalization.CultureInfo.InvariantCulture, out var s) && s > 0
+            ? s : 1.5f;
+
+    /// <summary>Locate a SentencePiece BPE vocab (needed for hotword biasing on a
+    /// BPE transducer). Null when the bundle doesn't ship one — hotwords then
+    /// degrade gracefully to plain beam search.</summary>
+    public static string? ResolveBpeVocab(string dir)
+    {
+        if (string.IsNullOrEmpty(dir) || !Directory.Exists(dir)) return null;
+        foreach (var pat in new[] { "bpe.vocab", "*.bpe.vocab", "*.vocab" })
+        {
+            var f = Directory.GetFiles(dir, pat, SearchOption.AllDirectories).FirstOrDefault();
+            if (f is not null) return f;
+        }
+        return null;
+    }
+
+    private static string? Env(string name)
+    {
+        var v = Environment.GetEnvironmentVariable(name);
+        return string.IsNullOrWhiteSpace(v) ? null : v.Trim();
+    }
+
     /// <summary>True when the desktop build has opted the on-device engine in
     /// via <c>RADIOPAD_LOCAL_STT_ENABLED</c>. Web/server builds leave it unset.</summary>
     public static bool IsEnabled()
