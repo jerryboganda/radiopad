@@ -60,10 +60,10 @@ describe('LoginPage auth choices', () => {
 
     render(<LoginPage />);
 
-    expect(screen.getByRole('heading', { name: 'Sign in' })).toBeInTheDocument();
+    expect(screen.getByRole('heading', { name: 'Sign in to RadioPad' })).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Continue with SSO' })).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Email me a sign-in link' })).toBeInTheDocument();
-    expect(screen.queryByText('Dev/test bearer sign-in')).not.toBeInTheDocument();
+    expect(screen.queryByText(/bearer sign-in/i)).not.toBeInTheDocument();
     expect(screen.queryByDisplayValue('radiologist@radiopad.local')).not.toBeInTheDocument();
   });
 
@@ -72,7 +72,7 @@ describe('LoginPage auth choices', () => {
 
     render(<LoginPage />);
 
-    expect(screen.getByText('Dev/test bearer sign-in')).toBeInTheDocument();
+    expect(screen.getByText(/bearer sign-in/i)).toBeInTheDocument();
     expect(screen.getByText(/NEXT_PUBLIC_ALLOW_DEV_LOGIN=true/)).toBeInTheDocument();
   });
 });
