@@ -194,7 +194,9 @@ public interface ILocalSttClient
     /// returned <see cref="TranscriptionResult.Provider"/> identifies the local
     /// engine; only the SHA-256 of the text is ever persisted by the caller.
     /// </summary>
-    Task<TranscriptionResult> TranscribeAsync(Stream audio, string contentType, CancellationToken ct);
+    /// <param name="mode">Optional per-request engine mode: <c>"ensemble"</c>,
+    /// <c>"single"</c>, or null/<c>"auto"</c> to use the configured default.</param>
+    Task<TranscriptionResult> TranscribeAsync(Stream audio, string contentType, CancellationToken ct, string? mode = null);
 }
 
 /// <summary>
@@ -216,7 +218,8 @@ public interface ITranscriptionService
         string fileName,
         long sizeBytes,
         string contentType,
-        CancellationToken ct);
+        CancellationToken ct,
+        string? sttMode = null);
 }
 
 /// <summary>

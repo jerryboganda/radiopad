@@ -104,4 +104,14 @@ describe('DictationOverlay', () => {
     expect(onCleanup).toHaveBeenCalledTimes(1);
     window.removeEventListener('radiopad:dictation-cleanup', onCleanup);
   });
+
+  it('defaults the on-device engine picker to Auto and persists a change', () => {
+    window.localStorage.removeItem('radiopad:stt-mode');
+    render(<DictationOverlay />);
+    const select = screen.getByTestId('dictation-mode') as HTMLSelectElement;
+    expect(select.value).toBe('auto');
+    fireEvent.change(select, { target: { value: 'ensemble' } });
+    expect(select.value).toBe('ensemble');
+    expect(window.localStorage.getItem('radiopad:stt-mode')).toBe('ensemble');
+  });
 });

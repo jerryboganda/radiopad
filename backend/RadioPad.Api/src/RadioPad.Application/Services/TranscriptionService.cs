@@ -67,7 +67,8 @@ public sealed class TranscriptionService : ITranscriptionService
         string fileName,
         long sizeBytes,
         string contentType,
-        CancellationToken ct)
+        CancellationToken ct,
+        string? sttMode = null)
     {
         if (audio is null)
             throw new ArgumentNullException(nameof(audio));
@@ -85,7 +86,7 @@ public sealed class TranscriptionService : ITranscriptionService
         // engine unconfigured (Available == false) and fall through to UBAG below.
         if (_localStt is { Available: true })
         {
-            var local = await _localStt.TranscribeAsync(audio, contentType, ct);
+            var local = await _localStt.TranscribeAsync(audio, contentType, ct, sttMode);
 
             _log.LogInformation(
                 "Transcribed dictation audio for report {ReportId} via {Provider}/{Model} (on-device, {SizeBytes} bytes, {LatencyMs} ms)",

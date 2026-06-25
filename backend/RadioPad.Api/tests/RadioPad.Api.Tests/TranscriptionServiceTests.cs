@@ -159,7 +159,7 @@ public class TranscriptionServiceTests
         public int Calls { get; private set; }
         public FakeLocalStt(TranscriptionResult? result) => _result = result;
         public bool Available => _result is not null;
-        public Task<TranscriptionResult> TranscribeAsync(Stream audio, string contentType, CancellationToken ct)
+        public Task<TranscriptionResult> TranscribeAsync(Stream audio, string contentType, CancellationToken ct, string? mode = null)
         {
             Calls++;
             return Task.FromResult(_result!);

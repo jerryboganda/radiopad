@@ -95,8 +95,10 @@ public sealed class SherpaParakeetSttClient : ILocalSttClient, ILocalSttEngine, 
         }
     }
 
-    public async Task<TranscriptionResult> TranscribeAsync(Stream audio, string contentType, CancellationToken ct)
+    public async Task<TranscriptionResult> TranscribeAsync(Stream audio, string contentType, CancellationToken ct, string? mode = null)
     {
+        // mode is ignored here — this is the single-engine client; the ensemble
+        // orchestrator (the registered ILocalSttClient) is what honors it.
         if (!Available)
             throw new InvalidOperationException("local STT engine is not available");
 
