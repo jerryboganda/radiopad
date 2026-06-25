@@ -1,6 +1,7 @@
 using System.Diagnostics;
 using Microsoft.Extensions.Logging;
 using RadioPad.Application.Abstractions;
+using RadioPad.Application.Stt;
 using RadioPad.Infrastructure.Audio;
 using SherpaOnnx;
 
@@ -29,10 +30,18 @@ namespace RadioPad.Infrastructure.Providers.Local;
 /// offline streams are not guaranteed thread-safe, so decode is serialized behind
 /// a lock — fine for the single-user desktop sidecar.</para>
 /// </summary>
-public sealed class SherpaParakeetSttClient : ILocalSttClient, IDisposable
+public sealed class SherpaParakeetSttClient : ILocalSttClient, ILocalSttEngine, IDisposable
 {
     /// <summary>Provider name recorded on the result + audit (never PHI).</summary>
     public const string ProviderName = "local";
+
+    /// <summary>Engine id used in ensemble hypotheses + calibration tables.</summary>
+    public const string EngineName = "parakeet";
+
+    // Transducers do not expose a usable per-word confidence through the sherpa
+    // C# result, so emit a fixed prior; the reconciler then flags disagreements
+    // (it cannot trust a missing confidence signal) — the safe default.
+    private const double ParakeetConfidence = 0.85;
 
     private const int SampleRate = 16000;
     private const int FeatureDim = 80;
@@ -94,18 +103,42 @@ public sealed class SherpaParakeetSttClient : ILocalSttClient, IDisposable
         var sw = Stopwatch.StartNew();
         var samples = await _decoder.DecodeAsync(audio, contentType, ct);
         ct.ThrowIfCancellationRequested();
+        var text = RecognizeText(samples);
+        sw.Stop();
 
-        string text;
+        return new TranscriptionResult(
+            Text: text,
+            Provider: ProviderName,
+            Model: _modelName,
+            LatencyMs: sw.ElapsedMilliseconds);
+    }
+
+    public string EngineId => EngineName;
+
+    public async Task<EngineTranscript> RecognizeAsync(byte[] wavBytes, CancellationToken ct)
+    {
+        if (!Available)
+            throw new InvalidOperationException("local STT engine is not available");
+
+        using var ms = new MemoryStream(wavBytes, writable: false);
+        var samples = await _decoder.DecodeAsync(ms, "audio/wav", ct);
+        ct.ThrowIfCancellationRequested();
+        var text = RecognizeText(samples);
+        return new EngineTranscript(EngineName, SttText.Tokenize(text, ParakeetConfidence));
+    }
+
+    /// <summary>Run the sherpa recognizer on decoded samples (serialized per recognizer).</summary>
+    private string RecognizeText(float[] samples)
+    {
         try
         {
             var recognizer = GetRecognizer();
-            // Serialize: one offline stream/decode at a time per recognizer.
             lock (_gate)
             {
                 using var stream = recognizer.CreateStream();
                 stream.AcceptWaveform(SampleRate, samples);
                 recognizer.Decode(stream);
-                text = stream.Result.Text ?? string.Empty;
+                return (stream.Result.Text ?? string.Empty).Trim();
             }
         }
         catch (Exception ex) when (ex is not OperationCanceledException)
@@ -116,13 +149,6 @@ public sealed class SherpaParakeetSttClient : ILocalSttClient, IDisposable
             _log.LogError(ex, "local STT decode failed; disabling on-device engine for this session");
             throw;
         }
-
-        sw.Stop();
-        return new TranscriptionResult(
-            Text: text.Trim(),
-            Provider: ProviderName,
-            Model: _modelName,
-            LatencyMs: sw.ElapsedMilliseconds);
     }
 
     private OfflineRecognizer GetRecognizer()

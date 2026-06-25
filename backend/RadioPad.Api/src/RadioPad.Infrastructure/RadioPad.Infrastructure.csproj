@@ -29,5 +29,10 @@
     <PackageReference Include="org.k2fsa.sherpa.onnx.runtime.win-x64" Version="1.13.3" />
     <!-- Phase 1 activation — extract the .tar.bz2 model bundle downloaded on first run. -->
     <PackageReference Include="SharpZipLib" Version="1.4.2" />
+    <!-- Phase 2 — Whisper (large-v3-turbo) as the decorrelated 2nd engine for the
+         ROVER ensemble. In-process whisper.cpp via Whisper.net; CPU runtime is
+         used on Windows only (the engine self-disables elsewhere). -->
+    <PackageReference Include="Whisper.net" Version="1.9.1" />
+    <PackageReference Include="Whisper.net.Runtime" Version="1.9.1" />
   </ItemGroup>
 </Project>

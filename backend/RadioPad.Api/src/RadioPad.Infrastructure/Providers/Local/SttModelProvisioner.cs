@@ -90,6 +90,59 @@ public sealed class SttModelProvisioner
         }
     }
 
+    /// <summary>Ensure the default (Whisper) model file is installed.</summary>
+    public Task<bool> EnsureWhisperAsync(CancellationToken ct) => EnsureFileAsync(LocalSttModels.Whisper, ct);
+
+    /// <summary>Ensure a single model FILE (e.g. a Whisper GGML .bin — no archive).</summary>
+    public Task<bool> EnsureFileAsync(LocalSttModels.FileSpec spec, CancellationToken ct)
+    {
+        var dir = LocalSttModels.ResolveModelDir(spec.Name);
+        if (dir is null)
+        {
+            _log.LogWarning("No local-app-data dir resolvable; cannot provision file '{File}'.", spec.FileName);
+            return Task.FromResult(false);
+        }
+        return EnsureFileInDirAsync(spec, dir, ct);
+    }
+
+    /// <summary>
+    /// Download + SHA-256-verify a single model file into <paramref name="dir"/>,
+    /// atomically. Exposed for tests (fast no-op when present; no network).
+    /// </summary>
+    public async Task<bool> EnsureFileInDirAsync(LocalSttModels.FileSpec spec, string dir, CancellationToken ct)
+    {
+        var dest = Path.Combine(dir, spec.FileName);
+        if (File.Exists(dest)) return true;
+
+        Directory.CreateDirectory(dir);
+        var tmp = dest + $".download-{Guid.NewGuid():N}";
+        try
+        {
+            _log.LogInformation(
+                "Downloading on-device STT model file '{File}' (~{SizeMB} MB).",
+                spec.FileName, spec.SizeBytes / (1024 * 1024));
+            await DownloadAsync(spec.Url, tmp, ct);
+            await VerifySha256Async(tmp, spec.Sha256, ct);
+            if (File.Exists(dest)) File.Delete(dest);
+            File.Move(tmp, dest);
+            _log.LogInformation("On-device STT model file '{File}' installed at {Dir}", spec.FileName, dir);
+            return true;
+        }
+        catch (OperationCanceledException)
+        {
+            throw;
+        }
+        catch (Exception ex)
+        {
+            _log.LogError(ex, "Failed to provision on-device STT model file '{File}'", spec.FileName);
+            return false;
+        }
+        finally
+        {
+            TryDelete(tmp);
+        }
+    }
+
     private static async Task DownloadAsync(string url, string destPath, CancellationToken ct)
     {
         using var http = new HttpClient { Timeout = Timeout.InfiniteTimeSpan };
