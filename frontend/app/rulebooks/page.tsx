@@ -1,127 +1,178 @@
 'use client';
 
-import { useEffect, useState } from 'react';
-import Link from 'next/link';
+import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useRouter } from 'next/navigation';
 import { api, type Rulebook } from '@/lib/api';
 import { rulebookHref, rulebookEditorHref } from '@/lib/routes';
+import { statusLabel, statusBadge, relativeTime } from '@/lib/rulebookStatus';
 import Container from '@/components/shell/Container';
 import PageHeader from '@/components/shell/PageHeader';
+import Skeleton from '@/components/ui/Skeleton';
+import EmptyState from '@/components/ui/EmptyState';
+import ErrorState from '@/components/ui/ErrorState';
+
+const STATUS_FILTERS = ['All', 'Draft', 'In review', 'Approved', 'Deprecated'] as const;
+type StatusFilter = (typeof STATUS_FILTERS)[number];
+
+function splitCsv(csv: string): string[] {
+  return (csv || '').split(',').map((s) => s.trim()).filter(Boolean);
+}
 
 export default function RulebooksPage() {
+  const router = useRouter();
   const [items, setItems] = useState<Rulebook[]>([]);
-  const [yaml, setYaml] = useState('');
-  const [busy, setBusy] = useState(false);
-  const [problems, setProblems] = useState<string[] | null>(null);
+  const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [query, setQuery] = useState('');
+  const [status, setStatus] = useState<StatusFilter>('All');
 
-  useEffect(() => {
-    api.rulebooks.list().then(setItems).catch((e: Error) => setError(e.message));
+  const refresh = useCallback(() => {
+    setLoading(true);
+    setError(null);
+    api.rulebooks.list()
+      .then((rows) => setItems(rows))
+      .catch((e: Error) => setError(e.message))
+      .finally(() => setLoading(false));
   }, []);
 
-  async function loadOne(id: string) {
-    const rb = await api.rulebooks.get(id);
-    setYaml(rb.sourceYaml || '');
-    setProblems(null);
-  }
+  useEffect(() => { refresh(); }, [refresh]);
 
-  async function validate() {
-    setBusy(true);
-    try {
-      const r = await api.rulebooks.validateYaml(yaml);
-      setProblems(r.problems);
-    } finally {
-      setBusy(false);
-    }
-  }
+  const openDetail = useCallback((id: string) => router.push(rulebookHref(id)), [router]);
+  const openEditor = useCallback((id?: string) => router.push(rulebookEditorHref(id)), [router]);
 
-  async function save() {
-    setBusy(true);
-    setError(null);
-    try {
-      await api.rulebooks.save(yaml);
-      setItems(await api.rulebooks.list());
-      setProblems([]);
-    } catch (e) {
-      const err = e as { body?: { error?: string }; message: string };
-      setError(err.body?.error || err.message);
-    } finally {
-      setBusy(false);
-    }
-  }
+  const filtered = useMemo(() => {
+    const q = query.trim().toLowerCase();
+    return items.filter((rb) => {
+      const matchesQuery = !q
+        || rb.name.toLowerCase().includes(q)
+        || rb.rulebookId.toLowerCase().includes(q);
+      const matchesStatus = status === 'All' || statusLabel(rb.status) === status;
+      return matchesQuery && matchesStatus;
+    });
+  }, [items, query, status]);
+
+  const newRulebookBtn = (
+    <button type="button" className="primary" onClick={() => openEditor()}>+ New rulebook</button>
+  );
 
   return (
     <Container>
       <PageHeader
         title="Rulebooks"
         description="Your clinic's approved playbooks for AI drafting and quality checks — versioned, testable, and reviewed by your team before going live."
-        primaryAction={
-          <Link href={rulebookEditorHref()} className="primary-ghost" style={{ textDecoration: 'none' }}>+ Create new (visual)</Link>
-        }
+        primaryAction={newRulebookBtn}
       />
 
-      {error && <div className="banner warn">{error}</div>}
+      {error && <ErrorState title="Couldn't load rulebooks" message={error} onRetry={refresh} />}
 
-      <div className="rp-workspace" style={{ gridTemplateColumns: 'minmax(280px, 360px) 1fr' }}>
-        <div className="rp-panel">
-          <div className="rp-panel-title">Library</div>
-          <table className="rp-table">
-            <thead>
-              <tr><th>Id</th><th>Version</th><th>Status</th><th aria-label="Actions" /></tr>
-            </thead>
-            <tbody>
-              {items.map((rb) => (
-                <tr key={rb.id} onClick={() => loadOne(rb.id)} tabIndex={0} role="button" onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') loadOne(rb.id); }} style={{ cursor: 'pointer' }}>
-                  <td><code>{rb.rulebookId}</code><div style={{ color: 'var(--text-muted)', fontSize: 12 }}>{rb.name}</div></td>
-                  <td>{rb.version}</td>
-                  <td><span className={`badge ${statusBadge(rb.status)}`}>{statusLabel(rb.status)}</span></td>
-                  <td onClick={(e) => e.stopPropagation()}>
-                    <Link href={rulebookHref(rb.id)}>Open →</Link>
-                    {' '}
-                    <Link href={rulebookEditorHref(rb.id)} className="primary-ghost" style={{ textDecoration: 'none', fontSize: 12, padding: '2px 8px' }}>Visual Editor</Link>
-                  </td>
-                </tr>
+      {!error && (
+        <>
+          <div className="rp-filter-bar">
+            <input
+              type="search"
+              className="rp-input rp-search"
+              placeholder="Search by name or id…"
+              value={query}
+              onChange={(e) => setQuery(e.target.value)}
+              aria-label="Search rulebooks"
+            />
+            <div className="rp-tabs" role="tablist" aria-label="Filter by status">
+              {STATUS_FILTERS.map((s) => (
+                <button
+                  key={s}
+                  type="button"
+                  role="tab"
+                  aria-selected={status === s}
+                  className={`rp-tab ${status === s ? 'active' : ''}`}
+                  onClick={() => setStatus(s)}
+                >
+                  {s}
+                </button>
               ))}
-              {items.length === 0 && <tr><td colSpan={4} style={{ color: 'var(--text-muted)' }}>No rulebooks yet.</td></tr>}
-            </tbody>
-          </table>
-        </div>
-
-        <div className="rp-panel">
-          <div className="rp-row between" style={{ marginBottom: 12 }}>
-            <div className="rp-panel-title" style={{ marginBottom: 0 }}>Editor</div>
-            <div className="rp-row">
-              <button className="ghost" onClick={validate} disabled={busy || !yaml}>Validate</button>
-              <button className="primary" onClick={save} disabled={busy || !yaml}>Save</button>
             </div>
           </div>
-          <textarea
-            value={yaml}
-            onChange={(e) => setYaml(e.target.value)}
-            placeholder="rulebook_id: chest_ct_v1
-name: Chest CT
-version: 1.0.0
-status: draft
-..."
-            style={{ minHeight: 420, fontFamily: 'var(--mono)', fontSize: 12.5 }}
-          />
-          {problems !== null && (
-            <div style={{ marginTop: 12 }}>
-              {problems.length === 0
-                ? <span className="badge ok">OK — schema valid</span>
-                : problems.map((p, i) => <div key={i} className="finding warning">{p}</div>)}
+
+          {loading ? (
+            <div className="rp-card-grid">
+              {Array.from({ length: 6 }).map((_, i) => (
+                <div key={i} className="rp-panel" style={{ margin: 0 }}>
+                  <Skeleton variant="block" height={96} />
+                </div>
+              ))}
+            </div>
+          ) : items.length === 0 ? (
+            <EmptyState
+              title="No rulebooks yet"
+              description="Create your first rulebook to define how AI drafts and validates reports for a study type."
+              action={newRulebookBtn}
+            />
+          ) : filtered.length === 0 ? (
+            <EmptyState
+              title="No matches"
+              description={`No rulebooks match "${query.trim()}"${status !== 'All' ? ` in ${status}` : ''}.`}
+            />
+          ) : (
+            <div className="rp-card-grid">
+              {filtered.map((rb) => {
+                const chips = [...splitCsv(rb.appliesToModalities), ...splitCsv(rb.appliesToBodyParts)];
+                const updated = relativeTime(rb.updatedAt);
+                return (
+                  <div
+                    key={rb.id}
+                    className="rp-card"
+                    role="link"
+                    tabIndex={0}
+                    onClick={() => openDetail(rb.id)}
+                    onKeyDown={(e) => {
+                      if (e.key === 'Enter' || e.key === ' ') {
+                        e.preventDefault();
+                        openDetail(rb.id);
+                      }
+                    }}
+                  >
+                    <div className="rp-card-head">
+                      <div style={{ minWidth: 0 }}>
+                        <h2 className="rp-card-title">{rb.name || rb.rulebookId}</h2>
+                        <code className="rp-card-id">{rb.rulebookId}</code>
+                      </div>
+                      <span className={`badge ${statusBadge(rb.status)}`}>{statusLabel(rb.status)}</span>
+                    </div>
+
+                    {chips.length > 0 && (
+                      <div className="rp-chip-row">
+                        {chips.map((c, i) => <span key={`${c}-${i}`} className="rp-chip">{c}</span>)}
+                      </div>
+                    )}
+
+                    <div className="rp-card-meta">
+                      v{rb.version}
+                      {rb.owner ? ` · ${rb.owner}` : ''}
+                      {updated ? ` · updated ${updated}` : ''}
+                    </div>
+
+                    <div className="rp-card-actions">
+                      <button
+                        type="button"
+                        className="ghost"
+                        onClick={(e) => { e.stopPropagation(); openDetail(rb.id); }}
+                      >
+                        Open
+                      </button>
+                      <button
+                        type="button"
+                        className="primary-ghost"
+                        onClick={(e) => { e.stopPropagation(); openEditor(rb.id); }}
+                      >
+                        Edit
+                      </button>
+                    </div>
+                  </div>
+                );
+              })}
             </div>
           )}
-        </div>
-      </div>
+        </>
+      )}
     </Container>
   );
-}
-
-function statusLabel(s: Rulebook['status']): string {
-  if (typeof s === 'string') return s;
-  return ['Draft', 'In review', 'Approved', 'Deprecated'][s] ?? String(s);
-}
-function statusBadge(s: Rulebook['status']): string {
-  const v = typeof s === 'number' ? s : 0;
-  return ['', 'warn', 'ok', 'danger'][v] ?? '';
 }

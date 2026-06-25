@@ -4,6 +4,8 @@ import { useEffect, useState, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
 import { api } from '@/lib/api';
 import { readQueryParam } from '@/lib/browserParams';
+import { statusBadge } from '@/lib/rulebookStatus';
+import Container from '@/components/shell/Container';
 import {
   type RulebookEditorState,
   emptyEditorState,
@@ -87,29 +89,23 @@ export default function RulebookEditorClient() {
     router.push('/rulebooks');
   }
 
-  const statusBadge =
-    state.status === 'approved' ? 'ok'
-      : state.status === 'deprecated' ? 'danger'
-        : state.status === 'in_review' ? 'warn'
-          : '';
+  void loadedId;
 
   return (
-    <div className="rp-container">
-      {/* Top bar */}
-      <div className="rp-row between rp-mb-md">
-        <div>
-          <div className="rp-row rp-gap-sm">
-            <button className="ghost" onClick={handleCancel}>← Back</button>
-            <h1 className="rp-page-title" style={{ margin: 0 }}>
-              {state.name || 'New Rulebook'}
-            </h1>
-            {state.version && (
-              <span style={{ color: 'var(--text-muted)', fontSize: 13 }}>v{state.version}</span>
-            )}
-            {state.status && (
-              <span className={`badge ${statusBadge}`}>{state.status}</span>
-            )}
-          </div>
+    <Container fluid>
+      {/* Sticky action bar — title/status on the left, actions on the right */}
+      <div className="rp-toolbar sticky" style={{ justifyContent: 'space-between', alignItems: 'center' }}>
+        <div className="rp-row rp-gap-sm" style={{ minWidth: 0 }}>
+          <button className="ghost" onClick={handleCancel}>← Back</button>
+          <h1 className="rp-page-title" style={{ margin: 0, fontSize: 18 }}>
+            {state.name || 'New Rulebook'}
+          </h1>
+          {state.version && (
+            <span style={{ color: 'var(--text-muted)', fontSize: 13 }}>v{state.version}</span>
+          )}
+          {state.status && (
+            <span className={`badge ${statusBadge(state.status)}`}>{state.status}</span>
+          )}
         </div>
         <div className="rp-row rp-gap-sm">
           <button className="ghost" onClick={handleCancel} disabled={busy}>Cancel</button>
@@ -119,9 +115,9 @@ export default function RulebookEditorClient() {
         </div>
       </div>
 
-      {error && <div className="banner warn">{error}</div>}
+      {error && <div className="banner danger">{error}</div>}
       {problems !== null && problems.length === 0 && (
-        <div className="banner info" style={{ marginBottom: 12 }}>
+        <div className="banner ok" style={{ marginBottom: 12 }}>
           <span className="badge ok">OK — schema valid</span>
         </div>
       )}
@@ -132,9 +128,9 @@ export default function RulebookEditorClient() {
       )}
 
       {/* Main split layout */}
-      <div className="split">
+      <div className="split rp-editor-split">
         {/* Left pane — visual editor */}
-        <section className="pane" style={{ overflow: 'auto', maxHeight: 'calc(100vh - 160px)' }}>
+        <section className="pane" style={{ overflow: 'auto', maxHeight: 'calc(100vh - 200px)' }}>
           <MetadataPanel data={state} onChange={setState} />
           <StylePanel
             style={state.style}
@@ -155,13 +151,13 @@ export default function RulebookEditorClient() {
         </section>
 
         {/* Right pane — live YAML preview */}
-        <section className="pane">
-          <div className="rp-panel-title">YAML Preview</div>
+        <section className="pane" style={{ padding: 16 }}>
+          <div className="rp-panel-title">YAML preview</div>
           <pre className="rp-yaml-preview">
             {yaml()}
           </pre>
         </section>
       </div>
-    </div>
+    </Container>
   );
 }

@@ -258,6 +258,32 @@ Prompt Studio, and rulebook YAML edits.
 Use `border-radius: var(--radius-pill)` and the semantic family tokens.
 Rule IDs / accession numbers / hashes render in `code` (mono, subtle bg).
 
+### 3.7 Card grid & chips (`.rp-card*`, `.rp-chip*`)
+
+Browsable collection landing pages (e.g. **Rulebooks** `/rulebooks`) use a
+responsive card grid instead of a dense table. Anatomy:
+
+- `.rp-card-grid` — `auto-fill` grid, `minmax(256px, 1fr)` columns, `14px` gap.
+- `.rp-card` — clickable surface (`--bg-panel`, hairline border, `--shadow-xs`);
+  lifts on hover (`--border-strong`, `--shadow-md`, `translateY(-1px)`) and shows
+  an accent focus ring. Use a real `<button>`/`<a>` so it is keyboard-focusable.
+  - `.rp-card-head` — title row (flex, space-between) holding `.rp-card-title`
+    (`--text-strong`, 15px) and a status `.badge`.
+  - `.rp-card-id` — the machine id in `--mono`/`--text-muted`.
+  - `.rp-chip-row` of `.rp-chip` — pill tags for metadata (modality, body part).
+  - `.rp-card-meta` — muted footer line (version · owner · updated).
+  - `.rp-card-actions` — pushed to the bottom (`margin-top:auto`); inner buttons
+    must `stopPropagation()` so they don't re-trigger the card's own click.
+- `.rp-filter-bar` + `.rp-search` (max-width 320px) — search/filter row above the
+  grid; pairs with `.rp-tabs`/`.badge` status filters.
+
+### 3.8 Sticky toolbar (`.rp-toolbar.sticky`)
+
+`.rp-toolbar.sticky` pins an action row (Cancel/Validate/Save/Publish) to the top
+of a scrolling editor (`--bg-app`, bottom hairline, `z-index:5`). Pair with
+`.split.rp-editor-split` (a wider left column, `minmax(420px, 0.9fr) 1fr`,
+collapsing to one column ≤1100px) for visual editors with stacked form panels.
+
 ---
 
 ## 4. RadioPad-specific patterns (built on the locked tokens)

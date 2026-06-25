@@ -4,7 +4,16 @@ import { useEffect, useMemo, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { api, type Rulebook } from '@/lib/api';
 import { readQueryParam } from '@/lib/browserParams';
-import { rulebookHref } from '@/lib/routes';
+import { rulebookHref, rulebookEditorHref } from '@/lib/routes';
+import { statusLabel, statusBadge, relativeTime } from '@/lib/rulebookStatus';
+import Container from '@/components/shell/Container';
+import PageHeader from '@/components/shell/PageHeader';
+import Skeleton from '@/components/ui/Skeleton';
+import ErrorState from '@/components/ui/ErrorState';
+
+function splitCsv(csv?: string): string[] {
+  return (csv || '').split(',').map((s) => s.trim()).filter(Boolean);
+}
 
 export default function RulebookDetailPage() {
   const router = useRouter();
@@ -84,8 +93,7 @@ export default function RulebookDetailPage() {
     setError(null);
     try {
       const next = await api.rulebooks.rollback(rb.id, rollbackVersion);
-      // Materialised as a new approved row; navigate back to the list so the
-      // user picks the rolled-back row.
+      // Materialised as a new approved row; navigate to it.
       router.push(rulebookHref(next.id));
     } catch (e) {
       const err = e as { body?: { error?: string }; message: string };
@@ -95,25 +103,90 @@ export default function RulebookDetailPage() {
     }
   }
 
-  if (error && !rb) return <div className="rp-container"><div className="banner warn">{error}</div></div>;
-  if (id === null) return <div className="rp-container"><p style={{ color: 'var(--text-muted)' }}>Loading rulebook…</p></div>;
-  if (!id) return <div className="rp-container"><div className="banner warn">Missing rulebook id.</div></div>;
-  if (!rb) return <div className="rp-container"><p style={{ color: 'var(--text-muted)' }}>Loading rulebook…</p></div>;
+  const backLink = (
+    <button type="button" className="ghost" onClick={() => router.push('/rulebooks')}>← Rulebooks</button>
+  );
+
+  if (error && !rb) {
+    return (
+      <Container>
+        <div className="rp-mb-md">{backLink}</div>
+        <ErrorState title="Couldn't load rulebook" message={error} onRetry={() => { setError(null); setId(readQueryParam('id')); }} />
+      </Container>
+    );
+  }
+  if (!id && id !== null) {
+    return (
+      <Container>
+        <div className="rp-mb-md">{backLink}</div>
+        <ErrorState title="Missing rulebook id" message="This link doesn't point to a rulebook." />
+      </Container>
+    );
+  }
+  if (!rb) {
+    return (
+      <Container>
+        <div className="rp-mb-md">{backLink}</div>
+        <div className="rp-panel"><Skeleton variant="text" width="40%" /><Skeleton variant="block" height={420} style={{ marginTop: 12 }} /></div>
+      </Container>
+    );
+  }
 
   const status = statusLabel(rb.status);
+  const modalities = splitCsv(rb.appliesToModalities);
+  const bodyParts = splitCsv(rb.appliesToBodyParts);
+  const updated = relativeTime(rb.updatedAt);
 
   return (
-    <div className="rp-container">
-      <button className="ghost" onClick={() => router.push('/rulebooks')}>← Back</button>
-      <h1 className="rp-page-title" style={{ marginTop: 8 }}>
-        {rb.name} <code>{rb.rulebookId}</code>
-      </h1>
-      <p className="rp-page-sub">
-        v{rb.version} · {rb.owner || 'no owner'} · <span className={`badge ${badgeFor(rb.status)}`}>{status}</span>
-      </p>
+    <Container>
+      <div className="rp-mb-md">{backLink}</div>
 
-      {error && <div className="banner warn">{error}</div>}
+      <PageHeader
+        title={<>{rb.name} <code style={{ fontSize: 14 }}>{rb.rulebookId}</code></>}
+        description={
+          <>
+            v{rb.version} · {rb.owner || 'no owner'} ·{' '}
+            <span className={`badge ${statusBadge(rb.status)}`}>{status}</span>
+          </>
+        }
+        primaryAction={
+          <button type="button" className="primary-ghost" onClick={() => router.push(rulebookEditorHref(rb.id))}>
+            Open visual editor
+          </button>
+        }
+      />
 
+      {error && <div className="banner danger">{error}</div>}
+
+      {/* Metadata strip */}
+      <div className="rp-panel">
+        <div className="rp-grid-2">
+          <div className="rp-field">
+            <span>Modalities</span>
+            <div className="rp-chip-row">
+              {modalities.length ? modalities.map((m) => <span key={m} className="rp-chip">{m}</span>)
+                : <em style={{ color: 'var(--text-faint)' }}>any</em>}
+            </div>
+          </div>
+          <div className="rp-field">
+            <span>Body parts</span>
+            <div className="rp-chip-row">
+              {bodyParts.length ? bodyParts.map((b) => <span key={b} className="rp-chip">{b}</span>)
+                : <em style={{ color: 'var(--text-faint)' }}>any</em>}
+            </div>
+          </div>
+          <div className="rp-field">
+            <span>Version</span>
+            <div>v{rb.version}</div>
+          </div>
+          <div className="rp-field">
+            <span>Last updated</span>
+            <div>{updated || '—'}</div>
+          </div>
+        </div>
+      </div>
+
+      {/* Lifecycle toolbar */}
       <div className="rp-toolbar">
         <button className="ghost" onClick={validate} disabled={busy}>Validate</button>
         <button className="primary" onClick={save} disabled={busy}>Save new version</button>
@@ -122,10 +195,11 @@ export default function RulebookDetailPage() {
         {versions.length > 0 && (
           <span className="rp-row" style={{ gap: 6, marginLeft: 'auto' }}>
             <select
-              className="rp-input"
+              className="rp-input subtle"
               value={rollbackVersion}
               onChange={(e) => setRollbackVersion(e.target.value)}
               disabled={busy}
+              style={{ width: 'auto' }}
             >
               <option value="">Rollback to…</option>
               {versions.map((v) => (
@@ -172,19 +246,19 @@ export default function RulebookDetailPage() {
         <div className="rp-panel">
           <div className="rp-panel-title">Visual</div>
           <p className="rp-page-sub" style={{ marginTop: 0 }}>
-            Read-only summary of the parsed rulebook. Edit the YAML tab and re-save to change these fields.
+            Read-only summary of the parsed rulebook. Edit the YAML tab and re-save, or use the visual editor, to change these fields.
           </p>
           <div className="rp-field">
             <span>Required sections</span>
-            <div>{visual.requiredSections.length === 0
+            <div className="rp-chip-row">{visual.requiredSections.length === 0
               ? <em style={{ color: 'var(--text-faint)' }}>none</em>
-              : visual.requiredSections.map((s) => <span key={s} className="badge" style={{ marginRight: 6 }}>{s}</span>)}</div>
+              : visual.requiredSections.map((s) => <span key={s} className="badge">{s}</span>)}</div>
           </div>
           <div className="rp-field">
             <span>Style — avoid terms</span>
-            <div>{visual.avoidTerms.length === 0
+            <div className="rp-chip-row">{visual.avoidTerms.length === 0
               ? <em style={{ color: 'var(--text-faint)' }}>none</em>
-              : visual.avoidTerms.map((s) => <span key={s} className="badge danger" style={{ marginRight: 6 }}>{s}</span>)}</div>
+              : visual.avoidTerms.map((s) => <span key={s} className="badge danger">{s}</span>)}</div>
           </div>
           <div className="rp-field">
             <span>Style — approved follow-ups</span>
@@ -204,13 +278,13 @@ export default function RulebookDetailPage() {
           </div>
           <div className="rp-field">
             <span>Prompt blocks</span>
-            <div>{visual.promptBlockKeys.length === 0
+            <div className="rp-chip-row">{visual.promptBlockKeys.length === 0
               ? <em style={{ color: 'var(--text-faint)' }}>none</em>
-              : visual.promptBlockKeys.map((k) => <span key={k} className="badge" style={{ marginRight: 6 }}>{k}</span>)}</div>
+              : visual.promptBlockKeys.map((k) => <span key={k} className="badge">{k}</span>)}</div>
           </div>
         </div>
       )}
-    </div>
+    </Container>
   );
 }
 
@@ -283,13 +357,4 @@ function stripStr(s: string): string {
   let v = s.trim();
   if ((v.startsWith('"') && v.endsWith('"')) || (v.startsWith("'") && v.endsWith("'"))) v = v.slice(1, -1);
   return v;
-}
-
-function statusLabel(s: Rulebook['status']): string {
-  if (typeof s === 'string') return s;
-  return ['Draft', 'In review', 'Approved', 'Deprecated'][s] ?? String(s);
-}
-function badgeFor(s: Rulebook['status']): string {
-  const v = typeof s === 'number' ? s : 0;
-  return ['', 'warn', 'ok', 'danger'][v] ?? '';
 }

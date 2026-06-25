@@ -5,7 +5,6 @@ import type { ReactNode } from 'react';
 import ShellBridge from './ShellBridge';
 import IntlBoundary from '@/components/IntlBoundary';
 import AppShell from '@/components/shell/AppShell';
-import DictationOverlay from '@/components/dictation/DictationOverlay';
 
 export const metadata = {
   title: 'RadioPad — AI radiology reporting',
@@ -19,7 +18,6 @@ export default function RootLayout({ children }: { children: ReactNode }) {
         <IntlBoundary>
           <AppShell>{children}</AppShell>
           <ShellBridge />
-          <DictationOverlay />
         </IntlBoundary>
       </body>
     </html>
