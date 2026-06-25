@@ -66,6 +66,7 @@ public static class EndpointPermissionMatrix
 
             Define("POST", "/api/mcp/tools/{id}/invoke", RbacPermission.McpToolsInvoke, "Invoke a registered MCP tool."),
             Define("POST", "/api/prompts/test-golden", RbacPermission.PromptOverridesManage, "Run a golden-set test of a prompt override."),
+            Define("POST", "/api/prompts/validate", RbacPermission.PromptOverridesManage, "Dry-run validate sample findings against a rulebook."),
             Define("GET", "/api/prompts/overrides", RbacPermission.PromptOverridesManage, "List prompt overrides."),
             Define("POST", "/api/templates/{id}/submit-review", RbacPermission.TemplatesManage, "Submit a template for review."),
             Define("GET", "/api/billing/status", RbacPermission.BillingRead, "Read billing status."),

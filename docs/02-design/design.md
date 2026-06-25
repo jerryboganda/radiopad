@@ -663,3 +663,40 @@ Copy rules added with this iteration:
 - **No env-var scheme samples** (`env:NAME`, `aws:arn:�`, `azkv:�`, `gcp:�`) shown to end users. If a placeholder is needed, use the existing configured value, never the raw scheme grammar.
 - **No technical jargon as severity labels.** The severity dropdown asks a question (`How strict should the safety check be?`) and uses friendly answers (`Just show a note` / `Show a warning (recommended)` / `Block signing until reviewed`) while preserving the underlying `Info`/`Warning`/`Blocker` enum.
 
+### 4.17 Prompt Studio (`/prompts`)
+
+The Prompt Studio rebuild is a two-pane workspace rendered inside `<Container>` +
+`<PageHeader>` like every other library page. A `.rp-filter-bar`-based context bar
+(`.rp-context-bar`) carries the rulebook `SearchableSelect`, the rulebook status
+`.badge`, and an `.rp-chip.rp-chip-dirty` "N unsaved drafts" indicator. Below it,
+`.rp-grid-2.rp-studio-grid` splits the editor (left, slightly wider) from the
+test/review workspace (right).
+
+New classes (all in `radiopad.css`, composing locked tokens only — `--mono`,
+`--bg-subtle`, `--border`, and the semantic green/red/amber families; no new
+tokens):
+
+- **Block editor** — `.rp-block-panel`, `.rp-block-list`, `.rp-block-card`,
+  `.rp-block-head`/`-headings`/`-title`/`-key`/`-desc`, `.rp-prompt-textarea`
+  (the monospace prompt field; there is no `.rp-textarea` class — the box,
+  border, and focus ring come from the `input,textarea,select` element baseline
+  in `globals.css`), `.rp-block-footer`/`-count`/`-saved`/`-actions`, and the
+  inline add-block row `.rp-add-block`/`-input`/`-suggest` (replaces the old
+  `window.prompt()`).
+- **Workspace** — right pane uses the existing `.rp-tabs`/`.rp-tab` pill control
+  (§4.7) with an `.rp-tab-count` pill for pending approvals. `.rp-tab-body` /
+  `.rp-tab-intro` wrap each tool. The Test Runner result and Golden-case summary
+  use an `.rp-stat-strip` of existing `.rp-stat-tile`s; findings render with the
+  existing `.finding` rows (§4.2).
+- **Output diff** — `.rp-diff-controls`, `.rp-diff-legend`/`-legend-item`, and a
+  mono `.rp-diff-panel` whose lines reuse the existing `.rp-diff-add`/
+  `.rp-diff-remove` families (§4.8) plus an `.rp-diff-gutter`.
+- **Approval** — `.rp-approval-list`/`-row`/`-headings`/`-title`/`-meta`/
+  `-actions`/`-note`; drafts are sorted first and gated by `isMedicalDirector`.
+
+Prompt blocks are parsed with the canonical `yamlToRulebookEditor().prompt_blocks`
+(scalar-clean), fixing the earlier leak where the YAML block-scalar indicator
+(`>` / `|`) showed as the first editor line. The Test Runner is non-destructive:
+it calls `POST /api/prompts/validate` (a transient, never-persisted report) instead
+of overwriting a real report's findings.
+

@@ -1125,6 +1125,16 @@ export const api = {
         method: 'POST',
         body: JSON.stringify(body),
       }),
+    /**
+     * Non-destructive dry-run: validate sample findings against a rulebook
+     * without persisting (or touching) any real report. `rulebookId` is the
+     * rulebook row's GUID. See `PromptStudioController.Validate`.
+     */
+    testValidation: (body: { rulebookId: string; findings: string; promptOverrideId?: string | null }) =>
+      request<ValidationResult>('/api/prompts/validate', {
+        method: 'POST',
+        body: JSON.stringify(body),
+      }),
   },
   templates: {
     list: () => request<ReportTemplate[]>('/api/templates'),
