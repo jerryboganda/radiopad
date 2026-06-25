@@ -94,6 +94,38 @@ public class LocalSttEnsembleTests
     }
 
     [Fact]
+    public async Task Mode_Ensemble_Override_Reconciles_Even_When_Default_Off()
+    {
+        await WithEnsemble(false, async () =>
+        {
+            var svc = Build(
+                new FakeEngine("parakeet", true, T("lungs", 0.7), T("clear", 0.5)),
+                new FakeEngine("whisper", true, T("lungs", 0.65), T("clean", 0.5)));
+
+            var r = await svc.TranscribeAsync(Audio(), "audio/wav", CancellationToken.None, "ensemble");
+
+            Assert.Equal("local_ensemble", r.Provider);
+            Assert.NotNull(r.Spans);
+        });
+    }
+
+    [Fact]
+    public async Task Mode_Single_Override_Uses_One_Engine_Even_When_Default_On()
+    {
+        await WithEnsemble(true, async () =>
+        {
+            var svc = Build(
+                new FakeEngine("parakeet", true, T("lungs", 0.9)),
+                new FakeEngine("whisper", true, T("lungs", 0.9)));
+
+            var r = await svc.TranscribeAsync(Audio(), "audio/wav", CancellationToken.None, "single");
+
+            Assert.Equal("local", r.Provider);
+            Assert.Null(r.Spans);
+        });
+    }
+
+    [Fact]
     public void Available_Is_True_When_Any_Engine_Available()
     {
         Assert.True(Build(new FakeEngine("a", true)).Available);

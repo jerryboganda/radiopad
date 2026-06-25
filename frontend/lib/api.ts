@@ -5,6 +5,18 @@
  * configured in `next.config.ts`.
  */
 
+/** On-device STT engine mode selectable from the dictation overlay. */
+export type SttMode = 'auto' | 'single' | 'ensemble';
+
+/** One reconciled word from the multi-engine ensemble. `flagged` spans are the
+ *  disagreement / safety-critical tokens the radiologist must eye-confirm. */
+export type SttSpan = {
+  text: string;
+  flagged: boolean;
+  reason: string | null;
+  source: string;
+};
+
 type PublicProcess = { env?: Record<string, string | undefined> };
 
 const RUNTIME_PUBLIC_ENV =
@@ -865,17 +877,22 @@ export const api = {
     // backend routes it through UBAG (audio attached into a chat model) and
     // returns the transcript. PHI routing is handled by the provider router,
     // exactly like the text dictation/cleanup path — no separate gate.
-    transcribe: (id: string, audio: Blob) => {
+    transcribe: (id: string, audio: Blob, mode?: SttMode) => {
       const form = new FormData();
       // Desktop converts to 16 kHz mono WAV for the on-device engine; web sends
       // the original webm. Name the part by type so the backend content-type
       // check sees the right format (it keys off the blob's MIME type).
       const name = audio.type.includes('wav') ? 'dictation.wav' : 'dictation.webm';
       form.append('audio', audio, name);
-      return requestForm<{ transcript: string; provider: string; model: string; latencyMs: number }>(
-        `/api/reports/${id}/dictation/transcribe`,
-        form,
-      );
+      // Per-request engine mode (on-device picker). 'auto' uses the server default.
+      if (mode && mode !== 'auto') form.append('mode', mode);
+      return requestForm<{
+        transcript: string;
+        provider: string;
+        model: string;
+        latencyMs: number;
+        spans?: SttSpan[] | null;
+      }>(`/api/reports/${id}/dictation/transcribe`, form);
     },
     signatures: (id: string) =>
       request<ReportSignature[]>(`/api/reports/${id}/signatures`),

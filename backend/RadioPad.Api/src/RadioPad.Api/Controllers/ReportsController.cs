@@ -846,7 +846,8 @@ public class ReportsController : TenantedController
         Guid id,
         [FromForm] IFormFile? audio,
         [FromServices] Application.Abstractions.ITranscriptionService service,
-        CancellationToken ct)
+        CancellationToken ct,
+        [FromForm] string? mode = null)
     {
         var (tenant, user) = await ResolveContextAsync(_db, ct);
         var deny = RequireRole(user, UserRole.Radiologist, UserRole.MedicalDirector);
@@ -869,7 +870,7 @@ public class ReportsController : TenantedController
             await using var stream = audio.OpenReadStream();
             var result = await service.TranscribeAsync(
                 tenant, user, report, stream, audio.FileName ?? "dictation.webm",
-                audio.Length, contentType, ct);
+                audio.Length, contentType, ct, mode);
             return Ok(new
             {
                 transcript = result.Text,

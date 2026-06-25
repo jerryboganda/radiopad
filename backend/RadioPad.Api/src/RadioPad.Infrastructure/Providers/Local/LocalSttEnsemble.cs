@@ -36,7 +36,7 @@ public sealed class LocalSttEnsemble : ILocalSttClient
 
     public bool Available => _engines.Any(e => e.Available);
 
-    public async Task<TranscriptionResult> TranscribeAsync(Stream audio, string contentType, CancellationToken ct)
+    public async Task<TranscriptionResult> TranscribeAsync(Stream audio, string contentType, CancellationToken ct, string? mode = null)
     {
         var available = _engines.Where(e => e.Available).ToList();
         if (available.Count == 0)
@@ -51,8 +51,17 @@ public sealed class LocalSttEnsemble : ILocalSttClient
 
         var sw = Stopwatch.StartNew();
 
-        // Single-engine path: ensemble off, or only one engine ready.
-        if (!LocalSttModels.IsEnsembleEnabled() || available.Count < 2)
+        // Per-request mode override (from the editor's engine picker) wins; else
+        // the configured default (RADIOPAD_STT_ENSEMBLE).
+        var useEnsemble = mode?.Trim().ToLowerInvariant() switch
+        {
+            "ensemble" => true,
+            "single" => false,
+            _ => LocalSttModels.IsEnsembleEnabled(),
+        };
+
+        // Single-engine path: ensemble off/not requested, or only one engine ready.
+        if (!useEnsemble || available.Count < 2)
         {
             var only = await PickPrimary(available).RecognizeAsync(bytes, ct);
             sw.Stop();

@@ -22,11 +22,19 @@ import {
   parseSpeechResults,
   type SpeechRecognitionLike,
 } from '@/lib/dictation/speech';
-import { api } from '@/lib/api';
+import { api, type SttMode, type SttSpan } from '@/lib/api';
 import { readQueryParam } from '@/lib/browserParams';
 
 const DICTATE_EVENT = 'radiopad:dictate';
 const CLEANUP_EVENT = 'radiopad:dictation-cleanup';
+const MODE_STORAGE_KEY = 'radiopad:stt-mode';
+const STT_MODES: SttMode[] = ['auto', 'single', 'ensemble'];
+
+function readStoredMode(): SttMode {
+  if (typeof window === 'undefined') return 'auto';
+  const v = window.localStorage.getItem(MODE_STORAGE_KEY);
+  return v === 'single' || v === 'ensemble' ? v : 'auto';
+}
 
 export default function DictationOverlay() {
   const [supported, setSupported] = useState(false);
@@ -45,6 +53,23 @@ export default function DictationOverlay() {
   const mediaRecorderRef = useRef<MediaRecorder | null>(null);
   const audioChunksRef = useRef<Blob[]>([]);
   const audioStreamRef = useRef<MediaStream | null>(null);
+
+  // On-device engine mode picker + the ensemble's flagged review spans.
+  const [mode, setMode] = useState<SttMode>('auto');
+  const [reviewSpans, setReviewSpans] = useState<SttSpan[]>([]);
+
+  useEffect(() => {
+    setMode(readStoredMode());
+  }, []);
+
+  const changeMode = useCallback((next: SttMode) => {
+    setMode(next);
+    try {
+      window.localStorage.setItem(MODE_STORAGE_KEY, next);
+    } catch {
+      /* storage unavailable — keep the in-memory choice */
+    }
+  }, []);
 
   useEffect(() => {
     setSupported(getSpeechRecognitionCtor() !== null);
@@ -116,15 +141,18 @@ export default function DictationOverlay() {
           payload = blob;
         }
       }
-      const res = await api.reports.transcribe(reportId, payload);
+      const res = await api.reports.transcribe(reportId, payload, mode);
       if (res.transcript) insertAtCursor(target, formatDictation(res.transcript));
+      // Surface ensemble disagreements / safety tokens for the radiologist to
+      // eye-confirm (null on single-engine / cloud paths).
+      setReviewSpans((res.spans ?? []).filter((s) => s.flagged));
     } catch {
       // Any provider/policy error surfaces as a non-2xx; the editor handles the
       // error envelope. Insert nothing on failure.
     } finally {
       setTranscribing(false);
     }
-  }, []);
+  }, [mode]);
 
   const startAudioCapture = useCallback(async () => {
     if (typeof navigator === 'undefined' || !navigator.mediaDevices?.getUserMedia) return;
@@ -183,6 +211,25 @@ export default function DictationOverlay() {
           {interim}
         </div>
       )}
+      {reviewSpans.length > 0 && (
+        <div className="rp-dictation-interim" data-testid="dictation-review" role="status">
+          {reviewSpans.length} to verify:{' '}
+          {reviewSpans.map((s, i) => (
+            <span key={i} className="ai-mark" title={s.reason ?? 'review'}>
+              {s.text}
+            </span>
+          ))}
+          <button
+            type="button"
+            className="subtle"
+            data-testid="dictation-review-dismiss"
+            aria-label="Dismiss review"
+            onClick={() => setReviewSpans([])}
+          >
+            ×
+          </button>
+        </div>
+      )}
       <div className="rp-dictation-controls">
         <button
           type="button"
@@ -220,6 +267,20 @@ export default function DictationOverlay() {
         >
           Fix
         </button>
+        <select
+          className="subtle"
+          data-testid="dictation-mode"
+          aria-label="On-device transcription engine mode"
+          title="On-device engine: Auto, Single (Parakeet) or Ensemble (Parakeet + Whisper, cross-checked)"
+          value={mode}
+          onChange={(e) => changeMode(e.target.value as SttMode)}
+        >
+          {STT_MODES.map((m) => (
+            <option key={m} value={m}>
+              {m === 'auto' ? 'Auto' : m === 'single' ? 'Single' : 'Ensemble'}
+            </option>
+          ))}
+        </select>
       </div>
     </div>
   );
