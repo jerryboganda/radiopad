@@ -57,10 +57,26 @@ public static class LocalSttModels
     public static string ResolveDecodingMethod()
         => Env("RADIOPAD_STT_DECODING") is { Length: > 0 } v ? v : DefaultDecodingMethod;
 
-    /// <summary>sherpa-onnx execution provider (cpu/cuda/directml). CPU by default;
-    /// GPU is opt-in and requires the matching native runtime on the box.</summary>
+    /// <summary>
+    /// Execution provider for the on-device engines. PROJECT RULE: inference runs
+    /// on the CPU and SYSTEM RAM — never the GPU/VRAM by manual choice. There is
+    /// deliberately NO env switch (no manual switching). A discrete GPU is used
+    /// ONLY when it is auto-detected AND a GPU-capable native runtime is actually
+    /// present; otherwise CPU. The shipped sherpa-onnx + Whisper runtimes are CPU
+    /// builds, so this resolves to "cpu" today — the detection seam keeps any
+    /// future elevation fully automatic (still no manual switch).
+    /// </summary>
     public static string ResolveProvider()
-        => (Env("RADIOPAD_STT_PROVIDER") ?? "cpu").ToLowerInvariant();
+        => GpuAccelerationAvailable() ? "cuda" : "cpu";
+
+    /// <summary>
+    /// Automatic, no-manual-override capability check. True ONLY when a GPU-capable
+    /// native runtime is present AND a discrete GPU with dedicated VRAM is detected.
+    /// The current CPU-only build ships no GPU runtime, so this is false and
+    /// inference stays on CPU + system RAM per the project rule. At most an
+    /// integrated Intel GPU may appear; it is never required.
+    /// </summary>
+    private static bool GpuAccelerationAvailable() => false;
 
     /// <summary>Decode threads, leaving headroom on the clinical workstation and
     /// capping so a many-core box doesn't oversubscribe on a single utterance.</summary>
