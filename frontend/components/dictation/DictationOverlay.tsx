@@ -21,6 +21,8 @@ import {
   parseSpeechResults,
   type SpeechRecognitionLike,
 } from '@/lib/dictation/speech';
+import { api } from '@/lib/api';
+import { readQueryParam } from '@/lib/browserParams';
 
 const DICTATE_EVENT = 'radiopad:dictate';
 const CLEANUP_EVENT = 'radiopad:dictation-cleanup';
@@ -32,6 +34,16 @@ export default function DictationOverlay() {
   const recognizerRef = useRef<SpeechRecognitionLike | null>(null);
   const listeningRef = useRef(false);
   listeningRef.current = listening;
+
+  // High-accuracy (HQ) path: record mic audio with MediaRecorder, send to the
+  // backend transcribe endpoint (UBAG-routed), and insert the transcript. This
+  // is the path that works in the desktop WebView2 shell, where Web Speech is
+  // unavailable.
+  const [transcribing, setTranscribing] = useState(false);
+  const [audioRecording, setAudioRecording] = useState(false);
+  const mediaRecorderRef = useRef<MediaRecorder | null>(null);
+  const audioChunksRef = useRef<Blob[]>([]);
+  const audioStreamRef = useRef<MediaStream | null>(null);
 
   useEffect(() => {
     setSupported(getSpeechRecognitionCtor() !== null);
@@ -84,6 +96,58 @@ export default function DictationOverlay() {
     else start();
   }, [start, stop]);
 
+  const transcribeAudio = useCallback(async (blob: Blob) => {
+    const reportId = readQueryParam('id');
+    const target = getLastFocusedEditable();
+    if (!reportId || !target || blob.size === 0) return;
+    setTranscribing(true);
+    try {
+      const res = await api.reports.transcribe(reportId, blob);
+      if (res.transcript) insertAtCursor(target, formatDictation(res.transcript));
+    } catch {
+      // Backend surfaces 403 audio_requires_deidentified / policy errors; left
+      // as a no-op insert here (the error envelope is handled by the editor).
+    } finally {
+      setTranscribing(false);
+    }
+  }, []);
+
+  const startAudioCapture = useCallback(async () => {
+    if (typeof navigator === 'undefined' || !navigator.mediaDevices?.getUserMedia) return;
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      audioStreamRef.current = stream;
+      audioChunksRef.current = [];
+      const rec = new MediaRecorder(stream, { mimeType: 'audio/webm' });
+      rec.ondataavailable = (ev) => {
+        if (ev.data && ev.data.size > 0) audioChunksRef.current.push(ev.data);
+      };
+      rec.onstop = () => {
+        const blob = new Blob(audioChunksRef.current, { type: 'audio/webm' });
+        audioStreamRef.current?.getTracks().forEach((t) => t.stop());
+        audioStreamRef.current = null;
+        void transcribeAudio(blob);
+      };
+      mediaRecorderRef.current = rec;
+      rec.start();
+      setAudioRecording(true);
+    } catch {
+      setAudioRecording(false);
+    }
+  }, [transcribeAudio]);
+
+  const stopAudioCapture = useCallback(() => {
+    const rec = mediaRecorderRef.current;
+    if (rec && rec.state !== 'inactive') rec.stop();
+    mediaRecorderRef.current = null;
+    setAudioRecording(false);
+  }, []);
+
+  const toggleAudio = useCallback(() => {
+    if (audioRecording) stopAudioCapture();
+    else void startAudioCapture();
+  }, [audioRecording, startAudioCapture, stopAudioCapture]);
+
   // Desktop hotkey (Ctrl+Shift+D) and the editor's Dictate button both dispatch
   // `radiopad:dictate`; this is the single owner that toggles the overlay.
   useEffect(() => {
@@ -119,6 +183,18 @@ export default function DictationOverlay() {
         >
           <span className="rp-dictation-dot" aria-hidden="true" />
           <span className="rp-dictation-label">{listening ? 'Listening…' : 'Dictate'}</span>
+        </button>
+        <button
+          type="button"
+          data-testid="dictation-hq"
+          className={`rp-dictation-fix subtle${audioRecording ? ' recording' : ''}`}
+          aria-pressed={audioRecording}
+          title="Record and transcribe with high accuracy (UBAG audio)"
+          disabled={transcribing}
+          onMouseDown={(e) => e.preventDefault()}
+          onClick={toggleAudio}
+        >
+          {transcribing ? '…' : audioRecording ? 'Stop' : 'HQ'}
         </button>
         <button
           type="button"
