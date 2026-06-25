@@ -157,7 +157,9 @@ describe('Copilot pages', () => {
     const { container } = render(<CopilotAdminPage />);
 
     await waitFor(() => expect(adminSettingsMock).toHaveBeenCalled());
-    expect(screen.getByText(/Fail-closed/)).toBeTruthy();
+    // findByText (async) waits for the post-fetch re-render — getByText raced the
+    // state update and flaked in slower CI.
+    expect(await screen.findByText(/Fail-closed/)).toBeTruthy();
     expect(screen.getByRole('button', { name: 'Save Copilot settings' })).toBeTruthy();
     expect(screen.getByRole('button', { name: 'Save quotas' })).toBeTruthy();
     expect(container.querySelectorAll('.rp-input').length).toBeGreaterThanOrEqual(8);

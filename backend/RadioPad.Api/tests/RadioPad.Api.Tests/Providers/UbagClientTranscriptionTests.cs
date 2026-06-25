@@ -3,6 +3,7 @@ using System.Text;
 using System.Text.Json;
 using Microsoft.Extensions.Logging.Abstractions;
 using RadioPad.Application.Abstractions;
+using RadioPad.Application.Services;
 using RadioPad.Infrastructure.Providers.Ubag;
 using Xunit;
 
