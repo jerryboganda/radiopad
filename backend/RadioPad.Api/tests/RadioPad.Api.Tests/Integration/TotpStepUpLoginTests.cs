@@ -52,6 +52,36 @@ public class TotpStepUpLoginTests : IClassFixture<RadioPadAppFactory>
         Assert.False(string.IsNullOrEmpty(loginBody.GetProperty("token").GetString()));
     }
 
+    /// <summary>
+    /// Regression: forced first-login TOTP setup must mint a session token when a
+    /// valid mfa-setup ticket is presented — even with RADIOPAD_DEV_HEADERS enabled
+    /// (the desktop sidecar's mode). Previously AuthorizeBody checked dev-header
+    /// identity first and left viaSetup=false, so Verify returned { mfaEnabled }
+    /// with no token and the login page reported "Enrolment did not complete"
+    /// despite a correct code.
+    /// </summary>
+    [Fact]
+    public async Task ForcedSetup_WithValidTicket_UnderDevHeaders_MintsSessionToken()
+    {
+        var http = _factory.CreateTenantClient();
+        var slug = _factory.SeedTenant.Slug;
+        var email = _factory.SeedUser.Email;
+        var setupToken = RadioPad.Api.Auth.RadioPadBearerTokens.MintTicket(
+            RadioPad.Api.Auth.RadioPadBearerTokens.MfaSetupScope, slug, email);
+
+        var enroll = await http.PostAsJsonAsync("/api/auth/mfa/enroll", new { tenant = slug, email, setupToken });
+        enroll.EnsureSuccessStatusCode();
+        var secret = (await enroll.Content.ReadFromJsonAsync<JsonElement>()).GetProperty("secret").GetString()!;
+
+        var verify = await http.PostAsJsonAsync("/api/auth/mfa/verify",
+            new { tenant = slug, email, code = CurrentCode(secret), setupToken });
+        Assert.Equal(HttpStatusCode.OK, verify.StatusCode);
+        var body = await verify.Content.ReadFromJsonAsync<JsonElement>();
+        Assert.True(body.GetProperty("mfaEnabled").GetBoolean());
+        Assert.False(string.IsNullOrEmpty(body.GetProperty("token").GetString()),
+            "forced first-login setup must mint a session token (viaSetup), even under dev headers");
+    }
+
     [Fact]
     public async Task MfaLogin_WithWrongCode_IsRejected()
     {

@@ -46,7 +46,12 @@ public class MfaController : ControllerBase
     private bool AuthorizeBody(string tenant, string email, string? setupToken, out bool viaSetup)
     {
         viaSetup = false;
-        if (CanUseBodyIdentity(tenant, email)) return true;
+        // Prefer a valid first-login setup ticket: that flow has no session yet and
+        // depends on Verify minting the session bearer (viaSetup=true). Checking it
+        // BEFORE CanUseBodyIdentity matters on the desktop sidecar, where
+        // RADIOPAD_DEV_HEADERS=1 makes CanUseBodyIdentity short-circuit to true and
+        // would otherwise leave viaSetup=false — so no token is minted and the login
+        // page reports "Enrolment did not complete" despite a correct code.
         if (!string.IsNullOrEmpty(setupToken)
             && RadioPadBearerTokens.TryValidateTicket(setupToken, RadioPadBearerTokens.MfaSetupScope, _env, out var t, out var u)
             && string.Equals(t, tenant, StringComparison.Ordinal)
@@ -55,6 +60,7 @@ public class MfaController : ControllerBase
             viaSetup = true;
             return true;
         }
+        if (CanUseBodyIdentity(tenant, email)) return true;
         return false;
     }
 
