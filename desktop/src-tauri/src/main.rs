@@ -157,6 +157,11 @@ fn main() {
         }))
         .plugin(tauri_plugin_shell::init())
         .plugin(tauri_plugin_dialog::init())
+        // DESK-001 — auto-updater. The frontend "Check for updates" button
+        // (and the silent check-on-launch) drive this plugin; `process` lets it
+        // relaunch into the freshly installed build once download+install finish.
+        .plugin(tauri_plugin_updater::Builder::new().build())
+        .plugin(tauri_plugin_process::init())
         .plugin(tauri_plugin_clipboard_manager::init())
         .plugin(tauri_plugin_store::Builder::new().build())
         .plugin(

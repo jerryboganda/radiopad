@@ -23,6 +23,7 @@
     "fhirImport": "FHIR आयात",
     "pacs": "PACS",
     "security": "सुरक्षा",
+    "signInDevices": "साइन-इन और डिवाइस",
     "signIn": "साइन इन",
     "groups": {
       "workspace": "कार्यक्षेत्र",
@@ -85,7 +86,16 @@
     "openMenu": "मेनू खोलें",
     "primaryNav": "मुख्य नेविगेशन",
     "collapseSidebar": "साइडबार छिपाएँ",
-    "expandSidebar": "साइडबार दिखाएँ"
+    "expandSidebar": "साइडबार दिखाएँ",
+    "update": {
+      "checkForUpdates": "अपडेट जाँचें",
+      "checking": "जाँच हो रही है…",
+      "available": "अपडेट उपलब्ध है",
+      "downloading": "डाउनलोड हो रहा है {pct}%",
+      "installing": "इंस्टॉल हो रहा है…",
+      "upToDate": "नवीनतम",
+      "failed": "अपडेट विफल — पुनः प्रयास करें"
+    }
   },
   "profile": {
     "account": "खाता",

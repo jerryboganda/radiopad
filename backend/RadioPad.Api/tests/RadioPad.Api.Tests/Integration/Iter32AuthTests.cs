@@ -1145,7 +1145,8 @@ public class Iter32WebAuthnFlowTests : IClassFixture<RadioPadAppFactory>
     public async Task Register_ThenList_ShowsCredential()
     {
         var http = _factory.CreateTenantClient();
-        var (attObj, clientData) = RadioPad.Api.Tests.Iter33.WebAuthnTestVectors.NoneAttestation();
+        var challenge = await RadioPad.Api.Tests.Iter33.WebAuthnTestVectors.FetchRegisterChallengeAsync(http, "Integration");
+        var (attObj, clientData) = RadioPad.Api.Tests.Iter33.WebAuthnTestVectors.NoneAttestation(challenge);
         var register = await http.PostAsJsonAsync("/api/auth/webauthn/register", new
         {
             attestationObject = attObj,

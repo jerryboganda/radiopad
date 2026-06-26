@@ -29,7 +29,8 @@ public class WebAuthnAttestationTests : IClassFixture<RadioPadAppFactory>
     public async Task NoneAttestation_RegistersAndPersistsFormat()
     {
         var http = _factory.CreateTenantClient();
-        var (attObj, clientData) = WebAuthnTestVectors.NoneAttestation();
+        var challenge = await WebAuthnTestVectors.FetchRegisterChallengeAsync(http, "iter33-none");
+        var (attObj, clientData) = WebAuthnTestVectors.NoneAttestation(challenge);
         var resp = await http.PostAsJsonAsync("/api/auth/webauthn/register", new
         {
             attestationObject = attObj,
@@ -47,7 +48,8 @@ public class WebAuthnAttestationTests : IClassFixture<RadioPadAppFactory>
     public async Task PackedSelfAttestation_RegistersAndPersistsFormat()
     {
         var http = _factory.CreateTenantClient();
-        var (attObj, clientData) = WebAuthnTestVectors.PackedSelfAttestation(corruptSignature: false);
+        var challenge = await WebAuthnTestVectors.FetchRegisterChallengeAsync(http, "iter33-packed");
+        var (attObj, clientData) = WebAuthnTestVectors.PackedSelfAttestation(corruptSignature: false, challenge);
         var resp = await http.PostAsJsonAsync("/api/auth/webauthn/register", new
         {
             attestationObject = attObj,
@@ -67,7 +69,8 @@ public class WebAuthnAttestationTests : IClassFixture<RadioPadAppFactory>
         var http = _factory.CreateTenantClient();
         var beforeFailures = await GetUserFailuresAsync();
 
-        var (attObj, clientData) = WebAuthnTestVectors.PackedSelfAttestation(corruptSignature: true);
+        var challenge = await WebAuthnTestVectors.FetchRegisterChallengeAsync(http, "iter33-bad");
+        var (attObj, clientData) = WebAuthnTestVectors.PackedSelfAttestation(corruptSignature: true, challenge);
         var resp = await http.PostAsJsonAsync("/api/auth/webauthn/register", new
         {
             attestationObject = attObj,
@@ -84,7 +87,8 @@ public class WebAuthnAttestationTests : IClassFixture<RadioPadAppFactory>
     public async Task UnsupportedFormat_TpmIsRejected()
     {
         var http = _factory.CreateTenantClient();
-        var (attObj, clientData) = WebAuthnTestVectors.UnsupportedFormat("tpm");
+        var challenge = await WebAuthnTestVectors.FetchRegisterChallengeAsync(http, "iter33-tpm");
+        var (attObj, clientData) = WebAuthnTestVectors.UnsupportedFormat("tpm", challenge);
         var resp = await http.PostAsJsonAsync("/api/auth/webauthn/register", new
         {
             attestationObject = attObj,
@@ -125,20 +129,74 @@ internal static class WebAuthnTestVectors
 {
     private const string RpId = "localhost";
 
-    public static (string AttestationObjectB64Url, string ClientDataJsonB64Url) NoneAttestation()
+    /// <summary>
+    /// AUTH-001 — the controller now binds /register to the single-use
+    /// challenge issued by /register-options. Tests call this first and feed
+    /// the returned challenge into the vector builders so clientDataJSON
+    /// matches what the server expects.
+    /// </summary>
+    public static async Task<string> FetchRegisterChallengeAsync(HttpClient http, string label = "test")
+    {
+        var resp = await http.PostAsJsonAsync("/api/auth/webauthn/register-options", new { label });
+        resp.EnsureSuccessStatusCode();
+        var body = await resp.Content.ReadFromJsonAsync<JsonElement>();
+        return body.GetProperty("challenge").GetString()!;
+    }
+
+    public static (string AttestationObjectB64Url, string ClientDataJsonB64Url) NoneAttestation(string? challenge = null)
     {
         using var ec = ECDsa.Create(ECCurve.NamedCurves.nistP256);
         var (authData, _) = BuildAuthData(ec);
-        var clientData = BuildClientDataBytes("webauthn.create");
+        var clientData = BuildClientDataBytes("webauthn.create", challenge);
         var att = EncodeAttestationObject("none", new Dictionary<object, object>(), authData);
         return (Base64Url(att), Base64Url(clientData));
     }
 
-    public static (string AttestationObjectB64Url, string ClientDataJsonB64Url) PackedSelfAttestation(bool corruptSignature)
+    /// <summary>
+    /// Like <see cref="NoneAttestation"/> but returns the credential id and the
+    /// authenticator's PKCS#8 private key so a sign-in test can produce a real
+    /// assertion signature the server must verify against the stored COSE key.
+    /// </summary>
+    public static (string AttestationObjectB64Url, string ClientDataJsonB64Url, byte[] CredentialId, byte[] EcPrivatePkcs8)
+        NoneAttestationWithKeyMaterial(string? challenge = null)
+    {
+        var ec = ECDsa.Create(ECCurve.NamedCurves.nistP256);
+        try
+        {
+            var (authData, credId) = BuildAuthData(ec);
+            var clientData = BuildClientDataBytes("webauthn.create", challenge);
+            var att = EncodeAttestationObject("none", new Dictionary<object, object>(), authData);
+            return (Base64Url(att), Base64Url(clientData), credId, ec.ExportPkcs8PrivateKey());
+        }
+        finally { ec.Dispose(); }
+    }
+
+    /// <summary>Builds assertion authenticatorData (rpIdHash + flags + counter; no attested credential data).</summary>
+    public static byte[] BuildAssertionAuthData(uint signCount, bool userVerified)
+    {
+        var rpIdHash = SHA256.HashData(Encoding.UTF8.GetBytes(RpId));
+        byte flags = 0x01; // UP
+        if (userVerified) flags |= 0x04; // UV
+        var ms = new MemoryStream();
+        ms.Write(rpIdHash);
+        ms.WriteByte(flags);
+        ms.Write(new byte[] { (byte)(signCount >> 24), (byte)(signCount >> 16), (byte)(signCount >> 8), (byte)signCount });
+        return ms.ToArray();
+    }
+
+    public static byte[] BuildGetClientData(string challenge)
+    {
+        var json = JsonSerializer.Serialize(new { type = "webauthn.get", challenge, origin = "https://" + RpId });
+        return Encoding.UTF8.GetBytes(json);
+    }
+
+    public static string Base64UrlPublic(byte[] b) => Base64Url(b);
+
+    public static (string AttestationObjectB64Url, string ClientDataJsonB64Url) PackedSelfAttestation(bool corruptSignature, string? challenge = null)
     {
         using var ec = ECDsa.Create(ECCurve.NamedCurves.nistP256);
         var (authData, _) = BuildAuthData(ec);
-        var clientData = BuildClientDataBytes("webauthn.create");
+        var clientData = BuildClientDataBytes("webauthn.create", challenge);
         var clientDataHash = SHA256.HashData(clientData);
 
         var signed = new byte[authData.Length + clientDataHash.Length];
@@ -156,11 +214,11 @@ internal static class WebAuthnTestVectors
         return (Base64Url(att), Base64Url(clientData));
     }
 
-    public static (string AttestationObjectB64Url, string ClientDataJsonB64Url) UnsupportedFormat(string fmt)
+    public static (string AttestationObjectB64Url, string ClientDataJsonB64Url) UnsupportedFormat(string fmt, string? challenge = null)
     {
         using var ec = ECDsa.Create(ECCurve.NamedCurves.nistP256);
         var (authData, _) = BuildAuthData(ec);
-        var clientData = BuildClientDataBytes("webauthn.create");
+        var clientData = BuildClientDataBytes("webauthn.create", challenge);
         var att = EncodeAttestationObject(fmt, new Dictionary<object, object>(), authData);
         return (Base64Url(att), Base64Url(clientData));
     }
@@ -187,12 +245,12 @@ internal static class WebAuthnTestVectors
         return (ms.ToArray(), credId);
     }
 
-    private static byte[] BuildClientDataBytes(string type)
+    private static byte[] BuildClientDataBytes(string type, string? challenge = null)
     {
         var json = JsonSerializer.Serialize(new
         {
             type,
-            challenge = Base64Url(RandomNumberGenerator.GetBytes(32)),
+            challenge = challenge ?? Base64Url(RandomNumberGenerator.GetBytes(32)),
             origin = "https://" + RpId,
         });
         return Encoding.UTF8.GetBytes(json);

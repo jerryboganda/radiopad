@@ -17,9 +17,14 @@
     "@capacitor/network": "^6.0.3",
     "@capacitor/preferences": "^6.0.3",
     "@capacitor/push-notifications": "^6.0.4",
+    "@tauri-apps/plugin-process": "^2.0.0",
+    "@tauri-apps/plugin-updater": "^2.0.0",
+    "@types/qrcode": "^1.5.6",
     "capacitor-secure-storage-plugin": "^0.10.0",
+    "lucide-react": "^0.469.0",
     "next": "^16.2.4",
     "next-intl": "^3.26.5",
+    "qrcode": "^1.5.4",
     "react": "^18.3.1",
     "react-dom": "^18.3.1"
   },
@@ -30,7 +35,10 @@
     "@types/react": "^18.3.12",
     "@types/react-dom": "^18.3.1",
     "@vitejs/plugin-react": "^4.3.4",
+    "autoprefixer": "^10.4.20",
     "jsdom": "^25.0.1",
+    "postcss": "^8.4.49",
+    "tailwindcss": "^3.4.17",
     "typescript": "^5.6.3",
     "vitest": "^2.1.8"
   }

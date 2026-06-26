@@ -63,6 +63,11 @@ builder.Services.AddDbContext<RadioPadDbContext>(opt =>
 });
 
 builder.Services.AddHttpClient();
+// In-memory store for short-lived, single-use WebAuthn challenges (AUTH-001).
+// Challenges expire in ~2 minutes; a single backend instance (desktop sidecar
+// and the single-VPS prod deployment) makes an in-process cache sufficient.
+// Move to a distributed cache if the API is ever scaled horizontally.
+builder.Services.AddMemoryCache();
 // Transactional email via HTTPS REST API (Resend/SendGrid/Mailgun).
 // Bypasses DigitalOcean SMTP port block for guaranteed deliverability.
 builder.Services.AddHttpClient<RadioPad.Infrastructure.Email.HttpEmailSender>();

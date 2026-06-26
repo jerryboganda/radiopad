@@ -7,6 +7,7 @@ import Topbar from './Topbar';
 import MobileDrawerBackdrop from './MobileDrawerBackdrop';
 import { ShellProvider, useShell } from './ShellContext';
 import { PageActionsProvider } from './PageActionsSlot';
+import AuthGate from './AuthGate';
 import BillingStatusBanner from '@/components/BillingStatusBanner';
 import DesktopStatusBanner from '@/components/DesktopStatusBanner';
 
@@ -43,7 +44,9 @@ export default function AppShell({ children }: { children: ReactNode }) {
   return (
     <ShellProvider>
       <PageActionsProvider>
-        <ShellRoot>{children}</ShellRoot>
+        <AuthGate>
+          <ShellRoot>{children}</ShellRoot>
+        </AuthGate>
       </PageActionsProvider>
     </ShellProvider>
   );

@@ -26,11 +26,13 @@ public class MfaController : ControllerBase
     private readonly RadioPadDbContext _db;
     private readonly IAuditLog _audit;
     private readonly RadioPad.Api.Auth.LockoutPolicy _lockout;
-    public MfaController(RadioPadDbContext db, IAuditLog audit, RadioPad.Api.Auth.LockoutPolicy lockout)
-    { _db = db; _audit = audit; _lockout = lockout; }
+    private readonly IWebHostEnvironment _env;
+    public MfaController(RadioPadDbContext db, IAuditLog audit, RadioPad.Api.Auth.LockoutPolicy lockout, IWebHostEnvironment env)
+    { _db = db; _audit = audit; _lockout = lockout; _env = env; }
 
     public record EnrollDto(string Tenant, string Email);
     public record VerifyDto(string Tenant, string Email, string Code);
+    public record LoginDto(string Tenant, string Email, string Code);
 
     [HttpPost("enroll")]
     public async Task<IActionResult> Enroll([FromBody] EnrollDto dto, CancellationToken ct)
@@ -79,6 +81,50 @@ public class MfaController : ControllerBase
             DetailsJson = JsonSerializer.Serialize(new { method = "totp" }),
         }, ct);
         return Ok(new { ok = true, mfaEnabled = true });
+    }
+
+    /// <summary>
+    /// AUTH-008 step-up sign-in. After a single-factor login returns
+    /// <c>{ mfaRequired: true }</c>, the client submits the 6-digit TOTP code
+    /// here; on success a session bearer token is minted (the token the
+    /// single-factor step withheld). This is the only place the second factor
+    /// turns into a session.
+    /// </summary>
+    [HttpPost("login")]
+    public async Task<IActionResult> Login([FromBody] LoginDto dto, CancellationToken ct)
+    {
+        var (user, tenant) = await ResolveAsync(dto.Tenant, dto.Email, ct);
+        if (user is null || tenant is null)
+            return Unauthorized(new { error = "Invalid sign-in.", kind = "unauthenticated" });
+        if (!user.IsActive)
+            return Unauthorized(new { error = "User has been deprovisioned.", kind = "unauthenticated" });
+        if (!user.MfaEnabled || string.IsNullOrEmpty(user.MfaSecret))
+            return BadRequest(new { error = "An authenticator app is not enrolled for this account.", kind = "validation" });
+        if (RadioPad.Api.Auth.LockoutPolicy.IsLocked(user))
+            return Unauthorized(new { error = "Account locked.", kind = "unauthenticated", until = user.LockedUntil });
+        if (!TotpVerify(user.MfaSecret, dto.Code))
+        {
+            await _lockout.OnFailureAsync(user, method: "totp", ct);
+            return Unauthorized(new { error = "Invalid TOTP code.", kind = "unauthenticated" });
+        }
+
+        await _lockout.OnSuccessAsync(user, ct);
+        var issuedAt = DateTimeOffset.UtcNow;
+        var token = RadioPadBearerTokens.Mint(tenant.Slug, user.Email, user.SessionEpoch, _env, issuedAt);
+        var expiresAt = RadioPadBearerTokens.ExpiresAt(issuedAt);
+        await EnterpriseIdentityBridge.RecordAuthSessionAsync(
+            _db, user, token, "totp", expiresAt, ct,
+            ip: HttpContext.Connection.RemoteIpAddress?.ToString(),
+            userAgent: HttpContext.Request.Headers.UserAgent.FirstOrDefault());
+        RadioPadSessionCookies.Append(Response, HttpContext.Request, token, expiresAt, _env);
+        await _audit.AppendAsync(new AuditEvent
+        {
+            TenantId = tenant.Id,
+            UserId = user.Id,
+            Action = AuditAction.UserLogin,
+            DetailsJson = JsonSerializer.Serialize(new { method = "totp", step = "login" }),
+        }, ct);
+        return Ok(new { token, tenant = tenant.Slug, user = user.Email, expiresAt });
     }
 
     private async Task<(User? user, Tenant? tenant)> ResolveAsync(string slug, string email, CancellationToken ct)
@@ -316,6 +362,12 @@ public class MagicLinkController : ControllerBase
         var user = await _db.Users.FirstOrDefaultAsync(u => u.Id == row.UserId && u.TenantId == tenant.Id, ct);
         if (user is null || !user.IsActive || user.LockedUntil > DateTimeOffset.UtcNow)
             return Unauthorized(new { error = "User is not active.", kind = "unauthenticated" });
+
+        // AUTH-008 step-up: the link proved email control (one factor). If the
+        // user has an authenticator app enrolled, require the 6-digit TOTP code
+        // via POST /api/auth/mfa/login before issuing a session token.
+        if (user.MfaEnabled)
+            return Ok(new { mfaRequired = true, tenant = tenant.Slug, user = user.Email });
 
         await _audit.AppendAsync(new AuditEvent
         {

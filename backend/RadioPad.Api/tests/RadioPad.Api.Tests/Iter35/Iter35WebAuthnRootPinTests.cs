@@ -41,7 +41,8 @@ public class Iter35WebAuthnRootPinTests
         await f.InitializeAsync();
         var http = f.CreateTenantClient();
 
-        var (attObj, clientData) = Iter35WebAuthnVectorExtensions.PackedX5cAttestationFor(leaf, ca);
+        var challenge = await WebAuthnTestVectors.FetchRegisterChallengeAsync(http, "iter35-trusted");
+        var (attObj, clientData) = Iter35WebAuthnVectorExtensions.PackedX5cAttestationFor(leaf, ca, challenge);
         var resp = await http.PostAsJsonAsync("/api/auth/webauthn/register", new
         {
             attestationObject = attObj,
@@ -63,7 +64,8 @@ public class Iter35WebAuthnRootPinTests
         await f.InitializeAsync();
         var http = f.CreateTenantClient();
 
-        var (attObj, clientData) = Iter35WebAuthnVectorExtensions.PackedX5cAttestationFor(leaf, attacker);
+        var challenge = await WebAuthnTestVectors.FetchRegisterChallengeAsync(http, "iter35-untrusted");
+        var (attObj, clientData) = Iter35WebAuthnVectorExtensions.PackedX5cAttestationFor(leaf, attacker, challenge);
         var resp = await http.PostAsJsonAsync("/api/auth/webauthn/register", new
         {
             attestationObject = attObj,
@@ -141,13 +143,14 @@ internal static class Iter35WebAuthnVectorExtensions
 
     public static (string AttestationObjectB64Url, string ClientDataJsonB64Url) PackedX5cAttestationFor(
         X509Certificate2 leafWithPrivateKey,
-        X509Certificate2 issuer)
+        X509Certificate2 issuer,
+        string? challenge = null)
     {
         // Authenticator's *own* keypair (used for the credential) — separate
         // from the leaf cert's keypair (used to sign the attStmt).
         using var authnEc = ECDsa.Create(ECCurve.NamedCurves.nistP256);
         var (authData, _) = BuildAuthData(authnEc);
-        var clientData = BuildClientDataBytes("webauthn.create");
+        var clientData = BuildClientDataBytes("webauthn.create", challenge);
         var clientDataHash = SHA256.HashData(clientData);
 
         var signed = new byte[authData.Length + clientDataHash.Length];
@@ -192,12 +195,12 @@ internal static class Iter35WebAuthnVectorExtensions
         return (ms.ToArray(), credId);
     }
 
-    private static byte[] BuildClientDataBytes(string type)
+    private static byte[] BuildClientDataBytes(string type, string? challenge = null)
     {
         var json = JsonSerializer.Serialize(new
         {
             type,
-            challenge = Base64Url(RandomNumberGenerator.GetBytes(32)),
+            challenge = challenge ?? Base64Url(RandomNumberGenerator.GetBytes(32)),
             origin = "https://" + RpId,
         });
         return Encoding.UTF8.GetBytes(json);

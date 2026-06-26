@@ -3,6 +3,7 @@ using System.Text;
 using System.Text.Json;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Caching.Memory;
 using RadioPad.Api.Auth;
 using RadioPad.Application.Abstractions;
 using RadioPad.Application.Services.WebAuthn;
@@ -54,28 +55,86 @@ public class WebAuthnController : TenantedController
     private readonly RadioPad.Api.Auth.LockoutPolicy _lockout;
     private readonly RadioPad.Application.Services.WebAuthn.IFidoMdsMetadataSource? _mdsRoots;
     private readonly IWebHostEnvironment _env;
+    private readonly IMemoryCache _cache;
 
     public WebAuthnController(
         RadioPadDbContext db,
         IAuditLog audit,
         RadioPad.Api.Auth.LockoutPolicy lockout,
         IWebHostEnvironment env,
+        IMemoryCache cache,
         RadioPad.Application.Services.WebAuthn.IFidoMdsMetadataSource? mdsRoots = null)
-    { _db = db; _audit = audit; _lockout = lockout; _env = env; _mdsRoots = mdsRoots; }
+    { _db = db; _audit = audit; _lockout = lockout; _env = env; _cache = cache; _mdsRoots = mdsRoots; }
 
     private static string Rp() => Environment.GetEnvironmentVariable("RADIOPAD_WEBAUTHN_RP_ID") ?? "localhost";
     private static string RpName() => Environment.GetEnvironmentVariable("RADIOPAD_WEBAUTHN_RP_NAME") ?? "RadioPad";
 
+    /// <summary>Explicit origin allow-list (comma-separated). Empty ⇒ derive from the RP id.</summary>
+    private static IReadOnlyCollection<string> AllowedOrigins() =>
+        (Environment.GetEnvironmentVariable("RADIOPAD_WEBAUTHN_ORIGINS") ?? "")
+            .Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
+
+    /// <summary>When set, the authenticator must report User Verification (Windows Hello PIN/biometric).</summary>
+    private static bool RequireUserVerification() =>
+        Environment.GetEnvironmentVariable("RADIOPAD_WEBAUTHN_REQUIRE_UV") == "1";
+
+    // Short-lived, single-use challenge store (AUTH-001). Keyed per
+    // tenant+user+ceremony so a register challenge can't be replayed at sign-in.
+    private static readonly TimeSpan ChallengeTtl = TimeSpan.FromMinutes(2);
+    private static string ChallengeKey(string purpose, Guid tenantId, Guid userId) =>
+        $"webauthn:{purpose}:{tenantId:N}:{userId:N}";
+    private void StoreChallenge(string purpose, Guid tenantId, Guid userId, string challenge) =>
+        _cache.Set(ChallengeKey(purpose, tenantId, userId), challenge, ChallengeTtl);
+    private string? ConsumeChallenge(string purpose, Guid tenantId, Guid userId)
+    {
+        var key = ChallengeKey(purpose, tenantId, userId);
+        if (_cache.TryGetValue(key, out string? value) && !string.IsNullOrEmpty(value))
+        {
+            _cache.Remove(key); // single use — replays after this fail
+            return value;
+        }
+        return null;
+    }
+
+    /// <summary>
+    /// Resolves the principal for a sign-in ceremony. When a verified session is
+    /// already present (post-login passkey use) the token identity wins. On the
+    /// login screen there is no token, so the caller-supplied tenant slug + email
+    /// identify whose credentials to offer — the assertion signature, not this
+    /// lookup, is what actually authenticates the user.
+    /// </summary>
+    private async Task<(Tenant tenant, User user)> ResolveSignInPrincipalAsync(string? tenantSlug, string? email, CancellationToken ct)
+    {
+        if (!RadioPadRequestIdentity.TryGet(HttpContext, out _)
+            && !string.IsNullOrWhiteSpace(tenantSlug) && !string.IsNullOrWhiteSpace(email))
+        {
+            var tenant = await _db.Tenants.FirstOrDefaultAsync(t => t.Slug == tenantSlug, ct)
+                ?? throw new UnauthorizedAccessException("Unknown tenant or credential.");
+            var user = await _db.Users.FirstOrDefaultAsync(u => u.TenantId == tenant.Id && u.Email == email, ct)
+                ?? throw new UnauthorizedAccessException("Unknown tenant or credential.");
+            if (!user.IsActive)
+                throw new UnauthorizedAccessException("User has been deprovisioned.");
+            return (tenant, user);
+        }
+        return await ResolveContextAsync(_db, ct);
+    }
+
     public record RegisterOptionsDto(string? Label);
     public record RegisterDto(string AttestationObject, string ClientDataJson, string? Label);
-    public record SignInOptionsDto();
-    public record SignInDto(string CredentialId, string ClientDataJson, string AuthenticatorData, string Signature, uint SignCount);
+    // Tenant/User are supplied only for pre-authentication sign-in (the login
+    // screen, before any session token exists). When a verified session is
+    // already present they are ignored in favour of the token identity.
+    public record SignInOptionsDto(string? Tenant = null, string? User = null);
+    public record SignInDto(
+        string CredentialId, string ClientDataJson, string AuthenticatorData, string Signature, uint SignCount,
+        string? Tenant = null, string? User = null);
 
     [HttpPost("register-options")]
     public async Task<IActionResult> RegisterOptions([FromBody] RegisterOptionsDto _, CancellationToken ct)
     {
         var (tenant, user) = await ResolveContextAsync(_db, ct);
         var challenge = NewChallenge();
+        StoreChallenge("register", tenant.Id, user.Id, challenge);
         var existing = await _db.WebAuthnCredentials
             .Where(c => c.TenantId == tenant.Id && c.UserId == user.Id)
             .Select(c => c.CredentialId)
@@ -115,6 +174,28 @@ public class WebAuthnController : TenantedController
         var (tenant, user) = await ResolveContextAsync(_db, ct);
         if (RadioPad.Api.Auth.LockoutPolicy.IsLocked(user))
             return Unauthorized(new { error = "Account locked.", kind = "unauthenticated" });
+
+        // Bind the response to the single-use challenge we issued in
+        // register-options, and confirm the ceremony type + origin before
+        // trusting the attestation. A missing challenge means the enrollment
+        // window lapsed or this is a replay.
+        var expectedChallenge = ConsumeChallenge("register", tenant.Id, user.Id);
+        if (expectedChallenge is null)
+            return Unauthorized(new { error = "Registration challenge expired or already used. Restart enrollment.", kind = "unauthenticated" });
+        try
+        {
+            AttestationParser.VerifyClientData(
+                FromBase64Url(dto.ClientDataJson), "webauthn.create", expectedChallenge, AllowedOrigins(), Rp());
+        }
+        catch (AttestationParser.AttestationException ex)
+        {
+            await _lockout.OnFailureAsync(user, "webauthn", ct);
+            return BadRequest(new { error = ex.Message, kind = ex.Kind });
+        }
+        catch (FormatException)
+        {
+            return BadRequest(new { error = "clientDataJson must be base64url.", kind = "validation" });
+        }
 
         AttestationParser.Result parsed;
         try
@@ -195,16 +276,18 @@ public class WebAuthnController : TenantedController
     }
 
     [HttpPost("signin-options")]
-    public async Task<IActionResult> SignInOptions([FromBody] SignInOptionsDto _, CancellationToken ct)
+    public async Task<IActionResult> SignInOptions([FromBody] SignInOptionsDto dto, CancellationToken ct)
     {
-        var (tenant, user) = await ResolveContextAsync(_db, ct);
+        var (tenant, user) = await ResolveSignInPrincipalAsync(dto.Tenant, dto.User, ct);
         var creds = await _db.WebAuthnCredentials
             .Where(c => c.TenantId == tenant.Id && c.UserId == user.Id)
             .Select(c => c.CredentialId)
             .ToListAsync(ct);
+        var challenge = NewChallenge();
+        StoreChallenge("signin", tenant.Id, user.Id, challenge);
         return Ok(new
         {
-            challenge = NewChallenge(),
+            challenge,
             rpId = Rp(),
             timeout = 60_000,
             userVerification = "preferred",
@@ -215,7 +298,7 @@ public class WebAuthnController : TenantedController
     [HttpPost("signin")]
     public async Task<IActionResult> SignIn([FromBody] SignInDto dto, CancellationToken ct)
     {
-        var (tenant, user) = await ResolveContextAsync(_db, ct);
+        var (tenant, user) = await ResolveSignInPrincipalAsync(dto.Tenant, dto.User, ct);
         if (RadioPad.Api.Auth.LockoutPolicy.IsLocked(user))
             return Unauthorized(new { error = "Account locked.", kind = "unauthenticated" });
 
@@ -227,14 +310,50 @@ public class WebAuthnController : TenantedController
             await _lockout.OnFailureAsync(user, "webauthn", ct);
             return Unauthorized(new { error = "Unknown credential.", kind = "unauthenticated" });
         }
-        if (dto.SignCount != 0 && dto.SignCount <= cred.SignCount)
+
+        // Bind to the single-use challenge from signin-options, then verify the
+        // ceremony type/origin, the authenticatorData (rpIdHash + UP/UV flags),
+        // and finally the assertion signature against the stored COSE public
+        // key. Any failure is a failed auth attempt (lockout-counted, 401).
+        var expectedChallenge = ConsumeChallenge("signin", tenant.Id, user.Id);
+        if (expectedChallenge is null)
+        {
+            await _lockout.OnFailureAsync(user, "webauthn", ct);
+            return Unauthorized(new { error = "Sign-in challenge expired or already used. Try again.", kind = "unauthenticated" });
+        }
+        // The signature-protected counter parsed from authenticatorData — used
+        // for clone detection instead of the unauthenticated dto.SignCount.
+        uint assertedSignCount = 0;
+        try
+        {
+            var clientBytes = FromBase64Url(dto.ClientDataJson);
+            var authBytes = FromBase64Url(dto.AuthenticatorData);
+            var sigBytes = FromBase64Url(dto.Signature);
+            AttestationParser.VerifyClientData(
+                clientBytes, "webauthn.get", expectedChallenge, AllowedOrigins(), Rp());
+            (_, _, assertedSignCount) = AttestationParser.VerifyAssertionAuthData(authBytes, Rp(), RequireUserVerification());
+            AttestationParser.VerifyAssertionSignature(
+                Convert.FromBase64String(cred.PublicKey), authBytes, clientBytes, sigBytes);
+        }
+        catch (AttestationParser.AttestationException ex)
+        {
+            await _lockout.OnFailureAsync(user, "webauthn", ct);
+            return Unauthorized(new { error = ex.Message, kind = "unauthenticated" });
+        }
+        catch (FormatException)
+        {
+            await _lockout.OnFailureAsync(user, "webauthn", ct);
+            return BadRequest(new { error = "clientDataJson, authenticatorData and signature must be base64url.", kind = "validation" });
+        }
+
+        if (assertedSignCount != 0 && assertedSignCount <= cred.SignCount)
         {
             // Authenticator counter regression — possible cloned key.
             await _lockout.OnFailureAsync(user, "webauthn", ct);
             return Unauthorized(new { error = "Authenticator counter regression.", kind = "unauthenticated" });
         }
 
-        cred.SignCount = dto.SignCount;
+        cred.SignCount = assertedSignCount;
         cred.LastUsedAt = DateTimeOffset.UtcNow;
         await _lockout.OnSuccessAsync(user, ct);
         await _db.SaveChangesAsync(ct);

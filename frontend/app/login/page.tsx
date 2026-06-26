@@ -7,6 +7,7 @@ import AuthScaffold from '@/components/auth/AuthScaffold';
 import CheckYourEmail from '@/components/auth/CheckYourEmail';
 import { api, publicEnv, setActiveAuthToken } from '@/lib/api';
 import { setAuthToken, isAuthTokenSecure } from '@/lib/secureAuth';
+import { signInWithPasskey, isPlatformAuthenticatorAvailable } from '@/lib/webauthn';
 
 const LS_TENANT = 'radiopad.tenant';
 const LS_USER = 'radiopad.user';
@@ -50,6 +51,9 @@ function LoginContent() {
   const [info, setInfo] = useState<string | null>(null);
   const [secure, setSecure] = useState<boolean | null>(null);
   const [magicSent, setMagicSent] = useState<{ email: string; devLink?: string } | null>(null);
+  const [helloAvailable, setHelloAvailable] = useState(false);
+  const [mfaPending, setMfaPending] = useState<{ tenant: string; user: string } | null>(null);
+  const [mfaCode, setMfaCode] = useState('');
   const returnToParam = search?.get('returnTo');
   const returnTo = useMemo(() => safeReturnTo(returnToParam), [returnToParam]);
   const callbackUrl = useMemo(() => {
@@ -69,6 +73,7 @@ function LoginContent() {
     setTenant(devLoginEnabled ? localStorage.getItem(LS_TENANT) || 'dev' : '');
     setUser(devLoginEnabled ? localStorage.getItem(LS_USER) || 'radiologist@radiopad.local' : '');
     isAuthTokenSecure().then(setSecure).catch(() => setSecure(false));
+    isPlatformAuthenticatorAvailable().then(setHelloAvailable).catch(() => setHelloAvailable(false));
   }, [devLoginEnabled]);
 
   async function completeSession(result: SessionResult) {
@@ -90,6 +95,34 @@ function LoginContent() {
     router.replace(returnTo);
   }
 
+  // Single-factor sign-ins (dev session, magic link) return { mfaRequired } when
+  // the user has an authenticator app enrolled. Hold for the 6-digit code rather
+  // than completing the session.
+  async function handleResult(result: SessionResult & { mfaRequired?: boolean }) {
+    if (result.mfaRequired) {
+      setMfaPending({ tenant: result.tenant ?? tenant.trim(), user: result.user ?? user.trim() });
+      setInfo(null);
+      return;
+    }
+    await completeSession(result);
+  }
+
+  async function verifyStepUp(e: React.FormEvent) {
+    e.preventDefault();
+    if (!mfaPending) return;
+    setBusy('mfa');
+    setErr(null);
+    try {
+      const result = await api.auth.mfaLogin(mfaPending.tenant, mfaPending.user, mfaCode.trim());
+      await completeSession(result);
+    } catch (ex) {
+      const e2 = ex as { body?: { error?: string }; message?: string };
+      setErr(e2.body?.error || 'That code did not match. Open your authenticator app and enter the current 6-digit code.');
+    } finally {
+      setBusy(null);
+    }
+  }
+
   useEffect(() => {
     const token = search?.get('magic');
     if (!token) return;
@@ -98,7 +131,7 @@ function LoginContent() {
     setErr(null);
     api.auth.magicLinkConsume(token)
       .then((result) => {
-        if (!cancelled) return completeSession(result);
+        if (!cancelled) return handleResult(result);
         return undefined;
       })
       .catch((e: unknown) => {
@@ -155,6 +188,30 @@ function LoginContent() {
     }
   }
 
+  async function signInWithHello() {
+    if (!tenant.trim() || !user.trim()) {
+      setErr('Enter your organization and email above, then use Windows Hello.');
+      return;
+    }
+    setBusy('hello');
+    setErr(null);
+    setInfo(null);
+    try {
+      const result = await signInWithPasskey({ tenant: tenant.trim(), user: user.trim() });
+      localStorage.setItem(LS_TENANT, tenant.trim());
+      localStorage.setItem(LS_USER, user.trim());
+      await completeSession(result);
+    } catch (e) {
+      const ex = e as { body?: { error?: string }; message?: string; name?: string };
+      // NotAllowedError = user dismissed / timed out the OS biometric prompt.
+      setErr(ex.name === 'NotAllowedError'
+        ? 'Windows Hello was cancelled or timed out.'
+        : ex.body?.error || ex.message || 'Windows Hello sign-in failed. Enroll this device under Settings → Sign-in & devices first.');
+    } finally {
+      setBusy(null);
+    }
+  }
+
   async function saveDevSession(e: React.FormEvent) {
     e.preventDefault();
     if (!devLoginEnabled) return;
@@ -163,12 +220,50 @@ function LoginContent() {
     try {
       localStorage.setItem(LS_TENANT, tenant.trim());
       localStorage.setItem(LS_USER, user.trim());
-      await completeSession(await api.auth.signIn(tenant.trim(), user.trim()));
+      await handleResult(await api.auth.signIn(tenant.trim(), user.trim()));
     } catch (e) {
       const ex = e as { body?: { error?: string }; message?: string };
       setErr(ex.body?.error || ex.message || 'Dev sign-in failed.');
       setBusy(null);
     }
+  }
+
+  if (mfaPending) {
+    return (
+      <AuthScaffold variant="signin">
+        <div className="rp-auth-head">
+          <div className="rp-auth-eyebrow">One more step</div>
+          <h1 className="rp-auth-title">Enter your authenticator code</h1>
+          <p className="rp-auth-sub">
+            This account uses an authenticator app. Enter the current 6-digit code for{' '}
+            <strong>{mfaPending.user}</strong> to finish signing in.
+          </p>
+        </div>
+        {err && <div className="banner danger" role="alert">{err}</div>}
+        <form className="rp-auth-form" onSubmit={verifyStepUp}>
+          <div className="section-block">
+            <label htmlFor="mfa-code">6-digit code</label>
+            <input
+              id="mfa-code"
+              inputMode="numeric"
+              autoComplete="one-time-code"
+              maxLength={6}
+              value={mfaCode}
+              onChange={(e) => setMfaCode(e.target.value.replace(/\D/g, ''))}
+              placeholder="123456"
+            />
+          </div>
+          <div className="rp-auth-actions">
+            <button className="primary" type="submit" disabled={busy !== null || mfaCode.trim().length !== 6}>
+              {busy === 'mfa' ? 'Verifying…' : 'Verify code'}
+            </button>
+            <button className="ghost" type="button" onClick={() => { setMfaPending(null); setMfaCode(''); }} disabled={busy !== null}>
+              Cancel
+            </button>
+          </div>
+        </form>
+      </AuthScaffold>
+    );
   }
 
   if (magicSent) {
@@ -236,10 +331,16 @@ function LoginContent() {
           <button className="primary" type="submit" disabled={busy !== null}>
             {busy === 'magic' ? 'Sending link…' : 'Email me a sign-in link'}
           </button>
+          {helloAvailable && (
+            <button className="primary-ghost" type="button" onClick={signInWithHello} disabled={busy !== null}>
+              {busy === 'hello' ? 'Waiting for Windows Hello…' : 'Sign in with fingerprint or face'}
+            </button>
+          )}
         </div>
         <p className="rp-auth-hint">
-          Trouble signing in? Re-enter your email above to request a fresh link, or ask your
-          administrator for an invitation. Passkey sign-in is coming soon.
+          {helloAvailable
+            ? 'Windows Hello uses your device fingerprint reader or front camera for face — enroll this device once under Settings → Sign-in & devices, then sign in with a touch or glance.'
+            : 'Trouble signing in? Re-enter your email above to request a fresh link, or ask your administrator for an invitation.'}
         </p>
       </form>
 

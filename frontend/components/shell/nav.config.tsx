@@ -4,6 +4,12 @@
  */
 
 import type { ComponentType, SVGProps } from 'react';
+import {
+  FileText, ClipboardCheck, ScrollText, BarChart3, BookOpen, LayoutTemplate,
+  MessageSquareText, Bot, Store, BookText, Server, Network, HardDrive,
+  FileInput, WifiOff, Scale, FlaskConical, ShieldCheck, Flag, CreditCard,
+  Activity, Settings2, Fingerprint,
+} from 'lucide-react';
 import type { PermissionKey } from '@/lib/permissions';
 
 export type NavIcon = ComponentType<SVGProps<SVGSVGElement>>;
@@ -28,53 +34,32 @@ export interface NavGroup {
   items: NavItem[];
 }
 
-const Icon = (path: string): NavIcon => {
-  const C = (props: SVGProps<SVGSVGElement>) => (
-    // eslint-disable-next-line jsx-a11y/aria-props
-    <svg
-      width={16}
-      height={16}
-      viewBox="0 0 24 24"
-      fill="none"
-      stroke="currentColor"
-      strokeWidth={1.6}
-      strokeLinecap="round"
-      strokeLinejoin="round"
-      aria-hidden
-      {...props}
-    >
-      <path d={path} />
-    </svg>
-  );
-  C.displayName = `NavIcon(${path.slice(0, 12)})`;
-  return C;
+// Hallmark icon set — lucide-react, matching UBAG's icon vocabulary.
+export const Icons: Record<string, NavIcon> = {
+  reports: FileText,
+  validation: ClipboardCheck,
+  audit: ScrollText,
+  analytics: BarChart3,
+  rulebooks: BookOpen,
+  templates: LayoutTemplate,
+  prompts: MessageSquareText,
+  copilot: Bot,
+  marketplace: Store,
+  terminology: BookText,
+  providers: Server,
+  ubag: Network,
+  pacs: HardDrive,
+  fhir: FileInput,
+  offline: WifiOff,
+  governance: Scale,
+  modelEval: FlaskConical,
+  security: ShieldCheck,
+  flags: Flag,
+  billing: CreditCard,
+  usage: Activity,
+  settings: Settings2,
+  signInDevices: Fingerprint,
 };
-
-// Minimal hand-rolled icon set (no external icon dep).
-export const Icons = {
-  reports: Icon('M4 4h12l4 4v12H4z M14 4v6h6'),
-  validation: Icon('M5 12l4 4L19 6'),
-  audit: Icon('M4 6h16 M4 12h16 M4 18h10'),
-  analytics: Icon('M4 20V10 M10 20V4 M16 20v-8 M22 20H2'),
-  rulebooks: Icon('M5 4h11a3 3 0 013 3v13H8a3 3 0 01-3-3z M8 4v13'),
-  templates: Icon('M4 5h16v4H4z M4 13h7v6H4z M14 13h6v6h-6z'),
-  prompts: Icon('M5 6h14v10H8l-3 3z'),
-  copilot: Icon('M4 5h16v12H8l-4 4z M8 9h8 M8 13h5'),
-  marketplace: Icon('M3 7l1-3h16l1 3 M3 7v13h18V7 M3 7h18 M9 11v4 M15 11v4'),
-  terminology: Icon('M4 4h11l5 5v11H4z M14 4v6h6 M8 14h8 M8 17h6'),
-  providers: Icon('M3 9l9-6 9 6v11H3z M9 20v-7h6v7'),
-  ubag: Icon('M4 8h16 M8 4v8 M16 4v8 M6 16h12 M10 12v8 M14 12v8'),
-  pacs: Icon('M4 6h16v6H4z M4 14h16v4H4z M8 9h.01 M8 16h.01'),
-  fhir: Icon('M12 2v8m0 0l-3-3m3 3l3-3 M4 14v6h16v-6'),
-  offline: Icon('M5 12a7 7 0 0114 0 M9 16a3 3 0 016 0 M3 3l18 18'),
-  governance: Icon('M12 3l8 4v5c0 5-3.5 8-8 9-4.5-1-8-4-8-9V7z'),
-  modelEval: Icon('M4 4h6v6H4z M14 4h6v6h-6z M4 14h6v6H4z M14 14h6v6h-6z'),
-  security: Icon('M12 3l8 3v6c0 5-3.5 8-8 9-4.5-1-8-4-8-9V6z M9 12l2 2 4-4'),
-  flags: Icon('M5 21V4h12l-2 4 2 4H5'),
-  billing: Icon('M3 7h18v10H3z M3 11h18 M7 15h3'),
-  usage: Icon('M4 20V10 M10 20V4 M16 20v-8 M22 20H2'),
-  settings: Icon('M12 15a3 3 0 100-6 3 3 0 000 6z M19 12l2-2-2-2-2 2 M5 12l-2-2 2-2 2 2 M12 5l-2-2-2 2 2 2 M12 19l-2 2 2 2 2-2'),
-} as const;
 
 export const navGroups: NavGroup[] = [
   {
@@ -84,6 +69,7 @@ export const navGroups: NavGroup[] = [
       { href: '/validation', labelKey: 'validation', icon: Icons.validation, permission: 'validation_packs.read' },
       { href: '/audit', labelKey: 'audit', icon: Icons.audit, permission: 'audit.read' },
       { href: '/analytics', labelKey: 'analytics', icon: Icons.analytics, permission: 'reports.read' },
+      { href: '/account/security', labelKey: 'signInDevices', icon: Icons.signInDevices },
     ],
   },
   {

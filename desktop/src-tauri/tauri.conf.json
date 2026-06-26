@@ -1,7 +1,7 @@
 {
   "$schema": "https://schema.tauri.app/config/2.0",
   "productName": "RadioPad",
-  "version": "0.1.22",
+  "version": "0.1.23",
   "identifier": "com.radiopad.desktop",
   "build": {
     "frontendDist": "../../frontend/out",
@@ -30,7 +30,7 @@
   "bundle": {
     "active": true,
     "targets": ["msi", "dmg", "deb", "appimage", "rpm"],
-    "icon": ["icons/icon.png", "icons/icon.ico"],
+    "icon": ["icons/icon.png", "icons/icon.icns", "icons/icon.ico"],
     "category": "Productivity",
     "shortDescription": "RadioPad — radiology reporting workspace",
     "longDescription": "Local-first AI radiology reporting platform with rulebooks, validation, and tamper-evident audit.",
@@ -77,9 +77,9 @@
     "shell": { "open": false },
     "updater": {
       "endpoints": [
-        "https://updates.radiopad.local/{{target}}/{{arch}}/{{current_version}}"
+        "https://github.com/jerryboganda/radiopad/releases/latest/download/latest.json"
       ],
-      "pubkey": "",
+      "pubkey": "dW50cnVzdGVkIGNvbW1lbnQ6IG1pbmlzaWduIHB1YmxpYyBrZXk6IDc3QURDOTA5OEUwMjMyRkYKUldUL01nS09DY210ZDNzRXZVem5ISE9abUdFZytFTklIUVRidGxodTlVeFpKS3VDa1FOL1BUaTMK",
       "dialog": false
     }
   }

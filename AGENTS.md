@@ -41,6 +41,31 @@ Rules for every AI agent and contributor:
 
 ---
 
+## 0.6. MISSION-CRITICAL: SHIP A DESKTOP RELEASE AFTER EVERY DESKTOP-AFFECTING CHANGE (auto-update)
+
+> **The desktop app self-updates (DESK-001). When you change anything that ends up in the desktop build — anything under `frontend/` or `desktop/` — you MUST cut a new desktop release so users receive it via the in-app "Check for updates" button. This is part of "done", not a separate request the operator has to make.** The operator should never have to ask for the build.
+
+How releases work (fully automated by GitHub Actions — do NOT build locally):
+
+1. After your `frontend/`/`desktop/` changes are committed and pushed, run **one command** from the repo root:
+   ```bash
+   pnpm release:desktop          # patch bump (e.g. 0.1.23 → 0.1.24); use `minor` / `major` / `X.Y.Z` to override
+   ```
+   It bumps the version in `desktop/src-tauri/tauri.conf.json` **and** `desktop/src-tauri/Cargo.toml` (they must stay in lock-step), commits, tags `vX.Y.Z`, and pushes the tag.
+2. The pushed tag triggers the pipeline with no further action:
+   - **`desktop-bundle`** → builds + code-signs the Windows `.msi` and Linux `.AppImage`, creates the GitHub Release, attaches the installers.
+   - **`tauri-updater`** → signs `latest.json` and uploads it to that release.
+3. The app's button reads `https://github.com/jerryboganda/radiopad/releases/latest/download/latest.json`, so every user auto-downloads the new build. Verify the run is green (`gh run watch …`); don't hand the operator manual steps.
+
+Rules:
+
+- **Backend-only / CLI-only / docs-only changes do NOT need a desktop release** (they don't ship in the desktop bundle). Frontend or `desktop/` changes DO.
+- **Never bump only one of the two version files**, and never hand-edit a build — a version mismatch makes the updater loop. Always use `pnpm release:desktop`.
+- **Signing keys are operator secrets** already configured in GitHub (`TAURI_PRIVATE_KEY`, `TAURI_KEY_PASSWORD`). The updater public key is embedded in `tauri.conf.json`. Don't regenerate or commit private keys.
+- **macOS is intentionally excluded** from the release matrix until Apple Developer signing is set up (see the `os:` list in `.github/workflows/desktop-bundle.yml`). Windows + Linux ship.
+
+---
+
 ## 1. Project at a glance
 
 RadioPad is an AI-assisted radiology reporting platform delivered as Web (Next.js), Backend (ASP.NET Core 8), Desktop (Tauri), Mobile (Capacitor), and CLI (.NET global tool). See [PRD.md](PRD.md) for the engineering PRD and [PROGRESS.md](PROGRESS.md) for the Ralph-loop build log.

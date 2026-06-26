@@ -26,7 +26,8 @@ public abstract class TenantedController : ControllerBase
             slug = identity.TenantSlug;
             email = identity.UserEmail;
         }
-        else if (RadioPadRequestIdentity.DevHeadersEnabled(HttpContext))
+        else if (!RadioPadRequestIdentity.RequireAuthEnabled(HttpContext)
+            && RadioPadRequestIdentity.DevHeadersEnabled(HttpContext))
         {
             slug = Request.Headers["X-RadioPad-Tenant"].FirstOrDefault() ?? "dev";
             email = Request.Headers["X-RadioPad-User"].FirstOrDefault() ?? "radiologist@radiopad.local";

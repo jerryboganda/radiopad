@@ -161,7 +161,7 @@ only (page actions, profile, locale).
     <header class="rp-topbar">
       <button class="rp-topbar-menu" aria-label="Open menu">≡</button>
       <nav class="rp-breadcrumbs">…</nav>
-      <div class="rp-topbar-actions">…locale, profile, page action slot…</div>
+      <div class="rp-topbar-actions">…check-for-updates, locale, profile, page action slot…</div>
     </header>
     <main class="rp-shell-content">
       <header class="rp-page-header">
@@ -185,6 +185,16 @@ Sidebar is collapsible to icon-only on desktop (state persisted in
 slide-out drawer triggered by the topbar hamburger; the drawer traps
 focus, closes on `Escape` / backdrop click, and respects
 `prefers-reduced-motion`.
+
+**Check-for-updates control (`.rp-update`, desktop shell only).** A 36×36
+top-bar icon button (`.rp-update-btn`, same chrome as `.rp-topbar-menu`)
+that drives the Tauri auto-updater (DESK-001). It renders only inside the
+Tauri webview and is absent on web/mobile. A silent check on launch shows an
+accent dot (`.rp-update-dot`) when an update is waiting; clicking runs
+check → download (live %) → install → relaunch. Status text
+(`.rp-update-label`) uses the semantic families — blue for checking/
+downloading, green for up-to-date, red for failure — and reuses existing
+tokens only (no new tokens).
 
 #### 3.1.1 In-page two-pane primitive (`.split`)
 

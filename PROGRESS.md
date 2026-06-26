@@ -4,6 +4,68 @@
 
 ---
 
+## Iteration 53 — Require login on launch + Windows Hello / authenticator-app sign-in
+
+- **Date:** 2026-06-26
+- **Scope:** Fix the desktop app opening straight to Reports (it should show the
+  login screen first), then enable biometric (fingerprint/face via Windows Hello)
+  and authenticator-app OTP sign-in. Staged: login gate first, then biometrics/OTP.
+
+### Delivered
+
+- **Login gate (the bug fix):** new `RADIOPAD_REQUIRE_AUTH` flag
+  ([RadioPadRequestIdentity.cs](backend/RadioPad.Api/src/RadioPad.Api/Auth/RadioPadRequestIdentity.cs))
+  makes `TenantedController.ResolveContextAsync` reject tokenless requests (401)
+  instead of resolving the default dev identity. The desktop sidecar
+  ([sidecar_manager.rs](desktop/src-tauri/src/sidecar_manager.rs)) now sets it
+  (keeping `RADIOPAD_DEV_HEADERS=1` only so `/api/auth/signin` can still mint a
+  token). Frontend `AuthGate` ([components/shell/AuthGate.tsx](frontend/components/shell/AuthGate.tsx),
+  wired in [AppShell.tsx](frontend/components/shell/AppShell.tsx)) redirects to
+  `/login` until `/api/tenant/me` succeeds.
+- **WebAuthn backend hardening (AUTH-001):** the passkey endpoints were disabled
+  because the challenge was never stored and the assertion signature was never
+  verified. Added a single-use, 2-min `IMemoryCache` challenge store; `Register`
+  and `SignIn` now bind to the issued challenge, verify `clientDataJSON`
+  (type/challenge/origin), the assertion `authenticatorData` (rpIdHash + UP/UV),
+  and the **assertion signature** against the stored COSE key
+  ([WebAuthnController.cs](backend/RadioPad.Api/src/RadioPad.Api/Controllers/WebAuthnController.cs),
+  new verifiers in [AttestationParser.cs](backend/RadioPad.Api/src/RadioPad.Application/Services/WebAuthn/AttestationParser.cs)).
+  Counter regression now uses the signature-protected counter. `signin-options`/
+  `signin` accept tenant+email for pre-auth (login-screen) use.
+- **Windows Hello sign-in (fingerprint + face):** [lib/webauthn.ts](frontend/lib/webauthn.ts)
+  (platform authenticator, UV required), login button on
+  [login/page.tsx](frontend/app/login/page.tsx), and a per-user enroll/list/delete
+  page at [account/security](frontend/app/account/security/page.tsx) (new
+  "Sign-in & devices" nav item). Windows Hello covers both fingerprint and front-
+  camera face — no custom camera code.
+- **Authenticator-app OTP (TOTP):** enrollment UI on the same account page using
+  the existing `/api/auth/mfa/enroll|verify` (Google/Microsoft Authenticator,
+  Authy — free, no SMS).
+
+### Validation
+
+- Backend `dotnet build` clean; auth tests **56/56**, WebAuthn + assertion tests
+  **15/15** (incl. new: valid assertion mints token, tampered signature 401,
+  missing/stale challenge 401, pre-auth tenant+email sign-in). Existing Iter32/33/35
+  WebAuthn tests updated to fetch a real challenge first.
+- Frontend `pnpm typecheck` clean (pre-existing `CheckUpdatesButton` Tauri-plugin
+  errors are environmental — those packages aren't installed in this checkout).
+  New `authGate.test.tsx` (3) + existing `loginAuth.test.tsx` pass.
+- Login-gate verified live: tokenless `/api/tenant/me` → 401 → dev sign-in mints
+  token → 200 (port 7458; the running desktop app held 7457).
+
+### Follow-ups (not in this iteration)
+
+- **Verify Windows Hello in the packaged Tauri (WebView2) build.** WebAuthn needs
+  a secure context and an RP id matching the custom-scheme origin
+  (`https://tauri.localhost`); set `RADIOPAD_WEBAUTHN_RP_ID` / `_ORIGINS` /
+  `_REQUIRE_UV` accordingly. Chrome behaves differently from WebView2 — this could
+  not be validated from the dev environment.
+- Optional: Windows Hello quick-unlock on relaunch; QR rendering for TOTP (manual
+  key entry ships now).
+
+---
+
 ## Iteration 52 — PRD v2 gap-closure: Iter 0c RBAC roles, policy scaffold, traceability seed
 
 - **Date:** 2026-06-19
@@ -615,7 +677,7 @@ validation completeness, reporting-workspace core) — start with Iter 1a
 
 ### Notes
 
-- `desktop/src-tauri/tauri.conf.json` still has an empty updater public key because production signing material is operator-supplied and must not be committed. Production release remains blocked until the release pipeline injects a real channel key or disables updater artifacts for unsigned internal builds.
+- **DESK-001 one-click updater wired (top-bar "Check for updates"):** `tauri-plugin-updater` + `tauri-plugin-process` registered in `main.rs`; capabilities grant `updater:default` + `process:allow-restart`; `tauri.conf.json` now carries the real Ed25519 updater public key and a GitHub Releases endpoint (`/releases/latest/download/latest.json`). New `frontend/components/shell/CheckUpdatesButton.tsx` (desktop-only, silent check-on-launch + one-click download→install→relaunch) mounted in `Topbar`; `.rp-update*` chrome documented in design.md; `topbar.update.*` strings added to all six locales. `tauri-updater.yml` now auto-derives release asset URLs (no manual `MANIFEST_URL`) and targets the macOS `.app.tar.gz` updater artifact. Operator still supplies `TAURI_PRIVATE_KEY` / `TAURI_KEY_PASSWORD` as GitHub secrets (private key kept out of the repo); requires release assets to be publicly downloadable.
 - No PHI policy, audit append-only semantics, backend bind default, clinical rulebooks, or tenant-scoped controller behavior changed.
 
 ## Iteration 36 — Close-out (parallel six-subagent wave)

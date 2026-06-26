@@ -4,6 +4,7 @@ import { useTranslations } from 'next-intl';
 import { useShell } from './ShellContext';
 import Breadcrumbs, { type BreadcrumbItem } from './Breadcrumbs';
 import { PageActionsSlot } from './PageActionsSlot';
+import CheckUpdatesButton from './CheckUpdatesButton';
 
 export interface TopbarProps {
   breadcrumbs?: BreadcrumbItem[];
@@ -31,6 +32,7 @@ export default function Topbar({ breadcrumbs = [] }: TopbarProps) {
       <div className="rp-topbar-spacer" />
 
       <div className="rp-topbar-actions">
+        <CheckUpdatesButton />
         <PageActionsSlot />
       </div>
     </header>

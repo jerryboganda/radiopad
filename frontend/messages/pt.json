@@ -23,6 +23,7 @@
     "fhirImport": "Importar FHIR",
     "pacs": "PACS",
     "security": "Segurança",
+    "signInDevices": "Início de sessão e dispositivos",
     "signIn": "Entrar",
     "groups": {
       "workspace": "Área de trabalho",
@@ -85,7 +86,16 @@
     "openMenu": "Abrir menu",
     "primaryNav": "Navegação principal",
     "collapseSidebar": "Recolher barra lateral",
-    "expandSidebar": "Expandir barra lateral"
+    "expandSidebar": "Expandir barra lateral",
+    "update": {
+      "checkForUpdates": "Procurar atualizações",
+      "checking": "Verificando…",
+      "available": "Atualização disponível",
+      "downloading": "Baixando {pct}%",
+      "installing": "Instalando…",
+      "upToDate": "Atualizado",
+      "failed": "Falha na atualização — tentar novamente"
+    }
   },
   "profile": {
     "account": "Conta",

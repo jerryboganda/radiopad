@@ -23,6 +23,7 @@
     "fhirImport": "Import from hospital system",
     "pacs": "Imaging archive",
     "security": "Security",
+    "signInDevices": "Sign-in & devices",
     "signIn": "Sign in",
     "groups": {
       "workspace": "Workspace",
@@ -85,7 +86,16 @@
     "openMenu": "Open menu",
     "primaryNav": "Primary navigation",
     "collapseSidebar": "Collapse sidebar",
-    "expandSidebar": "Expand sidebar"
+    "expandSidebar": "Expand sidebar",
+    "update": {
+      "checkForUpdates": "Check for updates",
+      "checking": "Checking…",
+      "available": "Update available",
+      "downloading": "Downloading {pct}%",
+      "installing": "Installing…",
+      "upToDate": "Up to date",
+      "failed": "Update failed — retry"
+    }
   },
   "profile": {
     "account": "Account",

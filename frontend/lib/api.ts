@@ -1485,9 +1485,16 @@ export const api = {
         '/api/auth/session',
       ),
     signIn: (tenant: string, user: string) =>
-      request<{ token: string; tenant: string; user: string; expiresAt: string }>(
+      request<{ token?: string; tenant: string; user: string; expiresAt?: string; mfaRequired?: boolean }>(
         '/api/auth/signin',
         { method: 'POST', body: JSON.stringify({ tenant, user }) },
+      ),
+    // Step-up: exchange a verified 6-digit TOTP code for a session token after a
+    // single-factor sign-in returned { mfaRequired: true }.
+    mfaLogin: (tenant: string, email: string, code: string) =>
+      request<{ token: string; tenant: string; user: string; expiresAt: string }>(
+        '/api/auth/mfa/login',
+        { method: 'POST', body: JSON.stringify({ tenant, email, code }) },
       ),
     mfaEnroll: (tenant: string, email: string) =>
       request<{ secret: string; otpauth: string }>('/api/auth/mfa/enroll', {
@@ -1505,7 +1512,7 @@ export const api = {
         body: JSON.stringify({ tenant, email, callbackUrl }),
       }),
     magicLinkConsume: (token: string) =>
-      request<{ token: string; tenant: string; user: string; expiresAt: string }>(
+      request<{ token?: string; tenant: string; user: string; expiresAt?: string; mfaRequired?: boolean }>(
         '/api/auth/magic-link/consume',
         { method: 'POST', body: JSON.stringify({ token }) },
       ),
@@ -1553,20 +1560,43 @@ export const api = {
       }),
     webAuthnCredentials: () =>
       request<WebAuthnCredentialRow[]>('/api/auth/webauthn/credentials'),
-    webAuthnSignInOptions: () =>
+    webAuthnDeleteCredential: (id: string) =>
+      request<void>(`/api/auth/webauthn/credentials/${encodeURIComponent(id)}`, { method: 'DELETE' }),
+    webAuthnRegisterOptions: (label?: string) =>
+      request<{
+        rp: { id: string; name: string };
+        user: { id: string; name: string; displayName: string };
+        challenge: string;
+        pubKeyCredParams: Array<{ type: 'public-key'; alg: number }>;
+        authenticatorSelection?: { userVerification?: string; residentKey?: string };
+        attestation?: string;
+        timeout?: number;
+        excludeCredentials?: Array<{ type: 'public-key'; id: string }>;
+      }>('/api/auth/webauthn/register-options', { method: 'POST', body: JSON.stringify({ label: label ?? null }) }),
+    webAuthnRegister: (body: { attestationObject: string; clientDataJson: string; label?: string }) =>
+      request<{ id: string; credentialIdHash: string; label: string; attestationFormat: string }>(
+        '/api/auth/webauthn/register',
+        { method: 'POST', body: JSON.stringify(body) },
+      ),
+    webAuthnSignInOptions: (identity?: { tenant: string; user: string }) =>
       request<{
         challenge: string;
         rpId?: string;
         timeout?: number;
         userVerification?: UserVerificationRequirement;
         allowCredentials?: Array<{ type: 'public-key'; id: string }>;
-      }>('/api/auth/webauthn/signin-options', { method: 'POST', body: JSON.stringify({}) }),
+      }>('/api/auth/webauthn/signin-options', {
+        method: 'POST',
+        body: JSON.stringify(identity ? { tenant: identity.tenant, user: identity.user } : {}),
+      }),
     webAuthnSignIn: (body: {
       credentialId: string;
       clientDataJson: string;
       authenticatorData: string;
       signature: string;
       signCount: number;
+      tenant?: string;
+      user?: string;
     }) =>
       request<{ token: string; tenant: string; user: string; expiresAt: string }>(
         '/api/auth/webauthn/signin',
