@@ -39,6 +39,29 @@ internal sealed record RadioPadRequestIdentity(string TenantSlug, string UserEma
             || Environment.GetEnvironmentVariable("RADIOPAD_DEV_HEADERS") == "1";
     }
 
+    /// <summary>
+    /// When enabled, a request must carry a server-verified identity (a valid
+    /// bearer token). The dev-header default-identity fallback is suppressed so
+    /// tokenless requests are rejected with 401. The desktop sidecar sets this
+    /// alongside <c>RADIOPAD_DEV_HEADERS</c> so the passwordless dev/local
+    /// sign-in endpoint still mints a token, but normal browsing requires it.
+    /// </summary>
+    public static bool RequireAuthEnabled(HttpContext ctx)
+    {
+        if (ctx.RequestServices is null)
+            return false;
+
+        var cfg = ctx.RequestServices.GetService<IConfiguration>();
+        var configured = cfg?["RadioPad:RequireAuth"];
+        if (!string.IsNullOrWhiteSpace(configured))
+        {
+            return string.Equals(configured, "true", StringComparison.OrdinalIgnoreCase)
+                || string.Equals(configured, "1", StringComparison.Ordinal);
+        }
+
+        return Environment.GetEnvironmentVariable("RADIOPAD_REQUIRE_AUTH") == "1";
+    }
+
     public static string? TenantSlugOrDevHeader(HttpContext ctx)
     {
         if (TryGet(ctx, out var identity)) return identity.TenantSlug;

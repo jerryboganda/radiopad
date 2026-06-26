@@ -23,6 +23,7 @@
     "fhirImport": "FHIR-Import",
     "pacs": "PACS",
     "security": "Sicherheit",
+    "signInDevices": "Anmeldung & Geräte",
     "signIn": "Anmelden",
     "groups": {
       "workspace": "Arbeitsbereich",

@@ -23,6 +23,7 @@
     "fhirImport": "FHIR आयात",
     "pacs": "PACS",
     "security": "सुरक्षा",
+    "signInDevices": "साइन-इन और डिवाइस",
     "signIn": "साइन इन",
     "groups": {
       "workspace": "कार्यक्षेत्र",

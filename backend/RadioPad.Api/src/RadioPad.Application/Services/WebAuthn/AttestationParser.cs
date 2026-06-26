@@ -1,6 +1,7 @@
 using System.Security.Cryptography;
 using System.Security.Cryptography.X509Certificates;
 using System.Text;
+using System.Text.Json;
 
 namespace RadioPad.Application.Services.WebAuthn;
 
@@ -96,6 +97,133 @@ public static class AttestationParser
         }
 
         return new Result(fmt, ad.CredentialId, ad.CosePublicKey, ad.SignCount, authData, ad.RpIdHash);
+    }
+
+    /// <summary>
+    /// AUTH-001 — verifies a WebAuthn assertion signature at sign-in time.
+    /// The authenticator signs <c>authenticatorData || SHA-256(clientDataJSON)</c>
+    /// with the private key whose COSE_Key public half we stored at
+    /// registration. The COSE algorithm is read from the key itself (label 3),
+    /// falling back to the key type (label 1) — ES256 (-7) for EC2, RS256
+    /// (-257) for RSA. Throws <see cref="AttestationException"/> (Kind
+    /// <c>"signature"</c> on a bad signature) on any failure.
+    /// </summary>
+    public static void VerifyAssertionSignature(
+        byte[] cosePublicKey, byte[] authenticatorData, byte[] clientDataJson, byte[] signature)
+    {
+        if (cosePublicKey is null || cosePublicKey.Length == 0)
+            throw new AttestationException("validation", "stored credentialPublicKey is empty.");
+        if (authenticatorData is null || authenticatorData.Length < 37)
+            throw new AttestationException("validation", "authenticatorData too short.");
+        if (clientDataJson is null || clientDataJson.Length == 0)
+            throw new AttestationException("validation", "clientDataJson is empty.");
+        if (signature is null || signature.Length == 0)
+            throw new AttestationException("validation", "assertion signature is empty.");
+
+        var clientDataHash = SHA256.HashData(clientDataJson);
+        var signed = new byte[authenticatorData.Length + clientDataHash.Length];
+        Buffer.BlockCopy(authenticatorData, 0, signed, 0, authenticatorData.Length);
+        Buffer.BlockCopy(clientDataHash, 0, signed, authenticatorData.Length, clientDataHash.Length);
+
+        var cose = new CborReader(cosePublicKey).ReadValue() as Dictionary<object, object>
+            ?? throw new AttestationException("validation", "stored credentialPublicKey is not a CBOR map.");
+        int alg;
+        if (cose.TryGetValue(3L, out var algObj) && algObj is long a)
+            alg = (int)a;
+        else if (cose.TryGetValue(1L, out var ktyObj) && ktyObj is long kty)
+            alg = kty == 3 ? -257 : -7; // 3 = RSA, 2 = EC2
+        else
+            alg = -7;
+
+        VerifySignatureWithCose(cosePublicKey, alg, signed, signature);
+    }
+
+    /// <summary>
+    /// AUTH-001 — validates the <c>clientDataJSON</c> collected by the browser
+    /// against the ceremony we initiated: the <c>type</c> must match
+    /// (<c>webauthn.create</c> for registration, <c>webauthn.get</c> for
+    /// sign-in), the <c>challenge</c> must equal the single-use value we issued
+    /// (compared constant-time), and the <c>origin</c> must be allowed. When
+    /// <paramref name="allowedOrigins"/> is empty the origin's host must equal
+    /// <paramref name="rpId"/> or be a sub-domain of it (WebAuthn §7).
+    /// </summary>
+    public static void VerifyClientData(
+        byte[] clientDataJson, string expectedType, string expectedChallengeB64Url,
+        IReadOnlyCollection<string>? allowedOrigins, string rpId)
+    {
+        JsonElement root;
+        try
+        {
+            using var doc = JsonDocument.Parse(clientDataJson);
+            root = doc.RootElement.Clone();
+        }
+        catch (JsonException)
+        {
+            throw new AttestationException("validation", "clientDataJSON is not valid JSON.");
+        }
+
+        if (!root.TryGetProperty("type", out var typeEl) || typeEl.GetString() is not string type)
+            throw new AttestationException("validation", "clientDataJSON missing type.");
+        if (!string.Equals(type, expectedType, StringComparison.Ordinal))
+            throw new AttestationException("validation", $"clientDataJSON.type must be {expectedType}.");
+
+        if (!root.TryGetProperty("challenge", out var chEl) || chEl.GetString() is not string challenge)
+            throw new AttestationException("validation", "clientDataJSON missing challenge.");
+        if (!ConstantTimeEquals(NormalizeB64Url(challenge), NormalizeB64Url(expectedChallengeB64Url)))
+            throw new AttestationException("validation", "clientDataJSON.challenge does not match the issued challenge.");
+
+        if (!root.TryGetProperty("origin", out var orEl) || orEl.GetString() is not string origin)
+            throw new AttestationException("validation", "clientDataJSON missing origin.");
+        if (!IsOriginAllowed(origin, allowedOrigins, rpId))
+            throw new AttestationException("validation", "clientDataJSON.origin is not an allowed origin.");
+    }
+
+    /// <summary>
+    /// AUTH-001 — parses and validates the assertion <c>authenticatorData</c>:
+    /// the rpIdHash must equal SHA-256(rpId), the User Present (UP) flag must be
+    /// set, and — when <paramref name="requireUserVerification"/> — the User
+    /// Verified (UV) flag must be set. Returns the parsed signCount for the
+    /// caller's clone-detection check.
+    /// </summary>
+    public static (byte[] rpIdHash, byte flags, uint signCount) VerifyAssertionAuthData(
+        byte[] authData, string rpId, bool requireUserVerification)
+    {
+        if (authData is null || authData.Length < 37)
+            throw new AttestationException("validation", "authenticatorData too short.");
+        var rpIdHash = authData[..32];
+        var flags = authData[32];
+        var signCount = (uint)((authData[33] << 24) | (authData[34] << 16) | (authData[35] << 8) | authData[36]);
+
+        var expected = SHA256.HashData(Encoding.UTF8.GetBytes(rpId));
+        if (!CryptographicOperations.FixedTimeEquals(rpIdHash, expected))
+            throw new AttestationException("validation", "authenticatorData rpIdHash does not match the RP id.");
+        const byte UP = 0x01, UV = 0x04;
+        if ((flags & UP) == 0)
+            throw new AttestationException("validation", "authenticatorData User Present (UP) flag not set.");
+        if (requireUserVerification && (flags & UV) == 0)
+            throw new AttestationException("validation", "authenticatorData User Verified (UV) flag required but not set.");
+        return (rpIdHash, flags, signCount);
+    }
+
+    private static bool IsOriginAllowed(string origin, IReadOnlyCollection<string>? allowedOrigins, string rpId)
+    {
+        if (allowedOrigins is { Count: > 0 })
+            return allowedOrigins.Any(o => string.Equals(o.TrimEnd('/'), origin.TrimEnd('/'), StringComparison.OrdinalIgnoreCase));
+        if (!Uri.TryCreate(origin, UriKind.Absolute, out var uri))
+            return false;
+        var host = uri.Host;
+        return string.Equals(host, rpId, StringComparison.OrdinalIgnoreCase)
+            || host.EndsWith("." + rpId, StringComparison.OrdinalIgnoreCase);
+    }
+
+    private static string NormalizeB64Url(string s) => s.Replace("=", "").Replace('+', '-').Replace('/', '_');
+
+    private static bool ConstantTimeEquals(string a, string b)
+    {
+        var ab = Encoding.UTF8.GetBytes(a);
+        var bb = Encoding.UTF8.GetBytes(b);
+        if (ab.Length != bb.Length) return false;
+        return CryptographicOperations.FixedTimeEquals(ab, bb);
     }
 
     // -- authData -----------------------------------------------------------

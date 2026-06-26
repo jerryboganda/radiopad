@@ -23,6 +23,7 @@
     "fhirImport": "Importar FHIR",
     "pacs": "PACS",
     "security": "Seguridad",
+    "signInDevices": "Inicio de sesión y dispositivos",
     "signIn": "Iniciar sesión",
     "groups": {
       "workspace": "Espacio de trabajo",

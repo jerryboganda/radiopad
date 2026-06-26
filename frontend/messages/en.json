@@ -23,6 +23,7 @@
     "fhirImport": "Import from hospital system",
     "pacs": "Imaging archive",
     "security": "Security",
+    "signInDevices": "Sign-in & devices",
     "signIn": "Sign in",
     "groups": {
       "workspace": "Workspace",

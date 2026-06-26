@@ -142,6 +142,11 @@ async fn supervise(app: AppHandle) {
             .env("RADIOPAD_BIND", &bind)
             .env("ASPNETCORE_ENVIRONMENT", "Development")
             .env("RADIOPAD_DEV_HEADERS", "1")
+            // Require a real session: tokenless requests are rejected (401)
+            // instead of silently resolving to the default dev identity, so the
+            // app opens the login screen first. DEV_HEADERS stays on only so the
+            // passwordless `/api/auth/signin` endpoint can still mint a token.
+            .env("RADIOPAD_REQUIRE_AUTH", "1")
             // UBAG AI via the web-server passthrough. The internal UBAG gateway is
             // unreachable from a clinician's machine, so the sidecar's UbagClient is
             // pointed at the radiopad.polytronx.com /api/ubag-gw passthrough, which

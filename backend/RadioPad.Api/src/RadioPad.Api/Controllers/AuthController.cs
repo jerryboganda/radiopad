@@ -81,6 +81,12 @@ public class AuthController : TenantedController
         if (user.LockedUntil is not null && user.LockedUntil > DateTimeOffset.UtcNow)
             return Unauthorized(new { error = "Account locked.", kind = "unauthenticated", until = user.LockedUntil });
 
+        // AUTH-008 step-up: this is a single-factor sign-in. When the user has an
+        // authenticator app enrolled, mint nothing yet — require the 6-digit TOTP
+        // code via POST /api/auth/mfa/login before a session token is issued.
+        if (user.MfaEnabled)
+            return Ok(new { mfaRequired = true, tenant = tenant.Slug, user = dto.User });
+
         var issuedAt = DateTimeOffset.UtcNow;
         var token = RadioPadBearerTokens.Mint(tenant.Slug, dto.User, user.SessionEpoch, _env, issuedAt);
         var expiresAt = RadioPadBearerTokens.ExpiresAt(issuedAt);
