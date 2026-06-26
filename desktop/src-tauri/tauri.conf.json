@@ -30,7 +30,7 @@
   "bundle": {
     "active": true,
     "targets": ["msi", "dmg", "deb", "appimage", "rpm"],
-    "icon": ["icons/icon.png", "icons/icon.ico"],
+    "icon": ["icons/icon.png", "icons/icon.icns", "icons/icon.ico"],
     "category": "Productivity",
     "shortDescription": "RadioPad — radiology reporting workspace",
     "longDescription": "Local-first AI radiology reporting platform with rulebooks, validation, and tamper-evident audit.",
