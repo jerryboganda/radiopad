@@ -85,7 +85,16 @@
     "openMenu": "Menü öffnen",
     "primaryNav": "Hauptnavigation",
     "collapseSidebar": "Seitenleiste einklappen",
-    "expandSidebar": "Seitenleiste ausklappen"
+    "expandSidebar": "Seitenleiste ausklappen",
+    "update": {
+      "checkForUpdates": "Nach Updates suchen",
+      "checking": "Wird geprüft…",
+      "available": "Update verfügbar",
+      "downloading": "Wird heruntergeladen {pct}%",
+      "installing": "Wird installiert…",
+      "upToDate": "Aktuell",
+      "failed": "Update fehlgeschlagen — erneut versuchen"
+    }
   },
   "profile": {
     "account": "Konto",

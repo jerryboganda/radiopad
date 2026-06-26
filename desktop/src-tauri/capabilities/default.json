@@ -17,6 +17,8 @@
     "store:allow-set",
     "store:allow-delete",
     "store:allow-keys",
-    "store:allow-save"
+    "store:allow-save",
+    "updater:default",
+    "process:allow-restart"
   ]
 }

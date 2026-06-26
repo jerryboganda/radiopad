@@ -25,6 +25,8 @@ tauri-plugin-global-shortcut = "2.0"
 tauri-plugin-store = "2.0"
 # DESK-001 — Tauri auto-updater (ed25519 signed; channel-aware endpoints).
 tauri-plugin-updater = "2"
+# DESK-001 — relaunch into the new build after the updater installs it.
+tauri-plugin-process = "2"
 # DESK-009 — local plugin / model sandbox (sha256 + ed25519 verification).
 sha2 = "0.10"
 ed25519-dalek = { version = "2", default-features = false }

@@ -66,7 +66,7 @@ jobs:
           echo "tag=$TAG" >> "$GITHUB_OUTPUT"
           mkdir -p dist
           gh release download "$TAG" --dir dist --pattern '*.msi' --pattern '*.exe' \
-            --pattern '*.dmg' --pattern '*.AppImage' --pattern '*.deb' || true
+            --pattern '*.app.tar.gz' --pattern '*.dmg' --pattern '*.AppImage' --pattern '*.deb' || true
 
       - name: Sign updater manifest
         if: steps.gate.outputs.secrets_present == '1'
@@ -78,9 +78,13 @@ jobs:
         run: |
           set -euo pipefail
           shopt -s nullglob
+          # Map each updater target to its Tauri updater artifact (NOT the
+          # plain installer): Windows ships the signed .msi, macOS the
+          # .app.tar.gz, Linux the .AppImage. nullglob means a missing
+          # artifact simply yields no entry for that platform.
           declare -A platforms=( \
             [windows-x86_64]='*.msi' \
-            [darwin-aarch64]='*.dmg' \
+            [darwin-aarch64]='*.app.tar.gz' \
             [linux-x86_64]='*.AppImage' \
           )
           MANIFEST=dist/latest.json
@@ -90,7 +94,14 @@ jobs:
               SIG=$(npx --yes @tauri-apps/cli signer sign --no-confirm \
                 --private-key "$TAURI_PRIVATE_KEY" \
                 --password "${TAURI_KEY_PASSWORD:-}" "$f" | tail -n1)
-              URL="${MANIFEST_URL%/}/$(basename "$f")"
+              # Default to the GitHub Releases download URL for this tag so the
+              # manifest is fully automatic on the workflow_run trigger (no
+              # MANIFEST_URL input needed); a non-empty MANIFEST_URL overrides.
+              BASE="${MANIFEST_URL%/}"
+              if [ -z "$BASE" ]; then
+                BASE="https://github.com/${GITHUB_REPOSITORY}/releases/download/${TAG}"
+              fi
+              URL="$BASE/$(basename "$f")"
               jq --arg p "$plat" --arg s "$SIG" --arg u "$URL" \
                 '.platforms[$p] = {signature:$s,url:$u}' "$MANIFEST" > "$MANIFEST.tmp"
               mv "$MANIFEST.tmp" "$MANIFEST"

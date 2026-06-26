@@ -77,9 +77,9 @@
     "shell": { "open": false },
     "updater": {
       "endpoints": [
-        "https://updates.radiopad.local/{{target}}/{{arch}}/{{current_version}}"
+        "https://github.com/jerryboganda/radiopad/releases/latest/download/latest.json"
       ],
-      "pubkey": "",
+      "pubkey": "dW50cnVzdGVkIGNvbW1lbnQ6IG1pbmlzaWduIHB1YmxpYyBrZXk6IDc3QURDOTA5OEUwMjMyRkYKUldUL01nS09DY210ZDNzRXZVem5ISE9abUdFZytFTklIUVRidGxodTlVeFpKS3VDa1FOL1BUaTMK",
       "dialog": false
     }
   }

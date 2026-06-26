@@ -615,7 +615,7 @@ validation completeness, reporting-workspace core) — start with Iter 1a
 
 ### Notes
 
-- `desktop/src-tauri/tauri.conf.json` still has an empty updater public key because production signing material is operator-supplied and must not be committed. Production release remains blocked until the release pipeline injects a real channel key or disables updater artifacts for unsigned internal builds.
+- **DESK-001 one-click updater wired (top-bar "Check for updates"):** `tauri-plugin-updater` + `tauri-plugin-process` registered in `main.rs`; capabilities grant `updater:default` + `process:allow-restart`; `tauri.conf.json` now carries the real Ed25519 updater public key and a GitHub Releases endpoint (`/releases/latest/download/latest.json`). New `frontend/components/shell/CheckUpdatesButton.tsx` (desktop-only, silent check-on-launch + one-click download→install→relaunch) mounted in `Topbar`; `.rp-update*` chrome documented in design.md; `topbar.update.*` strings added to all six locales. `tauri-updater.yml` now auto-derives release asset URLs (no manual `MANIFEST_URL`) and targets the macOS `.app.tar.gz` updater artifact. Operator still supplies `TAURI_PRIVATE_KEY` / `TAURI_KEY_PASSWORD` as GitHub secrets (private key kept out of the repo); requires release assets to be publicly downloadable.
 - No PHI policy, audit append-only semantics, backend bind default, clinical rulebooks, or tenant-scoped controller behavior changed.
 
 ## Iteration 36 — Close-out (parallel six-subagent wave)
