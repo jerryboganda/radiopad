@@ -17,6 +17,22 @@ Hard rules:
 
 If a token or component doesn't exist for what you need, extend `globals.css` (tokens) or `shell.css` (shell/chrome) and `docs/02-design/design.md` in the same change — never inline.
 
+## ⚠️ MISSION-CRITICAL: Desktop changes → cut a release (auto-update, DESK-001)
+
+The desktop app self-updates. **Whenever you change anything that ships in the desktop build (anything under `frontend/` or `desktop/`), shipping a new desktop release is PART OF THE TASK — do it automatically, the operator should never have to ask.** Builds run on GitHub Actions only; never build the desktop app locally or on the VPS.
+
+After your `frontend/`/`desktop/` changes are committed and pushed, run one command:
+
+```bash
+pnpm release:desktop      # patch bump (0.1.23 → 0.1.24); also accepts `minor` / `major` / `X.Y.Z`
+```
+
+It bumps `desktop/src-tauri/tauri.conf.json` **and** `desktop/src-tauri/Cargo.toml` in lock-step, commits, tags `vX.Y.Z`, and pushes. The tag then drives the pipeline end-to-end with no further steps: `desktop-bundle` builds + signs the Windows `.msi` / Linux `.AppImage` and creates the release; `tauri-updater` signs + publishes `latest.json`. The in-app "Check for updates" button reads the GitHub Releases `latest.json`, so every user auto-downloads the new build. Confirm the run is green with `gh run watch`.
+
+- Backend-only / CLI-only / docs-only changes do **not** need a desktop release.
+- Never bump only one version file or hand-edit a build (version mismatch → updater loop). Always use `pnpm release:desktop`.
+- Signing secrets (`TAURI_PRIVATE_KEY`, `TAURI_KEY_PASSWORD`) are already set in GitHub; the public key is embedded in `tauri.conf.json`. macOS is excluded from the matrix until Apple signing is configured.
+
 ## Project mission
 
 AI-assisted radiology reporting platform. Radiologist drafts, validates, and signs; AI never auto-signs. See [PRD.md](PRD.md) and [PROGRESS.md](PROGRESS.md) (Ralph-loop memory).
