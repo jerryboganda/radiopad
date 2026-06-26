@@ -4,6 +4,58 @@
 
 ---
 
+## Iteration 54 — Hallmark design-system migration (OKLCH tokens + build-time Tailwind)
+
+- **Date:** 2026-06-26
+- **Scope:** Seal the in-progress "Hallmark" re-platforming of the frontend
+  token system from hardcoded hex (Open Design / Claude-rust `#c96442`) to the
+  UBAG **Hallmark** "paper & ink" **OKLCH** system, and adopt build-time
+  Tailwind 3 — while preserving RadioPad's original 44 token names as a
+  compatibility alias layer so the ~6.8k-line legacy class layer re-skins
+  without a rewrite. (The previous session committed the `hallmark.css` import
+  in `layout.tsx` but never committed the file itself or the config.)
+
+### Delivered
+
+- **New `frontend/app/hallmark.css`** — canonical token source: Hallmark OKLCH
+  base (`--color-*`/`--font-*`/`--space-*`/`--text-*`) + the RadioPad→Hallmark
+  alias layer (`--bg`, `--accent`, `--red`/`--green`/`--blue`/`--purple`/
+  `--amber`, radii, shadows, `--serif`/`--sans`/`--mono`) + net-new Hallmark
+  component classes (`.control-button`, `.status-badge`, `.metric-card`,
+  `.data-table`, `.tab-button`, `.masthead`, …). The AI marker (`--color-ai`,
+  purple) is kept distinct from info/marine — a clinical-safety affordance.
+- **New `frontend/tailwind.config.ts`** — Hallmark color/font/radius scales;
+  Skeleton plugin deliberately omitted (Next 16 strict-CSS-parser break).
+- **New `frontend/postcss.config.js`** — Tailwind + Autoprefixer (build-time;
+  emits static CSS, compatible with `output: 'export'` → Tauri/Capacitor).
+- **`frontend/app/globals.css`** — old hex `:root` token block removed; now
+  leads with `@tailwind base/components/utilities`.
+- **`frontend/app/radiopad.css`** — `.rp-page-title` → `--font-display`, 24px/700.
+- **`skills-lock.json`** — autoskills lock (adds `tailwind-css-patterns`).
+- **Docs aligned (same change):** `docs/02-design/design.md` (lock + §1/§2/§8),
+  `CLAUDE.md`, `AGENTS.md`, `.github/copilot-instructions.md` rewritten so the
+  canonical token source is `hallmark.css` (OKLCH) + `tailwind.config.ts`, the
+  44 alias names are the stable contract, build-time Tailwind is allowed, and
+  the system stays light-only / one-accent.
+
+### Validation
+
+- `pnpm typecheck` (tsc -b) clean.
+- `pnpm build` (static export) green — all **42** pages prerendered; Tailwind
+  Preflight + OKLCH tokens compile and the legacy class layer builds clean.
+- Visual check on the production `out/` bundle (served standalone): `/login`
+  renders the Hallmark reskin (warm paper, terracotta accent, mono uppercase
+  labels, display heading); `/reports` correctly redirects to the auth gate;
+  zero runtime errors / console errors on the production bundle.
+
+### Notes
+
+- Deps (`tailwindcss@3.4.17`, `postcss`, `autoprefixer`) were already in
+  `package.json` and installed.
+- Frontend change → desktop release cut per the DESK-001 auto-update rule.
+
+---
+
 ## Iteration 53 — Require login on launch + Windows Hello / authenticator-app sign-in
 
 - **Date:** 2026-06-26
