@@ -27,7 +27,10 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        os: [windows-latest, macos-latest, ubuntu-22.04]
+        # macOS is excluded from releases until Apple Developer signing /
+        # notarization is configured (its sidecar + signing path is not yet
+        # set up). Re-add 'macos-latest' here to bring it back.
+        os: [windows-latest, ubuntu-22.04]
     runs-on: ${{ matrix.os }}
     permissions:
       contents: write
