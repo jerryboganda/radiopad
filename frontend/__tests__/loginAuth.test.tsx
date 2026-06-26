@@ -61,8 +61,11 @@ describe('LoginPage auth choices', () => {
     render(<LoginPage />);
 
     expect(screen.getByRole('heading', { name: 'Sign in to RadioPad' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Sign in' })).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Continue with SSO' })).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: 'Email me a sign-in link' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Pair a device' })).toBeInTheDocument();
+    // Magic-link sign-in was removed (auth is now password + mandatory TOTP + biometric).
+    expect(screen.queryByRole('button', { name: 'Email me a sign-in link' })).not.toBeInTheDocument();
     expect(screen.queryByText(/bearer sign-in/i)).not.toBeInTheDocument();
     expect(screen.queryByDisplayValue('radiologist@radiopad.local')).not.toBeInTheDocument();
   });
@@ -73,6 +76,6 @@ describe('LoginPage auth choices', () => {
     render(<LoginPage />);
 
     expect(screen.getByText(/bearer sign-in/i)).toBeInTheDocument();
-    expect(screen.getByText(/NEXT_PUBLIC_ALLOW_DEV_LOGIN=true/)).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Continue with dev session' })).toBeInTheDocument();
   });
 });
