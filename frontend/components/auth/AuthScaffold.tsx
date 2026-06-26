@@ -28,43 +28,45 @@ const COPY: Record<AuthVariant, { headline: string; tagline: string }> = {
 
 const FEATURES = [
   {
-    title: 'Password + authenticator',
-    sub: 'A password plus a 6-digit code from your authenticator app — required for everyone.',
+    title: 'AI-assisted drafting',
+    sub: 'Turn your findings into a structured impression in seconds — every AI line is marked for your review.',
     icon: (
       <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
-        <path d="M7 11V8a5 5 0 0 1 10 0v3" />
-        <rect x="5" y="11" width="14" height="9" rx="2" />
+        <path d="M15 3H7a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h6" />
+        <path d="M8 8h5M8 12h6M8 16h3" />
+        <path d="M18 13l.9 2.1 2.1.9-2.1.9L18 19l-.9-2.1-2.1-.9 2.1-.9z" />
       </svg>
     ),
   },
   {
-    title: 'Biometric sign-in',
-    sub: 'Add fingerprint or face (Windows Hello) on supported devices for one-touch access.',
-    icon: (
-      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
-        <path d="M12 11a2 2 0 0 1 2 2c0 2.5-.4 4.5-1.2 6" />
-        <path d="M5 12a7 7 0 0 1 12-5" />
-        <path d="M8 14c0 2 .3 3.7-.5 5.5" />
-        <path d="M19 13c0 3-.3 5-1 7" />
-      </svg>
-    ),
-  },
-  {
-    title: 'Tenant-isolated',
-    sub: "Every organization's data stays strictly separated.",
+    title: 'Validation rulebooks',
+    sub: 'Institution rulebooks catch laterality slips, contradictions, and missing sections before you sign.',
     icon: (
       <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
         <path d="M12 3l7 3v5c0 4.5-3 8-7 10-4-2-7-5.5-7-10V6l7-3z" />
-      </svg>
-    ),
-  },
-  {
-    title: 'Audit-logged, never auto-signed',
-    sub: 'AI drafts and marks its text; a radiologist always signs.',
-    icon: (
-      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
         <path d="M9 12l2 2 4-4" />
-        <path d="M12 3l7 3v5c0 4.5-3 8-7 10-4-2-7-5.5-7-10V6l7-3z" />
+      </svg>
+    ),
+  },
+  {
+    title: 'Hands-free dictation',
+    sub: 'Dictate naturally; on-device speech-to-text keeps your audio on the machine.',
+    icon: (
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
+        <rect x="9" y="3" width="6" height="11" rx="3" />
+        <path d="M5 11a7 7 0 0 0 14 0" />
+        <path d="M12 18v3" />
+      </svg>
+    ),
+  },
+  {
+    title: 'Structured templates',
+    sub: 'Start from study-specific templates — chest CT, cardiac MRI, mammography, and more.',
+    icon: (
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
+        <rect x="4" y="4" width="16" height="16" rx="2" />
+        <path d="M4 9h16" />
+        <path d="M10 9v11" />
       </svg>
     ),
   },
@@ -107,6 +109,11 @@ export default function AuthScaffold({
                 </span>
               </li>
             ))}
+          </ul>
+          <ul className="rp-auth-trust" aria-label="Compliance highlights">
+            <li className="rp-auth-trust-item">Tenant-isolated</li>
+            <li className="rp-auth-trust-item">Append-only audit</li>
+            <li className="rp-auth-trust-item">Never auto-signs</li>
           </ul>
         </div>
         <p className="rp-auth-aside-foot">

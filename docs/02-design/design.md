@@ -792,7 +792,15 @@ new colours, no dark mode):
 - **Aside content** — `.rp-auth-brand` (reuses the sidebar `.brand-mark` +
   `.brand-mark-letter`), `.rp-auth-headline` (serif), `.rp-auth-tagline`,
   `.rp-auth-features`/`-feature`/`-feature-icon`/`-feature-text`/`-feature-title`/
-  `-feature-sub`, `.rp-auth-aside-foot`.
+  `-feature-sub`, `.rp-auth-aside-foot`. The feature list **showcases product
+  capabilities** (AI-assisted drafting, validation rulebooks, hands-free dictation,
+  structured templates) rather than auth mechanics. Each `.rp-auth-feature` is a tidy
+  **card** (`--bg-panel` surface, `--border-soft`, `--radius`, `--shadow-xs`, with a
+  `prefers-reduced-motion`-gated hover lift to `--shadow-sm` / `--accent-soft`); the
+  icon tile is tinted with `--accent-tint`/`--accent-soft`. A compact **trust strip**
+  `.rp-auth-trust`/`.rp-auth-trust-item` (pill chips on `--bg-subtle`, `--border`,
+  `--text-muted`) sits below the cards for the credibility signal — all locked tokens,
+  no new colours.
 - **Card chrome** — `.rp-auth-mobile-brand` (shown only when the aside is hidden),
   `.rp-auth-head`/`-eyebrow`/`-title`/`-sub`, `.rp-auth-form`, `.rp-auth-actions`
   (full-width stacked buttons), `.rp-auth-divider` (labelled "or"-style rule),
