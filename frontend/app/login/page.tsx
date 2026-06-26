@@ -69,6 +69,10 @@ function LoginContent() {
   const [resetNewPw, setResetNewPw] = useState('');
 
   const pendingResult = useRef<SessionResult | null>(null);
+  // Canonical identity (tenant slug + email) returned by sign-in. The mfa-setup
+  // ticket is bound to these exact values, so enroll AND verify must send them —
+  // not the typed form fields, which may differ in case/format from the slug.
+  const enrollIdentity = useRef<{ tenant: string; user: string } | null>(null);
 
   const returnToParam = search?.get('returnTo');
   const returnTo = useMemo(() => safeReturnTo(returnToParam), [returnToParam]);
@@ -127,6 +131,7 @@ function LoginContent() {
         setStage('totp');
       } else if (result.mfaSetupRequired && result.setupToken) {
         setSetupToken(result.setupToken);
+        enrollIdentity.current = { tenant: result.tenant ?? t, user: result.user ?? u };
         await beginEnrollment(result.tenant ?? t, result.user ?? u, result.setupToken);
       } else {
         setErr('Unexpected sign-in response. Please try again.');
@@ -170,7 +175,10 @@ function LoginContent() {
     setBusy('enroll-verify');
     setErr(null);
     try {
-      const result = await api.auth.mfaVerify(tenant.trim(), user.trim(), code.trim(), setupToken);
+      // Use the canonical identity the setup ticket was minted for, falling back
+      // to the typed fields only if it is somehow unavailable.
+      const id = enrollIdentity.current ?? { tenant: tenant.trim(), user: user.trim() };
+      const result = await api.auth.mfaVerify(id.tenant, id.user, code.trim(), setupToken);
       if (!result.token) {
         setErr('Enrolment did not complete. Please try the code again.');
         return;
