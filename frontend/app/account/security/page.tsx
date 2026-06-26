@@ -30,6 +30,18 @@ export default function AccountSecurityPage() {
     } catch (e) {
       setErr((e as Error).message);
     }
+    // Reflect persisted TOTP enrolment so the card doesn't offer "Set up"
+    // again after a reload / fresh sign-in (status lives in the backend, not
+    // in this component's session-scoped state).
+    const id = currentIdentity();
+    if (id) {
+      try {
+        const { mfaEnabled } = await api.auth.mfaStatus(id.tenant, id.user);
+        if (mfaEnabled) setTotpDone(true);
+      } catch {
+        /* non-fatal: fall back to the enrolment button */
+      }
+    }
   }, []);
 
   useEffect(() => {
@@ -52,13 +64,6 @@ export default function AccountSecurityPage() {
     } finally {
       setBusy(false);
     }
-  }
-
-  function currentIdentity(): { tenant: string; user: string } | null {
-    if (typeof window === 'undefined') return null;
-    const tenant = localStorage.getItem('radiopad.tenant');
-    const user = localStorage.getItem('radiopad.user');
-    return tenant && user ? { tenant, user } : null;
   }
 
   async function startTotp() {
@@ -222,6 +227,13 @@ export default function AccountSecurityPage() {
       </div>
     </Container>
   );
+}
+
+function currentIdentity(): { tenant: string; user: string } | null {
+  if (typeof window === 'undefined') return null;
+  const tenant = localStorage.getItem('radiopad.tenant');
+  const user = localStorage.getItem('radiopad.user');
+  return tenant && user ? { tenant, user } : null;
 }
 
 function defaultDeviceLabel(): string {

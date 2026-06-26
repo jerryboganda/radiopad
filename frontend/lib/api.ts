@@ -1566,6 +1566,12 @@ export const api = {
         '/api/auth/mfa/login',
         { method: 'POST', body: JSON.stringify({ tenant, email, code }) },
       ),
+    /** Whether the account already has a confirmed authenticator-app (TOTP)
+     *  enrolment. Used by the Settings security page to render persisted state. */
+    mfaStatus: (tenant: string, email: string) =>
+      request<{ mfaEnabled: boolean }>(
+        `/api/auth/mfa/status?tenant=${encodeURIComponent(tenant)}&email=${encodeURIComponent(email)}`,
+      ),
     /** TOTP enrolment. `setupToken` authorizes the forced first-login path when
      *  the user has no session yet (otherwise the request identity is used). */
     mfaEnroll: (tenant: string, email: string, setupToken?: string) =>

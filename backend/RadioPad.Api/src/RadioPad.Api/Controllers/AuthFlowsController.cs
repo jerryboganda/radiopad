@@ -58,6 +58,24 @@ public class MfaController : ControllerBase
         return false;
     }
 
+    /// <summary>
+    /// Reports whether the authenticated user has a confirmed TOTP enrollment.
+    /// The Settings security page calls this on load so the authenticator card
+    /// reflects persisted state (<see cref="User.MfaEnabled"/>) instead of only
+    /// the in-session enrollment flag. Authorized to the caller's own account.
+    /// </summary>
+    [HttpGet("status")]
+    public async Task<IActionResult> Status([FromQuery] string tenant, [FromQuery] string email, CancellationToken ct)
+    {
+        if (!CanUseBodyIdentity(tenant, email))
+            return Unauthorized(new { error = "Verified identity is required.", kind = "unauthenticated" });
+
+        var (user, _) = await ResolveAsync(tenant, email, ct);
+        if (user is null) return NotFound(new { error = "User not found.", kind = "not_found" });
+
+        return Ok(new { mfaEnabled = user.MfaEnabled });
+    }
+
     [HttpPost("enroll")]
     public async Task<IActionResult> Enroll([FromBody] EnrollDto dto, CancellationToken ct)
     {
