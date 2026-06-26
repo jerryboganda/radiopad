@@ -186,6 +186,14 @@ builder.Services.AddSingleton<RadioPad.Application.Abstractions.ILocalSttEngine>
 builder.Services.AddSingleton<RadioPad.Infrastructure.Providers.Local.SttModelProvisioner>();
 if (!builder.Environment.IsEnvironment("Testing"))
     builder.Services.AddHostedService<RadioPad.Infrastructure.Providers.Local.SttModelProvisionHostedService>();
+// On-device model manager (LocalModelsController) — download-progress tracker +
+// generalized catalog (STT now; TTS + orchestrator are roadmap placeholders).
+// Singletons; the controller gates every action on RADIOPAD_LOCAL_STT_ENABLED so
+// these are inert on web/server.
+builder.Services.AddSingleton<RadioPad.Infrastructure.Providers.Local.IModelProvisioningStatus,
+    RadioPad.Infrastructure.Providers.Local.ModelProvisioningStatus>();
+builder.Services.AddSingleton<RadioPad.Infrastructure.Providers.Local.ILocalModelCatalog,
+    RadioPad.Infrastructure.Providers.Local.LocalModelCatalog>();
 // PRD BILL-001..006 — billing helpers (audit + plan quota + subscription lifecycle).
 builder.Services.AddScoped<IPlanQuotaStore, EfPlanQuotaStore>();
 builder.Services.AddScoped<RadioPad.Application.Services.IBillingAudit, RadioPad.Application.Services.BillingAudit>();

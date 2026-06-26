@@ -59,6 +59,7 @@ public sealed class SherpaParakeetSttClient : ILocalSttClient, ILocalSttEngine, 
     private string? _tokens;
     private OfflineRecognizer? _recognizer;
     private volatile bool _loadFailed;
+    private volatile string? _lastError;
 
     public SherpaParakeetSttClient(IAudioDecoder decoder, ILogger<SherpaParakeetSttClient> log)
     {
@@ -117,6 +118,8 @@ public sealed class SherpaParakeetSttClient : ILocalSttClient, ILocalSttEngine, 
 
     public string EngineId => EngineName;
 
+    public string? LastError => _lastError;
+
     public async Task<EngineTranscript> RecognizeAsync(byte[] wavBytes, CancellationToken ct)
     {
         if (!Available)
@@ -148,6 +151,7 @@ public sealed class SherpaParakeetSttClient : ILocalSttClient, ILocalSttEngine, 
             // Mark the engine bad so subsequent calls fall back to the cloud path
             // instead of repeatedly hard-failing on a broken native load.
             _loadFailed = true;
+            _lastError = $"{ex.GetType().Name}: {ex.Message}";
             _log.LogError(ex, "local STT decode failed; disabling on-device engine for this session");
             throw;
         }

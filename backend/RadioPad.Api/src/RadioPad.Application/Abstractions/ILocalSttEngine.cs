@@ -17,6 +17,13 @@ public interface ILocalSttEngine
     /// <summary>True when the engine is enabled and its model is present.</summary>
     bool Available { get; }
 
+    /// <summary>
+    /// Message from the most recent load/decode failure that self-disabled the
+    /// engine for this session, or null if it has not failed. Surfaced by the
+    /// local-models diagnostics endpoint for IT debugging.
+    /// </summary>
+    string? LastError { get; }
+
     /// <summary>Recognize a complete 16 kHz mono WAV buffer into a word-level hypothesis.</summary>
     Task<EngineTranscript> RecognizeAsync(byte[] wavBytes, CancellationToken ct);
 }

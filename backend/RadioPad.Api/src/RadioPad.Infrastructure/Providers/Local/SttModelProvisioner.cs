@@ -1,3 +1,4 @@
+using System.Collections.Concurrent;
 using System.Security.Cryptography;
 using ICSharpCode.SharpZipLib.BZip2;
 using ICSharpCode.SharpZipLib.Tar;
@@ -16,11 +17,44 @@ namespace RadioPad.Infrastructure.Providers.Local;
 public sealed class SttModelProvisioner
 {
     private readonly ILogger<SttModelProvisioner> _log;
+    private readonly IModelProvisioningStatus _status;
 
-    public SttModelProvisioner(ILogger<SttModelProvisioner> log) => _log = log;
+    // One gate per model id so the startup auto-download and a manual /download
+    // call can't race on the same temp/extract dirs.
+    private readonly ConcurrentDictionary<string, SemaphoreSlim> _locks = new(StringComparer.Ordinal);
+
+    public SttModelProvisioner(ILogger<SttModelProvisioner> log, IModelProvisioningStatus? status = null)
+    {
+        _log = log;
+        _status = status ?? NullModelProvisioningStatus.Instance;
+    }
+
+    private SemaphoreSlim LockFor(string id) => _locks.GetOrAdd(id, _ => new SemaphoreSlim(1, 1));
 
     /// <summary>Ensure the default (Parakeet) model is installed.</summary>
     public Task<bool> EnsureAsync(CancellationToken ct) => EnsureAsync(LocalSttModels.Parakeet, ct);
+
+    /// <summary>
+    /// Ensure the model described by <paramref name="desc"/> is installed,
+    /// dispatching by archive kind. Used by the manual download endpoint so any
+    /// catalog model (STT today; future kinds) provisions through one entry point.
+    /// </summary>
+    public Task<bool> EnsureByIdAsync(LocalModelDescriptor desc, CancellationToken ct)
+    {
+        if (desc.Placeholder)
+            return Task.FromResult(false);
+        return desc.ArchiveKind switch
+        {
+            ModelArchiveKind.TarBz2 => EnsureAsync(
+                new LocalSttModels.ModelSpec(desc.Id, desc.DownloadUrl, desc.SizeBytes, desc.Sha256), ct),
+            ModelArchiveKind.RawFile => EnsureFileAsync(
+                new LocalSttModels.FileSpec(
+                    desc.Id,
+                    desc.FileName ?? throw new InvalidOperationException("raw-file model requires a file name"),
+                    desc.DownloadUrl, desc.SizeBytes, desc.Sha256), ct),
+            _ => Task.FromResult(false),
+        };
+    }
 
     /// <summary>Ensure <paramref name="spec"/> is installed at its resolved model dir.</summary>
     public Task<bool> EnsureAsync(LocalSttModels.ModelSpec spec, CancellationToken ct)
@@ -42,51 +76,77 @@ public sealed class SttModelProvisioner
     public async Task<bool> EnsureInDirAsync(LocalSttModels.ModelSpec spec, string dir, CancellationToken ct)
     {
         if (LocalSttModels.IsComplete(dir))
+        {
+            _status.SetState(spec.Name, ProvisionState.Ready);
             return true; // already installed — fast path on every subsequent boot
+        }
 
-        var parent = Path.GetDirectoryName(dir);
-        if (!string.IsNullOrEmpty(parent))
-            Directory.CreateDirectory(parent);
-
-        var tmpArchive = dir + $".download-{Guid.NewGuid():N}.tar.bz2";
-        var tmpExtract = dir + $".extract-{Guid.NewGuid():N}";
+        var gate = LockFor(spec.Name);
+        await gate.WaitAsync(ct);
         try
         {
-            _log.LogInformation(
-                "Downloading on-device STT model '{Model}' (~{SizeMB} MB) — dictation uses the cloud until this completes.",
-                spec.Name, spec.SizeBytes / (1024 * 1024));
+            if (LocalSttModels.IsComplete(dir))
+            {
+                _status.SetState(spec.Name, ProvisionState.Ready);
+                return true; // another caller finished while we waited
+            }
 
-            await DownloadAsync(spec.Url, tmpArchive, ct);
-            await VerifySha256Async(tmpArchive, spec.Sha256, ct);
+            var parent = Path.GetDirectoryName(dir);
+            if (!string.IsNullOrEmpty(parent))
+                Directory.CreateDirectory(parent);
 
-            Directory.CreateDirectory(tmpExtract);
-            Extract(tmpArchive, tmpExtract);
+            var tmpArchive = dir + $".download-{Guid.NewGuid():N}.tar.bz2";
+            var tmpExtract = dir + $".extract-{Guid.NewGuid():N}";
+            try
+            {
+                _log.LogInformation(
+                    "Downloading on-device STT model '{Model}' (~{SizeMB} MB) — dictation uses the cloud until this completes.",
+                    spec.Name, spec.SizeBytes / (1024 * 1024));
 
-            if (!LocalSttModels.IsComplete(tmpExtract))
-                throw new InvalidOperationException(
-                    "extracted STT bundle is missing encoder/decoder/joiner/tokens");
+                _status.SetState(spec.Name, ProvisionState.Downloading);
+                await DownloadAsync(spec.Name, spec.Url, tmpArchive, ct);
 
-            // Atomic publish: move the verified extract into final place.
-            if (Directory.Exists(dir))
-                Directory.Delete(dir, recursive: true);
-            Directory.Move(tmpExtract, dir);
+                _status.SetState(spec.Name, ProvisionState.Verifying);
+                await VerifySha256Async(tmpArchive, spec.Sha256, ct);
 
-            _log.LogInformation("On-device STT model '{Model}' installed at {Dir}", spec.Name, dir);
-            return true;
-        }
-        catch (OperationCanceledException)
-        {
-            throw;
-        }
-        catch (Exception ex)
-        {
-            _log.LogError(ex, "Failed to provision on-device STT model '{Model}'", spec.Name);
-            return false;
+                _status.SetState(spec.Name, ProvisionState.Extracting);
+                Directory.CreateDirectory(tmpExtract);
+                Extract(tmpArchive, tmpExtract);
+
+                if (!LocalSttModels.IsComplete(tmpExtract))
+                    throw new InvalidOperationException(
+                        "extracted STT bundle is missing encoder/decoder/joiner/tokens");
+
+                _status.SetState(spec.Name, ProvisionState.Installing);
+                // Atomic publish: move the verified extract into final place.
+                if (Directory.Exists(dir))
+                    Directory.Delete(dir, recursive: true);
+                Directory.Move(tmpExtract, dir);
+
+                _status.SetState(spec.Name, ProvisionState.Ready);
+                _log.LogInformation("On-device STT model '{Model}' installed at {Dir}", spec.Name, dir);
+                return true;
+            }
+            catch (OperationCanceledException)
+            {
+                _status.SetState(spec.Name, ProvisionState.NotStarted);
+                throw;
+            }
+            catch (Exception ex)
+            {
+                _status.SetState(spec.Name, ProvisionState.Failed, ex.Message);
+                _log.LogError(ex, "Failed to provision on-device STT model '{Model}'", spec.Name);
+                return false;
+            }
+            finally
+            {
+                TryDelete(tmpArchive);
+                TryDeleteDir(tmpExtract);
+            }
         }
         finally
         {
-            TryDelete(tmpArchive);
-            TryDeleteDir(tmpExtract);
+            gate.Release();
         }
     }
 
@@ -112,45 +172,90 @@ public sealed class SttModelProvisioner
     public async Task<bool> EnsureFileInDirAsync(LocalSttModels.FileSpec spec, string dir, CancellationToken ct)
     {
         var dest = Path.Combine(dir, spec.FileName);
-        if (File.Exists(dest)) return true;
-
-        Directory.CreateDirectory(dir);
-        var tmp = dest + $".download-{Guid.NewGuid():N}";
-        try
+        if (File.Exists(dest))
         {
-            _log.LogInformation(
-                "Downloading on-device STT model file '{File}' (~{SizeMB} MB).",
-                spec.FileName, spec.SizeBytes / (1024 * 1024));
-            await DownloadAsync(spec.Url, tmp, ct);
-            await VerifySha256Async(tmp, spec.Sha256, ct);
-            if (File.Exists(dest)) File.Delete(dest);
-            File.Move(tmp, dest);
-            _log.LogInformation("On-device STT model file '{File}' installed at {Dir}", spec.FileName, dir);
+            _status.SetState(spec.Name, ProvisionState.Ready);
             return true;
         }
-        catch (OperationCanceledException)
+
+        var gate = LockFor(spec.Name);
+        await gate.WaitAsync(ct);
+        try
         {
-            throw;
-        }
-        catch (Exception ex)
-        {
-            _log.LogError(ex, "Failed to provision on-device STT model file '{File}'", spec.FileName);
-            return false;
+            if (File.Exists(dest))
+            {
+                _status.SetState(spec.Name, ProvisionState.Ready);
+                return true; // another caller finished while we waited
+            }
+
+            Directory.CreateDirectory(dir);
+            var tmp = dest + $".download-{Guid.NewGuid():N}";
+            try
+            {
+                _log.LogInformation(
+                    "Downloading on-device STT model file '{File}' (~{SizeMB} MB).",
+                    spec.FileName, spec.SizeBytes / (1024 * 1024));
+                _status.SetState(spec.Name, ProvisionState.Downloading);
+                await DownloadAsync(spec.Name, spec.Url, tmp, ct);
+                _status.SetState(spec.Name, ProvisionState.Verifying);
+                await VerifySha256Async(tmp, spec.Sha256, ct);
+                _status.SetState(spec.Name, ProvisionState.Installing);
+                if (File.Exists(dest)) File.Delete(dest);
+                File.Move(tmp, dest);
+                _status.SetState(spec.Name, ProvisionState.Ready);
+                _log.LogInformation("On-device STT model file '{File}' installed at {Dir}", spec.FileName, dir);
+                return true;
+            }
+            catch (OperationCanceledException)
+            {
+                _status.SetState(spec.Name, ProvisionState.NotStarted);
+                throw;
+            }
+            catch (Exception ex)
+            {
+                _status.SetState(spec.Name, ProvisionState.Failed, ex.Message);
+                _log.LogError(ex, "Failed to provision on-device STT model file '{File}'", spec.FileName);
+                return false;
+            }
+            finally
+            {
+                TryDelete(tmp);
+            }
         }
         finally
         {
-            TryDelete(tmp);
+            gate.Release();
         }
     }
 
-    private static async Task DownloadAsync(string url, string destPath, CancellationToken ct)
+    private async Task DownloadAsync(string modelId, string url, string destPath, CancellationToken ct)
     {
         using var http = new HttpClient { Timeout = Timeout.InfiniteTimeSpan };
         using var resp = await http.GetAsync(url, HttpCompletionOption.ResponseHeadersRead, ct);
         resp.EnsureSuccessStatusCode();
+
+        var total = resp.Content.Headers.ContentLength ?? 0L;
+        if (total > 0) _status.SetTotal(modelId, total);
+
         await using var src = await resp.Content.ReadAsStreamAsync(ct);
         await using var dst = File.Create(destPath);
-        await src.CopyToAsync(dst, 1 << 20, ct);
+
+        var buffer = new byte[1 << 20];
+        long done = 0;
+        long lastReported = 0;
+        const long reportEvery = 4L << 20; // throttle progress writes to ~4 MiB
+        int read;
+        while ((read = await src.ReadAsync(buffer, ct)) > 0)
+        {
+            await dst.WriteAsync(buffer.AsMemory(0, read), ct);
+            done += read;
+            if (done - lastReported >= reportEvery)
+            {
+                _status.ReportBytes(modelId, done);
+                lastReported = done;
+            }
+        }
+        _status.ReportBytes(modelId, done);
     }
 
     private static async Task VerifySha256Async(string path, string expectedHex, CancellationToken ct)

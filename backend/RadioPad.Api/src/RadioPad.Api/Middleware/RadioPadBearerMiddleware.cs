@@ -127,6 +127,12 @@ public sealed class RadioPadBearerMiddleware
 
     private static bool IsPublicApi(PathString path) =>
         path.StartsWithSegments("/api/health") ||
+        // On-device model manager (download/test/diagnostics). Loopback-only on the
+        // desktop sidecar; on a hosted build LocalModelsController gates every action
+        // on RADIOPAD_LOCAL_STT_ENABLED and returns inert results, so anonymous
+        // reachability exposes no tenant data, secrets, or PHI. Whitelisted here so
+        // it returns those inert results instead of a 401.
+        path.StartsWithSegments("/api/local-models") ||
         // Desktop UBAG passthrough — self-authenticated via RADIOPAD_DESKTOP_PROXY_TOKEN
         // in the controller, so it must bypass the Production bearer/OIDC requirement.
         path.StartsWithSegments("/api/ubag-gw") ||

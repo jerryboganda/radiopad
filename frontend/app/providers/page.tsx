@@ -7,6 +7,7 @@ import PageHeader from '@/components/shell/PageHeader';
 import EmptyState from '@/components/ui/EmptyState';
 import ErrorState from '@/components/ui/ErrorState';
 import { TableSkeleton } from '@/components/ui/Skeleton';
+import OnDeviceModels from './OnDeviceModels';
 
 const UBAG_FALLBACK_TARGETS = ['gemini_web', 'deepseek_web', 'mock'];
 
@@ -77,12 +78,26 @@ const EMPTY_DRAFT: Editable = {
 };
 
 export default function ProvidersPage() {
+  const [tab, setTab] = useState<'cloud' | 'on-device'>('cloud');
   const [items, setItems] = useState<Provider[]>([]);
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [draft, setDraft] = useState<Editable | null>(null);
   const [saving, setSaving] = useState(false);
   const [ubagTargets, setUbagTargets] = useState<string[]>(UBAG_FALLBACK_TARGETS);
+
+  // Deep-link the active tab via ?tab=on-device without pulling in next/navigation
+  // (keeps this page out of a Suspense boundary). Default 'cloud'; sync after mount.
+  useEffect(() => {
+    if (new URLSearchParams(window.location.search).get('tab') === 'on-device') setTab('on-device');
+  }, []);
+  const selectTab = useCallback((next: 'cloud' | 'on-device') => {
+    setTab(next);
+    const url = new URL(window.location.href);
+    if (next === 'cloud') url.searchParams.delete('tab');
+    else url.searchParams.set('tab', next);
+    window.history.replaceState(null, '', url.toString());
+  }, []);
 
   // Lazily fetch allowed UBAG targets when the modal is open with adapter=ubag.
   // Swallow errors — non-admin callers get a 403 and the fallback list is used.
@@ -163,9 +178,18 @@ export default function ProvidersPage() {
       <PageHeader
         title="AI models"
         description={<>The AI models your workspace can use for drafting reports. Patient information is only sent to models marked <span className="badge ok">Safe for patient data</span> or <span className="badge ai">Runs on-site</span>.</>}
-        primaryAction={<button className="primary" onClick={newProvider}>+ Add a model</button>}
+        primaryAction={tab === 'cloud' ? <button className="primary" onClick={newProvider}>+ Add a model</button> : undefined}
       />
 
+      <div className="rp-row" style={{ gap: 8, marginBottom: 16 }}>
+        <button className={tab === 'cloud' ? 'primary' : 'subtle'} onClick={() => selectTab('cloud')}>Cloud providers</button>
+        <button className={tab === 'on-device' ? 'primary' : 'subtle'} onClick={() => selectTab('on-device')}>On-device models</button>
+      </div>
+
+      {tab === 'on-device' && <OnDeviceModels />}
+
+      {tab === 'cloud' && (
+      <>
       {error && items.length > 0 && <div className="banner warn">{error}</div>}
 
       <div className="rp-panel">
@@ -226,6 +250,8 @@ export default function ProvidersPage() {
       </div>
 
       <SandboxComparePanel providers={items} />
+      </>
+      )}
 
       {draft && (
         <div className="rp-modal-backdrop" onClick={() => setDraft(null)}>

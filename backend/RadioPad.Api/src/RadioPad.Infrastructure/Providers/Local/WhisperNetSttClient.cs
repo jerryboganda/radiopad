@@ -27,6 +27,7 @@ public sealed class WhisperNetSttClient : ILocalSttEngine, IDisposable
     private string? _binPath;
     private WhisperFactory? _factory;
     private volatile bool _loadFailed;
+    private volatile string? _lastError;
 
     public WhisperNetSttClient(IAudioDecoder decoder, ILogger<WhisperNetSttClient> log)
     {
@@ -37,6 +38,8 @@ public sealed class WhisperNetSttClient : ILocalSttEngine, IDisposable
     }
 
     public string EngineId => EngineName;
+
+    public string? LastError => _lastError;
 
     public bool Available
     {
@@ -92,6 +95,7 @@ public sealed class WhisperNetSttClient : ILocalSttEngine, IDisposable
         catch (Exception ex) when (ex is not OperationCanceledException)
         {
             _loadFailed = true;
+            _lastError = $"{ex.GetType().Name}: {ex.Message}";
             _log.LogError(ex, "whisper recognize failed; disabling engine for this session");
             throw;
         }

@@ -24,6 +24,7 @@ public class LocalSttEnsembleTests
         }
         public string EngineId { get; }
         public bool Available { get; }
+        public string? LastError => null;
         public Task<EngineTranscript> RecognizeAsync(byte[] wavBytes, CancellationToken ct) => Task.FromResult(_t);
     }
 

@@ -825,6 +825,54 @@ export type MarketplaceSubmission = {
   publisherUser: string;
 };
 
+/** On-device model manager — kinds, lifecycle, and per-model status. */
+export type LocalModelKind = 'Stt' | 'Tts' | 'Orchestrator';
+export type ProvisionState =
+  | 'NotStarted'
+  | 'Downloading'
+  | 'Verifying'
+  | 'Extracting'
+  | 'Installing'
+  | 'Ready'
+  | 'Failed';
+
+export type ModelProgress = {
+  id: string;
+  state: ProvisionState;
+  bytesDownloaded: number;
+  totalBytes: number;
+  error: string | null;
+};
+
+export type LocalModel = {
+  id: string;
+  displayName: string;
+  kind: LocalModelKind;
+  engine: string;
+  sizeBytes: number;
+  license: string;
+  /** Roadmap kinds (TTS / orchestrator) with no engine yet — render as "coming soon". */
+  placeholder: boolean;
+  downloaded: boolean;
+  /** Engine loaded + usable right now (always false on a web build). */
+  available: boolean;
+  progress: ModelProgress;
+};
+
+/** `enabled` is false on a web/server build (no local engine) → the UI shows a desktop-only notice. */
+export type LocalModelsResponse = { enabled: boolean; models: LocalModel[] };
+
+export type ModelTestResult = {
+  ok: boolean;
+  engine: string;
+  latencyMs: number;
+  transcript: string | null;
+  sampleSource: string;
+  error?: string;
+  /** Full exception text for IT hand-off (only on failure). */
+  detail?: string;
+};
+
 export const api = {
   health: () => request<{ status: string }>('/api/health'),
   me: () =>
@@ -1030,6 +1078,29 @@ export const api = {
       delete: (id: string) =>
         request<void>(`/api/providers/${id}/oauth/refresh-token`, { method: 'DELETE' }),
     },
+  },
+  /**
+   * On-device AI model manager (desktop sidecar). `list` works everywhere — its
+   * `enabled` flag is false on a web build — while download/remove/test/diagnostics
+   * act on the local engine and 503 on the hosted API.
+   */
+  localModels: {
+    list: () => request<LocalModelsResponse>('/api/local-models'),
+    download: (id: string) =>
+      request<{ id: string; state: ProvisionState; alreadyInstalled?: boolean; startedUtc?: string }>(
+        `/api/local-models/${encodeURIComponent(id)}/download`,
+        { method: 'POST' },
+      ),
+    progress: (id: string) =>
+      request<ModelProgress>(`/api/local-models/${encodeURIComponent(id)}/progress`),
+    remove: (id: string) =>
+      request<{ id: string; deleted: boolean }>(`/api/local-models/${encodeURIComponent(id)}`, {
+        method: 'DELETE',
+      }),
+    test: (id: string) =>
+      request<ModelTestResult>(`/api/local-models/${encodeURIComponent(id)}/test`, { method: 'POST' }),
+    diagnostics: (id: string) =>
+      request<unknown>(`/api/local-models/${encodeURIComponent(id)}/diagnostics`),
   },
   copilot: {
     status: () => request<CopilotStatus>('/api/copilot/status'),
