@@ -70,6 +70,38 @@ export async function apiUrl(path: string): Promise<string> {
   return `${base}${path}`;
 }
 
+/**
+ * Base URL of the bundled on-device STT sidecar, resolved once via the desktop
+ * `get_local_stt_url` command. Empty string on web / non-desktop builds (no
+ * sidecar). Dictation transcription is routed here so PHI audio is transcribed
+ * locally and never leaves the machine; every other call uses `apiBase()`
+ * (production). See desktop `sidecar_manager` / `get_local_stt_url`.
+ */
+let resolvedLocalSttBase: string | null = null;
+export async function localSttBase(): Promise<string> {
+  if (resolvedLocalSttBase !== null) return resolvedLocalSttBase;
+  if (typeof window !== 'undefined') {
+    const tauri = (window as typeof window & {
+      __TAURI__?: {
+        core?: { invoke?: (cmd: string) => Promise<unknown> };
+        invoke?: (cmd: string) => Promise<unknown>;
+      };
+    }).__TAURI__;
+    const invoke = tauri?.core?.invoke ?? tauri?.invoke;
+    try {
+      const url = await invoke?.('get_local_stt_url');
+      if (typeof url === 'string' && url.length > 0) {
+        resolvedLocalSttBase = url.replace(/\/$/, '');
+        return resolvedLocalSttBase;
+      }
+    } catch {
+      /* not the desktop shell — fall through to web/cloud path */
+    }
+  }
+  resolvedLocalSttBase = '';
+  return resolvedLocalSttBase;
+}
+
 const TENANT_HEADER = 'X-RadioPad-Tenant';
 const USER_HEADER = 'X-RadioPad-User';
 
@@ -258,6 +290,24 @@ async function requestForm<T>(path: string, form: FormData): Promise<T> {
     body: form,
     credentials: requestCredentials(base),
   }, headers);
+  if (!res.ok) {
+    let body: unknown = null;
+    try { body = await res.json(); } catch { body = await res.text(); }
+    throw Object.assign(new Error(`API ${res.status} ${res.statusText}`), { status: res.status, body });
+  }
+  const ct = res.headers.get('content-type') || '';
+  if (ct.includes('application/json')) return (await res.json()) as T;
+  return (await res.text()) as unknown as T;
+}
+
+/**
+ * Multipart upload to an explicit base URL (the on-device STT sidecar), with NO
+ * tenant/auth headers and no credentials. The local sidecar's `/api/stt/...`
+ * endpoint is anonymous and loopback-bound, so the production session token is
+ * neither needed nor appropriate to send to localhost.
+ */
+async function requestFormTo<T>(base: string, path: string, form: FormData): Promise<T> {
+  const res = await fetch(`${base}${path}`, { method: 'POST', body: form, credentials: 'omit' });
   if (!res.ok) {
     let body: unknown = null;
     try { body = await res.json(); } catch { body = await res.text(); }
@@ -885,11 +935,13 @@ export const api = {
         method: 'POST',
         body: JSON.stringify({ rawDictation }),
       }),
-    // High-accuracy transcription: upload the recorded dictation audio; the
-    // backend routes it through UBAG (audio attached into a chat model) and
-    // returns the transcript. PHI routing is handled by the provider router,
-    // exactly like the text dictation/cleanup path — no separate gate.
-    transcribe: (id: string, audio: Blob, mode?: SttMode) => {
+    // Dictation transcription. On the desktop the recorded audio is transcribed
+    // FULLY ON-DEVICE by the bundled STT sidecar (Parakeet + Whisper CPU
+    // ensemble) — the PHI-bearing audio never leaves the machine; only the
+    // resulting de-identified transcript is saved to the production report. On
+    // web (no sidecar) it falls back to the report-scoped cloud path, where PHI
+    // routing is handled by the provider router exactly like text dictation.
+    transcribe: async (id: string, audio: Blob, mode?: SttMode) => {
       const form = new FormData();
       // Desktop converts to 16 kHz mono WAV for the on-device engine; web sends
       // the original webm. Name the part by type so the backend content-type
@@ -898,13 +950,22 @@ export const api = {
       form.append('audio', audio, name);
       // Per-request engine mode (on-device picker). 'auto' uses the server default.
       if (mode && mode !== 'auto') form.append('mode', mode);
-      return requestForm<{
+      type TranscribeResult = {
         transcript: string;
         provider: string;
         model: string;
         latencyMs: number;
         spans?: SttSpan[] | null;
-      }>(`/api/reports/${id}/dictation/transcribe`, form);
+      };
+      const local = await localSttBase();
+      if (local) {
+        // Desktop: on-device, loopback-only, anonymous STT endpoint. Not
+        // report-scoped — the engine needs only the audio. Deliberately NO cloud
+        // fallback here: if the on-device engine isn't ready it surfaces an error
+        // rather than silently shipping PHI audio off-device.
+        return requestFormTo<TranscribeResult>(local, '/api/stt/transcribe', form);
+      }
+      return requestForm<TranscribeResult>(`/api/reports/${id}/dictation/transcribe`, form);
     },
     signatures: (id: string) =>
       request<ReportSignature[]>(`/api/reports/${id}/signatures`),

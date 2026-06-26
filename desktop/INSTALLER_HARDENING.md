@@ -221,9 +221,9 @@ The capability grant list was reviewed and hardened. Removals:
 | Setting | Value | Note |
 | ------- | ----- | ---- |
 | `plugins.shell.open` | `false` | Previously `true` — allowed the frontend to open arbitrary URLs in the default browser. Disabled per iter-37 hardening guidance. |
-| `app.security.csp` | `default-src 'self'; connect-src 'self' http://127.0.0.1:7457 ipc: tauri:; img-src 'self' data:; style-src 'self' 'unsafe-inline'; font-src 'self' data:` | Tight CSP; `connect-src` allows only localhost API + Tauri IPC. No `script-src 'unsafe-eval'`. |
+| `app.security.csp` | `default-src 'self'; connect-src 'self' https://radiopad.polytronx.com http://127.0.0.1:7457 ipc: tauri:; img-src 'self' data:; style-src 'self' 'unsafe-inline'; font-src 'self' data:` | Tight CSP; `connect-src` allows only the hosted production API, the loopback STT sidecar, and Tauri IPC. No `script-src 'unsafe-eval'`. |
 | `app.withGlobalTauri` | `true` | Exposes `window.__TAURI__` only to the main window (capability-gated). Acceptable because the CSP prevents third-party script injection. |
-| `bundle.externalBin` | `["binaries/radiopad-api"]` | Only the sidecar; no other external binaries bundled. |
+| `bundle.externalBin` | `["binaries/radiopad-api"]` | Only the on-device STT sidecar; no other external binaries bundled. |
 | `bundle.resources` | `rulebooks`, `templates` | Read-only data; no executable resources. |
 | `bundle.macOS.hardenedRuntime` | `true` | Required for notarization; entitlements are minimal (see `entitlements.plist`). |
 

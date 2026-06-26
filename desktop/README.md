@@ -1,14 +1,24 @@
 # RadioPad Desktop (Tauri 2)
 
-Native shell that loads the static export of the Next.js frontend and talks to
-the local ASP.NET Core API on `http://127.0.0.1:7457`.
+Native shell that loads the static export of the Next.js frontend. The app is a
+**thin client over the hosted production API** (`https://radiopad.polytronx.com`)
+for everything — auth, reports, AI, settings. The ONE exception is **on-device
+dictation transcription**: the desktop bundles a loopback-only `radiopad-api`
+sidecar that runs the Parakeet + Whisper CPU STT ensemble, so dictation audio
+(PHI) is transcribed on the machine and never leaves it. The frontend routes
+only `POST /api/stt/transcribe` to that sidecar (`http://127.0.0.1:7457`); see
+`get_backend_url` / `get_local_stt_url` in `src-tauri/src/main.rs`.
+
+Override the app API with `RADIOPAD_BACKEND`, and the STT sidecar bind with
+`RADIOPAD_LOCAL_BIND`, for local development.
 
 ## Prerequisites
 
 - Rust (stable) — install via [rustup.rs](https://rustup.rs)
 - Node + pnpm
 - Tauri prerequisites for your OS — see <https://v2.tauri.app/start/prerequisites/>
-- The RadioPad backend running on port 7457
+- For app data during dev: reachable RadioPad API (production by default, or set
+  `RADIOPAD_BACKEND` to a local backend). The STT sidecar is built/bundled by CI.
 
 ## Dev
 

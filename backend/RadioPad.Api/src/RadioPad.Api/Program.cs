@@ -157,11 +157,17 @@ builder.Services.AddScoped<RadioPad.Application.Abstractions.IDictationCleanupSe
 // (IUbagClient) — no new client/config needed.
 builder.Services.AddScoped<RadioPad.Application.Abstractions.ITranscriptionService,
     RadioPad.Application.Services.TranscriptionService>();
-// Phase 1 (local STT) — fully on-device, offline transcription. Registered
-// always; ILocalSttClient.Available stays false (so TranscriptionService keeps
-// the UBAG cloud path) UNLESS the desktop build sets RADIOPAD_LOCAL_STT_ENABLED
-// and ships the model + ffmpeg. The recognizer loads the native model once, so
-// it is a singleton; the ffmpeg-backed decoder is stateless.
+// Phase 1 (local STT) — fully on-device, offline transcription, decoded
+// in-process (no ffmpeg). Registered always; ILocalSttClient.Available stays
+// false UNLESS RADIOPAD_LOCAL_STT_ENABLED is set and the model is present (the
+// desktop STT sidecar). Two consumers, by design:
+//   • Desktop → the anonymous, loopback-only POST /api/stt/transcribe
+//     (SttController) which requires the on-device engine and has NO cloud
+//     fallback (PHI audio must never leave the machine; 503 until the model
+//     provisions on first run).
+//   • Web / mobile → the report-scoped POST /api/reports/{id}/dictation/transcribe
+//     where TranscriptionService keeps the UBAG cloud path (Available == false).
+// The recognizer loads the native model once (singleton); the WAV decoder is stateless.
 builder.Services.AddSingleton<RadioPad.Infrastructure.Audio.IAudioDecoder,
     RadioPad.Infrastructure.Audio.WavAudioDecoder>();
 builder.Services.AddSingleton<RadioPad.Infrastructure.Providers.Local.SherpaParakeetSttClient>();

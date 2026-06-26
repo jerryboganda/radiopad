@@ -4,6 +4,54 @@
 
 ---
 
+## Iteration 55 — Desktop = thin client over production + on-device STT only
+
+- **Date:** 2026-06-27
+- **Scope:** Make the desktop app run **100% against the hosted production API**
+  (`https://radiopad.polytronx.com`) for auth, reports, AI, and settings — no
+  local app backend — while keeping the **dual-engine CPU on-device STT** fully
+  working so dictation audio (PHI) never leaves the machine. Local PostgreSQL 18
+  (a dev artifact) was uninstalled to lighten the workstation; production is
+  SQLite-backed and unaffected.
+
+### Delivered
+
+- **Desktop (`desktop/src-tauri/`):** `get_backend_url()` now returns the
+  production URL (override `RADIOPAD_BACKEND`); new `get_local_stt_url()` command
+  returns the loopback STT sidecar URL (override `RADIOPAD_LOCAL_BIND`).
+  `sidecar_manager.rs` runs the bundled `radiopad-api` in **STT-only mode**
+  (`ASPNETCORE_ENVIRONMENT=Development` + `RADIOPAD_LOCAL_STT_ENABLED=1` only;
+  no UBAG/proxy/dev-header wiring), bound to a fixed loopback address decoupled
+  from `RADIOPAD_BACKEND`. CSP `connect-src` now allows both the production
+  origin and `http://127.0.0.1:7457`. `externalBin` + the `shell:allow-spawn`
+  capability are kept (the sidecar is still bundled).
+- **Backend:** new stateless `SttController` — `POST /api/stt/transcribe`
+  (`[AllowAnonymous]`, not report-scoped) that runs `ILocalSttClient` and returns
+  the same `{transcript,provider,model,latencyMs,spans}` shape; 503
+  `stt_unavailable` when no on-device engine is configured (so it is inert on the
+  hosted server, which also 401s anonymous requests first). Tests:
+  `SttControllerTests`.
+- **Frontend:** `lib/api.ts` adds `localSttBase()` + `requestFormTo()`;
+  `api.reports.transcribe` routes to the local sidecar on desktop (no cloud
+  fallback — PHI stays local), else the report-scoped cloud path on web/mobile.
+  `DictationOverlay` surfaces a "engine warming up" banner for the 503 /
+  connection-warming case. `login/page.tsx` no longer force-enables dev sign-in
+  inside Tauri (it was broken against prod); dev login is now gated purely on the
+  `NEXT_PUBLIC_ALLOW_DEV_LOGIN` build flag.
+- **CI/docs:** dropped the now-unused `RADIOPAD_DESKTOP_PROXY_TOKEN` from
+  `desktop-bundle.yml`; refreshed desktop README / INSTALLER_HARDENING /
+  desktop-architecture / desktop-app-guide.
+
+### Follow-ups (flagged, not in this change)
+
+- **Desktop external redirects** (Stripe billing/portal, SSO, marketplace) use
+  top-level `window.location` and will strand the Tauri webview; needs the Tauri
+  opener plugin to open them in the system browser. Pre-existing; now reachable.
+- **On-device STT model hosting:** models download from github.com/huggingface.co
+  on first run with no cloud fallback on desktop; firewalled sites would get a
+  persistent 503. Consider serving the models from `radiopad.polytronx.com` or
+  bundling them.
+
 ## Iteration 54 — Hallmark design-system migration (OKLCH tokens + build-time Tailwind)
 
 - **Date:** 2026-06-26

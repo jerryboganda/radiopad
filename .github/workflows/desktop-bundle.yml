@@ -142,9 +142,10 @@ jobs:
       - name: Build Tauri bundle
         working-directory: desktop
         env:
-          # Baked into the binary via option_env! so the desktop can auth to the
-          # web-server UBAG passthrough. Never committed to source.
-          RADIOPAD_DESKTOP_PROXY_TOKEN: ${{ secrets.RADIOPAD_DESKTOP_PROXY_TOKEN }}
+          # NOTE: the desktop no longer carries a UBAG proxy token. AI runs
+          # through the hosted production API (server-side UBAG), and the bundled
+          # sidecar is on-device STT only — so RADIOPAD_DESKTOP_PROXY_TOKEN is no
+          # longer baked in.
           TAURI_PRIVATE_KEY: ${{ secrets.TAURI_PRIVATE_KEY }}
           TAURI_KEY_PASSWORD: ${{ secrets.TAURI_KEY_PASSWORD }}
           # Windows

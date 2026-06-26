@@ -9,7 +9,8 @@
 //     (PRD DESK-005), keyed off an OS-keyring-backed master key.
 //   * Per-install device pairing flow (PRD DESK-008).
 //   * PHI redaction layer over the global tracing subscriber (PRD DESK-010).
-//   * Spawn the bundled `radiopad-api` sidecar (PRD DESK-015).
+//   * Spawn the bundled `radiopad-api` sidecar for ON-DEVICE STT only (PRD
+//     DESK-015); the app itself talks to the hosted production API.
 
 #![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
 
@@ -81,9 +82,24 @@ fn clear_secure_clipboard_if_owned(app: &tauri::AppHandle) -> bool {
     false
 }
 
+/// Base URL for the RadioPad application API. The desktop is a thin client over
+/// the hosted production service — auth, reports, AI, settings, everything except
+/// on-device dictation goes here. `RADIOPAD_BACKEND` overrides it for development.
 #[tauri::command]
 fn get_backend_url() -> String {
-    std::env::var("RADIOPAD_BACKEND").unwrap_or_else(|_| "http://127.0.0.1:7457".to_string())
+    std::env::var("RADIOPAD_BACKEND")
+        .unwrap_or_else(|_| "https://radiopad.polytronx.com".to_string())
+}
+
+/// Base URL for the bundled on-device STT sidecar (loopback only). The frontend
+/// routes ONLY dictation transcription here so PHI audio is transcribed on the
+/// device and never leaves it; everything else uses `get_backend_url`. Kept in
+/// lock-step with the sidecar's bind in `sidecar_manager` (`RADIOPAD_LOCAL_BIND`
+/// overrides both).
+#[tauri::command]
+fn get_local_stt_url() -> String {
+    std::env::var("RADIOPAD_LOCAL_BIND")
+        .unwrap_or_else(|_| backend_health::DEFAULT_BACKEND_URL.to_string())
 }
 
 /// Copy `text` to the OS clipboard and clear it after `ttl_ms` milliseconds.
@@ -214,6 +230,7 @@ fn main() {
         )
         .invoke_handler(tauri::generate_handler![
             get_backend_url,
+            get_local_stt_url,
             secure_copy,
             verify_plugin,
             offline_drafts::offline_drafts_list,

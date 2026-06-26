@@ -1,28 +1,46 @@
 # Desktop Architecture
 
-**Status:** Current  ·  **Owner:** Engineering  ·  **Last Updated:** 2026-05-16
+**Status:** Current  ·  **Owner:** Engineering  ·  **Last Updated:** 2026-06-27
 
 ## Framework
 
 Tauri 2 (Rust core + WebView2/WKWebView). Source under `desktop/src-tauri/`.
 
+## Backend model — thin client over production + on-device STT
+
+The desktop is a **thin client over the hosted production API**
+(`https://radiopad.polytronx.com`): auth, reports, AI, settings — everything —
+goes to production (`get_backend_url`, override with `RADIOPAD_BACKEND`). The app
+no longer runs a local backend for its data.
+
+The **one** local component is the bundled `radiopad-api` sidecar running in
+**STT-only mode** so on-device dictation transcription (Parakeet + Whisper CPU
+ensemble) keeps PHI audio on the machine. The frontend routes ONLY
+`POST /api/stt/transcribe` to the sidecar at `http://127.0.0.1:7457`
+(`get_local_stt_url`, override with `RADIOPAD_LOCAL_BIND`); the sidecar's
+`/api/stt/transcribe` is anonymous, loopback-bound, and not report-scoped.
+
 ## Process model
 
 - **Tauri main process (Rust):** owns the OS window, capability set, global
   shortcuts, clipboard helpers, encrypted local stores, device-keyring
-  commands, backend sidecar supervision, and backend health events.
+  commands, STT-sidecar supervision, and backend-status health events.
 - **Renderer:** the static export from `frontend/out/` running in the system
-  WebView. It uses the same Open Design CSS as the web app.
-- **Backend sidecar:** the bundled ASP.NET Core `radiopad-api` binary. It binds
-  `http://127.0.0.1:7457` by default and is supervised by
-  `desktop/src-tauri/src/sidecar_manager.rs`.
+  WebView. It uses the same Open Design CSS as the web app and talks to the
+  production API for all app data.
+- **STT sidecar:** the bundled ASP.NET Core `radiopad-api` binary run in
+  STT-only mode (`ASPNETCORE_ENVIRONMENT=Development` + `RADIOPAD_LOCAL_STT_ENABLED=1`).
+  It binds `http://127.0.0.1:7457` and is supervised by
+  `desktop/src-tauri/src/sidecar_manager.rs`. It carries no UBAG/proxy/dev-header
+  wiring — AI runs server-side through production.
 - IPC is `invoke()`-style for narrow native capabilities plus one event stream
-  (`radiopad://backend-status`) for sidecar health.
+  (`radiopad://backend-status`) for STT-sidecar health.
 
 ## Local storage
 
-- The backend sidecar uses SQLite by default when no hosted database connection
-  string is configured.
+- The STT sidecar uses a throwaway local SQLite file only so the ASP.NET host
+  boots; no clinical data is stored locally (transcripts are returned, never
+  persisted by the sidecar).
 - The desktop shell stores long-lived native secrets in the OS credential store
   through `desktop/src-tauri/src/crypto_keyring.rs`.
 - Offline drafts use `offline_drafts.rs`: AES-256-GCM values in

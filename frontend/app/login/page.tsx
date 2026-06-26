@@ -31,11 +31,15 @@ function safeReturnTo(value: string | null | undefined): string {
 function allowDevLogin(): boolean {
   const nodeEnv = publicEnv('NODE_ENV') ?? BUILD_NODE_ENV;
   const flag = publicEnv('NEXT_PUBLIC_ALLOW_DEV_LOGIN') ?? DEV_LOGIN_FLAG;
-  // The Tauri desktop shell is a local single-user context whose bundled backend
-  // gates dev sign-in with RADIOPAD_DEV_HEADERS; its frontend is a production
-  // `next build`, so allow the dev path inside Tauri regardless of NODE_ENV.
-  const isDesktop = typeof window !== 'undefined' && '__TAURI__' in window;
-  return isDesktop || (nodeEnv !== 'production' && flag === 'true');
+  // Dev / passwordless sign-in is a development convenience, gated PURELY on an
+  // explicit build-time opt-in (NEXT_PUBLIC_ALLOW_DEV_LOGIN) in a non-production
+  // build. The desktop shell must NOT enable it just for being Tauri: the desktop
+  // now talks to the hosted PRODUCTION API, where dev sign-in is disabled (401),
+  // so the dev affordance + the prefilled `dev` / `radiologist@radiopad.local`
+  // defaults would be broken and misleading there. Real desktop auth uses the
+  // production password + TOTP + biometric flow; native secure token storage is
+  // gated separately on `isAuthTokenSecure()`, not on this flag.
+  return nodeEnv !== 'production' && flag === 'true';
 }
 
 function digitsOnly(v: string): string {

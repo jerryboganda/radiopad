@@ -51,6 +51,10 @@ export default function DictationOverlay() {
   // the two controls stay in sync — plus the ensemble's flagged review spans.
   const [mode, setMode] = useSttMode();
   const [reviewSpans, setReviewSpans] = useState<SttSpan[]>([]);
+  // Transient transcription error (e.g. on-device engine still downloading its
+  // model on first run → HTTP 503). Surfaced so the radiologist gets feedback
+  // instead of a silent no-op; cleared on the next attempt.
+  const [sttError, setSttError] = useState<string | null>(null);
 
   useEffect(() => {
     setSupported(getSpeechRecognitionCtor() !== null);
@@ -108,6 +112,7 @@ export default function DictationOverlay() {
     const target = getLastFocusedEditable();
     if (!reportId || !target || blob.size === 0) return;
     setTranscribing(true);
+    setSttError(null);
     try {
       // Desktop runs an on-device STT engine that needs 16 kHz mono WAV; the
       // WebView2 Chromium engine has the Opus codec, so convert here and the
@@ -127,9 +132,24 @@ export default function DictationOverlay() {
       // Surface ensemble disagreements / safety tokens for the radiologist to
       // eye-confirm (null on single-engine / cloud paths).
       setReviewSpans((res.spans ?? []).filter((s) => s.flagged));
-    } catch {
-      // Any provider/policy error surfaces as a non-2xx; the editor handles the
-      // error envelope. Insert nothing on failure.
+    } catch (e) {
+      // Surface a clear message instead of a silent no-op. Two warm-up cases on
+      // the desktop: the engine is still provisioning its model on first run
+      // (HTTP 503 stt_unavailable), or the loopback sidecar has not finished
+      // binding yet (fetch throws a TypeError / "Failed to fetch"). Both
+      // self-heal — tell the radiologist to retry. Nothing is inserted on
+      // failure, and there is deliberately no cloud fallback (PHI stays local).
+      const err = e as { status?: number; body?: { kind?: string }; message?: string };
+      const warmingUp =
+        err.status === 503 ||
+        err.body?.kind === 'stt_unavailable' ||
+        e instanceof TypeError ||
+        /failed to fetch/i.test(err.message ?? '');
+      if (warmingUp) {
+        setSttError('On-device dictation engine is starting up (it downloads its model on first run). Give it a moment and try again. If this persists, check that the machine can reach the model host.');
+      } else {
+        setSttError('Transcription failed. Please try again.');
+      }
     } finally {
       setTranscribing(false);
     }
@@ -190,6 +210,20 @@ export default function DictationOverlay() {
       {listening && interim && (
         <div className="rp-dictation-interim" data-testid="dictation-interim">
           {interim}
+        </div>
+      )}
+      {sttError && (
+        <div className="rp-dictation-interim" data-testid="dictation-error" role="alert">
+          {sttError}
+          <button
+            type="button"
+            className="subtle"
+            data-testid="dictation-error-dismiss"
+            aria-label="Dismiss error"
+            onClick={() => setSttError(null)}
+          >
+            ×
+          </button>
         </div>
       )}
       {reviewSpans.length > 0 && (

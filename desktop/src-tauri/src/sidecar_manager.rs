@@ -20,8 +20,16 @@ struct BackendStatus {
     restart_count: u32,
 }
 
-fn backend_url() -> String {
-    std::env::var("RADIOPAD_BACKEND").unwrap_or_else(|_| DEFAULT_BACKEND_URL.to_string())
+/// Loopback bind for the bundled STT sidecar.
+///
+/// This sidecar is NOT the application's data backend — the desktop UI talks to
+/// the hosted production API (see `get_backend_url`). The sidecar exists ONLY to
+/// run on-device dictation transcription (Parakeet + Whisper CPU ensemble), so
+/// its bind is a fixed loopback address, deliberately INDEPENDENT of
+/// `RADIOPAD_BACKEND` (which points the UI at production). `RADIOPAD_LOCAL_BIND`
+/// can override it for local development of the sidecar itself.
+fn stt_sidecar_bind() -> String {
+    std::env::var("RADIOPAD_LOCAL_BIND").unwrap_or_else(|_| DEFAULT_BACKEND_URL.to_string())
 }
 
 fn emit_status(app: &AppHandle, state: &'static str, message: Option<String>, restart_count: u32) {
@@ -69,13 +77,15 @@ fn spawn_health_loop(app: AppHandle, bind: String, stop: Arc<AtomicBool>, restar
 /// sidecar. The desktop install lives under a read-only location (e.g.
 /// `C:\Program Files\RadioPad`), so the API must not fall back to its
 /// CWD-relative default DB, which would be unwritable for a non-elevated user.
+/// The STT sidecar never stores clinical data here — this DB only exists so the
+/// ASP.NET host boots cleanly; the transcript itself is returned, never persisted.
 fn sidecar_db_conn(app: &AppHandle) -> Option<String> {
     let dir = app.path().app_local_data_dir().ok()?;
     if let Err(e) = std::fs::create_dir_all(&dir) {
         tracing::warn!("radiopad-api: could not create data dir {dir:?}: {e}");
         return None;
     }
-    Some(format!("Data Source={}", dir.join("radiopad.db").display()))
+    Some(format!("Data Source={}", dir.join("radiopad-stt.db").display()))
 }
 
 pub fn start(app: AppHandle) {
@@ -90,7 +100,7 @@ pub fn start(app: AppHandle) {
 }
 
 async fn supervise(app: AppHandle) {
-    let bind = backend_url();
+    let bind = stt_sidecar_bind();
     let db_conn = sidecar_db_conn(&app);
     let mut restart_count = 0;
 
@@ -100,10 +110,10 @@ async fn supervise(app: AppHandle) {
         // may leave its sidecar child running and still bound to the loopback port.
         // A freshly launched shell that blindly spawns a *second* sidecar would fail
         // to bind that port, crash-loop to MAX_RESTARTS, and raise a false "backend
-        // sidecar exited repeatedly" danger banner — even though the window reads live
-        // data fine off the surviving sidecar. Detect that case and monitor the
-        // existing backend instead of fighting it. (Only RadioPad serves
-        // /api/health/ready with 200 on this port, so this won't adopt a stranger.)
+        // sidecar exited repeatedly" danger banner — even though dictation works fine
+        // off the surviving sidecar. Detect that case and monitor the existing
+        // process instead of fighting it. (Only RadioPad serves /api/health/ready
+        // with 200 on this loopback port, so this won't adopt a stranger.)
         if backend_health::check_ready_async(&bind).await.is_ok() {
             emit_status(&app, "ready", None, restart_count);
             loop {
@@ -112,7 +122,7 @@ async fn supervise(app: AppHandle) {
                     break;
                 }
             }
-            // The adopted backend went away — reset and fall through to (re)spawn ours.
+            // The adopted sidecar went away — reset and fall through to (re)spawn ours.
             restart_count = 0;
             continue;
         }
@@ -124,62 +134,28 @@ async fn supervise(app: AppHandle) {
                 emit_status(
                     &app,
                     "failed",
-                    Some(format!("backend sidecar unavailable: {e}")),
+                    Some(format!("on-device dictation engine unavailable: {e}")),
                     restart_count,
                 );
                 break;
             }
         };
 
-        // The bundled sidecar is a single-user, loopback-only instance. Run it
-        // in the local "Development" profile so it uses built-in local defaults
+        // The bundled sidecar is a single-purpose, loopback-only ON-DEVICE STT host.
+        // It runs in the "Development" profile so it boots with local defaults
         // instead of demanding cloud production secrets (RADIOPAD_AUTH_SECRET /
-        // RADIOPAD_COLUMN_KEY_*) and seeds the local workspace. RADIOPAD_DEV_HEADERS
-        // enables the passwordless dev/local sign-in endpoint (Development alone
-        // does not — the gate checks for "Testing" or this flag). The environment
-        // is scoped to this child process only — it does not touch machine env.
+        // RADIOPAD_COLUMN_KEY_*). It serves ONLY the anonymous, loopback-bound
+        // `/api/stt/transcribe` endpoint; the application's data, auth, and AI all
+        // go to the hosted production API, so no UBAG / proxy-token / dev-header
+        // wiring is needed here. The environment is scoped to this child process
+        // only — it does not touch machine env.
         let mut command = sidecar
             .env("RADIOPAD_BIND", &bind)
             .env("ASPNETCORE_ENVIRONMENT", "Development")
-            .env("RADIOPAD_DEV_HEADERS", "1")
-            // Require a real session: tokenless requests are rejected (401)
-            // instead of silently resolving to the default dev identity, so the
-            // app opens the login screen first. DEV_HEADERS stays on only so the
-            // passwordless `/api/auth/signin` endpoint can still mint a token.
-            .env("RADIOPAD_REQUIRE_AUTH", "1")
-            // UBAG AI via the web-server passthrough. The internal UBAG gateway is
-            // unreachable from a clinician's machine, so the sidecar's UbagClient is
-            // pointed at the radiopad.polytronx.com /api/ubag-gw passthrough, which
-            // injects the real UBAG secret server-side. The desktop only carries a
-            // scoped proxy token (baked at build time from a CI secret — never in
-            // source). If the token wasn't baked in, UBAG simply stays unconfigured.
-            .env("RADIOPAD_UBAG_BASE_URL", "https://radiopad.polytronx.com/api/ubag-gw")
-            // Desktop AI targets. The gateway's deepseek_web extractor was fixed
-            // 2026-06-22 (it now returns clean final answers, not the R1 thinking pane),
-            // so DeepSeek is a first-class target again alongside Gemini. We deliberately
-            // do NOT set RADIOPAD_UBAG_ALLOWED_TARGETS: with no cap the backend allows any
-            // live UBAG catalog target, so any provider the operator logs into via the
-            // UBAG Chromium session is usable immediately and surfaces in the picker
-            // automatically (UbagProviderDiscoveryService). The ordered web-chain runs the
-            // two curated primaries.
-            .env("RADIOPAD_UBAG_ORDERED_TARGETS", "gemini_web,deepseek_web")
-            .env("RADIOPAD_UBAG_API_VERSION", "2026-05-22")
-            // On-device, offline STT (NVIDIA Parakeet via sherpa-onnx). The sidecar
-            // downloads the model to %LOCALAPPDATA% on first run and decodes the
-            // desktop's 16 kHz mono WAV in-process — no ffmpeg. Dictation falls back
-            // to the cloud path until the model is present, then flips to on-device
-            // automatically. Web/server builds never set this, so they stay on cloud.
+            // On-device, offline STT (NVIDIA Parakeet via sherpa-onnx + Whisper).
+            // The sidecar downloads the model to %LOCALAPPDATA% on first run and
+            // decodes the desktop's 16 kHz mono WAV in-process — no ffmpeg, no cloud.
             .env("RADIOPAD_LOCAL_STT_ENABLED", "1");
-        if let Some(token) = option_env!("RADIOPAD_DESKTOP_PROXY_TOKEN") {
-            // Strip a UTF-8 BOM (U+FEFF) and surrounding whitespace. A CI secret
-            // set via a BOM-prepending pipe bakes the BOM into the literal, which
-            // corrupts the Authorization header (U+FEFF is invalid in HTTP header
-            // values) and silently breaks every UBAG call.
-            let token = token.trim_matches(|c: char| c == '\u{feff}' || c.is_whitespace());
-            if !token.is_empty() {
-                command = command.env("RADIOPAD_UBAG_AUTH_SECRET", token);
-            }
-        }
         if let Some(ref conn) = db_conn {
             command = command.env("RADIOPAD_DB", conn);
         }
@@ -190,7 +166,7 @@ async fn supervise(app: AppHandle) {
                 emit_status(
                     &app,
                     "failed",
-                    Some(format!("failed to start backend sidecar: {e}")),
+                    Some(format!("failed to start on-device dictation engine: {e}")),
                     restart_count,
                 );
                 break;
@@ -220,7 +196,7 @@ async fn supervise(app: AppHandle) {
             emit_status(
                 &app,
                 "failed",
-                Some("backend sidecar exited repeatedly; restart RadioPad to try again".into()),
+                Some("on-device dictation engine exited repeatedly; restart RadioPad to try again".into()),
                 restart_count,
             );
             break;
