@@ -1,12 +1,29 @@
-# RadioPad — Design System (LOCKED tokens, EXTENDED shell)
+# RadioPad — Design System (Hallmark tokens, EXTENDED shell)
 
-**Status:** Tokens locked · Shell modernized (sidebar)  **Owner:** Product Design  **Last Updated:** 2026-05-16
+**Status:** Hallmark token system (OKLCH) · Build-time Tailwind · Shell modernized (sidebar)  **Owner:** Product Design  **Last Updated:** 2026-06-26
 
-> **MISSION-CRITICAL RULE.** RadioPad's **visual tokens** (palette,
-> typography, accent `#c96442`, semantic families, radii, shadows,
-> `.ai-mark`, serif-for-prose / sans-for-chrome) are LOCKED. New UI work
-> must reuse them verbatim — never invent a new colour, typeface, or
-> dark-mode variant.
+> **MISSION-CRITICAL RULE.** RadioPad's visual identity is the **Hallmark
+> "paper & ink" system** (ported from UBAG): a warm-paper, terracotta-accent,
+> editorial palette expressed in **OKLCH**. The canonical token source is
+> **`frontend/app/hallmark.css`** (OKLCH `--color-*` / `--font-*` / `--space-*`
+> / `--text-*`) plus **`frontend/tailwind.config.ts`** (the matching Tailwind
+> color/font/radius scales).
+>
+> RadioPad's **original 44 token names** (`--bg`, `--accent`, `--red`,
+> semantic families, radii, shadows, `--serif`/`--sans`/`--mono`) remain the
+> **stable contract** — they are re-pointed onto Hallmark via the alias layer
+> in `hallmark.css`, so the existing class layer re-skins without a rewrite.
+> Reuse those names verbatim; never reintroduce the old hex values, invent a
+> new colour or typeface, or add a **dark-mode** variant (the system is
+> **light-only**). To add a token, edit the Hallmark block in `hallmark.css`
+> (and mirror it in `tailwind.config.ts`) — never inline.
+>
+> **Build-time Tailwind 3 is now part of the stack** (`@tailwind` directives
+> in `globals.css`, config in `tailwind.config.ts`, PostCSS + Autoprefixer).
+> Tailwind utilities compile to static CSS at build time and ship into the
+> `output: 'export'` bundle (Tauri/Capacitor-safe). Utilities and the named
+> Hallmark/RadioPad component classes may be mixed freely; the alias layer
+> guarantees both resolve to the same tokens.
 >
 > The **app shell** has been modernized from the original Open Design
 > topbar+split layout into an enterprise-SaaS **left-sidebar shell**
@@ -27,16 +44,20 @@ If those files disagree with this document, this document wins.
 
 ## 1. Design philosophy
 
-RadioPad inherits Open Design's philosophy:
+RadioPad inherits Open Design's philosophy, now expressed through the
+Hallmark "paper & ink" system:
 
-- **Warm paper, not cold console.** Light cream backgrounds (`#faf9f7`),
-  hairline borders, soft shadows. Avoid generic dark-grey "developer tool"
-  aesthetics.
+- **Warm paper, not cold console.** Light warm-paper backgrounds
+  (`--color-paper` ≈ `oklch(96.5% 0.012 75)`), hairline rules, soft shadows.
+  Avoid generic dark-grey "developer tool" aesthetics. Light-only — no dark
+  palette.
 - **Serif for prose, sans for UI chrome, mono for code.** Reports and
-  AI-drafted narrative use the serif stack; controls use the sans stack;
-  rule IDs / accession numbers / hashes use mono.
-- **One accent.** Claude rust / burnt-sienna (`#c96442`). No additional
-  brand colours. Status semantics use the dedicated semantic tints below.
+  AI-drafted narrative use the serif stack; controls use the sans/body stack;
+  rule IDs / accession numbers / hashes use mono. Display headings use the
+  Hallmark display stack (`--font-display`).
+- **One accent.** Terracotta (`--color-accent` ≈ `oklch(58% 0.18 35)`). No
+  additional brand colours. Status semantics use the dedicated semantic tints
+  below.
 - **Calm, document-like surfaces.** A reporting workspace should feel like
   a bound report, not a dashboard.
 - **Hairline > heavyweight.** Borders are 1px, panels separated by lines
@@ -46,55 +67,67 @@ RadioPad inherits Open Design's philosophy:
 
 ## 2. Design tokens (canonical)
 
-These are exported as CSS custom properties on `:root` in
-`frontend/app/globals.css`. Do not redefine them inline.
+The **canonical source** is the Hallmark layer in
+**`frontend/app/hallmark.css`**: an OKLCH base set (`--color-*`, `--font-*`,
+`--space-*`, `--text-*`) plus a **compatibility alias layer** that re-points
+RadioPad's original 44 token names onto Hallmark. `globals.css` no longer
+declares colour tokens — it only carries the `@tailwind` directives. The
+matching Tailwind scales live in `frontend/tailwind.config.ts`. Do not
+redefine tokens inline, and do not reintroduce the pre-migration hex values;
+edit the Hallmark block instead.
+
+The tables below give the **alias name** (the stable contract you write
+against) and its **OKLCH value** (resolved via `hallmark.css`).
 
 ### 2.1 Surfaces
 
 | Token | Value | Use |
 | --- | --- | --- |
-| `--bg` / `--bg-app` | `#faf9f7` | App background, topbar |
-| `--bg-panel` | `#ffffff` | Panels, cards, composer |
-| `--bg-subtle` | `#f4f2ed` | Hover, secondary surfaces, code chips |
-| `--bg-muted` | `#ece9e2` | Pressed/selected backgrounds |
-| `--bg-elevated` | `#ffffff` | Popovers, modals |
+| `--bg` / `--bg-app` | `oklch(96.5% 0.012 75)` (paper) | App background, topbar |
+| `--bg-panel` / `--bg-elevated` | `oklch(99% 0.006 75)` (paper-soft) | Panels, cards, popovers, modals |
+| `--bg-subtle` | `oklch(93% 0.02 70)` (paper-warm) | Hover, secondary surfaces, code chips |
+| `--bg-muted` | `color-mix(paper-warm + ink-mute 14%)` | Pressed/selected backgrounds |
 
 ### 2.2 Borders
 
 | Token | Value |
 | --- | --- |
-| `--border` | `#ebe8e1` |
-| `--border-strong` | `#d8d4cb` |
-| `--border-soft` | `#f1eee7` |
+| `--border` | `oklch(86% 0.014 70)` (rule) |
+| `--border-strong` | `color-mix(rule + ink-mute 45%)` |
+| `--border-soft` | `oklch(91% 0.01 70)` (rule-soft) |
 
 ### 2.3 Text
 
 | Token | Value | Use |
 | --- | --- | --- |
-| `--text` | `#1a1916` | Body |
-| `--text-strong` | `#0d0c0a` | Titles |
-| `--text-muted` | `#74716b` | Secondary |
-| `--text-soft` | `#989590` | Tertiary |
-| `--text-faint` | `#b3b0a8` | Placeholder |
+| `--text` | `oklch(20% 0.022 55)` (ink) | Body |
+| `--text-strong` | `color-mix(ink + black 18%)` | Titles |
+| `--text-muted` | `oklch(38% 0.018 55)` (ink-soft) | Secondary |
+| `--text-soft` | `oklch(50% 0.012 60)` (ink-mute) | Tertiary |
+| `--text-faint` | `color-mix(ink-mute + paper 35%)` | Placeholder |
 
 ### 2.4 Accent
 
 | Token | Value |
 | --- | --- |
-| `--accent` | `#c96442` |
-| `--accent-strong` / `--accent-hover` | `#b45a3b` |
-| `--accent-soft` | `#f5d8cb` (focus halo) |
-| `--accent-tint` | `#fbeee5` (tinted hover) |
+| `--accent` | `oklch(58% 0.18 35)` (terracotta) |
+| `--accent-strong` / `--accent-hover` | `oklch(42% 0.2 32)` (accent-deep) |
+| `--accent-soft` | `oklch(82% 0.08 45)` (focus halo) |
+| `--accent-tint` | `color-mix(accent-soft + paper 55%)` (tinted hover) |
 
 ### 2.5 Semantic tints (status / severity / categories)
 
-| Family | Foreground | Background | Border |
-| --- | --- | --- | --- |
-| Green (success) | `#1f7a3a` | `#e8f7ee` | `#c6ead2` |
-| Blue (info) | `#2348b8` | `#e8efff` | `#c8d6ff` |
-| Purple (AI) | `#6c3aa6` | `#f3ecf9` | `#e4d4f1` |
-| Red (blocker) | `#9c2a25` | `#fdecea` | `#f5c6c2` |
-| Amber (warning) | `#b26200` | `#fff3e0` | (auto) |
+OKLCH; each family maps a RadioPad alias onto a Hallmark hue. The AI/purple
+family (`--color-ai`) is intentionally distinct from blue/marine — a clinical
+safety affordance.
+
+| Family | Foreground | Background |
+| --- | --- | --- |
+| Green (success) | `oklch(50% 0.09 150)` | `oklch(90% 0.04 145)` |
+| Blue (info / marine) | `oklch(34% 0.09 240)` | `oklch(83% 0.045 240)` |
+| Purple (AI) | `oklch(45% 0.14 300)` | `oklch(90% 0.05 300)` |
+| Red (blocker / danger) | `oklch(52% 0.17 25)` | `oklch(89% 0.055 32)` |
+| Amber (warning / saffron) | `color-mix(saffron + ink 45%)` | `oklch(91% 0.07 80)` |
 
 In RadioPad these map to validation severity:
 - **Blocker** → Red family
@@ -614,8 +647,11 @@ shadow. No bouncy springs. No content reflows on hover.
 
 The following are **forbidden**:
 
-1. Importing Tailwind, Material UI, Ant Design, Chakra, Bootstrap.
-2. Introducing dark-mode tokens.
+1. Importing Material UI, Ant Design, Chakra, or Bootstrap. (Build-time
+   **Tailwind 3** is part of the stack and allowed — see §2; the banned items
+   are component/theme frameworks that would fight the Hallmark tokens.)
+2. Introducing dark-mode tokens or a `.dark` palette (the system is light-only;
+   `darkMode: 'class'` is set in the Tailwind config but no dark values ship).
 3. Adding new accent colours.
 4. Using emoji as functional icons.
 5. Using a primary navigation pattern other than the canonical

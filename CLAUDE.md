@@ -2,20 +2,20 @@
 
 # CLAUDE.md — RadioPad project memory for Claude Code
 
-## ⚠️ MISSION-CRITICAL: Tokens LOCKED, shell modernized to sidebar
+## ⚠️ MISSION-CRITICAL: Hallmark tokens (OKLCH), build-time Tailwind, sidebar shell
 
-RadioPad's visual **tokens** (palette, typography, accent `#c96442`, `.ai-mark`, semantic families) are LOCKED. The **app shell** has been modernized from the original Open Design topbar+split layout into a left-sidebar SaaS shell — that sidebar shell is now canonical. Read [docs/02-design/design.md](docs/02-design/design.md) before touching any UI; the canonical stylesheets are [frontend/app/globals.css](frontend/app/globals.css) (tokens) + [frontend/app/shell.css](frontend/app/shell.css) (sidebar shell + page chrome).
+RadioPad's visual identity is the **Hallmark "paper & ink" system** (ported from UBAG): a warm-paper, terracotta-accent, **OKLCH** palette. The **canonical token source** is [frontend/app/hallmark.css](frontend/app/hallmark.css) (OKLCH `--color-*`/`--font-*`/`--space-*`/`--text-*` **plus** the alias layer that re-points RadioPad's original 44 token names — `--bg`, `--accent`, `.ai-mark`, semantic families — onto Hallmark) and [frontend/tailwind.config.ts](frontend/tailwind.config.ts) (matching Tailwind scales). [frontend/app/globals.css](frontend/app/globals.css) now only carries the `@tailwind` directives; [frontend/app/shell.css](frontend/app/shell.css) is the sidebar shell + page chrome. The **app shell** is the canonical left-sidebar SaaS shell. Read [docs/02-design/design.md](docs/02-design/design.md) before touching any UI.
 
 Hard rules:
 
-1. Use the documented design tokens only (`--bg: #faf9f7`, `--accent: #c96442`, semantic families: green/blue/purple/red/amber). Do not invent new tokens or add a dark mode.
+1. Write against the documented token names (`--bg`, `--accent`, semantic families: green/blue/purple/red/amber) — they are the **stable alias contract** and resolve to Hallmark OKLCH via `hallmark.css`. Do not reintroduce the old hex values, invent new tokens, or add a dark mode (light-only).
 2. Render every page inside `<AppShell>` (`frontend/components/shell/AppShell.tsx`). Use `<Container>` + `<PageHeader>` for the top of every page. Use the documented component classes only (`.rp-shell`, `.rp-sidebar`, `.rp-topbar`, `.rp-page-header`, `.rp-panel`, `.section-block`, `.composer`, `.msg`, `.finding`, `.ai-mark`, `.brand-mark`, `.badge`, button variants `.primary` / `.primary-ghost` / `.ghost` / `.subtle`). The legacy `.app` / `.topbar` classes are reserved for in-page editor chrome inside `.split` two-pane surfaces and must not be the application root.
 3. AI-generated text wears `.ai-mark` (purple family) until acknowledged.
 4. Validation severities map: Blocker→red, Warning→amber, Info→blue.
 5. Data-driven pages use `<Skeleton />` / `<EmptyState />` / `<ErrorState onRetry />` for loading / empty / error states.
-6. **Forbidden:** Tailwind utility-only styling, MUI/Ant/Chakra/Bootstrap, dark mode, emoji as icons, additional accent colours, primary navigation patterns other than the canonical left-sidebar shell.
+6. **Forbidden:** MUI/Ant/Chakra/Bootstrap, dark mode, emoji as icons, additional accent colours, primary navigation patterns other than the canonical left-sidebar shell. (Build-time **Tailwind 3** is part of the stack — `@tailwind` directives in `globals.css`, config in `tailwind.config.ts`, PostCSS + Autoprefixer; it compiles to static CSS for `output: 'export'`. Utilities and the named Hallmark/RadioPad classes may be mixed.)
 
-If a token or component doesn't exist for what you need, extend `globals.css` (tokens) or `shell.css` (shell/chrome) and `docs/02-design/design.md` in the same change — never inline.
+If a token doesn't exist for what you need, extend the Hallmark block in `hallmark.css` (and mirror it in `tailwind.config.ts`); for shell/chrome extend `shell.css`. Update `docs/02-design/design.md` in the same change — never inline.
 
 ## ⚠️ MISSION-CRITICAL: Desktop changes → cut a release (auto-update, DESK-001)
 

@@ -1,21 +1,21 @@
 # Copilot instructions for RadioPad
 
-## ⚠️ UI/UX is LOCKED — read this first
+## ⚠️ UI/UX direction — read this first
 
-The RadioPad frontend uses the Open Design (Claude.ai-inspired) visual language. **Do not deviate.** The full spec lives in [docs/02-design/design.md](../docs/02-design/design.md); the canonical stylesheet is [frontend/app/globals.css](../frontend/app/globals.css).
+The RadioPad frontend uses the **Hallmark "paper & ink"** visual language (OKLCH, ported from UBAG). **Do not deviate.** The full spec lives in [docs/02-design/design.md](../docs/02-design/design.md); the canonical token source is [frontend/app/hallmark.css](../frontend/app/hallmark.css) (OKLCH Hallmark tokens + alias layer) + [frontend/tailwind.config.ts](../frontend/tailwind.config.ts), with `globals.css` carrying the `@tailwind` directives.
 
 When generating any UI code:
 
-- Use only the documented design tokens (`--bg: #faf9f7`, `--accent: #c96442`, `--text`, `--border`, semantic families: green/blue/purple/red/amber).
+- Use only the documented design token names (`--bg`, `--accent`, `--text`, `--border`, semantic families: green/blue/purple/red/amber). They are the stable alias contract and resolve to Hallmark OKLCH — do not reintroduce the old hex values.
 - Use only the documented component classes (`.app`, `.topbar`, `.split`, `.pane`, `.panel`, `.section-block`, `.composer`, `.composer-shell`, `.msg`, `.finding`, `.ai-mark`, `.brand-mark`, `.badge`).
 - Buttons: `.primary`, `.primary-ghost`, `.ghost`, `.subtle`, `.icon-btn`. Exactly one `.primary` per surface.
 - Reports/AI prose use `var(--serif)`; UI chrome uses `var(--sans)`; rule ids and accession numbers use `var(--mono)` via `<code>`.
 - AI-generated text is wrapped in `.ai-mark` (purple family) until acknowledged.
 - Validation severities: `Blocker → red`, `Warning → amber`, `Info → blue`.
 
-**Forbidden:** Tailwind utility-only styling, MUI / Ant / Chakra / Bootstrap, dark mode, emoji as functional icons, generic dark "developer-tool" palettes, additional accent colours, replacing `.app > .topbar + .split` with another shell.
+**Forbidden:** MUI / Ant / Chakra / Bootstrap, dark mode, emoji as functional icons, generic dark "developer-tool" palettes, additional accent colours, replacing the canonical left-sidebar shell with another shell. (Build-time **Tailwind 3** is part of the stack and allowed — it compiles to static CSS for `output: 'export'`.)
 
-If a token/component doesn't exist for what you need, add it to `globals.css` AND `docs/02-design/design.md` in the same change — never inline a one-off style.
+If a token doesn't exist for what you need, add it to the Hallmark block in `hallmark.css` (and `tailwind.config.ts`) AND `docs/02-design/design.md` in the same change — never inline a one-off style.
 
 ## Tech stack (strict)
 
@@ -52,7 +52,7 @@ Do not introduce other frameworks or ORMs.
 
 ## PR checklist
 
-- [ ] UI uses locked tokens/classes only (no Tailwind / MUI / dark mode / emoji icons).
+- [ ] UI uses the Hallmark token names/classes (no MUI / Ant / Chakra / Bootstrap, no dark mode, no emoji icons; build-time Tailwind is allowed).
 - [ ] `dotnet build && dotnet test` for backend changes.
 - [ ] `pnpm typecheck` for frontend changes.
 - [ ] No secrets / PHI in code or fixtures.

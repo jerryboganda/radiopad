@@ -1,0 +1,370 @@
+/* ============================================================
+   RadioPad — Hallmark design system (ported from UBAG).
+
+   Canonical token source. Imported in app/layout.tsx immediately
+   after globals.css (which carries the @tailwind directives) and
+   before radiopad.css / shell.css.
+
+   Two layers live here:
+     1. Hallmark tokens  — the OKLCH palette, fonts, scales, motion
+        exposed as --color-* / --font-* / --space-* / --text-* …
+     2. Compatibility aliases — RadioPad's original 44 token names
+        (--bg, --accent, --red …) re-pointed onto Hallmark, so the
+        existing class layer (globals/radiopad/shell ~6.8k lines)
+        re-skins to Hallmark without being rewritten.
+
+   Light-only: every value is a warm-paper light tone. No .dark palette.
+   See docs/02-design/design.md.
+   ============================================================ */
+
+:root {
+  /* ---- Hallmark surfaces & ink (OKLCH) ---- */
+  --color-paper: oklch(96.5% 0.012 75);
+  --color-paper-soft: oklch(99% 0.006 75);
+  --color-paper-warm: oklch(93% 0.02 70);
+  --color-ink: oklch(20% 0.022 55);
+  --color-ink-soft: oklch(38% 0.018 55);
+  --color-ink-mute: oklch(50% 0.012 60);
+  --color-rule: oklch(86% 0.014 70);
+  --color-rule-soft: oklch(91% 0.01 70);
+
+  /* ---- Accent (terracotta) ---- */
+  --color-accent: oklch(58% 0.18 35);
+  --color-accent-deep: oklch(42% 0.2 32);
+  --color-accent-soft: oklch(82% 0.08 45);
+
+  /* ---- Status hues ---- */
+  --color-saffron: oklch(78% 0.16 78);
+  --color-saffron-soft: oklch(91% 0.07 80);
+  --color-marine: oklch(34% 0.09 240);
+  --color-marine-soft: oklch(83% 0.045 240);
+  --color-success: oklch(50% 0.09 150);
+  --color-success-soft: oklch(90% 0.04 145);
+  --color-danger: oklch(52% 0.17 25);
+  --color-danger-soft: oklch(89% 0.055 32);
+  --color-focus-ring: oklch(48% 0.2 32);
+
+  /* ---- RadioPad-specific: AI-generated text marker (clinical safety;
+         must stay distinct from info/marine). ---- */
+  --color-ai: oklch(45% 0.14 300);
+  --color-ai-soft: oklch(90% 0.05 300);
+
+  /* ---- Type families ---- */
+  --font-display: ui-rounded, "Aptos Display", "Segoe UI", system-ui, sans-serif;
+  --font-body: "Aptos", "Segoe UI", BlinkMacSystemFont, system-ui, sans-serif;
+  --font-mono: "Cascadia Mono", "SFMono-Regular", Consolas, ui-monospace, monospace;
+  --font-serif: "Source Serif Pro", "Source Serif 4", "Iowan Old Style", Georgia, "Times New Roman", serif;
+
+  /* ---- Spacing scale ---- */
+  --space-1: 0.25rem;
+  --space-2: 0.5rem;
+  --space-3: 0.75rem;
+  --space-4: 1rem;
+  --space-5: 1.5rem;
+  --space-6: 2rem;
+  --space-7: 3rem;
+  --space-8: 4rem;
+  --space-9: 6rem;
+  --space-10: 8rem;
+  --space-11: 12rem;
+
+  /* ---- Type scale ---- */
+  --text-xs: 0.75rem;
+  --text-sm: 0.875rem;
+  --text-base: 1rem;
+  --text-lg: 1.125rem;
+  --text-xl: 1.35rem;
+  --text-2xl: 1.75rem;
+  --text-display-s: 2.35rem;
+  --text-display: 3.5rem;
+
+  /* ---- Radii (Hallmark) ---- */
+  --hm-radius-sm: 4px;
+  --hm-radius-md: 8px;
+  --hm-radius-pill: 999px;
+
+  /* ---- Rules, shadows, motion ---- */
+  --rule-thin: 1px;
+  --rule-strong: 2px;
+  --shadow-tight: 0 1px 0 color-mix(in oklch, var(--color-ink), transparent 88%);
+  --dur-fast: 120ms;
+  --dur-base: 180ms;
+  --dur-slow: 260ms;
+  --ease-out: cubic-bezier(0.16, 1, 0.3, 1);
+  --ease-in: cubic-bezier(0.7, 0, 0.84, 0);
+  --ease-in-out: cubic-bezier(0.65, 0, 0.35, 1);
+}
+
+/* ============================================================
+   Compatibility aliases — RadioPad token names → Hallmark.
+   These re-skin the existing class layer. Do not reintroduce the
+   old hex values; edit the Hallmark tokens above instead.
+   ============================================================ */
+:root {
+  /* Surfaces */
+  --bg: var(--color-paper);
+  --bg-app: var(--color-paper);
+  --bg-panel: var(--color-paper-soft);
+  --bg-elevated: var(--color-paper-soft);
+  --bg-subtle: var(--color-paper-warm);
+  --bg-muted: color-mix(in oklch, var(--color-paper-warm), var(--color-ink-mute) 14%);
+
+  /* Borders / rules */
+  --border: var(--color-rule);
+  --border-soft: var(--color-rule-soft);
+  --border-strong: color-mix(in oklch, var(--color-rule), var(--color-ink-mute) 45%);
+
+  /* Text / ink */
+  --text: var(--color-ink);
+  --text-strong: color-mix(in oklch, var(--color-ink), black 18%);
+  --text-muted: var(--color-ink-soft);
+  --text-soft: var(--color-ink-mute);
+  --text-faint: color-mix(in oklch, var(--color-ink-mute), var(--color-paper) 35%);
+
+  /* Accent */
+  --accent: var(--color-accent);
+  --accent-strong: var(--color-accent-deep);
+  --accent-hover: var(--color-accent-deep);
+  --accent-soft: var(--color-accent-soft);
+  --accent-tint: color-mix(in oklch, var(--color-accent-soft), var(--color-paper) 55%);
+
+  /* Semantic families: green→success, blue→marine, red→danger,
+     amber→saffron, purple→ai. */
+  --green: var(--color-success);
+  --green-bg: var(--color-success-soft);
+  --green-border: color-mix(in oklch, var(--color-success), var(--color-paper) 55%);
+  --blue: var(--color-marine);
+  --blue-bg: var(--color-marine-soft);
+  --blue-border: color-mix(in oklch, var(--color-marine), var(--color-paper) 60%);
+  --red: var(--color-danger);
+  --red-bg: var(--color-danger-soft);
+  --red-border: color-mix(in oklch, var(--color-danger), var(--color-paper) 55%);
+  --amber: color-mix(in oklch, var(--color-saffron), var(--color-ink) 45%);
+  --amber-bg: var(--color-saffron-soft);
+  --purple: var(--color-ai);
+  --purple-bg: var(--color-ai-soft);
+  --purple-border: color-mix(in oklch, var(--color-ai), var(--color-paper) 55%);
+
+  /* Shadows (neutral warm-dark; compatible with Hallmark hairline look) */
+  --shadow-xs: 0 1px 0 rgba(28, 27, 26, 0.04);
+  --shadow-sm: 0 1px 2px rgba(28, 27, 26, 0.05), 0 1px 3px rgba(28, 27, 26, 0.04);
+  --shadow-md: 0 6px 24px rgba(28, 27, 26, 0.07), 0 2px 6px rgba(28, 27, 26, 0.04);
+  --shadow-lg: 0 24px 60px rgba(28, 27, 26, 0.16), 0 8px 16px rgba(28, 27, 26, 0.07);
+
+  /* Radii → Hallmark scale */
+  --radius-sm: var(--hm-radius-sm);
+  --radius: var(--hm-radius-md);
+  --radius-lg: var(--hm-radius-md);
+  --radius-pill: var(--hm-radius-pill);
+
+  /* Fonts (serif kept for clinical report prose — decision #1) */
+  --sans: var(--font-body);
+  --mono: var(--font-mono);
+  --serif: var(--font-serif);
+}
+
+/* ============================================================
+   Base — Hallmark signatures layered over Tailwind Preflight.
+   ============================================================ */
+html { color-scheme: light; }
+
+body {
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+:focus-visible {
+  outline: 2px solid var(--color-focus-ring);
+  outline-offset: 2px;
+  border-radius: var(--hm-radius-sm);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: 0.001ms !important;
+    transition-duration: 0.001ms !important;
+  }
+}
+
+/* ============================================================
+   Hallmark component classes (ported from UBAG legacy/styles/app.css).
+   Net-new class names — safe to use directly in migrated pages.
+   Plain unlayered CSS so utilities can still override per instance.
+   ============================================================ */
+
+/* ---- Control button ---- */
+.control-button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-2);
+  min-height: 2.75rem;
+  padding: var(--space-2) var(--space-4);
+  border: 1px solid var(--color-accent);
+  border-radius: var(--hm-radius-md);
+  background: var(--color-accent);
+  color: var(--color-paper-soft);
+  font-family: var(--font-body);
+  font-weight: 800;
+  font-size: var(--text-sm);
+  line-height: 1.2;
+  cursor: pointer;
+  transition: transform var(--dur-fast) var(--ease-out),
+    background var(--dur-base) var(--ease-out),
+    border-color var(--dur-base) var(--ease-out);
+}
+.control-button:hover {
+  transform: translateY(-1px);
+  background: var(--color-accent-deep);
+  border-color: var(--color-accent-deep);
+}
+.control-button:active { transform: translateY(0); }
+.control-button:disabled { opacity: 0.55; cursor: not-allowed; transform: none; }
+.control-button[aria-busy="true"] { opacity: 0.82; cursor: wait; }
+.control-button.secondary {
+  background: var(--color-paper-soft);
+  color: var(--color-ink);
+  border-color: var(--color-rule);
+}
+.control-button.secondary:hover {
+  background: var(--color-paper-warm);
+  border-color: var(--color-ink-mute);
+}
+.control-button.is-success { background: var(--color-success); border-color: var(--color-success); }
+.control-button.is-error { background: var(--color-danger); border-color: var(--color-danger); }
+
+/* ---- Status badge ---- */
+.status-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-1);
+  min-height: 1.6rem;
+  padding: var(--space-1) var(--space-2);
+  border: 1px solid var(--color-rule);
+  border-radius: var(--hm-radius-pill);
+  background: var(--color-paper-warm);
+  color: var(--color-ink-soft);
+  font-family: var(--font-mono);
+  font-size: var(--text-xs);
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.02em;
+  white-space: nowrap;
+}
+.status-badge[data-tone="ready"] { border-color: var(--color-success); background: var(--color-success-soft); color: var(--color-success); }
+.status-badge[data-tone="review"] { border-color: var(--color-saffron); background: var(--color-saffron-soft); color: color-mix(in oklch, var(--color-saffron), var(--color-ink) 45%); }
+.status-badge[data-tone="blocked"] { border-color: var(--color-danger); background: var(--color-danger-soft); color: var(--color-danger); }
+.status-badge[data-tone="info"] { border-color: var(--color-marine); background: var(--color-marine-soft); color: var(--color-marine); }
+.status-badge[data-tone="ai"] { border-color: var(--color-ai); background: var(--color-ai-soft); color: var(--color-ai); }
+.status-badge[data-tone="draft"],
+.status-badge[data-tone="muted"] { border-color: var(--color-rule); background: var(--color-paper-warm); color: var(--color-ink-soft); }
+
+/* ---- Metric cards ---- */
+.metric-grid {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: var(--space-3);
+}
+@media (max-width: 1024px) { .metric-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+@media (max-width: 560px) { .metric-grid { grid-template-columns: 1fr; } }
+.metric-card {
+  display: grid;
+  gap: var(--space-2);
+  min-height: 8rem;
+  padding: var(--space-4);
+  background: var(--color-paper-soft);
+  border: 1px solid var(--color-rule);
+  border-block-start: var(--rule-strong) solid var(--color-accent);
+  border-radius: var(--hm-radius-md);
+}
+.metric-card[data-tone="ready"] { border-block-start-color: var(--color-success); }
+.metric-card[data-tone="review"] { border-block-start-color: var(--color-saffron); }
+.metric-card[data-tone="blocked"] { border-block-start-color: var(--color-danger); }
+.metric-card[data-tone="info"] { border-block-start-color: var(--color-marine); }
+.metric-card-value { font-family: var(--font-display); font-size: var(--text-2xl); line-height: 1; color: var(--color-ink); }
+.metric-card-label { font-family: var(--font-mono); font-size: var(--text-xs); text-transform: uppercase; letter-spacing: 0.04em; color: var(--color-ink-soft); }
+
+/* ---- Data table ---- */
+.table-wrap {
+  border: 1px solid var(--color-rule);
+  border-radius: var(--hm-radius-md);
+  background: var(--color-paper-soft);
+  overflow: clip;
+}
+.data-table { width: 100%; border-collapse: collapse; }
+.data-table th {
+  background: var(--color-paper-warm);
+  color: var(--color-ink-soft);
+  font-family: var(--font-mono);
+  font-size: var(--text-xs);
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  text-align: start;
+  padding: var(--space-3);
+  border-block-end: 1px solid var(--color-rule);
+}
+.data-table td {
+  padding: var(--space-3);
+  border-block-end: 1px solid var(--color-rule-soft);
+  vertical-align: top;
+  color: var(--color-ink);
+}
+.data-table tbody tr:last-child td { border-block-end: 0; }
+.data-table tbody tr:hover td { background: var(--color-paper-warm); }
+
+/* ---- Tabs ---- */
+.tab-list { display: inline-flex; flex-wrap: wrap; gap: var(--space-2); }
+.tab-button {
+  padding: var(--space-2) var(--space-3);
+  border: 1px solid var(--color-rule);
+  border-radius: var(--hm-radius-sm);
+  background: var(--color-paper-soft);
+  color: var(--color-ink);
+  font-family: var(--font-body);
+  font-size: var(--text-sm);
+  font-weight: 600;
+  cursor: pointer;
+  transition: transform var(--dur-fast) var(--ease-out), background var(--dur-base) var(--ease-out);
+}
+.tab-button:hover { transform: translateY(-1px); }
+.tab-button[aria-selected="true"] { background: var(--color-marine); border-color: var(--color-marine); color: var(--color-paper-soft); }
+
+/* ---- Panels / lists / empty ---- */
+.view-panel { background: var(--color-paper-soft); border: 1px solid var(--color-rule); border-radius: var(--hm-radius-md); padding: var(--space-5); }
+.list-panel { background: var(--color-paper-soft); border: 1px solid var(--color-rule); border-radius: var(--hm-radius-md); overflow: clip; }
+.empty-state {
+  display: grid;
+  gap: var(--space-2);
+  justify-items: center;
+  text-align: center;
+  padding: var(--space-7) var(--space-5);
+  background: var(--color-paper-soft);
+  border: 1px dashed var(--color-rule);
+  border-radius: var(--hm-radius-md);
+  color: var(--color-ink-soft);
+}
+
+/* ---- Editorial accents ---- */
+.masthead {
+  display: grid;
+  gap: var(--space-3);
+  padding: var(--space-5);
+  background: var(--color-paper-soft);
+  border: 1px solid var(--color-rule);
+  border-radius: var(--hm-radius-md);
+}
+.source-pill,
+.section-kicker {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-1);
+  padding: var(--space-1) var(--space-3);
+  border-radius: var(--hm-radius-pill);
+  background: var(--color-paper-warm);
+  color: var(--color-accent-deep);
+  font-family: var(--font-mono);
+  font-size: var(--text-xs);
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+}
