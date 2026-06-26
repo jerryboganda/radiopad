@@ -30,14 +30,38 @@ public class MfaController : ControllerBase
     public MfaController(RadioPadDbContext db, IAuditLog audit, RadioPad.Api.Auth.LockoutPolicy lockout, IWebHostEnvironment env)
     { _db = db; _audit = audit; _lockout = lockout; _env = env; }
 
-    public record EnrollDto(string Tenant, string Email);
-    public record VerifyDto(string Tenant, string Email, string Code);
+    public record EnrollDto(string Tenant, string Email, string? SetupToken = null);
+    public record VerifyDto(string Tenant, string Email, string Code, string? SetupToken = null);
     public record LoginDto(string Tenant, string Email, string Code);
+
+    /// <summary>
+    /// Authorizes an MFA enroll/verify body. Two callers are allowed: (1) an
+    /// already-authenticated user enrolling/re-enrolling TOTP from Settings
+    /// (verified request identity or dev headers), or (2) the mandatory
+    /// first-login enrollment driven by the password sign-in path, which
+    /// presents a short-lived <c>mfa-setup</c> ticket instead of a session.
+    /// <paramref name="viaSetup"/> is true only for case (2), in which a fresh
+    /// session bearer must be minted on successful verification.
+    /// </summary>
+    private bool AuthorizeBody(string tenant, string email, string? setupToken, out bool viaSetup)
+    {
+        viaSetup = false;
+        if (CanUseBodyIdentity(tenant, email)) return true;
+        if (!string.IsNullOrEmpty(setupToken)
+            && RadioPadBearerTokens.TryValidateTicket(setupToken, RadioPadBearerTokens.MfaSetupScope, _env, out var t, out var u)
+            && string.Equals(t, tenant, StringComparison.Ordinal)
+            && string.Equals(u, email, StringComparison.OrdinalIgnoreCase))
+        {
+            viaSetup = true;
+            return true;
+        }
+        return false;
+    }
 
     [HttpPost("enroll")]
     public async Task<IActionResult> Enroll([FromBody] EnrollDto dto, CancellationToken ct)
     {
-        if (!CanUseBodyIdentity(dto.Tenant, dto.Email))
+        if (!AuthorizeBody(dto.Tenant, dto.Email, dto.SetupToken, out _))
             return Unauthorized(new { error = "Verified identity is required.", kind = "unauthenticated" });
 
         var (user, _) = await ResolveAsync(dto.Tenant, dto.Email, ct);
@@ -57,6 +81,9 @@ public class MfaController : ControllerBase
     [HttpPost("verify")]
     public async Task<IActionResult> Verify([FromBody] VerifyDto dto, CancellationToken ct)
     {
+        if (!AuthorizeBody(dto.Tenant, dto.Email, dto.SetupToken, out var viaSetup))
+            return Unauthorized(new { error = "Verified identity is required.", kind = "unauthenticated" });
+
         var (user, tenant) = await ResolveAsync(dto.Tenant, dto.Email, ct);
         if (user is null || tenant is null)
             return NotFound(new { error = "User not found.", kind = "not_found" });
@@ -78,8 +105,32 @@ public class MfaController : ControllerBase
             TenantId = tenant.Id,
             UserId = user.Id,
             Action = AuditAction.UserLogin,
-            DetailsJson = JsonSerializer.Serialize(new { method = "totp" }),
+            DetailsJson = JsonSerializer.Serialize(new { method = "totp", step = viaSetup ? "setup-verify" : "enroll-verify" }),
         }, ct);
+
+        // Forced first-login enrollment (no prior session): the verified TOTP is
+        // now the second factor proving the password sign-in, so mint the full
+        // session bearer that the password step deliberately withheld.
+        if (viaSetup)
+        {
+            var issuedAt = DateTimeOffset.UtcNow;
+            var token = RadioPadBearerTokens.Mint(tenant.Slug, user.Email, user.SessionEpoch, _env, issuedAt);
+            var expiresAt = RadioPadBearerTokens.ExpiresAt(issuedAt);
+            await EnterpriseIdentityBridge.RecordAuthSessionAsync(
+                _db, user, token, "password+totp-setup", expiresAt, ct,
+                ip: HttpContext.Connection.RemoteIpAddress?.ToString(),
+                userAgent: HttpContext.Request.Headers.UserAgent.FirstOrDefault());
+            RadioPadSessionCookies.Append(Response, HttpContext.Request, token, expiresAt, _env);
+            await _audit.AppendAsync(new AuditEvent
+            {
+                TenantId = tenant.Id,
+                UserId = user.Id,
+                Action = AuditAction.UserLogin,
+                DetailsJson = JsonSerializer.Serialize(new { method = "password+totp-setup", step = "login" }),
+            }, ct);
+            return Ok(new { ok = true, mfaEnabled = true, token, tenant = tenant.Slug, user = user.Email, expiresAt });
+        }
+
         return Ok(new { ok = true, mfaEnabled = true });
     }
 

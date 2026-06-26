@@ -28,12 +28,24 @@ const COPY: Record<AuthVariant, { headline: string; tagline: string }> = {
 
 const FEATURES = [
   {
-    title: 'Passwordless by design',
-    sub: 'Magic links, SSO, and device pairing — no passwords to leak.',
+    title: 'Password + authenticator',
+    sub: 'A password plus a 6-digit code from your authenticator app — required for everyone.',
     icon: (
       <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
         <path d="M7 11V8a5 5 0 0 1 10 0v3" />
         <rect x="5" y="11" width="14" height="9" rx="2" />
+      </svg>
+    ),
+  },
+  {
+    title: 'Biometric sign-in',
+    sub: 'Add fingerprint or face (Windows Hello) on supported devices for one-touch access.',
+    icon: (
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
+        <path d="M12 11a2 2 0 0 1 2 2c0 2.5-.4 4.5-1.2 6" />
+        <path d="M5 12a7 7 0 0 1 12-5" />
+        <path d="M8 14c0 2 .3 3.7-.5 5.5" />
+        <path d="M19 13c0 3-.3 5-1 7" />
       </svg>
     ),
   },

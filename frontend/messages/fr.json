@@ -24,6 +24,7 @@
     "pacs": "PACS",
     "security": "Sécurité",
     "signInDevices": "Connexion et appareils",
+    "users": "Utilisateurs et accès",
     "signIn": "Se connecter",
     "groups": {
       "workspace": "Espace de travail",

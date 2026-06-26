@@ -19,8 +19,9 @@ public sealed class RadioPadBearerMiddlewareTests
 {
     [Theory]
     [InlineData("/api/auth/signin")]
-    [InlineData("/api/auth/mfa/enroll")]
-    [InlineData("/api/auth/mfa/verify")]
+    // AUTH-003: the authenticated self-service change stays behind the gate; the
+    // pre-session password sign-in route is matched exactly and is public.
+    [InlineData("/api/auth/password/change")]
     [InlineData("/api/auth/webauthn/register-options")]
     [InlineData("/api/auth/webauthn/register")]
     [InlineData("/api/auth/webauthn/credentials")]
@@ -54,6 +55,16 @@ public sealed class RadioPadBearerMiddlewareTests
     [InlineData("/api/auth/device/authorize")]
     [InlineData("/api/auth/device/token")]
     [InlineData("/api/billing/webhook")]
+    // AUTH-003 password + mandatory-TOTP entrance runs before a session exists.
+    // These pass the middleware but are still gated inside their controllers
+    // (password verify, signed mfa-setup ticket / verified identity, TOTP code,
+    // or the RADIOPAD_BOOTSTRAP_SECRET header).
+    [InlineData("/api/auth/password")]
+    [InlineData("/api/auth/password/reset-with-totp")]
+    [InlineData("/api/auth/mfa/login")]
+    [InlineData("/api/auth/mfa/enroll")]
+    [InlineData("/api/auth/mfa/verify")]
+    [InlineData("/api/admin/bootstrap-org")]
     public async Task Production_Allows_Login_Bootstrap_And_Webhook_Routes(string path)
     {
         using var db = CreateDb();

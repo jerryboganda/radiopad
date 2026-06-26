@@ -45,13 +45,17 @@ public class AuthController : TenantedController
     private readonly IAuditLog _audit;
     private readonly IWebHostEnvironment _env;
     private readonly IHttpClientFactory _http;
+    private readonly LockoutPolicy _lockout;
 
-    public AuthController(RadioPadDbContext db, IAuditLog audit, IWebHostEnvironment env, IHttpClientFactory http)
+    public AuthController(RadioPadDbContext db, IAuditLog audit, IWebHostEnvironment env, IHttpClientFactory http, LockoutPolicy lockout)
     {
-        _db = db; _audit = audit; _env = env; _http = http;
+        _db = db; _audit = audit; _env = env; _http = http; _lockout = lockout;
     }
 
     public record SignInDto(string Tenant, string User);
+    public record PasswordSignInDto(string Tenant, string Email, string Password);
+    public record ChangePasswordDto(string CurrentPassword, string NewPassword);
+    public record ResetPasswordWithTotpDto(string Tenant, string Email, string Code, string NewPassword);
 
     [HttpPost("signin")]
     public async Task<IActionResult> SignIn([FromBody] SignInDto dto, CancellationToken ct)
@@ -116,6 +120,138 @@ public class AuthController : TenantedController
             user = dto.User,
             expiresAt,
         });
+    }
+
+    /// <summary>
+    /// PRD AUTH-001 (password tier) — primary credential sign-in. Verifies the
+    /// tenant-scoped email + password, then enforces mandatory two-factor:
+    /// <list type="bullet">
+    ///   <item>MFA already enrolled → <c>{ mfaRequired: true }</c>; the client
+    ///   finishes via <c>POST /api/auth/mfa/login</c> (existing step-up).</item>
+    ///   <item>MFA not yet enrolled → <c>{ mfaSetupRequired: true, setupToken }</c>;
+    ///   the client is forced through TOTP enrollment (<c>/api/auth/mfa/enroll</c>
+    ///   + <c>/verify</c> presenting the ticket) before any session is minted.</item>
+    /// </list>
+    /// No session bearer is issued by this endpoint — the second factor always
+    /// completes the login. Failures count toward the shared lockout window.
+    /// </summary>
+    [HttpPost("password")]
+    public async Task<IActionResult> PasswordSignIn([FromBody] PasswordSignInDto dto, CancellationToken ct)
+    {
+        if (string.IsNullOrWhiteSpace(dto.Tenant) || string.IsNullOrWhiteSpace(dto.Email) || string.IsNullOrWhiteSpace(dto.Password))
+            return BadRequest(new { error = "Tenant, email, and password are required.", kind = "validation" });
+
+        // Generic failure avoids tenant/user enumeration.
+        var genericFail = Unauthorized(new { error = "Invalid email or password.", kind = "unauthenticated" });
+
+        var tenant = await _db.Tenants.FirstOrDefaultAsync(t => t.Slug == dto.Tenant, ct);
+        if (tenant is null) return genericFail;
+        var user = await _db.Users.FirstOrDefaultAsync(u => u.TenantId == tenant.Id && u.Email == dto.Email, ct);
+        if (user is null) return genericFail;
+        if (!user.IsActive)
+            return Unauthorized(new { error = "User has been deprovisioned.", kind = "unauthenticated" });
+        if (LockoutPolicy.IsLocked(user))
+            return Unauthorized(new { error = "Account locked.", kind = "unauthenticated", until = user.LockedUntil });
+
+        if (!PasswordHasher.Verify(dto.Password, user.PasswordHash))
+        {
+            await _lockout.OnFailureAsync(user, method: "password", ct);
+            return genericFail;
+        }
+        await _lockout.OnSuccessAsync(user, ct);
+
+        if (user.MfaEnabled && !string.IsNullOrEmpty(user.MfaSecret))
+        {
+            await _audit.AppendAsync(new AuditEvent
+            {
+                TenantId = tenant.Id,
+                UserId = user.Id,
+                Action = AuditAction.UserLogin,
+                DetailsJson = JsonSerializer.Serialize(new { method = "password", step = "primary", mfa = "required" }),
+            }, ct);
+            return Ok(new { mfaRequired = true, tenant = tenant.Slug, user = user.Email });
+        }
+
+        // TOTP is mandatory for every account: hand back a short-lived setup
+        // ticket that authorizes enrollment before a session is minted.
+        var setupToken = RadioPadBearerTokens.MintTicket(RadioPadBearerTokens.MfaSetupScope, tenant.Slug, user.Email, _env);
+        await _audit.AppendAsync(new AuditEvent
+        {
+            TenantId = tenant.Id,
+            UserId = user.Id,
+            Action = AuditAction.UserLogin,
+            DetailsJson = JsonSerializer.Serialize(new { method = "password", step = "primary", mfa = "setup_required" }),
+        }, ct);
+        return Ok(new { mfaSetupRequired = true, setupToken, tenant = tenant.Slug, user = user.Email });
+    }
+
+    /// <summary>
+    /// Self-service password change for the signed-in user. Requires the current
+    /// password; the active session is preserved (other sessions remain valid —
+    /// an admin can revoke them separately).
+    /// </summary>
+    [HttpPost("password/change")]
+    public async Task<IActionResult> ChangePassword([FromBody] ChangePasswordDto dto, CancellationToken ct)
+    {
+        var (tenant, user) = await ResolveContextAsync(_db, ct);
+        if (string.IsNullOrEmpty(dto.NewPassword) || dto.NewPassword.Length < PasswordHasher.MinLength)
+            return BadRequest(new { error = $"New password must be at least {PasswordHasher.MinLength} characters.", kind = "validation" });
+        if (!PasswordHasher.Verify(dto.CurrentPassword, user.PasswordHash))
+            return Unauthorized(new { error = "Current password is incorrect.", kind = "unauthenticated" });
+
+        user.PasswordHash = PasswordHasher.Hash(dto.NewPassword);
+        user.UpdatedAt = DateTimeOffset.UtcNow;
+        await _db.SaveChangesAsync(ct);
+        await _audit.AppendAsync(new AuditEvent
+        {
+            TenantId = tenant.Id,
+            UserId = user.Id,
+            Action = AuditAction.PasswordChanged,
+            DetailsJson = JsonSerializer.Serialize(new { scope = "self" }),
+        }, ct);
+        return Ok(new { ok = true });
+    }
+
+    /// <summary>
+    /// Email-free password reset. The user proves possession of their enrolled
+    /// authenticator (TOTP) instead of clicking a mailed link, then sets a new
+    /// password. All existing sessions are revoked via a SessionEpoch bump.
+    /// </summary>
+    [HttpPost("password/reset-with-totp")]
+    public async Task<IActionResult> ResetPasswordWithTotp([FromBody] ResetPasswordWithTotpDto dto, CancellationToken ct)
+    {
+        if (string.IsNullOrEmpty(dto.NewPassword) || dto.NewPassword.Length < PasswordHasher.MinLength)
+            return BadRequest(new { error = $"New password must be at least {PasswordHasher.MinLength} characters.", kind = "validation" });
+
+        var genericFail = Unauthorized(new { error = "Invalid reset request.", kind = "unauthenticated" });
+        var tenant = await _db.Tenants.FirstOrDefaultAsync(t => t.Slug == dto.Tenant, ct);
+        if (tenant is null) return genericFail;
+        var user = await _db.Users.FirstOrDefaultAsync(u => u.TenantId == tenant.Id && u.Email == dto.Email, ct);
+        if (user is null || !user.IsActive) return genericFail;
+        if (LockoutPolicy.IsLocked(user))
+            return Unauthorized(new { error = "Account locked.", kind = "unauthenticated", until = user.LockedUntil });
+        if (!user.MfaEnabled || string.IsNullOrEmpty(user.MfaSecret))
+            return BadRequest(new { error = "No authenticator is enrolled. Ask an administrator to reset your password.", kind = "validation" });
+
+        if (!MfaController.TotpVerify(user.MfaSecret, dto.Code))
+        {
+            await _lockout.OnFailureAsync(user, method: "totp-reset", ct);
+            return genericFail;
+        }
+        await _lockout.OnSuccessAsync(user, ct);
+
+        user.PasswordHash = PasswordHasher.Hash(dto.NewPassword);
+        user.SessionEpoch += 1; // invalidate every existing bearer
+        user.UpdatedAt = DateTimeOffset.UtcNow;
+        await _db.SaveChangesAsync(ct);
+        await _audit.AppendAsync(new AuditEvent
+        {
+            TenantId = tenant.Id,
+            UserId = user.Id,
+            Action = AuditAction.PasswordChanged,
+            DetailsJson = JsonSerializer.Serialize(new { scope = "self", method = "totp-reset", newEpoch = user.SessionEpoch }),
+        }, ct);
+        return Ok(new { ok = true });
     }
 
     [HttpGet("oidc/authorize-url")]

@@ -32,6 +32,13 @@ public class Tenant : Entity
     /// disable all outbound MCP egress with a single switch.
     /// </summary>
     public bool AllowExternalMcp { get; set; } = false;
+    /// <summary>
+    /// AUTH-003 — when true (default), every user must enrol a TOTP authenticator
+    /// and complete the second factor on each password sign-in. The password
+    /// sign-in path forces first-login enrolment regardless; this flag exists so
+    /// the policy is explicit and a future tenant could relax it.
+    /// </summary>
+    public bool RequireMfa { get; set; } = true;
     public List<User> Users { get; set; } = new();
     public List<ProviderConfig> Providers { get; set; } = new();
 }

@@ -1222,6 +1222,9 @@ namespace RadioPad.Infrastructure.Migrations
                         .IsRequired()
                         .HasColumnType("TEXT");
 
+                    b.Property<bool>("RequireMfa")
+                        .HasColumnType("INTEGER");
+
                     b.Property<bool>("RequirePhiApprovedProvider")
                         .HasColumnType("INTEGER");
 

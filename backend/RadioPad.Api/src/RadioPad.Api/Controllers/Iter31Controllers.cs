@@ -1,10 +1,12 @@
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
+using RadioPad.Api.Auth;
 using RadioPad.Application.Abstractions;
 using RadioPad.Application.Security;
 using RadioPad.Application.Services;
 using RadioPad.Domain.Entities;
 using RadioPad.Domain.Enums;
+using RadioPad.Infrastructure.Identity;
 using RadioPad.Infrastructure.Persistence;
 
 namespace RadioPad.Api.Controllers;
@@ -322,21 +324,257 @@ public class UsersController : TenantedController
     private readonly IAuditLog _audit;
     public UsersController(RadioPadDbContext db, IAuditLog audit) { _db = db; _audit = audit; }
 
+    public record CreateUserDto(string Email, string? DisplayName, string Role, string? TempPassword);
+    public record UpdateUserDto(string? DisplayName, string? Role, bool? IsActive);
+    public record ResetPasswordDto(string? TempPassword);
+
     [HttpGet]
     public async Task<IActionResult> List(CancellationToken ct)
     {
         var (tenant, user) = await ResolveContextAsync(_db, ct);
         var deny = RequirePermission(user, RbacPermission.UsersRead);
         if (deny is not null) return deny;
+        var now = DateTimeOffset.UtcNow;
         var rows = await _db.Users
             .Where(u => u.TenantId == tenant.Id)
             .OrderBy(u => u.Email)
             .Select(u => new
             {
                 u.Id, u.Email, u.DisplayName, role = u.Role.ToString(), u.IsActive,
+                u.MfaEnabled, u.LockedUntil,
+                locked = u.LockedUntil != null && u.LockedUntil > now,
             })
             .ToListAsync(ct);
         return Ok(rows);
+    }
+
+    /// <summary>Available roles for the admin role picker, with permission counts.</summary>
+    [HttpGet("roles")]
+    public async Task<IActionResult> Roles(CancellationToken ct)
+    {
+        var (_, user) = await ResolveContextAsync(_db, ct);
+        var deny = RequirePermission(user, RbacPermission.UsersRead);
+        if (deny is not null) return deny;
+        var roles = Enum.GetValues<UserRole>()
+            .Select(r => new { value = r.ToString(), permissions = RolePermissionMap.ForRole(r).Count })
+            .ToArray();
+        return Ok(new { roles });
+    }
+
+    /// <summary>
+    /// Master-admin user creation. Issues a temporary password (generated when
+    /// not supplied) and leaves MFA un-enrolled so the new user is forced through
+    /// TOTP setup on first sign-in. The temp password is returned exactly once.
+    /// </summary>
+    [HttpPost]
+    public async Task<IActionResult> Create([FromBody] CreateUserDto dto, CancellationToken ct)
+    {
+        var (tenant, actor) = await ResolveContextAsync(_db, ct);
+        var deny = RequirePermission(actor, RbacPermission.UsersManage);
+        if (deny is not null) return deny;
+
+        var email = (dto.Email ?? string.Empty).Trim();
+        if (string.IsNullOrWhiteSpace(email) || !email.Contains('@') || email.Length > 254)
+            return BadRequest(new { error = "A valid email is required.", kind = "validation" });
+        if (!Enum.TryParse<UserRole>(dto.Role, ignoreCase: true, out var role))
+            return BadRequest(new { error = "Unknown role.", kind = "validation" });
+        if (await _db.Users.AnyAsync(u => u.TenantId == tenant.Id && u.Email == email, ct))
+            return Conflict(new { error = "A user with that email already exists.", kind = "conflict" });
+
+        var tempPassword = string.IsNullOrWhiteSpace(dto.TempPassword)
+            ? PasswordHasher.GenerateTemporaryPassword()
+            : dto.TempPassword!.Trim();
+        if (tempPassword.Length < PasswordHasher.MinLength)
+            return BadRequest(new { error = $"Temporary password must be at least {PasswordHasher.MinLength} characters.", kind = "validation" });
+
+        var created = new User
+        {
+            TenantId = tenant.Id,
+            Email = email,
+            DisplayName = string.IsNullOrWhiteSpace(dto.DisplayName) ? email : dto.DisplayName!.Trim(),
+            Role = role,
+            PasswordHash = PasswordHasher.Hash(tempPassword),
+            IsActive = true,
+            MfaEnabled = false,
+        };
+        _db.Users.Add(created);
+        await _db.SaveChangesAsync(ct);
+        await EnterpriseIdentityBridge.EnsureMembershipForUserAsync(_db, created, ct);
+        await _audit.AppendAsync(new AuditEvent
+        {
+            TenantId = tenant.Id,
+            UserId = actor.Id,
+            Action = AuditAction.UserCreated,
+            DetailsJson = System.Text.Json.JsonSerializer.Serialize(new
+            {
+                targetUserId = created.Id,
+                targetEmail = created.Email,
+                role = role.ToString(),
+            }),
+        }, ct);
+        return Ok(new { id = created.Id, email = created.Email, displayName = created.DisplayName, role = role.ToString(), tempPassword });
+    }
+
+    /// <summary>Master-admin profile/role/active-state update.</summary>
+    [HttpPatch("{id:guid}")]
+    public async Task<IActionResult> Update(Guid id, [FromBody] UpdateUserDto dto, CancellationToken ct)
+    {
+        var (tenant, actor) = await ResolveContextAsync(_db, ct);
+        var deny = RequirePermission(actor, RbacPermission.UsersManage);
+        if (deny is not null) return deny;
+        var target = await _db.Users.FirstOrDefaultAsync(u => u.Id == id && u.TenantId == tenant.Id, ct);
+        if (target is null) return NotFound();
+
+        var changes = new List<string>();
+        if (!string.IsNullOrWhiteSpace(dto.DisplayName) && dto.DisplayName.Trim() != target.DisplayName)
+        {
+            target.DisplayName = dto.DisplayName.Trim();
+            changes.Add("displayName");
+        }
+        if (dto.Role is not null)
+        {
+            if (!Enum.TryParse<UserRole>(dto.Role, ignoreCase: true, out var role))
+                return BadRequest(new { error = "Unknown role.", kind = "validation" });
+            if (target.Id == actor.Id && role != actor.Role)
+                return BadRequest(new { error = "You cannot change your own role.", kind = "validation" });
+            if (target.Role != role) { target.Role = role; changes.Add("role"); }
+        }
+        if (dto.IsActive is bool active)
+        {
+            if (target.Id == actor.Id && !active)
+                return BadRequest(new { error = "You cannot deactivate yourself.", kind = "validation" });
+            if (target.IsActive != active)
+            {
+                target.IsActive = active;
+                if (active) { target.LockedUntil = null; target.FailedLoginCount = 0; target.FailedLoginWindowStart = null; }
+                changes.Add("isActive");
+            }
+        }
+
+        if (changes.Count == 0) return Ok(new { id = target.Id, changed = false });
+        target.UpdatedAt = DateTimeOffset.UtcNow;
+        await _db.SaveChangesAsync(ct);
+        await _audit.AppendAsync(new AuditEvent
+        {
+            TenantId = tenant.Id,
+            UserId = actor.Id,
+            Action = AuditAction.UserUpdated,
+            DetailsJson = System.Text.Json.JsonSerializer.Serialize(new
+            {
+                targetUserId = target.Id,
+                targetEmail = target.Email,
+                fields = changes,
+            }),
+        }, ct);
+        return Ok(new { id = target.Id, changed = true, fields = changes });
+    }
+
+    /// <summary>
+    /// Master-admin user removal — soft-delete (deprovision). The row is kept so
+    /// audit-log and report references stay intact; the account is deactivated
+    /// and every session is revoked.
+    /// </summary>
+    [HttpDelete("{id:guid}")]
+    public async Task<IActionResult> Delete(Guid id, CancellationToken ct)
+    {
+        var (tenant, actor) = await ResolveContextAsync(_db, ct);
+        var deny = RequirePermission(actor, RbacPermission.UsersManage);
+        if (deny is not null) return deny;
+        if (id == actor.Id)
+            return BadRequest(new { error = "You cannot delete yourself.", kind = "validation" });
+        var target = await _db.Users.FirstOrDefaultAsync(u => u.Id == id && u.TenantId == tenant.Id, ct);
+        if (target is null) return NotFound();
+
+        target.IsActive = false;
+        target.SessionEpoch += 1;
+        target.UpdatedAt = DateTimeOffset.UtcNow;
+        await _db.SaveChangesAsync(ct);
+        await _audit.AppendAsync(new AuditEvent
+        {
+            TenantId = tenant.Id,
+            UserId = actor.Id,
+            Action = AuditAction.UserDeleted,
+            DetailsJson = System.Text.Json.JsonSerializer.Serialize(new
+            {
+                targetUserId = target.Id,
+                targetEmail = target.Email,
+                mode = "soft",
+            }),
+        }, ct);
+        return Ok(new { id = target.Id, deactivated = true });
+    }
+
+    /// <summary>
+    /// Master-admin password reset. Sets a temporary password (generated when not
+    /// supplied), revokes all sessions, and returns the temp password once for
+    /// hand-off. No email is sent.
+    /// </summary>
+    [HttpPost("{id:guid}/reset-password")]
+    public async Task<IActionResult> ResetPassword(Guid id, [FromBody] ResetPasswordDto? dto, CancellationToken ct)
+    {
+        var (tenant, actor) = await ResolveContextAsync(_db, ct);
+        var deny = RequirePermission(actor, RbacPermission.UsersManage);
+        if (deny is not null) return deny;
+        var target = await _db.Users.FirstOrDefaultAsync(u => u.Id == id && u.TenantId == tenant.Id, ct);
+        if (target is null) return NotFound();
+
+        var temp = string.IsNullOrWhiteSpace(dto?.TempPassword)
+            ? PasswordHasher.GenerateTemporaryPassword()
+            : dto!.TempPassword!.Trim();
+        if (temp.Length < PasswordHasher.MinLength)
+            return BadRequest(new { error = $"Temporary password must be at least {PasswordHasher.MinLength} characters.", kind = "validation" });
+
+        target.PasswordHash = PasswordHasher.Hash(temp);
+        target.SessionEpoch += 1;
+        target.UpdatedAt = DateTimeOffset.UtcNow;
+        await _db.SaveChangesAsync(ct);
+        await _audit.AppendAsync(new AuditEvent
+        {
+            TenantId = tenant.Id,
+            UserId = actor.Id,
+            Action = AuditAction.PasswordChanged,
+            DetailsJson = System.Text.Json.JsonSerializer.Serialize(new
+            {
+                scope = "admin-reset",
+                targetUserId = target.Id,
+                targetEmail = target.Email,
+                newEpoch = target.SessionEpoch,
+            }),
+        }, ct);
+        return Ok(new { id = target.Id, tempPassword = temp });
+    }
+
+    /// <summary>
+    /// Master-admin MFA reset — clears the enrolled TOTP secret so the user is
+    /// forced to re-enroll an authenticator on their next sign-in. Sessions are
+    /// revoked.
+    /// </summary>
+    [HttpPost("{id:guid}/reset-mfa")]
+    public async Task<IActionResult> ResetMfa(Guid id, CancellationToken ct)
+    {
+        var (tenant, actor) = await ResolveContextAsync(_db, ct);
+        var deny = RequirePermission(actor, RbacPermission.UsersManage);
+        if (deny is not null) return deny;
+        var target = await _db.Users.FirstOrDefaultAsync(u => u.Id == id && u.TenantId == tenant.Id, ct);
+        if (target is null) return NotFound();
+
+        target.MfaSecret = string.Empty;
+        target.MfaEnabled = false;
+        target.SessionEpoch += 1;
+        target.UpdatedAt = DateTimeOffset.UtcNow;
+        await _db.SaveChangesAsync(ct);
+        await _audit.AppendAsync(new AuditEvent
+        {
+            TenantId = tenant.Id,
+            UserId = actor.Id,
+            Action = AuditAction.UserMfaReset,
+            DetailsJson = System.Text.Json.JsonSerializer.Serialize(new
+            {
+                targetUserId = target.Id,
+                targetEmail = target.Email,
+            }),
+        }, ct);
+        return Ok(new { id = target.Id, mfaEnabled = false });
     }
 
     [HttpPost("{id:guid}/lockout")]

@@ -8,7 +8,7 @@ import {
   FileText, ClipboardCheck, ScrollText, BarChart3, BookOpen, LayoutTemplate,
   MessageSquareText, Bot, Store, BookText, Server, Network, HardDrive,
   FileInput, WifiOff, Scale, FlaskConical, ShieldCheck, Flag, CreditCard,
-  Activity, Settings2, Fingerprint,
+  Activity, Settings2, Fingerprint, Users,
 } from 'lucide-react';
 import type { PermissionKey } from '@/lib/permissions';
 
@@ -59,6 +59,7 @@ export const Icons: Record<string, NavIcon> = {
   usage: Activity,
   settings: Settings2,
   signInDevices: Fingerprint,
+  users: Users,
 };
 
 export const navGroups: NavGroup[] = [
@@ -96,6 +97,7 @@ export const navGroups: NavGroup[] = [
   {
     labelKey: 'admin',
     items: [
+      { href: '/admin/users', labelKey: 'users', icon: Icons.users, permission: 'users.manage' },
       { href: '/admin/governance', labelKey: 'governance', icon: Icons.governance, permission: 'audit.verify' },
       { href: '/admin/model-eval', labelKey: 'modelEval', icon: Icons.modelEval, permission: 'audit.verify' },
       { href: '/admin/copilot', labelKey: 'copilotAdmin', icon: Icons.copilot, permission: 'prompt_overrides.manage' },

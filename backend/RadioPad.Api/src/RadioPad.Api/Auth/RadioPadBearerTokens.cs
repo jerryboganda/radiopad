@@ -7,10 +7,78 @@ namespace RadioPad.Api.Auth;
 public static class RadioPadBearerTokens
 {
     public const string Prefix = "rp_";
+
+    /// <summary>
+    /// Prefix for short-lived, scope-bound tickets (NOT session bearers). Chosen
+    /// so it never collides with <see cref="Prefix"/> under a StartsWith("rp_")
+    /// test ("rpt_" does not start with "rp_").
+    /// </summary>
+    public const string TicketPrefix = "rpt_";
+
+    /// <summary>Scope value for the forced first-login TOTP-enrollment ticket.</summary>
+    public const string MfaSetupScope = "mfa-setup";
+
     private const string DefaultDevSecret = "dev-only-not-for-production";
     private static readonly TimeSpan DefaultLifetime = TimeSpan.FromHours(12);
+    private static readonly TimeSpan TicketLifetime = TimeSpan.FromMinutes(10);
 
     public static DateTimeOffset ExpiresAt(DateTimeOffset issuedAt) => issuedAt.Add(DefaultLifetime);
+
+    /// <summary>
+    /// AUTH-001/AUTH-003 — mint a short-lived (10 min), scope-bound ticket that
+    /// authorizes a single follow-up step before a full session exists. Used by
+    /// the password sign-in path to drive mandatory first-login TOTP enrollment:
+    /// the password endpoint hands the client a <c>mfa-setup</c> ticket, and the
+    /// MFA enroll/verify endpoints accept it in lieu of a session. The ticket is
+    /// signed with the same server secret as session bearers but carries a scope
+    /// claim and cannot be used as a session token (distinct prefix + payload).
+    /// </summary>
+    public static string MintTicket(string scope, string tenant, string email, IHostEnvironment? env = null, DateTimeOffset? now = null)
+    {
+        var issuedAt = now ?? DateTimeOffset.UtcNow;
+        var expiresAt = issuedAt.Add(TicketLifetime);
+        var payload = new TicketPayload(
+            v: 1,
+            s: scope,
+            t: tenant,
+            u: email,
+            iat: issuedAt.ToUnixTimeSeconds(),
+            exp: expiresAt.ToUnixTimeSeconds(),
+            jti: Guid.NewGuid().ToString("N"));
+        var payloadSegment = Base64Url(JsonSerializer.SerializeToUtf8Bytes(payload));
+        var signature = Sign(payloadSegment, ResolveSecret(env));
+        return TicketPrefix + payloadSegment + "." + signature;
+    }
+
+    public static bool TryValidateTicket(string token, string expectedScope, IHostEnvironment? env, out string tenant, out string email, DateTimeOffset? now = null)
+    {
+        tenant = string.Empty;
+        email = string.Empty;
+        if (string.IsNullOrEmpty(token) || !token.StartsWith(TicketPrefix, StringComparison.Ordinal)) return false;
+
+        var body = token[TicketPrefix.Length..];
+        var parts = body.Split('.', 2);
+        if (parts.Length != 2) return false;
+
+        string expectedSignature;
+        try { expectedSignature = Sign(parts[0], ResolveSecret(env)); }
+        catch (InvalidOperationException) { return false; }
+        if (!FixedTimeEquals(parts[1], expectedSignature)) return false;
+
+        TicketPayload? payload;
+        try { payload = JsonSerializer.Deserialize<TicketPayload>(Base64UrlDecode(parts[0])); }
+        catch { return false; }
+
+        if (payload is null || payload.v != 1) return false;
+        if (!string.Equals(payload.s, expectedScope, StringComparison.Ordinal)) return false;
+        if (string.IsNullOrWhiteSpace(payload.t) || string.IsNullOrWhiteSpace(payload.u)) return false;
+        var clock = now ?? DateTimeOffset.UtcNow;
+        if (payload.exp <= clock.ToUnixTimeSeconds()) return false;
+
+        tenant = payload.t;
+        email = payload.u;
+        return true;
+    }
 
     public static void ValidateStartupSecret(IHostEnvironment env)
     {
@@ -171,4 +239,6 @@ public static class RadioPadBearerTokens
     }
 
     private sealed record TokenPayload(int v, string t, string u, int e, long iat, long exp, string jti);
+
+    private sealed record TicketPayload(int v, string s, string t, string u, long iat, long exp, string jti);
 }

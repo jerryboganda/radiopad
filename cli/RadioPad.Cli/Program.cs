@@ -39,6 +39,7 @@ public static class Program
         root.AddCommand(BuildPluginCommand());
         root.AddCommand(BuildBundleCommand());
         root.AddCommand(BuildPacsCommand());
+        root.AddCommand(BuildOrgCommand());
 
         // PRD §17.4 — read-only MCP server.
         var mcp = new Command("mcp", "Model Context Protocol server (stdio)");
@@ -81,6 +82,63 @@ public static class Program
         root.AddCommand(eval);
 
         return await root.InvokeAsync(args);
+    }
+
+    // -------------------------------------------------------------------- org
+    /// <summary>
+    /// Operator org bootstrap — super-admin only. Creates a tenant + first
+    /// master admin (MedicalDirector) with a temporary password via the
+    /// secret-gated <c>/api/admin/bootstrap-org</c> endpoint. The bootstrap
+    /// secret is read from <c>RADIOPAD_BOOTSTRAP_SECRET</c>, never the CLI.
+    /// </summary>
+    private static Command BuildOrgCommand()
+    {
+        var cmd = new Command("org", "Operator org bootstrap (super-admin only; no email, no self-serve)");
+        var serverOpt = new Option<string>("--server", () => CliRuntime.LoadConfig().Server, "Backend base URL");
+
+        var create = new Command("create", "Create a new organization and its first master admin");
+        var slugOpt = new Option<string>("--slug", "Organization slug (3–40: lowercase letters, numbers, hyphens)") { IsRequired = true };
+        var nameOpt = new Option<string?>("--name", () => null, "Organization display name (defaults to the slug)");
+        var adminEmailOpt = new Option<string>("--admin-email", "First master-admin email") { IsRequired = true };
+        var adminNameOpt = new Option<string?>("--admin-name", () => null, "First master-admin display name");
+        var tempPwOpt = new Option<string?>("--temp-password", () => null, "Temporary password (generated when omitted)");
+        create.AddOption(serverOpt);
+        create.AddOption(slugOpt);
+        create.AddOption(nameOpt);
+        create.AddOption(adminEmailOpt);
+        create.AddOption(adminNameOpt);
+        create.AddOption(tempPwOpt);
+        create.SetHandler(async (System.CommandLine.Invocation.InvocationContext ctx) =>
+        {
+            var server = ctx.ParseResult.GetValueForOption(serverOpt)!;
+            var slug = ctx.ParseResult.GetValueForOption(slugOpt)!;
+            var name = ctx.ParseResult.GetValueForOption(nameOpt);
+            var adminEmail = ctx.ParseResult.GetValueForOption(adminEmailOpt)!;
+            var adminName = ctx.ParseResult.GetValueForOption(adminNameOpt);
+            var tempPw = ctx.ParseResult.GetValueForOption(tempPwOpt);
+            Environment.Exit(await OrgBootstrap.CreateAsync(server, slug, name, adminEmail, adminName, tempPw, default));
+        });
+
+        var resetAdmin = new Command("reset-admin", "Reset (or create) an org's master admin with a new temp password");
+        var rSlugOpt = new Option<string>("--slug", "Organization slug") { IsRequired = true };
+        var rEmailOpt = new Option<string>("--email", "Master-admin email") { IsRequired = true };
+        var rTempPwOpt = new Option<string?>("--temp-password", () => null, "Temporary password (generated when omitted)");
+        resetAdmin.AddOption(serverOpt);
+        resetAdmin.AddOption(rSlugOpt);
+        resetAdmin.AddOption(rEmailOpt);
+        resetAdmin.AddOption(rTempPwOpt);
+        resetAdmin.SetHandler(async (System.CommandLine.Invocation.InvocationContext ctx) =>
+        {
+            var server = ctx.ParseResult.GetValueForOption(serverOpt)!;
+            var slug = ctx.ParseResult.GetValueForOption(rSlugOpt)!;
+            var email = ctx.ParseResult.GetValueForOption(rEmailOpt)!;
+            var tempPw = ctx.ParseResult.GetValueForOption(rTempPwOpt);
+            Environment.Exit(await OrgBootstrap.ResetAdminAsync(server, slug, email, tempPw, default));
+        });
+
+        cmd.AddCommand(create);
+        cmd.AddCommand(resetAdmin);
+        return cmd;
     }
 
     // ------------------------------------------------------------------ login

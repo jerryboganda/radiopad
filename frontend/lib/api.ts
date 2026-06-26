@@ -705,6 +705,18 @@ export type BillingCredits = {
   trialEndsAt: string | null;
 };
 
+/** Master-admin user row from GET /api/users. */
+export type UserRow = {
+  id: string;
+  email: string;
+  displayName: string;
+  role: string;
+  isActive: boolean;
+  mfaEnabled: boolean;
+  lockedUntil: string | null;
+  locked: boolean;
+};
+
 export type WebAuthnCredentialRow = {
   id: string;
   label: string;
@@ -1416,6 +1428,34 @@ export const api = {
           body: JSON.stringify({ locale }),
         }),
     },
+    /** Master-admin user management (RBAC: UsersManage). Tenant-scoped. */
+    list: () => request<UserRow[]>('/api/users'),
+    roles: () => request<{ roles: Array<{ value: string; permissions: number }> }>('/api/users/roles'),
+    create: (body: { email: string; displayName?: string; role: string; tempPassword?: string }) =>
+      request<{ id: string; email: string; displayName: string; role: string; tempPassword: string }>(
+        '/api/users',
+        { method: 'POST', body: JSON.stringify(body) },
+      ),
+    update: (id: string, body: { displayName?: string; role?: string; isActive?: boolean }) =>
+      request<{ id: string; changed: boolean; fields?: string[] }>(`/api/users/${id}`, {
+        method: 'PATCH',
+        body: JSON.stringify(body),
+      }),
+    remove: (id: string) =>
+      request<{ id: string; deactivated: boolean }>(`/api/users/${id}`, { method: 'DELETE' }),
+    lockout: (id: string) =>
+      request<{ id: string; isActive: boolean; changed: boolean }>(`/api/users/${id}/lockout`, { method: 'POST' }),
+    unlock: (id: string) =>
+      request<{ id: string; isActive: boolean; changed: boolean }>(`/api/users/${id}/unlock`, { method: 'POST' }),
+    revokeSessions: (id: string) =>
+      request<{ id: string; sessionEpoch: number }>(`/api/users/${id}/revoke-sessions`, { method: 'POST' }),
+    resetPassword: (id: string, tempPassword?: string) =>
+      request<{ id: string; tempPassword: string }>(`/api/users/${id}/reset-password`, {
+        method: 'POST',
+        body: JSON.stringify({ tempPassword }),
+      }),
+    resetMfa: (id: string) =>
+      request<{ id: string; mfaEnabled: boolean }>(`/api/users/${id}/reset-mfa`, { method: 'POST' }),
   },
   billing: {
     checkout: (priceId: string, successUrl: string, cancelUrl: string) =>
@@ -1489,6 +1529,36 @@ export const api = {
         '/api/auth/signin',
         { method: 'POST', body: JSON.stringify({ tenant, user }) },
       ),
+    /**
+     * AUTH-001 — primary password sign-in. Returns one of:
+     *  - `{ mfaRequired }`        → finish via `mfaLogin` (enrolled user)
+     *  - `{ mfaSetupRequired, setupToken }` → forced first-login TOTP enrolment
+     *    via `mfaEnroll(setupToken)` + `mfaVerify(setupToken)` (which mints the
+     *    session). No session token is ever returned by this call directly.
+     */
+    passwordSignIn: (tenant: string, email: string, password: string) =>
+      request<{
+        tenant: string;
+        user: string;
+        mfaRequired?: boolean;
+        mfaSetupRequired?: boolean;
+        setupToken?: string;
+      }>('/api/auth/password', {
+        method: 'POST',
+        body: JSON.stringify({ tenant, email, password }),
+      }),
+    /** Self-service password change for the signed-in user. */
+    passwordChange: (currentPassword: string, newPassword: string) =>
+      request<{ ok: boolean }>('/api/auth/password/change', {
+        method: 'POST',
+        body: JSON.stringify({ currentPassword, newPassword }),
+      }),
+    /** Email-free password reset: prove possession of the enrolled TOTP. */
+    passwordResetWithTotp: (tenant: string, email: string, code: string, newPassword: string) =>
+      request<{ ok: boolean }>('/api/auth/password/reset-with-totp', {
+        method: 'POST',
+        body: JSON.stringify({ tenant, email, code, newPassword }),
+      }),
     // Step-up: exchange a verified 6-digit TOTP code for a session token after a
     // single-factor sign-in returned { mfaRequired: true }.
     mfaLogin: (tenant: string, email: string, code: string) =>
@@ -1496,16 +1566,20 @@ export const api = {
         '/api/auth/mfa/login',
         { method: 'POST', body: JSON.stringify({ tenant, email, code }) },
       ),
-    mfaEnroll: (tenant: string, email: string) =>
+    /** TOTP enrolment. `setupToken` authorizes the forced first-login path when
+     *  the user has no session yet (otherwise the request identity is used). */
+    mfaEnroll: (tenant: string, email: string, setupToken?: string) =>
       request<{ secret: string; otpauth: string }>('/api/auth/mfa/enroll', {
         method: 'POST',
-        body: JSON.stringify({ tenant, email }),
+        body: JSON.stringify({ tenant, email, setupToken }),
       }),
-    mfaVerify: (tenant: string, email: string, code: string) =>
-      request<{ ok: boolean; mfaEnabled: boolean }>('/api/auth/mfa/verify', {
-        method: 'POST',
-        body: JSON.stringify({ tenant, email, code }),
-      }),
+    /** Confirm TOTP enrolment. With a `setupToken` (forced first-login) a session
+     *  token is minted and returned; otherwise just `{ ok, mfaEnabled }`. */
+    mfaVerify: (tenant: string, email: string, code: string, setupToken?: string) =>
+      request<{ ok: boolean; mfaEnabled: boolean; token?: string; tenant?: string; user?: string; expiresAt?: string }>(
+        '/api/auth/mfa/verify',
+        { method: 'POST', body: JSON.stringify({ tenant, email, code, setupToken }) },
+      ),
     magicLinkRequest: (tenant: string, email: string, callbackUrl?: string) =>
       request<{ ok: boolean; devLink?: string }>('/api/auth/magic-link/request', {
         method: 'POST',

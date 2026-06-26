@@ -24,6 +24,7 @@
     "pacs": "PACS",
     "security": "Sicherheit",
     "signInDevices": "Anmeldung & Geräte",
+    "users": "Benutzer & Zugriff",
     "signIn": "Anmelden",
     "groups": {
       "workspace": "Arbeitsbereich",

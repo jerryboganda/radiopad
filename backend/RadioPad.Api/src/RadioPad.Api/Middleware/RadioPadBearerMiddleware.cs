@@ -136,6 +136,21 @@ public sealed class RadioPadBearerMiddleware
         path.StartsWithSegments("/api/auth/magic-link/consume") ||
         path.StartsWithSegments("/api/auth/device/authorize") ||
         path.StartsWithSegments("/api/auth/device/token") ||
+        // AUTH-001 password sign-in is the pre-session primary factor (no bearer
+        // yet). Match the sign-in route EXACTLY (allowing the client's trailing
+        // slash) so the authenticated `/api/auth/password/change` endpoint stays
+        // behind the bearer/OIDC gate.
+        (path.StartsWithSegments("/api/auth/password", out var pwRest) && (!pwRest.HasValue || pwRest == "/")) ||
+        // Email-free password reset proves possession of the enrolled TOTP in the
+        // controller; the caller has no session.
+        path.StartsWithSegments("/api/auth/password/reset-with-totp") ||
+        // TOTP step-up + mandatory first-login enrolment run before a session
+        // exists. The MFA controller still requires a verified identity or a
+        // signed mfa-setup ticket, so anonymous reachability is safe here.
+        path.StartsWithSegments("/api/auth/mfa") ||
+        // Operator org bootstrap — runs before any tenant/admin exists and is
+        // gated by the RADIOPAD_BOOTSTRAP_SECRET header inside the controller.
+        path.StartsWithSegments("/api/admin/bootstrap-org") ||
         // Self-serve SaaS onboarding — creating a brand-new organization happens
         // before any tenant/user exists, so it cannot carry a bearer. Gated
         // separately by RADIOPAD_ALLOW_SELF_SIGNUP inside the controller.

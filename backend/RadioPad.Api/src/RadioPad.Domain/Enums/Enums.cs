@@ -213,6 +213,22 @@ public enum AuditAction
     /// first admin user were created via <c>POST /api/registration/create-organization</c>.
     /// Details record the slug and admin email; no secrets are stored.</summary>
     OrganizationCreated = 56,
+    /// <summary>Master-admin user management — a tenant user was created by an
+    /// administrator (<c>POST /api/users</c>). Details record the target email
+    /// and role; the temporary password is never stored in the audit row.</summary>
+    UserCreated = 57,
+    /// <summary>Master-admin user management — a tenant user's profile/role/active
+    /// state was updated by an administrator (<c>PATCH /api/users/{id}</c>).</summary>
+    UserUpdated = 58,
+    /// <summary>Master-admin user management — a tenant user was soft-deleted
+    /// (deprovisioned) or hard-deleted by an administrator (<c>DELETE /api/users/{id}</c>).</summary>
+    UserDeleted = 59,
+    /// <summary>Credential change — a user's password was set or reset (self-service
+    /// change, TOTP-based reset, or admin reset). The password is never stored.</summary>
+    PasswordChanged = 60,
+    /// <summary>Master-admin user management — a user's enrolled TOTP authenticator
+    /// was cleared so they must re-enroll on next sign-in (<c>POST /api/users/{id}/reset-mfa</c>).</summary>
+    UserMfaReset = 61,
 }
 
 public enum CopilotMode
