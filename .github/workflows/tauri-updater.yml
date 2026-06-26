@@ -88,11 +88,16 @@ jobs:
           )
           MANIFEST=dist/latest.json
           echo "{\"version\":\"${TAG#v}\",\"notes\":\"RadioPad ${TAG}\",\"pub_date\":\"$(date -u +%Y-%m-%dT%H:%M:%SZ)\",\"platforms\":{}}" > "$MANIFEST"
+          export TAURI_SIGNING_PRIVATE_KEY="$TAURI_PRIVATE_KEY"
+          export TAURI_SIGNING_PRIVATE_KEY_PASSWORD="${TAURI_KEY_PASSWORD:-}"
           for plat in "${!platforms[@]}"; do
             for f in dist/${platforms[$plat]}; do
-              SIG=$(npx --yes @tauri-apps/cli signer sign --no-confirm \
-                --private-key "$TAURI_PRIVATE_KEY" \
-                --password "${TAURI_KEY_PASSWORD:-}" "$f" | tail -n1)
+              # Tauri CLI v2 signer: key + password come from the
+              # TAURI_SIGNING_* env vars (the v1 --no-confirm/--private-key
+              # flags were removed). It writes "$f.sig" containing the
+              # base64 signature that goes into the manifest.
+              npx --yes @tauri-apps/cli@^2 signer sign "$f"
+              SIG=$(cat "$f.sig")
               # Default to the GitHub Releases download URL for this tag so the
               # manifest is fully automatic on the workflow_run trigger (no
               # MANIFEST_URL input needed); a non-empty MANIFEST_URL overrides.
