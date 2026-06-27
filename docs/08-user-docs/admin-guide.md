@@ -19,7 +19,7 @@ Current tenant roles are:
 - `ReportingAdmin` — reporting operations, providers, rulebooks/templates, lexicon/prompts, validation-pack runs, and MCP operations where allowed.
 - `MedicalDirector` — clinical governance, approvals, signing/addenda, audit/security review, billing governance, and user/session controls.
 - `ComplianceReviewer` — audit/security review, SIEM/security checks, and session revocation workflows.
-- `ItAdmin` — operational administration for providers, users/devices, security/KMS, validation packs, MCP, Copilot, and billing where allowed.
+- `ItAdmin` — operational administration for providers, users/devices, security/KMS, validation packs, MCP, and billing where allowed.
 - `BillingAdmin` — billing and marketplace payment operations plus provider OAuth token-vault operations where allowed.
 
 Custom database-backed roles are deferred. See [authorization-rbac.md](../03-architecture/authorization-rbac.md) for the current permission matrix.

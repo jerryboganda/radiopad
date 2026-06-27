@@ -35,8 +35,6 @@ public class AiGatewayPolicyTests
     }
 
     [Theory]
-    [InlineData("github-copilot-sdk")]
-    [InlineData("github-copilot-cli")]
     [InlineData("gemini-cli")]
     [InlineData("openai-compatible")]
     [InlineData("ubag")]

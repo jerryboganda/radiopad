@@ -13,7 +13,7 @@ namespace RadioPad.Api.Tests.Providers;
 
 /// <summary>
 /// Iter-36 AI-012 — CLI-spawning provider adapter tests
-/// (GitHub Copilot CLI / Gemini CLI / Codex CLI) plus the missing-API-key
+/// (Gemini CLI / Codex CLI) plus the missing-API-key
 /// policy added to <see cref="OpenAiCompatibleProvider"/>. All tests use a
 /// stub <see cref="IProcessLauncher"/> or <see cref="StubHandler"/> so no
 /// real binary or network is touched.
@@ -64,55 +64,6 @@ public class Iter36CliProviderTests
             Compliance = ProviderComplianceClass.LocalOnly,
             Enabled = true,
         }, "be helpful", "summarise this CT chest", "v1", ContainsPhi: false);
-
-    // -----------------------------------------------------------------
-    // GitHub Copilot CLI
-    // -----------------------------------------------------------------
-    [Fact]
-    public async Task GhCopilot_HappyPath_ReturnsStdout_AndPipesPromptOptionsOnStdin()
-    {
-        var stub = StubLauncher.Ok("Suggested: review the lung bases.\n");
-        var sut = new GitHubCopilotCliProvider(stub, NullLogger<GitHubCopilotCliProvider>.Instance);
-
-        var r = await sut.CompleteAsync(Request(GitHubCopilotCliProvider.AdapterId), CancellationToken.None);
-
-        Assert.Equal("Suggested: review the lung bases.", r.Text);
-        Assert.Single(stub.Captured);
-        var spec = stub.Captured[0];
-        Assert.Equal("copilot", spec.FileName);
-        Assert.Empty(spec.Arguments);
-        Assert.NotNull(spec.StandardInput);
-        Assert.Contains("--prompt", spec.StandardInput!);
-        Assert.Contains("--deny-tool=shell", spec.StandardInput!);
-        Assert.Contains("--deny-tool=write", spec.StandardInput!);
-        Assert.Contains("summarise this CT chest", spec.StandardInput!);
-        // Prompt must never be passed as a process argument (shell-injection guard).
-        Assert.DoesNotContain(spec.Arguments, a => a.Contains("summarise this CT chest"));
-    }
-
-    [Fact]
-    public async Task GhCopilot_BinaryNotFound_ThrowsProviderTransport()
-    {
-        var sut = new GitHubCopilotCliProvider(StubLauncher.NotFound(), NullLogger<GitHubCopilotCliProvider>.Instance);
-        await Assert.ThrowsAsync<ProviderTransportException>(
-            () => sut.CompleteAsync(Request(GitHubCopilotCliProvider.AdapterId), CancellationToken.None));
-    }
-
-    [Fact]
-    public async Task GhCopilot_Timeout_ThrowsProviderTransport()
-    {
-        var sut = new GitHubCopilotCliProvider(StubLauncher.Timeout(), NullLogger<GitHubCopilotCliProvider>.Instance);
-        var ex = await Assert.ThrowsAsync<ProviderTransportException>(
-            () => sut.CompleteAsync(Request(GitHubCopilotCliProvider.AdapterId), CancellationToken.None));
-        Assert.Contains("timed out", ex.Message);
-    }
-
-    [Fact]
-    public void GhCopilot_DefaultComplianceClass_IsSandbox()
-    {
-        Assert.Equal(ProviderComplianceClass.Sandbox, GitHubCopilotCliProvider.DefaultComplianceClass);
-        Assert.Equal("github-copilot-cli", GitHubCopilotCliProvider.AdapterId);
-    }
 
     // -----------------------------------------------------------------
     // Gemini CLI
@@ -248,48 +199,6 @@ public class Iter36CliProviderTests
     }
 
     // -----------------------------------------------------------------
-    // GitHub Copilot SDK fail-closed provider
-    // -----------------------------------------------------------------
-    [Fact]
-    public async Task GitHubCopilotSdk_DefaultsSandbox_AndFailsClosed()
-    {
-        using var env = EnvVarScope.Set(GitHubCopilotSdkProvider.EnabledEnvVar, null);
-        var sut = new GitHubCopilotSdkProvider(NullLogger<GitHubCopilotSdkProvider>.Instance);
-
-        Assert.Equal(ProviderComplianceClass.Sandbox, GitHubCopilotSdkProvider.DefaultComplianceClass);
-        Assert.Equal("github-copilot-sdk", sut.Id);
-        var ex = await Assert.ThrowsAsync<ProviderPolicyException>(
-            () => sut.CompleteAsync(Request(GitHubCopilotSdkProvider.AdapterId), CancellationToken.None));
-        Assert.Contains("runtime_not_configured", ex.Message);
-
-        var health = await sut.ProbeAsync(new ProviderConfig { Adapter = GitHubCopilotSdkProvider.AdapterId }, CancellationToken.None);
-        Assert.False(health.Ok);
-        Assert.Equal("runtime_not_configured", health.Error);
-    }
-
-    [Fact]
-    public async Task GitHubCopilotSdk_RefusesPhiEvenIfMisclassified()
-    {
-        using var env = EnvVarScope.Set(GitHubCopilotSdkProvider.EnabledEnvVar, "true");
-        var sut = new GitHubCopilotSdkProvider(NullLogger<GitHubCopilotSdkProvider>.Instance);
-        var req = new AiCompletionRequest(
-            new ProviderConfig
-            {
-                Name = "copilot-sdk",
-                Adapter = GitHubCopilotSdkProvider.AdapterId,
-                Compliance = ProviderComplianceClass.PhiApproved,
-                Enabled = true,
-            },
-            "sys",
-            "patient data",
-            "v1",
-            ContainsPhi: true);
-
-        var ex = await Assert.ThrowsAsync<ProviderPolicyException>(() => sut.CompleteAsync(req, CancellationToken.None));
-        Assert.Contains("phi_not_supported", ex.Message);
-    }
-
-    // -----------------------------------------------------------------
     // Cross-cutting: prompt sanitation, allowlist
     // -----------------------------------------------------------------
     [Fact]
@@ -347,10 +256,8 @@ public class Iter36CliProviderTests
             "v1",
             ContainsPhi: true);
 
-        var github = new GitHubCopilotCliProvider(StubLauncher.Ok("never"), NullLogger<GitHubCopilotCliProvider>.Instance);
         var gemini = new GeminiCliProvider(StubLauncher.Ok("never"), NullLogger<GeminiCliProvider>.Instance);
 
-        await Assert.ThrowsAsync<ProviderPolicyException>(() => github.CompleteAsync(PhiRequest(GitHubCopilotCliProvider.AdapterId), CancellationToken.None));
         await Assert.ThrowsAsync<ProviderPolicyException>(() => gemini.CompleteAsync(PhiRequest(GeminiCliProvider.AdapterId), CancellationToken.None));
     }
 

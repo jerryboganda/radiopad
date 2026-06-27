@@ -24,7 +24,7 @@ Note: presence of an MCP server in a developer's editor configuration is **not**
 
 ## Setup
 
-- For dev, follow the editor's MCP guide (e.g. VS Code Copilot MCP).
+- For dev, follow the editor's MCP guide.
 - Tokens are stored in the OS keychain or a `.env.local` file ignored by git.
 - No tokens may appear in shared docs.
 

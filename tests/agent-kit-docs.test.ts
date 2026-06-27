@@ -31,7 +31,6 @@ interface AgentKitPlugin {
 describe('agent development kit documents', () => {
   it('keeps the five layer documents present', () => {
     [
-      '.github/copilot-instructions.md',
       'CLAUDE.md',
       'skills/README.md',
       '.github/hooks/open-design-agent-kit.json',
@@ -41,29 +40,10 @@ describe('agent development kit documents', () => {
     ].forEach(expectFile);
   });
 
-  it('keeps Copilot automatic instructions wired to every layer', () => {
-    const instructions = readText('.github/copilot-instructions.md');
-
-    [
-      'CLAUDE.md',
-      'skills/README.md',
-      '.github/hooks/open-design-agent-kit.json',
-      '.github/agents/*.agent.md',
-      'plugins/open-design-agent-kit/plugin.json',
-    ].forEach((requiredReference) => {
-      expect(instructions).toContain(requiredReference);
-    });
-
-    expect(instructions).toContain('Apply them on every task without waiting for the user to ask');
-    expect(instructions).toContain('Delegate automatically');
-    expect(instructions).toContain('Do not bypass safety prompts for destructive shell commands');
-  });
-
   it('keeps CLAUDE.md aligned with automatic layer utilization', () => {
     const constitution = readText('CLAUDE.md');
 
     expect(constitution).toContain('## Automatic Utilization');
-    expect(constitution).toContain('.github/copilot-instructions.md');
     expect(constitution).toContain('without waiting for the user to name them');
     expect(constitution).toContain('Never commit API keys');
   });
@@ -110,28 +90,12 @@ describe('agent development kit documents', () => {
     }
   });
 
-  it('keeps Copilot subagents discoverable as subagents', () => {
-    const agentFiles = [
-      '.github/agents/open-design-explorer.agent.md',
-      '.github/agents/open-design-code-reviewer.agent.md',
-      '.github/agents/open-design-test-runner.agent.md',
-      '.github/agents/open-design-feature-dev.agent.md',
-    ];
-
-    for (const agentFile of agentFiles) {
-      const body = readText(agentFile);
-      expect(body).toContain('description:');
-      expect(body).toContain('user-invocable: false');
-      expect(body).toMatch(/^---[\s\S]*---/);
-    }
-  });
-
   it('keeps the plugin manifest references valid', () => {
     const plugin = JSON.parse(readText('plugins/open-design-agent-kit/plugin.json')) as AgentKitPlugin;
 
     expect(plugin.name).toBe('open-design-agent-kit');
     expect(plugin.version).toMatch(/^\d+\.\d+\.\d+/);
-    expect(plugin.layers.memory.files).toContain('.github/copilot-instructions.md');
+    expect(plugin.layers.memory.files).toContain('CLAUDE.md');
 
     for (const relativePath of manifestFiles(plugin)) {
       expectFile(relativePath);

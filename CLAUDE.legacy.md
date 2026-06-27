@@ -12,7 +12,7 @@ Open Design is a local-first design generation product. The web app lets users t
 - portable design systems in `design-systems/`
 - project/runtime files under `.od/`, which must stay untracked
 
-The product does not ship its own model runtime. It detects and delegates to installed agent CLIs such as Claude Code, Codex, Cursor Agent, Gemini CLI, OpenCode, Qwen, GitHub Copilot CLI, or falls back to browser-side Anthropic BYOK.
+The product does not ship its own model runtime. It detects and delegates to installed agent CLIs such as Claude Code, Codex, Cursor Agent, Gemini CLI, OpenCode, Qwen, or falls back to browser-side Anthropic BYOK.
 
 ## Architecture Facts
 
@@ -59,16 +59,15 @@ The product does not ship its own model runtime. It detects and delegates to ins
 
 ## Automatic Utilization
 
-- GitHub Copilot must load `.github/copilot-instructions.md` automatically and use it as the workspace entrypoint.
 - Agents should apply all five layers without waiting for the user to name them: memory for repo facts, skills for artifact workflows, hooks for deterministic safety, subagents for focused delegation, and plugins for distribution metadata.
 - When a layer file is added, moved, or removed, update `plugins/open-design-agent-kit/plugin.json` and `tests/agent-kit-docs.test.ts` in the same change.
 
 ## Agent Layer Map
 
-- Layer 1 memory: `.github/copilot-instructions.md` and this `CLAUDE.md`.
+- Layer 1 memory: this `CLAUDE.md`.
 - Layer 2 skills: `skills/README.md` plus each `skills/*/SKILL.md`.
 - Layer 3 hooks: `.github/hooks/open-design-agent-kit.json` and `hooks/` scripts.
-- Layer 4 subagents: `.github/agents/*.agent.md` for Copilot and `subagents/*.md` as portable definitions.
+- Layer 4 subagents: `subagents/*.md` portable definitions.
 - Layer 5 plugins: `plugins/open-design-agent-kit/plugin.json`.
 
 ## Review Checklist

@@ -190,16 +190,6 @@ public enum AuditAction
     MarketplaceRejected = 47,
     /// <summary>PRD Enterprise GA #13 — a marketplace listing was installed into a tenant.</summary>
     MarketplaceInstalled = 48,
-    /// <summary>Enterprise Copilot — tenant Copilot admin settings or secret-reference metadata changed.</summary>
-    CopilotAdminSettingsChanged = 49,
-    /// <summary>Enterprise Copilot — user GitHub account state changed or was inspected.</summary>
-    CopilotAccountChanged = 50,
-    /// <summary>Enterprise Copilot — a request was blocked by Copilot policy, PHI, entitlement, quota, or runtime gates.</summary>
-    CopilotPolicyBlocked = 51,
-    /// <summary>Enterprise Copilot — an admin diagnostics/status check was executed.</summary>
-    CopilotDiagnosticsRun = 52,
-    /// <summary>Enterprise Copilot — request lifecycle event (start/complete/fail/cancel) recorded without prompt/code bodies.</summary>
-    CopilotRequestLifecycle = 53,
     /// <summary>An AI provider configuration was created or updated by an admin
     /// (POST /api/providers). A routine admin action — NOT a policy violation
     /// (it was previously mis-tagged as <see cref="PolicyViolation"/>).</summary>
@@ -229,23 +219,6 @@ public enum AuditAction
     /// <summary>Master-admin user management — a user's enrolled TOTP authenticator
     /// was cleared so they must re-enroll on next sign-in (<c>POST /api/users/{id}/reset-mfa</c>).</summary>
     UserMfaReset = 61,
-}
-
-public enum CopilotMode
-{
-    Disabled = 0,
-    EnterpriseManaged = 1,
-    BringYourOwnAccount = 2,
-    LocalCli = 3,
-    Byok = 4,
-}
-
-public enum CopilotRuntimeStatus
-{
-    Disabled = 0,
-    NotConfigured = 1,
-    RuntimeUnavailable = 2,
-    Ready = 3,
 }
 
 /// <summary>

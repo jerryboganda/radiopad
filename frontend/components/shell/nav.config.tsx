@@ -6,7 +6,7 @@
 import type { ComponentType, SVGProps } from 'react';
 import {
   FileText, ClipboardCheck, ScrollText, BarChart3, BookOpen, LayoutTemplate,
-  MessageSquareText, Bot, Store, BookText, Server, Network, HardDrive,
+  MessageSquareText, Store, BookText, Server, Network, HardDrive,
   FileInput, WifiOff, Scale, FlaskConical, ShieldCheck, Flag, CreditCard,
   Activity, Settings2, Fingerprint, Users,
 } from 'lucide-react';
@@ -43,7 +43,6 @@ export const Icons: Record<string, NavIcon> = {
   rulebooks: BookOpen,
   templates: LayoutTemplate,
   prompts: MessageSquareText,
-  copilot: Bot,
   marketplace: Store,
   terminology: BookText,
   providers: Server,
@@ -88,7 +87,6 @@ export const navGroups: NavGroup[] = [
     items: [
       { href: '/providers', labelKey: 'providers', icon: Icons.providers, permission: 'providers.read' },
       { href: '/admin/ubag', labelKey: 'ubag', icon: Icons.ubag, permission: 'mcp_tools.invoke' },
-      { href: '/copilot', labelKey: 'copilot', icon: Icons.copilot },
       { href: '/admin/pacs', labelKey: 'pacs', icon: Icons.pacs, permission: 'tenant_settings.manage' },
       { href: '/admin/fhir-import', labelKey: 'fhirImport', icon: Icons.fhir, permission: 'reports.draft' },
       { href: '/offline', labelKey: 'offline', icon: Icons.offline },
@@ -100,7 +98,6 @@ export const navGroups: NavGroup[] = [
       { href: '/admin/users', labelKey: 'users', icon: Icons.users, permission: 'users.manage' },
       { href: '/admin/governance', labelKey: 'governance', icon: Icons.governance, permission: 'audit.verify' },
       { href: '/admin/model-eval', labelKey: 'modelEval', icon: Icons.modelEval, permission: 'audit.verify' },
-      { href: '/admin/copilot', labelKey: 'copilotAdmin', icon: Icons.copilot, permission: 'prompt_overrides.manage' },
       { href: '/admin/security', labelKey: 'security', icon: Icons.security, permission: 'security.manage' },
       { href: '/admin/feature-flags', labelKey: 'featureFlags', icon: Icons.flags, permission: 'billing.read' },
       { href: '/admin/billing', labelKey: 'billing', icon: Icons.billing, permission: 'billing.read' },

@@ -16,7 +16,6 @@
 
 mod crypto_keyring;
 mod backend_health;
-mod copilot_cli;
 mod device_pairing;
 mod local_cache;
 mod log_redactor;
@@ -240,9 +239,6 @@ fn main() {
             local_cache::local_cache_get,
             local_cache::local_cache_put,
             local_cache::local_cache_clear,
-            copilot_cli::copilot_cli_status,
-            copilot_cli::copilot_cli_login_begin,
-            copilot_cli::copilot_cli_logout,
             device_pairing::device_fingerprint,
             device_pairing::device_pairing_token_set,
             device_pairing::device_pairing_token_get,

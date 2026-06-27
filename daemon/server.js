@@ -17,7 +17,6 @@ import { listSkills } from './skills.js';
 import { listDesignSystems, readDesignSystem } from './design-systems.js';
 import { attachAcpSession } from './acp.js';
 import { createClaudeStreamHandler } from './claude-stream.js';
-import { createCopilotStreamHandler } from './copilot-stream.js';
 import { createJsonEventStreamHandler } from './json-event-stream.js';
 import { renderDesignSystemPreview } from './design-system-preview.js';
 import { renderDesignSystemShowcase } from './design-system-showcase.js';
@@ -1176,10 +1175,6 @@ export async function startServer({ port = 7456, returnServer = false } = {}) {
       const claude = createClaudeStreamHandler((ev) => send('agent', ev));
       child.stdout.on('data', (chunk) => claude.feed(chunk));
       child.on('close', () => claude.flush());
-    } else if (def.streamFormat === 'copilot-stream-json') {
-      const copilot = createCopilotStreamHandler((ev) => send('agent', ev));
-      child.stdout.on('data', (chunk) => copilot.feed(chunk));
-      child.on('close', () => copilot.flush());
     } else if (def.streamFormat === 'acp-json-rpc') {
       acpSession = attachAcpSession({
         child,

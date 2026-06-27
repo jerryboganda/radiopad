@@ -2,7 +2,7 @@
 
 **Status:** Current  ·  **Owner:** Engineering  ·  **Last Updated:** 2026-05-04
 
-These rules apply to every AI coding agent (Copilot, Claude Code, Cursor, Codex, Gemini, OmO, Ralph, etc.) operating in this repo.
+These rules apply to every AI coding agent (Claude Code, Cursor, Codex, Gemini, OmO, Ralph, etc.) operating in this repo.
 
 ## Hard rules
 

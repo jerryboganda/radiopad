@@ -17,7 +17,7 @@ public static class ProviderRegister
     {
         "azure-openai", "aws-bedrock", "google-vertex", "gcp-vertex", "vertex-ai", "google-vertex-ai",
         "openai", "openai-direct", "openai-compatible", "anthropic", "mock", "ollama", "ollama-chat",
-        "vllm", "llama-cpp", "github-copilot-sdk", "github-copilot-cli", "gemini-cli", "codex-cli",
+        "vllm", "llama-cpp", "gemini-cli", "codex-cli",
     };
 
     /// <summary>

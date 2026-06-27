@@ -105,8 +105,8 @@ radiopad provider register `
 Supported `--type` values: `azure-openai`, `aws-bedrock`, `google-vertex`
 (`gcp-vertex`, `vertex-ai`, and `google-vertex-ai` are accepted aliases),
 `openai` (`openai-direct` alias), `openai-compatible`, `anthropic`, `mock`,
-`ollama`, `ollama-chat`, `vllm`, `llama-cpp`, `github-copilot-sdk`,
-`github-copilot-cli`, `gemini-cli`, and `codex-cli`. The `--api-key-ref`
+`ollama`, `ollama-chat`, `vllm`, `llama-cpp`, `gemini-cli`, and
+`codex-cli`. The `--api-key-ref`
 value MUST be of the form `env:NAME` whenever a key is supplied; direct
 cloud providers require it. OpenAI-compatible local shims and CLI providers
 may leave it blank because credentials live in the endpoint or vendor CLI.
@@ -179,11 +179,10 @@ is logged to stdout.
 
 ## CLI-AI providers
 
-**Iter-36 AI-012.** Three first-class adapters shell out to local AI CLIs. Each provider runs as a subprocess of the API host (or `radiopad daemon`), receives the composed prompt on **stdin**, and returns stdout. Compliance class defaults to `Sandbox` because the local binary may call a vendor cloud. Adapter-level policy now refuses PHI and secret-shaped prompts before process launch; the AI gateway still enforces tenant policy authoritatively.
+**Iter-36 AI-012.** Two first-class adapters shell out to local AI CLIs. Each provider runs as a subprocess of the API host (or `radiopad daemon`), receives the composed prompt on **stdin**, and returns stdout. Compliance class defaults to `Sandbox` because the local binary may call a vendor cloud. Adapter-level policy now refuses PHI and secret-shaped prompts before process launch; the AI gateway still enforces tenant policy authoritatively.
 
 | Adapter id | Default binary | Override env var | Underlying CLI |
 | --- | --- | --- | --- |
-| `github-copilot-cli` | `copilot` | `RADIOPAD_COPILOT_BIN` | [GitHub Copilot CLI](https://docs.github.com/en/copilot/concepts/agents/copilot-cli/about-copilot-cli) prompt option stream over stdin |
 | `gemini-cli` | `gemini` | `RADIOPAD_GEMINI_BIN` | Google Gemini CLI |
 | `codex-cli` | `codex` | `RADIOPAD_CODEX_BIN` | OpenAI Codex CLI |
 
@@ -194,14 +193,9 @@ Shared environment knobs:
 | `RADIOPAD_CLI_PROVIDER_TIMEOUT_MS` | Per-process timeout in milliseconds. Default `60000`. Exceeding it kills the process tree and surfaces a `ProviderTransportException`. |
 | `RADIOPAD_CLI_PROVIDER_ALLOWED_PATHS` | **Required in Production** for CLI providers; optional in development. Semicolon-separated absolute paths or bare command names. Unlisted binaries throw `ProviderPolicyException("cli_binary_not_allowed")`; missing production allowlists throw `cli_binary_allowlist_required`. |
 | `RADIOPAD_CLI_PROVIDER_ENV_ALLOWLIST` | Optional comma/semicolon-separated env vars to pass into CLI subprocesses in addition to OS basics (`PATH`, home/config/temp locations). Keep this minimal and provider-specific. |
-| `RADIOPAD_COPILOT_SERVER_CLI_ENABLED` | Must be `1` before a production API host may execute the server-side `github-copilot-cli` adapter. Development desktop flows can still use the local Tauri bridge. |
 | `RADIOPAD_CODEX_CLI_ENABLED` | Must be `1` before `codex-cli` will execute. Without it the adapter fails closed with `runtime_not_enabled`. |
 
 Security boundary: arguments are passed via `ProcessStartInfo.ArgumentList` (never the legacy concatenated `Arguments` string), so prompts cannot escape into a shell. The subprocess runs from a neutral temp working directory with a scrubbed environment. Prompts containing NUL or other C0 control characters, PHI, or secret-like material are refused before launch. `codex-cli` runs `codex exec --sandbox read-only -` and never uses full-auto mode.
-
-## GitHub Copilot SDK provider
-
-`github-copilot-sdk` is registered as a provider id for policy modeling and admin setup, but it fails closed until RadioPad is wired to an official backend-safe GitHub Copilot SDK transport. Its health check returns `runtime_not_configured` by default, and the adapter refuses PHI even if a provider row is misclassified. Do not scrape IDE tokens or call undocumented Copilot endpoints.
 
 ## Design lock
 

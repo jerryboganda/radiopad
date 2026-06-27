@@ -57,8 +57,6 @@ const PRESETS: Preset[] = [
   { id: 'anthropic',    label: 'Anthropic (sandbox)',    patch: { adapter: 'anthropic',    endpointUrl: '',                       compliance: 1, model: 'claude-3-5-sonnet-20241022' } },
   { id: 'openai',       label: 'OpenAI direct',          patch: { adapter: 'openai',       endpointUrl: '',                       compliance: 1, model: 'gpt-4o-mini' } },
   { id: 'openai-compatible', label: 'OpenAI-compatible', patch: { adapter: 'openai-compatible', endpointUrl: '',                  compliance: 1, model: '' } },
-  { id: 'github-copilot-sdk', label: 'GitHub Copilot SDK', patch: { adapter: 'github-copilot-sdk', endpointUrl: '',                compliance: 1, model: 'copilot' } },
-  { id: 'github-copilot-cli', label: 'GitHub Copilot CLI', patch: { adapter: 'github-copilot-cli', endpointUrl: '',                compliance: 1, model: 'copilot' } },
   { id: 'gemini-cli',   label: 'Gemini CLI',             patch: { adapter: 'gemini-cli',   endpointUrl: '',                       compliance: 1, model: '' } },
   { id: 'codex-cli',    label: 'Codex CLI',              patch: { adapter: 'codex-cli',    endpointUrl: '',                       compliance: 1, model: '' } },
   { id: 'ubag',         label: 'UBAG automation hub',     patch: { adapter: 'ubag',         endpointUrl: '',                       compliance: 1, model: 'gemini_web', retentionLabel: 'non-phi-browser-automation' } },
@@ -294,8 +292,6 @@ export default function ProvidersPage() {
                 <option value="ollama-chat">ollama-chat (iter-32 /api/chat)</option>
                 <option value="vllm">vllm (iter-32 local)</option>
                 <option value="llama-cpp">llama-cpp (iter-32 local)</option>
-                <option value="github-copilot-sdk">github-copilot-sdk</option>
-                <option value="github-copilot-cli">github-copilot-cli</option>
                 <option value="gemini-cli">gemini-cli</option>
                 <option value="codex-cli">codex-cli</option>
                 <option value="ubag">ubag</option>

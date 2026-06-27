@@ -90,7 +90,6 @@ If both signals agree, detection is confident. If only one signal fires, we mark
 | **gemini-cli** | `gemini` | `~/.config/gemini/` | ❌ | ❌ (prompt-injected) | ❌ (regenerate) | ✅ | P2 |
 | **opencode** | `opencode` | `~/.opencode/` | 〜 | 〜 | ✅ | P2 |
 | **openclaw** | `openclaw` | `~/.openclaw/` | 〜 | 〜 | 〜 | P2 |
-| **copilot** | `copilot` | `~/.copilot/` | ❌ | ✅ (`edit` tool) | ✅ (`--output-format json` JSONL) | P2 |
 
 "P0/P1/P2" correspond to the roadmap phases in [`roadmap.md`](roadmap.md).
 
@@ -172,14 +171,6 @@ The adapter declares which strategy to use via `capabilities().nativeSkillLoadin
 ### 5.6 OpenCode / OpenClaw
 
 - Less-matured CLIs. Targeting P2. Expect bumps; adapter implementations will likely be the thinnest possible "shell out, parse output, synthesize events" approach.
-
-### 5.7 GitHub Copilot CLI
-
-- Invocation: `copilot` with Copilot CLI's `--prompt` option supplied through stdin option-stream input. RadioPad's provider adapter does not set automatic approval flags; agentic daemon profiles that need tools must opt in inside a sandboxed runtime with explicit allow/deny policy. The provider path keeps prompt text out of the process argument list.
-- Streaming: `--output-format json` emits JSONL with the same expressive shape as Claude Code's stream-json (`assistant.reasoning_delta`, `assistant.message_delta`, `tool.execution_start/complete`, `result`). `daemon/copilot-stream.js` maps these onto the same UI events as `claude-stream.js`.
-- Skill loading: prompt injection only. Github Copilot's tool catalog includes a `skill` tool — native format worth reverse-engineering later.
-- Surgical edits: dedicated `edit` tool.
-- Detection assumes Copilot is already authenticated, via one of: `copilot login` (subcommand, OAuth device flow), the interactive `/login` slash command inside `copilot` with no args.
 
 ## 6. Capability-driven UI
 

@@ -1,6 +1,6 @@
 # RadioPad — instructions for AI coding agents
 
-This file is the entry point for every AI coding agent (Copilot, Claude Code, Codex, Cursor, Gemini, etc.) working in this repository. Read it before making any change.
+This file is the entry point for every AI coding agent (Claude Code, Codex, Cursor, Gemini, etc.) working in this repository. Read it before making any change.
 
 ---
 

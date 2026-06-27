@@ -725,7 +725,7 @@
    {
     "title": "§20.1 Web app navigation — primary modules present in shell",
     "status": "partial",
-    "evidence": "frontend/components/shell/nav.config.tsx defines sidebar groups (workspace/library/integrations/admin). Present: Reports (Dashboard), Validation Center (/validation), Audit Logs (/audit), Analytics (/analytics), Rulebooks, Templates, Prompt Studio (/prompts), Marketplace, Terminology, AI Providers (/providers), Copilot, PACS, FHIR import, Offline, Governance, Model-Eval, Security, Feature Flags, Billing (/admin/billing), Usage (/admin/settings). Reporting Workspace = report editor reached via Reports rows.",
+    "evidence": "frontend/components/shell/nav.config.tsx defines sidebar groups (workspace/library/integrations/admin). Present: Reports (Dashboard), Validation Center (/validation), Audit Logs (/audit), Analytics (/analytics), Rulebooks, Templates, Prompt Studio (/prompts), Marketplace, Terminology, AI Providers (/providers), PACS, FHIR import, Offline, Governance, Model-Eval, Security, Feature Flags, Billing (/admin/billing), Usage (/admin/settings). Reporting Workspace = report editor reached via Reports rows.",
     "gap": "No dedicated nav entries/pages for: Worklist, Peer Review, Teaching Files, Users & Roles, Integrations (consolidated), Plugins (separate from Marketplace), and a general Settings page (only /admin/settings exists). Glob for app/{worklist,peer-review,teaching,users,roles,integrations,plugins,settings} returned no files.",
     "effort": "L",
     "priority": "P1",
@@ -1407,7 +1407,7 @@
    {
     "title": "§20.1 Web app navigation — primary modules present in shell",
     "status": "partial",
-    "evidence": "frontend/components/shell/nav.config.tsx defines sidebar groups (workspace/library/integrations/admin). Present: Reports (Dashboard), Validation Center (/validation), Audit Logs (/audit), Analytics (/analytics), Rulebooks, Templates, Prompt Studio (/prompts), Marketplace, Terminology, AI Providers (/providers), Copilot, PACS, FHIR import, Offline, Governance, Model-Eval, Security, Feature Flags, Billing (/admin/billing), Usage, Settings (/admin/settings).",
+    "evidence": "frontend/components/shell/nav.config.tsx defines sidebar groups (workspace/library/integrations/admin). Present: Reports (Dashboard), Validation Center (/validation), Audit Logs (/audit), Analytics (/analytics), Rulebooks, Templates, Prompt Studio (/prompts), Marketplace, Terminology, AI Providers (/providers), PACS, FHIR import, Offline, Governance, Model-Eval, Security, Feature Flags, Billing (/admin/billing), Usage, Settings (/admin/settings).",
     "gap": "No dedicated nav entries/pages for: Worklist, Peer Review, Teaching Files, Users & Roles, Integrations (consolidated), Plugins (separate from Marketplace), and a general Settings page. Glob for app/{worklist,peer-review,teaching,users,roles,integrations,plugins,settings} returned no files.",
     "effort": "L",
     "priority": "P1",
@@ -2400,7 +2400,7 @@
    {
     "title": "CLI-007 — `radiopad ai providers list|test|set-default`",
     "status": "partial",
-    "evidence": "Program.cs BuildProviderCommand() implements `provider list` (GET /api/providers), `provider test` (round-trips a throwaway report through a provider), and `provider register` (Commands/ProviderRegister.cs, POST /api/providers, env: secret refs, compliance forced to Sandbox). Adapter catalog is broad (Azure/Bedrock/Vertex/OpenAI/Anthropic/Ollama/vLLM/llama-cpp/Copilot/Gemini/Codex). Matrix line 154 (✅).",
+    "evidence": "Program.cs BuildProviderCommand() implements `provider list` (GET /api/providers), `provider test` (round-trips a throwaway report through a provider), and `provider register` (Commands/ProviderRegister.cs, POST /api/providers, env: secret refs, compliance forced to Sandbox). Adapter catalog is broad (Azure/Bedrock/Vertex/OpenAI/Anthropic/Ollama/vLLM/llama-cpp/Gemini/Codex). Matrix line 154 (✅).",
     "gap": "Command group is `provider` not `ai providers`. The `set-default` verb is NOT implemented (no way to set the default provider from the CLI; default routing is server-side). `register` exists but is not one of the three required verbs.",
     "effort": "M",
     "priority": "P1",
@@ -3307,7 +3307,7 @@
     "status": "missing",
     "edition": "CE",
     "priority": "P0",
-    "evidence": "grep for impersonat across backend src = no auth feature (matches are only in copilot/PRD/docs contexts). No 'act-as'/'on-behalf-of' token shape in RadioPadBearerTokens; no support-impersonation endpoint.",
+    "evidence": "grep for impersonat across backend src = no auth feature (matches are only in PRD/docs contexts). No 'act-as'/'on-behalf-of' token shape in RadioPadBearerTokens; no support-impersonation endpoint.",
     "gap": "No support impersonation capability at all: no dual-approval request flow, no time-boxed act-as session, no impersonation banner/marking, and no dedicated audit trail distinguishing impersonated actions. Requires a full impersonation feature (request → dual approve → scoped act-as token → audit every action with actor+subject).",
     "effort": "XL"
    }
@@ -3893,7 +3893,7 @@
     "edition": "CE",
     "priority": "P1",
     "effort": "M",
-    "evidence": "Wired adapters (Program.cs:87-112): mock, anthropic, ollama (legacy), azure-openai, aws-bedrock, google-vertex, openai (direct), openai-compatible, github-copilot-sdk, ollama-chat, vllm, llama-cpp, gemini-cli/codex-cli, ubag. Catalog (docs/03-architecture/provider-catalog.md) states openai-compatible covers OpenRouter/Groq/Together/Mistral/NVIDIA NIM/vLLM.",
+    "evidence": "Wired adapters (Program.cs:87-112): mock, anthropic, ollama (legacy), azure-openai, aws-bedrock, google-vertex, openai (direct), openai-compatible, ollama-chat, vllm, llama-cpp, gemini-cli/codex-cli, ubag. Catalog (docs/03-architecture/provider-catalog.md) states openai-compatible covers OpenRouter/Groq/Together/Mistral/NVIDIA NIM/vLLM.",
     "gap": "Dedicated first-class adapters for Cohere, Mistral La Plateforme, Groq, Together, Fireworks, Replicate are NOT individually implemented (only reachable generically via openai-compatible). Local OSS LocalAI, TGI, and Tabby have no dedicated adapter (also only via openai-compatible). Generic reachability partially satisfies the function but not the 'first-class adapter' clause per named provider."
    },
    {
@@ -3965,8 +3965,8 @@
     "edition": "CE",
     "priority": "P2",
     "effort": "L",
-    "evidence": "CopilotIntegrationSettings supports BYO accounts / OAuth client id + secret ref + AllowByoAccounts (Entities.cs:229-258); IOAuthTokenIssuer + OAuthRefreshVault provide the storage/rotation substrate; CopilotMode.BringYourOwnAccount exists.",
-    "gap": "BYO-OAuth-app is only realized for the GitHub Copilot integration, not a general 'bring-your-own-OAuth-app' for arbitrary subscription-backed AI providers. No generic provider-level BYO-OAuth-app registration UI/endpoint with the non-PHI-by-default guard; concrete IOAuthTokenIssuer is Noop."
+    "evidence": "IOAuthTokenIssuer + OAuthRefreshVault provide the storage/rotation substrate for BYO accounts (OAuth client id + secret ref + AllowByoAccounts).",
+    "gap": "No general 'bring-your-own-OAuth-app' for arbitrary subscription-backed AI providers. No generic provider-level BYO-OAuth-app registration UI/endpoint with the non-PHI-by-default guard; concrete IOAuthTokenIssuer is Noop."
    },
    {
     "title": "PROV-020 Confidential-computing inference attestation surfaced to admins",
@@ -5811,7 +5811,7 @@
    {
     "title": "§23.3 WebSocket / SSE for streaming AI + real-time collaboration",
     "status": "missing",
-    "evidence": "No text/event-stream or WebSocket in backend controllers (grep returns only StreamReader/MemoryStream usage; CopilotController.cs has no streaming). AI draft endpoints return buffered JSON. SSE exists only in legacy Node daemon (daemon/json-event-stream.js) which is read-only reference. No CRDT relay / live collaboration.",
+    "evidence": "No text/event-stream or WebSocket in backend controllers (grep returns only StreamReader/MemoryStream usage; AI controllers have no streaming). AI draft endpoints return buffered JSON. SSE exists only in legacy Node daemon (daemon/json-event-stream.js) which is read-only reference. No CRDT relay / live collaboration.",
     "gap": "Add SSE or WebSocket token streaming for AI generation and a real-time collaboration channel (PRD §24.1 reporting 'CRDT relay'). Currently AI is request/response only.",
     "effort": "L",
     "priority": "medium"

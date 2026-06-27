@@ -6,11 +6,10 @@ It is a distribution document today, not a daemon runtime plugin. The daemon doe
 
 ## Bundle Contents
 
-- `.github/copilot-instructions.md`: automatic GitHub Copilot workspace entrypoint.
 - `CLAUDE.md`: project constitution and repo memory.
 - `skills/README.md` and `skills/*/SKILL.md`: capability layer.
 - `.github/hooks/open-design-agent-kit.json` and `hooks/`: deterministic lifecycle hooks.
-- `.github/agents/*.agent.md` and `subagents/*.md`: focused subagent roles.
+- `subagents/*.md`: focused subagent roles.
 - `plugins/README.md`: plugin authoring and security notes.
 
 ## Install Guidance

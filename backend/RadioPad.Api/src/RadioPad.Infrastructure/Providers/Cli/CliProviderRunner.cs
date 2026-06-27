@@ -6,7 +6,7 @@ namespace RadioPad.Infrastructure.Providers.Cli;
 
 /// <summary>
 /// Iter-36 — shared helpers for CLI-spawning provider adapters
-/// (GitHub Copilot CLI, Gemini CLI, Codex CLI). Centralises:
+/// (Gemini CLI, Codex CLI). Centralises:
 /// <list type="bullet">
 ///   <item>Default per-process timeout (60s, override via
 ///   <c>RADIOPAD_CLI_PROVIDER_TIMEOUT_MS</c>).</item>
@@ -16,7 +16,7 @@ namespace RadioPad.Infrastructure.Providers.Cli;
 ///   <item>Prompt sanitation — refuses NUL / control characters that could
 ///   break stdin framing.</item>
 /// </list>
-/// All three CLI adapters default to <see cref="ProviderComplianceClass.Sandbox"/>
+/// Both CLI adapters default to <see cref="ProviderComplianceClass.Sandbox"/>
 /// because the local binary may forward the prompt to a vendor cloud. Operators
 /// must explicitly mark a configured provider <c>PhiApproved</c> before PHI may
 /// flow through it.

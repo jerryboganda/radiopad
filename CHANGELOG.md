@@ -6,6 +6,12 @@ The format is based on [Keep a Changelog 1.1.0](https://keepachangelog.com/en/1.
 
 ## [Unreleased]
 
+### Removed
+- **Removed GitHub Copilot integration.** The `github-copilot-sdk` /
+  `github-copilot-cli` provider adapters, server-side Copilot CLI execution,
+  the desktop native Copilot session runner, and all related admin/session
+  surfaces have been dropped from the active codebase.
+
 ### Fixed
 - **Report editor — "Generate impression" no longer drafts from empty findings.**
   Section textareas persist on blur, but the AI endpoint
@@ -105,33 +111,22 @@ The format is based on [Keep a Changelog 1.1.0](https://keepachangelog.com/en/1.
   endpoint overrides are allowlisted per vendor before credentials are attached;
   RadioPad `rp_` bearers are signed expiring payloads with `iat` / `exp` / `jti`;
   CLI providers require binary allowlists in production; Codex now runs through
-  `codex exec --sandbox read-only -`; server-side Copilot CLI execution is
-  production-gated by `RADIOPAD_COPILOT_SERVER_CLI_ENABLED=1`. The Copilot and
-  provider admin pages gained canonical loading/error/empty states and sidebar
-  navigation, golden-case docs/CLI now align on `expectFlagged`, and release
-  workflows no longer contain placeholder AWS account / TODO jobs.
-- **Iter-46 — AI provider catalog hardening**: exposed `github-copilot-sdk`,
-  `github-copilot-cli`, `gemini-cli`, and `openai-compatible` as aligned
-  backend/frontend/CLI/OpenAPI provider options. The Copilot SDK adapter is
-  fail-closed (`runtime_not_configured`) until a reviewed official backend
-  SDK transport is installed and refuses PHI even when misclassified. CLI
-  adapters now have prompt-free health probes, and OpenAI-compatible health
-  probes `/v1/models` without sending clinical content. Copilot session/chat
-  execution now requires a tenant-owned `github-copilot-cli` provider and
-  routes through `IAiGateway` instead of shelling out from the controller
-  service path; the desktop bridge no longer exposes a direct native Copilot
-  session runner.
+  `codex exec --sandbox read-only -`. The provider admin pages gained canonical
+  loading/error/empty states and sidebar navigation, golden-case docs/CLI now
+  align on `expectFlagged`, and release workflows no longer contain placeholder
+  AWS account / TODO jobs.
+- **Iter-46 — AI provider catalog hardening**: exposed `gemini-cli` and
+  `openai-compatible` as aligned backend/frontend/CLI/OpenAPI provider options.
+  CLI adapters now have prompt-free health probes, and OpenAI-compatible health
+  probes `/v1/models` without sending clinical content.
 - **Iter-46 — provider security completion pass**: production API identity now
   requires validated OIDC or `rp_` bearer tokens unless `RADIOPAD_DEV_HEADERS=1`
-  is explicitly enabled; Copilot prompts that look like secrets are blocked
-  before session creation; CLI providers refuse PHI/secret-shaped prompts at
+  is explicitly enabled; CLI providers refuse PHI/secret-shaped prompts at
   adapter level, run with a scrubbed environment, and Codex CLI is disabled
   unless `RADIOPAD_CODEX_CLI_ENABLED=1`. OpenAI-compatible endpoints are
   validated against SSRF/private-network use unless `LocalOnly`, provider
   config saves and health checks append audit rows, and provider admin UI now
-  has loading/empty/error states plus test coverage. Copilot quota accounting
-  now counts terminal request rows only so successful sessions are not
-  double-counted.
+  has loading/empty/error states plus test coverage.
 - **Iter-36 — Stripe webhook hardening**: `POST /api/billing/webhook` now
   handles `invoice.payment_succeeded` (clears `gracePeriodUntil` +
   `suspendedAt`, sets `subscriptionStatus = "active"`) and
@@ -193,11 +188,11 @@ The format is based on [Keep a Changelog 1.1.0](https://keepachangelog.com/en/1.
   and
   [`frontend/__tests__/admin/modelEval.test.tsx`](frontend/__tests__/admin/modelEval.test.tsx).
   Docs: [`docs/06-operations/governance.md`](docs/06-operations/governance.md).
-- **Iter-36 — CLI-AI provider adapters**: three new `IAiProviderAdapter`
+- **Iter-36 — CLI-AI provider adapters**: two new `IAiProviderAdapter`
   implementations under
   [`backend/RadioPad.Api/src/RadioPad.Infrastructure/Providers/Cli/`](backend/RadioPad.Api/src/RadioPad.Infrastructure/Providers/Cli/)
-  shell out to local AI CLI binaries — `github-copilot-cli` (`copilot`),
-  `gemini-cli` (`gemini`), and `codex-cli` (`codex`). All three default to
+  shell out to local AI CLI binaries — `gemini-cli` (`gemini`) and
+  `codex-cli` (`codex`). Both default to
   `ProviderComplianceClass.Sandbox`; the AI gateway's PHI policy is
   unchanged. The composed prompt is piped on **stdin**; arguments are passed
   via `ProcessStartInfo.ArgumentList` so prompts cannot escape into a shell.
@@ -206,7 +201,7 @@ The format is based on [Keep a Changelog 1.1.0](https://keepachangelog.com/en/1.
   (`RADIOPAD_CLI_PROVIDER_TIMEOUT_MS`, default 60s), default-deny binary
   allowlist (`RADIOPAD_CLI_PROVIDER_ALLOWED_PATHS`), and a control-character
   prompt sanitiser (refuses NUL / C0 controls). Per-provider binary override
-  envs: `RADIOPAD_COPILOT_BIN`, `RADIOPAD_GEMINI_BIN`, `RADIOPAD_CODEX_BIN`.
+  envs: `RADIOPAD_GEMINI_BIN`, `RADIOPAD_CODEX_BIN`.
   The existing generic `OpenAiCompatibleProvider` (`openai-compatible`) gains
   a missing-API-key guard: when `apiKeySecretRef` is set but resolves empty
   the adapter throws `ProviderPolicyException("api_key_missing")` instead of

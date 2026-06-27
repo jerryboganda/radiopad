@@ -59,14 +59,12 @@ All knobs are environment variables:
 | `RADIOPAD_SMTP_HOST` / `RADIOPAD_SMTP_PORT` / `RADIOPAD_SMTP_USER` / `RADIOPAD_SMTP_PASS` / `RADIOPAD_SMTP_FROM` | required for production magic links | SMTP settings for passwordless browser sign-in. Production never returns raw magic-link dev URLs when email delivery is unavailable. |
 | `ANTHROPIC_API_KEY` (or any other key referenced by `ApiKeySecretRef`) | when using that provider | The provider config stores `env:ANTHROPIC_API_KEY`; the runtime resolves it. |
 | `OPENAI_COMPATIBLE_API_KEY` | optional | Example env var for `openai-compatible` providers. Tenants may choose any `env:NAME` reference. |
-| `RADIOPAD_COPILOT_BIN` / `RADIOPAD_GEMINI_BIN` / `RADIOPAD_CODEX_BIN` | optional | Override local CLI binaries for sandbox CLI providers. |
+| `RADIOPAD_GEMINI_BIN` / `RADIOPAD_CODEX_BIN` | optional | Override local CLI binaries for sandbox CLI providers. |
 | `RADIOPAD_CLI_PROVIDER_TIMEOUT_MS` | optional | Per-process timeout for CLI providers. Default `60000`. |
 | `RADIOPAD_CLI_PROVIDER_ALLOWED_PATHS` | required for production CLI providers | Semicolon-separated allowlist for CLI binaries. Missing production allowlists and unlisted binaries are blocked. |
 | `RADIOPAD_CLI_PROVIDER_ENV_ALLOWLIST` | optional | Extra env vars passed to CLI subprocesses beyond OS basics. Keep minimal and provider-specific. |
-| `RADIOPAD_COPILOT_SERVER_CLI_ENABLED` | optional | Defaults `0`; must be `1` before a production API host may execute `github-copilot-cli`. |
 | `RADIOPAD_CODEX_CLI_ENABLED` | optional | Defaults `0`; must be `1` before `codex-cli` executes. |
 | `RADIOPAD_OPENAI_COMPATIBLE_ALLOW_PHI` | optional | Defaults `0`; set only after reviewed approval for a remote OpenAI-compatible PHI endpoint. |
-| `RADIOPAD_GITHUB_COPILOT_SDK_ENABLED` | optional | Defaults `false`. The SDK provider remains fail-closed until a reviewed official backend-safe transport is installed. |
 | `RADIOPAD_UBAG_BASE_URL` | optional | Defaults to production UBAG `https://ubag.polytronx.com`. RadioPad backend only; never expose this as a frontend public env var. |
 | `RADIOPAD_UBAG_API_VERSION` | optional | Defaults `2026-05-22`; sent in UBAG job/workflow envelopes. |
 | `RADIOPAD_UBAG_TIMEOUT_MS` | optional | Defaults `120000`; HTTP timeout and adapter polling budget. |

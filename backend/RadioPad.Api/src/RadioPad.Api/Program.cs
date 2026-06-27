@@ -98,7 +98,6 @@ builder.Services.AddSingleton<IAiProviderAdapter, RadioPad.Infrastructure.Provid
 builder.Services.AddSingleton<IAiProviderAdapter, RadioPad.Infrastructure.Providers.GoogleVertexAiProvider>();
 builder.Services.AddSingleton<IAiProviderAdapter, RadioPad.Infrastructure.Providers.OpenAiDirectProvider>();
 builder.Services.AddSingleton<IAiProviderAdapter, RadioPad.Infrastructure.Providers.OpenAiCompatibleProvider>();
-builder.Services.AddSingleton<IAiProviderAdapter, RadioPad.Infrastructure.Providers.GitHubCopilotSdkProvider>();
 // Iter-32 AI-011 — local-only adapters. Default to 127.0.0.1; remote URLs
 // require explicit operator configuration. Compliance class defaults to
 // LocalOnly so PHI may be routed when the operator opts in.
@@ -110,7 +109,6 @@ builder.Services.AddSingleton<IAiProviderAdapter, RadioPad.Infrastructure.Provid
 // per-process launcher is a singleton so test code can substitute it.
 builder.Services.AddSingleton<RadioPad.Infrastructure.Providers.Cli.IProcessLauncher,
     RadioPad.Infrastructure.Providers.Cli.DefaultProcessLauncher>();
-builder.Services.AddSingleton<IAiProviderAdapter, RadioPad.Infrastructure.Providers.Cli.GitHubCopilotCliProvider>();
 builder.Services.AddSingleton<IAiProviderAdapter, RadioPad.Infrastructure.Providers.Cli.GeminiCliProvider>();
 builder.Services.AddSingleton<IAiProviderAdapter, RadioPad.Infrastructure.Providers.Cli.CodexCliProvider>();
 builder.Services.AddSingleton<IUbagClient, RadioPad.Infrastructure.Providers.Ubag.UbagClient>();
@@ -140,9 +138,6 @@ builder.Services.AddSingleton<ReportValidator>();
 builder.Services.AddScoped<ReportingService>();
 // Iter-35 — versioned clinical validation packs.
 builder.Services.AddScoped<RadioPad.Api.Services.ValidationPackService>();
-// Enterprise Copilot broker foundation. Defaults fail closed; no SDK/CLI
-// runtime is invoked until an official backend-safe transport is enabled.
-builder.Services.AddScoped<RadioPad.Api.Services.CopilotService>();
 // PRD §18 — advanced analytics dashboard service.
 builder.Services.AddScoped<RadioPad.Application.Services.AnalyticsService>();
 builder.Services.AddSingleton<RadioPad.Application.Services.HallucinationDetector>();

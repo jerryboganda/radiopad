@@ -1,6 +1,6 @@
 # 05 — Page-by-Page Audit
 
-**Scope:** All 37 `page.tsx` files under `frontend/app/`. Each row is
+**Scope:** All 35 `page.tsx` files under `frontend/app/`. Each row is
 evaluated against the locked Open Design system (`docs/02-design/design.md`,
 `frontend/app/globals.css`, `frontend/app/shell.css`).
 
@@ -40,49 +40,47 @@ in the page file (excluding imported client components). **Dialog** =
 | 1 | `/` | ✅ | ✅ | 4 | — | ✅ | Medium | Inline styles in cards (`UIUX-PAGE-HOME-001`); no `<PageHeader>` on `/reports` so `/` is the only chrome reference. |
 | 2 | `/login` | ❌ | N/A | 1 | — | ❌ | High | Hand-rolled centered layout; wordy token explanation; no PageHeader. |
 | 3 | `/offline` | ❌ | partial | 6 | — | ✅ | High | Heavy inline styles; no ErrorState fallback. |
-| 4 | `/copilot` | ❌ | ❌ | 0 | — | ❌ | High | No chrome, no IA entry, no data-state components. |
-| 5 | `/pair` | ❌ | ❌ | 0 | — | ❌ | High | Pairing flow shown bare without PageHeader; OAuth-like state changes silent. |
-| 6 | `/marketplace` | ❌ | partial | 1 | — | ✅ | High | List page, no Skeleton, no EmptyState. |
-| 7 | `/governance` | ❌ | ❌ | 6 | — | ❌ | High | Multiple inline-style violations; route name collision with `/admin/governance` causes IA confusion. |
-| 8 | `/prompts` | ❌ | partial | 0 | ✅ `prompt()` | ✅ | Critical | Uses `window.prompt()` for create flow. Tab-style pattern duplicates `/terminology`. |
-| 9 | `/providers` | ✅ | partial | 12 | — | ✅ | High | Container/PageHeader present but 12 inline styles inside list. |
-| 10 | `/terminology` | ❌ | partial | 0 | — | ✅ | Medium | Tab pattern inconsistent with `/prompts`; no canonical `<Tabs>` primitive. |
-| 11 | `/templates` | ✅ | partial | 20 | — | ✅ | High | Heaviest inline-style offender (`UIUX-PAGE-TEMPLATES-001..020`). |
-| 12 | `/validation` | ✅ | ✅ | 8 | — | ✅ | High | Chrome OK; inline styles in finding rows. |
-| 13 | `/reports` | ❌ | partial | 0 | — | indirect | Medium | Duplicates `/` semantically; uses `<div>Loading…</div>` instead of `<Skeleton/>`. |
-| 14 | `/reports/view` | ❌ | partial | 9 | ✅ `confirm()` | ❌ | Critical | `ReportClient.tsx` uses `confirm()` for sign action; deep view with no PageHeader. |
-| 15 | `/rulebooks` | ✅ | partial | 10 | — | ✅ | High | Chrome OK; 10 inline styles in list. |
-| 16 | `/rulebooks/view` | ❌ | partial | 15 | — | ❌ | High | `RulebookDetailClient.tsx` 15 inline styles. |
-| 17 | `/rulebooks/editor` | ❌ | partial | 5 (+34 across panels) | — | ❌ | High | Editor split panels (`MetadataPanel`, `RulesPanel`, etc.) all use inline styles. |
-| 18 | `/audit` | ❌ | partial | 4 | — | ✅ | High | Table without `<caption>` / `<th scope>`; no Skeleton. |
-| 19 | `/audit/verify` | ❌ | ❌ | 3 | — | ❌ | High | Verifier page with no chrome, no IA entry, no Skeleton. |
-| 20 | `/analytics` | ❌ | partial | 8 | — | ✅ | High | Charts use inline width/height styles; no `<Skeleton/>`. |
-| 21 | `/analytics/quality` | ❌ | partial | 22 | — | ❌ | High | Heaviest analytics page (`UIUX-PAGE-QUALITY-001..022`); IA gap. |
-| 22 | `/mobile/dictate` | ❌ | ❌ | 0 | — | ❌ | High | No mobile-tailored chrome; DictateButton hard-coded `lang='en-US'`. |
-| 23 | `/mobile/reports/edit` | ❌ | partial | 0 | — | ❌ | High | No PageHeader; mobile breakpoint chrome unverified. |
-| 24 | `/mobile/reports/sign` | ❌ | partial | 0 | — | ❌ | Critical | Signing is irreversible — no `<ConfirmDialog>`; no audit trail surfaced. |
-| 25 | `/admin/billing` | ❌ | partial | 0 | — | ✅ | High | BillingStatusBanner inconsistency (status vs alert); long table without scope. |
-| 26 | `/admin/copilot` | ❌ | partial | 0 | — | ❌ | High | Admin page hidden from IA. |
-| 27 | `/admin/feature-flags` | ❌ | partial | 0 | — | ✅ | Medium | Toggles without optimistic UI; success silent. |
-| 28 | `/admin/fhir-import` | ❌ | partial | 0 | — | ✅ | High | File upload without progress affordance; error states ad-hoc. |
-| 29 | `/admin/governance` | ❌ | partial | 0 | — | ✅ | High | Confusion with `/governance` route. |
-| 30 | `/admin/mcp` | ❌ | partial | 7 | ✅ `confirm()`+`prompt()` | ❌ | Critical | Browser dialogs for connector add/remove; 7 inline styles. |
-| 31 | `/admin/model-eval` | ❌ | partial | 0 | — | ✅ | High | Long-running job UX uses polling-on-mount with no Skeleton. |
-| 32 | `/admin/pacs` | ❌ | partial | 0 | — | ✅ | High | Connectivity test result rendered inline without role="status". |
-| 33 | `/admin/providers/oauth` | ❌ | partial | 0 | — | ❌ | System | OAuth callback target — minimal chrome acceptable, but currently no success/error surface beyond raw banner. |
-| 34 | `/admin/security` | ❌ | partial | 4 | — | ✅ | High | Token rotation surfaces backend enum names (`rotationPolicy`, `before_expiry`). |
-| 35 | `/admin/settings` | ❌ | partial | 5 | — | ✅ | High | Tenant settings form lacks explicit labels on several inputs. |
-| 36 | `/admin/sso` | ❌ | partial | 0 | — | ❌ | Critical | Security-critical page invisible from IA (`UIUX-NAV-001`). |
-| 37 | `/admin/usage` | ❌ | partial | 0 | — | ✅ | High | Usage table without horizontal scroll wrapper for narrow viewports. |
+| 4 | `/pair` | ❌ | ❌ | 0 | — | ❌ | High | Pairing flow shown bare without PageHeader; OAuth-like state changes silent. |
+| 5 | `/marketplace` | ❌ | partial | 1 | — | ✅ | High | List page, no Skeleton, no EmptyState. |
+| 6 | `/governance` | ❌ | ❌ | 6 | — | ❌ | High | Multiple inline-style violations; route name collision with `/admin/governance` causes IA confusion. |
+| 7 | `/prompts` | ❌ | partial | 0 | ✅ `prompt()` | ✅ | Critical | Uses `window.prompt()` for create flow. Tab-style pattern duplicates `/terminology`. |
+| 8 | `/providers` | ✅ | partial | 12 | — | ✅ | High | Container/PageHeader present but 12 inline styles inside list. |
+| 9 | `/terminology` | ❌ | partial | 0 | — | ✅ | Medium | Tab pattern inconsistent with `/prompts`; no canonical `<Tabs>` primitive. |
+| 10 | `/templates` | ✅ | partial | 20 | — | ✅ | High | Heaviest inline-style offender (`UIUX-PAGE-TEMPLATES-001..020`). |
+| 11 | `/validation` | ✅ | ✅ | 8 | — | ✅ | High | Chrome OK; inline styles in finding rows. |
+| 12 | `/reports` | ❌ | partial | 0 | — | indirect | Medium | Duplicates `/` semantically; uses `<div>Loading…</div>` instead of `<Skeleton/>`. |
+| 13 | `/reports/view` | ❌ | partial | 9 | ✅ `confirm()` | ❌ | Critical | `ReportClient.tsx` uses `confirm()` for sign action; deep view with no PageHeader. |
+| 14 | `/rulebooks` | ✅ | partial | 10 | — | ✅ | High | Chrome OK; 10 inline styles in list. |
+| 15 | `/rulebooks/view` | ❌ | partial | 15 | — | ❌ | High | `RulebookDetailClient.tsx` 15 inline styles. |
+| 16 | `/rulebooks/editor` | ❌ | partial | 5 (+34 across panels) | — | ❌ | High | Editor split panels (`MetadataPanel`, `RulesPanel`, etc.) all use inline styles. |
+| 17 | `/audit` | ❌ | partial | 4 | — | ✅ | High | Table without `<caption>` / `<th scope>`; no Skeleton. |
+| 18 | `/audit/verify` | ❌ | ❌ | 3 | — | ❌ | High | Verifier page with no chrome, no IA entry, no Skeleton. |
+| 19 | `/analytics` | ❌ | partial | 8 | — | ✅ | High | Charts use inline width/height styles; no `<Skeleton/>`. |
+| 20 | `/analytics/quality` | ❌ | partial | 22 | — | ❌ | High | Heaviest analytics page (`UIUX-PAGE-QUALITY-001..022`); IA gap. |
+| 21 | `/mobile/dictate` | ❌ | ❌ | 0 | — | ❌ | High | No mobile-tailored chrome; DictateButton hard-coded `lang='en-US'`. |
+| 22 | `/mobile/reports/edit` | ❌ | partial | 0 | — | ❌ | High | No PageHeader; mobile breakpoint chrome unverified. |
+| 23 | `/mobile/reports/sign` | ❌ | partial | 0 | — | ❌ | Critical | Signing is irreversible — no `<ConfirmDialog>`; no audit trail surfaced. |
+| 24 | `/admin/billing` | ❌ | partial | 0 | — | ✅ | High | BillingStatusBanner inconsistency (status vs alert); long table without scope. |
+| 25 | `/admin/feature-flags` | ❌ | partial | 0 | — | ✅ | Medium | Toggles without optimistic UI; success silent. |
+| 26 | `/admin/fhir-import` | ❌ | partial | 0 | — | ✅ | High | File upload without progress affordance; error states ad-hoc. |
+| 27 | `/admin/governance` | ❌ | partial | 0 | — | ✅ | High | Confusion with `/governance` route. |
+| 28 | `/admin/mcp` | ❌ | partial | 7 | ✅ `confirm()`+`prompt()` | ❌ | Critical | Browser dialogs for connector add/remove; 7 inline styles. |
+| 29 | `/admin/model-eval` | ❌ | partial | 0 | — | ✅ | High | Long-running job UX uses polling-on-mount with no Skeleton. |
+| 30 | `/admin/pacs` | ❌ | partial | 0 | — | ✅ | High | Connectivity test result rendered inline without role="status". |
+| 31 | `/admin/providers/oauth` | ❌ | partial | 0 | — | ❌ | System | OAuth callback target — minimal chrome acceptable, but currently no success/error surface beyond raw banner. |
+| 32 | `/admin/security` | ❌ | partial | 4 | — | ✅ | High | Token rotation surfaces backend enum names (`rotationPolicy`, `before_expiry`). |
+| 33 | `/admin/settings` | ❌ | partial | 5 | — | ✅ | High | Tenant settings form lacks explicit labels on several inputs. |
+| 34 | `/admin/sso` | ❌ | partial | 0 | — | ❌ | Critical | Security-critical page invisible from IA (`UIUX-NAV-001`). |
+| 35 | `/admin/usage` | ❌ | partial | 0 | — | ✅ | High | Usage table without horizontal scroll wrapper for narrow viewports. |
 
 Totals:
 
-- Chrome (Container+PageHeader): **5 / 37** (page 1, 9, 11, 12, 15)
-- Browser dialogs: **5 routes** (#8, #14, #30 — and the in-page client
-  components for `ProviderOAuthAdminClient` reached via #33, plus
-  `ReportClient` used by #14)
+- Chrome (Container+PageHeader): **5 / 35** (page 1, 8, 10, 11, 14)
+- Browser dialogs: **5 routes** (#7, #13, #28 — and the in-page client
+  components for `ProviderOAuthAdminClient` reached via #31, plus
+  `ReportClient` used by #13)
 - Inline-style violations: **31 page files** totaling ~187 occurrences
-- Sidebar-linked: **20 / 37** (54%)
+- Sidebar-linked: **20 / 35** (57%)
 
 ## Per-page records
 
@@ -187,10 +185,6 @@ Totals:
 - Plan/invoice table has no `<caption>` or `<th scope>`.
 - **Severity**: High.
 
-#### `/admin/copilot`
-- Admin page not linked from the sidebar despite being a core admin surface.
-- **Severity**: High.
-
 #### `/admin/feature-flags`
 - Toggles fire and forget; no optimistic UI; success state is silent.
 - **Severity**: Medium.
@@ -241,8 +235,8 @@ Totals:
 
 ### (a) Missing chrome wrappers
 
-Only **5 of 37 pages** (14%) use both `<Container>` and `<PageHeader>`.
-The other 32 hand-roll wrappers — sometimes a bare `<div>`, sometimes
+Only **5 of 35 pages** (14%) use both `<Container>` and `<PageHeader>`.
+The other 30 hand-roll wrappers — sometimes a bare `<div>`, sometimes
 `<main className="rp-container">` inlined, sometimes nothing at all.
 This is the single largest design-lock violation in the app and the
 root cause of most spacing, alignment, and breakpoint inconsistencies

@@ -24,18 +24,6 @@
     "doc": "05-page-by-page-audit.md"
   },
   {
-    "id": "UIUX-CHROME-003",
-    "title": "/copilot lacks chrome wrappers",
-    "severity": "high",
-    "category": "design-lock",
-    "page": "frontend/app/copilot/page.tsx",
-    "location": "frontend/app/copilot/page.tsx",
-    "evidence": "No Container or PageHeader.",
-    "recommendation": "Wrap in canonical chrome.",
-    "wcag": null,
-    "doc": "05-page-by-page-audit.md"
-  },
-  {
     "id": "UIUX-CHROME-004",
     "title": "/pair lacks chrome wrappers",
     "severity": "high",
@@ -240,18 +228,6 @@
     "doc": "05-page-by-page-audit.md"
   },
   {
-    "id": "UIUX-CHROME-021",
-    "title": "/admin/copilot lacks chrome and not in sidebar",
-    "severity": "high",
-    "category": "design-lock",
-    "page": "frontend/app/admin/copilot/page.tsx",
-    "location": "frontend/app/admin/copilot/page.tsx",
-    "evidence": "No PageHeader; hidden from IA.",
-    "recommendation": "Add chrome and sidebar entry under Admin.",
-    "wcag": null,
-    "doc": "05-page-by-page-audit.md"
-  },
-  {
     "id": "UIUX-CHROME-022",
     "title": "/admin/feature-flags lacks chrome",
     "severity": "medium",
@@ -385,13 +361,13 @@
   },
   {
     "id": "UIUX-NAV-001",
-    "title": "18 routes missing from sidebar IA",
+    "title": "16 routes missing from sidebar IA",
     "severity": "critical",
     "category": "ia",
     "page": null,
     "location": "frontend/components/shell/nav.config.tsx",
-    "evidence": "Only 20 of 37 routes appear in the sidebar. Hidden: copilot, pair, governance, audit/verify, analytics/quality, mobile/*, admin/copilot, admin/mcp, admin/sso, plus detail views.",
-    "recommendation": "Audit IA; promote admin/sso, audit/verify, admin/copilot, admin/mcp to sidebar; document intentional exclusions.",
+    "evidence": "Only 20 of 35 routes appear in the sidebar. Hidden: pair, governance, audit/verify, analytics/quality, mobile/*, admin/mcp, admin/sso, plus detail views.",
+    "recommendation": "Audit IA; promote admin/sso, audit/verify, admin/mcp to sidebar; document intentional exclusions.",
     "wcag": null,
     "doc": "08-interaction-flow-audit.md"
   },

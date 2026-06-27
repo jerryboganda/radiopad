@@ -367,10 +367,8 @@ components:
         37=TemplateSubmittedForReview, 38=StudyReceived, 39=RateLimited, 40=SystemAlert,
         41=OAuthRefreshRotated, 42=ValidationPackApproved, 43=ValidationPackDeprecated,
         44=ValidationPackRun, 45=MarketplaceSubmission, 46=MarketplaceApproved,
-        47=MarketplaceRejected, 48=MarketplaceInstalled, 49=CopilotAdminSettingsChanged,
-        50=CopilotAccountChanged, 51=CopilotPolicyBlocked, 52=CopilotDiagnosticsRun,
-        53=CopilotRequestLifecycle
-      enum: [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24, 25, 26, 27, 28, 29, 30, 31, 32, 33, 34, 35, 36, 37, 38, 39, 40, 41, 42, 43, 44, 45, 46, 47, 48, 49, 50, 51, 52, 53]
+        47=MarketplaceRejected, 48=MarketplaceInstalled
+      enum: [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24, 25, 26, 27, 28, 29, 30, 31, 32, 33, 34, 35, 36, 37, 38, 39, 40, 41, 42, 43, 44, 45, 46, 47, 48]
 
     BillingStatus:
       type: object
@@ -557,7 +555,7 @@ components:
       properties:
         id: { type: string, format: uuid }
         name: { type: string }
-        adapter: { type: string, enum: [mock, anthropic, openai, openai-compatible, azure-openai, aws-bedrock, google-vertex, ollama, ollama-chat, vllm, llama-cpp, github-copilot-sdk, github-copilot-cli, gemini-cli, codex-cli, ubag] }
+        adapter: { type: string, enum: [mock, anthropic, openai, openai-compatible, azure-openai, aws-bedrock, google-vertex, ollama, ollama-chat, vllm, llama-cpp, gemini-cli, codex-cli, ubag] }
         model: { type: string }
         endpointUrl: { type: string }
         compliance: { $ref: "#/components/schemas/ProviderComplianceClass" }
@@ -589,7 +587,7 @@ components:
       properties:
         id: { type: string, format: uuid, nullable: true }
         name: { type: string }
-        adapter: { type: string, enum: [mock, anthropic, openai, openai-compatible, azure-openai, aws-bedrock, google-vertex, ollama, ollama-chat, vllm, llama-cpp, github-copilot-sdk, github-copilot-cli, gemini-cli, codex-cli, ubag] }
+        adapter: { type: string, enum: [mock, anthropic, openai, openai-compatible, azure-openai, aws-bedrock, google-vertex, ollama, ollama-chat, vllm, llama-cpp, gemini-cli, codex-cli, ubag] }
         model: { type: string }
         endpointUrl: { type: string }
         apiKeySecretRef:
@@ -1002,7 +1000,7 @@ paths:
 
   /api/providers/{id}/health:
     post:
-      summary: Adapter-specific health probe. Local providers probe their metadata endpoints; OpenAI-compatible probes `/v1/models`; CLI providers verify the configured binary without sending a prompt; GitHub Copilot SDK fails closed until a reviewed backend SDK transport is enabled.
+      summary: Adapter-specific health probe. Local providers probe their metadata endpoints; OpenAI-compatible probes `/v1/models`; CLI providers verify the configured binary without sending a prompt.
       parameters: [{ in: path, name: id, required: true, schema: { type: string, format: uuid } }]
       responses:
         "200":
@@ -1010,179 +1008,6 @@ paths:
           content:
             application/json:
               schema: { $ref: "#/components/schemas/ProviderHealthResult" }
-
-  /api/copilot/status:
-    get:
-      summary: Current user's Copilot runtime status.
-      responses:
-        "200":
-          description: Copilot status.
-          content:
-            application/json:
-              schema: { type: object }
-  /api/copilot/account:
-    get:
-      summary: Current user's Copilot account link state.
-      responses:
-        "200":
-          description: Copilot account.
-          content:
-            application/json:
-              schema: { type: object }
-    delete:
-      summary: Revoke the current user's Copilot account link.
-      responses:
-        "204": { description: Account link revoked. }
-  /api/copilot/entitlement:
-    get:
-      summary: Current user's Copilot entitlement decision.
-      responses:
-        "200":
-          description: Entitlement state.
-          content:
-            application/json:
-              schema: { type: object }
-  /api/copilot/account/auth/start:
-    post:
-      summary: Begin Copilot account authorization.
-      requestBody:
-        required: true
-        content:
-          application/json:
-            schema: { type: object }
-      responses:
-        "200":
-          description: Authorization start response.
-          content:
-            application/json:
-              schema: { type: object }
-  /api/copilot/account/local-cli:
-    post:
-      summary: Link a local GitHub Copilot CLI runtime for the current user.
-      requestBody:
-        required: true
-        content:
-          application/json:
-            schema: { type: object }
-      responses:
-        "200":
-          description: Account linked.
-          content:
-            application/json:
-              schema: { type: object }
-        "409": { description: Blocked by tenant policy. }
-  /api/copilot/context/preview:
-    post:
-      summary: Preview Copilot prompt context after PHI/secret redaction.
-      requestBody:
-        required: true
-        content:
-          application/json:
-            schema: { type: object }
-      responses:
-        "200":
-          description: Redacted context preview.
-          content:
-            application/json:
-              schema: { type: object }
-  /api/copilot/sessions:
-    post:
-      summary: Start a Copilot session through the AI gateway.
-      requestBody:
-        required: true
-        content:
-          application/json:
-            schema: { type: object }
-      responses:
-        "200":
-          description: Session completed.
-          content:
-            application/json:
-              schema: { type: object }
-        "409": { description: Copilot policy or runtime blocked the request. }
-  /api/copilot/sessions/{sessionId}/cancel:
-    post:
-      summary: Cancel a Copilot session.
-      parameters: [{ in: path, name: sessionId, required: true, schema: { type: string, format: uuid } }]
-      responses:
-        "200":
-          description: Session cancelled.
-          content:
-            application/json:
-              schema: { type: object }
-        "404": { description: Session not found. }
-  /api/copilot/chat:
-    post:
-      summary: Compatibility endpoint that starts a one-shot Copilot chat session through the AI gateway.
-      requestBody:
-        required: true
-        content:
-          application/json:
-            schema: { type: object }
-      responses:
-        "200":
-          description: Chat completed.
-          content:
-            application/json:
-              schema: { type: object }
-        "409": { description: Copilot policy or runtime blocked the request. }
-
-  /api/copilot/admin/settings:
-    get:
-      summary: Read tenant Copilot settings.
-      responses:
-        "200": { description: Settings object. }
-    post:
-      summary: Save tenant Copilot settings.
-      requestBody:
-        required: true
-        content:
-          application/json:
-            schema: { type: object }
-      responses:
-        "200": { description: Saved settings. }
-  /api/copilot/admin/status:
-    get:
-      summary: Admin Copilot runtime status.
-      responses:
-        "200": { description: Status object. }
-  /api/copilot/admin/diagnostics:
-    post:
-      summary: Run Copilot diagnostics without sending clinical content.
-      responses:
-        "200": { description: Diagnostic run. }
-  /api/copilot/admin/features/{featureKey}:
-    post:
-      summary: Toggle a Copilot feature flag.
-      parameters: [{ in: path, name: featureKey, required: true, schema: { type: string } }]
-      requestBody:
-        required: true
-        content:
-          application/json:
-            schema: { type: object }
-      responses:
-        "200": { description: Feature state. }
-  /api/copilot/admin/quotas:
-    get:
-      summary: List Copilot quota policies.
-      responses:
-        "200": { description: Quota policy array. }
-    post:
-      summary: Save Copilot quota policies.
-      requestBody:
-        required: true
-        content:
-          application/json:
-            schema:
-              type: array
-              items: { type: object }
-      responses:
-        "200": { description: Saved quota policies. }
-  /api/copilot/admin/usage:
-    get:
-      summary: Copilot usage summary.
-      responses:
-        "200": { description: Usage summary. }
 
   /api/providers/{id}/oauth/refresh-token:
     post:

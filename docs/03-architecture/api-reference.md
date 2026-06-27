@@ -162,7 +162,7 @@ The canonical `kind` enum surfaces in `openapi/openapi.yaml#/components/schemas/
 | --- | --- | --- |
 | GET    | `/api/providers`              | Returns providers without secrets (only `apiKeyConfigured: bool`, plus `quality` 0–1, the operator-supplied compliance class, and the iter-34 PROV-009 `retentionLabel` free-text label). |
 | POST   | `/api/providers`              | Save (create when `id` missing). `apiKeySecretRef` accepts `env:NAME` only; empty keeps an existing secret ref or configures a no-key provider. OpenAI-compatible endpoints are validated for scheme/private-network safety before save. Provider config saves are audited. |
-| POST   | `/api/providers/{id}/health`  | Adapter-specific health probe. Returns `{ ok, error?, note?, status?, runtime?, probedAt }` and writes an audit row. For `ollama-chat` calls `GET {base}/api/tags`; for `vllm` calls `GET {base}/v1/models`; for `llama-cpp` calls `GET {base}/health`; for `openai-compatible` calls `GET {base}/v1/models` without sending bearer auth and blocks unsafe endpoint targets; for CLI adapters validates the configured binary without sending a prompt; for `github-copilot-sdk` returns unavailable until a reviewed backend SDK transport is enabled. ItAdmin / ReportingAdmin / MedicalDirector only. |
+| POST   | `/api/providers/{id}/health`  | Adapter-specific health probe. Returns `{ ok, error?, note?, status?, runtime?, probedAt }` and writes an audit row. For `ollama-chat` calls `GET {base}/api/tags`; for `vllm` calls `GET {base}/v1/models`; for `llama-cpp` calls `GET {base}/health`; for `openai-compatible` calls `GET {base}/v1/models` without sending bearer auth and blocks unsafe endpoint targets; for CLI adapters validates the configured binary without sending a prompt. ItAdmin / ReportingAdmin / MedicalDirector only. |
 | POST   | `/api/providers/{id}/oauth/refresh-token`        | **Iter-35 PROV-007.** Save (or replace) the per-provider OAuth refresh token in the encrypted vault. Body `{ refreshToken: string, expiresAt?: string \| null, rotationPolicy?: "never"\|"before_expiry"\|"every_24h" }`. Token is encrypted with AES-256-GCM under a per-token DEK wrapped by the tenant KMS KEK. Returns `204 No Content`. **ItAdmin / BillingAdmin only.** Audited as `OAuthRefreshRotated` with `kind:"saved"`; never logs the token bytes. Returns `503 kind:"kms_unavailable"` when no tenant KEK is configured. |
 | DELETE | `/api/providers/{id}/oauth/refresh-token`        | **Iter-35 PROV-007.** Delete the stored refresh token (clears all four ciphertext columns + timestamps; rotation policy is preserved). `204 No Content`. ItAdmin / BillingAdmin only. Audited as `OAuthRefreshRotated` with `kind:"deleted"`. |
 | GET    | `/api/providers/{id}/oauth/refresh-token/status` | **Iter-35 PROV-007.** Returns `{ hasToken: bool, updatedAt: string\|null, expiresAt: string\|null, rotationPolicy: string }`. **Never** returns the ciphertext, IV, tag, or wrapped DEK. ItAdmin / BillingAdmin only. |
@@ -176,8 +176,6 @@ The provider rows reference an `adapter` id from this fixed catalog. Compliance 
 | `mock` / `anthropic` / `azure-openai` / `aws-bedrock` / `google-vertex` / `openai` | HTTP | `Sandbox` unless the tenant has a documented `PhiApproved` posture | Cloud-vendor adapters. |
 | `openai-compatible` | HTTP | `Sandbox` (or `LocalOnly` for `127.0.0.1` / `localhost` / `*.local` hosts) | Generic OpenAI-API-compatible endpoint. **Iter-36:** when `apiKeySecretRef` is set but resolves empty, the adapter throws `ProviderPolicyException("api_key_missing")` instead of letting upstream return 401. Private-network endpoints require `LocalOnly`; PHI requires `LocalOnly` or the explicit `RADIOPAD_OPENAI_COMPATIBLE_ALLOW_PHI=1` review flag. |
 | `ollama-chat` / `vllm` / `llama-cpp` | HTTP | `LocalOnly` | In-tenant local servers (iter-32 AI-011). |
-| `github-copilot-sdk` | SDK transport, fail-closed | `Sandbox` | First-class provider id for GitHub Copilot SDK policy modeling. Runtime returns `runtime_not_configured` until an official backend-safe SDK transport is installed and reviewed. PHI routing is refused even if a row is misclassified. |
-| `github-copilot-cli` | CLI subprocess | `Sandbox` | **Iter-36 AI-012 / Iter-47 hardening.** Shells out to `copilot` using Copilot CLI's prompt option stream over stdin, keeping prompt text out of process arguments. Binary override env `RADIOPAD_COPILOT_BIN` (default `copilot`). Production server-side execution also requires `RADIOPAD_COPILOT_SERVER_CLI_ENABLED=1`. PHI and secret-like prompts are refused by the adapter even if a row is misclassified. |
 | `gemini-cli` | CLI subprocess | `Sandbox` | **Iter-36 AI-012.** Shells out to `gemini` headless mode with `--output-format json`. Binary override env `RADIOPAD_GEMINI_BIN` (default `gemini`). PHI and secret-like prompts are refused by the adapter even if a row is misclassified. |
 | `codex-cli` | CLI subprocess, fail-closed | `Sandbox` | **Iter-36 AI-012 / Iter-47 hardening.** Shells out to `codex exec --sandbox read-only -` only when `RADIOPAD_CODEX_CLI_ENABLED=1`. Binary override env `RADIOPAD_CODEX_BIN` (default `codex`). The adapter does not opt into `--full-auto`; PHI and secret-like prompts are refused. |
 | `ubag` | HTTPS automation gateway | `Sandbox` | **Iter-50.** Routes non-PHI, non-secret prompts to production UBAG through the RadioPad backend. `model` selects the UBAG target (`gemini_web`, `deepseek_web`, `chatgpt_web`, or `mock`); default UI preset uses `gemini_web`. The adapter refuses PHI even if a row is misclassified. Ordered ChatGPT -> Gemini -> DeepSeek runs use `/api/ubag/workflows/ordered-web-chain`, not report drafting. |
@@ -223,30 +221,6 @@ Configuration:
 | GET | `/api/ubag/jobs/{id}` | Poll a UBAG job. |
 | POST | `/api/ubag/workflows/ordered-web-chain` | Create and run the fixed `chatgpt_web -> gemini_web -> deepseek_web` workflow. Body `{ prompt, name? }`. |
 | GET | `/api/ubag/workflows/runs/{id}` | Poll a UBAG workflow run. |
-
-## Copilot
-
-Copilot endpoints are tenant-scoped and metadata-only in audit rows. Chat/session requests are routed through `IAiGateway` using an enabled tenant-owned `github-copilot-cli` provider; disabled providers are ignored. Secret-shaped prompts and clinical/PHI context are blocked before session rows are created.
-
-| Method | Path | Description |
-| --- | --- | --- |
-| GET | `/api/copilot/status` | Runtime status for the current user. |
-| GET | `/api/copilot/account` | Current user's Copilot account link state. |
-| GET | `/api/copilot/entitlement` | Current user's entitlement decision. |
-| POST | `/api/copilot/account/auth/start` | Begin OAuth/device authorization. |
-| POST | `/api/copilot/account/local-cli` | Link a local CLI-attested Copilot account. |
-| DELETE | `/api/copilot/account` | Revoke current user's Copilot account link. |
-| POST | `/api/copilot/context/preview` | Preview redacted context and policy removals. |
-| POST | `/api/copilot/sessions` | Start a gateway-routed session. Returns `409` with a policy error when blocked. |
-| POST | `/api/copilot/sessions/{sessionId}/cancel` | Cancel a session owned by the current user. |
-| POST | `/api/copilot/chat` | Compatibility one-shot chat endpoint backed by the same session path. |
-| GET/POST | `/api/copilot/admin/settings` | Read or save tenant settings (admin roles). |
-| GET | `/api/copilot/admin/status` | Admin status view. |
-| POST | `/api/copilot/admin/diagnostics` | Run prompt-free diagnostics. |
-| POST | `/api/copilot/admin/features/{featureKey}` | Toggle a tenant feature flag. |
-| GET/POST | `/api/copilot/admin/quotas` | Read or save tenant quota policies. |
-| GET | `/api/copilot/admin/usage` | Tenant Copilot usage summary. |
-
 
 ## AI routing preview
 

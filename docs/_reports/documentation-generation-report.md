@@ -51,7 +51,7 @@ user-guide, admin-guide, api-docs, sdk-guide, faq, troubleshooting, support-play
 
 ## What was preserved (not overwritten)
 
-- `README.md`, `AGENTS.md`, `CLAUDE.md`, `LICENSE`, `PRD.md`, `PROGRESS.md`, `.editorconfig`, `.github/copilot-instructions.md`.
+- `README.md`, `AGENTS.md`, `CLAUDE.md`, `LICENSE`, `PRD.md`, `PROGRESS.md`, `.editorconfig`.
 - `docs/00-product/{vision,personas,user-stories}.md`.
 - `docs/02-design/design.md`.
 - `docs/03-architecture/{architecture,api-reference,fhir-mapping,provider-catalog}.md` and ADRs `0001/0002/0003`.

@@ -34,7 +34,6 @@
 
 This document is the source of truth referenced by:
 - `AGENTS.md`
-- `.github/copilot-instructions.md`
 - `CLAUDE.md`
 - `/memories/repo/radiopad-design-lock.md`
 

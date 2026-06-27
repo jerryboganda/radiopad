@@ -6,7 +6,6 @@ const AGENT_LABELS: Record<string, string> = {
   'cursor-agent': 'Cursor',
   cursor: 'Cursor',
   qwen: 'Qwen',
-  copilot: 'Copilot',
 };
 
 const AGENT_ALIASES: Record<string, string> = {
@@ -15,7 +14,6 @@ const AGENT_ALIASES: Record<string, string> = {
   'gemini cli': 'gemini',
   'cursor agent': 'cursor-agent',
   'qwen code': 'qwen',
-  'github copilot cli': 'copilot',
 };
 
 export function agentDisplayName(
@@ -40,7 +38,6 @@ function knownAgentLabel(raw: string | null | undefined): string | null {
   const direct = AGENT_LABELS[alias];
   if (direct) return direct;
   if (key.includes('cursor-agent')) return 'Cursor';
-  if (key.includes('copilot')) return 'Copilot';
   for (const [agentId, label] of Object.entries(AGENT_LABELS)) {
     if (key.includes(agentId)) return label;
   }

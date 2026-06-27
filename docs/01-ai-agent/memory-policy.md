@@ -2,7 +2,7 @@
 
 **Status:** Current  ·  **Owner:** Engineering + Security  ·  **Last Updated:** 2026-05-04
 
-Applies to long-lived AI agent memories (Copilot persistent memory, Claude `CLAUDE.md`, Cursor rules, OmO `/memories/`, etc.).
+Applies to long-lived AI agent memories (Claude `CLAUDE.md`, Cursor rules, OmO `/memories/`, etc.).
 
 ## Agents may remember
 

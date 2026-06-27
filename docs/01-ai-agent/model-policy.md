@@ -14,8 +14,6 @@
 | **AWS Bedrock** | `aws-bedrock` | `PhiApproved` after AWS BAA and model-scope review | Tenant-approved Bedrock models. |
 | **Google Vertex AI** | `google-vertex` | `PhiApproved` after Google Cloud BAA and project/region review | Vertex publisher models. |
 | **Ollama / vLLM / llama.cpp (local)** | `ollama`, `ollama-chat`, `vllm`, `llama-cpp` | `LocalOnly` | On-prem models for PHI-bearing input. |
-| **GitHub Copilot SDK** | `github-copilot-sdk` | `Sandbox`, fail-closed | Policy-mode provider id only until an official backend-safe SDK transport is reviewed and enabled. PHI routing is refused. |
-| **GitHub Copilot CLI** | `github-copilot-cli` | `Sandbox` | Local CLI subprocess. PHI and secret-like prompts are refused before launch. |
 | **Gemini CLI** | `gemini-cli` | `Sandbox` | Local CLI subprocess for non-PHI/de-identified workflows. PHI and secret-like prompts are refused before launch. |
 | **Codex CLI** | `codex-cli` | `Sandbox`, fail-closed | Local CLI subprocess for non-PHI/de-identified workflows. Requires explicit runtime opt-in; PHI and secret-like prompts are refused before launch. |
 
@@ -42,7 +40,6 @@ New providers must:
 ## Privacy constraints
 
 - PHI requests must use `PhiApproved` or `LocalOnly` providers.
-- GitHub Copilot SDK refuses PHI even if a provider row is accidentally marked `PhiApproved`.
 - CLI providers default to `Sandbox` because a local binary may call a vendor cloud; the current adapters also refuse PHI and secret-shaped prompts at adapter level.
 - Provider responses never persist outside the tenant boundary.
 - API keys live in env vars referenced by `ApiKeySecretRef = "env:<NAME>"`.

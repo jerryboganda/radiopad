@@ -1,7 +1,7 @@
 # RadioPad Frontend UI/UX Audit — Gap Report
 
 **Audit Period:** 2025-01-24  
-**Auditor:** GitHub Copilot  
+**Auditor:** Automated UI/UX audit  
 **Project:** RadioPad (v0.1)  
 **Scope:** `frontend/` directory (Next.js 16 App Router)  
 **Method:** Static analysis + repository convention review (no live screenshots)  

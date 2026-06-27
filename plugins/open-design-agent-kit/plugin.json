@@ -8,7 +8,6 @@
     "memory": {
       "description": "Always-loaded project constitution and repo memory.",
       "files": [
-        ".github/copilot-instructions.md",
         "CLAUDE.md"
       ]
     },
@@ -48,11 +47,7 @@
         "subagents/explorer.md",
         "subagents/code-reviewer.md",
         "subagents/test-runner.md",
-        "subagents/feature-dev.md",
-        ".github/agents/open-design-explorer.agent.md",
-        ".github/agents/open-design-code-reviewer.agent.md",
-        ".github/agents/open-design-test-runner.agent.md",
-        ".github/agents/open-design-feature-dev.agent.md"
+        "subagents/feature-dev.md"
       ]
     },
     "plugins": {

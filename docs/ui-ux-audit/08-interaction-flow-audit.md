@@ -224,19 +224,18 @@ RadioPad has **9 critical user journeys** spanning auth, reporting, AI collabora
 
 ### Sidebar Coverage Gap
 
-**Finding:** Only **20 of 37 routes** are linked from the sidebar (`frontend/components/shell/nav.config.tsx` lines 71–112).
+**Finding:** Only **20 of 35 routes** are linked from the sidebar (`frontend/components/shell/nav.config.tsx` lines 71–112).
 
-**Hidden routes (18 total):**
+**Hidden routes (16 total):**
 - **Workspace:** `/reports` (duplicate of `/`), `/reports/view`, `/audit/verify`
 - **Library:** `/rulebooks/view`, `/rulebooks/editor`
-- **Intended but not discoverable:** `/copilot`, `/pair`, `/governance`, `/analytics/quality`, `/mobile/dictate`, `/mobile/reports/edit`, `/mobile/reports/sign`
-- **Admin:** `/admin/copilot`, `/admin/mcp`, `/admin/sso`, `/admin/providers/oauth`
+- **Intended but not discoverable:** `/pair`, `/governance`, `/analytics/quality`, `/mobile/dictate`, `/mobile/reports/edit`, `/mobile/reports/sign`
+- **Admin:** `/admin/mcp`, `/admin/sso`, `/admin/providers/oauth`
 - **System:** `/admin/providers/oauth` (OAuth callback)
 
-**Severity:** `UIUX-NAV-001` **Low-discoverability route inventory.** Routes like `/copilot` (AI workspace), `/governance` (public transparency), `/admin/sso` (critical security config), and `/audit/verify` (integrity auditing) are part of the product but invisible to new users. Recommend:
+**Severity:** `UIUX-NAV-001` **Low-discoverability route inventory.** Routes like `/governance` (public transparency), `/admin/sso` (critical security config), and `/audit/verify` (integrity auditing) are part of the product but invisible to new users. Recommend:
 1. Add an "Advanced" sidebar section or collapsible group for low-frequency admin routes.
-2. Surface `/copilot` under "Workspace" if it's part of the core UX.
-3. Clearly document which routes are intentional (e.g., OAuth callback) vs. usability gaps.
+2. Clearly document which routes are intentional (e.g., OAuth callback) vs. usability gaps.
 
 ### Query-String vs. Dynamic-Route Inconsistency
 

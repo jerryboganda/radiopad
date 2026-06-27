@@ -64,8 +64,6 @@ public class ProviderRegisterTests
     [InlineData("gcp-vertex", "google-vertex")]
     [InlineData("google-vertex-ai", "google-vertex")]
     [InlineData("openai-direct", "openai")]
-    [InlineData("github-copilot-sdk", "github-copilot-sdk")]
-    [InlineData("github-copilot-cli", "github-copilot-cli")]
     [InlineData("gemini-cli", "gemini-cli")]
     [InlineData("codex-cli", "codex-cli")]
     [InlineData("openai-compatible", "openai-compatible")]

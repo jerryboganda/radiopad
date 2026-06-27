@@ -2,7 +2,7 @@
 
 Subagents are focused helper roles with their own context window. Use them to keep research, review, test execution, and implementation work scoped instead of filling the main session with every intermediate detail.
 
-This folder contains portable role definitions. GitHub Copilot-native versions live in `.github/agents/*.agent.md` and should stay aligned with these files.
+This folder contains portable role definitions.
 
 ## Available Subagents
 

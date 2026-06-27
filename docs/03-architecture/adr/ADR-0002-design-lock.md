@@ -27,4 +27,4 @@ If a new requirement cannot be satisfied with the existing tokens/components, th
 - Designers and engineers ship faster because every page looks immediately consistent.
 - AI safety is partially enforced visually: a missing `.ai-mark` is a code-review blocker, not a stylistic preference.
 - Adopting popular component kits is gated behind a future ADR.
-- The lock is encoded in `AGENTS.md`, `CLAUDE.md`, `.github/copilot-instructions.md`, and `/memories/repo/radiopad-design-lock.md` so AI coding agents inherit the constraint.
+- The lock is encoded in `AGENTS.md`, `CLAUDE.md`, and `/memories/repo/radiopad-design-lock.md` so AI coding agents inherit the constraint.

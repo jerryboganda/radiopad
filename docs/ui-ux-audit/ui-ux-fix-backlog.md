@@ -34,15 +34,14 @@ detailed audit doc. Effort is sized as **S** (≤1 day), **M** (2–5 days),
 **Goal:** Every routable page renders inside `<Container>` + `<PageHeader>`.
 
 **Acceptance:**
-- 37/37 routes wrap content in `<Container>` (or `<Container fluid>` for editor-class surfaces).
-- 37/37 routes render `<PageHeader title=… description=… />`.
+- 35/35 routes wrap content in `<Container>` (or `<Container fluid>` for editor-class surfaces).
+- 35/35 routes render `<PageHeader title=… description=… />`.
 - An ESLint rule (or lint script) flags any new page that skips chrome.
 
 | Ticket | Title | Files | Effort | Severity | Finding IDs | Depends on |
 |---|---|---|---|---|---|---|
 | P1-1 | Wrap `/login` in chrome | `frontend/app/login/page.tsx` | S | High | UIUX-CHROME-001 | — |
 | P1-2 | Wrap `/offline` | `frontend/app/offline/page.tsx` | S | High | UIUX-CHROME-002 | — |
-| P1-3 | Wrap `/copilot` | `frontend/app/copilot/page.tsx` | S | High | UIUX-CHROME-003 | — |
 | P1-4 | Wrap `/pair` | `frontend/app/pair/page.tsx` | S | High | UIUX-CHROME-004 | — |
 | P1-5 | Wrap `/marketplace` | `frontend/app/marketplace/page.tsx` | S | High | UIUX-CHROME-005 | — |
 | P1-6 | Wrap `/governance` + clarify vs admin | `frontend/app/governance/page.tsx` | S | High | UIUX-CHROME-006, UIUX-CHROME-024 | — |
@@ -60,7 +59,6 @@ detailed audit doc. Effort is sized as **S** (≤1 day), **M** (2–5 days),
 | P1-18 | Wrap `/mobile/reports/edit` | `frontend/app/mobile/reports/edit/page.tsx` | S | High | UIUX-CHROME-018 | — |
 | P1-19 ⚠️ | Wrap `/mobile/reports/sign` (chrome + confirm) | `frontend/app/mobile/reports/sign/page.tsx` | M | Critical | UIUX-CHROME-019 | P3-1 (ConfirmDialog) |
 | P1-20 | Wrap `/admin/billing` | `frontend/app/admin/billing/page.tsx` | S | High | UIUX-CHROME-020 | — |
-| P1-21 | Wrap `/admin/copilot` + surface in sidebar | `frontend/app/admin/copilot/page.tsx` + nav | S | High | UIUX-CHROME-021, UIUX-NAV-001 | — |
 | P1-22 | Wrap `/admin/feature-flags` | `frontend/app/admin/feature-flags/page.tsx` | S | Medium | UIUX-CHROME-022 | — |
 | P1-23 | Wrap `/admin/fhir-import` | `frontend/app/admin/fhir-import/page.tsx` | S | High | UIUX-CHROME-023 | — |
 | P1-24 ⚠️ | Wrap `/admin/mcp` + surface in sidebar | `frontend/app/admin/mcp/page.tsx` + nav | M | Critical | UIUX-CHROME-025, UIUX-NAV-001 | P3-1 |
@@ -215,13 +213,13 @@ detailed audit doc. Effort is sized as **S** (≤1 day), **M** (2–5 days),
 **Goal:** Every product page is discoverable and every flow has a confirmation contract.
 
 **Acceptance:**
-- All 17 currently-hidden routes are either surfaced in sidebar or intentionally documented as system/utility routes.
+- All 15 currently-hidden routes are either surfaced in sidebar or intentionally documented as system/utility routes.
 - Detail surfaces use `[id]` dynamic segments.
 - Locale change preserves state.
 
 | Ticket | Title | Files | Effort | Severity | Finding IDs |
 |---|---|---|---|---|---|
-| P9-1 | Sidebar IA pass: add admin/sso, audit/verify, admin/mcp, admin/copilot, analytics/quality | `frontend/components/shell/nav.config.tsx` | S | Critical | UIUX-NAV-001, UIUX-CHROME-014,016,021,025,027 |
+| P9-1 | Sidebar IA pass: add admin/sso, audit/verify, admin/mcp, analytics/quality | `frontend/components/shell/nav.config.tsx` | S | Critical | UIUX-NAV-001, UIUX-CHROME-014,016,025,027 |
 | P9-2 | Migrate detail surfaces from `?id=` to `[id]/page.tsx` | reports, rulebooks | L | Medium | UIUX-NAV-002 |
 | P9-3 | Resolve `/reports` vs `/` (redirect chosen non-canonical) | `frontend/app/` | S | Medium | UIUX-NAV-003 |
 | P9-4 | Login `?return=` redirect | `frontend/app/login/page.tsx` | S | Medium | UIUX-FLOW-F1-001 |

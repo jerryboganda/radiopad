@@ -16,7 +16,7 @@ IAiProviderAdapter ← interface
    ├── MockAiAdapter / AnthropicAiAdapter
    ├── OpenAiCompatibleProvider / cloud providers
    ├── Local providers (Ollama / vLLM / llama.cpp)
-   └── CLI / SDK providers (Copilot / Gemini / Codex)
+   └── CLI providers (Gemini / Codex)
 ```
 
 The gateway is the **only** place that performs the PHI policy check. The adapters are dumb: they accept a request DTO and return a response DTO.

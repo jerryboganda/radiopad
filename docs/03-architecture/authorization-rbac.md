@@ -14,8 +14,8 @@ The active backend roles are the stable `UserRole` enum values:
 | `ReportingAdmin` | 1 | Reporting operations: providers, rulebook/template governance, lexicon, prompts, and MCP operations where allowed. |
 | `MedicalDirector` | 2 | Clinical governance: approvals, validation packs, report sign/addendum, audit/security review, and user lockout workflows. |
 | `ComplianceReviewer` | 3 | Audit/security review, SIEM/security checks, and session revocation workflows. |
-| `ItAdmin` | 4 | Operational administration: providers, users/devices, security, validation packs, MCP, Copilot, and billing where allowed. |
-| `BillingAdmin` | 5 | Billing, marketplace payment operations, provider OAuth token vault, and Copilot billing/admin operations where allowed. |
+| `ItAdmin` | 4 | Operational administration: providers, users/devices, security, validation packs, MCP, and billing where allowed. |
+| `BillingAdmin` | 5 | Billing, marketplace payment operations, and provider OAuth token vault operations where allowed. |
 
 Do not reorder these enum values; frontend role helpers and persisted data rely on them.
 
