@@ -569,6 +569,14 @@ app.UseMiddleware<PerfBudgetMiddleware>();
 // Iter-32 SEC-008 — global per-IP + per-tenant fixed-window rate limiter.
 // Sits before auth so brute-force attempts are rate-limited too.
 app.UseMiddleware<RateLimitMiddleware>();
+// CORS must run BEFORE the bearer/OIDC auth middlewares: a cross-origin
+// preflight (OPTIONS) to a protected endpoint carries no credentials, so if auth
+// runs first it rejects the preflight with 401 and the browser/webview blocks the
+// real request. The desktop webview (tauri.localhost) is a cross-origin client,
+// so without this every authenticated GET after login fails its preflight and the
+// app bounces back to the login screen. The web app is same-origin (no preflight)
+// and was unaffected. Default policy allow-lists the tauri/capacitor origins.
+app.UseCors();
 app.UseMiddleware<OidcBearerMiddleware>();
 app.UseMiddleware<RadioPadBearerMiddleware>();
 // Runs after identity projection so per-tenant allowlists are evaluated
@@ -576,7 +584,6 @@ app.UseMiddleware<RadioPadBearerMiddleware>();
 // requests still resolve the tenant from the request body.
 app.UseMiddleware<IpAllowlistMiddleware>();
 app.UseMiddleware<SuspensionGuardMiddleware>();
-app.UseCors();
 app.UseRateLimiter();
 if (!app.Environment.IsProduction() || Environment.GetEnvironmentVariable("RADIOPAD_ENABLE_SWAGGER") == "1")
 {
