@@ -30,20 +30,35 @@ function hasTauri(): boolean {
   return typeof window !== 'undefined' && '__TAURI__' in window;
 }
 
+/**
+ * Tauri-presence gate. Renders nothing outside the desktop shell. Keeping the
+ * i18n + updater body in an inner component that only mounts under Tauri means
+ * `useTranslations` is never called on web/mobile — or in tests that render the
+ * shell without a `NextIntlClientProvider` — since the update button is
+ * desktop-only anyway. (Calling `useTranslations` at the top of the old single
+ * component threw "context from NextIntlClientProvider was not found" the moment
+ * any non-desktop tree mounted it, even though it ultimately rendered null.)
+ */
 export default function CheckUpdatesButton() {
-  const t = useTranslations('topbar.update');
   const [mounted, setMounted] = useState(false);
-  const [phase, setPhase] = useState<Phase>('idle');
-  const [pct, setPct] = useState(0);
-  const busyRef = useRef(false);
 
   useEffect(() => {
     setMounted(hasTauri());
   }, []);
 
+  if (!mounted) return null;
+  return <UpdateButton />;
+}
+
+function UpdateButton() {
+  const t = useTranslations('topbar.update');
+  const [phase, setPhase] = useState<Phase>('idle');
+  const [pct, setPct] = useState(0);
+  const busyRef = useRef(false);
+
   // Silent check-on-launch — surfaces the badge without interrupting the user.
+  // This inner component only mounts under Tauri, so the check always runs.
   useEffect(() => {
-    if (!mounted) return;
     let cancelled = false;
     (async () => {
       try {
@@ -57,7 +72,7 @@ export default function CheckUpdatesButton() {
     return () => {
       cancelled = true;
     };
-  }, [mounted]);
+  }, []);
 
   // Transient states (up-to-date / error) fall back to idle after a beat.
   const revertSoon = useCallback(() => {
@@ -107,8 +122,6 @@ export default function CheckUpdatesButton() {
       revertSoon();
     }
   }, [revertSoon]);
-
-  if (!mounted) return null;
 
   const busy = phase === 'checking' || phase === 'downloading' || phase === 'installing';
   const label =
