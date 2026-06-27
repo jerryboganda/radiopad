@@ -179,35 +179,42 @@ public static class LocalSttModels
     public static bool IsWhisperModel(string? modelId) =>
         modelId == WhisperModelName || modelId == WhisperSmallEnModelName;
 
-    // ── Kyutai STT 1B (en/fr) — 3rd cross-check engine via moshi.cpp (GGUF) ──
-    // CPU + system RAM only (per the on-device rule). The GGUF artifact is
-    // operator-provided (converted from the candle weights), so there is no pinned
-    // download URL yet; the engine self-enables when the GGUF + moshi.cpp binary
-    // are present on disk.
+    // ── Medical-domain Whisper — 3rd cross-check engine (whisper.cpp, CPU/RAM) ──
+    // A decorrelated verification voice: the FULL (non-distilled) Whisper large-v3,
+    // distinct from the distilled large-v3-turbo live model AND the Parakeet
+    // transducer, so it makes different errors — exactly what ROVER needs to
+    // reduce WER. Runs through the same Whisper.net/whisper.cpp sidecar on CPU +
+    // system RAM (no GPU). Provisioned ON DEMAND via the model manager (not forced
+    // into the first-run download set); the engine self-enables once present.
+    //
+    // MEDICAL FINE-TUNE UPGRADE PATH: no English radiology-specific Whisper ggml
+    // exists publicly today. To upgrade this voice to a medical fine-tune, convert
+    // Na0s/Medical-Whisper-Large-v3 (Apache-2.0, English, consultation-trained) to
+    // a q5_0 ggml and place it in this model's dir (the engine loads any *.bin
+    // there, so it transparently supersedes the default). VALIDATE on real
+    // radiology audio first — a consultation-trained finetune may not beat stock
+    // large-v3 on radiology vocabulary. Conversion recipe:
+    //   python whisper.cpp/models/convert-h5-to-ggml.py <hf-dir> <hf-dir> ./out
+    //   ./whisper.cpp/build/bin/quantize ./out/ggml-model.bin ggml-medical-q5_0.bin q5_0
 
-    public const string KyutaiModelName = "kyutai-stt-1b-en_fr";
-
-    /// <summary>Locate the Kyutai GGUF under its model dir, or null when absent.</summary>
-    public static string? ResolveKyutaiGguf()
-    {
-        var dir = ResolveModelDir(KyutaiModelName);
-        if (dir is null || !Directory.Exists(dir)) return null;
-        return Directory.GetFiles(dir, "*.gguf", SearchOption.AllDirectories).FirstOrDefault();
-    }
-
-    /// <summary>Path to the moshi.cpp executable (<c>RADIOPAD_STT_MOSHI_BIN</c>), or null.</summary>
-    public static string? ResolveMoshiBin()
-        => Env("RADIOPAD_STT_MOSHI_BIN") is { Length: > 0 } v && File.Exists(v) ? v : null;
+    public const string MedicalWhisperModelName = "whisper-medical-large-v3-q5_0";
 
     /// <summary>
-    /// Argument template for the moshi.cpp invocation. <c>{model}</c> and
-    /// <c>{audio}</c> are substituted with the GGUF path and the temp WAV path.
-    /// Override via <c>RADIOPAD_STT_MOSHI_ARGS</c> to match the shipped binary's CLI.
+    /// Full (non-distilled) Whisper large-v3 q5_0 GGML for whisper.cpp / Whisper.net
+    /// (~1.03 GB). MIT (whisper.cpp repackaging) over Apache-2.0 OpenAI weights. The
+    /// higher-accuracy, architecturally-decorrelated 3rd cross-check voice (the live
+    /// model ships distilled turbo; this is the full model). SHA-256 from the
+    /// HuggingFace LFS pointer.
     /// </summary>
-    public const string DefaultMoshiArgs = "--model {model} --file {audio}";
+    public static readonly FileSpec MedicalWhisper = new(
+        Name: MedicalWhisperModelName,
+        FileName: "ggml-large-v3-q5_0.bin",
+        Url: "https://huggingface.co/ggerganov/whisper.cpp/resolve/main/ggml-large-v3-q5_0.bin",
+        SizeBytes: 1081140203L,
+        Sha256: "d75795ecff3f83b5faa89d1900604ad8c780abd5739fae406de19f23ecd98ad1");
 
-    public static string ResolveMoshiArgs()
-        => Env("RADIOPAD_STT_MOSHI_ARGS") is { Length: > 0 } v ? v : DefaultMoshiArgs;
+    /// <summary>Resolve the medical cross-check Whisper GGML (.bin), or null when absent.</summary>
+    public static string? ResolveMedicalWhisperBin() => ResolveWhisperBin(MedicalWhisperModelName);
 
     /// <summary>
     /// Path of the per-install on-device STT preferences file (primary-model

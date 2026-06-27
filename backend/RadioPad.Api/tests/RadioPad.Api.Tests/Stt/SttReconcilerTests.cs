@@ -154,7 +154,7 @@ public class SttReconcilerTests
         // Backbone (live draft) = whisper "long" @0.5; two other engines say "lung".
         var live = Eng("whisper", T("long", 0.50));
         var p = Eng("parakeet", T("lung", 0.90));
-        var k = Eng("kyutai", T("lung", 0.90));
+        var k = Eng("medical", T("lung", 0.90));
 
         var r = SttReconciler.ReconcileMany(new[] { live, p, k });
 
@@ -184,7 +184,7 @@ public class SttReconcilerTests
     {
         var live = Eng("whisper", T("the", 0.9), T("nodule", 0.9));
         var p = Eng("parakeet", T("the", 0.9));
-        var k = Eng("kyutai", T("the", 0.9));
+        var k = Eng("medical", T("the", 0.9));
 
         var r = SttReconciler.ReconcileMany(new[] { live, p, k });
 
@@ -196,7 +196,7 @@ public class SttReconcilerTests
     {
         var live = Eng("whisper", T("the", 0.9), T("lung", 0.9));
         var p = Eng("parakeet", T("the", 0.9), T("left", 0.9), T("lung", 0.9));
-        var k = Eng("kyutai", T("the", 0.9), T("left", 0.9), T("lung", 0.9));
+        var k = Eng("medical", T("the", 0.9), T("left", 0.9), T("lung", 0.9));
 
         var r = SttReconciler.ReconcileMany(new[] { live, p, k });
 
@@ -211,7 +211,7 @@ public class SttReconcilerTests
     {
         var live = Eng("whisper", T("the", 0.9), T("lung", 0.9));
         var p = Eng("parakeet", T("the", 0.9), T("left", 0.9), T("lung", 0.9));
-        var k = Eng("kyutai", T("the", 0.9), T("lung", 0.9)); // no "left"
+        var k = Eng("medical", T("the", 0.9), T("lung", 0.9)); // no "left"
 
         var r = SttReconciler.ReconcileMany(new[] { live, p, k });
 

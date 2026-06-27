@@ -64,41 +64,12 @@ public sealed class WhisperNetSttClient : ILocalSttEngine, IDisposable
         if (!Available)
             throw new InvalidOperationException("whisper engine is not available");
 
-        // Decode + resample to 16 kHz mono first. Whisper.net's WAV reader only
-        // accepts exactly 16 kHz, so feeding raw mic audio (44.1/48 kHz) straight
-        // in throws NotSupportedWaveException. Going through the shared decoder (as
-        // the Parakeet engine does) makes the engine accept any input rate.
-        var samples = await _decoder.DecodeAsync(
-            new MemoryStream(wavBytes, writable: false), "audio/wav", ct);
-
         var factory = GetFactory();
-        var tokens = new List<SttToken>();
         try
         {
-            // Optimized decode: multi-threaded, beam search (accuracy over the
-            // default greedy), real token probabilities (so the reconciler gets a
-            // usable confidence signal), and a radiology priming prompt to bias
-            // domain vocabulary.
-            var builder = factory.CreateBuilder()
-                .WithLanguage("en")
-                .WithThreads(LocalSttModels.ResolveThreads())
-                .WithProbabilities();
-
-            var beam = LocalSttModels.ResolveWhisperBeamSize();
-            if (beam > 1)
-                builder = builder.WithBeamSearchSamplingStrategy(c => c.WithBeamSize(beam));
-
-            var prompt = LocalSttModels.ResolveWhisperPrompt();
-            if (!string.IsNullOrWhiteSpace(prompt))
-                builder = builder.WithPrompt(prompt);
-
-            using var processor = builder.Build();
-            await foreach (var seg in processor.ProcessAsync(samples, ct))
-            {
-                var conf = NormalizeProbability(seg.Probability);
-                foreach (var t in SttText.Tokenize(seg.Text, conf))
-                    tokens.Add(t);
-            }
+            var tokens = await WhisperDecoder.DecodeAsync(
+                factory, _decoder, wavBytes, LocalSttModels.ResolveWhisperPrompt(), ct);
+            return new EngineTranscript(EngineName, tokens);
         }
         catch (Exception ex) when (ex is not OperationCanceledException)
         {
@@ -107,11 +78,7 @@ public sealed class WhisperNetSttClient : ILocalSttEngine, IDisposable
             _log.LogError(ex, "whisper recognize failed; disabling engine for this session");
             throw;
         }
-
-        return new EngineTranscript(EngineName, tokens);
     }
-
-    private static double NormalizeProbability(float p) => p <= 0f ? 0.5 : Math.Clamp(p, 0f, 1f);
 
     /// <summary>
     /// Return the native factory for the currently-selected whisper model, loading

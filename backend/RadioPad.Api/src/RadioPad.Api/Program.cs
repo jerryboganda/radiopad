@@ -185,11 +185,11 @@ builder.Services.AddSingleton<RadioPad.Application.Abstractions.ILocalSttEngine>
     sp => sp.GetRequiredService<RadioPad.Infrastructure.Providers.Local.SherpaParakeetSttClient>());
 builder.Services.AddSingleton<RadioPad.Application.Abstractions.ILocalSttEngine>(
     sp => sp.GetRequiredService<RadioPad.Infrastructure.Providers.Local.WhisperNetSttClient>());
-// 3rd cross-check engine: Kyutai STT 1B (en/fr) via moshi.cpp (GGUF, CPU/RAM).
-// Dormant until the moshi binary + GGUF are provisioned; otherwise inert.
-builder.Services.AddSingleton<RadioPad.Infrastructure.Providers.Local.KyutaiMoshiSttClient>();
+// 3rd cross-check engine: medical-domain Whisper (full large-v3) via whisper.cpp
+// (CPU/RAM). Dormant until the medical model is provisioned on demand; else inert.
+builder.Services.AddSingleton<RadioPad.Infrastructure.Providers.Local.MedicalWhisperSttClient>();
 builder.Services.AddSingleton<RadioPad.Application.Abstractions.ILocalSttEngine>(
-    sp => sp.GetRequiredService<RadioPad.Infrastructure.Providers.Local.KyutaiMoshiSttClient>());
+    sp => sp.GetRequiredService<RadioPad.Infrastructure.Providers.Local.MedicalWhisperSttClient>());
 // Manual "Cross Check" pass: re-runs retained audio through all available engines,
 // N-way ROVER reconcile vs the live draft, then (later phases) an LLM medical pass.
 // Singletons (engines are singletons); jobs are tracked in-memory, non-durable.

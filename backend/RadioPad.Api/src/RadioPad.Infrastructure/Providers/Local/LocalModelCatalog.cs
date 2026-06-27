@@ -51,6 +51,7 @@ public sealed class LocalModelCatalog : ILocalModelCatalog
         var parakeet = LocalSttModels.Parakeet;
         var whisper = LocalSttModels.Whisper;
         var smallEn = LocalSttModels.WhisperSmallEn;
+        var medical = LocalSttModels.MedicalWhisper;
         return new List<LocalModelDescriptor>
         {
             new(
@@ -90,24 +91,25 @@ public sealed class LocalModelCatalog : ILocalModelCatalog
                 FileName: smallEn.FileName,
                 Placeholder: false),
 
-            // Kyutai STT 1B (en/fr) — the 3rd cross-check engine, run on CPU/RAM via
-            // moshi.cpp from a GGUF the operator converts from the candle weights.
-            // No pinned download URL yet (operator-provided artifact): rendered as a
-            // disabled card until URL/SHA/size are filled and Placeholder flipped.
-            // The engine self-enables from disk regardless (RADIOPAD_STT_MOSHI_BIN +
-            // the GGUF under its model dir).
+            // Medical-domain Whisper — the 3rd cross-check engine, run on CPU/RAM via
+            // whisper.cpp. Default artifact is the verified full (non-distilled)
+            // large-v3 q5_0 — a higher-accuracy, decorrelated voice vs the distilled
+            // turbo live model. Provisioned ON DEMAND (a downloadable manager card,
+            // not in the first-run set). To upgrade to a true medical fine-tune,
+            // convert Na0s/Medical-Whisper-Large-v3 to q5_0 ggml into this model's
+            // dir (engine loads any *.bin there) — validate on radiology audio first.
             new(
-                Id: LocalSttModels.KyutaiModelName,
-                DisplayName: "Kyutai STT 1B (en/fr) — medical cross-check (moshi.cpp, GGUF)",
+                Id: medical.Name,
+                DisplayName: "Whisper large-v3 (full) — medical cross-check speech-to-text",
                 Kind: ModelKind.Stt,
-                Engine: KyutaiMoshiSttClient.EngineName, // "kyutai"
-                DownloadUrl: "",
-                Sha256: "",
-                SizeBytes: 0,
-                License: "CC-BY-4.0",
+                Engine: MedicalWhisperSttClient.EngineName, // "whisper_medical"
+                DownloadUrl: medical.Url,
+                Sha256: medical.Sha256,
+                SizeBytes: medical.SizeBytes,
+                License: "MIT",
                 ArchiveKind: ModelArchiveKind.RawFile,
-                FileName: null,
-                Placeholder: true),
+                FileName: medical.FileName,
+                Placeholder: false),
 
             // ── Roadmap placeholders (no engine/URL yet). The manager renders these
             // as disabled "coming soon" cards. When the engine lands: flip Placeholder

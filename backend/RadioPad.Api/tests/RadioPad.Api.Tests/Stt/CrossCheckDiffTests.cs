@@ -27,7 +27,7 @@ public class CrossCheckDiffTests
         {
             new ReconciledSpan("the", false, null, "live"),
             new ReconciledSpan("right", true, "disagreement", "parakeet", OriginalText: "left",
-                Votes: new[] { V("live", "left", 0.5), V("parakeet", "right", 0.9), V("kyutai", "right", 0.9) }),
+                Votes: new[] { V("live", "left", 0.5), V("parakeet", "right", 0.9), V("medical", "right", 0.9) }),
             new ReconciledSpan("lung", false, null, "live"),
             new ReconciledSpan("is", false, null, "live"),
             new ReconciledSpan("clear", false, null, "live"),
@@ -75,7 +75,7 @@ public class CrossCheckDiffTests
         {
             new ReconciledSpan("the", false, null, "live"),
             new ReconciledSpan("left", true, "insert", "parakeet", OriginalText: "",
-                Votes: new[] { V("parakeet", "left", 0.9), V("kyutai", "left", 0.9) }),
+                Votes: new[] { V("parakeet", "left", 0.9), V("medical", "left", 0.9) }),
             new ReconciledSpan("lung", false, null, "live"),
         };
         var corrections = CrossCheckDiff.BuildCorrections(live, new ReconciledResult("the left lung", spans));
