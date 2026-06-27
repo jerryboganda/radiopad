@@ -318,6 +318,40 @@ async function requestFormTo<T>(base: string, path: string, form: FormData): Pro
   return (await res.text()) as unknown as T;
 }
 
+/**
+ * JSON request to an explicit base URL — used by the on-device model manager,
+ * which must talk to the bundled STT sidecar (loopback, anonymous) rather than
+ * the production API. No tenant/auth headers and credentials omitted, like
+ * `requestFormTo` (the sidecar is loopback-bound and unauthenticated).
+ */
+async function requestTo<T>(base: string, path: string, init?: RequestInit): Promise<T> {
+  const headers = new Headers(init?.headers || {});
+  if (init?.body && !headers.has('Content-Type')) headers.set('Content-Type', 'application/json');
+  const res = await fetch(`${base}${path}`, { ...init, headers, credentials: 'omit' });
+  if (!res.ok) {
+    let body: unknown = null;
+    try { body = await res.json(); } catch { body = await res.text(); }
+    throw Object.assign(new Error(`API ${res.status} ${res.statusText}`), { status: res.status, body });
+  }
+  if (res.status === 204) return undefined as unknown as T;
+  const ct = res.headers.get('content-type') || '';
+  if (ct.includes('application/json')) return (await res.json()) as T;
+  return (await res.text()) as unknown as T;
+}
+
+/**
+ * Route an on-device-model-manager call to the local STT sidecar when running in
+ * the desktop shell (where the models actually live and RADIOPAD_LOCAL_STT_ENABLED
+ * is set), else fall back to the hosted API — which returns `enabled:false`, so the
+ * web shows the catalog read-only. Without this the desktop would hit production
+ * (on-device STT disabled there) and every model would show "not downloaded" with
+ * the actions disabled.
+ */
+async function requestLocal<T>(path: string, init?: RequestInit): Promise<T> {
+  const base = await localSttBase();
+  return base ? requestTo<T>(base, path, init) : request<T>(path, init);
+}
+
 export type Report = {
   id: string;
   tenantId: string;
@@ -1080,27 +1114,29 @@ export const api = {
     },
   },
   /**
-   * On-device AI model manager (desktop sidecar). `list` works everywhere — its
-   * `enabled` flag is false on a web build — while download/remove/test/diagnostics
-   * act on the local engine and 503 on the hosted API.
+   * On-device AI model manager. On the desktop these calls go to the bundled STT
+   * sidecar (via `localSttBase()` → `requestLocal`), where the models are actually
+   * downloaded/run and `enabled` is true. On the web there is no sidecar, so they
+   * fall back to the hosted API which returns `enabled:false` and the page renders
+   * the catalog read-only.
    */
   localModels: {
-    list: () => request<LocalModelsResponse>('/api/local-models'),
+    list: () => requestLocal<LocalModelsResponse>('/api/local-models'),
     download: (id: string) =>
-      request<{ id: string; state: ProvisionState; alreadyInstalled?: boolean; startedUtc?: string }>(
+      requestLocal<{ id: string; state: ProvisionState; alreadyInstalled?: boolean; startedUtc?: string }>(
         `/api/local-models/${encodeURIComponent(id)}/download`,
         { method: 'POST' },
       ),
     progress: (id: string) =>
-      request<ModelProgress>(`/api/local-models/${encodeURIComponent(id)}/progress`),
+      requestLocal<ModelProgress>(`/api/local-models/${encodeURIComponent(id)}/progress`),
     remove: (id: string) =>
-      request<{ id: string; deleted: boolean }>(`/api/local-models/${encodeURIComponent(id)}`, {
+      requestLocal<{ id: string; deleted: boolean }>(`/api/local-models/${encodeURIComponent(id)}`, {
         method: 'DELETE',
       }),
     test: (id: string) =>
-      request<ModelTestResult>(`/api/local-models/${encodeURIComponent(id)}/test`, { method: 'POST' }),
+      requestLocal<ModelTestResult>(`/api/local-models/${encodeURIComponent(id)}/test`, { method: 'POST' }),
     diagnostics: (id: string) =>
-      request<unknown>(`/api/local-models/${encodeURIComponent(id)}/diagnostics`),
+      requestLocal<unknown>(`/api/local-models/${encodeURIComponent(id)}/diagnostics`),
   },
   copilot: {
     status: () => request<CopilotStatus>('/api/copilot/status'),
