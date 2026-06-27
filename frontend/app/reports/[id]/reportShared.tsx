@@ -2,6 +2,7 @@
 // report editor. Extracted from ReportClient so the ribbon + inspector
 // components can reuse them without import cycles.
 import type { Report, ValidationFinding, RewriteMode } from '@/lib/api';
+import { getSectionEditor } from '@/lib/editor/sectionEditorRegistry';
 
 export const SECTIONS: Array<{ key: keyof Report; label: string; cls?: string }> = [
   { key: 'indication', label: 'Indication' },
@@ -76,6 +77,13 @@ export function UnsupportedClaimFinding({ finding }: { finding: ValidationFindin
     const el = document.getElementById('rp-findings-section');
     if (!el) return;
     el.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    // Prefer the rich section editor (cross-check) when mounted; fall back to
+    // the plain textarea.
+    const richFindings = getSectionEditor('findings');
+    if (richFindings) {
+      richFindings.focus();
+      return;
+    }
     const ta = el.querySelector('textarea');
     if (ta && ta instanceof HTMLTextAreaElement) ta.focus();
   }

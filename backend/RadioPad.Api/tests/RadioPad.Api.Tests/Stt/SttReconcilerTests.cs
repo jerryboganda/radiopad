@@ -134,4 +134,100 @@ public class SttReconcilerTests
         Assert.False(r.Spans[0].Flagged);
         Assert.Equal("both", r.Spans[0].Source);
     }
+
+    // ---- N-way cross-check (ReconcileMany) -------------------------------
+
+    [Fact]
+    public void ReconcileMany_SingleHypothesis_ReturnedVerbatim_NoCorrections()
+    {
+        var only = Eng("whisper", T("lungs", 0.9), T("clear", 0.9));
+
+        var r = SttReconciler.ReconcileMany(new[] { only });
+
+        Assert.Equal("lungs clear", r.Text);
+        Assert.All(r.Spans, s => Assert.Null(s.OriginalText)); // nothing changed
+    }
+
+    [Fact]
+    public void ReconcileMany_TwoOthersOutvote_LiveDraft_RecordingOriginal()
+    {
+        // Backbone (live draft) = whisper "long" @0.5; two other engines say "lung".
+        var live = Eng("whisper", T("long", 0.50));
+        var p = Eng("parakeet", T("lung", 0.90));
+        var k = Eng("kyutai", T("lung", 0.90));
+
+        var r = SttReconciler.ReconcileMany(new[] { live, p, k });
+
+        Assert.Equal("lung", r.Text);
+        var span = r.Spans[0];
+        Assert.Equal("long", span.OriginalText); // original→corrected diff
+        Assert.Equal("lung", span.Text);
+        Assert.NotNull(span.Votes);
+        Assert.Equal(3, span.Votes!.Count);
+    }
+
+    [Fact]
+    public void ReconcileMany_TieKeepsBackboneWord()
+    {
+        // Equal summed confidence → the dictated backbone word wins (no change).
+        var live = Eng("whisper", T("alpha", 0.80));
+        var p = Eng("parakeet", T("beta", 0.80));
+
+        var r = SttReconciler.ReconcileMany(new[] { live, p });
+
+        Assert.Equal("alpha", r.Text);
+        Assert.Null(r.Spans[0].OriginalText);
+    }
+
+    [Fact]
+    public void ReconcileMany_NeverDeletes_A_Dictated_Word()
+    {
+        var live = Eng("whisper", T("the", 0.9), T("nodule", 0.9));
+        var p = Eng("parakeet", T("the", 0.9));
+        var k = Eng("kyutai", T("the", 0.9));
+
+        var r = SttReconciler.ReconcileMany(new[] { live, p, k });
+
+        Assert.Equal("the nodule", r.Text); // backbone word retained despite no support
+    }
+
+    [Fact]
+    public void ReconcileMany_InsertsOnlyOnUnanimousAgreement()
+    {
+        var live = Eng("whisper", T("the", 0.9), T("lung", 0.9));
+        var p = Eng("parakeet", T("the", 0.9), T("left", 0.9), T("lung", 0.9));
+        var k = Eng("kyutai", T("the", 0.9), T("left", 0.9), T("lung", 0.9));
+
+        var r = SttReconciler.ReconcileMany(new[] { live, p, k });
+
+        Assert.Equal("the left lung", r.Text);
+        var inserted = Assert.Single(r.Spans, s => s.OriginalText == string.Empty);
+        Assert.Equal("left", inserted.Text);
+        Assert.True(inserted.Flagged);
+    }
+
+    [Fact]
+    public void ReconcileMany_DropsInsertion_WithoutUnanimousAgreement()
+    {
+        var live = Eng("whisper", T("the", 0.9), T("lung", 0.9));
+        var p = Eng("parakeet", T("the", 0.9), T("left", 0.9), T("lung", 0.9));
+        var k = Eng("kyutai", T("the", 0.9), T("lung", 0.9)); // no "left"
+
+        var r = SttReconciler.ReconcileMany(new[] { live, p, k });
+
+        Assert.Equal("the lung", r.Text);
+        Assert.DoesNotContain(r.Spans, s => s.OriginalText == string.Empty);
+    }
+
+    [Fact]
+    public void ReconcileMany_PreservesSafetyFlag()
+    {
+        var live = Eng("whisper", T("left", 0.97));
+        var p = Eng("parakeet", T("left", 0.97));
+
+        var r = SttReconciler.ReconcileMany(new[] { live, p });
+
+        Assert.True(r.Spans[0].Flagged);
+        Assert.Equal("safety", r.Spans[0].Reason);
+    }
 }

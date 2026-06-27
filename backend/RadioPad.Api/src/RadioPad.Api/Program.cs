@@ -152,6 +152,10 @@ builder.Services.AddScoped<RadioPad.Application.Services.ITerminologyAdapter, Ra
 builder.Services.AddScoped<IPromptOverrideStore, EfPromptOverrideStore>();
 builder.Services.AddScoped<RadioPad.Application.Abstractions.IDictationCleanupService,
     RadioPad.Application.Services.DictationCleanupService>();
+// Cross-check LLM medical-accuracy review (hosted-side; routes via IAiGateway so
+// PHI policy + audit apply). Opt-in UBAG is honored by a forced provider.
+builder.Services.AddScoped<RadioPad.Application.Abstractions.ICrossCheckReviewService,
+    RadioPad.Application.Services.CrossCheckReviewService>();
 // Phase B (dictation transcription) — audio → transcript via the UBAG
 // medical_transcription flow. Uses the existing "ubag" named HttpClient
 // (IUbagClient) — no new client/config needed.
@@ -181,6 +185,18 @@ builder.Services.AddSingleton<RadioPad.Application.Abstractions.ILocalSttEngine>
     sp => sp.GetRequiredService<RadioPad.Infrastructure.Providers.Local.SherpaParakeetSttClient>());
 builder.Services.AddSingleton<RadioPad.Application.Abstractions.ILocalSttEngine>(
     sp => sp.GetRequiredService<RadioPad.Infrastructure.Providers.Local.WhisperNetSttClient>());
+// 3rd cross-check engine: Kyutai STT 1B (en/fr) via moshi.cpp (GGUF, CPU/RAM).
+// Dormant until the moshi binary + GGUF are provisioned; otherwise inert.
+builder.Services.AddSingleton<RadioPad.Infrastructure.Providers.Local.KyutaiMoshiSttClient>();
+builder.Services.AddSingleton<RadioPad.Application.Abstractions.ILocalSttEngine>(
+    sp => sp.GetRequiredService<RadioPad.Infrastructure.Providers.Local.KyutaiMoshiSttClient>());
+// Manual "Cross Check" pass: re-runs retained audio through all available engines,
+// N-way ROVER reconcile vs the live draft, then (later phases) an LLM medical pass.
+// Singletons (engines are singletons); jobs are tracked in-memory, non-durable.
+builder.Services.AddSingleton<RadioPad.Application.Abstractions.ICrossCheckJobStore,
+    RadioPad.Infrastructure.Providers.Local.InMemoryCrossCheckJobStore>();
+builder.Services.AddSingleton<RadioPad.Application.Abstractions.ICrossCheckService,
+    RadioPad.Infrastructure.Providers.Local.CrossCheckService>();
 // First-run download of the on-device STT model. The hosted service is a no-op
 // unless RADIOPAD_LOCAL_STT_ENABLED is set (desktop), so web/server are unaffected.
 builder.Services.AddSingleton<RadioPad.Infrastructure.Providers.Local.SttModelProvisioner>();

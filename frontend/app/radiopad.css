@@ -149,6 +149,113 @@
 }
 .ai-mark textarea:focus { box-shadow: none; }
 
+/* -------- Rich section editor (Tiptap) — visual twin of the textareas --- */
+/* ProseMirror renders a contenteditable div; mirror the input chrome so the
+   rich editor is indistinguishable from the .section-block textarea it
+   replaces (see lib/editor + components/editor/SectionEditor). */
+.rp-section-editor {
+  font: inherit;
+  color: var(--text);
+  background: var(--bg-panel);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  padding: 7px 10px;
+  width: 100%;
+  min-height: 72px;
+  white-space: pre-wrap;
+  word-break: break-word;
+  transition: border-color 120ms ease, box-shadow 120ms ease;
+}
+.rp-section-editor:focus { outline: none; }
+.rp-section-editor.ProseMirror-focused,
+.rp-section-editor:focus-within {
+  border-color: var(--accent);
+  box-shadow: 0 0 0 3px var(--accent-soft);
+}
+.rp-section-editor p { margin: 0; }
+.rp-section-editor.findings { min-height: 168px; }
+.rp-section-editor.impression { min-height: 132px; }
+.rp-narrative .rp-section-editor {
+  font-family: var(--serif);
+  font-size: 14.5px;
+  line-height: 1.6;
+}
+.ai-mark .rp-section-editor {
+  background: transparent;
+  border: 0;
+  padding: 0;
+  box-shadow: none;
+}
+.ai-mark .rp-section-editor.ProseMirror-focused { box-shadow: none; border: 0; }
+
+/* -------- Cross-check correction highlights (inline, ephemeral) -------- */
+/* Background-coloured spans marking where a cross-check engine/LLM changed the
+   wording. Severity → colour; kept visually distinct from the .ai-mark purple.
+   Text colour is left untouched so the corrected word stays readable. */
+.rp-xc-correction {
+  border-radius: 3px;
+  padding: 0 1px;
+  cursor: pointer;
+  border-bottom: 2px solid transparent;
+}
+.rp-xc-correction.safety  { background: var(--red-bg);   border-bottom-color: var(--red); }
+.rp-xc-correction.warning { background: var(--amber-bg); border-bottom-color: var(--amber); }
+.rp-xc-correction.info    { background: var(--blue-bg);  border-bottom-color: var(--blue); }
+
+/* Bottom-right cross-check processing badge. */
+.rp-xc-badge {
+  position: fixed;
+  right: 18px;
+  bottom: 18px;
+  z-index: 60;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 12px;
+  border-radius: var(--radius-pill);
+  border: 1px solid var(--border);
+  background: var(--bg-panel);
+  box-shadow: var(--shadow-md);
+  font-size: 13px;
+}
+.rp-xc-badge.info    { border-color: var(--blue-border);  color: var(--blue); }
+.rp-xc-badge.success { border-color: var(--green-border); color: var(--green); }
+.rp-xc-badge.danger  { border-color: var(--red-border);   color: var(--red); }
+.rp-xc-badge-dismiss {
+  border: 0;
+  background: transparent;
+  cursor: pointer;
+  color: inherit;
+  font-size: 15px;
+  line-height: 1;
+}
+.rp-xc-spinner {
+  width: 12px;
+  height: 12px;
+  border: 2px solid color-mix(in srgb, currentColor 30%, transparent);
+  border-top-color: currentColor;
+  border-radius: 50%;
+  animation: rp-xc-spin 0.7s linear infinite;
+}
+@keyframes rp-xc-spin { to { transform: rotate(360deg); } }
+
+/* Cross-check review panel items (original → corrected). */
+.rp-xc-item {
+  border: 1px solid var(--border-soft);
+  border-left: 3px solid var(--border-strong);
+  border-radius: var(--radius-sm);
+  padding: 8px 10px;
+  margin-bottom: 8px;
+}
+.rp-xc-item.safety  { border-left-color: var(--red);   background: var(--red-bg); }
+.rp-xc-item.warning { border-left-color: var(--amber); background: var(--amber-bg); }
+.rp-xc-item.info    { border-left-color: var(--blue);  background: var(--blue-bg); }
+.rp-xc-change { font-size: 14px; margin-bottom: 4px; }
+.rp-xc-from { text-decoration: line-through; color: var(--text-muted); }
+.rp-xc-arrow { margin: 0 6px; color: var(--text-muted); }
+.rp-xc-to { font-weight: 600; }
+.rp-xc-meta { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; margin-bottom: 6px; font-size: 12px; color: var(--text-muted); }
+
 /* -------- Validation findings ------------------------------------- */
 .finding {
   background: var(--bg-subtle);

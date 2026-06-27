@@ -7,6 +7,7 @@ import { useTranslations } from 'next-intl';
 import { api, setActiveAuthToken } from '@/lib/api';
 import { clearAuthToken } from '@/lib/secureAuth';
 import { useSttMode } from '@/lib/dictation/sttMode';
+import { useCrossCheckEnabled, useUseUbag } from '@/lib/dictation/crossCheckPrefs';
 import LocalePicker from '../LocalePicker';
 
 type Me = { tenant: { displayName: string }; user: { email: string } } | null;
@@ -20,6 +21,8 @@ export default function ProfileMenu() {
   const [me, setMe] = useState<Me>(null);
   const [open, setOpen] = useState(false);
   const [dictMode, setDictMode] = useSttMode();
+  const [ccEnabled, setCcEnabled] = useCrossCheckEnabled();
+  const [ccUbag, setCcUbag] = useUseUbag();
   const [signingOut, setSigningOut] = useState(false);
   const [signOutError, setSignOutError] = useState<string | null>(null);
   const ref = useRef<HTMLDivElement | null>(null);
@@ -100,6 +103,31 @@ export default function ProfileMenu() {
               onChange={(e) => setDictMode(e.target.checked ? 'ensemble' : 'single')}
             />{' '}
             Dual-engine cross-check
+          </label>
+          <label
+            className="rp-profile-popover-item"
+            data-testid="profile-crosscheck"
+            title="Show a 'Cross Check' button that re-runs a dictation through extra engines + a medical-AI review and highlights corrections."
+          >
+            <input
+              type="checkbox"
+              checked={ccEnabled}
+              onChange={(e) => setCcEnabled(e.target.checked)}
+            />{' '}
+            Manual Cross Check
+          </label>
+          <label
+            className="rp-profile-popover-item"
+            data-testid="profile-crosscheck-ubag"
+            title="Also route the medical-accuracy review through the UBAG cloud AI. Only use on reports with NO patient-identifying information (PHI)."
+          >
+            <input
+              type="checkbox"
+              checked={ccUbag}
+              disabled={!ccEnabled}
+              onChange={(e) => setCcUbag(e.target.checked)}
+            />{' '}
+            Cross Check via UBAG (no PHI)
           </label>
           <div className="rp-profile-popover-divider" />
           <div className="rp-profile-popover-meta">{tProfile('language')}</div>

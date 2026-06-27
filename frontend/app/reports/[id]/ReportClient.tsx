@@ -11,7 +11,12 @@ import {
   type ReportTemplate,
   type RewriteMode,
   type ReportSignature,
+  type CrossCheckCorrection,
 } from '@/lib/api';
+import { getSessionAudio } from '@/lib/dictation/audioBuffer';
+import { isUseUbagEnabled } from '@/lib/dictation/crossCheckPrefs';
+import { anchorCorrections, applyCorrection } from '@/lib/dictation/anchorCorrections';
+import CrossCheckBadge from '@/components/dictation/CrossCheckBadge';
 import { readQueryParam } from '@/lib/browserParams';
 import { detectCommand, stripCommand, type VoiceCommand, type CommandMatch } from '@/lib/voiceCommands';
 import RewriteStylePanel from './RewriteStylePanel';
@@ -20,6 +25,8 @@ import ReportRibbon, { type RibbonTab, type ExportFormat } from './ReportRibbon'
 import ReportInspector, { type InspectorTab } from './ReportInspector';
 import { SECTIONS, statusLabel, statusTone, normalizeRole } from './reportShared';
 import { usePermissions } from '@/lib/permissions';
+import SectionEditor from '@/components/editor/SectionEditor';
+import { useRichEditorEnabled } from '@/lib/editor/richEditorFlag';
 
 type RewriteState = {
   mode: RewriteMode;
@@ -35,6 +42,7 @@ export default function ReportPage() {
   // (e.g. Researcher, Auditor) or a trainee who cannot sign should never see.
   // The backend still enforces each action.
   const { can: canDo } = usePermissions();
+  const richEditor = useRichEditorEnabled();
   const [id, setId] = useState<string | null>(null);
   const [report, setReport] = useState<Report | null>(null);
   const [providers, setProviders] = useState<Provider[]>([]);
@@ -44,6 +52,9 @@ export default function ReportPage() {
   const [qualityScore, setQualityScore] = useState<number | null>(null);
   const [aiBusy, setAiBusy] = useState(false);
   const [aiHighlights, setAiHighlights] = useState<Record<string, boolean>>({});
+  // Cross-check suggestions keyed by section, plus the processing-badge state.
+  const [corrections, setCorrections] = useState<Record<string, CrossCheckCorrection[]>>({});
+  const [xc, setXc] = useState<{ status: 'running' | 'completed' | 'failed'; stage: string } | null>(null);
   const [providerId, setProviderId] = useState<string>('');
   const [error, setError] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
@@ -328,6 +339,95 @@ export default function ReportPage() {
     }
   }
 
+  /**
+   * Manual Cross Check (triggered by the dictation overlay's button). Re-runs the
+   * retained dictation audio through the on-device engines (sidecar, ROVER), then
+   * a hosted LLM medical-accuracy review, and surfaces the merged suggestions as
+   * inline highlights + a review panel. Non-blocking: a badge polls in the corner.
+   */
+  async function runCrossCheck() {
+    const current = reportRef.current;
+    if (!current) return;
+    const sess = getSessionAudio(current.id);
+    if (!sess) {
+      setError('Record a dictation with the HQ button first, then Cross Check.');
+      return;
+    }
+    setError(null);
+    setXc({ status: 'running', stage: 're-running engines' });
+    try {
+      const useUbag = isUseUbagEnabled();
+      const { jobId } = await api.reports.crossCheck(current.id, sess.blob, {
+        liveTranscript: sess.transcript,
+        sectionKey: sess.sectionKey,
+        useUbag,
+      });
+
+      // Poll the on-device ASR cross-check job (~2 min budget).
+      let asr: CrossCheckCorrection[] = [];
+      for (let i = 0; i < 150; i++) {
+        await new Promise((r) => setTimeout(r, 800));
+        const s = await api.reports.crossCheckStatus(current.id, jobId);
+        setXc({ status: s.status === 'completed' || s.status === 'failed' ? s.status : 'running', stage: s.stage });
+        if (s.status === 'completed') { asr = s.corrections ?? []; break; }
+        if (s.status === 'failed') throw new Error(s.error || 'cross-check failed');
+      }
+
+      // Hosted LLM medical-accuracy review on the same base text (best-effort).
+      let llm: CrossCheckCorrection[] = [];
+      setXc({ status: 'running', stage: 'medical review' });
+      try {
+        const r = await api.reports.crossCheckReview(current.id, {
+          text: sess.transcript,
+          sectionKey: sess.sectionKey,
+          useUbag,
+        });
+        llm = r.corrections ?? [];
+      } catch {
+        /* review is best-effort — keep the ASR corrections */
+      }
+
+      const merged = [...asr, ...llm];
+      setCorrections({ [sess.sectionKey]: merged });
+      setXc({
+        status: 'completed',
+        stage: merged.length ? `${merged.length} suggestion${merged.length === 1 ? '' : 's'}` : 'no changes',
+      });
+    } catch (e) {
+      setError((e as Error).message);
+      setXc({ status: 'failed', stage: 'cross-check failed' });
+    }
+  }
+
+  function rejectCorrection(sectionKey: string, id: string) {
+    setCorrections((prev) => ({ ...prev, [sectionKey]: (prev[sectionKey] ?? []).filter((c) => c.id !== id) }));
+  }
+
+  async function acceptCorrection(c: CrossCheckCorrection) {
+    const current = reportRef.current;
+    if (!current || !c.sectionKey) return;
+    const key = c.sectionKey as keyof Report;
+    const text = String((current as Record<string, unknown>)[c.sectionKey] ?? '');
+    const next = applyCorrection(text, c);
+    rejectCorrection(c.sectionKey, c.id); // drop it either way (can't re-anchor → skip)
+    if (next == null) return;
+    setReport({ ...current, [key]: next } as Report);
+    await update({ [key]: next } as Partial<Report>);
+  }
+
+  async function acceptAllCorrections(sectionKey: string) {
+    const current = reportRef.current;
+    if (!current) return;
+    let text = String((current as Record<string, unknown>)[sectionKey] ?? '');
+    for (const c of corrections[sectionKey] ?? []) {
+      const n = applyCorrection(text, c);
+      if (n != null) text = n;
+    }
+    setReport({ ...current, [sectionKey]: text } as Report);
+    await update({ [sectionKey]: text } as Partial<Report>);
+    setCorrections((prev) => ({ ...prev, [sectionKey]: [] }));
+  }
+
   async function signAsPrimary() {
     if (!report) return;
     setSignBusy(true);
@@ -415,14 +515,17 @@ export default function ReportPage() {
     // editor only reacts to the overlay's "Fix" action, which cleans the
     // dictated prose into structured medical sections via UBAG.
     const cleanup = () => { void runDictationCleanup(); };
+    const crossCheck = () => { void runCrossCheck(); };
 
     window.addEventListener('radiopad:generate-impression', generate);
     window.addEventListener('radiopad:rewrite', rewrite);
     window.addEventListener('radiopad:dictation-cleanup', cleanup);
+    window.addEventListener('radiopad:cross-check', crossCheck);
     return () => {
       window.removeEventListener('radiopad:generate-impression', generate);
       window.removeEventListener('radiopad:rewrite', rewrite);
       window.removeEventListener('radiopad:dictation-cleanup', cleanup);
+      window.removeEventListener('radiopad:cross-check', crossCheck);
     };
   }, [id, report?.id, providerId]);
 
@@ -586,6 +689,48 @@ export default function ReportPage() {
         </div>
       )}
 
+      {Object.values(corrections).some((list) => list.length > 0) && (
+        <div className="rp-panel" data-testid="crosscheck-panel">
+          <div className="rp-panel-title">
+            Cross-check suggestions <span className="badge ai">AI</span>
+          </div>
+          <p className="rp-page-sub">
+            Review each change the cross-check engines and medical AI proposed. Accepting applies the edit.
+          </p>
+          {Object.entries(corrections).flatMap(([sectionKey, list]) =>
+            list.map((c) => (
+              <div key={c.id} className={`rp-xc-item ${c.severity}`}>
+                <div className="rp-xc-change">
+                  <span className="rp-xc-from">{c.originalText || '∅'}</span>
+                  <span className="rp-xc-arrow" aria-hidden="true">→</span>
+                  <span className="rp-xc-to">{c.correctedText}</span>
+                </div>
+                <div className="rp-xc-meta">
+                  <span className="badge">{sectionKey}</span>
+                  <span className="rp-xc-reason">{c.reason}</span>
+                  <span className="rp-xc-source">{c.source}</span>
+                </div>
+                <div className="rp-row" style={{ gap: 8 }}>
+                  <button className="primary" onClick={() => acceptCorrection(c)}>Accept</button>
+                  <button className="ghost" onClick={() => rejectCorrection(sectionKey, c.id)}>Reject</button>
+                </div>
+              </div>
+            )),
+          )}
+          <div className="rp-toolbar rp-mt-sm">
+            {Object.keys(corrections).map((sectionKey) =>
+              (corrections[sectionKey]?.length ?? 0) > 0 ? (
+                <button key={sectionKey} className="subtle" onClick={() => acceptAllCorrections(sectionKey)}>
+                  Accept all
+                </button>
+              ) : null,
+            )}
+            <button className="ghost" onClick={() => setCorrections({})}>Reject all</button>
+            <button className="subtle" onClick={() => { void flushEdits(); }}>Save</button>
+          </div>
+        </div>
+      )}
+
       <div className="rp-report-body">
         <div className="rp-doc">
           {Object.values(aiHighlights).some(Boolean) && (
@@ -605,22 +750,47 @@ export default function ReportPage() {
               >
                 <label>{label}</label>
                 <div className={aiHighlights[key as string] ? 'ai-mark' : ''}>
-                  <textarea
-                    className={cls}
-                    value={(report as Record<string, unknown>)[key as string] as string}
-                    onChange={(e) => {
-                      const next = { ...aiHighlights };
-                      if (next[key as string]) delete next[key as string];
-                      setAiHighlights(next);
-                      setReport({ ...report, [key]: e.target.value });
-                    }}
-                    onBlur={(e) =>
-                      update({
-                        [key]: e.target.value,
-                        aiHighlightsJson: JSON.stringify(aiHighlights),
-                      } as Partial<Report>)
-                    }
-                  />
+                  {richEditor ? (
+                    <SectionEditor
+                      sectionKey={key as string}
+                      className={cls}
+                      ariaLabel={label}
+                      value={(report as Record<string, unknown>)[key as string] as string}
+                      corrections={anchorCorrections(
+                        (report as Record<string, unknown>)[key as string] as string,
+                        corrections[key as string] ?? [],
+                      )}
+                      onChange={(val) => {
+                        const next = { ...aiHighlights };
+                        if (next[key as string]) delete next[key as string];
+                        setAiHighlights(next);
+                        setReport({ ...report, [key]: val });
+                      }}
+                      onBlur={(val) =>
+                        update({
+                          [key]: val,
+                          aiHighlightsJson: JSON.stringify(aiHighlights),
+                        } as Partial<Report>)
+                      }
+                    />
+                  ) : (
+                    <textarea
+                      className={cls}
+                      value={(report as Record<string, unknown>)[key as string] as string}
+                      onChange={(e) => {
+                        const next = { ...aiHighlights };
+                        if (next[key as string]) delete next[key as string];
+                        setAiHighlights(next);
+                        setReport({ ...report, [key]: e.target.value });
+                      }}
+                      onBlur={(e) =>
+                        update({
+                          [key]: e.target.value,
+                          aiHighlightsJson: JSON.stringify(aiHighlights),
+                        } as Partial<Report>)
+                      }
+                    />
+                  )}
                 </div>
               </div>
             );
@@ -653,6 +823,10 @@ export default function ReportPage() {
           onSubmitAddendum={submitAddendum}
         />
       </div>
+
+      {xc && (
+        <CrossCheckBadge status={xc.status} stage={xc.stage} onDismiss={() => setXc(null)} />
+      )}
     </div>
   );
 }

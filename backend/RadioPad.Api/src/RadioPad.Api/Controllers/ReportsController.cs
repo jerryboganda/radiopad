@@ -829,6 +829,73 @@ public class ReportsController : TenantedController
         }
     }
 
+    public record CrossCheckReviewDto(string Text, string? SectionKey, bool UseUbag);
+
+    /// <summary>
+    /// Cross-check LLM medical-accuracy review of already-transcribed text — returns
+    /// suggested original→corrected edits for the editor. Mirrors
+    /// <see cref="DictationCleanup"/>: RBAC <see cref="UserRole.Radiologist"/> /
+    /// <see cref="UserRole.MedicalDirector"/>, the "ai" rate limit, and a
+    /// <see cref="Application.Services.ProviderPolicyException"/> → 403
+    /// <c>provider_policy</c>. When <c>useUbag</c> is set and the tenant has an
+    /// enabled UBAG provider, the review routes through it (opt-in cloud web-AI).
+    /// </summary>
+    [HttpPost("{id:guid}/crosscheck/review")]
+    [Microsoft.AspNetCore.RateLimiting.EnableRateLimiting("ai")]
+    public async Task<IActionResult> CrossCheckReview(
+        Guid id,
+        [FromBody] CrossCheckReviewDto dto,
+        [FromServices] Application.Abstractions.ICrossCheckReviewService service,
+        CancellationToken ct)
+    {
+        var (tenant, user) = await ResolveContextAsync(_db, ct);
+        var deny = RequireRole(user, UserRole.Radiologist, UserRole.MedicalDirector);
+        if (deny is not null) return deny;
+        var report = await _db.Reports.FirstOrDefaultAsync(r => r.Id == id && r.TenantId == tenant.Id, ct);
+        if (report is null) return NotFound();
+        if (string.IsNullOrWhiteSpace(dto.Text))
+            return BadRequest(new { error = "text is required.", kind = "validation" });
+
+        // Opt-in UBAG: force an enabled UBAG provider when the tenant has one.
+        RadioPad.Domain.Entities.ProviderConfig? forced = null;
+        if (dto.UseUbag)
+        {
+            forced = await _db.Providers.FirstOrDefaultAsync(
+                p => p.TenantId == tenant.Id
+                     && p.Enabled
+                     && p.Adapter == RadioPad.Infrastructure.Providers.Ubag.UbagProviderAdapter.AdapterId, ct);
+        }
+
+        try
+        {
+            var result = await service.ReviewAsync(tenant, report, dto.Text, dto.SectionKey, forced, ct);
+            return Ok(new
+            {
+                provider = result.Provider,
+                model = result.Model,
+                latencyMs = result.LatencyMs,
+                corrections = result.Corrections.Select(c => new
+                {
+                    id = c.Id,
+                    sectionKey = c.SectionKey,
+                    originalText = c.OriginalText,
+                    correctedText = c.CorrectedText,
+                    startOffset = c.StartOffset,
+                    endOffset = c.EndOffset,
+                    reason = c.Reason,
+                    category = c.Category,
+                    source = c.Source,
+                    confidence = c.Confidence,
+                    severity = c.Severity,
+                }),
+            });
+        }
+        catch (Application.Services.ProviderPolicyException pex)
+        {
+            return StatusCode(StatusCodes.Status403Forbidden, new { error = pex.Message, kind = "provider_policy" });
+        }
+    }
+
     /// <summary>
     /// Phase B (dictation transcription) — accepts a dictation audio file
     /// (multipart form, field <c>audio</c>) and returns a free-text transcript

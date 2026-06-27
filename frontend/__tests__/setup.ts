@@ -66,6 +66,22 @@ if (typeof Element !== 'undefined') {
   Element.prototype.scrollIntoView = function () {};
 }
 
+// ProseMirror/Tiptap (the rich SectionEditor) probe layout geometry that jsdom
+// only partially implements. Provide harmless stubs so mounting the editor in
+// tests doesn't throw.
+if (typeof Range !== 'undefined') {
+  if (typeof Range.prototype.getClientRects !== 'function') {
+    // @ts-expect-error minimal stub for jsdom
+    Range.prototype.getClientRects = () => ({ length: 0, item: () => null });
+  }
+  if (typeof Range.prototype.getBoundingClientRect !== 'function') {
+    // @ts-expect-error minimal stub for jsdom
+    Range.prototype.getBoundingClientRect = () => ({
+      x: 0, y: 0, width: 0, height: 0, top: 0, left: 0, right: 0, bottom: 0,
+    });
+  }
+}
+
 afterEach(() => {
   cleanup();
   vi.restoreAllMocks();

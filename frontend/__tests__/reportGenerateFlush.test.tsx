@@ -113,6 +113,9 @@ import { api } from '@/lib/api';
 beforeEach(() => {
   h.state.db = { ...h.initialReport };
   h.state.aiReadFindings = null;
+  // This test exercises the flush-before-AI logic, which is identical for both
+  // editors; pin the plain-textarea path so it doesn't depend on driving Tiptap.
+  window.localStorage.setItem('radiopad:rich-editor', '0');
 });
 
 describe('Generate impression — flush before AI (HANDOFF gotcha #3)', () => {

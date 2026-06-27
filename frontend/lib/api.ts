@@ -17,6 +17,33 @@ export type SttSpan = {
   source: string;
 };
 
+/** One AI correction from the cross-check pass (original→corrected + provenance). */
+export type CrossCheckCorrection = {
+  id: string;
+  sectionKey?: string | null;
+  originalText: string;
+  correctedText: string;
+  startOffset: number;
+  endOffset: number;
+  reason: string;
+  category: string;
+  source: string;
+  confidence: number;
+  severity: 'safety' | 'warning' | 'info';
+};
+
+/** Poll result for an async cross-check job. */
+export type CrossCheckStatus = {
+  jobId: string;
+  status: 'queued' | 'running' | 'completed' | 'failed';
+  stage: string;
+  error?: string | null;
+  transcript?: string | null;
+  engineIds?: string | null;
+  latencyMs?: number | null;
+  corrections?: CrossCheckCorrection[] | null;
+};
+
 type PublicProcess = { env?: Record<string, string | undefined> };
 
 const RUNTIME_PUBLIC_ENV =
@@ -1051,6 +1078,44 @@ export const api = {
       }
       return requestForm<TranscribeResult>(`/api/reports/${id}/dictation/transcribe`, form);
     },
+    /**
+     * Manual "Cross Check": re-run the retained dictation audio through the extra
+     * on-device engines, reconcile against the live draft, and (later) an LLM
+     * medical pass. Async — returns a job id to poll via `crossCheckStatus`.
+     * Desktop hits the loopback sidecar (PHI-local); web hits the hosted path.
+     */
+    crossCheck: async (
+      id: string,
+      audio: Blob,
+      opts: { liveTranscript: string; sectionKey?: string; useUbag?: boolean },
+    ): Promise<{ jobId: string }> => {
+      const form = new FormData();
+      const name = audio.type.includes('wav') ? 'dictation.wav' : 'dictation.webm';
+      form.append('audio', audio, name);
+      form.append('liveTranscript', opts.liveTranscript);
+      if (opts.sectionKey) form.append('sectionKey', opts.sectionKey);
+      if (opts.useUbag) form.append('useUbag', 'true');
+      const local = await localSttBase();
+      if (local) return requestFormTo<{ jobId: string }>(local, '/api/stt/crosscheck', form);
+      return requestForm<{ jobId: string }>(`/api/reports/${id}/crosscheck`, form);
+    },
+    crossCheckStatus: async (id: string, jobId: string): Promise<CrossCheckStatus> => {
+      const local = await localSttBase();
+      if (local) return requestTo<CrossCheckStatus>(local, `/api/stt/crosscheck/${jobId}`);
+      return request<CrossCheckStatus>(`/api/reports/${id}/crosscheck/${jobId}`);
+    },
+    /**
+     * LLM medical-accuracy review of already-transcribed text. Always hosted (it
+     * needs the tenant + AI gateway); opt-in `useUbag` routes via the cloud gateway.
+     */
+    crossCheckReview: async (
+      id: string,
+      body: { text: string; sectionKey?: string; useUbag?: boolean },
+    ): Promise<{ provider: string; model: string; latencyMs: number; corrections: CrossCheckCorrection[] }> =>
+      request(`/api/reports/${id}/crosscheck/review`, {
+        method: 'POST',
+        body: JSON.stringify(body),
+      }),
     signatures: (id: string) =>
       request<ReportSignature[]>(`/api/reports/${id}/signatures`),
     sign: (id: string, body: { role: 'Primary' | 'CoSigner'; note?: string }) =>

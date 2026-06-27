@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { render, screen, fireEvent, waitFor } from '@testing-library/react';
+import { render, screen, fireEvent, waitFor, within } from '@testing-library/react';
 import * as React from 'react';
 import ProfileMenu from '@/components/shell/ProfileMenu';
 
@@ -103,7 +103,8 @@ describe('ProfileMenu sign-out', () => {
     render(<ProfileMenu />);
     fireEvent.click(await screen.findByRole('button', { name: /reader@example.com/i }));
 
-    const checkbox = screen.getByRole('checkbox') as HTMLInputElement;
+    const checkbox = within(screen.getByTestId('profile-dual-check'))
+      .getByRole('checkbox') as HTMLInputElement;
     expect(checkbox.checked).toBe(false); // default: off (single / auto)
 
     fireEvent.click(checkbox);

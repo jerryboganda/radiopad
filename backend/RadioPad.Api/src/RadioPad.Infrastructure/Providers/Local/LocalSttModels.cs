@@ -179,6 +179,36 @@ public static class LocalSttModels
     public static bool IsWhisperModel(string? modelId) =>
         modelId == WhisperModelName || modelId == WhisperSmallEnModelName;
 
+    // ── Kyutai STT 1B (en/fr) — 3rd cross-check engine via moshi.cpp (GGUF) ──
+    // CPU + system RAM only (per the on-device rule). The GGUF artifact is
+    // operator-provided (converted from the candle weights), so there is no pinned
+    // download URL yet; the engine self-enables when the GGUF + moshi.cpp binary
+    // are present on disk.
+
+    public const string KyutaiModelName = "kyutai-stt-1b-en_fr";
+
+    /// <summary>Locate the Kyutai GGUF under its model dir, or null when absent.</summary>
+    public static string? ResolveKyutaiGguf()
+    {
+        var dir = ResolveModelDir(KyutaiModelName);
+        if (dir is null || !Directory.Exists(dir)) return null;
+        return Directory.GetFiles(dir, "*.gguf", SearchOption.AllDirectories).FirstOrDefault();
+    }
+
+    /// <summary>Path to the moshi.cpp executable (<c>RADIOPAD_STT_MOSHI_BIN</c>), or null.</summary>
+    public static string? ResolveMoshiBin()
+        => Env("RADIOPAD_STT_MOSHI_BIN") is { Length: > 0 } v && File.Exists(v) ? v : null;
+
+    /// <summary>
+    /// Argument template for the moshi.cpp invocation. <c>{model}</c> and
+    /// <c>{audio}</c> are substituted with the GGUF path and the temp WAV path.
+    /// Override via <c>RADIOPAD_STT_MOSHI_ARGS</c> to match the shipped binary's CLI.
+    /// </summary>
+    public const string DefaultMoshiArgs = "--model {model} --file {audio}";
+
+    public static string ResolveMoshiArgs()
+        => Env("RADIOPAD_STT_MOSHI_ARGS") is { Length: > 0 } v ? v : DefaultMoshiArgs;
+
     /// <summary>
     /// Path of the per-install on-device STT preferences file (primary-model
     /// selection). Independent of <c>RADIOPAD_STT_MODEL_DIR</c> so it survives a

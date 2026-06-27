@@ -90,6 +90,25 @@ public sealed class LocalModelCatalog : ILocalModelCatalog
                 FileName: smallEn.FileName,
                 Placeholder: false),
 
+            // Kyutai STT 1B (en/fr) — the 3rd cross-check engine, run on CPU/RAM via
+            // moshi.cpp from a GGUF the operator converts from the candle weights.
+            // No pinned download URL yet (operator-provided artifact): rendered as a
+            // disabled card until URL/SHA/size are filled and Placeholder flipped.
+            // The engine self-enables from disk regardless (RADIOPAD_STT_MOSHI_BIN +
+            // the GGUF under its model dir).
+            new(
+                Id: LocalSttModels.KyutaiModelName,
+                DisplayName: "Kyutai STT 1B (en/fr) — medical cross-check (moshi.cpp, GGUF)",
+                Kind: ModelKind.Stt,
+                Engine: KyutaiMoshiSttClient.EngineName, // "kyutai"
+                DownloadUrl: "",
+                Sha256: "",
+                SizeBytes: 0,
+                License: "CC-BY-4.0",
+                ArchiveKind: ModelArchiveKind.RawFile,
+                FileName: null,
+                Placeholder: true),
+
             // ── Roadmap placeholders (no engine/URL yet). The manager renders these
             // as disabled "coming soon" cards. When the engine lands: flip Placeholder
             // to false and fill the URL/SHA/size — nothing else in the pipeline changes.

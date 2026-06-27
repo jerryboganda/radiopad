@@ -15,6 +15,9 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { startFocusTracking, getLastFocusedEditable } from '@/lib/dictation/focusTracker';
 import { insertAtCursor } from '@/lib/dictation/insertText';
+import { getLastFocusedSectionEditor } from '@/lib/editor/sectionEditorRegistry';
+import { setSessionAudio } from '@/lib/dictation/audioBuffer';
+import { useCrossCheckEnabled, useUseUbag } from '@/lib/dictation/crossCheckPrefs';
 import { formatDictation } from '@/lib/dictation/medicalFormat';
 import { blobToWav16kMono } from '@/lib/dictation/wavEncode';
 import {
@@ -28,6 +31,23 @@ import { readQueryParam } from '@/lib/browserParams';
 
 const DICTATE_EVENT = 'radiopad:dictate';
 const CLEANUP_EVENT = 'radiopad:dictation-cleanup';
+
+// Insert dictated text into whichever field the radiologist last focused —
+// preferring a rich SectionEditor (cross-check editor) and falling back to a
+// plain textarea/input. Returns true if a target was found.
+function insertDictation(text: string): boolean {
+  const handle = getLastFocusedSectionEditor();
+  if (handle) {
+    handle.insertAtCursor(text);
+    return true;
+  }
+  const target = getLastFocusedEditable();
+  if (target) {
+    insertAtCursor(target, text);
+    return true;
+  }
+  return false;
+}
 
 export default function DictationOverlay() {
   const [supported, setSupported] = useState(false);
@@ -50,6 +70,8 @@ export default function DictationOverlay() {
   // On-device engine mode — shared with the profile-menu dual-check toggle so
   // the two controls stay in sync — plus the ensemble's flagged review spans.
   const [mode, setMode] = useSttMode();
+  const [crossCheckEnabled] = useCrossCheckEnabled();
+  const [useUbag] = useUseUbag();
   const [reviewSpans, setReviewSpans] = useState<SttSpan[]>([]);
   // Transient transcription error (e.g. on-device engine still downloading its
   // model on first run → HTTP 503). Surfaced so the radiologist gets feedback
@@ -83,8 +105,7 @@ export default function DictationOverlay() {
       const { finalText, interimText } = parseSpeechResults(event);
       setInterim(interimText);
       if (finalText) {
-        const target = getLastFocusedEditable();
-        if (target) insertAtCursor(target, formatDictation(finalText));
+        insertDictation(formatDictation(finalText));
         setInterim('');
       }
     };
@@ -109,8 +130,8 @@ export default function DictationOverlay() {
 
   const transcribeAudio = useCallback(async (blob: Blob) => {
     const reportId = readQueryParam('id');
-    const target = getLastFocusedEditable();
-    if (!reportId || !target || blob.size === 0) return;
+    const hasTarget = !!getLastFocusedSectionEditor() || !!getLastFocusedEditable();
+    if (!reportId || !hasTarget || blob.size === 0) return;
     setTranscribing(true);
     setSttError(null);
     try {
@@ -128,7 +149,14 @@ export default function DictationOverlay() {
         }
       }
       const res = await api.reports.transcribe(reportId, payload, mode);
-      if (res.transcript) insertAtCursor(target, formatDictation(res.transcript));
+      if (res.transcript) {
+        const formatted = formatDictation(res.transcript);
+        insertDictation(formatted);
+        // Retain the audio + its transcript (and which section it went into) so the
+        // manual Cross Check can re-run the same audio through the extra engines.
+        const sectionKey = getLastFocusedSectionEditor()?.sectionKey ?? 'findings';
+        setSessionAudio(reportId, payload, formatted, sectionKey);
+      }
       // Surface ensemble disagreements / safety tokens for the radiologist to
       // eye-confirm (null on single-engine / cloud paths).
       setReviewSpans((res.spans ?? []).filter((s) => s.flagged));
@@ -282,6 +310,29 @@ export default function DictationOverlay() {
         >
           Fix
         </button>
+        {crossCheckEnabled && (
+          <button
+            type="button"
+            data-testid="dictation-crosscheck"
+            className="rp-dictation-fix subtle"
+            title="Re-run the dictation through the cross-check engines and verify the wording"
+            onMouseDown={(e) => e.preventDefault()}
+            onClick={() => {
+              if (
+                useUbag &&
+                !window.confirm(
+                  'Cross-check via UBAG sends report text to a cloud AI service. ' +
+                    'Confirm this report contains NO patient-identifying information (PHI).',
+                )
+              ) {
+                return;
+              }
+              window.dispatchEvent(new CustomEvent('radiopad:cross-check'));
+            }}
+          >
+            Cross Check
+          </button>
+        )}
         <select
           className="subtle"
           data-testid="dictation-mode"
