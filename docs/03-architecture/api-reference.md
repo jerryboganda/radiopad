@@ -178,7 +178,7 @@ The provider rows reference an `adapter` id from this fixed catalog. Compliance 
 | `ollama-chat` / `vllm` / `llama-cpp` | HTTP | `LocalOnly` | In-tenant local servers (iter-32 AI-011). |
 | `gemini-cli` | CLI subprocess | `Sandbox` | **Iter-36 AI-012.** Shells out to `gemini` headless mode with `--output-format json`. Binary override env `RADIOPAD_GEMINI_BIN` (default `gemini`). PHI and secret-like prompts are refused by the adapter even if a row is misclassified. |
 | `codex-cli` | CLI subprocess, fail-closed | `Sandbox` | **Iter-36 AI-012 / Iter-47 hardening.** Shells out to `codex exec --sandbox read-only -` only when `RADIOPAD_CODEX_CLI_ENABLED=1`. Binary override env `RADIOPAD_CODEX_BIN` (default `codex`). The adapter does not opt into `--full-auto`; PHI and secret-like prompts are refused. |
-| `ubag` | HTTPS automation gateway | `Sandbox` | **Iter-50.** Routes non-PHI, non-secret prompts to production UBAG through the RadioPad backend. `model` selects the UBAG target (`gemini_web`, `deepseek_web`, `chatgpt_web`, or `mock`); default UI preset uses `gemini_web`. The adapter refuses PHI even if a row is misclassified. Ordered ChatGPT -> Gemini -> DeepSeek runs use `/api/ubag/workflows/ordered-web-chain`, not report drafting. |
+| `ubag` | HTTPS automation gateway | `PhiApproved` | **Iter-50; PHI gate removed 2026-06-27 (operator decision).** Routes report prompts to production UBAG through the RadioPad backend. `model` selects the UBAG target (`gemini_web`, `deepseek_web`, `chatgpt_web`, or `mock`); default UI preset uses `gemini_web`. Secret-shaped prompts are still refused; the PHI block was removed so cleanup/impression/rewrite/cross-check run on patient-linked reports. Ordered ChatGPT -> Gemini -> DeepSeek runs use `/api/ubag/workflows/ordered-web-chain`, not report drafting. |
 
 CLI adapters share these guard-rails (`RadioPad.Infrastructure.Providers.Cli.CliProviderRunner`):
 
@@ -191,14 +191,14 @@ CLI adapters share these guard-rails (`RadioPad.Infrastructure.Providers.Cli.Cli
 
 ## UBAG Hub
 
-UBAG is a governed browser-automation gateway for non-PHI work. RadioPad never
+UBAG is a governed browser-automation gateway for report AI work. RadioPad never
 calls UBAG from the browser; the frontend calls RadioPad's `/api/ubag/*`
 endpoints, and the backend calls production UBAG with server-only auth.
 
 Required posture:
 
-- UBAG provider rows must remain `Sandbox`.
-- PHI and secret-shaped prompts are rejected before dispatch.
+- UBAG provider rows are `PhiApproved` (operator decision 2026-06-27); the workflow sends only de-identified report text and the adapter's PHI gate was removed.
+- Secret-shaped prompts are still rejected before dispatch.
 - Generated output is draft material and is rendered with `.ai-mark` until reviewed.
 - Provider login, CAPTCHA, 2FA, consent, cookies, and credentials remain manual in UBAG Browser Sessions.
 
