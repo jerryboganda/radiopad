@@ -1353,12 +1353,22 @@
 
 /* ---- Right form pane -------------------------------------------- */
 .rp-auth-main {
+  position: relative;
   flex: 1 1 54%;
   display: flex;
   align-items: center;
   justify-content: center;
   padding: 48px 24px;
   min-height: 100vh;
+}
+/* Desktop "Check for updates" — pinned top-right of the auth pane. The inner
+   CheckUpdatesButton renders only inside the Tauri shell, so this slot is empty
+   (and harmless) on web/mobile. */
+.rp-auth-update {
+  position: absolute;
+  top: 18px;
+  right: 18px;
+  z-index: 2;
 }
 .rp-auth-card {
   width: 100%;

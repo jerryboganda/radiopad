@@ -1,6 +1,7 @@
 'use client';
 
 import type { ReactNode } from 'react';
+import CheckUpdatesButton from '@/components/shell/CheckUpdatesButton';
 
 /**
  * Split-screen scaffold for the public auth entrance (sign-in / register /
@@ -122,6 +123,11 @@ export default function AuthScaffold({
       </aside>
 
       <main className="rp-auth-main">
+        {/* Desktop self-update, reachable before sign-in. Renders only inside the
+            Tauri shell (CheckUpdatesButton self-hides on web/mobile). */}
+        <div className="rp-auth-update">
+          <CheckUpdatesButton />
+        </div>
         <div className="rp-auth-card">
           <div className="rp-auth-mobile-brand">
             <BrandMark />
