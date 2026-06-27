@@ -177,6 +177,19 @@ function ModelCard({
     }
   }
 
+  async function doSetPrimary() {
+    setBusy('primary');
+    setMsg(null);
+    try {
+      await api.localModels.setPrimary(model.id);
+      await onChanged();
+    } catch (e) {
+      setMsg(errText(e));
+    } finally {
+      setBusy(null);
+    }
+  }
+
   async function copyDiagnostics() {
     try {
       const diagnostics = await api.localModels.diagnostics(model.id);
@@ -200,6 +213,7 @@ function ModelCard({
       </div>
 
       <div className="rp-row" style={{ gap: 6, marginTop: 8, flexWrap: 'wrap' }}>
+        {model.isPrimary && <span className="badge ai">Primary</span>}
         {!model.placeholder && <span className="badge">{fmtBytes(model.sizeBytes)}</span>}
         {model.license && <span className="badge">{model.license}</span>}
         {model.available && <span className="badge ok">Loaded</span>}
@@ -243,6 +257,11 @@ function ModelCard({
             </button>
           ) : (
             <>
+              {!model.isPrimary && (
+                <button className="primary-ghost" onClick={doSetPrimary} disabled={!enabled || busy !== null}>
+                  {busy === 'primary' ? 'Setting…' : 'Make primary'}
+                </button>
+              )}
               <button className="subtle" onClick={doTest} disabled={!enabled || busy !== null}>
                 {busy === 'test' ? 'Testing…' : 'Test'}
               </button>

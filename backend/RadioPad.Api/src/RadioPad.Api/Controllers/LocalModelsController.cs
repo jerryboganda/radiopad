@@ -30,6 +30,7 @@ public sealed class LocalModelsController : ControllerBase
     private readonly IModelProvisioningStatus _status;
     private readonly SttModelProvisioner _provisioner;
     private readonly IReadOnlyList<ILocalSttEngine> _engines;
+    private readonly ILocalSttSettings _settings;
     private readonly ILogger<LocalModelsController> _log;
 
     public LocalModelsController(
@@ -37,12 +38,14 @@ public sealed class LocalModelsController : ControllerBase
         IModelProvisioningStatus status,
         SttModelProvisioner provisioner,
         IEnumerable<ILocalSttEngine> engines,
+        ILocalSttSettings settings,
         ILogger<LocalModelsController> log)
     {
         _catalog = catalog;
         _status = status;
         _provisioner = provisioner;
         _engines = engines.ToList();
+        _settings = settings;
         _log = log;
     }
 
@@ -262,6 +265,27 @@ public sealed class LocalModelsController : ControllerBase
         });
     }
 
+    /// <summary>
+    /// Make a downloaded STT model the primary dictation engine (persisted per
+    /// workstation; honored by the ensemble + whisper engine on the next dictation).
+    /// </summary>
+    [HttpPost("{id}/primary")]
+    public IActionResult SetPrimary(string id)
+    {
+        var desc = _catalog.ById(id);
+        if (desc is null) return NotFound(new { error = "unknown model.", kind = "not_found" });
+        if (!LocalSttModels.IsEnabled())
+            return StatusCode(StatusCodes.Status503ServiceUnavailable,
+                new { error = "on-device models are only available in the RadioPad desktop app.", kind = "stt_unavailable" });
+        if (desc.Placeholder || desc.Kind != ModelKind.Stt)
+            return BadRequest(new { error = "only a speech-to-text model can be the primary engine.", kind = "validation" });
+        if (!IsDownloaded(desc))
+            return Conflict(new { error = "download the model before making it primary.", kind = "not_downloaded" });
+
+        _settings.SetPrimary(id);
+        return Ok(new { id, isPrimary = true });
+    }
+
     // ── helpers ─────────────────────────────────────────────────────────────
 
     private object Project(LocalModelDescriptor d, bool enabled)
@@ -278,6 +302,7 @@ public sealed class LocalModelsController : ControllerBase
             placeholder = d.Placeholder,
             downloaded = IsDownloaded(d),
             available = enabled && (engine?.Available ?? false),
+            isPrimary = !d.Placeholder && d.Kind == ModelKind.Stt && _settings.IsPrimary(d.Id),
             progress = ProjectProgress(d.Id, _status.Get(d.Id)),
         };
     }

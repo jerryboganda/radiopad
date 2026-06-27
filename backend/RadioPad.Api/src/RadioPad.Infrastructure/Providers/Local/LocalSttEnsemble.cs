@@ -21,17 +21,21 @@ namespace RadioPad.Infrastructure.Providers.Local;
 /// </summary>
 public sealed class LocalSttEnsemble : ILocalSttClient
 {
-    private const string PrimaryEngineId = SherpaParakeetSttClient.EngineName; // "parakeet"
     private const string SingleProvider = SherpaParakeetSttClient.ProviderName; // "local"
     private const string EnsembleProvider = "local_ensemble";
 
     private readonly IReadOnlyList<ILocalSttEngine> _engines;
     private readonly ILogger<LocalSttEnsemble> _log;
+    private readonly ILocalSttSettings _settings;
 
-    public LocalSttEnsemble(IEnumerable<ILocalSttEngine> engines, ILogger<LocalSttEnsemble> log)
+    public LocalSttEnsemble(
+        IEnumerable<ILocalSttEngine> engines,
+        ILogger<LocalSttEnsemble> log,
+        ILocalSttSettings? settings = null)
     {
         _engines = engines.ToList();
         _log = log;
+        _settings = settings ?? DefaultLocalSttSettings.Instance;
     }
 
     public bool Available => _engines.Any(e => e.Available);
@@ -80,7 +84,7 @@ public sealed class LocalSttEnsemble : ILocalSttClient
         if (ok.Count == 1)
             return new TranscriptionResult(ok[0].Text, SingleProvider, ok[0].EngineId, sw.ElapsedMilliseconds);
 
-        var a = ok.FirstOrDefault(h => h.EngineId == PrimaryEngineId) ?? ok[0];
+        var a = ok.FirstOrDefault(h => h.EngineId == _settings.PrimaryEngineId) ?? ok[0];
         var b = ok.First(h => !ReferenceEquals(h, a));
         var reconciled = SttReconciler.Reconcile(a, b, BuildOptions());
 
@@ -93,8 +97,8 @@ public sealed class LocalSttEnsemble : ILocalSttClient
             sw.ElapsedMilliseconds, reconciled.Spans);
     }
 
-    private static ILocalSttEngine PickPrimary(IReadOnlyList<ILocalSttEngine> engines)
-        => engines.FirstOrDefault(e => e.EngineId == PrimaryEngineId) ?? engines[0];
+    private ILocalSttEngine PickPrimary(IReadOnlyList<ILocalSttEngine> engines)
+        => engines.FirstOrDefault(e => e.EngineId == _settings.PrimaryEngineId) ?? engines[0];
 
     private async Task<EngineTranscript?> RunSafe(ILocalSttEngine engine, byte[] bytes, CancellationToken ct)
     {
@@ -110,8 +114,8 @@ public sealed class LocalSttEnsemble : ILocalSttClient
     }
 
     // Parakeet (transducer) is over-confident vs Whisper's token-prob, so scale it
-    // down for a fair calibrated vote. A starting prior until reliability tables
-    // are built from a held-out de-identified dictation set.
+    // down for a fair calibrated vote regardless of which engine leads. A starting
+    // prior until reliability tables are built from a held-out dictation set.
     private static ReconcileOptions BuildOptions()
-        => new() { EngineScale = new Dictionary<string, double> { [PrimaryEngineId] = 0.9 } };
+        => new() { EngineScale = new Dictionary<string, double> { [SherpaParakeetSttClient.EngineName] = 0.9 } };
 }

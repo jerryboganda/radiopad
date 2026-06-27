@@ -194,6 +194,10 @@ builder.Services.AddSingleton<RadioPad.Infrastructure.Providers.Local.IModelProv
     RadioPad.Infrastructure.Providers.Local.ModelProvisioningStatus>();
 builder.Services.AddSingleton<RadioPad.Infrastructure.Providers.Local.ILocalModelCatalog,
     RadioPad.Infrastructure.Providers.Local.LocalModelCatalog>();
+// Persisted per-workstation "primary STT model" selection, honored by the ensemble
+// + whisper engine and set via POST /api/local-models/{id}/primary.
+builder.Services.AddSingleton<RadioPad.Infrastructure.Providers.Local.ILocalSttSettings,
+    RadioPad.Infrastructure.Providers.Local.LocalSttSettings>();
 // PRD BILL-001..006 — billing helpers (audit + plan quota + subscription lifecycle).
 builder.Services.AddScoped<IPlanQuotaStore, EfPlanQuotaStore>();
 builder.Services.AddScoped<RadioPad.Application.Services.IBillingAudit, RadioPad.Application.Services.BillingAudit>();

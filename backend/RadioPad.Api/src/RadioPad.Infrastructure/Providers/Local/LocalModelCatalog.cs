@@ -50,6 +50,7 @@ public sealed class LocalModelCatalog : ILocalModelCatalog
     {
         var parakeet = LocalSttModels.Parakeet;
         var whisper = LocalSttModels.Whisper;
+        var smallEn = LocalSttModels.WhisperSmallEn;
         return new List<LocalModelDescriptor>
         {
             new(
@@ -75,6 +76,18 @@ public sealed class LocalModelCatalog : ILocalModelCatalog
                 License: "MIT",
                 ArchiveKind: ModelArchiveKind.RawFile,
                 FileName: whisper.FileName,
+                Placeholder: false),
+            new(
+                Id: smallEn.Name,
+                DisplayName: "Whisper small.en — fast English speech-to-text",
+                Kind: ModelKind.Stt,
+                Engine: WhisperNetSttClient.EngineName, // "whisper"
+                DownloadUrl: smallEn.Url,
+                Sha256: smallEn.Sha256,
+                SizeBytes: smallEn.SizeBytes,
+                License: "MIT",
+                ArchiveKind: ModelArchiveKind.RawFile,
+                FileName: smallEn.FileName,
                 Placeholder: false),
 
             // ── Roadmap placeholders (no engine/URL yet). The manager renders these

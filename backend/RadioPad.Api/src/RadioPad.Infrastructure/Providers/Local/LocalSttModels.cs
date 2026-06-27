@@ -25,6 +25,9 @@ public static class LocalSttModels
 
     public const string WhisperModelName = "whisper-large-v3-turbo-q5_0";
 
+    /// <summary>English-only whisper.cpp small model — the low-latency option.</summary>
+    public const string WhisperSmallEnModelName = "whisper-small.en-q5_1";
+
     /// <summary>
     /// OpenAI Whisper large-v3-turbo q5_0 GGML for whisper.cpp / Whisper.net
     /// (~547 MB). MIT (weights + whisper.cpp). SHA-256 from the HuggingFace LFS
@@ -36,6 +39,18 @@ public static class LocalSttModels
         Url: "https://huggingface.co/ggerganov/whisper.cpp/resolve/main/ggml-large-v3-turbo-q5_0.bin",
         SizeBytes: 574041195L,
         Sha256: "394221709cd5ad1f40c46e6031ca61bce88931e6e088c188294c6d5a55ffa7e2");
+
+    /// <summary>
+    /// OpenAI Whisper small.en q5_1 GGML (~181 MB). MIT. English-only and much
+    /// faster than turbo — the low-latency choice for the primary dictation engine.
+    /// SHA-256 from the HuggingFace LFS pointer.
+    /// </summary>
+    public static readonly FileSpec WhisperSmallEn = new(
+        Name: WhisperSmallEnModelName,
+        FileName: "ggml-small.en-q5_1.bin",
+        Url: "https://huggingface.co/ggerganov/whisper.cpp/resolve/main/ggml-small.en-q5_1.bin",
+        SizeBytes: 190098681L,
+        Sha256: "bfdff4894dcb76bbf647d56263ea2a96645423f1669176f4844a1bf8e478ad30");
 
     /// <summary>A single downloadable model file (no archive extraction).</summary>
     public sealed record FileSpec(string Name, string FileName, string Url, long SizeBytes, string Sha256);
@@ -151,12 +166,29 @@ public static class LocalSttModels
         return Path.Combine(localAppData, "com.radiopad.desktop", "models", modelName);
     }
 
-    /// <summary>Resolve the Whisper GGML model file under its model dir, or null when absent.</summary>
-    public static string? ResolveWhisperBin()
+    /// <summary>Resolve the Whisper GGML model file for <paramref name="modelName"/>
+    /// (the turbo model by default), or null when absent.</summary>
+    public static string? ResolveWhisperBin(string? modelName = null)
     {
-        var dir = ResolveModelDir(WhisperModelName);
+        var dir = ResolveModelDir(modelName ?? WhisperModelName);
         if (dir is null || !Directory.Exists(dir)) return null;
         return Directory.GetFiles(dir, "*.bin", SearchOption.AllDirectories).FirstOrDefault();
+    }
+
+    /// <summary>True when <paramref name="modelId"/> is one of the whisper models.</summary>
+    public static bool IsWhisperModel(string? modelId) =>
+        modelId == WhisperModelName || modelId == WhisperSmallEnModelName;
+
+    /// <summary>
+    /// Path of the per-install on-device STT preferences file (primary-model
+    /// selection). Independent of <c>RADIOPAD_STT_MODEL_DIR</c> so it survives a
+    /// model-dir override. Null when no local-app-data dir is resolvable.
+    /// </summary>
+    public static string? ResolveSettingsPath()
+    {
+        var localAppData = Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData);
+        if (string.IsNullOrEmpty(localAppData)) return null;
+        return Path.Combine(localAppData, "com.radiopad.desktop", "stt-prefs.json");
     }
 
     /// <summary>True when multi-engine ensemble mode is on (<c>RADIOPAD_STT_ENSEMBLE</c>).</summary>

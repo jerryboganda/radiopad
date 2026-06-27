@@ -7,14 +7,18 @@ using Whisper.net;
 namespace RadioPad.Infrastructure.Providers.Local;
 
 /// <summary>
-/// Phase 2 — the second on-device ASR engine: OpenAI Whisper (large-v3-turbo,
-/// q5_0 GGML) via Whisper.net / whisper.cpp, in-process. Architecturally
-/// decorrelated from the Parakeet transducer (Conformer attention-decoder vs
-/// FastConformer-TDT), so the two make different errors — exactly what ROVER
-/// needs to actually reduce WER rather than just doubling cost.
+/// Phase 2 — the second on-device ASR engine: OpenAI Whisper via Whisper.net /
+/// whisper.cpp, in-process. Architecturally decorrelated from the Parakeet
+/// transducer (Conformer attention-decoder vs FastConformer-TDT), so the two make
+/// different errors — exactly what ROVER needs to actually reduce WER.
 ///
-/// Dormant unless the local engine is enabled AND the model is present, so it is
-/// inert on web/server and until the ensemble is switched on + model downloaded.
+/// The ACTIVE whisper model is chosen by <see cref="ILocalSttSettings"/>: when the
+/// operator makes a whisper model (large-v3-turbo or small.en) primary, this engine
+/// loads that model; otherwise it loads turbo for the ensemble cross-check. The
+/// native factory is (re)loaded only when the selected model changes.
+///
+/// Dormant unless the local engine is enabled AND the selected model is present, so
+/// it is inert on web/server and until a model is downloaded.
 /// </summary>
 public sealed class WhisperNetSttClient : ILocalSttEngine, IDisposable
 {
@@ -22,19 +26,23 @@ public sealed class WhisperNetSttClient : ILocalSttEngine, IDisposable
 
     private readonly IAudioDecoder _decoder;
     private readonly ILogger<WhisperNetSttClient> _log;
+    private readonly ILocalSttSettings _settings;
     private readonly bool _enabled;
     private readonly object _gate = new();
-    private string? _binPath;
+    private string? _loadedModelId;
     private WhisperFactory? _factory;
     private volatile bool _loadFailed;
     private volatile string? _lastError;
 
-    public WhisperNetSttClient(IAudioDecoder decoder, ILogger<WhisperNetSttClient> log)
+    public WhisperNetSttClient(
+        IAudioDecoder decoder,
+        ILogger<WhisperNetSttClient> log,
+        ILocalSttSettings? settings = null)
     {
         _decoder = decoder;
         _log = log;
+        _settings = settings ?? DefaultLocalSttSettings.Instance;
         _enabled = LocalSttModels.IsEnabled();
-        _binPath = LocalSttModels.ResolveWhisperBin();
     }
 
     public string EngineId => EngineName;
@@ -46,8 +54,8 @@ public sealed class WhisperNetSttClient : ILocalSttEngine, IDisposable
         get
         {
             if (!_enabled || _loadFailed) return false;
-            EnsureBinResolved();
-            return _binPath is not null;
+            // Available iff the currently-selected whisper model is downloaded.
+            return LocalSttModels.ResolveWhisperBin(_settings.ActiveWhisperModelId) is not null;
         }
     }
 
@@ -105,22 +113,30 @@ public sealed class WhisperNetSttClient : ILocalSttEngine, IDisposable
 
     private static double NormalizeProbability(float p) => p <= 0f ? 0.5 : Math.Clamp(p, 0f, 1f);
 
+    /// <summary>
+    /// Return the native factory for the currently-selected whisper model, loading
+    /// (or hot-reloading, when the operator switched models) it on demand.
+    /// </summary>
     private WhisperFactory GetFactory()
     {
-        if (_factory is not null) return _factory;
         lock (_gate)
         {
-            if (_factory is not null) return _factory;
-            _log.LogInformation("Loading Whisper model {Bin}", _binPath);
-            _factory = WhisperFactory.FromPath(_binPath!);
+            var activeId = _settings.ActiveWhisperModelId;
+            if (_factory is not null && string.Equals(activeId, _loadedModelId, StringComparison.Ordinal))
+                return _factory;
+
+            // First load, or the selected model changed — drop the old factory.
+            _factory?.Dispose();
+            _factory = null;
+            _loadedModelId = null;
+
+            var bin = LocalSttModels.ResolveWhisperBin(activeId)
+                ?? throw new InvalidOperationException($"whisper model '{activeId}' is not present");
+            _log.LogInformation("Loading Whisper model {Model} from {Bin}", activeId, bin);
+            _factory = WhisperFactory.FromPath(bin);
+            _loadedModelId = activeId;
             return _factory;
         }
-    }
-
-    private void EnsureBinResolved()
-    {
-        if (_binPath is not null) return;
-        lock (_gate) { _binPath ??= LocalSttModels.ResolveWhisperBin(); }
     }
 
     public void Dispose()

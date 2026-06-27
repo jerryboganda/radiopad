@@ -28,10 +28,41 @@ public class LocalSttEnsembleTests
         public Task<EngineTranscript> RecognizeAsync(byte[] wavBytes, CancellationToken ct) => Task.FromResult(_t);
     }
 
+    private sealed class StubSettings : ILocalSttSettings
+    {
+        private string _primary;
+        public StubSettings(string primaryModelId) => _primary = primaryModelId;
+        public string PrimaryModelId => _primary;
+        public string PrimaryEngineId => LocalSttModels.IsWhisperModel(_primary)
+            ? WhisperNetSttClient.EngineName : SherpaParakeetSttClient.EngineName;
+        public string ActiveWhisperModelId => LocalSttModels.IsWhisperModel(_primary)
+            ? _primary : LocalSttModels.WhisperModelName;
+        public bool IsPrimary(string id) => id == _primary;
+        public void SetPrimary(string id) => _primary = id;
+    }
+
     private static SttToken T(string w, double c) => new(w, c);
     private static MemoryStream Audio() => new(new byte[] { 1, 2, 3, 4 });
     private static LocalSttEnsemble Build(params FakeEngine[] engines)
         => new(engines, NullLogger<LocalSttEnsemble>.Instance);
+
+    [Fact]
+    public async Task ConfiguredPrimary_Whisper_Single_Uses_Whisper()
+    {
+        await WithEnsemble(false, async () =>
+        {
+            var ensemble = new LocalSttEnsemble(
+                new ILocalSttEngine[]
+                {
+                    new FakeEngine("parakeet", true, T("para", 0.9)),
+                    new FakeEngine("whisper", true, T("whis", 0.9)),
+                },
+                NullLogger<LocalSttEnsemble>.Instance,
+                new StubSettings(LocalSttModels.WhisperSmallEnModelName)); // whisper is primary
+            var res = await ensemble.TranscribeAsync(Audio(), "audio/wav", CancellationToken.None);
+            Assert.Equal("whisper", res.Model); // single-engine path picked the configured primary
+        });
+    }
 
     private static async Task WithEnsemble(bool on, Func<Task> body)
     {

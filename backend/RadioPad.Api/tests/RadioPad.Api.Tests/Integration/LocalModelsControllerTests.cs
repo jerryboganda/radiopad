@@ -86,4 +86,24 @@ public class LocalModelsControllerTests : IClassFixture<RadioPadAppFactory>
         // No server paths leaked off-desktop.
         Assert.False(root.TryGetProperty("paths", out _));
     }
+
+    [Fact]
+    public async Task SetPrimary_While_Disabled_Returns_503()
+    {
+        using var client = _factory.CreateClient();
+        var resp = await client.PostAsync("/api/local-models/parakeet-tdt-0.6b-v3/primary", null);
+
+        Assert.Equal(HttpStatusCode.ServiceUnavailable, resp.StatusCode);
+        Assert.Contains("stt_unavailable", await resp.Content.ReadAsStringAsync());
+    }
+
+    [Fact]
+    public async Task List_Items_Expose_IsPrimary()
+    {
+        using var client = _factory.CreateClient();
+        var resp = await client.GetAsync("/api/local-models");
+        using var doc = JsonDocument.Parse(await resp.Content.ReadAsStringAsync());
+        var first = doc.RootElement.GetProperty("models").EnumerateArray().First();
+        Assert.True(first.TryGetProperty("isPrimary", out _));
+    }
 }

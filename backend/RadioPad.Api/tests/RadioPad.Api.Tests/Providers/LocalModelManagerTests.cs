@@ -53,6 +53,19 @@ public class LocalModelCatalogTests
     {
         Assert.Null(new LocalModelCatalog().ById("nope"));
     }
+
+    [Fact]
+    public void Catalog_Includes_Whisper_SmallEn_As_A_Whisper_Stt_Model()
+    {
+        var m = new LocalModelCatalog().ById(LocalSttModels.WhisperSmallEnModelName);
+        Assert.NotNull(m);
+        Assert.Equal(ModelKind.Stt, m!.Kind);
+        Assert.Equal(WhisperNetSttClient.EngineName, m.Engine);
+        Assert.Equal(ModelArchiveKind.RawFile, m.ArchiveKind);
+        Assert.False(m.Placeholder);
+        Assert.Equal(LocalSttModels.WhisperSmallEn.Sha256, m.Sha256);
+        Assert.Equal(LocalSttModels.WhisperSmallEn.FileName, m.FileName);
+    }
 }
 
 public class ModelProvisioningStatusTests

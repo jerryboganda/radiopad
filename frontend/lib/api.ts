@@ -890,6 +890,8 @@ export type LocalModel = {
   downloaded: boolean;
   /** Engine loaded + usable right now (always false on a web build). */
   available: boolean;
+  /** True when this is the selected primary dictation engine (STT only). */
+  isPrimary: boolean;
   progress: ModelProgress;
 };
 
@@ -1137,6 +1139,11 @@ export const api = {
       requestLocal<ModelTestResult>(`/api/local-models/${encodeURIComponent(id)}/test`, { method: 'POST' }),
     diagnostics: (id: string) =>
       requestLocal<unknown>(`/api/local-models/${encodeURIComponent(id)}/diagnostics`),
+    setPrimary: (id: string) =>
+      requestLocal<{ id: string; isPrimary: boolean }>(
+        `/api/local-models/${encodeURIComponent(id)}/primary`,
+        { method: 'POST' },
+      ),
   },
   copilot: {
     status: () => request<CopilotStatus>('/api/copilot/status'),
