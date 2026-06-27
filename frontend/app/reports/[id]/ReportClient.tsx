@@ -296,19 +296,46 @@ export default function ReportPage() {
   }
 
   /**
+   * Broadcasts the dictation-cleanup lifecycle to the floating overlay so the
+   * "Fix" button can render a live spinner and a result line. The work runs
+   * here (in the editor) but the button lives in the global overlay, so the two
+   * are bridged by a window event. `busy` shows the spinner; the terminal
+   * statuses replace it with a message instead of failing silently.
+   */
+  function emitCleanupResult(
+    status: 'busy' | 'success' | 'no-changes' | 'empty' | 'error',
+    message?: string,
+  ) {
+    if (typeof window === 'undefined') return;
+    window.dispatchEvent(
+      new CustomEvent('radiopad:dictation-cleanup-result', { detail: { status, message } }),
+    );
+  }
+
+  /**
    * "Fix everything" from the dictation overlay — runs the report's dictated
    * prose through the UBAG-routed cleanup pipeline and applies the structured
    * medical sections it returns. AI-touched sections wear `.ai-mark` until the
    * radiologist acknowledges them (CLAUDE.md rule 3).
    */
   async function runDictationCleanup() {
-    if (!report) return;
+    if (!report) {
+      emitCleanupResult('error', 'Open a report before running Fix.');
+      return;
+    }
     setAiBusy(true);
     setError(null);
+    // Tell the floating overlay to show its "Fixing…" spinner immediately — the
+    // UBAG cleanup is a web-automation round trip that can take up to a minute,
+    // so the radiologist needs a live indication the action is in progress.
+    emitCleanupResult('busy');
     try {
       await flushEdits();
       const current = reportRef.current;
-      if (!current) return;
+      if (!current) {
+        emitCleanupResult('error', 'Report is still loading — try again in a moment.');
+        return;
+      }
       const raw = [
         current.indication, current.technique, current.comparison,
         current.findings, current.impression, current.recommendations,
@@ -316,7 +343,10 @@ export default function ReportPage() {
         .map((s) => (s ?? '').trim())
         .filter(Boolean)
         .join('\n');
-      if (!raw) return;
+      if (!raw) {
+        emitCleanupResult('empty', 'Nothing to clean up yet — dictate or type into a section first.');
+        return;
+      }
       const res = await api.reports.cleanupDictation(current.id, raw);
       const cs = res.cleanedSections;
       const patch: Partial<Report> = {};
@@ -328,12 +358,19 @@ export default function ReportPage() {
           nextHighlights[k] = true;
         }
       });
-      if (Object.keys(patch).length === 0) return;
+      const changed = Object.keys(patch).length;
+      if (changed === 0) {
+        emitCleanupResult('no-changes', 'UBAG returned no changes for this dictation.');
+        return;
+      }
       setAiHighlights(nextHighlights);
       await update({ ...patch, aiHighlightsJson: JSON.stringify(nextHighlights) } as Partial<Report>);
+      emitCleanupResult('success', `Cleaned ${changed} section${changed === 1 ? '' : 's'} via ${res.provider || 'UBAG'}.`);
     } catch (e) {
-      const err = e as { body?: { error?: string }; message: string };
-      setError(err.body?.error || err.message);
+      const err = e as { body?: { error?: string; detail?: string; title?: string }; message: string };
+      const msg = err.body?.error || err.body?.detail || err.body?.title || err.message || 'Fix failed.';
+      setError(msg);
+      emitCleanupResult('error', msg);
     } finally {
       setAiBusy(false);
     }

@@ -936,6 +936,60 @@
   white-space: pre-wrap;
 }
 
+/* "Fix" (dictation cleanup) busy + result feedback. The cleanup runs through
+   UBAG web automation and can take up to a minute, so the button shows a live
+   spinner ("Fixing…") while it works and a status line confirms the outcome
+   (success / no changes / error) instead of the action silently no-opping. */
+.rp-dictation-spinner {
+  display: inline-block;
+  width: 12px;
+  height: 12px;
+  border: 2px solid var(--border-strong);
+  border-top-color: var(--accent);
+  border-radius: 50%;
+  animation: rp-xc-spin 0.7s linear infinite;
+  vertical-align: -2px;
+  margin-right: 6px;
+}
+.rp-dictation-fix:disabled { opacity: 0.85; cursor: progress; }
+.rp-dictation-fix.recording {
+  background: var(--accent-tint);
+  color: var(--accent);
+  border-color: var(--accent);
+}
+.rp-dictation-status {
+  pointer-events: auto;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-style: normal;
+  font-family: var(--sans);
+  font-size: 13px;
+  line-height: 1.4;
+}
+.rp-dictation-status button { margin-left: auto; }
+.rp-dictation-status-busy {
+  background: var(--accent-tint);
+  color: var(--accent);
+  border-color: var(--accent);
+}
+.rp-dictation-status-success {
+  background: var(--green-bg);
+  color: var(--green);
+  border-color: var(--green-border);
+}
+.rp-dictation-status-error {
+  background: var(--red-bg);
+  color: var(--red);
+  border-color: var(--red-border);
+}
+.rp-dictation-status-no-changes,
+.rp-dictation-status-empty {
+  background: var(--amber-bg);
+  color: var(--amber);
+  border-color: var(--amber);
+}
+
 /* Collapsible section panel used by the mobile editor. The summary
    row is the tap target (44 px high for touch) and respects the
    locked panel idiom. */

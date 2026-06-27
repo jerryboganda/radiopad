@@ -174,6 +174,15 @@ public sealed class UbagProviderDiscoveryHostedService : BackgroundService
                 _logger.LogInformation(
                     "UBAG primary backfill: seeded {Count} curated row(s) across {Tenants} tenant(s)",
                     seeded, allTenantIds.Count);
+
+            // Policy change (2026-06-27): UBAG is PHI-approved. Promote any rows
+            // that were seeded as Sandbox before this change so existing orgs'
+            // AI features (cleanup/impression/rewrite/cross-check) stop being
+            // blocked by the PHI gates. Idempotent — only non-PhiApproved rows.
+            var promoted = await UbagPrimarySeed.EnsureCuratedComplianceAsync(db, stoppingToken);
+            if (promoted > 0)
+                _logger.LogInformation(
+                    "UBAG compliance backfill: promoted {Count} row(s) to PhiApproved", promoted);
         }
         catch (OperationCanceledException) { return; }
         catch (Exception ex)
