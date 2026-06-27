@@ -26,8 +26,11 @@ public static class UbagPrimarySeed
     /// The curated UBAG primaries for <paramref name="tenantId"/>. Mirrors the values
     /// the dev tenant has carried since the 2026-06-22 integration: Gemini ranks first
     /// (Quality 0.90 / Priority 1) so the Quality-weighted router prefers it unattended;
-    /// DeepSeek is an enabled secondary (Quality 0.85 / Priority 2). Both are Sandbox
-    /// class — UBAG is non-PHI by policy.
+    /// DeepSeek is an enabled secondary (Quality 0.85 / Priority 2). Both are
+    /// <see cref="ProviderComplianceClass.PhiApproved"/> (operator decision 2026-06-27):
+    /// RadioPad sends only de-identified report text to UBAG, so it must never be blocked
+    /// by the PHI / compliance gates that drive AI features (cleanup, impression, rewrite,
+    /// cross-check). <see cref="EnsureCuratedComplianceAsync"/> backfills pre-existing rows.
     /// </summary>
     public static IReadOnlyList<ProviderConfig> CuratedPrimaries(Guid tenantId) => new[]
     {
@@ -37,7 +40,7 @@ public static class UbagPrimarySeed
             Name = "UBAG (Gemini Web)",
             Adapter = UbagProviderAdapter.AdapterId,
             Model = "gemini_web",
-            Compliance = ProviderComplianceClass.Sandbox,
+            Compliance = ProviderComplianceClass.PhiApproved,
             Enabled = true,
             Quality = 0.9m,
             Priority = 1,
@@ -48,12 +51,33 @@ public static class UbagPrimarySeed
             Name = "UBAG (DeepSeek Web)",
             Adapter = UbagProviderAdapter.AdapterId,
             Model = "deepseek_web",
-            Compliance = ProviderComplianceClass.Sandbox,
+            Compliance = ProviderComplianceClass.PhiApproved,
             Enabled = true,
             Quality = 0.85m,
             Priority = 2,
         },
     };
+
+    /// <summary>
+    /// Idempotently promotes every existing UBAG provider row (any tenant) to
+    /// <see cref="ProviderComplianceClass.PhiApproved"/> so reports created before
+    /// the 2026-06-27 policy change — including production orgs whose UBAG rows were
+    /// seeded as <c>Sandbox</c> — stop being rejected by the PHI gates. Only rows that
+    /// are not already PhiApproved are touched; returns the number updated.
+    /// </summary>
+    public static async Task<int> EnsureCuratedComplianceAsync(
+        RadioPadDbContext db, CancellationToken ct)
+    {
+        var stale = await db.Providers
+            .Where(p => p.Adapter == UbagProviderAdapter.AdapterId
+                     && p.Compliance != ProviderComplianceClass.PhiApproved)
+            .ToListAsync(ct);
+        if (stale.Count == 0) return 0;
+        foreach (var p in stale)
+            p.Compliance = ProviderComplianceClass.PhiApproved;
+        await db.SaveChangesAsync(ct);
+        return stale.Count;
+    }
 
     /// <summary>
     /// Idempotently ensures the curated UBAG primaries exist for <paramref name="tenantId"/>.

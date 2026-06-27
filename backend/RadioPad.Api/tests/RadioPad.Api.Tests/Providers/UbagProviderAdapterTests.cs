@@ -11,14 +11,18 @@ namespace RadioPad.Api.Tests.Providers;
 public class UbagProviderAdapterTests
 {
     [Fact]
-    public async Task CompleteAsync_Blocks_Phi_Request()
+    public async Task CompleteAsync_Allows_Phi_Request()
     {
-        var adapter = new UbagProviderAdapter(new FakeUbagClient());
+        // Policy change (2026-06-27): UBAG is operator-approved for PHI, so the
+        // adapter must no longer reject a PHI-flagged request — it submits the job.
+        var fake = new FakeUbagClient();
+        var adapter = new UbagProviderAdapter(fake);
         var request = new AiCompletionRequest(Provider("gemini_web"), "sys", "patient data", "v1", ContainsPhi: true);
 
-        var ex = await Assert.ThrowsAsync<ProviderPolicyException>(() => adapter.CompleteAsync(request, default));
+        var result = await adapter.CompleteAsync(request, default);
 
-        Assert.Contains("phi_not_supported", ex.Message);
+        Assert.Equal("ubag response", result.Text);
+        Assert.Equal("gemini_web", fake.CreatedTarget);
     }
 
     [Fact]

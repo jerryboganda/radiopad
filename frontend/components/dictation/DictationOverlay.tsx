@@ -31,6 +31,18 @@ import { readQueryParam } from '@/lib/browserParams';
 
 const DICTATE_EVENT = 'radiopad:dictate';
 const CLEANUP_EVENT = 'radiopad:dictation-cleanup';
+const CLEANUP_RESULT_EVENT = 'radiopad:dictation-cleanup-result';
+
+// Lifecycle of the "Fix" (dictation cleanup) action, broadcast by the report
+// editor (ReportClient) so this overlay can render a live spinner + result.
+type FixStatus = { status: 'busy' | 'success' | 'no-changes' | 'empty' | 'error'; message?: string };
+
+function fixStatusLabel(s: FixStatus): string {
+  if (s.message) return s.message;
+  if (s.status === 'busy') return 'Cleaning dictation via UBAG…';
+  if (s.status === 'success') return 'Done.';
+  return '';
+}
 
 // Insert dictated text into whichever field the radiologist last focused —
 // preferring a rich SectionEditor (cross-check editor) and falling back to a
@@ -77,6 +89,13 @@ export default function DictationOverlay() {
   // model on first run → HTTP 503). Surfaced so the radiologist gets feedback
   // instead of a silent no-op; cleared on the next attempt.
   const [sttError, setSttError] = useState<string | null>(null);
+
+  // "Fix" cleanup progress/result, driven by CLEANUP_RESULT_EVENT from the
+  // editor. `busy` shows the spinner; terminal states show a message so the
+  // action is never a silent no-op.
+  const [fixStatus, setFixStatus] = useState<FixStatus | null>(null);
+  const fixDismissRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const fixBusy = fixStatus?.status === 'busy';
 
   useEffect(() => {
     setSupported(getSpeechRecognitionCtor() !== null);
@@ -227,6 +246,29 @@ export default function DictationOverlay() {
     return () => window.removeEventListener(DICTATE_EVENT, handler);
   }, [toggle]);
 
+  // Reflect the editor's cleanup lifecycle on the Fix button. Success / no-change
+  // / empty outcomes auto-clear after a few seconds; errors stay until the next
+  // attempt so the radiologist can read them.
+  useEffect(() => {
+    const onResult = (e: Event) => {
+      const detail = (e as CustomEvent<FixStatus>).detail;
+      if (!detail) return;
+      if (fixDismissRef.current) {
+        clearTimeout(fixDismissRef.current);
+        fixDismissRef.current = null;
+      }
+      setFixStatus(detail);
+      if (detail.status === 'success' || detail.status === 'no-changes' || detail.status === 'empty') {
+        fixDismissRef.current = setTimeout(() => setFixStatus(null), 6000);
+      }
+    };
+    window.addEventListener(CLEANUP_RESULT_EVENT, onResult);
+    return () => {
+      window.removeEventListener(CLEANUP_RESULT_EVENT, onResult);
+      if (fixDismissRef.current) clearTimeout(fixDismissRef.current);
+    };
+  }, []);
+
   const title = !supported
     ? 'Dictation needs the audio engine — unavailable in this build'
     : listening
@@ -273,6 +315,28 @@ export default function DictationOverlay() {
           </button>
         </div>
       )}
+      {fixStatus && (
+        <div
+          className={`rp-dictation-interim rp-dictation-status rp-dictation-status-${fixStatus.status}`}
+          data-testid="dictation-fix-status"
+          role="status"
+          aria-live="polite"
+        >
+          {fixBusy && <span className="rp-dictation-spinner" aria-hidden="true" />}
+          <span>{fixStatusLabel(fixStatus)}</span>
+          {!fixBusy && (
+            <button
+              type="button"
+              className="subtle"
+              data-testid="dictation-fix-status-dismiss"
+              aria-label="Dismiss"
+              onClick={() => setFixStatus(null)}
+            >
+              ×
+            </button>
+          )}
+        </div>
+      )}
       <div className="rp-dictation-controls">
         <button
           type="button"
@@ -303,12 +367,21 @@ export default function DictationOverlay() {
         <button
           type="button"
           data-testid="dictation-fix"
-          className="rp-dictation-fix subtle"
+          className={`rp-dictation-fix subtle${fixBusy ? ' recording' : ''}`}
           title="Clean up the dictation into medical phrasing (UBAG)"
+          aria-busy={fixBusy}
+          disabled={fixBusy}
           onMouseDown={(e) => e.preventDefault()}
           onClick={() => window.dispatchEvent(new CustomEvent(CLEANUP_EVENT))}
         >
-          Fix
+          {fixBusy ? (
+            <>
+              <span className="rp-dictation-spinner" aria-hidden="true" />
+              Fixing…
+            </>
+          ) : (
+            'Fix'
+          )}
         </button>
         {crossCheckEnabled && (
           <button

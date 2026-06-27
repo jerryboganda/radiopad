@@ -81,10 +81,12 @@ Public magic-link requests still participate in per-tenant IP allowlists: the AP
 
 CLI providers default to `Sandbox` because the local binary may call a vendor cloud. They refuse PHI and secret-shaped prompts before launch; do not rely on provider-row promotion to bypass that boundary.
 
-UBAG also defaults to `Sandbox`. It is approved only for de-identified,
-non-secret prompts in this release. ChatGPT, Gemini, and DeepSeek provider
-logins remain manual through UBAG Browser Sessions; RadioPad must not automate
-login, CAPTCHA, 2FA, consent, cookie extraction, or credential collection.
+UBAG is `PhiApproved` (operator decision 2026-06-27): the workflow sends only
+de-identified report text, so the adapter's PHI gate was removed and report AI
+features (cleanup/impression/rewrite/cross-check) route through it. Secret-shaped
+prompts are still refused. ChatGPT, Gemini, and DeepSeek provider logins remain
+manual through UBAG Browser Sessions; RadioPad must not automate login, CAPTCHA,
+2FA, consent, cookie extraction, or credential collection.
 
 ## 4. Database
 

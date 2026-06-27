@@ -23,7 +23,7 @@ Secrets are always referenced as `ApiKeySecretRef = "env:<NAME>"`. Literal API k
 | `llama-cpp` | Local HTTP | `LocalOnly` | `http://127.0.0.1:8080` | Local llama.cpp server. |
 | `gemini-cli` | CLI subprocess | `Sandbox` | `RADIOPAD_GEMINI_BIN` (default `gemini`) | Prompt is piped on stdin in headless mode with `--output-format json`. JSON stdout is parsed when present; PHI and secret-like prompts are refused before launch. |
 | `codex-cli` | CLI subprocess, fail-closed | `Sandbox` | `RADIOPAD_CODEX_BIN` (default `codex`), `RADIOPAD_CODEX_CLI_ENABLED=1` | Prompt is piped on stdin via `codex exec --sandbox read-only -`. The adapter never opts into full-auto mode; PHI and secret-like prompts are refused before launch. |
-| `ubag` | HTTPS automation gateway | `Sandbox` | `RADIOPAD_UBAG_BASE_URL`, optional server-only auth env ref | Routes non-PHI, non-secret prompts to production UBAG. `ProviderConfig.Model` selects `chatgpt_web`, `gemini_web`, `deepseek_web`, or `mock`; default preset uses `gemini_web`. PHI is refused even if a row is misclassified. |
+| `ubag` | HTTPS automation gateway | `PhiApproved` | `RADIOPAD_UBAG_BASE_URL`, optional server-only auth env ref | Routes report prompts to production UBAG (PHI gate removed 2026-06-27, operator decision — only de-identified text is sent). `ProviderConfig.Model` selects `chatgpt_web`, `gemini_web`, `deepseek_web`, or `mock`; default preset uses `gemini_web`. Secret-shaped prompts are still refused. |
 
 Production CLI providers require `RADIOPAD_CLI_PROVIDER_ALLOWED_PATHS`; empty/unset allowlists are accepted only in development.
 

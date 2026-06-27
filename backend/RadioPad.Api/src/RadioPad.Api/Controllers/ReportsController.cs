@@ -827,6 +827,17 @@ public class ReportsController : TenantedController
         {
             return StatusCode(StatusCodes.Status403Forbidden, new { error = pex.Message, kind = "provider_policy" });
         }
+        catch (Application.Services.ProviderTransportException tex)
+        {
+            // UBAG (and other web/HTTP) adapters raise this on a failed job,
+            // empty output, or timeout. Surface a clear 502 with the reason so
+            // the editor shows it on the Fix button instead of a generic 500.
+            return StatusCode(StatusCodes.Status502BadGateway, new
+            {
+                error = $"The AI provider could not complete the cleanup: {tex.Message}",
+                kind = "provider_transport",
+            });
+        }
     }
 
     public record CrossCheckReviewDto(string Text, string? SectionKey, bool UseUbag);

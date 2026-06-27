@@ -9,7 +9,13 @@ namespace RadioPad.Infrastructure.Providers.Ubag;
 public sealed class UbagProviderAdapter : IAiProviderAdapter, IAiProviderHealthProbe
 {
     public const string AdapterId = "ubag";
-    public const ProviderComplianceClass DefaultComplianceClass = ProviderComplianceClass.Sandbox;
+    // Operator decision (2026-06-27): RadioPad routes only de-identified report
+    // text to UBAG and the workflow guarantees no PHI reaches it, so UBAG is
+    // treated as a PHI-approved provider — it must never be blocked by the PHI /
+    // compliance gates (router eligibility, AiGateway policy, and the
+    // request-level guard below). See UbagPrimarySeed for the seeded value and
+    // the discovery hosted service for the one-time backfill of existing rows.
+    public const ProviderComplianceClass DefaultComplianceClass = ProviderComplianceClass.PhiApproved;
     private static readonly TimeSpan PollDelay = TimeSpan.FromSeconds(2);
 
     private readonly IUbagClient _client;
@@ -106,8 +112,11 @@ public sealed class UbagProviderAdapter : IAiProviderAdapter, IAiProviderHealthP
 
     internal static void EnforceRequestPolicy(AiCompletionRequest request)
     {
-        if (request.ContainsPhi)
-            throw new ProviderPolicyException($"{AdapterId}: phi_not_supported");
+        // PHI gate intentionally removed (2026-06-27): UBAG is operator-approved
+        // for PHI (see DefaultComplianceClass). The remaining guards are not PHI
+        // restrictions — they stop credentials/secrets from leaking to a web AI
+        // and stop ordered Hub workflows from being mis-routed through report
+        // drafting. They never trigger for normal radiology dictation.
         if (LooksLikeSecret(request.SystemPrompt) || LooksLikeSecret(request.UserPrompt))
             throw new ProviderPolicyException($"{AdapterId}: secret_not_supported");
         if (string.Equals(request.Provider.Model, "ordered:web-chain", StringComparison.OrdinalIgnoreCase))

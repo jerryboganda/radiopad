@@ -49,7 +49,9 @@ public class UbagPrimarySeedTests
         var gemini = rows[0];
         Assert.Equal("UBAG (Gemini Web)", gemini.Name);
         Assert.Equal("gemini_web", gemini.Model);
-        Assert.Equal(ProviderComplianceClass.Sandbox, gemini.Compliance);
+        // Policy change (2026-06-27): UBAG is PHI-approved so AI features are not
+        // blocked by the PHI gates.
+        Assert.Equal(ProviderComplianceClass.PhiApproved, gemini.Compliance);
         Assert.True(gemini.Enabled);
 
         var deepseek = rows[1];
@@ -90,6 +92,26 @@ public class UbagPrimarySeedTests
         Assert.Equal(1, added); // only deepseek_web
         Assert.Equal(1, await db.Providers.CountAsync(p => p.TenantId == Tenant && p.Model == "gemini_web"));
         Assert.Equal(1, await db.Providers.CountAsync(p => p.TenantId == Tenant && p.Model == "deepseek_web"));
+    }
+
+    [Fact]
+    public async Task Compliance_backfill_promotes_legacy_sandbox_rows_to_phi_approved()
+    {
+        using var db = CreateDb();
+        // Two pre-existing rows as production seeded them before the policy change.
+        db.Providers.AddRange(
+            new ProviderConfig { TenantId = Tenant, Name = "UBAG (Gemini Web)", Adapter = "ubag", Model = "gemini_web", Compliance = ProviderComplianceClass.Sandbox, Enabled = true },
+            new ProviderConfig { TenantId = Tenant, Name = "UBAG (DeepSeek Web)", Adapter = "ubag", Model = "deepseek_web", Compliance = ProviderComplianceClass.PhiApproved, Enabled = true });
+        await db.SaveChangesAsync();
+
+        var promoted = await UbagPrimarySeed.EnsureCuratedComplianceAsync(db, default);
+
+        Assert.Equal(1, promoted); // only the Sandbox row needed promotion
+        Assert.All(
+            await db.Providers.Where(p => p.Adapter == "ubag").ToListAsync(),
+            p => Assert.Equal(ProviderComplianceClass.PhiApproved, p.Compliance));
+        // Idempotent: a second run touches nothing.
+        Assert.Equal(0, await UbagPrimarySeed.EnsureCuratedComplianceAsync(db, default));
     }
 
     [Fact]
