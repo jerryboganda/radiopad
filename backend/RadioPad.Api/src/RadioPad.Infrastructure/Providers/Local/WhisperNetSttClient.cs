@@ -132,6 +132,13 @@ public sealed class WhisperNetSttClient : ILocalSttEngine, IDisposable
 
             var bin = LocalSttModels.ResolveWhisperBin(activeId)
                 ?? throw new InvalidOperationException($"whisper model '{activeId}' is not present");
+
+            // Stage the native whisper.cpp runtime before the first factory is
+            // created — the single-file desktop sidecar has no on-disk
+            // `runtimes/win-x64`, so Whisper.net's loader can't find its DLLs
+            // without this. No-op on non-Windows-x64 / non-bundled builds.
+            WhisperNativeLibrary.EnsureLoaded();
+
             _log.LogInformation("Loading Whisper model {Model} from {Bin}", activeId, bin);
             _factory = WhisperFactory.FromPath(bin);
             _loadedModelId = activeId;

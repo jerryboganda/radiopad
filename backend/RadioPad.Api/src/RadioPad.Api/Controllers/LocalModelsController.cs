@@ -216,6 +216,25 @@ public sealed class LocalModelsController : ControllerBase
         var dir = LocalSttModels.ResolveModelDir(id);
         var engine = _engines.FirstOrDefault(e => string.Equals(e.EngineId, desc.Engine, StringComparison.Ordinal));
 
+        // For whisper models, surface where the native runtime was staged + whether
+        // its DLLs are present — this is the exact failure mode behind the
+        // "Native Library not found" error on the single-file desktop sidecar.
+        object? whisperNative = null;
+        if (string.Equals(desc.Engine, WhisperNetSttClient.EngineName, StringComparison.Ordinal))
+        {
+            WhisperNativeLibrary.EnsureLoaded();
+            var nativeDir = WhisperNativeLibrary.ResolvedRuntimeDir;
+            var whisperDll = nativeDir is null
+                ? null
+                : Path.Combine(nativeDir, "runtimes", "win-x64", "whisper.dll");
+            whisperNative = new
+            {
+                runtimeDir = nativeDir,
+                staged = nativeDir is not null,
+                whisperDll = PathInfo(whisperDll),
+            };
+        }
+
         object files;
         if (desc.ArchiveKind == ModelArchiveKind.TarBz2 && dir is not null)
         {
@@ -232,7 +251,7 @@ public sealed class LocalModelsController : ControllerBase
         {
             enabled = true,
             model = new { desc.Id, kind = desc.Kind.ToString(), engine = desc.Engine, desc.DisplayName, desc.License },
-            paths = new { modelDir = dir, files },
+            paths = new { modelDir = dir, files, whisperNative },
             engineState = new { available = engine?.Available ?? false, lastError = engine?.LastError },
             env = new
             {
