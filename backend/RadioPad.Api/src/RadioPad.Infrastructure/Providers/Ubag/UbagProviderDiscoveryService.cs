@@ -6,6 +6,7 @@ using RadioPad.Application.Abstractions;
 using RadioPad.Application.Services;
 using RadioPad.Domain.Entities;
 using RadioPad.Infrastructure.Persistence;
+using RadioPad.Infrastructure.Seeding;
 
 namespace RadioPad.Infrastructure.Providers.Ubag;
 
@@ -153,6 +154,32 @@ public sealed class UbagProviderDiscoveryHostedService : BackgroundService
         // Let the sidecar finish migrating/seeding and the gateway come up first.
         try { await Task.Delay(StartupDelay, stoppingToken); }
         catch (OperationCanceledException) { return; }
+
+        // One-time backfill: ensure EVERY existing tenant has the curated UBAG primaries
+        // (Gemini Web + DeepSeek Web). Orgs created before per-controller seeding shipped —
+        // e.g. production orgs bootstrapped earlier — would otherwise never get them, because
+        // the periodic discovery below only runs for tenants that ALREADY have a UBAG row, and
+        // those primaries were historically seeded only for the DevSeed "dev" tenant. This is
+        // idempotent + ensure-on-absence and runs ONCE at startup (not every sweep), so an
+        // operator who deletes a primary keeps it deleted until the next restart.
+        try
+        {
+            using var scope = _scopes.CreateScope();
+            var db = scope.ServiceProvider.GetRequiredService<RadioPadDbContext>();
+            var allTenantIds = await db.Tenants.Select(t => t.Id).ToListAsync(stoppingToken);
+            var seeded = 0;
+            foreach (var tid in allTenantIds)
+                seeded += await UbagPrimarySeed.EnsureCuratedPrimariesAsync(db, tid, stoppingToken);
+            if (seeded > 0)
+                _logger.LogInformation(
+                    "UBAG primary backfill: seeded {Count} curated row(s) across {Tenants} tenant(s)",
+                    seeded, allTenantIds.Count);
+        }
+        catch (OperationCanceledException) { return; }
+        catch (Exception ex)
+        {
+            _logger.LogWarning(ex, "UBAG primary backfill failed");
+        }
 
         while (!stoppingToken.IsCancellationRequested)
         {

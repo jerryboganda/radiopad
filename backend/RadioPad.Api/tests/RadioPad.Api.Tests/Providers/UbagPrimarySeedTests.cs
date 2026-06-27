@@ -1,0 +1,116 @@
+using Microsoft.EntityFrameworkCore;
+using RadioPad.Domain.Entities;
+using RadioPad.Domain.Enums;
+using RadioPad.Infrastructure.Persistence;
+using RadioPad.Infrastructure.Seeding;
+using Xunit;
+
+namespace RadioPad.Api.Tests.Providers;
+
+/// <summary>
+/// The curated UBAG primaries (Gemini Web + DeepSeek Web) must be seedable for ANY
+/// tenant — not just the DevSeed "dev" org — so production orgs created via
+/// bootstrap-org / registration (and existing orgs backfilled at startup) surface
+/// the UBAG models on the AI-models page. <see cref="UbagPrimarySeed"/> is the single
+/// idempotent source of truth those paths share.
+/// </summary>
+public class UbagPrimarySeedTests
+{
+    private static readonly Guid Tenant = Guid.Parse("22222222-2222-2222-2222-222222222222");
+
+    private static RadioPadDbContext CreateDb()
+    {
+        var options = new DbContextOptionsBuilder<RadioPadDbContext>()
+            .UseSqlite("Data Source=:memory:")
+            .Options;
+        var db = new RadioPadDbContext(options);
+        db.Database.OpenConnection();
+        db.Database.EnsureCreated();
+        // ProviderConfig.TenantId is an enforced FK; seed the tenant first.
+        db.Tenants.Add(new Tenant { Id = Tenant, Slug = "seed-test", DisplayName = "Seed Test" });
+        db.SaveChanges();
+        return db;
+    }
+
+    [Fact]
+    public async Task Seeds_both_curated_primaries_for_a_fresh_tenant()
+    {
+        using var db = CreateDb();
+
+        var added = await UbagPrimarySeed.EnsureCuratedPrimariesAsync(db, Tenant, default);
+
+        Assert.Equal(2, added);
+        var rows = await db.Providers
+            .Where(p => p.TenantId == Tenant && p.Adapter == "ubag")
+            .OrderBy(p => p.Priority)
+            .ToListAsync();
+        Assert.Equal(2, rows.Count);
+
+        var gemini = rows[0];
+        Assert.Equal("UBAG (Gemini Web)", gemini.Name);
+        Assert.Equal("gemini_web", gemini.Model);
+        Assert.Equal(ProviderComplianceClass.Sandbox, gemini.Compliance);
+        Assert.True(gemini.Enabled);
+
+        var deepseek = rows[1];
+        Assert.Equal("UBAG (DeepSeek Web)", deepseek.Name);
+        Assert.Equal("deepseek_web", deepseek.Model);
+        Assert.True(deepseek.Enabled);
+    }
+
+    [Fact]
+    public async Task Is_idempotent_a_second_call_adds_nothing()
+    {
+        using var db = CreateDb();
+
+        await UbagPrimarySeed.EnsureCuratedPrimariesAsync(db, Tenant, default);
+        var addedSecond = await UbagPrimarySeed.EnsureCuratedPrimariesAsync(db, Tenant, default);
+
+        Assert.Equal(0, addedSecond);
+        Assert.Equal(2, await db.Providers.CountAsync(p => p.TenantId == Tenant && p.Adapter == "ubag"));
+    }
+
+    [Fact]
+    public async Task Adds_only_the_missing_primary()
+    {
+        using var db = CreateDb();
+        db.Providers.Add(new ProviderConfig
+        {
+            TenantId = Tenant,
+            Name = "UBAG (Gemini Web)",
+            Adapter = "ubag",
+            Model = "gemini_web",
+            Compliance = ProviderComplianceClass.Sandbox,
+            Enabled = true,
+        });
+        await db.SaveChangesAsync();
+
+        var added = await UbagPrimarySeed.EnsureCuratedPrimariesAsync(db, Tenant, default);
+
+        Assert.Equal(1, added); // only deepseek_web
+        Assert.Equal(1, await db.Providers.CountAsync(p => p.TenantId == Tenant && p.Model == "gemini_web"));
+        Assert.Equal(1, await db.Providers.CountAsync(p => p.TenantId == Tenant && p.Model == "deepseek_web"));
+    }
+
+    [Fact]
+    public async Task Does_not_overwrite_an_existing_operator_customised_row()
+    {
+        using var db = CreateDb();
+        db.Providers.Add(new ProviderConfig
+        {
+            TenantId = Tenant,
+            Name = "My Gemini",
+            Adapter = "ubag",
+            Model = "gemini_web",
+            Compliance = ProviderComplianceClass.Sandbox,
+            Enabled = false, // operator deliberately disabled it
+        });
+        await db.SaveChangesAsync();
+
+        await UbagPrimarySeed.EnsureCuratedPrimariesAsync(db, Tenant, default);
+
+        var gemini = await db.Providers.SingleAsync(p => p.TenantId == Tenant && p.Model == "gemini_web");
+        Assert.Equal("My Gemini", gemini.Name); // untouched
+        Assert.False(gemini.Enabled);           // still disabled
+    }
+}

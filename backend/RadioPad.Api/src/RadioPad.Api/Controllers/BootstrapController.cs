@@ -10,6 +10,7 @@ using RadioPad.Domain.Entities;
 using RadioPad.Domain.Enums;
 using RadioPad.Infrastructure.Identity;
 using RadioPad.Infrastructure.Persistence;
+using RadioPad.Infrastructure.Seeding;
 
 namespace RadioPad.Api.Controllers;
 
@@ -33,9 +34,10 @@ public class BootstrapController : ControllerBase
 {
     private readonly RadioPadDbContext _db;
     private readonly IAuditLog _audit;
+    private readonly ILogger<BootstrapController> _log;
 
-    public BootstrapController(RadioPadDbContext db, IAuditLog audit)
-    { _db = db; _audit = audit; }
+    public BootstrapController(RadioPadDbContext db, IAuditLog audit, ILogger<BootstrapController> log)
+    { _db = db; _audit = audit; _log = log; }
 
     public record BootstrapDto(string Slug, string Name, string AdminEmail, string? AdminName, string? TempPassword);
     public record ResetAdminDto(string Slug, string Email, string? TempPassword);
@@ -119,6 +121,12 @@ public class BootstrapController : ControllerBase
         });
         await _db.SaveChangesAsync(ct);
         await EnterpriseIdentityBridge.EnsureMembershipForUserAsync(_db, admin, ct);
+
+        // Surface the curated UBAG models (Gemini Web + DeepSeek Web) on the new org's
+        // AI-models page immediately. Idempotent + isolated: never fail org bootstrap on
+        // a seed/DB hiccup — the startup backfill would catch it on the next restart.
+        try { await UbagPrimarySeed.EnsureCuratedPrimariesAsync(_db, tenant.Id, ct); }
+        catch (Exception ex) { _log.LogWarning(ex, "UBAG primary seeding failed for bootstrapped org {Slug}", slug); }
 
         await _audit.AppendAsync(new AuditEvent
         {
