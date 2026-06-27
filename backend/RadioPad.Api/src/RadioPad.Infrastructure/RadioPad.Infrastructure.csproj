@@ -36,6 +36,12 @@
          DLLs can be embedded (see below). -->
     <PackageReference Include="Whisper.net" Version="1.9.1" />
     <PackageReference Include="Whisper.net.Runtime" Version="1.9.1" GeneratePathProperty="true" />
+    <!-- Windows on-device speech (System.Speech / SAPI) — the classic Windows
+         Speech Recognition engine for WindowsSapiSttClient. 9.0.4 ships a plain
+         net8.0 (+ netstandard2.0) asset, so it restores cross-platform on the
+         Linux server build; it is Windows-only at runtime and the engine guards
+         every call with OperatingSystem.IsWindows() (inert elsewhere). -->
+    <PackageReference Include="System.Speech" Version="9.0.4" />
   </ItemGroup>
 
   <!-- DESK/STT — make whisper.cpp loadable from the single-file desktop sidecar.

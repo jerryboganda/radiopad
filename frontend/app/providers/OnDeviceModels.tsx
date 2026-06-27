@@ -1,7 +1,14 @@
 'use client';
 
 import { useCallback, useEffect, useState } from 'react';
-import { api, type LocalModel, type LocalModelKind, type ModelTestResult } from '@/lib/api';
+import {
+  api,
+  type LocalModel,
+  type LocalModelKind,
+  type ModelProvisioning,
+  type ModelTestResult,
+} from '@/lib/api';
+import { probeWebSpeechAvailable } from '@/lib/dictation/speech';
 import ErrorState from '@/components/ui/ErrorState';
 import { TableSkeleton } from '@/components/ui/Skeleton';
 
@@ -106,8 +113,29 @@ export default function OnDeviceModels() {
   );
 }
 
-function StateBadge({ model }: { model: LocalModel }) {
+function StateBadge({ model, edgeOk }: { model: LocalModel; edgeOk?: boolean | null }) {
   if (model.placeholder) return <span className="badge">Coming soon</span>;
+  const provisioning: ModelProvisioning = model.provisioning ?? 'HostedFile';
+  if (provisioning === 'BrowserWebSpeech') {
+    if (edgeOk == null) return <span className="badge">Checking…</span>;
+    return edgeOk ? (
+      <span className="badge ok">Available</span>
+    ) : (
+      <span className="badge warn">Unavailable here</span>
+    );
+  }
+  if (provisioning === 'WindowsBuiltIn')
+    return model.available ? (
+      <span className="badge ok">Built in</span>
+    ) : (
+      <span className="badge warn">Unavailable</span>
+    );
+  if (provisioning === 'WindowsLanguagePack')
+    return model.available ? (
+      <span className="badge ok">Ready</span>
+    ) : (
+      <span className="badge warn">Needs language pack</span>
+    );
   const s = model.progress.state;
   if (ACTIVE_STATES.includes(s)) return <span className="badge ai">{s}…</span>;
   if (s === 'Failed') return <span className="badge danger">Failed</span>;
@@ -128,6 +156,27 @@ function ModelCard({
   const [msg, setMsg] = useState<string | null>(null);
   const [test, setTest] = useState<ModelTestResult | null>(null);
   const [testOpen, setTestOpen] = useState(false);
+  // Edge Web Speech availability — probed in the WebView, not reported by the
+  // sidecar (null = not yet checked).
+  const [edgeOk, setEdgeOk] = useState<boolean | null>(null);
+
+  const provisioning: ModelProvisioning = model.provisioning ?? 'HostedFile';
+  const isBrowser = provisioning === 'BrowserWebSpeech';
+  const isBuiltIn = provisioning === 'WindowsBuiltIn';
+  const isLangPack = provisioning === 'WindowsLanguagePack';
+  const isPlatform = provisioning !== 'HostedFile';
+
+  // Probe the Edge engine once when the card mounts so its badge is accurate.
+  useEffect(() => {
+    if (!isBrowser || !enabled) return;
+    let cancelled = false;
+    void probeWebSpeechAvailable().then((r) => {
+      if (!cancelled) setEdgeOk(r.ok);
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [isBrowser, enabled]);
 
   const inProgress = ACTIVE_STATES.includes(model.progress.state);
   const pct =
@@ -190,6 +239,40 @@ function ModelCard({
     }
   }
 
+  // Edge Web Speech "Test" — run the live microphone probe in the WebView (the
+  // engine runs here, not in the sidecar). Reports a clear, non-silent result.
+  async function doProbeTest() {
+    setBusy('test');
+    setMsg(null);
+    try {
+      const r = await probeWebSpeechAvailable();
+      setEdgeOk(r.ok);
+      setMsg(
+        r.ok
+          ? 'Microsoft Edge speech is available in this app window.'
+          : `Edge speech is not available here (${r.error ?? 'unknown'}). Use an on-device engine instead.`,
+      );
+    } finally {
+      setBusy(null);
+    }
+  }
+
+  // WinRT language pack — "download" opens Windows speech settings so the user can
+  // install/enable the on-device pack, then return and Test.
+  async function doOpenSettings() {
+    setBusy('download');
+    setMsg(null);
+    try {
+      await api.localModels.download(model.id);
+      setMsg('Opened Windows speech settings. Install/enable a language pack, then press Test.');
+      await onChanged();
+    } catch (e) {
+      setMsg(errText(e));
+    } finally {
+      setBusy(null);
+    }
+  }
+
   async function copyDiagnostics() {
     try {
       const diagnostics = await api.localModels.diagnostics(model.id);
@@ -209,15 +292,26 @@ function ModelCard({
             <code>{model.id}</code>
           </div>
         </div>
-        <StateBadge model={model} />
+        <StateBadge model={model} edgeOk={edgeOk} />
       </div>
 
       <div className="rp-row" style={{ gap: 6, marginTop: 8, flexWrap: 'wrap' }}>
         {model.isPrimary && <span className="badge ai">Primary</span>}
-        {!model.placeholder && <span className="badge">{fmtBytes(model.sizeBytes)}</span>}
+        {/* Platform engines have no meaningful download size. */}
+        {!model.placeholder && !isPlatform && <span className="badge">{fmtBytes(model.sizeBytes)}</span>}
         {model.license && <span className="badge">{model.license}</span>}
         {model.available && <span className="badge ok">Loaded</span>}
       </div>
+
+      {model.note && (
+        <p
+          className="rp-faint"
+          style={{ marginTop: 8, marginBottom: 0, fontSize: 12 }}
+          data-testid="model-note"
+        >
+          {model.note}
+        </p>
+      )}
 
       {inProgress && (
         <div style={{ marginTop: 10 }}>
@@ -249,6 +343,40 @@ function ModelCard({
           Coming in a future release — it will be downloadable and testable here, just like the
           speech-to-text models.
         </p>
+      ) : isBrowser ? (
+        // Edge Web Speech — no download/delete; it runs in the app window. Probe
+        // tests it; Make primary routes the live "Dictate" button through it.
+        <div className="rp-row" style={{ gap: 8, marginTop: 12, flexWrap: 'wrap' }}>
+          {!model.isPrimary && (
+            <button className="primary-ghost" onClick={doSetPrimary} disabled={!enabled || busy !== null}>
+              {busy === 'primary' ? 'Setting…' : 'Make primary'}
+            </button>
+          )}
+          <button className="subtle" onClick={doProbeTest} disabled={busy !== null}>
+            {busy === 'test' ? 'Testing…' : 'Test in app'}
+          </button>
+        </div>
+      ) : isPlatform ? (
+        // Windows speech engines (SAPI built-in / WinRT language pack). SAPI needs
+        // no download; WinRT offers an "open Windows settings" action. Neither has
+        // files to delete.
+        <div className="rp-row" style={{ gap: 8, marginTop: 12, flexWrap: 'wrap' }}>
+          {isLangPack && (
+            <button className="primary" onClick={doOpenSettings} disabled={!enabled || busy !== null}>
+              {busy === 'download' ? 'Opening…' : 'Open Windows speech settings'}
+            </button>
+          )}
+          {/* Only the SAPI built-in card is a selectable engine; the language-pack
+              card is a settings helper for the same recognizer. */}
+          {isBuiltIn && !model.isPrimary && (
+            <button className="primary-ghost" onClick={doSetPrimary} disabled={!enabled || busy !== null}>
+              {busy === 'primary' ? 'Setting…' : 'Make primary'}
+            </button>
+          )}
+          <button className="subtle" onClick={doTest} disabled={!enabled || busy !== null}>
+            {busy === 'test' ? 'Testing…' : 'Test'}
+          </button>
+        </div>
       ) : (
         <div className="rp-row" style={{ gap: 8, marginTop: 12, flexWrap: 'wrap' }}>
           {!model.downloaded ? (

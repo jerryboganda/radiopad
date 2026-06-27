@@ -775,6 +775,20 @@ export type ModelProgress = {
   error: string | null;
 };
 
+/**
+ * How a model entry is provisioned + run, driving the card's actions:
+ * - `HostedFile` — we download/verify a model bundle (Parakeet/Whisper).
+ * - `WindowsBuiltIn` — System.Speech / SAPI: ships with Windows, no download.
+ * - `WindowsLanguagePack` — WinRT speech: "download" opens Windows speech settings.
+ * - `BrowserWebSpeech` — Edge Web Speech: runs in the WebView; availability probed
+ *   in the frontend, not the sidecar.
+ */
+export type ModelProvisioning =
+  | 'HostedFile'
+  | 'WindowsBuiltIn'
+  | 'WindowsLanguagePack'
+  | 'BrowserWebSpeech';
+
 export type LocalModel = {
   id: string;
   displayName: string;
@@ -784,6 +798,10 @@ export type LocalModel = {
   license: string;
   /** Roadmap kinds (TTS / orchestrator) with no engine yet — render as "coming soon". */
   placeholder: boolean;
+  /** How this entry is provisioned + run (defaults to HostedFile for older builds). */
+  provisioning?: ModelProvisioning;
+  /** Optional card note (e.g. the online/PHI warning on Edge / WinRT-online). */
+  note?: string | null;
   downloaded: boolean;
   /** Engine loaded + usable right now (always false on a web build). */
   available: boolean;

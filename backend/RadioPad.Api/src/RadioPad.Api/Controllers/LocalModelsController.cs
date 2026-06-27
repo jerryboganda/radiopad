@@ -75,6 +75,11 @@ public sealed class LocalModelsController : ControllerBase
             return StatusCode(StatusCodes.Status503ServiceUnavailable,
                 new { error = "on-device models are only available in the RadioPad desktop app.", kind = "stt_unavailable" });
 
+        // Platform speech engines (SAPI / WinRT language pack / Edge) have no hosted
+        // artifact to fetch — handle them without the download pipeline.
+        if (desc.Provisioning != ModelProvisioning.HostedFile)
+            return ProvisionPlatformEngine(desc);
+
         if (IsDownloaded(desc))
         {
             _status.SetState(id, ProvisionState.Ready);
@@ -115,6 +120,14 @@ public sealed class LocalModelsController : ControllerBase
         if (!LocalSttModels.IsEnabled())
             return StatusCode(StatusCodes.Status503ServiceUnavailable,
                 new { error = "on-device models are only available in the RadioPad desktop app.", kind = "stt_unavailable" });
+
+        // Platform speech engines have no downloaded files to remove.
+        if (desc.Provisioning != ModelProvisioning.HostedFile)
+            return Conflict(new
+            {
+                error = "this engine is built into Windows or the browser — there are no downloaded files to remove.",
+                kind = "not_removable",
+            });
 
         // RADIOPAD_STT_MODEL_DIR points at a single operator-mounted dir (not
         // models/<id>), so it isn't ours to remove — refuse rather than nuke a shared mount.
@@ -159,6 +172,18 @@ public sealed class LocalModelsController : ControllerBase
         if (desc.Placeholder)
             return StatusCode(StatusCodes.Status503ServiceUnavailable,
                 new { error = "this model is not available yet.", kind = "coming_soon" });
+
+        // Edge Web Speech recognizes in the WebView, not the sidecar — there is no
+        // backend engine to exercise. The frontend runs the real microphone probe.
+        if (desc.Provisioning == ModelProvisioning.BrowserWebSpeech)
+            return Ok(new
+            {
+                ok = true,
+                engine = desc.Engine,
+                inApp = true,
+                transcript = (string?)null,
+                message = "Microsoft Edge speech is tested in the app window — use the in-app microphone test.",
+            });
 
         var engine = _engines.FirstOrDefault(e => string.Equals(e.EngineId, desc.Engine, StringComparison.Ordinal));
         if (engine is null || !engine.Available)
@@ -319,6 +344,10 @@ public sealed class LocalModelsController : ControllerBase
             sizeBytes = d.SizeBytes,
             license = d.License,
             placeholder = d.Placeholder,
+            // How the card behaves in the UI (download vs built-in vs settings vs
+            // browser-probe) + an optional note (e.g. the online/PHI warning).
+            provisioning = d.Provisioning.ToString(),
+            note = d.Note,
             downloaded = IsDownloaded(d),
             available = enabled && (engine?.Available ?? false),
             isPrimary = !d.Placeholder && d.Kind == ModelKind.Stt && _settings.IsPrimary(d.Id),
@@ -335,17 +364,74 @@ public sealed class LocalModelsController : ControllerBase
         error = s?.Error,
     };
 
-    private static bool IsDownloaded(LocalModelDescriptor d)
+    private bool IsDownloaded(LocalModelDescriptor d)
     {
         if (d.Placeholder) return false;
-        var dir = LocalSttModels.ResolveModelDir(d.Id);
-        if (dir is null) return false;
-        return d.ArchiveKind switch
+        switch (d.Provisioning)
         {
-            ModelArchiveKind.TarBz2 => LocalSttModels.IsComplete(dir),
-            ModelArchiveKind.RawFile => d.FileName is not null && System.IO.File.Exists(Path.Combine(dir, d.FileName)),
-            _ => false,
-        };
+            // Built into Windows / provided by a Windows language pack — "present"
+            // iff the engine reports itself available (recognizer/pack installed).
+            case ModelProvisioning.WindowsBuiltIn:
+            case ModelProvisioning.WindowsLanguagePack:
+                return EngineAvailable(d);
+            // Provided by the WebView (Edge) — no backend artifact. Treat as present;
+            // the frontend capability probe decides whether it actually works.
+            case ModelProvisioning.BrowserWebSpeech:
+                return true;
+            case ModelProvisioning.HostedFile:
+            default:
+                var dir = LocalSttModels.ResolveModelDir(d.Id);
+                if (dir is null) return false;
+                return d.ArchiveKind switch
+                {
+                    ModelArchiveKind.TarBz2 => LocalSttModels.IsComplete(dir),
+                    ModelArchiveKind.RawFile => d.FileName is not null && System.IO.File.Exists(Path.Combine(dir, d.FileName)),
+                    _ => false,
+                };
+        }
+    }
+
+    private bool EngineAvailable(LocalModelDescriptor d)
+    {
+        var engine = _engines.FirstOrDefault(e => string.Equals(e.EngineId, d.Engine, StringComparison.Ordinal));
+        return engine?.Available ?? false;
+    }
+
+    /// <summary>
+    /// Provision a platform speech engine (no hosted artifact): SAPI + Edge are
+    /// instant no-ops (Ready); the WinRT language-pack opens Windows speech settings
+    /// so the user can install/enable the on-device pack, then Test.
+    /// </summary>
+    private IActionResult ProvisionPlatformEngine(LocalModelDescriptor desc)
+    {
+        if (desc.Provisioning == ModelProvisioning.WindowsLanguagePack)
+        {
+            var opened = TryOpenWindowsSpeechSettings();
+            _status.SetState(desc.Id, EngineAvailable(desc) ? ProvisionState.Ready : ProvisionState.NotStarted);
+            return Ok(new
+            {
+                id = desc.Id,
+                action = "open_settings",
+                opened,
+                settingsUri = "ms-settings:speech",
+                message = "Install or enable a Windows speech language pack in Settings, then return and press Test.",
+            });
+        }
+
+        // WindowsBuiltIn (SAPI) + BrowserWebSpeech (Edge): nothing to fetch.
+        _status.SetState(desc.Id, ProvisionState.Ready);
+        return Ok(new { id = desc.Id, state = ProvisionState.Ready.ToString(), alreadyInstalled = true });
+    }
+
+    private static bool TryOpenWindowsSpeechSettings()
+    {
+        if (!OperatingSystem.IsWindows()) return false;
+        try
+        {
+            using var _ = Process.Start(new ProcessStartInfo("ms-settings:speech") { UseShellExecute = true });
+            return true;
+        }
+        catch { return false; }
     }
 
     private static bool IsInProgress(ProvisionState s) =>

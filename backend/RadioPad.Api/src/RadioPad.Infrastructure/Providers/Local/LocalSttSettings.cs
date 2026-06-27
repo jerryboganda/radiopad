@@ -42,8 +42,22 @@ public sealed class LocalSttSettings : ILocalSttSettings
     public LocalSttSettings(string? path)
     {
         _path = path;
-        _primaryModelId = Load(path) ?? LocalSttModels.DefaultModelName;
+        _primaryModelId = Load(path) ?? DefaultPrimaryModelId;
     }
+
+    /// <summary>
+    /// The out-of-box primary on a fresh install: Windows on-device speech (SAPI)
+    /// when a Windows recognizer is actually installed — it is PHI-safe and needs no
+    /// download — else the downloadable Parakeet model. The recognizer check matters
+    /// on Windows 11, where the legacy speech recognizer is often absent; defaulting
+    /// to SAPI only when present keeps the "Primary" badge honest. Either way the
+    /// ensemble's primary-pick falls back to the first available engine, so this is
+    /// always safe.
+    /// </summary>
+    internal static string DefaultPrimaryModelId =>
+        LocalSttModels.IsEnabled() && WindowsSapiSttClient.IsRecognizerInstalled()
+            ? LocalModelCatalog.WindowsSapiId
+            : LocalSttModels.DefaultModelName;
 
     private static string? Load(string? path)
     {
@@ -61,10 +75,24 @@ public sealed class LocalSttSettings : ILocalSttSettings
         get { lock (_gate) { return _primaryModelId; } }
     }
 
-    public string PrimaryEngineId =>
-        LocalSttModels.IsWhisperModel(PrimaryModelId)
-            ? WhisperNetSttClient.EngineName
-            : SherpaParakeetSttClient.EngineName;
+    public string PrimaryEngineId => MapEngine(PrimaryModelId);
+
+    /// <summary>Map a primary model id to the engine id that should lead. The two
+    /// Windows engines + the Edge Web Speech engine map to their own ids; whisper
+    /// models map to the whisper engine; everything else (incl. Parakeet) maps to
+    /// Parakeet. Edge is frontend-routed and has no backend engine, so when it is
+    /// primary the ensemble's primary-pick simply falls back to the first available
+    /// engine for any (rare) sidecar call.</summary>
+    internal static string MapEngine(string modelId) => modelId switch
+    {
+        LocalModelCatalog.WindowsSapiId => LocalModelCatalog.WindowsSapiEngine,
+        // The "languages & accuracy" helper card drives the same on-device Windows
+        // recognizer (SAPI), so it maps to the SAPI engine rather than a separate one.
+        LocalModelCatalog.WindowsWinRtId => LocalModelCatalog.WindowsSapiEngine,
+        LocalModelCatalog.EdgeWebSpeechId => LocalModelCatalog.EdgeWebSpeechEngine,
+        _ when LocalSttModels.IsWhisperModel(modelId) => WhisperNetSttClient.EngineName,
+        _ => SherpaParakeetSttClient.EngineName,
+    };
 
     public string ActiveWhisperModelId
     {

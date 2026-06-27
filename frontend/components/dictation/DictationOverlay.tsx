@@ -7,10 +7,14 @@
 // focused — so they can click between Findings / Impression / etc. and keep
 // dictating without leaving the editor.
 //
-// Engine = browser Web Speech API (works in Chromium/Chrome/Edge). It is NOT
-// available in the Tauri desktop WebView2 shell, where the mic shows a disabled
-// state until the UBAG audio path (Phase B/C) lands. The "Fix" button asks the
-// host page to clean the dictation into medical phrasing via UBAG.
+// Live "Dictate" engine = the browser Web Speech API (Chromium/Chrome/Edge). On
+// modern Windows WebView2 this is backed by Microsoft Edge's (online) speech
+// service and works — it is the highly-accurate "Microsoft Edge Speech" engine
+// surfaced in the On-Device Models manager. When it is unavailable (older runtime
+// / no recognizer), the mic is disabled and the radiologist uses the "HQ" button,
+// which records and transcribes through the bundled on-device sidecar engine
+// (Windows Speech / Parakeet / Whisper). The "Fix" button asks the host page to
+// clean the dictation into medical phrasing via UBAG.
 
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { startFocusTracking, getLastFocusedEditable } from '@/lib/dictation/focusTracker';
@@ -128,7 +132,19 @@ export default function DictationOverlay() {
         setInterim('');
       }
     };
-    rec.onerror = () => setListening(false);
+    rec.onerror = (e) => {
+      setListening(false);
+      // Surface the common Edge/WebView2 failures instead of a silent stop so the
+      // radiologist knows to grant the mic or fall back to the on-device (HQ) path.
+      const err = (e as { error?: string })?.error;
+      if (err === 'network') {
+        setSttError(
+          'Live speech (Microsoft Edge) could not reach the speech service. Use the HQ button for on-device dictation, or check this machine’s connection.',
+        );
+      } else if (err === 'not-allowed' || err === 'service-not-allowed') {
+        setSttError('Microphone access is blocked. Allow the microphone to use live dictation.');
+      }
+    };
     rec.onend = () => {
       setListening(false);
       setInterim('');

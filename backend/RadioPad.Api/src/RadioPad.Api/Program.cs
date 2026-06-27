@@ -185,6 +185,14 @@ builder.Services.AddSingleton<RadioPad.Application.Abstractions.ILocalSttEngine>
 builder.Services.AddSingleton<RadioPad.Infrastructure.Providers.Local.MedicalWhisperSttClient>();
 builder.Services.AddSingleton<RadioPad.Application.Abstractions.ILocalSttEngine>(
     sp => sp.GetRequiredService<RadioPad.Infrastructure.Providers.Local.MedicalWhisperSttClient>());
+// Windows on-device speech (System.Speech / SAPI) — the classic Windows Speech
+// Recognition engine, fully on-device (PHI-safe) and built into Windows. Registered
+// always; Available is false off Windows / when no recognizer is installed (the
+// engine guards every call with OperatingSystem.IsWindows()), so it is inert on the
+// Linux server build. This is the preferred default dictation engine on the desktop.
+builder.Services.AddSingleton<RadioPad.Infrastructure.Providers.Local.WindowsSapiSttClient>();
+builder.Services.AddSingleton<RadioPad.Application.Abstractions.ILocalSttEngine>(
+    sp => sp.GetRequiredService<RadioPad.Infrastructure.Providers.Local.WindowsSapiSttClient>());
 // Manual "Cross Check" pass: re-runs retained audio through all available engines,
 // N-way ROVER reconcile vs the live draft, then (later phases) an LLM medical pass.
 // Singletons (engines are singletons); jobs are tracked in-memory, non-durable.
