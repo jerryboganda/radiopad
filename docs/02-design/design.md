@@ -280,7 +280,14 @@ input (inherits the input shell) over a `.rp-combobox-list` of
 `[aria-selected]` → `--accent-strong`; `[aria-disabled]` muted) and a
 `.rp-combobox-empty` no-match state. Click-outside + Escape close it (the
 ProfileMenu popover pattern). Use it ONLY where filtering helps — keep native
-`<select>` elsewhere. Containers must not `overflow: hidden` around it or the
+`<select>` elsewhere.
+
+Checkbox rows inside `.rp-profile-popover` (the ProfileMenu "Dictation"
+toggles) add `.rp-profile-popover-check` with a `.rp-profile-check-label` span
+around the text. Because the popover is narrow, these labels wrap to 2–3 lines,
+so the row is `align-items: flex-start` (box top-aligned with the first line,
+not centred against the whole block — centring leaves the checkbox floating
+mid-row and reads as broken) and the box uses `accent-color: var(--accent)`. Containers must not `overflow: hidden` around it or the
 popover is clipped (see §4.16 — the inspector is `overflow: visible` for this).
 
 ### 3.4 Messages (chat & report sections)

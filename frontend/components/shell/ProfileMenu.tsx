@@ -93,7 +93,7 @@ export default function ProfileMenu() {
           <div className="rp-profile-popover-divider" />
           <div className="rp-profile-popover-meta">Dictation</div>
           <label
-            className="rp-profile-popover-item"
+            className="rp-profile-popover-item rp-profile-popover-check"
             data-testid="profile-dual-check"
             title="Cross-check dictation with a second on-device engine (Parakeet + Whisper) and flag disagreements for review. Doubles CPU/RAM."
           >
@@ -101,11 +101,11 @@ export default function ProfileMenu() {
               type="checkbox"
               checked={dictMode === 'ensemble'}
               onChange={(e) => setDictMode(e.target.checked ? 'ensemble' : 'single')}
-            />{' '}
-            Dual-engine cross-check
+            />
+            <span className="rp-profile-check-label">Dual-engine cross-check</span>
           </label>
           <label
-            className="rp-profile-popover-item"
+            className="rp-profile-popover-item rp-profile-popover-check"
             data-testid="profile-crosscheck"
             title="Show a 'Cross Check' button that re-runs a dictation through extra engines + a medical-AI review and highlights corrections."
           >
@@ -113,11 +113,11 @@ export default function ProfileMenu() {
               type="checkbox"
               checked={ccEnabled}
               onChange={(e) => setCcEnabled(e.target.checked)}
-            />{' '}
-            Manual Cross Check
+            />
+            <span className="rp-profile-check-label">Manual Cross Check</span>
           </label>
           <label
-            className="rp-profile-popover-item"
+            className="rp-profile-popover-item rp-profile-popover-check"
             data-testid="profile-crosscheck-ubag"
             title="Also route the medical-accuracy review through the UBAG cloud AI. Only use on reports with NO patient-identifying information (PHI)."
           >
@@ -126,8 +126,8 @@ export default function ProfileMenu() {
               checked={ccUbag}
               disabled={!ccEnabled}
               onChange={(e) => setCcUbag(e.target.checked)}
-            />{' '}
-            Cross Check via UBAG (no PHI)
+            />
+            <span className="rp-profile-check-label">Cross Check via UBAG (no PHI)</span>
           </label>
           <div className="rp-profile-popover-divider" />
           <div className="rp-profile-popover-meta">{tProfile('language')}</div>

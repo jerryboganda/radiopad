@@ -603,6 +603,31 @@
 .rp-profile-popover-item:hover { background: var(--bg-subtle); }
 .rp-profile-popover-item:focus-visible { outline: 2px solid var(--accent); outline-offset: -2px; }
 
+/* Checkbox rows (Dictation): the labels wrap to 2–3 lines in the narrow
+   popover, so top-align the box with the first line instead of centring it
+   against the whole block — otherwise the checkbox floats mid-row and reads
+   as broken. The box keeps its size; the label takes the remaining width. */
+.rp-profile-popover-check {
+  align-items: flex-start;
+  cursor: pointer;
+}
+.rp-profile-popover-check input[type='checkbox'] {
+  flex: 0 0 auto;
+  width: 15px;
+  height: 15px;
+  margin: 1px 0 0;
+  accent-color: var(--accent);
+  cursor: pointer;
+}
+.rp-profile-popover-check input[type='checkbox']:disabled { cursor: not-allowed; }
+.rp-profile-check-label {
+  flex: 1 1 auto;
+  min-width: 0;
+}
+.rp-profile-popover-check:has(input:disabled) .rp-profile-check-label {
+  color: var(--text-muted);
+}
+
 .rp-profile-popover-divider {
   height: 1px;
   background: var(--border-soft);
