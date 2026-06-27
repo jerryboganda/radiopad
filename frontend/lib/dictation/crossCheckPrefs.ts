@@ -12,7 +12,7 @@ const ENABLED_KEY = 'radiopad:crosscheck-enabled';
 const UBAG_KEY = 'radiopad:crosscheck-ubag';
 const EVENT = 'radiopad:crosscheck-prefs-changed';
 
-function read(key: string, defaultOn = false): boolean {
+function readStorage(key: string, defaultOn: boolean): boolean {
   if (typeof window === 'undefined') return defaultOn;
   try {
     const v = window.localStorage.getItem(key);
@@ -23,14 +23,36 @@ function read(key: string, defaultOn = false): boolean {
   }
 }
 
+// In-memory source of truth keyed by storage key. localStorage is best-effort:
+// in some webview origins (e.g. Tauri's custom protocol) writes can silently
+// fail or not reflect back on read, which would make a controlled checkbox snap
+// back to its old value after a click and feel "unresponsive". Holding the live
+// value in memory makes every toggle stick; storage only persists/syncs it when
+// available. Seeded lazily from storage (or the supplied default) on first use.
+const mem = new Map<string, boolean>();
+
+function read(key: string, defaultOn = false): boolean {
+  const cached = mem.get(key);
+  if (cached !== undefined) return cached;
+  const initial = readStorage(key, defaultOn);
+  mem.set(key, initial);
+  return initial;
+}
+
 function write(key: string, on: boolean): void {
+  mem.set(key, on);
   if (typeof window === 'undefined') return;
   try {
     window.localStorage.setItem(key, on ? '1' : '0');
   } catch {
-    /* storage unavailable — ignore */
+    /* storage unavailable — the in-memory value above still applies */
   }
   window.dispatchEvent(new CustomEvent(EVENT));
+}
+
+/** Re-sync an in-memory value from storage (for cross-tab `storage` events). */
+function syncFromStorage(key: string, defaultOn: boolean): void {
+  mem.set(key, readStorage(key, defaultOn));
 }
 
 // Cross Check ships ON by default (opt-out); UBAG stays opt-in (cloud + PHI risk).
@@ -46,13 +68,17 @@ function usePref(
 ): [boolean, (on: boolean) => void] {
   const [on, setOn] = useState(defaultOn);
   useEffect(() => {
-    const sync = () => setOn(read(key, defaultOn));
-    sync();
-    window.addEventListener(EVENT, sync);
-    window.addEventListener('storage', sync);
+    setOn(read(key, defaultOn));
+    const onChange = () => setOn(read(key, defaultOn));
+    const onStorage = () => {
+      syncFromStorage(key, defaultOn);
+      setOn(read(key, defaultOn));
+    };
+    window.addEventListener(EVENT, onChange);
+    window.addEventListener('storage', onStorage);
     return () => {
-      window.removeEventListener(EVENT, sync);
-      window.removeEventListener('storage', sync);
+      window.removeEventListener(EVENT, onChange);
+      window.removeEventListener('storage', onStorage);
     };
   }, [key, defaultOn]);
   return [on, useCallback((v: boolean) => setter(v), [setter])];
