@@ -11,6 +11,7 @@ using RadioPad.Domain.Entities;
 using RadioPad.Domain.Enums;
 using RadioPad.Infrastructure.Identity;
 using RadioPad.Infrastructure.Persistence;
+using RadioPad.Infrastructure.Seeding;
 
 namespace RadioPad.Api.Controllers;
 
@@ -200,6 +201,12 @@ public class RegistrationController : ControllerBase
             ExpiresAt = DateTimeOffset.UtcNow.AddMinutes(60),
         });
         await _db.SaveChangesAsync(ct);
+
+        // Surface the curated UBAG models (Gemini Web + DeepSeek Web) on the new org's
+        // AI-models page from day one. Isolated + idempotent: a gateway/seed hiccup must
+        // never fail org creation, so swallow + log.
+        try { await UbagPrimarySeed.EnsureCuratedPrimariesAsync(_db, tenant.Id, ct); }
+        catch (Exception ex) { _log.LogWarning(ex, "UBAG primary seeding failed for new org {Slug}", slug); }
 
         // Bridge the new admin into the enterprise-identity tables so the
         // first magic-link consume mints a session cleanly.

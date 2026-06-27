@@ -17,6 +17,7 @@ namespace RadioPad.Api.Tests.Integration;
 /// <c>devLink</c> so the test can complete the passwordless loop through the
 /// existing <c>/api/auth/magic-link/consume</c> endpoint.
 /// </summary>
+[Collection("OrgCreationSerial")]
 public sealed class RegistrationTests : IClassFixture<RadioPadAppFactory>
 {
     private readonly RadioPadAppFactory _factory;

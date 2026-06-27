@@ -95,49 +95,18 @@ public static class DevSeed
                     Compliance = ProviderComplianceClass.LocalOnly,
                     Enabled = false,
                     Priority = 10,
-                },
-                // UBAG browser-automation AI gateway. The desktop reaches it via the
-                // web-server passthrough (RADIOPAD_UBAG_BASE_URL -> /api/ubag-gw);
-                // EndpointUrl/ApiKeySecretRef stay empty — UbagClient gets the base
-                // URL + bearer from the RADIOPAD_UBAG_* environment.
-                //
-                // Gemini is the unattended PRIMARY: end-to-end QA (2026-06) showed
-                // gemini_web returns clean, final radiology impressions. DeepSeek Web is
-                // an enabled secondary (its gateway extractor was fixed 2026-06-22) but is
-                // deliberately ranked just below Gemini. The router (EfProviderRouter) is
-                // Quality/Cost weighted and only uses Priority as a tie-break, so Quality
-                // is set explicitly to make Gemini win the unattended route outright while
-                // both remain selectable.
-                new ProviderConfig
-                {
-                    TenantId = tenant.Id,
-                    Name = "UBAG (Gemini Web)",
-                    Adapter = "ubag",
-                    Model = "gemini_web",
-                    Compliance = ProviderComplianceClass.Sandbox,
-                    Enabled = true,
-                    Quality = 0.9m,
-                    Priority = 1,
-                },
-                new ProviderConfig
-                {
-                    TenantId = tenant.Id,
-                    Name = "UBAG (DeepSeek Web)",
-                    Adapter = "ubag",
-                    Model = "deepseek_web",
-                    Compliance = ProviderComplianceClass.Sandbox,
-                    // ENABLED: the gateway's deepseek_web extractor was fixed 2026-06-22.
-                    // The worker now targets div.ds-markdown.ds-assistant-message-main-content
-                    // (the answer pane) instead of the R1 reasoner's thinking pane, and
-                    // honours options.return_mode="final"; verified 2/2 returning clean
-                    // final answers ("391"; "No acute cardiopulmonary abnormality identified.").
-                    // DeepSeek is now a fully usable secondary, ranked just below Gemini via a
-                    // slightly lower Quality so the unattended router still prefers Gemini while
-                    // both are selectable in the editor picker and the UBAG Hub.
-                    Enabled = true,
-                    Quality = 0.85m,
-                    Priority = 2,
                 });
+
+            // UBAG browser-automation AI gateway (Gemini Web + DeepSeek Web). These
+            // curated primaries now live in UbagPrimarySeed — the single source of
+            // truth shared by org bootstrap/registration and the startup backfill, so
+            // EVERY org gets them (not just this dev tenant) and the definitions never
+            // drift across call sites. The desktop reaches the gateway via the
+            // web-server passthrough (RADIOPAD_UBAG_BASE_URL -> /api/ubag-gw);
+            // EndpointUrl/ApiKeySecretRef stay empty — UbagClient gets the base URL +
+            // bearer from the RADIOPAD_UBAG_* environment. Gemini is the unattended
+            // PRIMARY (higher Quality); DeepSeek is the enabled secondary.
+            db.Providers.AddRange(UbagPrimarySeed.CuratedPrimaries(tenant.Id));
         }
 
         if (Directory.Exists(rulebooksDir))
