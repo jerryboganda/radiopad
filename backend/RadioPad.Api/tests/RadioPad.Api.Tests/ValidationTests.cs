@@ -266,7 +266,6 @@ public class PhiDetectorTests
         {
             Study = new StudyContext
             {
-                Indication = "Cough",
                 Comparison = "Prior exam for MRN 44556677.",
             },
         };

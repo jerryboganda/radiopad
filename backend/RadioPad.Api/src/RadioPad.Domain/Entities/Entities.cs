@@ -270,12 +270,50 @@ public class ReportTemplate : Entity
     public DateTimeOffset? ApprovedAt { get; set; }
 }
 
+/// <summary>
+/// Admin-managed catalog of imaging modalities (CT, MR, US, ...). Tenant-scoped
+/// so each org curates its own list. Together with <see cref="BodyPart"/> this is
+/// the single selection key that drives report-template and rulebook (prompt)
+/// resolution — see <c>ReportingService.ResolveBindingsAsync</c>.
+/// </summary>
+public class Modality : Entity
+{
+    public Guid TenantId { get; set; }
+    /// <summary>Stable code used for matching (e.g. "CT"). Unique per tenant.</summary>
+    public string Code { get; set; } = "";
+    /// <summary>Human-readable label (e.g. "Computed Tomography"). Falls back to Code when blank.</summary>
+    public string Name { get; set; } = "";
+    public bool Active { get; set; } = true;
+    public int SortOrder { get; set; }
+}
+
+/// <summary>
+/// Admin-managed catalog of anatomical regions (Chest, Abdomen, ...). Tenant-scoped.
+/// See <see cref="Modality"/> for how the pair drives template/rulebook resolution.
+/// </summary>
+public class BodyPart : Entity
+{
+    public Guid TenantId { get; set; }
+    /// <summary>Stable code used for matching (e.g. "Chest"). Unique per tenant.</summary>
+    public string Code { get; set; } = "";
+    /// <summary>Human-readable label. Falls back to Code when blank.</summary>
+    public string Name { get; set; } = "";
+    public bool Active { get; set; } = true;
+    public int SortOrder { get; set; }
+}
+
 public class StudyContext
 {
     public string AccessionNumber { get; set; } = "";
     public string Modality { get; set; } = "";
     public string BodyPart { get; set; } = "";
-    public string Indication { get; set; } = "";
+    /// <summary>Iter-36 — patient age in years. Null when unknown. Replaces the
+    /// former study-context Indication field; the report-body Indication section
+    /// (<see cref="Report.Indication"/>) remains the clinical indication of record.</summary>
+    public int? Age { get; set; }
+    /// <summary>Iter-36 — patient gender (Male/Female/Other/Unknown). Free-form
+    /// string for forward-compat; the UI constrains it to a fixed set.</summary>
+    public string Gender { get; set; } = "";
     public string Comparison { get; set; } = "";
     public string PriorReportSummary { get; set; } = "";
     public string PatientReference { get; set; } = "";

@@ -344,7 +344,8 @@ public sealed class ModelDriftDetectionService : BackgroundService
         {
             r.Study.Modality = st.TryGetProperty("modality", out var m) ? (m.GetString() ?? "") : "";
             r.Study.BodyPart = st.TryGetProperty("bodyPart", out var b) ? (b.GetString() ?? "") : "";
-            r.Study.Indication = st.TryGetProperty("indication", out var i) ? (i.GetString() ?? "") : "";
+            // Iter-36 — study-context Indication removed; map the sample's indication onto the report-body section.
+            r.Indication = st.TryGetProperty("indication", out var i) ? (i.GetString() ?? "") : "";
             r.Study.AccessionNumber = st.TryGetProperty("accessionNumber", out var a) ? (a.GetString() ?? "") : "";
         }
         r.Indication = el.TryGetProperty("indication", out var ind) ? (ind.GetString() ?? "") : "";

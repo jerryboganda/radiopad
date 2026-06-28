@@ -1,10 +1,8 @@
 'use client';
 
-import { useState, type ChangeEvent } from 'react';
+import { useEffect, useState, type ChangeEvent } from 'react';
 import type { RulebookEditorState } from '@/lib/rulebookYaml';
-
-const MODALITY_OPTIONS = ['CT', 'MR', 'US', 'XR', 'NM', 'PET', 'MG', 'FL'];
-const BODY_PART_OPTIONS = ['Head', 'Neck', 'Chest', 'Abdomen', 'Pelvis', 'Spine', 'Extremity', 'Whole Body'];
+import { api } from '@/lib/api';
 
 type Props = {
   data: RulebookEditorState;
@@ -15,6 +13,16 @@ export default function MetadataPanel({ data, onChange }: Props) {
   const [newModality, setNewModality] = useState('');
   const [newBodyPart, setNewBodyPart] = useState('');
   const [newReportType, setNewReportType] = useState('');
+  // Iter-36 — modality/body-part options come from the admin-managed catalogs
+  // (formerly hardcoded constants). Fall back to empty lists on fetch failure.
+  const [modalityOptions, setModalityOptions] = useState<string[]>([]);
+  const [bodyPartOptions, setBodyPartOptions] = useState<string[]>([]);
+  useEffect(() => {
+    api.modalities.list().then((rows) => setModalityOptions(rows.map((m) => m.code))).catch(() => {});
+    api.bodyParts.list().then((rows) => setBodyPartOptions(rows.map((b) => b.code))).catch(() => {});
+  }, []);
+  const MODALITY_OPTIONS = modalityOptions;
+  const BODY_PART_OPTIONS = bodyPartOptions;
 
   function set<K extends keyof RulebookEditorState>(key: K, val: RulebookEditorState[K]) {
     onChange({ ...data, [key]: val });

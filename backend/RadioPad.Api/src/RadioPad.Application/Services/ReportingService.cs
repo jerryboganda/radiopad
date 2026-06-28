@@ -150,7 +150,7 @@ public class ReportingService
             "draft" => (
                 "Generate a structured draft report from the dictation and metadata, with sections: Indication, Technique, Comparison, Findings, Impression. " +
                 "Do not invent findings beyond what is dictated.",
-                $"Modality: {report.Study.Modality}\nBody part: {report.Study.BodyPart}\nIndication: {report.Study.Indication}\nComparison: {report.Study.Comparison}\nDICTATION:\n{report.Findings}"),
+                $"Modality: {report.Study.Modality}\nBody part: {report.Study.BodyPart}\nIndication: {report.Indication}\nComparison: {report.Study.Comparison}\nDICTATION:\n{report.Findings}"),
             "concise" => (
                 "Rewrite the impression to be more concise. Do not change clinical meaning, negations, or measurements.",
                 $"IMPRESSION:\n{report.Impression}"),
@@ -171,10 +171,17 @@ public class ReportingService
         // instruction by named prompt block (mode key).
         var instructions = Resolve(mode) ?? defaultInstr;
 
+        // Iter-36 — patient demographics replace the former study-context Indication
+        // field in the prompt header; the clinical indication of record is now the
+        // report-body Indication section (report.Indication).
+        var age = report.Study.Age is int a ? a.ToString() : "Unknown";
+        var gender = string.IsNullOrWhiteSpace(report.Study.Gender) ? "Unknown" : report.Study.Gender;
+
         var userPrompt = $"""
             Modality: {report.Study.Modality}
             Body part: {report.Study.BodyPart}
-            Indication: {report.Study.Indication}
+            Patient: age {age}, gender {gender}
+            Indication: {report.Indication}
 
             {body}
 
@@ -184,6 +191,48 @@ public class ReportingService
 
         return (system, instructions, userPrompt);
     }
+
+    /// <summary>
+    /// Iter-36 — pick the Approved report template + rulebook that match a
+    /// (modality, body part) selection key. This is the single mechanism behind
+    /// both automatic scaffolding (template) and prompt selection (rulebook).
+    /// Templates tie-break Normal-variant first, then most-recently-updated;
+    /// rulebooks tie-break highest version. Returns nulls when no Approved match
+    /// exists or the key is incomplete. Pure + side-effect free for unit testing —
+    /// callers load tenant-scoped candidates and apply the result.
+    /// </summary>
+    public static (ReportTemplate? template, Rulebook? rulebook) ResolveBindings(
+        IEnumerable<ReportTemplate> templates,
+        IEnumerable<Rulebook> rulebooks,
+        string? modality, string? bodyPart)
+    {
+        var m = (modality ?? "").Trim();
+        var bp = (bodyPart ?? "").Trim();
+        if (m.Length == 0 || bp.Length == 0) return (null, null);
+
+        var template = templates
+            .Where(t => t.Status == TemplateStatus.Approved
+                && string.Equals(t.Modality, m, StringComparison.OrdinalIgnoreCase)
+                && string.Equals(t.BodyPart, bp, StringComparison.OrdinalIgnoreCase))
+            .OrderByDescending(t => t.Variant == TemplateVariant.Normal)
+            .ThenByDescending(t => t.UpdatedAt)
+            .FirstOrDefault();
+
+        var rulebook = rulebooks
+            .Where(r => r.Status == RulebookStatus.Approved
+                && AppliesTo(r.AppliesToModalities, m)
+                && AppliesTo(r.AppliesToBodyParts, bp))
+            .OrderByDescending(r => r.Version, StringComparer.OrdinalIgnoreCase)
+            .FirstOrDefault();
+
+        return (template, rulebook);
+    }
+
+    /// <summary>True when a comma-separated <c>applies_to</c> list contains <paramref name="value"/> (case-insensitive).</summary>
+    private static bool AppliesTo(string? csv, string value) =>
+        !string.IsNullOrWhiteSpace(csv) && csv
+            .Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)
+            .Any(x => string.Equals(x, value, StringComparison.OrdinalIgnoreCase));
 
     public async Task<ValidationResult> ValidateAsync(Tenant tenant, Report report, CancellationToken ct)
     {
@@ -438,7 +487,6 @@ public class ReportingService
         if (!string.IsNullOrWhiteSpace(r.Study.PatientReference)) return true;
         return ContainsPhiText(
             r.Study.AccessionNumber,
-            r.Study.Indication,
             r.Study.Comparison,
             r.Study.PriorReportSummary,
             r.Indication,

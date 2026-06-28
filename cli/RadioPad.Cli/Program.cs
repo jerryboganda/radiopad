@@ -282,7 +282,6 @@ public static class Program
         {
             r.Study.Modality = st.TryGetProperty("modality", out var m) ? m.GetString() ?? "" : "";
             r.Study.BodyPart = st.TryGetProperty("bodyPart", out var b) ? b.GetString() ?? "" : "";
-            r.Study.Indication = st.TryGetProperty("indication", out var i) ? i.GetString() ?? "" : "";
             r.Study.AccessionNumber = st.TryGetProperty("accessionNumber", out var a) ? a.GetString() ?? "" : "";
         }
         r.Indication = el.TryGetProperty("indication", out var ind) ? ind.GetString() ?? "" : "";

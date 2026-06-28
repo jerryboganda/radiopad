@@ -15,7 +15,7 @@ vi.mock('next/link', () => ({
 
 const LOCKED_GROUPS: ReadonlyArray<{ key: string; hrefs: string[] }> = [
   { key: 'workspace', hrefs: ['/', '/validation', '/audit', '/analytics', '/account/security'] },
-  { key: 'library', hrefs: ['/rulebooks', '/templates', '/prompts', '/marketplace', '/terminology'] },
+  { key: 'library', hrefs: ['/rulebooks', '/templates', '/modalities', '/body-parts', '/prompts', '/marketplace', '/terminology'] },
   { key: 'integrations', hrefs: ['/providers', '/admin/ubag', '/admin/pacs', '/admin/fhir-import', '/offline'] },
   { key: 'admin', hrefs: ['/admin/users', '/admin/governance', '/admin/model-eval', '/admin/security', '/admin/feature-flags', '/admin/billing', '/admin/usage', '/admin/settings'] },
 ];

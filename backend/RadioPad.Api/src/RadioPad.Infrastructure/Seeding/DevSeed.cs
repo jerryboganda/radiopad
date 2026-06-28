@@ -198,6 +198,11 @@ public static class DevSeed
         }
 
         await db.SaveChangesAsync(ct);
+
+        // Iter-36 — admin-managed Modality + BodyPart catalogs (formerly hardcoded
+        // in the frontend). Idempotent; shared with registration/bootstrap + the
+        // startup backfill so every org gets the same defaults.
+        await CatalogSeed.EnsureCatalogAsync(db, tenant.Id, ct);
     }
 
     private static RulebookStatus ParseStatus(string s) => s.ToLowerInvariant() switch

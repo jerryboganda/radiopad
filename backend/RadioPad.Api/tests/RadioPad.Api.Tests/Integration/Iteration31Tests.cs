@@ -165,7 +165,6 @@ public class Iteration31Tests : IClassFixture<RadioPadAppFactory>
                 var db = scope.ServiceProvider.GetRequiredService<RadioPadDbContext>();
                 var r = await db.Reports.FindAsync(reportId);
                 r!.Indication = "";
-                r.Study.Indication = "";
                 await db.SaveChangesAsync();
             }
 

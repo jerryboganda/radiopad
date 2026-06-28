@@ -4,9 +4,7 @@
 // stacked right-pane panels (study context, validation, sign & addendum) into
 // one persistent panel with Context / Checks / Sign-off tabs so they never sit
 // at uneven heights. Purely presentational — state + handlers come from props.
-import { useState } from 'react';
-import type { Report, ValidationFinding, ReportTemplate, ReportSignature } from '@/lib/api';
-import SearchableSelect from '@/components/ui/SearchableSelect';
+import type { Report, ValidationFinding, ReportTemplate, ReportSignature, CatalogItem, Rulebook } from '@/lib/api';
 import {
   groupBySeverity,
   normalizeRole,
@@ -25,7 +23,12 @@ export interface ReportInspectorProps {
 
   // Context
   templates: ReportTemplate[];
-  onApplyTemplate: (id: string) => void;
+  // Iter-36 — admin-managed catalogs drive the modality/body-part dropdowns;
+  // rulebooks are used to label the auto-matched rulebook (prompts).
+  modalities: CatalogItem[];
+  bodyParts: CatalogItem[];
+  rulebooks: Rulebook[];
+  onStudyChange: (patch: { modality?: string; bodyPart?: string; age?: number | null; gender?: string }) => void;
 
   // Checks
   findings: ValidationFinding[];
@@ -84,41 +87,94 @@ export default function ReportInspector(p: ReportInspectorProps) {
 }
 
 function ContextPanel(p: ReportInspectorProps) {
-  // "Apply template" is an action, not a sticky selection: snap back to the
-  // placeholder after firing so re-picking the same template re-applies.
-  const [tplPick, setTplPick] = useState<string | null>(null);
+  const study = p.report.study;
+  // Modality + body part are the single selection key. They are admin-managed
+  // dropdowns; changing either re-binds the matching template (scaffolding) and
+  // rulebook (prompts) server-side, shown read-only below.
+  const matchedTemplate = p.templates.find((t) => t.id === p.report.templateId);
+  const matchedRulebook = p.rulebooks.find((r) => r.id === p.report.rulebookId);
+
+  // Keep a PACS/legacy value selectable even if it's no longer in the catalog.
+  const modalityOptions = study.modality && !p.modalities.some((m) => m.code === study.modality)
+    ? [{ id: `_${study.modality}`, code: study.modality, name: study.modality, active: true, sortOrder: -1 } as CatalogItem, ...p.modalities]
+    : p.modalities;
+  const bodyPartOptions = study.bodyPart && !p.bodyParts.some((b) => b.code === study.bodyPart)
+    ? [{ id: `_${study.bodyPart}`, code: study.bodyPart, name: study.bodyPart, active: true, sortOrder: -1 } as CatalogItem, ...p.bodyParts]
+    : p.bodyParts;
+
   return (
     <div className="rp-panel">
       <div className="rp-panel-title">Study context</div>
       <div className="section-block">
         <label>Modality</label>
-        <input value={p.report.study.modality} readOnly />
+        <select
+          className="rp-input"
+          aria-label="Modality"
+          value={study.modality}
+          onChange={(e) => p.onStudyChange({ modality: e.target.value })}
+        >
+          <option value="">— select —</option>
+          {modalityOptions.map((m) => (
+            <option key={m.id} value={m.code}>{m.name || m.code}</option>
+          ))}
+        </select>
       </div>
       <div className="section-block">
         <label>Body part</label>
-        <input value={p.report.study.bodyPart} readOnly />
+        <select
+          className="rp-input"
+          aria-label="Body part"
+          value={study.bodyPart}
+          onChange={(e) => p.onStudyChange({ bodyPart: e.target.value })}
+        >
+          <option value="">— select —</option>
+          {bodyPartOptions.map((b) => (
+            <option key={b.id} value={b.code}>{b.name || b.code}</option>
+          ))}
+        </select>
+      </div>
+      <div className="rp-row rp-gap-sm">
+        <div className="section-block" style={{ flex: 1 }}>
+          <label>Age</label>
+          <input
+            className="rp-input"
+            type="number"
+            min={0}
+            max={150}
+            aria-label="Patient age"
+            value={study.age ?? ''}
+            onChange={(e) => {
+              const v = e.target.value;
+              p.onStudyChange({ age: v === '' ? null : Number(v) });
+            }}
+          />
+        </div>
+        <div className="section-block" style={{ flex: 1 }}>
+          <label>Gender</label>
+          <select
+            className="rp-input"
+            aria-label="Patient gender"
+            value={study.gender || ''}
+            onChange={(e) => p.onStudyChange({ gender: e.target.value })}
+          >
+            <option value="">— select —</option>
+            <option value="Male">Male</option>
+            <option value="Female">Female</option>
+            <option value="Other">Other</option>
+            <option value="Unknown">Unknown</option>
+          </select>
+        </div>
       </div>
       <div className="section-block">
-        <label>Indication</label>
-        <input value={p.report.study.indication} readOnly />
+        <label>Matched template</label>
+        <input className="rp-input" value={matchedTemplate ? matchedTemplate.name : '— none —'} readOnly />
       </div>
       <div className="section-block">
-        <label>Template (apply scaffolding)</label>
-        <SearchableSelect
-          ariaLabel="Apply template scaffolding"
-          value={tplPick}
-          onChange={(v) => {
-            setTplPick(v);
-            if (v) p.onApplyTemplate(v);
-            setTplPick(null);
-          }}
-          placeholder="— none —"
-          searchPlaceholder="Search templates…"
-          options={p.templates.map((t) => ({
-            value: t.id,
-            label: t.name,
-            searchText: `${t.modality} ${t.bodyPart}`,
-          }))}
+        <label>Matched rulebook (prompts)</label>
+        <input
+          className="rp-input"
+          value={matchedRulebook ? `${matchedRulebook.name} · v${matchedRulebook.version}` : '— none —'}
+          readOnly
         />
       </div>
     </div>

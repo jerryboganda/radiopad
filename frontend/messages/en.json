@@ -3,6 +3,8 @@
     "reports": "Reports",
     "rulebooks": "Rulebooks",
     "templates": "Templates",
+    "modalities": "Modalities",
+    "bodyParts": "Body Parts",
     "providers": "AI models",
     "ubag": "UBAG Hub",
     "prompts": "Prompts",

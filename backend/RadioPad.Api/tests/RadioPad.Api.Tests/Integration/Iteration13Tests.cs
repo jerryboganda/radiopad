@@ -199,7 +199,7 @@ public class HallucinationDetectorTests : IClassFixture<RadioPadAppFactory>
         Impression = impression,
         Indication = "",
         Comparison = "",
-        Study = new StudyContext { Indication = "", Comparison = "", PriorReportSummary = "" },
+        Study = new StudyContext { Comparison = "", PriorReportSummary = "" },
     };
 }
 

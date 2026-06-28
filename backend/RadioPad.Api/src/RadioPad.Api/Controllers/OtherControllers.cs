@@ -1112,7 +1112,7 @@ public class AnalyticsController : TenantedController
                 r.CreatedByUserId,
                 r.RulebookId,
                 r.Status,
-                HasIndication = !string.IsNullOrWhiteSpace(r.Study.Indication) || !string.IsNullOrWhiteSpace(r.Indication),
+                HasIndication = !string.IsNullOrWhiteSpace(r.Indication),
                 HasComparison = !string.IsNullOrWhiteSpace(r.Study.Comparison) || !string.IsNullOrWhiteSpace(r.Comparison),
                 EmptySections =
                     (string.IsNullOrWhiteSpace(r.Indication) ? 1 : 0) +

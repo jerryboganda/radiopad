@@ -128,6 +128,10 @@ public class BootstrapController : ControllerBase
         try { await UbagPrimarySeed.EnsureCuratedPrimariesAsync(_db, tenant.Id, ct); }
         catch (Exception ex) { _log.LogWarning(ex, "UBAG primary seeding failed for bootstrapped org {Slug}", slug); }
 
+        // Iter-36 — seed the admin Modality + BodyPart catalogs for the bootstrapped org.
+        try { await CatalogSeed.EnsureCatalogAsync(_db, tenant.Id, ct); }
+        catch (Exception ex) { _log.LogWarning(ex, "Catalog seeding failed for bootstrapped org {Slug}", slug); }
+
         await _audit.AppendAsync(new AuditEvent
         {
             TenantId = tenant.Id,

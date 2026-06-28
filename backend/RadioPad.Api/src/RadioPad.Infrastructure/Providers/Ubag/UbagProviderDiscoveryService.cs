@@ -175,6 +175,17 @@ public sealed class UbagProviderDiscoveryHostedService : BackgroundService
                     "UBAG primary backfill: seeded {Count} curated row(s) across {Tenants} tenant(s)",
                     seeded, allTenantIds.Count);
 
+            // Iter-36 — same one-time, all-tenant backfill for the admin Modality +
+            // BodyPart catalogs, so pre-existing (production) orgs get the defaults
+            // that were formerly hardcoded in the frontend. Idempotent on absence.
+            var catalogRows = 0;
+            foreach (var tid in allTenantIds)
+                catalogRows += await Seeding.CatalogSeed.EnsureCatalogAsync(db, tid, stoppingToken);
+            if (catalogRows > 0)
+                _logger.LogInformation(
+                    "Catalog backfill: seeded {Count} modality/body-part row(s) across {Tenants} tenant(s)",
+                    catalogRows, allTenantIds.Count);
+
             // Policy change (2026-06-27): UBAG is PHI-approved. Promote any rows
             // that were seeded as Sandbox before this change so existing orgs'
             // AI features (cleanup/impression/rewrite/cross-check) stop being

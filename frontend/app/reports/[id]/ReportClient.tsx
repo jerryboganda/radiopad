@@ -12,6 +12,7 @@ import {
   type RewriteMode,
   type ReportSignature,
   type CrossCheckCorrection,
+  type CatalogItem,
 } from '@/lib/api';
 import { getSessionAudio } from '@/lib/dictation/audioBuffer';
 import { isUseUbagEnabled } from '@/lib/dictation/crossCheckPrefs';
@@ -48,6 +49,9 @@ export default function ReportPage() {
   const [providers, setProviders] = useState<Provider[]>([]);
   const [rulebooks, setRulebooks] = useState<Rulebook[]>([]);
   const [templates, setTemplates] = useState<ReportTemplate[]>([]);
+  // Iter-36 — admin-managed catalogs for the study-context dropdowns.
+  const [modalities, setModalities] = useState<CatalogItem[]>([]);
+  const [bodyParts, setBodyParts] = useState<CatalogItem[]>([]);
   const [findings, setFindings] = useState<ValidationFinding[]>([]);
   const [qualityScore, setQualityScore] = useState<number | null>(null);
   const [aiBusy, setAiBusy] = useState(false);
@@ -105,10 +109,14 @@ export default function ReportPage() {
     });
     api.rulebooks.list().then(setRulebooks);
     api.templates.list().then(setTemplates).catch(() => {});
+    api.modalities.list().then(setModalities).catch(() => {});
+    api.bodyParts.list().then(setBodyParts).catch(() => {});
     api.reports.signatures(id).then(setSignatures).catch(() => setSignatures([]));
   }, [id]);
 
-  const update = useCallback(async (patch: Partial<Report>) => {
+  const update = useCallback(async (
+    patch: Partial<Report> & { modality?: string; bodyPart?: string; age?: number | null; gender?: string },
+  ) => {
     if (!report) return;
     setSaving(true);
     try {
@@ -206,8 +214,14 @@ export default function ReportPage() {
     setInspectorTab('checks');
   }
 
-  async function applyTemplate(templatePk: string) {
-    if (!report || !templatePk) return;
+  // Iter-36 — fill empty report sections from a template's scaffolding. The
+  // template binding itself is resolved server-side from modality + body part;
+  // this only fills blanks (never overwrites the radiologist's text) and skips
+  // the PATCH entirely when there is nothing to fill, so auto-apply on load /
+  // selection-key change never writes spurious versions.
+  const applyTemplate = useCallback(async (templatePk: string) => {
+    const current = reportRef.current;
+    if (!current || !templatePk) return;
     const t = templates.find((x) => x.id === templatePk);
     if (!t) return;
     let sections: Array<{ id: string; placeholder?: string }> = [];
@@ -215,7 +229,7 @@ export default function ReportPage() {
       const parsed = JSON.parse(t.sectionsJson) as { sections?: typeof sections } | typeof sections;
       sections = Array.isArray(parsed) ? parsed : parsed.sections ?? [];
     } catch { return; }
-    const patch: Partial<Report> = { templateId: t.id };
+    const patch: Partial<Report> = {};
     const map: Record<string, keyof Report> = {
       indication: 'indication', technique: 'technique', comparison: 'comparison',
       findings: 'findings', impression: 'impression', recommendations: 'recommendations',
@@ -223,13 +237,27 @@ export default function ReportPage() {
     for (const s of sections) {
       const key = map[s.id];
       if (!key) continue;
-      const current = (report as Record<string, unknown>)[key as string];
-      if (!current || (typeof current === 'string' && current.trim().length === 0)) {
+      const value = (current as Record<string, unknown>)[key as string];
+      if (!value || (typeof value === 'string' && value.trim().length === 0)) {
         (patch as Record<string, unknown>)[key as string] = s.placeholder ?? '';
       }
     }
+    if (Object.keys(patch).length === 0) return;
     await update(patch);
-  }
+  }, [templates, update]);
+
+  // Auto-apply scaffolding once per resolved template id. The server binds
+  // report.templateId from the (modality, body part) key on create + on change;
+  // when that id appears (and its template is loaded) we fill empty sections.
+  const appliedTemplateRef = useRef<string | null>(null);
+  useEffect(() => {
+    const tid = report?.templateId;
+    if (!tid) return;
+    if (appliedTemplateRef.current === tid) return;
+    if (!templates.some((t) => t.id === tid)) return;
+    appliedTemplateRef.current = tid;
+    void applyTemplate(tid);
+  }, [report?.templateId, templates, applyTemplate]);
 
   async function acknowledge() {
     if (!report) return;
@@ -839,7 +867,10 @@ export default function ReportPage() {
           onTabChange={setInspectorTab}
           report={report}
           templates={templates}
-          onApplyTemplate={applyTemplate}
+          modalities={modalities}
+          bodyParts={bodyParts}
+          rulebooks={rulebooks}
+          onStudyChange={(patch) => update(patch)}
           findings={findings}
           qualityScore={qualityScore}
           blockers={blockers}

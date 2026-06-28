@@ -105,7 +105,8 @@ public sealed class Hl7MessageHandler
                 AccessionNumber = parsed.Accession,
                 Modality = parsed.Modality,
                 BodyPart = "",
-                Indication = parsed.Indication,
+                // Iter-36 — study-context Indication removed; the report-body
+                // Indication section (set above) carries the clinical indication.
                 PatientReference = parsed.PatientReference,
             },
         };

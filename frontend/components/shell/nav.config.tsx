@@ -8,7 +8,7 @@ import {
   FileText, ClipboardCheck, ScrollText, BarChart3, BookOpen, LayoutTemplate,
   MessageSquareText, Store, BookText, Server, Network, HardDrive,
   FileInput, WifiOff, Scale, FlaskConical, ShieldCheck, Flag, CreditCard,
-  Activity, Settings2, Fingerprint, Users,
+  Activity, Settings2, Fingerprint, Users, ScanLine, Bone,
 } from 'lucide-react';
 import type { PermissionKey } from '@/lib/permissions';
 
@@ -45,6 +45,8 @@ export const Icons: Record<string, NavIcon> = {
   prompts: MessageSquareText,
   marketplace: Store,
   terminology: BookText,
+  modalities: ScanLine,
+  bodyParts: Bone,
   providers: Server,
   ubag: Network,
   pacs: HardDrive,
@@ -77,6 +79,8 @@ export const navGroups: NavGroup[] = [
     items: [
       { href: '/rulebooks', labelKey: 'rulebooks', icon: Icons.rulebooks, permission: 'rulebooks.read' },
       { href: '/templates', labelKey: 'templates', icon: Icons.templates, permission: 'templates.read' },
+      { href: '/modalities', labelKey: 'modalities', icon: Icons.modalities, permission: 'modalities.read' },
+      { href: '/body-parts', labelKey: 'bodyParts', icon: Icons.bodyParts, permission: 'body_parts.read' },
       { href: '/prompts', labelKey: 'prompts', icon: Icons.prompts, permission: 'prompt_overrides.manage' },
       { href: '/marketplace', labelKey: 'marketplace', icon: Icons.marketplace },
       { href: '/terminology', labelKey: 'terminology', icon: Icons.terminology },

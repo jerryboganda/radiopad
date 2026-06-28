@@ -208,6 +208,11 @@ public class RegistrationController : ControllerBase
         try { await UbagPrimarySeed.EnsureCuratedPrimariesAsync(_db, tenant.Id, ct); }
         catch (Exception ex) { _log.LogWarning(ex, "UBAG primary seeding failed for new org {Slug}", slug); }
 
+        // Iter-36 — seed the admin Modality + BodyPart catalogs so the new org's
+        // reporting module has selectable defaults from day one. Idempotent + isolated.
+        try { await CatalogSeed.EnsureCatalogAsync(_db, tenant.Id, ct); }
+        catch (Exception ex) { _log.LogWarning(ex, "Catalog seeding failed for new org {Slug}", slug); }
+
         // Bridge the new admin into the enterprise-identity tables so the
         // first magic-link consume mints a session cleanly.
         await EnterpriseIdentityBridge.EnsureMembershipForUserAsync(_db, admin, ct);

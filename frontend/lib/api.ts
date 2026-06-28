@@ -389,7 +389,10 @@ export type Report = {
     accessionNumber: string;
     modality: string;
     bodyPart: string;
-    indication: string;
+    /** Iter-36 — patient age in years (null when unknown). Replaced study-context indication. */
+    age: number | null;
+    /** Iter-36 — patient gender (Male/Female/Other/Unknown). */
+    gender: string;
     comparison: string;
   };
   indication: string;
@@ -428,6 +431,16 @@ export type ReportTemplate = {
   status?: number;
   /** Iter-34 GOV-001 — set when an admin approves the template. */
   approvedAt?: string | null;
+};
+
+/** Iter-36 — admin-managed catalog row (Modality or BodyPart), tenant-scoped. */
+export type CatalogItem = {
+  id: string;
+  code: string;
+  name: string;
+  active: boolean;
+  sortOrder: number;
+  updatedAt?: string;
 };
 
 export type Provider = {
@@ -844,10 +857,27 @@ export const api = {
       return requestPaged<Report>(`/api/reports${qs ? '?' + qs : ''}`);
     },
     get: (id: string) => request<Report>(`/api/reports/${id}`),
-    create: (body: Partial<Report['study']> & { rulebookId?: string | null; templateId?: string | null }) =>
-      request<Report>('/api/reports', { method: 'POST', body: JSON.stringify(body) }),
-    patch: (id: string, body: Partial<Report>) =>
-      request<Report>(`/api/reports/${id}`, { method: 'PATCH', body: JSON.stringify(body) }),
+    create: (
+      body: Partial<Report['study']> & {
+        // `indication` is the report-body section (not study context); the backend
+        // create DTO accepts it alongside the study selection key.
+        indication?: string;
+        rulebookId?: string | null;
+        templateId?: string | null;
+      },
+    ) => request<Report>('/api/reports', { method: 'POST', body: JSON.stringify(body) }),
+    // Iter-36 — study-context fields (modality/bodyPart/age/gender) are patched as
+    // flat top-level keys, matching the backend PatchReportDto; everything else is a
+    // standard Partial<Report> body field.
+    patch: (
+      id: string,
+      body: Partial<Report> & {
+        modality?: string;
+        bodyPart?: string;
+        age?: number | null;
+        gender?: string;
+      },
+    ) => request<Report>(`/api/reports/${id}`, { method: 'PATCH', body: JSON.stringify(body) }),
     /**
      * Iter-36 MOB — append a transcript to the Findings section. The
      * mobile dictation page calls this so a radiologist's spoken notes
@@ -1253,6 +1283,25 @@ export const api = {
         byUser: Array<{ userId: string; count: number }>;
         byModality: Array<{ modality: string; count: number }>;
       }>(`/api/templates/${id}/usage`),
+  },
+  /**
+   * Iter-36 — admin-managed imaging-modality catalog (tenant-scoped). Reads are
+   * open; save/remove require `modalities.manage`.
+   */
+  modalities: {
+    list: () => request<CatalogItem[]>('/api/modalities'),
+    save: (body: { code: string; name?: string; active?: boolean; sortOrder?: number }) =>
+      request<CatalogItem>('/api/modalities', { method: 'POST', body: JSON.stringify(body) }),
+    remove: (id: string) =>
+      request<void>(`/api/modalities/${id}`, { method: 'DELETE' }),
+  },
+  /** Iter-36 — admin-managed body-part catalog (tenant-scoped). Mirrors `modalities`. */
+  bodyParts: {
+    list: () => request<CatalogItem[]>('/api/body-parts'),
+    save: (body: { code: string; name?: string; active?: boolean; sortOrder?: number }) =>
+      request<CatalogItem>('/api/body-parts', { method: 'POST', body: JSON.stringify(body) }),
+    remove: (id: string) =>
+      request<void>(`/api/body-parts/${id}`, { method: 'DELETE' }),
   },
   /**
    * Iter-35 — versioned clinical validation packs (rulebook golden suites).

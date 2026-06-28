@@ -107,7 +107,7 @@ public sealed class ReportRewriteService : IReportRewriteService
         var sb = new System.Text.StringBuilder();
         sb.Append("Modality: ").Append(report.Study.Modality).Append('\n');
         sb.Append("Body part: ").Append(report.Study.BodyPart).Append('\n');
-        sb.Append("Indication: ").Append(report.Study.Indication).Append("\n\n");
+        sb.Append("Indication: ").Append(report.Indication).Append("\n\n");
         Append(sb, "INDICATION", report.Indication, include);
         Append(sb, "TECHNIQUE", report.Technique, include);
         Append(sb, "COMPARISON", report.Comparison, include);

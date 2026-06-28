@@ -99,6 +99,7 @@ public class ReportsController : TenantedController
 
     public record CreateReportDto(
         string? Modality, string? BodyPart, string? Indication,
+        int? Age, string? Gender,
         string? Comparison, string? AccessionNumber, Guid? RulebookId, Guid? TemplateId);
 
     [HttpGet]
@@ -177,14 +178,51 @@ public class ReportsController : TenantedController
             {
                 Modality = dto.Modality ?? "",
                 BodyPart = dto.BodyPart ?? "",
-                Indication = dto.Indication ?? "",
+                Age = dto.Age,
+                Gender = dto.Gender ?? "",
                 Comparison = dto.Comparison ?? "",
                 AccessionNumber = dto.AccessionNumber ?? Guid.NewGuid().ToString("n")[..10],
             },
         };
+
+        // Iter-36 — modality + body part are the single selection key. When the
+        // caller did not pin a template/rulebook, auto-resolve the Approved pair
+        // for this (modality, body part) so scaffolding + prompts are bound from
+        // creation. Caller-supplied pins always win.
+        await ApplyAutoBindingsAsync(tenant, report, overwriteExisting: false, ct);
+
         _db.Reports.Add(report);
         await _db.SaveChangesAsync(ct);
         return CreatedAtAction(nameof(Get), new { id = report.Id }, report);
+    }
+
+    /// <summary>
+    /// Iter-36 — bind the report to the Approved template + rulebook that match its
+    /// (modality, body part) selection key. Loads tenant-scoped Approved candidates
+    /// and delegates the pick to the pure <see cref="ReportingService.ResolveBindings"/>.
+    /// When <paramref name="overwriteExisting"/> is false an existing pin is preserved
+    /// (creation with a caller-supplied template/rulebook); when true the binding is
+    /// refreshed (the selection key changed on PATCH).
+    /// </summary>
+    private async Task ApplyAutoBindingsAsync(Tenant tenant, Report report, bool overwriteExisting, CancellationToken ct)
+    {
+        if (string.IsNullOrWhiteSpace(report.Study.Modality) || string.IsNullOrWhiteSpace(report.Study.BodyPart))
+            return;
+
+        var templates = await _db.Templates
+            .Where(t => t.TenantId == tenant.Id && t.Status == TemplateStatus.Approved)
+            .ToListAsync(ct);
+        var rulebooks = await _db.Rulebooks
+            .Where(r => r.TenantId == tenant.Id && r.Status == RulebookStatus.Approved)
+            .ToListAsync(ct);
+
+        var (template, rulebook) = ReportingService.ResolveBindings(
+            templates, rulebooks, report.Study.Modality, report.Study.BodyPart);
+
+        if (template is not null && (overwriteExisting || report.TemplateId is null))
+            report.TemplateId = template.Id;
+        if (rulebook is not null && (overwriteExisting || report.RulebookId is null))
+            report.RulebookId = rulebook.Id;
     }
 
     [HttpGet("{id:guid}")]
@@ -234,7 +272,9 @@ public class ReportsController : TenantedController
     public record PatchReportDto(
         string? Indication, string? Technique, string? Comparison,
         string? Findings, string? Impression, string? Recommendations,
-        string? AiHighlightsJson, Guid? RulebookId);
+        string? AiHighlightsJson, Guid? RulebookId,
+        // Iter-36 — study-context fields editable from the reporting panel.
+        string? Modality, string? BodyPart, int? Age, string? Gender);
 
     [HttpPatch("{id:guid}")]
     public async Task<IActionResult> Patch(Guid id, [FromBody] PatchReportDto dto, CancellationToken ct)
@@ -252,6 +292,20 @@ public class ReportsController : TenantedController
         if (dto.Recommendations is not null) report.Recommendations = dto.Recommendations;
         if (dto.AiHighlightsJson is not null) report.AiHighlightsJson = dto.AiHighlightsJson;
         if (dto.RulebookId is not null) report.RulebookId = dto.RulebookId;
+
+        // Iter-36 — study-context demographics + the modality/body-part selection key.
+        if (dto.Age is not null) report.Study.Age = dto.Age;
+        if (dto.Gender is not null) report.Study.Gender = dto.Gender;
+        var modalityChanged = dto.Modality is not null && dto.Modality != report.Study.Modality;
+        var bodyPartChanged = dto.BodyPart is not null && dto.BodyPart != report.Study.BodyPart;
+        if (dto.Modality is not null) report.Study.Modality = dto.Modality;
+        if (dto.BodyPart is not null) report.Study.BodyPart = dto.BodyPart;
+        // When the selection key changes, re-bind the matching Approved template +
+        // rulebook (which carries the prompts). An explicit RulebookId in the same
+        // PATCH still wins — auto-bind never overwrites a caller pin.
+        if (modalityChanged || bodyPartChanged)
+            await ApplyAutoBindingsAsync(tenant, report, overwriteExisting: dto.RulebookId is null, ct);
+
         report.UpdatedAt = DateTimeOffset.UtcNow;
 
         // Append a versioned snapshot so the editor can later show diff/history.
@@ -324,7 +378,7 @@ public class ReportsController : TenantedController
 
         int score = 100;
         var reasons = new List<string>();
-        if (string.IsNullOrWhiteSpace(report.Study.Indication) && string.IsNullOrWhiteSpace(report.Indication))
+        if (string.IsNullOrWhiteSpace(report.Indication))
         { score -= 10; reasons.Add("missing_indication"); }
         if (string.IsNullOrWhiteSpace(report.Comparison) && string.IsNullOrWhiteSpace(report.Study.Comparison))
         { score -= 5; reasons.Add("missing_comparison"); }

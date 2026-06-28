@@ -47,7 +47,11 @@ export type PermissionKey =
   | 'mcp_tools.invoke'
   | 'mcp_tools.manage'
   | 'prompt_overrides.manage'
-  | 'prompt_overrides.approve';
+  | 'prompt_overrides.approve'
+  | 'modalities.read'
+  | 'modalities.manage'
+  | 'body_parts.read'
+  | 'body_parts.manage';
 
 /** Pure check: does this permission set grant the given key? */
 export function can(

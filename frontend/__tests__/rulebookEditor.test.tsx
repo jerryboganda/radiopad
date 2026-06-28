@@ -24,6 +24,9 @@ vi.mock('@/lib/api', () => ({
       validateYaml: (...args: unknown[]) => rulebookValidateYamlMock(...args),
       approve: (...args: unknown[]) => rulebookApproveMock(...args),
     },
+    // Iter-36 — MetadataPanel fetches the admin catalogs on mount.
+    modalities: { list: () => Promise.resolve([]) },
+    bodyParts: { list: () => Promise.resolve([]) },
   },
 }));
 

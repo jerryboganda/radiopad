@@ -101,7 +101,7 @@ public class IngestController : ControllerBase
                 AccessionNumber = dto.AccessionNumber,
                 Modality = dto.Modality,
                 BodyPart = dto.BodyPart ?? "",
-                Indication = dto.Indication ?? "",
+                // Iter-36 — study-context Indication removed; report-body Indication (set above) is canonical.
                 Comparison = dto.Comparison ?? "",
             },
         };
@@ -200,7 +200,7 @@ public class IngestController : ControllerBase
                 AccessionNumber = parsed.AccessionNumber,
                 Modality = parsed.Modality,
                 BodyPart = parsed.BodyPart,
-                Indication = parsed.Indication,
+                // Iter-36 — study-context Indication removed; report-body Indication (set above) is canonical.
                 Comparison = "",
             },
         };

@@ -72,7 +72,7 @@ public class DictationCleanupService : IDictationCleanupService
         var userPrompt = $$"""
             Modality: {{report.Study.Modality}}
             Body part: {{report.Study.BodyPart}}
-            Indication: {{report.Study.Indication}}
+            Indication: {{report.Indication}}
 
             DICTATION:
             {{rawDictation}}

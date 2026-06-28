@@ -38,6 +38,10 @@ public static class PermissionCatalog
             [RbacPermission.McpToolsManage] = Define(RbacPermission.McpToolsManage, "mcp_tools.manage", "Register, approve, test, or revoke MCP tools."),
             [RbacPermission.PromptOverridesManage] = Define(RbacPermission.PromptOverridesManage, "prompt_overrides.manage", "Create, update, or delete prompt overrides.", clinical: true),
             [RbacPermission.PromptOverridesApprove] = Define(RbacPermission.PromptOverridesApprove, "prompt_overrides.approve", "Approve prompt overrides for runtime use.", clinical: true),
+            [RbacPermission.ModalitiesRead] = Define(RbacPermission.ModalitiesRead, "modalities.read", "Read the imaging-modality catalog."),
+            [RbacPermission.ModalitiesManage] = Define(RbacPermission.ModalitiesManage, "modalities.manage", "Create, update, or delete imaging modalities.", clinical: true),
+            [RbacPermission.BodyPartsRead] = Define(RbacPermission.BodyPartsRead, "body_parts.read", "Read the body-part catalog."),
+            [RbacPermission.BodyPartsManage] = Define(RbacPermission.BodyPartsManage, "body_parts.manage", "Create, update, or delete body parts.", clinical: true),
         };
 
     public static IReadOnlyCollection<PermissionDefinition> All => Definitions.Values.ToArray();

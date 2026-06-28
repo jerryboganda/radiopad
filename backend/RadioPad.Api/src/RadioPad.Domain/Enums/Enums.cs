@@ -93,6 +93,11 @@ public enum RbacPermission
     McpToolsManage = 181,
     PromptOverridesManage = 200,
     PromptOverridesApprove = 201,
+    // Iter-36 — admin-managed Modality + BodyPart catalogs.
+    ModalitiesRead = 220,
+    ModalitiesManage = 221,
+    BodyPartsRead = 240,
+    BodyPartsManage = 241,
 }
 
 public enum AuditAction

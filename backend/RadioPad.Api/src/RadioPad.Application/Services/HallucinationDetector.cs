@@ -40,7 +40,6 @@ public sealed class HallucinationDetector
             report.Findings,
             report.Indication,
             report.Comparison,
-            report.Study.Indication,
             report.Study.Comparison,
             report.Study.PriorReportSummary,
             settings.HallucinationAllowList);

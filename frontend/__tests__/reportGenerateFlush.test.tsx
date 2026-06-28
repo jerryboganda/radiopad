@@ -92,6 +92,9 @@ vi.mock('@/lib/api', () => {
     },
     rulebooks: { list: vi.fn(async () => []) },
     templates: { list: vi.fn(async () => []) },
+    // Iter-36 — ReportClient fetches the admin catalogs for the study-context dropdowns.
+    modalities: { list: vi.fn(async () => []) },
+    bodyParts: { list: vi.fn(async () => []) },
     // RBAC mirror (added in the per-controller RBAC pass): ReportClient calls
     // usePermissions() → api.me() to decide which actions to render. Grant the
     // full reporting permission set so editor affordances (Generate impression,

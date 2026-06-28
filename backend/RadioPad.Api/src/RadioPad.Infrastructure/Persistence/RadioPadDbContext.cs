@@ -18,6 +18,10 @@ public class RadioPadDbContext : DbContext
     public DbSet<ProviderConfig> Providers => Set<ProviderConfig>();
     public DbSet<Rulebook> Rulebooks => Set<Rulebook>();
     public DbSet<ReportTemplate> Templates => Set<ReportTemplate>();
+    /// <summary>Iter-36 — admin-managed, tenant-scoped imaging-modality catalog.</summary>
+    public DbSet<Modality> Modalities => Set<Modality>();
+    /// <summary>Iter-36 — admin-managed, tenant-scoped anatomical body-part catalog.</summary>
+    public DbSet<BodyPart> BodyParts => Set<BodyPart>();
     public DbSet<Report> Reports => Set<Report>();
     public DbSet<ReportVersion> ReportVersions => Set<ReportVersion>();
     public DbSet<ReportSignature> ReportSignatures => Set<ReportSignature>();
@@ -73,6 +77,9 @@ public class RadioPadDbContext : DbContext
         b.Entity<AuthSession>().HasIndex(x => new { x.RevokedAt, x.ExpiresAt });
         b.Entity<Rulebook>().HasIndex(x => new { x.TenantId, x.RulebookId, x.Version }).IsUnique();
         b.Entity<ReportTemplate>().HasIndex(x => new { x.TenantId, x.TemplateId }).IsUnique();
+        // Iter-36 — admin catalogs. Code is unique per tenant so matching is unambiguous.
+        b.Entity<Modality>().HasIndex(x => new { x.TenantId, x.Code }).IsUnique();
+        b.Entity<BodyPart>().HasIndex(x => new { x.TenantId, x.Code }).IsUnique();
         b.Entity<ProviderConfig>().HasIndex(x => new { x.TenantId, x.Name }).IsUnique();
         b.Entity<TenantLexicon>().HasIndex(x => new { x.TenantId, x.Term }).IsUnique();
         b.Entity<TenantSettings>().HasIndex(x => x.TenantId).IsUnique();
