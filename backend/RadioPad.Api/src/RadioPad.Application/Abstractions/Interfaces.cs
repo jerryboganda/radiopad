@@ -176,7 +176,7 @@ public sealed record UbagArtifact(
 
 /// <summary>
 /// Phase 1 (local STT) — an on-device, fully-offline speech-to-text engine
-/// (e.g. sherpa-onnx Parakeet or Whisper.net). When <see cref="Available"/> is
+/// (e.g. sherpa-onnx Parakeet). When <see cref="Available"/> is
 /// true, <see cref="ITranscriptionService"/> routes dictation audio here and the
 /// bytes never leave the machine — replacing the cloud (UBAG) path on desktop.
 /// Implementations self-disable (<see cref="Available"/> == false) when the

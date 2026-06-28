@@ -16,7 +16,7 @@ namespace RadioPad.Infrastructure.Providers.Local;
 /// desktop.
 ///
 /// <para>Audio is decoded to 16 kHz mono via the shared <see cref="IAudioDecoder"/>
-/// (same path as Parakeet/Whisper) and fed to SAPI as 16-bit PCM through
+/// (same path as Parakeet) and fed to SAPI as 16-bit PCM through
 /// <see cref="SpeechRecognitionEngine.SetInputToAudioStream"/>, so recognition is
 /// independent of the source WAV's container/format.</para>
 ///

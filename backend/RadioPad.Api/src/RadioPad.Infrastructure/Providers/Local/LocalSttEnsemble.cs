@@ -113,8 +113,8 @@ public sealed class LocalSttEnsemble : ILocalSttClient
         }
     }
 
-    // Parakeet (transducer) is over-confident vs Whisper's token-prob, so scale it
-    // down for a fair calibrated vote regardless of which engine leads. A starting
+    // Parakeet (transducer) is over-confident vs a calibrated token-prob, so scale
+    // it down for a fair calibrated vote regardless of which engine leads. A starting
     // prior until reliability tables are built from a held-out dictation set.
     private static ReconcileOptions BuildOptions()
         => new() { EngineScale = new Dictionary<string, double> { [SherpaParakeetSttClient.EngineName] = 0.9 } };

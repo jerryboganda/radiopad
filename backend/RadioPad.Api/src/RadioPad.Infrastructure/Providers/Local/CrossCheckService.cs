@@ -7,8 +7,8 @@ namespace RadioPad.Infrastructure.Providers.Local;
 
 /// <summary>
 /// The manual cross-check pass. Re-runs the retained dictation audio through every
-/// available on-device ASR engine (Parakeet + Whisper + the medical Whisper engine
-/// when present), reconciles them against the live draft via the N-way ROVER voter
+/// available on-device ASR engine (Parakeet + the platform speech engines when
+/// present), reconciles them against the live draft via the N-way ROVER voter
 /// (<see cref="SttReconciler.ReconcileMany"/>), and emits an original→corrected
 /// list for the editor. The live draft is the backbone (so corrections are framed
 /// as edits to it) and also votes, at a deliberately modest confidence so a

@@ -9,8 +9,7 @@ import { useEffect, useRef, useState } from 'react';
  *
  * Falls back to a disabled button if the browser doesn't expose the
  * SpeechRecognition API (e.g. Firefox, Safari on Linux). Desktop dictation
- * uses Whisper-local through the Tauri sidecar (see `desktop/whisper.md`)
- * so the UI is identical there.
+ * uses the on-device Parakeet sidecar through Tauri so the UI is identical there.
  */
 export function DictateButton(props: { onTranscript: (text: string) => void }) {
   const [supported, setSupported] = useState(false);

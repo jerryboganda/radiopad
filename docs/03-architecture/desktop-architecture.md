@@ -14,8 +14,8 @@ goes to production (`get_backend_url`, override with `RADIOPAD_BACKEND`). The ap
 no longer runs a local backend for its data.
 
 The **one** local component is the bundled `radiopad-api` sidecar running in
-**STT-only mode** so on-device dictation transcription (Parakeet + Whisper CPU
-ensemble) keeps PHI audio on the machine. The frontend routes ONLY
+**STT-only mode** so on-device dictation transcription (Parakeet CPU engine)
+keeps PHI audio on the machine. The frontend routes ONLY
 `POST /api/stt/transcribe` to the sidecar at `http://127.0.0.1:7457`
 (`get_local_stt_url`, override with `RADIOPAD_LOCAL_BIND`); the sidecar's
 `/api/stt/transcribe` is anonymous, loopback-bound, and not report-scoped.

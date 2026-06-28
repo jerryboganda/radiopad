@@ -170,21 +170,14 @@ builder.Services.AddScoped<RadioPad.Application.Abstractions.ITranscriptionServi
 builder.Services.AddSingleton<RadioPad.Infrastructure.Audio.IAudioDecoder,
     RadioPad.Infrastructure.Audio.WavAudioDecoder>();
 builder.Services.AddSingleton<RadioPad.Infrastructure.Providers.Local.SherpaParakeetSttClient>();
-builder.Services.AddSingleton<RadioPad.Infrastructure.Providers.Local.WhisperNetSttClient>();
-// The ensemble orchestrator is the ILocalSttClient: it reconciles both engines
-// when RADIOPAD_STT_ENSEMBLE is on (≥2 available), else transcribes single-engine.
+// The ensemble orchestrator is the ILocalSttClient: it reconciles the available
+// engines when RADIOPAD_STT_ENSEMBLE is on (≥2 available), else transcribes
+// single-engine.
 builder.Services.AddSingleton<RadioPad.Application.Abstractions.ILocalSttClient,
     RadioPad.Infrastructure.Providers.Local.LocalSttEnsemble>();
-// Both engines register as ILocalSttEngine for the orchestrator to consume.
+// Engines register as ILocalSttEngine for the orchestrator to consume.
 builder.Services.AddSingleton<RadioPad.Application.Abstractions.ILocalSttEngine>(
     sp => sp.GetRequiredService<RadioPad.Infrastructure.Providers.Local.SherpaParakeetSttClient>());
-builder.Services.AddSingleton<RadioPad.Application.Abstractions.ILocalSttEngine>(
-    sp => sp.GetRequiredService<RadioPad.Infrastructure.Providers.Local.WhisperNetSttClient>());
-// 3rd cross-check engine: medical-domain Whisper (full large-v3) via whisper.cpp
-// (CPU/RAM). Dormant until the medical model is provisioned on demand; else inert.
-builder.Services.AddSingleton<RadioPad.Infrastructure.Providers.Local.MedicalWhisperSttClient>();
-builder.Services.AddSingleton<RadioPad.Application.Abstractions.ILocalSttEngine>(
-    sp => sp.GetRequiredService<RadioPad.Infrastructure.Providers.Local.MedicalWhisperSttClient>());
 // Windows on-device speech (System.Speech / SAPI) — the classic Windows Speech
 // Recognition engine, fully on-device (PHI-safe) and built into Windows. Registered
 // always; Available is false off Windows / when no recognizer is installed (the
@@ -214,7 +207,7 @@ builder.Services.AddSingleton<RadioPad.Infrastructure.Providers.Local.IModelProv
 builder.Services.AddSingleton<RadioPad.Infrastructure.Providers.Local.ILocalModelCatalog,
     RadioPad.Infrastructure.Providers.Local.LocalModelCatalog>();
 // Persisted per-workstation "primary STT model" selection, honored by the ensemble
-// + whisper engine and set via POST /api/local-models/{id}/primary.
+// and set via POST /api/local-models/{id}/primary.
 builder.Services.AddSingleton<RadioPad.Infrastructure.Providers.Local.ILocalSttSettings,
     RadioPad.Infrastructure.Providers.Local.LocalSttSettings>();
 // PRD BILL-001..006 — billing helpers (audit + plan quota + subscription lifecycle).

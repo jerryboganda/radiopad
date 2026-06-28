@@ -24,7 +24,7 @@ struct BackendStatus {
 ///
 /// This sidecar is NOT the application's data backend — the desktop UI talks to
 /// the hosted production API (see `get_backend_url`). The sidecar exists ONLY to
-/// run on-device dictation transcription (Parakeet + Whisper CPU ensemble), so
+/// run on-device dictation transcription (Parakeet CPU engine), so
 /// its bind is a fixed loopback address, deliberately INDEPENDENT of
 /// `RADIOPAD_BACKEND` (which points the UI at production). `RADIOPAD_LOCAL_BIND`
 /// can override it for local development of the sidecar itself.
@@ -152,7 +152,7 @@ async fn supervise(app: AppHandle) {
         let mut command = sidecar
             .env("RADIOPAD_BIND", &bind)
             .env("ASPNETCORE_ENVIRONMENT", "Development")
-            // On-device, offline STT (NVIDIA Parakeet via sherpa-onnx + Whisper).
+            // On-device, offline STT (NVIDIA Parakeet via sherpa-onnx).
             // The sidecar downloads the model to %LOCALAPPDATA% on first run and
             // decodes the desktop's 16 kHz mono WAV in-process — no ffmpeg, no cloud.
             .env("RADIOPAD_LOCAL_STT_ENABLED", "1");

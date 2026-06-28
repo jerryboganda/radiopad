@@ -13,7 +13,7 @@
 // surfaced in the On-Device Models manager. When it is unavailable (older runtime
 // / no recognizer), the mic is disabled and the radiologist uses the "HQ" button,
 // which records and transcribes through the bundled on-device sidecar engine
-// (Windows Speech / Parakeet / Whisper). The "Fix" button asks the host page to
+// (Windows Speech / Parakeet). The "Fix" button asks the host page to
 // clean the dictation into medical phrasing via UBAG.
 
 import { useCallback, useEffect, useRef, useState } from 'react';
@@ -426,7 +426,7 @@ export default function DictationOverlay() {
           className="subtle"
           data-testid="dictation-mode"
           aria-label="On-device transcription engine mode"
-          title="On-device engine: Auto, Single (Parakeet) or Ensemble (Parakeet + Whisper, cross-checked)"
+          title="On-device engine: Auto, Single (Parakeet) or Ensemble (Parakeet + Windows Speech, cross-checked)"
           value={mode}
           onChange={(e) => setMode(e.target.value as SttMode)}
         >

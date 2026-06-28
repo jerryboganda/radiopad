@@ -25,12 +25,6 @@ public class LocalModelCatalogTests
         // Id MUST equal the model-dir name the engine resolves, or status/delete
         // look in the wrong folder.
         Assert.Equal(LocalSttModels.Parakeet.Sha256, parakeet.Sha256);
-
-        var whisper = cat.ById(LocalSttModels.Whisper.Name);
-        Assert.NotNull(whisper);
-        Assert.Equal(WhisperNetSttClient.EngineName, whisper!.Engine);
-        Assert.Equal(ModelArchiveKind.RawFile, whisper.ArchiveKind);
-        Assert.Equal(LocalSttModels.Whisper.FileName, whisper.FileName);
     }
 
     [Fact]
@@ -52,19 +46,6 @@ public class LocalModelCatalogTests
     public void Unknown_Id_Resolves_To_Null()
     {
         Assert.Null(new LocalModelCatalog().ById("nope"));
-    }
-
-    [Fact]
-    public void Catalog_Includes_Whisper_SmallEn_As_A_Whisper_Stt_Model()
-    {
-        var m = new LocalModelCatalog().ById(LocalSttModels.WhisperSmallEnModelName);
-        Assert.NotNull(m);
-        Assert.Equal(ModelKind.Stt, m!.Kind);
-        Assert.Equal(WhisperNetSttClient.EngineName, m.Engine);
-        Assert.Equal(ModelArchiveKind.RawFile, m.ArchiveKind);
-        Assert.False(m.Placeholder);
-        Assert.Equal(LocalSttModels.WhisperSmallEn.Sha256, m.Sha256);
-        Assert.Equal(LocalSttModels.WhisperSmallEn.FileName, m.FileName);
     }
 }
 

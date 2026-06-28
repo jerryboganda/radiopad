@@ -95,7 +95,7 @@ export default function ProfileMenu() {
           <label
             className="rp-profile-popover-item rp-profile-popover-check"
             data-testid="profile-dual-check"
-            title="Cross-check dictation with a second on-device engine (Parakeet + Whisper) and flag disagreements for review. Doubles CPU/RAM."
+            title="Cross-check dictation with a second on-device engine (Parakeet + Windows Speech) and flag disagreements for review. Doubles CPU/RAM."
           >
             <input
               type="checkbox"

@@ -29,45 +29,11 @@
     <PackageReference Include="org.k2fsa.sherpa.onnx.runtime.win-x64" Version="1.13.3" />
     <!-- Phase 1 activation — extract the .tar.bz2 model bundle downloaded on first run. -->
     <PackageReference Include="SharpZipLib" Version="1.4.2" />
-    <!-- Phase 2 — Whisper (large-v3-turbo) as the decorrelated 2nd engine for the
-         ROVER ensemble. In-process whisper.cpp via Whisper.net; CPU runtime is
-         used on Windows only (the engine self-disables elsewhere).
-         GeneratePathProperty exposes $(PkgWhisper_net_Runtime) so the native
-         DLLs can be embedded (see below). -->
-    <PackageReference Include="Whisper.net" Version="1.9.1" />
-    <PackageReference Include="Whisper.net.Runtime" Version="1.9.1" GeneratePathProperty="true" />
     <!-- Windows on-device speech (System.Speech / SAPI) — the classic Windows
          Speech Recognition engine for WindowsSapiSttClient. 9.0.4 ships a plain
          net8.0 (+ netstandard2.0) asset, so it restores cross-platform on the
          Linux server build; it is Windows-only at runtime and the engine guards
          every call with OperatingSystem.IsWindows() (inert elsewhere). -->
     <PackageReference Include="System.Speech" Version="9.0.4" />
-  </ItemGroup>
-
-  <!-- DESK/STT — make whisper.cpp loadable from the single-file desktop sidecar.
-       Whisper.net's native loader requires its DLLs on disk in a
-       `runtimes/<rid>/` layout under one of its search paths. The sidecar ships
-       as a self-contained, single-file Tauri externalBin, which breaks that:
-       Whisper.net.Runtime emits the win-x64 DLLs as loose content next to the
-       published exe, but only the exe is copied into the Tauri binaries dir, so
-       the `runtimes/win-x64` folder is orphaned and never ships — yielding the
-       runtime "Native Library not found in default paths" error. We embed the
-       four win-x64 DLLs here and re-materialize them at startup (see
-       WhisperNativeLibrary), pointing Whisper.net at the cache via
-       RuntimeOptions.LibraryPath. Restricted to win RIDs (and plain builds) so
-       the Linux server build isn't bloated by Windows binaries it never loads. -->
-  <ItemGroup Condition="'$(PkgWhisper_net_Runtime)' != '' and ('$(RuntimeIdentifier)' == '' or $(RuntimeIdentifier.StartsWith('win')))">
-    <EmbeddedResource Include="$(PkgWhisper_net_Runtime)\build\win-x64\whisper.dll">
-      <LogicalName>RadioPad.WhisperNative.win-x64.whisper.dll</LogicalName>
-    </EmbeddedResource>
-    <EmbeddedResource Include="$(PkgWhisper_net_Runtime)\build\win-x64\ggml-whisper.dll">
-      <LogicalName>RadioPad.WhisperNative.win-x64.ggml-whisper.dll</LogicalName>
-    </EmbeddedResource>
-    <EmbeddedResource Include="$(PkgWhisper_net_Runtime)\build\win-x64\ggml-base-whisper.dll">
-      <LogicalName>RadioPad.WhisperNative.win-x64.ggml-base-whisper.dll</LogicalName>
-    </EmbeddedResource>
-    <EmbeddedResource Include="$(PkgWhisper_net_Runtime)\build\win-x64\ggml-cpu-whisper.dll">
-      <LogicalName>RadioPad.WhisperNative.win-x64.ggml-cpu-whisper.dll</LogicalName>
-    </EmbeddedResource>
   </ItemGroup>
 </Project>

@@ -31,9 +31,6 @@ public sealed class SttModelProvisionHostedService : BackgroundService
         try
         {
             await _provisioner.EnsureAsync(stoppingToken);
-            // Ensemble mode also needs the decorrelated second engine (Whisper).
-            if (LocalSttModels.IsEnsembleEnabled())
-                await _provisioner.EnsureWhisperAsync(stoppingToken);
         }
         catch (OperationCanceledException)
         {

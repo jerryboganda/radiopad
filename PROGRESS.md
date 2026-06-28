@@ -4,6 +4,42 @@
 
 ---
 
+## Iteration 56 — Remove all Whisper STT models & engines
+
+- **Date:** 2026-06-28
+- **Scope:** Operator decision — drop Whisper entirely as an on-device STT
+  option. No Whisper model is offered, downloaded, loaded, or used anywhere
+  (primary dictation, the ensemble, or the manual Cross-Check pass).
+
+### Delivered
+
+- **Backend engines removed:** deleted `WhisperNetSttClient`,
+  `MedicalWhisperSttClient`, `WhisperDecoder`, `WhisperNativeLibrary`. Dropped
+  their DI registrations in `Program.cs`. The `LocalSttEnsemble` and
+  `CrossCheckService` are engine-agnostic, so they now reconcile only the
+  remaining engines (Parakeet + Windows Speech).
+- **Catalog/specs:** removed the `whisper-large-v3-turbo-q5_0`,
+  `whisper-small.en-q5_1`, and `whisper-medical-large-v3-q5_0` entries from
+  `LocalModelCatalog` and all Whisper specs/helpers from `LocalSttModels`
+  (`Whisper`, `WhisperSmallEn`, `MedicalWhisper`, `IsWhisperModel`,
+  `ResolveWhisperBin`, `ResolveWhisperBeamSize`, `ResolveWhisperPrompt`, …).
+  `ILocalSttSettings.ActiveWhisperModelId` and the Whisper engine mapping are
+  gone. `SttModelProvisioner.EnsureWhisperAsync` and the ensemble first-run
+  Whisper download were removed; `LocalModelsController` no longer reports the
+  Whisper native-DLL diagnostics or `whisperBeam` tuning.
+- **Build:** removed `Whisper.net` / `Whisper.net.Runtime` packages and the
+  embedded win-x64 native DLL `ItemGroup` from `RadioPad.Infrastructure.csproj`.
+- **Tests/CI:** deleted the Whisper engine + ensemble smoke tests, neutralized
+  the Whisper labels in the remaining STT tests, and reduced the
+  `desktop-stt-smoke` workflow to the Parakeet engine only.
+- **Frontend/desktop/docs:** dictation copy, `desktop/README.md`,
+  `sidecar_manager.rs`, the desktop architecture doc, and
+  `THIRD_PARTY_NOTICES.md` no longer mention Whisper; `desktop/whisper.md` was
+  deleted. (The PRD's `whisper.cpp` acceptance criteria remain as historical
+  spec text, tracked 🔴 not-implemented.)
+
+---
+
 ## Iteration 55 — Desktop = thin client over production + on-device STT only
 
 - **Date:** 2026-06-27

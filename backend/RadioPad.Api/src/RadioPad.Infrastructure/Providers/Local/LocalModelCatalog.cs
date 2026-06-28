@@ -8,7 +8,7 @@ public enum ModelArchiveKind { TarBz2, RawFile }
 
 /// <summary>
 /// How an entry is provisioned + run. Distinguishes the hosted-file engines
-/// (Parakeet/Whisper — we download a model bundle) from the platform speech
+/// (Parakeet — we download a model bundle) from the platform speech
 /// engines that have no hosted artifact:
 /// <list type="bullet">
 /// <item><see cref="HostedFile"/> — we download/verify/extract a model file from
@@ -44,8 +44,8 @@ public sealed record LocalModelDescriptor(
     string? FileName,
     bool Placeholder,
     // How this entry is provisioned + run. Defaults to HostedFile so the existing
-    // Parakeet/Whisper descriptors are unchanged; the platform speech engines set
-    // it explicitly. When not HostedFile, DownloadUrl/Sha256/FileName/ArchiveKind
+    // Parakeet descriptor is unchanged; the platform speech engines set it
+    // explicitly. When not HostedFile, DownloadUrl/Sha256/FileName/ArchiveKind
     // are ignored (there is no hosted artifact).
     ModelProvisioning Provisioning = ModelProvisioning.HostedFile,
     // Free-text note shown on the card (e.g. an online/PHI warning). Optional.
@@ -84,9 +84,6 @@ public sealed class LocalModelCatalog : ILocalModelCatalog
     private static IReadOnlyList<LocalModelDescriptor> Build()
     {
         var parakeet = LocalSttModels.Parakeet;
-        var whisper = LocalSttModels.Whisper;
-        var smallEn = LocalSttModels.WhisperSmallEn;
-        var medical = LocalSttModels.MedicalWhisper;
         return new List<LocalModelDescriptor>
         {
             new(
@@ -100,50 +97,6 @@ public sealed class LocalModelCatalog : ILocalModelCatalog
                 License: "CC-BY-4.0",
                 ArchiveKind: ModelArchiveKind.TarBz2,
                 FileName: null,
-                Placeholder: false),
-            new(
-                Id: whisper.Name,
-                DisplayName: "Whisper large-v3-turbo — cross-check speech-to-text",
-                Kind: ModelKind.Stt,
-                Engine: WhisperNetSttClient.EngineName, // "whisper"
-                DownloadUrl: whisper.Url,
-                Sha256: whisper.Sha256,
-                SizeBytes: whisper.SizeBytes,
-                License: "MIT",
-                ArchiveKind: ModelArchiveKind.RawFile,
-                FileName: whisper.FileName,
-                Placeholder: false),
-            new(
-                Id: smallEn.Name,
-                DisplayName: "Whisper small.en — fast English speech-to-text",
-                Kind: ModelKind.Stt,
-                Engine: WhisperNetSttClient.EngineName, // "whisper"
-                DownloadUrl: smallEn.Url,
-                Sha256: smallEn.Sha256,
-                SizeBytes: smallEn.SizeBytes,
-                License: "MIT",
-                ArchiveKind: ModelArchiveKind.RawFile,
-                FileName: smallEn.FileName,
-                Placeholder: false),
-
-            // Medical-domain Whisper — the 3rd cross-check engine, run on CPU/RAM via
-            // whisper.cpp. Default artifact is the verified full (non-distilled)
-            // large-v3 q5_0 — a higher-accuracy, decorrelated voice vs the distilled
-            // turbo live model. Provisioned ON DEMAND (a downloadable manager card,
-            // not in the first-run set). To upgrade to a true medical fine-tune,
-            // convert Na0s/Medical-Whisper-Large-v3 to q5_0 ggml into this model's
-            // dir (engine loads any *.bin there) — validate on radiology audio first.
-            new(
-                Id: medical.Name,
-                DisplayName: "Whisper large-v3 (full) — medical cross-check speech-to-text",
-                Kind: ModelKind.Stt,
-                Engine: MedicalWhisperSttClient.EngineName, // "whisper_medical"
-                DownloadUrl: medical.Url,
-                Sha256: medical.Sha256,
-                SizeBytes: medical.SizeBytes,
-                License: "MIT",
-                ArchiveKind: ModelArchiveKind.RawFile,
-                FileName: medical.FileName,
                 Placeholder: false),
 
             // ── Platform speech engines (no hosted artifact) ───────────────────

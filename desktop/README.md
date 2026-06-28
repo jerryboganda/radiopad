@@ -4,7 +4,7 @@ Native shell that loads the static export of the Next.js frontend. The app is a
 **thin client over the hosted production API** (`https://radiopad.polytronx.com`)
 for everything — auth, reports, AI, settings. The ONE exception is **on-device
 dictation transcription**: the desktop bundles a loopback-only `radiopad-api`
-sidecar that runs the Parakeet + Whisper CPU STT ensemble, so dictation audio
+sidecar that runs the on-device Parakeet CPU STT engine, so dictation audio
 (PHI) is transcribed on the machine and never leaves it. The frontend routes
 only `POST /api/stt/transcribe` to that sidecar (`http://127.0.0.1:7457`); see
 `get_backend_url` / `get_local_stt_url` in `src-tauri/src/main.rs`.

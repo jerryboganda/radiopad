@@ -777,7 +777,7 @@ export type ModelProgress = {
 
 /**
  * How a model entry is provisioned + run, driving the card's actions:
- * - `HostedFile` — we download/verify a model bundle (Parakeet/Whisper).
+ * - `HostedFile` — we download/verify a model bundle (Parakeet).
  * - `WindowsBuiltIn` — System.Speech / SAPI: ships with Windows, no download.
  * - `WindowsLanguagePack` — WinRT speech: "download" opens Windows speech settings.
  * - `BrowserWebSpeech` — Edge Web Speech: runs in the WebView; availability probed
@@ -935,8 +935,8 @@ export const api = {
         body: JSON.stringify({ rawDictation }),
       }),
     // Dictation transcription. On the desktop the recorded audio is transcribed
-    // FULLY ON-DEVICE by the bundled STT sidecar (Parakeet + Whisper CPU
-    // ensemble) — the PHI-bearing audio never leaves the machine; only the
+    // FULLY ON-DEVICE by the bundled STT sidecar (Parakeet, CPU) — the
+    // PHI-bearing audio never leaves the machine; only the
     // resulting de-identified transcript is saved to the production report. On
     // web (no sidecar) it falls back to the report-scoped cloud path, where PHI
     // routing is handled by the provider router exactly like text dictation.

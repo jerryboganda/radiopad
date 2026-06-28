@@ -10,7 +10,7 @@ namespace RadioPad.Api.Controllers;
 
 /// <summary>
 /// Manage the on-device AI models — download, delete, test, and diagnose them.
-/// STT (Parakeet + Whisper) is actionable today; TTS + an orchestrator brain are
+/// STT (Parakeet) is actionable today; TTS + an orchestrator brain are
 /// roadmap placeholders surfaced as "coming soon".
 ///
 /// Mirrors <see cref="SttController"/>'s safety model: not report-scoped, so there
@@ -241,25 +241,6 @@ public sealed class LocalModelsController : ControllerBase
         var dir = LocalSttModels.ResolveModelDir(id);
         var engine = _engines.FirstOrDefault(e => string.Equals(e.EngineId, desc.Engine, StringComparison.Ordinal));
 
-        // For whisper models, surface where the native runtime was staged + whether
-        // its DLLs are present — this is the exact failure mode behind the
-        // "Native Library not found" error on the single-file desktop sidecar.
-        object? whisperNative = null;
-        if (string.Equals(desc.Engine, WhisperNetSttClient.EngineName, StringComparison.Ordinal))
-        {
-            WhisperNativeLibrary.EnsureLoaded();
-            var nativeDir = WhisperNativeLibrary.ResolvedRuntimeDir;
-            var whisperDll = nativeDir is null
-                ? null
-                : Path.Combine(nativeDir, "runtimes", "win-x64", "whisper.dll");
-            whisperNative = new
-            {
-                runtimeDir = nativeDir,
-                staged = nativeDir is not null,
-                whisperDll = PathInfo(whisperDll),
-            };
-        }
-
         object files;
         if (desc.ArchiveKind == ModelArchiveKind.TarBz2 && dir is not null)
         {
@@ -276,7 +257,7 @@ public sealed class LocalModelsController : ControllerBase
         {
             enabled = true,
             model = new { desc.Id, kind = desc.Kind.ToString(), engine = desc.Engine, desc.DisplayName, desc.License },
-            paths = new { modelDir = dir, files, whisperNative },
+            paths = new { modelDir = dir, files },
             engineState = new { available = engine?.Available ?? false, lastError = engine?.LastError },
             env = new
             {
@@ -286,7 +267,6 @@ public sealed class LocalModelsController : ControllerBase
                 model = HasEnv("RADIOPAD_STT_MODEL"),
                 decoding = HasEnv("RADIOPAD_STT_DECODING"),
                 threads = HasEnv("RADIOPAD_STT_THREADS"),
-                whisperBeam = HasEnv("RADIOPAD_STT_WHISPER_BEAM"),
                 hotwordsFile = HasEnv("RADIOPAD_STT_HOTWORDS_FILE"),
             },
             tuning = new
@@ -294,7 +274,6 @@ public sealed class LocalModelsController : ControllerBase
                 threads = LocalSttModels.ResolveThreads(),
                 provider = LocalSttModels.ResolveProvider(),
                 decoding = LocalSttModels.ResolveDecodingMethod(),
-                whisperBeam = LocalSttModels.ResolveWhisperBeamSize(),
             },
             system = new
             {
@@ -311,7 +290,7 @@ public sealed class LocalModelsController : ControllerBase
 
     /// <summary>
     /// Make a downloaded STT model the primary dictation engine (persisted per
-    /// workstation; honored by the ensemble + whisper engine on the next dictation).
+    /// workstation; honored by the ensemble on the next dictation).
     /// </summary>
     [HttpPost("{id}/primary")]
     public IActionResult SetPrimary(string id)

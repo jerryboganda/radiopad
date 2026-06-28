@@ -4,8 +4,8 @@ namespace RadioPad.Application.Abstractions;
 
 /// <summary>
 /// A single on-device ASR engine that produces a word-level hypothesis from a
-/// 16 kHz mono WAV buffer. Multiple engines (e.g. Parakeet + Whisper) are run in
-/// parallel and combined by the ensemble orchestrator via the ROVER reconciler.
+/// 16 kHz mono WAV buffer. Multiple engines (e.g. Parakeet + Windows Speech) are
+/// run in parallel and combined by the ensemble orchestrator via the ROVER reconciler.
 /// Implementations self-disable (<see cref="Available"/> == false) when their
 /// model is absent, so the orchestrator can skip them gracefully.
 /// </summary>

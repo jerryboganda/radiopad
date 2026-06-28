@@ -33,10 +33,8 @@ public class LocalSttEnsembleTests
         private string _primary;
         public StubSettings(string primaryModelId) => _primary = primaryModelId;
         public string PrimaryModelId => _primary;
-        public string PrimaryEngineId => LocalSttModels.IsWhisperModel(_primary)
-            ? WhisperNetSttClient.EngineName : SherpaParakeetSttClient.EngineName;
-        public string ActiveWhisperModelId => LocalSttModels.IsWhisperModel(_primary)
-            ? _primary : LocalSttModels.WhisperModelName;
+        public string PrimaryEngineId => _primary == LocalModelCatalog.WindowsSapiId
+            ? LocalModelCatalog.WindowsSapiEngine : SherpaParakeetSttClient.EngineName;
         public bool IsPrimary(string id) => id == _primary;
         public void SetPrimary(string id) => _primary = id;
     }
@@ -47,7 +45,7 @@ public class LocalSttEnsembleTests
         => new(engines, NullLogger<LocalSttEnsemble>.Instance);
 
     [Fact]
-    public async Task ConfiguredPrimary_Whisper_Single_Uses_Whisper()
+    public async Task ConfiguredPrimary_Single_Uses_Configured_Engine()
     {
         await WithEnsemble(false, async () =>
         {
@@ -55,12 +53,12 @@ public class LocalSttEnsembleTests
                 new ILocalSttEngine[]
                 {
                     new FakeEngine("parakeet", true, T("para", 0.9)),
-                    new FakeEngine("whisper", true, T("whis", 0.9)),
+                    new FakeEngine(LocalModelCatalog.WindowsSapiEngine, true, T("sapi", 0.9)),
                 },
                 NullLogger<LocalSttEnsemble>.Instance,
-                new StubSettings(LocalSttModels.WhisperSmallEnModelName)); // whisper is primary
+                new StubSettings(LocalModelCatalog.WindowsSapiId)); // SAPI is primary
             var res = await ensemble.TranscribeAsync(Audio(), "audio/wav", CancellationToken.None);
-            Assert.Equal("whisper", res.Model); // single-engine path picked the configured primary
+            Assert.Equal(LocalModelCatalog.WindowsSapiEngine, res.Model); // single-engine path picked the configured primary
         });
     }
 
@@ -79,7 +77,7 @@ public class LocalSttEnsembleTests
         {
             var svc = Build(
                 new FakeEngine("parakeet", true, T("lungs", 0.9), T("clear", 0.9)),
-                new FakeEngine("whisper", true, T("lungs", 0.9), T("clear", 0.9)));
+                new FakeEngine("secondary", true, T("lungs", 0.9), T("clear", 0.9)));
 
             var r = await svc.TranscribeAsync(Audio(), "audio/wav", CancellationToken.None);
 
@@ -97,12 +95,12 @@ public class LocalSttEnsembleTests
         {
             var svc = Build(
                 new FakeEngine("parakeet", true, T("lungs", 0.7), T("clear", 0.5)),
-                new FakeEngine("whisper", true, T("lungs", 0.65), T("clean", 0.5)));
+                new FakeEngine("secondary", true, T("lungs", 0.65), T("clean", 0.5)));
 
             var r = await svc.TranscribeAsync(Audio(), "audio/wav", CancellationToken.None);
 
             Assert.Equal("local_ensemble", r.Provider);
-            Assert.Equal("parakeet+whisper", r.Model);
+            Assert.Equal("parakeet+secondary", r.Model);
             Assert.NotNull(r.Spans);
             Assert.Contains(r.Spans!, s => s.Flagged); // the clear/clean disagreement
         });
@@ -115,7 +113,7 @@ public class LocalSttEnsembleTests
         {
             var svc = Build(
                 new FakeEngine("parakeet", true, T("lungs", 0.9)),
-                new FakeEngine("whisper", available: false, T("ignored", 0.9)));
+                new FakeEngine("secondary", available: false, T("ignored", 0.9)));
 
             var r = await svc.TranscribeAsync(Audio(), "audio/wav", CancellationToken.None);
 
@@ -132,7 +130,7 @@ public class LocalSttEnsembleTests
         {
             var svc = Build(
                 new FakeEngine("parakeet", true, T("lungs", 0.7), T("clear", 0.5)),
-                new FakeEngine("whisper", true, T("lungs", 0.65), T("clean", 0.5)));
+                new FakeEngine("secondary", true, T("lungs", 0.65), T("clean", 0.5)));
 
             var r = await svc.TranscribeAsync(Audio(), "audio/wav", CancellationToken.None, "ensemble");
 
@@ -148,7 +146,7 @@ public class LocalSttEnsembleTests
         {
             var svc = Build(
                 new FakeEngine("parakeet", true, T("lungs", 0.9)),
-                new FakeEngine("whisper", true, T("lungs", 0.9)));
+                new FakeEngine("secondary", true, T("lungs", 0.9)));
 
             var r = await svc.TranscribeAsync(Audio(), "audio/wav", CancellationToken.None, "single");
 

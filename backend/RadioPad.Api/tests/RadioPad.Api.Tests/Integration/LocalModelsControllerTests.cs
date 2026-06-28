@@ -36,7 +36,6 @@ public class LocalModelsControllerTests : IClassFixture<RadioPadAppFactory>
 
         var ids = models.EnumerateArray().Select(m => m.GetProperty("id").GetString()).ToList();
         Assert.Contains("parakeet-tdt-0.6b-v3", ids);
-        Assert.Contains("whisper-large-v3-turbo-q5_0", ids);
 
         // Future kinds surface as disabled "coming soon" placeholders.
         Assert.Contains(

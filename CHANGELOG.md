@@ -7,6 +7,16 @@ The format is based on [Keep a Changelog 1.1.0](https://keepachangelog.com/en/1.
 ## [Unreleased]
 
 ### Removed
+- **Removed all Whisper speech-to-text models and engines.** The Whisper
+  large-v3-turbo, small.en, and medical large-v3 models, the `WhisperNet` /
+  `MedicalWhisper` engines, the `Whisper.net` / `Whisper.net.Runtime` packages
+  and embedded native DLLs, the model-manager catalog cards, and the Whisper
+  legs of the dictation ensemble and Cross-Check pass are all gone. On-device
+  STT now runs on Parakeet (primary) plus the platform speech engines (Windows
+  Speech / Edge); the ensemble and Cross-Check reconcile whatever engines remain
+  available. The Whisper engine smoke + ensemble smoke tests and the
+  `desktop/whisper.md` doc were removed; the `desktop-stt-smoke` workflow now
+  validates only the Parakeet engine.
 - **Removed GitHub Copilot integration.** The `github-copilot-sdk` /
   `github-copilot-cli` provider adapters, server-side Copilot CLI execution,
   the desktop native Copilot session runner, and all related admin/session

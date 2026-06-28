@@ -13,14 +13,8 @@ public interface ILocalSttSettings
     /// <summary>The model id chosen as primary (defaults to Parakeet).</summary>
     string PrimaryModelId { get; }
 
-    /// <summary>Engine that should lead transcription: "parakeet" or "whisper".</summary>
+    /// <summary>Engine that should lead transcription (e.g. "parakeet").</summary>
     string PrimaryEngineId { get; }
-
-    /// <summary>
-    /// The whisper model the whisper engine should load — the primary when it is a
-    /// whisper model, else the turbo model (used as the ensemble cross-check engine).
-    /// </summary>
-    string ActiveWhisperModelId { get; }
 
     bool IsPrimary(string modelId);
     void SetPrimary(string modelId);
@@ -78,11 +72,10 @@ public sealed class LocalSttSettings : ILocalSttSettings
     public string PrimaryEngineId => MapEngine(PrimaryModelId);
 
     /// <summary>Map a primary model id to the engine id that should lead. The two
-    /// Windows engines + the Edge Web Speech engine map to their own ids; whisper
-    /// models map to the whisper engine; everything else (incl. Parakeet) maps to
-    /// Parakeet. Edge is frontend-routed and has no backend engine, so when it is
-    /// primary the ensemble's primary-pick simply falls back to the first available
-    /// engine for any (rare) sidecar call.</summary>
+    /// Windows engines + the Edge Web Speech engine map to their own ids; everything
+    /// else (incl. Parakeet) maps to Parakeet. Edge is frontend-routed and has no
+    /// backend engine, so when it is primary the ensemble's primary-pick simply
+    /// falls back to the first available engine for any (rare) sidecar call.</summary>
     internal static string MapEngine(string modelId) => modelId switch
     {
         LocalModelCatalog.WindowsSapiId => LocalModelCatalog.WindowsSapiEngine,
@@ -90,18 +83,8 @@ public sealed class LocalSttSettings : ILocalSttSettings
         // recognizer (SAPI), so it maps to the SAPI engine rather than a separate one.
         LocalModelCatalog.WindowsWinRtId => LocalModelCatalog.WindowsSapiEngine,
         LocalModelCatalog.EdgeWebSpeechId => LocalModelCatalog.EdgeWebSpeechEngine,
-        _ when LocalSttModels.IsWhisperModel(modelId) => WhisperNetSttClient.EngineName,
         _ => SherpaParakeetSttClient.EngineName,
     };
-
-    public string ActiveWhisperModelId
-    {
-        get
-        {
-            var id = PrimaryModelId;
-            return LocalSttModels.IsWhisperModel(id) ? id : LocalSttModels.WhisperModelName;
-        }
-    }
 
     public bool IsPrimary(string modelId) =>
         string.Equals(modelId, PrimaryModelId, StringComparison.Ordinal);
@@ -126,14 +109,13 @@ public sealed class LocalSttSettings : ILocalSttSettings
 /// <summary>
 /// Default (in-memory, Parakeet-primary) settings used when an engine/orchestrator
 /// is constructed without DI — e.g. the unit/smoke tests that build engines
-/// directly. Keeps the historical behavior (Parakeet primary, turbo whisper).
+/// directly. Keeps the historical behavior (Parakeet primary).
 /// </summary>
 internal sealed class DefaultLocalSttSettings : ILocalSttSettings
 {
     public static readonly DefaultLocalSttSettings Instance = new();
     public string PrimaryModelId => LocalSttModels.DefaultModelName;
     public string PrimaryEngineId => SherpaParakeetSttClient.EngineName;
-    public string ActiveWhisperModelId => LocalSttModels.WhisperModelName;
     public bool IsPrimary(string modelId) =>
         string.Equals(modelId, LocalSttModels.DefaultModelName, StringComparison.Ordinal);
     public void SetPrimary(string modelId) { }

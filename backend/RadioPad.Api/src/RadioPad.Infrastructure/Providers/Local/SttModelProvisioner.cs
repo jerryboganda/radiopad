@@ -150,10 +150,7 @@ public sealed class SttModelProvisioner
         }
     }
 
-    /// <summary>Ensure the default (Whisper) model file is installed.</summary>
-    public Task<bool> EnsureWhisperAsync(CancellationToken ct) => EnsureFileAsync(LocalSttModels.Whisper, ct);
-
-    /// <summary>Ensure a single model FILE (e.g. a Whisper GGML .bin — no archive).</summary>
+    /// <summary>Ensure a single model FILE (a raw .bin/.onnx download — no archive).</summary>
     public Task<bool> EnsureFileAsync(LocalSttModels.FileSpec spec, CancellationToken ct)
     {
         var dir = LocalSttModels.ResolveModelDir(spec.Name);

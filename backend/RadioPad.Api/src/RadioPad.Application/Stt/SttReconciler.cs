@@ -47,7 +47,7 @@ public sealed class ReconcileOptions
     public double DisagreementMargin { get; init; } = 0.15;
 
     /// <summary>Per-engine multiplicative confidence calibration (transducers run
-    /// hot relative to Whisper's token-prob). Missing engines use 1.0.</summary>
+    /// hot relative to a calibrated token-prob). Missing engines use 1.0.</summary>
     public IReadOnlyDictionary<string, double>? EngineScale { get; init; }
 }
 

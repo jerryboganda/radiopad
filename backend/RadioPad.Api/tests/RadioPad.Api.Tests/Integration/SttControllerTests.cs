@@ -96,7 +96,7 @@ public class SttControllerTests : IClassFixture<RadioPadAppFactory>
         var root = doc.RootElement;
         Assert.Equal("chest is clear", root.GetProperty("transcript").GetString());
         Assert.Equal("on-device", root.GetProperty("provider").GetString());
-        Assert.Equal("parakeet+whisper", root.GetProperty("model").GetString());
+        Assert.Equal("parakeet+secondary", root.GetProperty("model").GetString());
         Assert.Equal(42, root.GetProperty("latencyMs").GetInt64());
         var spans = root.GetProperty("spans");
         Assert.Equal(JsonValueKind.Array, spans.ValueKind);
@@ -105,7 +105,7 @@ public class SttControllerTests : IClassFixture<RadioPadAppFactory>
         Assert.Equal("clear", span.GetProperty("text").GetString());
         Assert.True(span.GetProperty("flagged").GetBoolean());
         Assert.Equal("disagreement", span.GetProperty("reason").GetString());
-        Assert.Equal("whisper", span.GetProperty("source").GetString());
+        Assert.Equal("secondary", span.GetProperty("source").GetString());
     }
 
     /// <summary>Minimal on-device STT stub: always available, returns a canned
@@ -119,8 +119,8 @@ public class SttControllerTests : IClassFixture<RadioPadAppFactory>
             => Task.FromResult(new TranscriptionResult(
                 Text: "chest is clear",
                 Provider: "on-device",
-                Model: "parakeet+whisper",
+                Model: "parakeet+secondary",
                 LatencyMs: 42,
-                Spans: new[] { new ReconciledSpan("clear", true, "disagreement", "whisper") }));
+                Spans: new[] { new ReconciledSpan("clear", true, "disagreement", "secondary") }));
     }
 }

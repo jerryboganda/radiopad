@@ -23,35 +23,6 @@ public static class LocalSttModels
 
     public sealed record ModelSpec(string Name, string Url, long SizeBytes, string Sha256);
 
-    public const string WhisperModelName = "whisper-large-v3-turbo-q5_0";
-
-    /// <summary>English-only whisper.cpp small model — the low-latency option.</summary>
-    public const string WhisperSmallEnModelName = "whisper-small.en-q5_1";
-
-    /// <summary>
-    /// OpenAI Whisper large-v3-turbo q5_0 GGML for whisper.cpp / Whisper.net
-    /// (~547 MB). MIT (weights + whisper.cpp). SHA-256 from the HuggingFace LFS
-    /// pointer. The architecturally-decorrelated second engine for the ensemble.
-    /// </summary>
-    public static readonly FileSpec Whisper = new(
-        Name: WhisperModelName,
-        FileName: "ggml-large-v3-turbo-q5_0.bin",
-        Url: "https://huggingface.co/ggerganov/whisper.cpp/resolve/main/ggml-large-v3-turbo-q5_0.bin",
-        SizeBytes: 574041195L,
-        Sha256: "394221709cd5ad1f40c46e6031ca61bce88931e6e088c188294c6d5a55ffa7e2");
-
-    /// <summary>
-    /// OpenAI Whisper small.en q5_1 GGML (~181 MB). MIT. English-only and much
-    /// faster than turbo — the low-latency choice for the primary dictation engine.
-    /// SHA-256 from the HuggingFace LFS pointer.
-    /// </summary>
-    public static readonly FileSpec WhisperSmallEn = new(
-        Name: WhisperSmallEnModelName,
-        FileName: "ggml-small.en-q5_1.bin",
-        Url: "https://huggingface.co/ggerganov/whisper.cpp/resolve/main/ggml-small.en-q5_1.bin",
-        SizeBytes: 190098681L,
-        Sha256: "bfdff4894dcb76bbf647d56263ea2a96645423f1669176f4844a1bf8e478ad30");
-
     /// <summary>A single downloadable model file (no archive extraction).</summary>
     public sealed record FileSpec(string Name, string FileName, string Url, long SizeBytes, string Sha256);
 
@@ -63,12 +34,6 @@ public static class LocalSttModels
     /// prerequisite for hotword biasing. Override: <c>RADIOPAD_STT_DECODING</c>.</summary>
     public const string DefaultDecodingMethod = "modified_beam_search";
 
-    /// <summary>Default radiology priming prompt for Whisper (biases domain
-    /// vocabulary). Override: <c>RADIOPAD_STT_WHISPER_PROMPT</c>.</summary>
-    public const string DefaultWhisperPrompt =
-        "Radiology report dictation. Findings: lungs, pleura, mediastinum, " +
-        "cardiac silhouette. Impression:";
-
     public static string ResolveDecodingMethod()
         => Env("RADIOPAD_STT_DECODING") is { Length: > 0 } v ? v : DefaultDecodingMethod;
 
@@ -77,8 +42,8 @@ public static class LocalSttModels
     /// on the CPU and SYSTEM RAM — never the GPU/VRAM by manual choice. There is
     /// deliberately NO env switch (no manual switching). A discrete GPU is used
     /// ONLY when it is auto-detected AND a GPU-capable native runtime is actually
-    /// present; otherwise CPU. The shipped sherpa-onnx + Whisper runtimes are CPU
-    /// builds, so this resolves to "cpu" today — the detection seam keeps any
+    /// present; otherwise CPU. The shipped sherpa-onnx runtime is a CPU
+    /// build, so this resolves to "cpu" today — the detection seam keeps any
     /// future elevation fully automatic (still no manual switch).
     /// </summary>
     public static string ResolveProvider()
@@ -102,12 +67,6 @@ public static class LocalSttModels
 
     public static int ResolveMaxActivePaths()
         => int.TryParse(Env("RADIOPAD_STT_MAX_ACTIVE_PATHS"), out var n) && n > 0 ? n : 4;
-
-    public static int ResolveWhisperBeamSize()
-        => int.TryParse(Env("RADIOPAD_STT_WHISPER_BEAM"), out var n) && n >= 1 ? n : 5;
-
-    public static string? ResolveWhisperPrompt()
-        => Env("RADIOPAD_STT_WHISPER_PROMPT") is { Length: > 0 } v ? v : DefaultWhisperPrompt;
 
     /// <summary>Explicit hotwords file (one phrase per line); null when unset/missing.</summary>
     public static string? ResolveHotwordsFile()
@@ -165,56 +124,6 @@ public static class LocalSttModels
             return null;
         return Path.Combine(localAppData, "com.radiopad.desktop", "models", modelName);
     }
-
-    /// <summary>Resolve the Whisper GGML model file for <paramref name="modelName"/>
-    /// (the turbo model by default), or null when absent.</summary>
-    public static string? ResolveWhisperBin(string? modelName = null)
-    {
-        var dir = ResolveModelDir(modelName ?? WhisperModelName);
-        if (dir is null || !Directory.Exists(dir)) return null;
-        return Directory.GetFiles(dir, "*.bin", SearchOption.AllDirectories).FirstOrDefault();
-    }
-
-    /// <summary>True when <paramref name="modelId"/> is one of the whisper models.</summary>
-    public static bool IsWhisperModel(string? modelId) =>
-        modelId == WhisperModelName || modelId == WhisperSmallEnModelName;
-
-    // ── Medical-domain Whisper — 3rd cross-check engine (whisper.cpp, CPU/RAM) ──
-    // A decorrelated verification voice: the FULL (non-distilled) Whisper large-v3,
-    // distinct from the distilled large-v3-turbo live model AND the Parakeet
-    // transducer, so it makes different errors — exactly what ROVER needs to
-    // reduce WER. Runs through the same Whisper.net/whisper.cpp sidecar on CPU +
-    // system RAM (no GPU). Provisioned ON DEMAND via the model manager (not forced
-    // into the first-run download set); the engine self-enables once present.
-    //
-    // MEDICAL FINE-TUNE UPGRADE PATH: no English radiology-specific Whisper ggml
-    // exists publicly today. To upgrade this voice to a medical fine-tune, convert
-    // Na0s/Medical-Whisper-Large-v3 (Apache-2.0, English, consultation-trained) to
-    // a q5_0 ggml and place it in this model's dir (the engine loads any *.bin
-    // there, so it transparently supersedes the default). VALIDATE on real
-    // radiology audio first — a consultation-trained finetune may not beat stock
-    // large-v3 on radiology vocabulary. Conversion recipe:
-    //   python whisper.cpp/models/convert-h5-to-ggml.py <hf-dir> <hf-dir> ./out
-    //   ./whisper.cpp/build/bin/quantize ./out/ggml-model.bin ggml-medical-q5_0.bin q5_0
-
-    public const string MedicalWhisperModelName = "whisper-medical-large-v3-q5_0";
-
-    /// <summary>
-    /// Full (non-distilled) Whisper large-v3 q5_0 GGML for whisper.cpp / Whisper.net
-    /// (~1.03 GB). MIT (whisper.cpp repackaging) over Apache-2.0 OpenAI weights. The
-    /// higher-accuracy, architecturally-decorrelated 3rd cross-check voice (the live
-    /// model ships distilled turbo; this is the full model). SHA-256 from the
-    /// HuggingFace LFS pointer.
-    /// </summary>
-    public static readonly FileSpec MedicalWhisper = new(
-        Name: MedicalWhisperModelName,
-        FileName: "ggml-large-v3-q5_0.bin",
-        Url: "https://huggingface.co/ggerganov/whisper.cpp/resolve/main/ggml-large-v3-q5_0.bin",
-        SizeBytes: 1081140203L,
-        Sha256: "d75795ecff3f83b5faa89d1900604ad8c780abd5739fae406de19f23ecd98ad1");
-
-    /// <summary>Resolve the medical cross-check Whisper GGML (.bin), or null when absent.</summary>
-    public static string? ResolveMedicalWhisperBin() => ResolveWhisperBin(MedicalWhisperModelName);
 
     /// <summary>
     /// Path of the per-install on-device STT preferences file (primary-model
