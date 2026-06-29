@@ -12,11 +12,12 @@ namespace RadioPad.Api.Tests;
 public class ReportingBindingsTests
 {
     private static ReportTemplate Tmpl(string modality, string bodyPart, TemplateStatus status,
-        TemplateVariant variant = TemplateVariant.Normal, int ageMinutes = 0) =>
+        TemplateVariant variant = TemplateVariant.Normal, int ageMinutes = 0, string contrast = "") =>
         new()
         {
             Modality = modality,
             BodyPart = bodyPart,
+            Contrast = contrast,
             Status = status,
             Variant = variant,
             UpdatedAt = DateTimeOffset.UnixEpoch.AddMinutes(ageMinutes),
@@ -88,5 +89,46 @@ public class ReportingBindingsTests
         var (t, r) = ReportingService.ResolveBindings(templates, rulebooks, "MR", "Head");
         Assert.Null(t);
         Assert.Null(r);
+    }
+
+    // --- Hybrid contrast model: 3-tier template preference -----------------------
+
+    [Fact]
+    public void Contrast_Prefers_Exact_Match_Over_Agnostic()
+    {
+        var withContrast = Tmpl("CT", "Abdomen & Pelvis", TemplateStatus.Approved, contrast: "With");
+        var plain = Tmpl("CT", "Abdomen & Pelvis", TemplateStatus.Approved, contrast: "None");
+        var agnostic = Tmpl("CT", "Abdomen & Pelvis", TemplateStatus.Approved, contrast: "");
+        var templates = new[] { agnostic, plain, withContrast };
+
+        var (t, _) = ReportingService.ResolveBindings(templates, Array.Empty<Rulebook>(), "CT", "Abdomen & Pelvis", "With");
+        Assert.Same(withContrast, t);
+
+        var (t2, _) = ReportingService.ResolveBindings(templates, Array.Empty<Rulebook>(), "CT", "Abdomen & Pelvis", "None");
+        Assert.Same(plain, t2);
+    }
+
+    [Fact]
+    public void Contrast_FallsBack_To_Agnostic_Then_Any()
+    {
+        // No exact contrast match → tier 2 picks the contrast-agnostic template.
+        var agnostic = Tmpl("CT", "Chest", TemplateStatus.Approved, contrast: "");
+        var withContrast = Tmpl("CT", "Chest", TemplateStatus.Approved, contrast: "With");
+        var (t, _) = ReportingService.ResolveBindings(new[] { withContrast, agnostic }, Array.Empty<Rulebook>(), "CT", "Chest", "None");
+        Assert.Same(agnostic, t);
+
+        // No exact and no agnostic → tier 3 returns any (modality, body part) match.
+        var (t2, _) = ReportingService.ResolveBindings(new[] { withContrast }, Array.Empty<Rulebook>(), "CT", "Chest", "None");
+        Assert.Same(withContrast, t2);
+    }
+
+    [Fact]
+    public void Contrast_Null_Or_Empty_Behaves_As_Before()
+    {
+        // Backward-compat: omitting contrast prefers the agnostic template, else any.
+        var agnostic = Tmpl("MR", "Brain", TemplateStatus.Approved, contrast: "");
+        var withContrast = Tmpl("MR", "Brain", TemplateStatus.Approved, contrast: "With");
+        var (t, _) = ReportingService.ResolveBindings(new[] { withContrast, agnostic }, Array.Empty<Rulebook>(), "MR", "Brain");
+        Assert.Same(agnostic, t);
     }
 }

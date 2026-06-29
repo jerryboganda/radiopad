@@ -1,0 +1,43 @@
+{
+  "id": "mr-brain-c",
+  "templateId": "mr-brain-c",
+  "name": "MRI Brain (post-contrast)",
+  "modality": "MR",
+  "bodyPart": "Brain",
+  "contrast": "With",
+  "status": "approved",
+  "subspecialty": "Neuro",
+  "rulebookId": "brain_mri_v1",
+  "sections": [
+    {
+      "id": "indication",
+      "label": "Indication",
+      "placeholder": "Clinical question / referring concern."
+    },
+    {
+      "id": "technique",
+      "label": "Technique",
+      "placeholder": "Multiplanar, multisequence MRI of the brain after intravenous gadolinium-based contrast. State field strength, sequences, and any diffusion/dynamic series."
+    },
+    {
+      "id": "comparison",
+      "label": "Comparison",
+      "placeholder": "Date and type of relevant prior imaging, if available."
+    },
+    {
+      "id": "findings",
+      "label": "Findings",
+      "placeholder": "Cerebral hemispheres / grey–white differentiation: \nVentricles and CSF spaces: \nMidline / no shift: \nBasal cisterns: \nPosterior fossa and brainstem: \nExtra-axial spaces (no collection): \nVascular territories (no acute infarct): \nNo intracranial haemorrhage: \nCalvarium and skull base: \nVisualised paranasal sinuses / mastoids / orbits: "
+    },
+    {
+      "id": "impression",
+      "label": "Impression",
+      "placeholder": "Concise, prioritised bulleted impression with any required scoring category and approved follow-up."
+    },
+    {
+      "id": "recommendations",
+      "label": "Recommendations",
+      "placeholder": "Evidence-based follow-up or correlation, drawn from approved phrasing, only if indicated."
+    }
+  ]
+}

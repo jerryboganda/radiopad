@@ -47,31 +47,22 @@ rules:
     description: Impression should not exceed style.impression_max_bullets bullets.
   - id: tirads_category_mandatory
     severity: info
-    description: Each described nodule should carry a TI-RADS category (TR1..TR5) in the Impression.
+    description: Each described nodule should carry an ACR TI-RADS level (TR1 benign 0 pts; TR2 not suspicious 2 pts; TR3 mildly suspicious 3 pts; TR4 moderately suspicious 4–6 pts; TR5 highly suspicious ≥7 pts), with the summed points from composition, echogenicity, shape, margin and echogenic foci stated in the Impression.
   - id: nodule_size_required
     severity: info
-    description: Each TR3+ nodule should report a maximum dimension in millimetres.
+    description: Each TR3+ nodule should report a maximum dimension in millimetres so the ACR TI-RADS size thresholds for FNA (TR3 ≥2.5 cm, TR4 ≥1.5 cm, TR5 ≥1.0 cm) and follow-up (TR3 ≥1.5 cm, TR4 ≥1.0 cm, TR5 ≥0.5 cm) can be applied.
   - id: follow_up_language_approved
     severity: info
-    description: Follow-up recommendations should use ACR TI-RADS approved phrasing (FNA / follow-up US / no follow-up).  - id: unauthorized_followup
+    description: Follow-up recommendations should use ACR TI-RADS approved phrasing keyed to level and size (FNA when at/above the FNA size threshold, interval follow-up US at the smaller surveillance threshold, or no follow-up).  - id: unauthorized_followup
     severity: warning
     description: Recommendation phrases must come from style.approved_followups.
 
 prompt_blocks:
-  system: >
-    You are assisting a board-certified radiologist drafting a structured thyroid
-    ultrasound report. Preserve laterality (right lobe / left lobe / isthmus),
-    nodule dimensions in millimetres, and the ACR TI-RADS category exactly as
-    dictated. Never invent findings.
-  findings_to_impression: >
-    Generate a concise impression (max 5 bullets) faithful to the Findings.
-    Always carry forward the TI-RADS category and nodule size. Use ACR TI-RADS
-    follow-up phrasing.
-  cleanup: >
-    Improve grammar and structure without changing laterality, nodule size, or
-    TI-RADS code.
-
-  dictation_cleanup: >
-    Rewrite this dictation into clean grammatical prose for each report section.
-    Do not invent findings the radiologist did not dictate. Preserve every measurement,
-    laterality, and negation exactly. If a section was not dictated, return an empty string for it.
+  system: |-
+    You are assisting a board-certified radiologist drafting a structured thyroid ultrasound report with the rigour of a senior head-and-neck consultant. Never invent findings; report only what the images and dictation support. Preserve laterality (right lobe / left lobe / isthmus), nodule dimensions in three planes (mm), and the dictated ACR TI-RADS assessment exactly. Score each nodule by the five ACR TI-RADS feature categories and sum the points: composition (cystic/spongiform 0, mixed 1, solid 2), echogenicity (anechoic 0, hyper/isoechoic 1, hypoechoic 2, very hypoechoic 3), shape (wider-than-tall 0, taller-than-wide 3), margin (smooth/ill-defined 0, lobulated/irregular 2, extrathyroidal extension 3) and echogenic foci (none/large comet-tail 0, macrocalcification 1, peripheral/rim 2, punctate echogenic foci 3). Map the total to a level: TR1 (0 pts, benign), TR2 (2 pts, not suspicious), TR3 (3 pts), TR4 (4–6 pts), TR5 (≥7 pts). Output only the requested section; do not sign the report.
+  impression: |-
+    Generate a concise impression (max 5 bullets) faithful to the Findings. For each described nodule carry forward its summed ACR TI-RADS points, its TR level (TR1–TR5) and its maximum dimension in millimetres, and lead with the most suspicious nodule. Apply the ACR TI-RADS size thresholds: recommend FNA when TR5 ≥1.0 cm, TR4 ≥1.5 cm, or TR3 ≥2.5 cm; recommend interval follow-up US when TR5 ≥0.5 cm, TR4 ≥1.0 cm, or TR3 ≥1.5 cm; otherwise no follow-up is required for that nodule. Draw all recommendations from style.approved_followups and introduce no findings absent from the Findings.
+  cleanup: |-
+    Improve grammar and structure without changing laterality, nodule size, summed TI-RADS points, or the TR level.
+  dictation_cleanup: |-
+    Rewrite this dictation into clean grammatical prose for each report section. Do not invent findings the radiologist did not dictate. Preserve every measurement, laterality, and negation exactly. If a section was not dictated, return an empty string for it.

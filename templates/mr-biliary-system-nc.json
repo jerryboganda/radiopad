@@ -1,0 +1,38 @@
+{
+  "id": "mr-biliary-system-nc",
+  "templateId": "mr-biliary-system-nc",
+  "name": "MRCP (magnetic resonance cholangiopancreatography)",
+  "modality": "MR",
+  "bodyPart": "Biliary System",
+  "contrast": "None",
+  "status": "approved",
+  "subspecialty": "Body",
+  "rulebookId": "mr_biliary_system_rp_v1",
+  "sections": [
+    {
+      "id": "indication",
+      "label": "Indication",
+      "placeholder": "Clinical question / referring concern."
+    },
+    {
+      "id": "technique",
+      "label": "Technique",
+      "placeholder": "Multiplanar, multisequence MRI of the biliary system without intravenous gadolinium. State field strength, sequences, and any diffusion/dynamic series."
+    },
+    {
+      "id": "comparison",
+      "label": "Comparison",
+      "placeholder": "Date and type of relevant prior imaging, if available."
+    },
+    {
+      "id": "findings",
+      "label": "Findings",
+      "placeholder": "Intrahepatic ducts: \nCommon hepatic / common bile duct (calibre, stones, stricture): \nPancreatic duct: \nGallbladder and cystic duct: \nAmpullary region: \nLiver / pancreas parenchyma: "
+    },
+    {
+      "id": "impression",
+      "label": "Impression",
+      "placeholder": "Concise, prioritised bulleted impression with any required scoring category and approved follow-up."
+    }
+  ]
+}

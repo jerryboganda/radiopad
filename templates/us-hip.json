@@ -1,0 +1,38 @@
+{
+  "id": "us-hip",
+  "templateId": "us-hip",
+  "name": "Ultrasound Infant Hip (DDH)",
+  "modality": "US",
+  "bodyPart": "Hip",
+  "contrast": "",
+  "status": "approved",
+  "subspecialty": "Paediatric",
+  "rulebookId": "us_hip_rp_v1",
+  "sections": [
+    {
+      "id": "indication",
+      "label": "Indication",
+      "placeholder": "Clinical question / referring concern."
+    },
+    {
+      "id": "technique",
+      "label": "Technique",
+      "placeholder": "Real-time greyscale and colour/spectral Doppler ultrasound of the hip. State transducer and approach (e.g. transabdominal/endocavitary)."
+    },
+    {
+      "id": "comparison",
+      "label": "Comparison",
+      "placeholder": "Date and type of relevant prior imaging, if available."
+    },
+    {
+      "id": "findings",
+      "label": "Findings",
+      "placeholder": "Osseous structures (alignment, marrow, fracture): \nArticular cartilage: \nLigaments / tendons: \nFibrocartilage / labrum (where applicable): \nJoint effusion / synovium: \nMuscles and soft tissues: "
+    },
+    {
+      "id": "impression",
+      "label": "Impression",
+      "placeholder": "Concise, prioritised bulleted impression with any required scoring category and approved follow-up."
+    }
+  ]
+}

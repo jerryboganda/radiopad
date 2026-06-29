@@ -1,0 +1,43 @@
+{
+  "id": "mr-pelvis-fistula-mp",
+  "templateId": "mr-pelvis-fistula-mp",
+  "name": "MRI Pelvis (perianal fistula)",
+  "modality": "MR",
+  "bodyPart": "Pelvis",
+  "contrast": "WithAndWithout",
+  "status": "approved",
+  "subspecialty": "Body",
+  "rulebookId": "pelvis_mri_v1",
+  "sections": [
+    {
+      "id": "indication",
+      "label": "Indication",
+      "placeholder": "Clinical question / referring concern."
+    },
+    {
+      "id": "technique",
+      "label": "Technique",
+      "placeholder": "Multiplanar, multisequence MRI of the pelvis before and after intravenous gadolinium-based contrast. State field strength, sequences, and any diffusion/dynamic series."
+    },
+    {
+      "id": "comparison",
+      "label": "Comparison",
+      "placeholder": "Date and type of relevant prior imaging, if available."
+    },
+    {
+      "id": "findings",
+      "label": "Findings",
+      "placeholder": "Uterus (size, position, endometrial thickness, myometrium/fibroids): \nCervix: \nRight ovary (size, follicles, lesion): \nLeft ovary: \nAdnexal lesion characterisation with O-RADS: \nFree fluid / cul-de-sac: \nBladder and bowel: \nLymph nodes: "
+    },
+    {
+      "id": "impression",
+      "label": "Impression",
+      "placeholder": "Concise, prioritised bulleted impression with any required scoring category and approved follow-up."
+    },
+    {
+      "id": "recommendations",
+      "label": "Recommendations",
+      "placeholder": "Evidence-based follow-up or correlation, drawn from approved phrasing, only if indicated."
+    }
+  ]
+}

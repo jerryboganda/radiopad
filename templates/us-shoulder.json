@@ -1,0 +1,38 @@
+{
+  "id": "us-shoulder",
+  "templateId": "us-shoulder",
+  "name": "Ultrasound Shoulder (rotator cuff)",
+  "modality": "US",
+  "bodyPart": "Shoulder",
+  "contrast": "",
+  "status": "approved",
+  "subspecialty": "MSK",
+  "rulebookId": "us_shoulder_rp_v1",
+  "sections": [
+    {
+      "id": "indication",
+      "label": "Indication",
+      "placeholder": "Clinical question / referring concern."
+    },
+    {
+      "id": "technique",
+      "label": "Technique",
+      "placeholder": "Real-time greyscale and colour/spectral Doppler ultrasound of the shoulder. State transducer and approach (e.g. transabdominal/endocavitary)."
+    },
+    {
+      "id": "comparison",
+      "label": "Comparison",
+      "placeholder": "Date and type of relevant prior imaging, if available."
+    },
+    {
+      "id": "findings",
+      "label": "Findings",
+      "placeholder": "Rotator cuff (supraspinatus, infraspinatus, subscapularis, teres minor — tendon thickness, tear type/size): \nLong head of biceps: \nLabrum (including anterosuperior/SLAP): \nGlenohumeral cartilage and bone: \nAcromion morphology / AC joint: \nMuscle bulk and fatty atrophy: \nEffusion / bursa: "
+    },
+    {
+      "id": "impression",
+      "label": "Impression",
+      "placeholder": "Concise, prioritised bulleted impression with any required scoring category and approved follow-up."
+    }
+  ]
+}

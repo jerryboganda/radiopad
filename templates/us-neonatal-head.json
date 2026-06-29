@@ -1,0 +1,38 @@
+{
+  "id": "us-neonatal-head",
+  "templateId": "us-neonatal-head",
+  "name": "Ultrasound Neonatal Cranial",
+  "modality": "US",
+  "bodyPart": "Neonatal Head",
+  "contrast": "",
+  "status": "approved",
+  "subspecialty": "Paediatric",
+  "rulebookId": "us_neonatal_head_rp_v1",
+  "sections": [
+    {
+      "id": "indication",
+      "label": "Indication",
+      "placeholder": "Clinical question / referring concern."
+    },
+    {
+      "id": "technique",
+      "label": "Technique",
+      "placeholder": "Real-time greyscale and colour/spectral Doppler ultrasound of the neonatal head. State transducer and approach (e.g. transabdominal/endocavitary)."
+    },
+    {
+      "id": "comparison",
+      "label": "Comparison",
+      "placeholder": "Date and type of relevant prior imaging, if available."
+    },
+    {
+      "id": "findings",
+      "label": "Findings",
+      "placeholder": "Cerebral hemispheres / grey–white differentiation: \nVentricles and CSF spaces: \nMidline / no shift: \nBasal cisterns: \nPosterior fossa and brainstem: \nExtra-axial spaces (no collection): \nVascular territories (no acute infarct): \nNo intracranial haemorrhage: \nCalvarium and skull base: \nVisualised paranasal sinuses / mastoids / orbits: "
+    },
+    {
+      "id": "impression",
+      "label": "Impression",
+      "placeholder": "Concise, prioritised bulleted impression with any required scoring category and approved follow-up."
+    }
+  ]
+}

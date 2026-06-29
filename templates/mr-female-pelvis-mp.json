@@ -1,0 +1,43 @@
+{
+  "id": "mr-female-pelvis-mp",
+  "templateId": "mr-female-pelvis-mp",
+  "name": "MRI Female Pelvis",
+  "modality": "MR",
+  "bodyPart": "Female Pelvis",
+  "contrast": "WithAndWithout",
+  "status": "approved",
+  "subspecialty": "Body",
+  "rulebookId": "mr_female_pelvis_rp_v1",
+  "sections": [
+    {
+      "id": "indication",
+      "label": "Indication",
+      "placeholder": "Clinical question / referring concern."
+    },
+    {
+      "id": "technique",
+      "label": "Technique",
+      "placeholder": "Multiplanar, multisequence MRI of the female pelvis before and after intravenous gadolinium-based contrast. State field strength, sequences, and any diffusion/dynamic series."
+    },
+    {
+      "id": "comparison",
+      "label": "Comparison",
+      "placeholder": "Date and type of relevant prior imaging, if available."
+    },
+    {
+      "id": "findings",
+      "label": "Findings",
+      "placeholder": "Uterus: size, position, zonal anatomy, junctional-zone thickness; myometrium and any fibroids (number, FIGO leiomyoma location, size, degeneration); adenomyosis.\nEndometrium: thickness (mm) and signal; for endometrial carcinoma, depth of myometrial invasion (<50% vs >=50%) and cervical-stromal involvement.\nCervix and parametria; vagina.\nRight ovary: size/volume, follicles, any lesion. Left ovary: same.\nAdnexal lesion characterisation (O-RADS MRI v1): size (mm), unilocular/multilocular, enhancing solid tissue, T1/T2/fat signal, lipid content, diffusion, DCE time-intensity-curve type (low/intermediate/high risk), and assigned O-RADS MRI category 1-5.\nFree fluid / cul-de-sac; peritoneal, mesenteric or omental nodularity/implants.\nBladder and bowel; deep infiltrating endometriosis sites if relevant.\nLymph nodes (short-axis, morphology) and osseous lesions."
+    },
+    {
+      "id": "impression",
+      "label": "Impression",
+      "placeholder": "Concise prioritised bullets. For each adnexal lesion give the O-RADS MRI category (1-5), laterality, and maximum diameter (mm). Management implication: O-RADS 2 (almost certainly benign, <0.5%) = benign, follow-up only per indication; O-RADS 3 (low, ~5%) = consider US correlation/gynae input; O-RADS 4 (intermediate, ~50%) and O-RADS 5 (high, ~90%, or peritoneal disease) = refer to gynaecological oncology MDT. When the indication is oncologic, provide FIGO staging (e.g. endometrial myometrial-invasion depth, cervical/parametrial extent, peritoneal/nodal disease). Use only approved follow-up phrasing."
+    },
+    {
+      "id": "recommendations",
+      "label": "Recommendations",
+      "placeholder": "Evidence-based follow-up or correlation, drawn from approved phrasing, only if indicated."
+    }
+  ]
+}

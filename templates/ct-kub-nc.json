@@ -1,0 +1,38 @@
+{
+  "id": "ct-kub-nc",
+  "templateId": "ct-kub-nc",
+  "name": "CT KUB (renal colic / stone protocol)",
+  "modality": "CT",
+  "bodyPart": "KUB",
+  "contrast": "None",
+  "status": "approved",
+  "subspecialty": "Body",
+  "rulebookId": "ct_kub_rp_v1",
+  "sections": [
+    {
+      "id": "indication",
+      "label": "Indication",
+      "placeholder": "Clinical question / referring concern."
+    },
+    {
+      "id": "technique",
+      "label": "Technique",
+      "placeholder": "Multidetector CT of the kub acquired without intravenous contrast. Multiplanar reformats reviewed. State kVp/contrast volume/phase and DLP as per local dose policy."
+    },
+    {
+      "id": "comparison",
+      "label": "Comparison",
+      "placeholder": "Date and type of relevant prior imaging, if available."
+    },
+    {
+      "id": "findings",
+      "label": "Findings",
+      "placeholder": "Right kidney (size, cortical thickness, lesion): \nLeft kidney: \nCystic lesions with Bosniak class: \nSolid masses (size, enhancement): \nCollecting systems / hydronephrosis: \nCalculi (size, location, HU): \nUreters and bladder: \nPerinephric fat / vasculature: "
+    },
+    {
+      "id": "impression",
+      "label": "Impression",
+      "placeholder": "Concise, prioritised bulleted impression with any required scoring category and approved follow-up."
+    }
+  ]
+}

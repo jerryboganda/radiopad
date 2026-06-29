@@ -1,0 +1,38 @@
+{
+  "id": "nm-cardiac",
+  "templateId": "nm-cardiac",
+  "name": "Myocardial Perfusion Scan",
+  "modality": "NM",
+  "bodyPart": "Cardiac",
+  "contrast": "",
+  "status": "approved",
+  "subspecialty": "Nuclear",
+  "rulebookId": "nm_cardiac_rp_v1",
+  "sections": [
+    {
+      "id": "indication",
+      "label": "Indication",
+      "placeholder": "Clinical question / referring concern."
+    },
+    {
+      "id": "technique",
+      "label": "Technique",
+      "placeholder": "Scintigraphic imaging of the cardiac. State radiopharmaceutical, administered activity, and acquisition timing."
+    },
+    {
+      "id": "comparison",
+      "label": "Comparison",
+      "placeholder": "Date and type of relevant prior imaging, if available."
+    },
+    {
+      "id": "findings",
+      "label": "Findings",
+      "placeholder": "Radiopharmaceutical biodistribution: \nTarget-organ uptake / function: \nFocal abnormality (site, intensity): \nQuantification (where applicable): \nSPECT/CT correlation: "
+    },
+    {
+      "id": "impression",
+      "label": "Impression",
+      "placeholder": "Concise, prioritised bulleted impression with any required scoring category and approved follow-up."
+    }
+  ]
+}

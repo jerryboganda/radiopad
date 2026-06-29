@@ -1,0 +1,43 @@
+{
+  "id": "ct-pancreas-mp",
+  "templateId": "ct-pancreas-mp",
+  "name": "CT Pancreas (pancreatic protocol)",
+  "modality": "CT",
+  "bodyPart": "Pancreas",
+  "contrast": "WithAndWithout",
+  "status": "approved",
+  "subspecialty": "Body",
+  "rulebookId": "ct_pancreas_rp_v1",
+  "sections": [
+    {
+      "id": "indication",
+      "label": "Indication",
+      "placeholder": "Clinical question / referring concern."
+    },
+    {
+      "id": "technique",
+      "label": "Technique",
+      "placeholder": "Multidetector CT of the pancreas acquired before and after intravenous iodinated contrast. Multiplanar reformats reviewed. State kVp/contrast volume/phase and DLP as per local dose policy."
+    },
+    {
+      "id": "comparison",
+      "label": "Comparison",
+      "placeholder": "Date and type of relevant prior imaging, if available."
+    },
+    {
+      "id": "findings",
+      "label": "Findings",
+      "placeholder": "Pancreatic parenchyma (atrophy, mass — size/location/enhancement): \nDuctal system (MPD calibre, abrupt cut-off): \nVascular involvement (SMA, SMV, coeliac, portal): \nPeripancreatic fat / collections: \nBiliary tree / CBD: \nLiver (metastases): \nNodes / ascites: \nResectability statement: "
+    },
+    {
+      "id": "impression",
+      "label": "Impression",
+      "placeholder": "Concise, prioritised bulleted impression with any required scoring category and approved follow-up."
+    },
+    {
+      "id": "recommendations",
+      "label": "Recommendations",
+      "placeholder": "Evidence-based follow-up or correlation, drawn from approved phrasing, only if indicated."
+    }
+  ]
+}

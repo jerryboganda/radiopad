@@ -1,0 +1,43 @@
+{
+  "id": "ct-brain-c",
+  "templateId": "ct-brain-c",
+  "name": "CT Brain (post-contrast)",
+  "modality": "CT",
+  "bodyPart": "Brain",
+  "contrast": "With",
+  "status": "approved",
+  "subspecialty": "Neuro",
+  "rulebookId": "head_ct_trauma_v1",
+  "sections": [
+    {
+      "id": "indication",
+      "label": "Indication",
+      "placeholder": "Clinical question / referring concern."
+    },
+    {
+      "id": "technique",
+      "label": "Technique",
+      "placeholder": "Multidetector CT of the brain acquired after intravenous iodinated contrast. Multiplanar reformats reviewed. State kVp/contrast volume/phase and DLP as per local dose policy."
+    },
+    {
+      "id": "comparison",
+      "label": "Comparison",
+      "placeholder": "Date and type of relevant prior imaging, if available."
+    },
+    {
+      "id": "findings",
+      "label": "Findings",
+      "placeholder": "Cerebral hemispheres / grey–white differentiation: \nEnhancing abnormality (mass, abscess, vascular lesion) — pattern of enhancement, size (mm), location: \nIntracranial haemorrhage by compartment — extra-axial (epidural / subdural / subarachnoid), intraparenchymal / intraventricular (thickness mm): \nVentricles and CSF spaces: \nMidline shift (mm at septum/foramen of Monro): \nBasal cisterns (patent vs effaced): \nMass effect / herniation (subfalcine, uncal, tonsillar): \nPosterior fossa and brainstem: \nVascular territories (acute infarct): \nCalvarium and skull base: \nVisualised paranasal sinuses / mastoids / orbits: "
+    },
+    {
+      "id": "impression",
+      "label": "Impression",
+      "placeholder": "Concise, prioritised bullets, most time-critical first. Characterise any enhancing abnormality (mass / abscess / vascular) and state presence/absence of acute intracranial haemorrhage by compartment with hematoma thickness and midline shift (mm), plus any mass effect or herniation. Critical-result communication language for haemorrhage, herniation or shift, and approved follow-up where indicated."
+    },
+    {
+      "id": "recommendations",
+      "label": "Recommendations",
+      "placeholder": "Evidence-based follow-up or correlation, drawn from approved phrasing, only if indicated."
+    }
+  ]
+}

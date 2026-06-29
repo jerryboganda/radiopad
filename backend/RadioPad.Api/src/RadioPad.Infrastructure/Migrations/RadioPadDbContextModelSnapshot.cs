@@ -1177,6 +1177,10 @@ namespace RadioPad.Infrastructure.Migrations
                         .IsRequired()
                         .HasColumnType("TEXT");
 
+                    b.Property<string>("Contrast")
+                        .IsRequired()
+                        .HasColumnType("TEXT");
+
                     b.Property<long>("CreatedAt")
                         .HasColumnType("INTEGER");
 
@@ -1958,6 +1962,10 @@ namespace RadioPad.Infrastructure.Migrations
                                 .HasColumnType("TEXT");
 
                             b1.Property<string>("Comparison")
+                                .IsRequired()
+                                .HasColumnType("TEXT");
+
+                            b1.Property<string>("Contrast")
                                 .IsRequired()
                                 .HasColumnType("TEXT");
 

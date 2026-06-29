@@ -1,0 +1,43 @@
+{
+  "id": "mr-brain-stroke-nc",
+  "templateId": "mr-brain-stroke-nc",
+  "name": "MRI Brain (stroke / DWI protocol)",
+  "modality": "MR",
+  "bodyPart": "Brain",
+  "contrast": "None",
+  "status": "approved",
+  "subspecialty": "Neuro",
+  "rulebookId": "brain_mri_v1",
+  "sections": [
+    {
+      "id": "indication",
+      "label": "Indication",
+      "placeholder": "Clinical question / referring concern."
+    },
+    {
+      "id": "technique",
+      "label": "Technique",
+      "placeholder": "Multiplanar, multisequence MRI of the brain without intravenous gadolinium. State field strength, sequences, and any diffusion/dynamic series."
+    },
+    {
+      "id": "comparison",
+      "label": "Comparison",
+      "placeholder": "Date and type of relevant prior imaging, if available."
+    },
+    {
+      "id": "findings",
+      "label": "Findings",
+      "placeholder": "Acute infarct — DWI restriction with corresponding low ADC (true restriction, not T2 shine-through); vascular territory (ICA / MCA M1–M2 / ACA / PCA / vertebrobasilar / lacunar) and laterality; estimated volume: \nASPECTS (0–10 MCA territory; lower = larger established core): \nHaemorrhage / microbleeds (GRE/SWI): \nLarge-vessel occlusion / susceptibility (hyperdense) vessel sign: \nChronic ischaemic change / prior infarct: \nMidline shift / mass effect / herniation: \nGrey–white differentiation: "
+    },
+    {
+      "id": "impression",
+      "label": "Impression",
+      "placeholder": "Concise, prioritised bullets. State presence/absence of acute infarct (DWI-positive / ADC-low), its vascular territory and laterality, and — for MCA-territory ischaemia — the ASPECTS (0–10). Explicitly state presence/absence of intracranial haemorrhage and any large-vessel occlusion, and flag mass effect / midline shift / herniation as time-critical. Recommendation drawn from approved follow-up."
+    },
+    {
+      "id": "recommendations",
+      "label": "Recommendations",
+      "placeholder": "Evidence-based follow-up or correlation, drawn from approved phrasing, only if indicated."
+    }
+  ]
+}

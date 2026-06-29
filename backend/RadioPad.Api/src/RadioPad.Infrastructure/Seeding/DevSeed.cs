@@ -109,6 +109,22 @@ public static class DevSeed
             db.Providers.AddRange(UbagPrimarySeed.CuratedPrimaries(tenant.Id));
         }
 
+        // Bundled clinical content (rulebooks + templates + the admin catalogs) for
+        // the dev tenant. Extracted so the SAME idempotent seeding can run in
+        // Production for every existing tenant — see EnsureBundledContentForAllTenantsAsync.
+        await SeedBundledContentAsync(db, tenant, rulebooksDir, templatesDir, ct);
+    }
+
+    /// <summary>
+    /// Seeds the bundled clinical content library (rulebooks/*.yaml + templates/*.json)
+    /// and the admin Modality/BodyPart catalogs for a single tenant. Idempotent:
+    /// rulebooks are keyed on (RulebookId, Version) and templates on TemplateId, so
+    /// only missing rows are inserted — an operator's later edits are never clobbered.
+    /// Per-file try/catch so one malformed bundled file can never abort startup.
+    /// </summary>
+    public static async Task SeedBundledContentAsync(
+        RadioPadDbContext db, Tenant tenant, string rulebooksDir, string templatesDir, CancellationToken ct)
+    {
         if (Directory.Exists(rulebooksDir))
         {
             foreach (var path in Directory.EnumerateFiles(rulebooksDir, "*.yaml"))
@@ -184,7 +200,16 @@ public static class DevSeed
                         Name = Str("name"),
                         Modality = Str("modality"),
                         BodyPart = Str("bodyPart"),
+                        // Hybrid contrast model — "" (absent) = contrast-agnostic; the
+                        // curated library tags contrast-specific templates "None" /
+                        // "With" / "WithAndWithout" so resolution can prefer an exact match.
+                        Contrast = Str("contrast"),
                         Subspecialty = Str("subspecialty"),
+                        // Curated library content carries `"status":"approved"` so it
+                        // resolves out-of-the-box (ResolveBindings is Approved-only).
+                        // Defaults to Approved when absent; the idempotent only-when-missing
+                        // insert means this never re-approves an admin's later Draft edit.
+                        Status = ParseTemplateStatus(Str("status")),
                         SectionsJson = root.TryGetProperty("sections", out var sEl)
                             ? sEl.GetRawText()
                             : "[]",
@@ -205,11 +230,38 @@ public static class DevSeed
         await CatalogSeed.EnsureCatalogAsync(db, tenant.Id, ct);
     }
 
+    /// <summary>
+    /// Production-safe bundled-content backfill: seeds the curated rulebook + template
+    /// library and the admin catalogs into EVERY existing tenant, idempotently. Unlike
+    /// <see cref="EnsureSeededAsync"/> this never creates a dev tenant/user/providers,
+    /// so it is safe to run unconditionally at startup in Production — it is how the
+    /// shipped clinical library reaches real tenants (the Dockerfile bundles
+    /// rulebooks/ + templates/ alongside the binary for exactly this purpose).
+    /// </summary>
+    public static async Task EnsureBundledContentForAllTenantsAsync(
+        RadioPadDbContext db, string rulebooksDir, string templatesDir, CancellationToken ct)
+    {
+        var tenants = await db.Tenants.ToListAsync(ct);
+        foreach (var tenant in tenants)
+            await SeedBundledContentAsync(db, tenant, rulebooksDir, templatesDir, ct);
+    }
+
     private static RulebookStatus ParseStatus(string s) => s.ToLowerInvariant() switch
     {
         "approved" => RulebookStatus.Approved,
         "review" or "in_review" or "in-review" => RulebookStatus.InReview,
         "deprecated" => RulebookStatus.Deprecated,
         _ => RulebookStatus.Draft,
+    };
+
+    // Curated bundled templates are production content, so an unspecified status
+    // means Approved (resolves immediately). Explicit "draft"/"review"/"deprecated"
+    // are still honored for hand-staged files.
+    private static TemplateStatus ParseTemplateStatus(string s) => s.ToLowerInvariant() switch
+    {
+        "draft" => TemplateStatus.Draft,
+        "review" or "in_review" or "in-review" => TemplateStatus.Review,
+        "deprecated" => TemplateStatus.Deprecated,
+        _ => TemplateStatus.Approved,
     };
 }

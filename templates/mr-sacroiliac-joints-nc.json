@@ -1,0 +1,38 @@
+{
+  "id": "mr-sacroiliac-joints-nc",
+  "templateId": "mr-sacroiliac-joints-nc",
+  "name": "MRI Sacroiliac Joints (sacroiliitis)",
+  "modality": "MR",
+  "bodyPart": "Sacroiliac Joints",
+  "contrast": "None",
+  "status": "approved",
+  "subspecialty": "MSK",
+  "rulebookId": "mr_sacroiliac_joints_rp_v1",
+  "sections": [
+    {
+      "id": "indication",
+      "label": "Indication",
+      "placeholder": "Clinical question / referring concern."
+    },
+    {
+      "id": "technique",
+      "label": "Technique",
+      "placeholder": "Multiplanar, multisequence MRI of the sacroiliac joints without intravenous gadolinium. State field strength, sequences, and any diffusion/dynamic series."
+    },
+    {
+      "id": "comparison",
+      "label": "Comparison",
+      "placeholder": "Date and type of relevant prior imaging, if available."
+    },
+    {
+      "id": "findings",
+      "label": "Findings",
+      "placeholder": "Osseous structures (alignment, marrow, fracture): \nArticular cartilage: \nLigaments / tendons: \nFibrocartilage / labrum (where applicable): \nJoint effusion / synovium: \nMuscles and soft tissues: "
+    },
+    {
+      "id": "impression",
+      "label": "Impression",
+      "placeholder": "Concise, prioritised bulleted impression with any required scoring category and approved follow-up."
+    }
+  ]
+}

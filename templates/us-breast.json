@@ -1,0 +1,38 @@
+{
+  "id": "us-breast",
+  "templateId": "us-breast",
+  "name": "Ultrasound Breast",
+  "modality": "US",
+  "bodyPart": "Breast",
+  "contrast": "",
+  "status": "approved",
+  "subspecialty": "Breast",
+  "rulebookId": "us_breast_rp_v1",
+  "sections": [
+    {
+      "id": "indication",
+      "label": "Indication",
+      "placeholder": "Clinical question / referring concern."
+    },
+    {
+      "id": "technique",
+      "label": "Technique",
+      "placeholder": "Real-time greyscale and colour/spectral Doppler ultrasound of the breast. State transducer and approach (e.g. transabdominal/endocavitary)."
+    },
+    {
+      "id": "comparison",
+      "label": "Comparison",
+      "placeholder": "Date and type of relevant prior imaging, if available."
+    },
+    {
+      "id": "findings",
+      "label": "Findings",
+      "placeholder": "Right breast — mass (shape: oval/round/irregular; orientation: parallel vs not-parallel; margin: circumscribed vs not-circumscribed — indistinct/angular/microlobulated/spiculated; echo pattern: anechoic/hypo/iso/hyper/complex cystic-and-solid; posterior features: none/enhancement/shadowing/combined); size (mm, 2–3 planes); clock/distance from nipple: \nLeft breast: \nAxillary nodes (cortical thickness, hilum): \nBI-RADS final assessment category (0/1/2/3/4A/4B/4C/5/6): "
+    },
+    {
+      "id": "impression",
+      "label": "Impression",
+      "placeholder": "Concise, prioritised bullets. State the ACR BI-RADS 5th ed final assessment category on its own line (0 incomplete; 1 negative; 2 benign; 3 probably benign ≤2%, short-interval follow-up; 4A/4B/4C suspicious — biopsy; 5 highly suggestive ≥95% — biopsy; 6 known malignancy), consistent with the dominant mass's shape/orientation/margin, with management drawn from approved follow-up."
+    }
+  ]
+}

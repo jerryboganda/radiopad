@@ -561,6 +561,23 @@ if (!app.Environment.IsEnvironment("Testing"))
         }
         await DevSeed.EnsureSeededAsync(db, rulebooksDir, templatesDir, default);
     }
+
+    // Production-safe library backfill: seed the curated rulebook + template library
+    // and the admin Modality/BodyPart catalogs into EVERY existing tenant,
+    // idempotently. The dev block above only seeds the dev tenant (and only when the
+    // dev-seed gate is on); this covers REAL prod tenants, so the shipped clinical
+    // content (bundled into the Docker image alongside the binary) actually reaches
+    // them. Dirs resolved the same way — app-relative bundle first, repo-relative
+    // fallback.
+    {
+        var rbDir = Path.Combine(AppContext.BaseDirectory, "rulebooks");
+        if (!Directory.Exists(rbDir))
+            rbDir = Path.GetFullPath(Path.Combine(AppContext.BaseDirectory, "..", "..", "..", "..", "..", "..", "..", "rulebooks"));
+        var tplDir = Path.Combine(AppContext.BaseDirectory, "templates");
+        if (!Directory.Exists(tplDir))
+            tplDir = Path.GetFullPath(Path.Combine(AppContext.BaseDirectory, "..", "..", "..", "..", "..", "..", "..", "templates"));
+        await DevSeed.EnsureBundledContentForAllTenantsAsync(db, rbDir, tplDir, default);
+    }
 }
 
 if (!app.Environment.IsDevelopment() && !app.Environment.IsEnvironment("Testing"))

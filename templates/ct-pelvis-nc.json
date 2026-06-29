@@ -1,0 +1,43 @@
+{
+  "id": "ct-pelvis-nc",
+  "templateId": "ct-pelvis-nc",
+  "name": "CT Pelvis (non-contrast)",
+  "modality": "CT",
+  "bodyPart": "Pelvis",
+  "contrast": "None",
+  "status": "approved",
+  "subspecialty": "Body",
+  "rulebookId": "abdomen_ct_v1",
+  "sections": [
+    {
+      "id": "indication",
+      "label": "Indication",
+      "placeholder": "Clinical question / referring concern."
+    },
+    {
+      "id": "technique",
+      "label": "Technique",
+      "placeholder": "Multidetector CT of the pelvis acquired without intravenous contrast. Multiplanar reformats reviewed. State kVp/contrast volume/phase and DLP as per local dose policy."
+    },
+    {
+      "id": "comparison",
+      "label": "Comparison",
+      "placeholder": "Date and type of relevant prior imaging, if available."
+    },
+    {
+      "id": "findings",
+      "label": "Findings",
+      "placeholder": "Liver (size, contour, focal lesion): \nGallbladder and biliary tree: \nPancreas: \nSpleen: \nAdrenals: \nKidneys and ureters: \nBowel and appendix: \nBladder: \nPelvic organs (uterus/adnexa or prostate/seminal vesicles): \nPeritoneum / free fluid / free air: \nVasculature and lymph nodes: \nSkeleton and body wall: "
+    },
+    {
+      "id": "impression",
+      "label": "Impression",
+      "placeholder": "Concise, prioritised bulleted impression with any required scoring category and approved follow-up."
+    },
+    {
+      "id": "recommendations",
+      "label": "Recommendations",
+      "placeholder": "Evidence-based follow-up or correlation, drawn from approved phrasing, only if indicated."
+    }
+  ]
+}

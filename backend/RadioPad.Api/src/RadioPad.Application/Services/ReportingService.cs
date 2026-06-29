@@ -150,7 +150,7 @@ public class ReportingService
             "draft" => (
                 "Generate a structured draft report from the dictation and metadata, with sections: Indication, Technique, Comparison, Findings, Impression. " +
                 "Do not invent findings beyond what is dictated.",
-                $"Modality: {report.Study.Modality}\nBody part: {report.Study.BodyPart}\nIndication: {report.Indication}\nComparison: {report.Study.Comparison}\nDICTATION:\n{report.Findings}"),
+                $"Modality: {report.Study.Modality}\nBody part: {report.Study.BodyPart}\nContrast: {report.Study.Contrast}\nIndication: {report.Indication}\nComparison: {report.Study.Comparison}\nDICTATION:\n{report.Findings}"),
             "concise" => (
                 "Rewrite the impression to be more concise. Do not change clinical meaning, negations, or measurements.",
                 $"IMPRESSION:\n{report.Impression}"),
@@ -176,10 +176,12 @@ public class ReportingService
         // report-body Indication section (report.Indication).
         var age = report.Study.Age is int a ? a.ToString() : "Unknown";
         var gender = string.IsNullOrWhiteSpace(report.Study.Gender) ? "Unknown" : report.Study.Gender;
+        var contrast = string.IsNullOrWhiteSpace(report.Study.Contrast) ? "Unspecified" : report.Study.Contrast;
 
         var userPrompt = $"""
             Modality: {report.Study.Modality}
             Body part: {report.Study.BodyPart}
+            Contrast: {contrast}
             Patient: age {age}, gender {gender}
             Indication: {report.Indication}
 
@@ -194,29 +196,50 @@ public class ReportingService
 
     /// <summary>
     /// Iter-36 — pick the Approved report template + rulebook that match a
-    /// (modality, body part) selection key. This is the single mechanism behind
-    /// both automatic scaffolding (template) and prompt selection (rulebook).
-    /// Templates tie-break Normal-variant first, then most-recently-updated;
-    /// rulebooks tie-break highest version. Returns nulls when no Approved match
-    /// exists or the key is incomplete. Pure + side-effect free for unit testing —
-    /// callers load tenant-scoped candidates and apply the result.
+    /// (modality, body part[, contrast]) selection key. This is the single
+    /// mechanism behind both automatic scaffolding (template) and prompt selection
+    /// (rulebook).
+    /// <para>
+    /// Hybrid contrast model: contrast influences TEMPLATE selection only. Among the
+    /// Approved templates matching (modality, body part), the contrast preference is
+    /// 3-tier: (1) exact contrast match, (2) contrast-agnostic template (empty
+    /// Contrast), (3) any match ignoring contrast. This guarantees a selection always
+    /// resolves a template when one exists for the region, and is fully
+    /// backward-compatible (empty Contrast everywhere = pre-contrast behaviour).
+    /// Within each tier the existing tie-break holds: Normal-variant first, then
+    /// most-recently-updated. Rulebooks remain keyed on (modality, body part),
+    /// tie-broken by highest version, and adapt contrast prose via prompt blocks.
+    /// </para>
+    /// Returns nulls when no Approved match exists or the key is incomplete. Pure +
+    /// side-effect free for unit testing — callers load tenant-scoped candidates and
+    /// apply the result.
     /// </summary>
     public static (ReportTemplate? template, Rulebook? rulebook) ResolveBindings(
         IEnumerable<ReportTemplate> templates,
         IEnumerable<Rulebook> rulebooks,
-        string? modality, string? bodyPart)
+        string? modality, string? bodyPart, string? contrast = null)
     {
         var m = (modality ?? "").Trim();
         var bp = (bodyPart ?? "").Trim();
+        var c = (contrast ?? "").Trim();
         if (m.Length == 0 || bp.Length == 0) return (null, null);
 
-        var template = templates
+        // Materialize the (modality, body part) candidates once so the three
+        // contrast tiers reuse a single, deterministically-ordered list.
+        var matches = templates
             .Where(t => t.Status == TemplateStatus.Approved
                 && string.Equals(t.Modality, m, StringComparison.OrdinalIgnoreCase)
                 && string.Equals(t.BodyPart, bp, StringComparison.OrdinalIgnoreCase))
             .OrderByDescending(t => t.Variant == TemplateVariant.Normal)
             .ThenByDescending(t => t.UpdatedAt)
-            .FirstOrDefault();
+            .ToList();
+
+        var template =
+            (c.Length > 0
+                ? matches.FirstOrDefault(t => string.Equals(t.Contrast, c, StringComparison.OrdinalIgnoreCase))
+                : null)                                                   // tier 1: exact contrast
+            ?? matches.FirstOrDefault(t => string.IsNullOrEmpty(t.Contrast)) // tier 2: contrast-agnostic
+            ?? matches.FirstOrDefault();                                  // tier 3: ignore contrast
 
         var rulebook = rulebooks
             .Where(r => r.Status == RulebookStatus.Approved

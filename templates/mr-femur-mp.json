@@ -1,0 +1,43 @@
+{
+  "id": "mr-femur-mp",
+  "templateId": "mr-femur-mp",
+  "name": "MRI Femur (marrow / tumour)",
+  "modality": "MR",
+  "bodyPart": "Femur",
+  "contrast": "WithAndWithout",
+  "status": "approved",
+  "subspecialty": "MSK",
+  "rulebookId": "mr_femur_rp_v1",
+  "sections": [
+    {
+      "id": "indication",
+      "label": "Indication",
+      "placeholder": "Clinical question / referring concern."
+    },
+    {
+      "id": "technique",
+      "label": "Technique",
+      "placeholder": "Multiplanar, multisequence MRI of the femur before and after intravenous gadolinium-based contrast. State field strength, sequences, and any diffusion/dynamic series."
+    },
+    {
+      "id": "comparison",
+      "label": "Comparison",
+      "placeholder": "Date and type of relevant prior imaging, if available."
+    },
+    {
+      "id": "findings",
+      "label": "Findings",
+      "placeholder": "Osseous structures (alignment, marrow, fracture): \nArticular cartilage: \nLigaments / tendons: \nFibrocartilage / labrum (where applicable): \nJoint effusion / synovium: \nMuscles and soft tissues: "
+    },
+    {
+      "id": "impression",
+      "label": "Impression",
+      "placeholder": "Concise, prioritised bulleted impression with any required scoring category and approved follow-up."
+    },
+    {
+      "id": "recommendations",
+      "label": "Recommendations",
+      "placeholder": "Evidence-based follow-up or correlation, drawn from approved phrasing, only if indicated."
+    }
+  ]
+}

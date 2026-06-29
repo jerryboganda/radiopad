@@ -1,0 +1,38 @@
+{
+  "id": "us-carotid-arteries",
+  "templateId": "us-carotid-arteries",
+  "name": "Ultrasound Carotid Doppler",
+  "modality": "US",
+  "bodyPart": "Carotid Arteries",
+  "contrast": "",
+  "status": "approved",
+  "subspecialty": "Vascular",
+  "rulebookId": "us_carotid_arteries_rp_v1",
+  "sections": [
+    {
+      "id": "indication",
+      "label": "Indication",
+      "placeholder": "Clinical question / referring concern."
+    },
+    {
+      "id": "technique",
+      "label": "Technique",
+      "placeholder": "Real-time greyscale and colour/spectral Doppler ultrasound of the carotid arteries. State transducer and approach (e.g. transabdominal/endocavitary)."
+    },
+    {
+      "id": "comparison",
+      "label": "Comparison",
+      "placeholder": "Date and type of relevant prior imaging, if available."
+    },
+    {
+      "id": "findings",
+      "label": "Findings",
+      "placeholder": "Right ICA/CCA/ECA (PSV, EDV, ICA/CCA ratio, % stenosis): \nLeft ICA/CCA/ECA: \nPlaque (extent, surface, calcification): \nVertebral arteries (flow direction): \nStenosis category per NASCET/consensus criteria: "
+    },
+    {
+      "id": "impression",
+      "label": "Impression",
+      "placeholder": "Concise, prioritised bulleted impression with any required scoring category and approved follow-up."
+    }
+  ]
+}

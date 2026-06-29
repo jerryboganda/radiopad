@@ -28,7 +28,7 @@ export interface ReportInspectorProps {
   modalities: CatalogItem[];
   bodyParts: CatalogItem[];
   rulebooks: Rulebook[];
-  onStudyChange: (patch: { modality?: string; bodyPart?: string; age?: number | null; gender?: string }) => void;
+  onStudyChange: (patch: { modality?: string; bodyPart?: string; contrast?: string; age?: number | null; gender?: string }) => void;
 
   // Checks
   findings: ValidationFinding[];
@@ -131,6 +131,20 @@ function ContextPanel(p: ReportInspectorProps) {
           {bodyPartOptions.map((b) => (
             <option key={b.id} value={b.code}>{b.name || b.code}</option>
           ))}
+        </select>
+      </div>
+      <div className="section-block">
+        <label>Contrast</label>
+        <select
+          className="rp-input"
+          aria-label="Contrast"
+          value={study.contrast || ''}
+          onChange={(e) => p.onStudyChange({ contrast: e.target.value })}
+        >
+          <option value="">— select —</option>
+          <option value="None">Without contrast</option>
+          <option value="With">With contrast</option>
+          <option value="WithAndWithout">With and without contrast</option>
         </select>
       </div>
       <div className="rp-row rp-gap-sm">

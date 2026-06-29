@@ -1,0 +1,38 @@
+{
+  "id": "mr-shoulder-nc",
+  "templateId": "mr-shoulder-nc",
+  "name": "MRI Shoulder",
+  "modality": "MR",
+  "bodyPart": "Shoulder",
+  "contrast": "None",
+  "status": "approved",
+  "subspecialty": "MSK",
+  "rulebookId": "shoulder_mri_v1",
+  "sections": [
+    {
+      "id": "indication",
+      "label": "Indication",
+      "placeholder": "Clinical question / referring concern."
+    },
+    {
+      "id": "technique",
+      "label": "Technique",
+      "placeholder": "Multiplanar, multisequence MRI of the shoulder without intravenous gadolinium. State field strength, sequences, and any diffusion/dynamic series."
+    },
+    {
+      "id": "comparison",
+      "label": "Comparison",
+      "placeholder": "Date and type of relevant prior imaging, if available."
+    },
+    {
+      "id": "findings",
+      "label": "Findings",
+      "placeholder": "Rotator cuff (supraspinatus, infraspinatus, subscapularis, teres minor — tendon thickness, tear type/size): \nLong head of biceps: \nLabrum (including anterosuperior/SLAP): \nGlenohumeral cartilage and bone: \nAcromion morphology / AC joint: \nMuscle bulk and fatty atrophy: \nEffusion / bursa: "
+    },
+    {
+      "id": "impression",
+      "label": "Impression",
+      "placeholder": "Concise, prioritised bulleted impression with any required scoring category and approved follow-up."
+    }
+  ]
+}

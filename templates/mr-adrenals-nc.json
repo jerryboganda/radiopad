@@ -1,0 +1,38 @@
+{
+  "id": "mr-adrenals-nc",
+  "templateId": "mr-adrenals-nc",
+  "name": "MRI Adrenal (chemical-shift)",
+  "modality": "MR",
+  "bodyPart": "Adrenals",
+  "contrast": "None",
+  "status": "approved",
+  "subspecialty": "Body",
+  "rulebookId": "mr_adrenals_rp_v1",
+  "sections": [
+    {
+      "id": "indication",
+      "label": "Indication",
+      "placeholder": "Clinical question / referring concern."
+    },
+    {
+      "id": "technique",
+      "label": "Technique",
+      "placeholder": "Multiplanar, multisequence MRI of the adrenals without intravenous gadolinium. State field strength, sequences, and any diffusion/dynamic series."
+    },
+    {
+      "id": "comparison",
+      "label": "Comparison",
+      "placeholder": "Date and type of relevant prior imaging, if available."
+    },
+    {
+      "id": "findings",
+      "label": "Findings",
+      "placeholder": "Right adrenal (size, nodule): \nLeft adrenal: \nNodule characterisation (size, unenhanced HU, absolute/relative washout, signal drop on out-of-phase): \nBenign vs indeterminate statement: "
+    },
+    {
+      "id": "impression",
+      "label": "Impression",
+      "placeholder": "Concise, prioritised bulleted impression with any required scoring category and approved follow-up."
+    }
+  ]
+}

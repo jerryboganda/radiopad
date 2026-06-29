@@ -1,0 +1,38 @@
+{
+  "id": "us-peripheral-runoff-arterial",
+  "templateId": "us-peripheral-runoff-arterial",
+  "name": "Ultrasound Arterial Doppler (lower limb)",
+  "modality": "US",
+  "bodyPart": "Peripheral Runoff",
+  "contrast": "",
+  "status": "approved",
+  "subspecialty": "Vascular",
+  "rulebookId": "us_peripheral_runoff_rp_v1",
+  "sections": [
+    {
+      "id": "indication",
+      "label": "Indication",
+      "placeholder": "Clinical question / referring concern."
+    },
+    {
+      "id": "technique",
+      "label": "Technique",
+      "placeholder": "Real-time greyscale and colour/spectral Doppler ultrasound of the peripheral runoff. State transducer and approach (e.g. transabdominal/endocavitary)."
+    },
+    {
+      "id": "comparison",
+      "label": "Comparison",
+      "placeholder": "Date and type of relevant prior imaging, if available."
+    },
+    {
+      "id": "findings",
+      "label": "Findings",
+      "placeholder": "Vessel patency and flow direction: \nPeak systolic / end-diastolic velocities: \nStenosis (% by velocity criteria): \nThrombus (acute vs chronic, compressibility for veins): \nPlaque morphology: \nWaveform analysis: "
+    },
+    {
+      "id": "impression",
+      "label": "Impression",
+      "placeholder": "Concise, prioritised bulleted impression with any required scoring category and approved follow-up."
+    }
+  ]
+}

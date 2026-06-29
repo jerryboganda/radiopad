@@ -1,0 +1,89 @@
+rulebook_id: ct_kidneys_rp_v1
+name: "CT Kidneys Reporting Rulebook"
+version: 1.0.0
+owner: "Body Imaging Committee"
+status: approved
+applies_to:
+  modalities:
+    - CT
+  body_parts:
+    - "Kidneys"
+  report_types:
+    - diagnostic
+    - follow_up
+style:
+  tone: concise_clinical
+  impression_max_bullets: 5
+  avoid_terms:
+    - "unremarkable"
+    - "cannot rule out"
+    - "grossly normal"
+    - "questionable"
+    - "rule out"
+  approved_followups:
+    - "Recommend clinical correlation."
+    - "Recommend correlation with laboratory and clinical findings."
+    - "Recommend follow-up imaging as clinically indicated."
+    - "Recommend comparison with prior imaging when available."
+    - "Recommend specialty consultation if clinically warranted."
+required_sections:
+  - Indication
+  - Technique
+  - Comparison
+  - Findings
+  - Impression
+  - Recommendations
+rules:
+  - id: laterality_consistency
+    severity: blocker
+    description: "Right/left renal findings must be internally consistent and match the Impression; a side error can misdirect nephrectomy/ablation and is a blocker."
+  - id: negation_conflict
+    severity: blocker
+    description: "A renal mass, enhancement, nodule, hydronephrosis, or calculus denied in Findings must not be asserted in the Impression, and vice versa."
+  - id: measurement_consistency
+    severity: warning
+    description: "Lesion size (mm), enhancement values (HU), and calculus dimensions must agree across Findings and Impression; the 3 mm/4 mm wall-and-septa thresholds and the >=20 HU enhancement rule drive the Bosniak category."
+  - id: modality_mismatch
+    severity: warning
+    description: "Do not attribute these findings to a different modality; this is a CT Kidneys study and the prose must read as CT-derived."
+  - id: impression_bullet_count
+    severity: warning
+    description: "The Impression should not exceed style.impression_max_bullets bullets; lead with the highest Bosniak category, a solid enhancing mass, or an obstructing calculus."
+  - id: critical_result_language
+    severity: blocker
+    description: "Critical/urgent findings (e.g. infected obstructed system/pyonephrosis, active haemorrhage, suspected high-grade malignancy with vascular/IVC tumour thrombus) require documented communication to the referrer/team with read-back, recipient, and date/time."
+  - id: unauthorized_followup
+    severity: warning
+    description: "Recommendation phrasing must be drawn verbatim from style.approved_followups (e.g. Bosniak IIF surveillance interval, urology referral for III-IV or a solid mass)."
+  - id: prior_comparison_required
+    severity: info
+    description: "Compare with relevant prior imaging when available; document interval change in a cystic lesion's complexity or a solid mass's size, which can alter Bosniak management."
+  - id: contrast_phase_documented
+    severity: warning
+    description: "Document the contrast phase(s) acquired (non-contrast, corticomedullary, nephrographic, excretory); accurate enhancement assessment and Bosniak classification require comparison of pre- and post-contrast attenuation."
+  - id: incidental_findings_listed
+    severity: info
+    description: "List actionable incidental findings (e.g. adrenal nodule, indeterminate hepatic/pancreatic lesion, AAA, suspicious node) with appropriate characterisation or follow-up guidance."
+prompt_blocks:
+  system: |-
+    You are assisting a board-certified consultant/uroradiologist drafting a structured CT Kidneys report.
+    Write with the precision and economy of a senior subspecialty consultant. Never invent findings; report only what is supported by the images and dictation. Preserve every measurement, laterality and negation exactly. Adapt normal ranges and differential emphasis to the patient's age and sex. Output only the requested section; do not sign the report. Avoid the terms in style.avoid_terms.
+    Apply the Bosniak v2019 classification to renal cystic lesions (a renal mass is cystic when <25% of its volume is enhancing soft tissue). Enhancement = a >=20 HU increase after contrast; assess wall and septa thickness/number, calcification, and enhancement:
+    - Bosniak I (benign, ~0%): simple cyst, thin (<=2 mm) smooth wall, water density, no septa/calcification/enhancement.
+    - Bosniak II (benign, ~0%): a few (1-3) thin (<=2 mm) septa, or thin smooth calcification; minimally complex hyperdense (>=70 HU at non-contrast) or homogeneously non-enhancing cysts up to 3 cm; septa/wall may enhance.
+    - Bosniak IIF (follow-up, ~5%): smooth minimally thickened (3 mm) enhancing wall or septa, OR many (>=4) thin (<=2 mm) enhancing smooth septa.
+    - Bosniak III (intermediate, ~50%): one or more thick (>=4 mm) OR enhancing irregular (displaying <=3 mm obtusely-margined convex protrusion) walls or septa.
+    - Bosniak IV (high risk, ~90%): one or more enhancing nodule(s) — a >=4 mm convex protrusion with obtuse margins, or a convex protrusion of any size with acute margins.
+    - State the category, lesion size, enhancement (HU), and the malignancy implication/follow-up. For solid masses, report size, enhancement, fat content (to suggest AML), and staging features.
+  draft: |-
+    Generate a structured draft with the sections: Indication, Technique, Comparison, Findings, Impression, Recommendations. Populate Findings organ-by-organ using the scaffold (each kidney with size/cortical thickness; cystic lesions with Bosniak class; solid masses with size and enhancement HU; collecting systems and hydronephrosis; calculi with size/location/density; ureters and bladder; perinephric fat and vasculature). Convert dictation into clean clinical prose without adding findings. Honour the stated contrast phases (non-contrast, corticomedullary, nephrographic, excretory) and report pre/post HU for enhancement. Do not exceed the impression bullet limit.
+    Apply Bosniak v2019: classify each cystic lesion (I, II, IIF, III, IV) from wall/septa thickness, enhancement, and nodularity, and give the malignancy implication and follow-up.
+  impression: |-
+    Generate a concise impression (max 5 bullets) faithful to the Findings. Lead with the most clinically significant finding, give actionable recommendations only from style.approved_followups, and include any required scoring category.
+    Apply Bosniak v2019: carry forward the category, lesion size (mm), enhancement (HU), and laterality. State management: I-II → benign, no follow-up; IIF → imaging surveillance (e.g. at 6 and 12 months, then annually to 5 years); III-IV → urology referral for consideration of surgery/ablation or active surveillance. For a solid enhancing mass, state size and recommend urology referral.
+  cleanup: |-
+    Rewrite the dictated text into clean grammatical clinical prose without changing meaning. Preserve all numbers, laterality, negations and units exactly. Return an empty string for any section that was not dictated.
+  follow_up: |-
+    Suggest up to three short, evidence-based follow-up recommendations, one per line, drawn only from approved follow-up phrasing and tied to a finding already present. No new diagnoses.
+  dictation_cleanup: |-
+    Rewrite this dictation into clean grammatical prose for each report section. Do not invent findings the radiologist did not dictate. Preserve every measurement, laterality and negation exactly. If a section was not dictated, return an empty string for it.

@@ -1,0 +1,43 @@
+{
+  "id": "mr-cardiac-mp",
+  "templateId": "mr-cardiac-mp",
+  "name": "MRI Cardiac (function & viability)",
+  "modality": "MR",
+  "bodyPart": "Cardiac",
+  "contrast": "WithAndWithout",
+  "status": "approved",
+  "subspecialty": "Cardiac",
+  "rulebookId": "mr_cardiac_rp_v1",
+  "sections": [
+    {
+      "id": "indication",
+      "label": "Indication",
+      "placeholder": "Clinical question / referring concern."
+    },
+    {
+      "id": "technique",
+      "label": "Technique",
+      "placeholder": "Multiplanar, multisequence MRI of the cardiac before and after intravenous gadolinium-based contrast. State field strength, sequences, and any diffusion/dynamic series."
+    },
+    {
+      "id": "comparison",
+      "label": "Comparison",
+      "placeholder": "Date and type of relevant prior imaging, if available."
+    },
+    {
+      "id": "findings",
+      "label": "Findings",
+      "placeholder": "Biventricular size and systolic function (EF, volumes indexed): \nRegional wall motion: \nMyocardial signal (oedema T2, early/late gadolinium enhancement pattern): \nValves and flow: \nPericardium: \nGreat vessels: "
+    },
+    {
+      "id": "impression",
+      "label": "Impression",
+      "placeholder": "Concise, prioritised bulleted impression with any required scoring category and approved follow-up."
+    },
+    {
+      "id": "recommendations",
+      "label": "Recommendations",
+      "placeholder": "Evidence-based follow-up or correlation, drawn from approved phrasing, only if indicated."
+    }
+  ]
+}

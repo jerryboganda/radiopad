@@ -30,10 +30,44 @@ public static class CatalogSeed
         ("FL", "Fluoroscopy"),
     };
 
-    /// <summary>Default anatomical body parts (code == display name here).</summary>
+    /// <summary>
+    /// Default anatomical body parts (code == display name). These codes are the
+    /// canonical resolution-key vocabulary: report-template <c>BodyPart</c> and
+    /// rulebook <c>applies_to.body_parts</c> must match one of these verbatim
+    /// (case-insensitive). The original 8 generic regions stay first so their
+    /// historical SortOrder is preserved; the granular clinical regions that back
+    /// the curated exam library are appended.
+    /// </summary>
     public static readonly IReadOnlyList<string> DefaultBodyParts = new[]
     {
+        // Original generic regions (kept first — preserves their SortOrder).
         "Head", "Neck", "Chest", "Abdomen", "Pelvis", "Spine", "Extremity", "Whole Body",
+
+        // Neuro
+        "Brain", "Pituitary", "Orbits", "Internal Auditory Canal", "Temporal Bones",
+        // Head & Neck
+        "Paranasal Sinuses", "Facial Bones", "Nasopharynx", "Larynx",
+        "Salivary Glands", "Thyroid", "Temporomandibular Joints",
+        // Spine
+        "Cervical Spine", "Thoracic Spine", "Lumbar Spine", "Whole Spine",
+        "Sacrum & Coccyx", "Sacroiliac Joints",
+        // Chest / Cardiac / Breast
+        "Cardiac", "Coronary Arteries", "Pulmonary Arteries", "Thoracic Aorta", "Breast",
+        // Abdomen
+        "Liver", "Pancreas", "Biliary System", "Kidneys", "Adrenals",
+        "Abdominal Aorta", "Abdomen & Pelvis",
+        // Pelvis / GU
+        "Female Pelvis", "Prostate", "Rectum", "Bladder", "Scrotum",
+        // GI / GU specials
+        "Small Bowel", "Urinary Tract", "KUB",
+        // MSK upper limb
+        "Shoulder", "Humerus", "Elbow", "Forearm", "Wrist", "Hand",
+        // MSK lower limb
+        "Hip", "Femur", "Knee", "Tibia & Fibula", "Ankle", "Foot", "Bony Pelvis",
+        // Vascular
+        "Carotid Arteries", "Intracranial Arteries", "Renal Arteries", "Peripheral Runoff",
+        // Whole body / Obstetric / Paediatric
+        "Obstetric", "Neonatal Head",
     };
 
     /// <summary>

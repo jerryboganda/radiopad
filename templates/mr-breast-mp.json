@@ -1,0 +1,43 @@
+{
+  "id": "mr-breast-mp",
+  "templateId": "mr-breast-mp",
+  "name": "MRI Breast (dynamic contrast-enhanced)",
+  "modality": "MR",
+  "bodyPart": "Breast",
+  "contrast": "WithAndWithout",
+  "status": "approved",
+  "subspecialty": "Breast",
+  "rulebookId": "mr_breast_rp_v1",
+  "sections": [
+    {
+      "id": "indication",
+      "label": "Indication",
+      "placeholder": "Clinical question / referring concern."
+    },
+    {
+      "id": "technique",
+      "label": "Technique",
+      "placeholder": "Multiplanar, multisequence MRI of the breast before and after intravenous gadolinium-based contrast. State field strength, sequences, and any diffusion/dynamic series."
+    },
+    {
+      "id": "comparison",
+      "label": "Comparison",
+      "placeholder": "Date and type of relevant prior imaging, if available."
+    },
+    {
+      "id": "findings",
+      "label": "Findings",
+      "placeholder": "Amount of fibroglandular tissue and background parenchymal enhancement (minimal / mild / moderate / marked): \nRight breast — mass (shape, margin, internal enhancement) and/or non-mass enhancement (distribution: focal / linear / segmental / regional; pattern: homogeneous / heterogeneous / clumped / clustered-ring), with enhancement kinetics (initial: slow/medium/fast; delayed: persistent/plateau/washout); size (mm); clock/distance from nipple: \nLeft breast: \nAxillary nodes: \nBI-RADS final assessment category (0/1/2/3/4A/4B/4C/5/6): "
+    },
+    {
+      "id": "impression",
+      "label": "Impression",
+      "placeholder": "Concise, prioritised bullets. State the ACR BI-RADS 5th ed final assessment category on its own line (0 incomplete; 1 negative; 2 benign; 3 probably benign ≤2%, short-interval follow-up; 4A/4B/4C suspicious — biopsy; 5 highly suggestive ≥95% — biopsy; 6 known malignancy), reconciled with background parenchymal enhancement and the dominant lesion's morphology and kinetics, with management drawn from approved follow-up."
+    },
+    {
+      "id": "recommendations",
+      "label": "Recommendations",
+      "placeholder": "Evidence-based follow-up or correlation, drawn from approved phrasing, only if indicated."
+    }
+  ]
+}

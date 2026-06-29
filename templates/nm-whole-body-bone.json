@@ -1,0 +1,38 @@
+{
+  "id": "nm-whole-body-bone",
+  "templateId": "nm-whole-body-bone",
+  "name": "Bone Scan (whole body)",
+  "modality": "NM",
+  "bodyPart": "Whole Body",
+  "contrast": "",
+  "status": "approved",
+  "subspecialty": "Nuclear",
+  "rulebookId": "nm_whole_body_rp_v1",
+  "sections": [
+    {
+      "id": "indication",
+      "label": "Indication",
+      "placeholder": "Clinical question / referring concern."
+    },
+    {
+      "id": "technique",
+      "label": "Technique",
+      "placeholder": "Scintigraphic imaging of the whole body. State radiopharmaceutical, administered activity, and acquisition timing."
+    },
+    {
+      "id": "comparison",
+      "label": "Comparison",
+      "placeholder": "Date and type of relevant prior imaging, if available."
+    },
+    {
+      "id": "findings",
+      "label": "Findings",
+      "placeholder": "Tracer distribution (symmetry): \nFocal abnormal uptake (site, intensity, pattern — benign vs metastatic): \nDegenerative vs aggressive pattern: \nSuperscan / flare considerations: \nSPECT/CT correlation (if performed): "
+    },
+    {
+      "id": "impression",
+      "label": "Impression",
+      "placeholder": "Concise, prioritised bulleted impression with any required scoring category and approved follow-up."
+    }
+  ]
+}

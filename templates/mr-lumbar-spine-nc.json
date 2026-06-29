@@ -1,0 +1,43 @@
+{
+  "id": "mr-lumbar-spine-nc",
+  "templateId": "mr-lumbar-spine-nc",
+  "name": "MRI Lumbar Spine",
+  "modality": "MR",
+  "bodyPart": "Lumbar Spine",
+  "contrast": "None",
+  "status": "approved",
+  "subspecialty": "MSK/Spine",
+  "rulebookId": "mr_lumbar_spine_rp_v1",
+  "sections": [
+    {
+      "id": "indication",
+      "label": "Indication",
+      "placeholder": "Clinical question / referring concern."
+    },
+    {
+      "id": "technique",
+      "label": "Technique",
+      "placeholder": "Multiplanar, multisequence MRI of the lumbar spine without intravenous gadolinium. State field strength, sequences, and any diffusion/dynamic series."
+    },
+    {
+      "id": "comparison",
+      "label": "Comparison",
+      "placeholder": "Date and type of relevant prior imaging, if available."
+    },
+    {
+      "id": "findings",
+      "label": "Findings",
+      "placeholder": "Alignment / lordosis: \nVertebral body heights and marrow: \nDiscs L1–S1 (level-by-level: disc height/desiccation, herniation, canal and foraminal stenosis, nerve-root contact): \nConus medullaris (level and signal): \nFacet joints / ligamentum flavum: \nParaspinal soft tissues: \nSacrum / SI joints: "
+    },
+    {
+      "id": "impression",
+      "label": "Impression",
+      "placeholder": "Concise, prioritised bulleted impression with any required scoring category and approved follow-up."
+    },
+    {
+      "id": "recommendations",
+      "label": "Recommendations",
+      "placeholder": "Evidence-based follow-up or correlation, drawn from approved phrasing, only if indicated."
+    }
+  ]
+}

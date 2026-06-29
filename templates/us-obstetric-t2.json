@@ -1,0 +1,38 @@
+{
+  "id": "us-obstetric-t2",
+  "templateId": "us-obstetric-t2",
+  "name": "Ultrasound Obstetric (second/third trimester)",
+  "modality": "US",
+  "bodyPart": "Obstetric",
+  "contrast": "",
+  "status": "approved",
+  "subspecialty": "OB/GYN",
+  "rulebookId": "us_obstetric_rp_v1",
+  "sections": [
+    {
+      "id": "indication",
+      "label": "Indication",
+      "placeholder": "Clinical question / referring concern."
+    },
+    {
+      "id": "technique",
+      "label": "Technique",
+      "placeholder": "Real-time greyscale and colour/spectral Doppler ultrasound of the obstetric. State transducer and approach (e.g. transabdominal/endocavitary)."
+    },
+    {
+      "id": "comparison",
+      "label": "Comparison",
+      "placeholder": "Date and type of relevant prior imaging, if available."
+    },
+    {
+      "id": "findings",
+      "label": "Findings",
+      "placeholder": "Number of gestations / chorionicity: \nFetal cardiac activity and heart rate: \nBiometry (BPD, HC, AC, FL) and EFW with centile: \nPlacenta (position, relationship to os): \nAmniotic fluid (DVP/AFI): \nFetal anatomy survey: \nCervix and adnexa: "
+    },
+    {
+      "id": "impression",
+      "label": "Impression",
+      "placeholder": "Concise, prioritised bulleted impression with any required scoring category and approved follow-up."
+    }
+  ]
+}

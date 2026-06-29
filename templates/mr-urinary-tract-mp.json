@@ -1,0 +1,43 @@
+{
+  "id": "mr-urinary-tract-mp",
+  "templateId": "mr-urinary-tract-mp",
+  "name": "MR Urography",
+  "modality": "MR",
+  "bodyPart": "Urinary Tract",
+  "contrast": "WithAndWithout",
+  "status": "approved",
+  "subspecialty": "Body",
+  "rulebookId": "mr_urinary_tract_rp_v1",
+  "sections": [
+    {
+      "id": "indication",
+      "label": "Indication",
+      "placeholder": "Clinical question / referring concern."
+    },
+    {
+      "id": "technique",
+      "label": "Technique",
+      "placeholder": "Multiplanar, multisequence MRI of the urinary tract before and after intravenous gadolinium-based contrast. State field strength, sequences, and any diffusion/dynamic series."
+    },
+    {
+      "id": "comparison",
+      "label": "Comparison",
+      "placeholder": "Date and type of relevant prior imaging, if available."
+    },
+    {
+      "id": "findings",
+      "label": "Findings",
+      "placeholder": "Right kidney (size, cortical thickness, lesion): \nLeft kidney: \nCystic lesions with Bosniak class: \nSolid masses (size, enhancement): \nCollecting systems / hydronephrosis: \nCalculi (size, location, HU): \nUreters and bladder: \nPerinephric fat / vasculature: "
+    },
+    {
+      "id": "impression",
+      "label": "Impression",
+      "placeholder": "Concise, prioritised bulleted impression with any required scoring category and approved follow-up."
+    },
+    {
+      "id": "recommendations",
+      "label": "Recommendations",
+      "placeholder": "Evidence-based follow-up or correlation, drawn from approved phrasing, only if indicated."
+    }
+  ]
+}

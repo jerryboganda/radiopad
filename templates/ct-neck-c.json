@@ -1,0 +1,43 @@
+{
+  "id": "ct-neck-c",
+  "templateId": "ct-neck-c",
+  "name": "CT Neck (post-contrast)",
+  "modality": "CT",
+  "bodyPart": "Neck",
+  "contrast": "With",
+  "status": "approved",
+  "subspecialty": "Head & Neck",
+  "rulebookId": "ct_neck_rp_v1",
+  "sections": [
+    {
+      "id": "indication",
+      "label": "Indication",
+      "placeholder": "Clinical question / referring concern."
+    },
+    {
+      "id": "technique",
+      "label": "Technique",
+      "placeholder": "Multidetector CT of the neck acquired after intravenous iodinated contrast. Multiplanar reformats reviewed. State kVp/contrast volume/phase and DLP as per local dose policy."
+    },
+    {
+      "id": "comparison",
+      "label": "Comparison",
+      "placeholder": "Date and type of relevant prior imaging, if available."
+    },
+    {
+      "id": "findings",
+      "label": "Findings",
+      "placeholder": "Pharynx / larynx / supraglottis: \nThyroid and parathyroid beds: \nSalivary glands (parotid, submandibular): \nCervical lymph node levels (I–VII) with size: \nGreat vessels (carotid/jugular): \nAerodigestive tract: \nVisualised lung apices and skull base: "
+    },
+    {
+      "id": "impression",
+      "label": "Impression",
+      "placeholder": "Concise, prioritised bulleted impression with any required scoring category and approved follow-up."
+    },
+    {
+      "id": "recommendations",
+      "label": "Recommendations",
+      "placeholder": "Evidence-based follow-up or correlation, drawn from approved phrasing, only if indicated."
+    }
+  ]
+}

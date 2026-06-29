@@ -1,0 +1,38 @@
+{
+  "id": "ct-peripheral-runoff-c",
+  "templateId": "ct-peripheral-runoff-c",
+  "name": "CT Angiography — Peripheral Runoff",
+  "modality": "CT",
+  "bodyPart": "Peripheral Runoff",
+  "contrast": "With",
+  "status": "approved",
+  "subspecialty": "Vascular",
+  "rulebookId": "ct_peripheral_runoff_rp_v1",
+  "sections": [
+    {
+      "id": "indication",
+      "label": "Indication",
+      "placeholder": "Clinical question / referring concern."
+    },
+    {
+      "id": "technique",
+      "label": "Technique",
+      "placeholder": "Multidetector CT of the peripheral runoff acquired after intravenous iodinated contrast. Multiplanar reformats reviewed. State kVp/contrast volume/phase and DLP as per local dose policy."
+    },
+    {
+      "id": "comparison",
+      "label": "Comparison",
+      "placeholder": "Date and type of relevant prior imaging, if available."
+    },
+    {
+      "id": "findings",
+      "label": "Findings",
+      "placeholder": "Vessel patency and flow direction: \nPeak systolic / end-diastolic velocities: \nStenosis (% by velocity criteria): \nThrombus (acute vs chronic, compressibility for veins): \nPlaque morphology: \nWaveform analysis: "
+    },
+    {
+      "id": "impression",
+      "label": "Impression",
+      "placeholder": "Concise, prioritised bulleted impression with any required scoring category and approved follow-up."
+    }
+  ]
+}

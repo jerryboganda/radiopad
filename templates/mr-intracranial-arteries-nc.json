@@ -1,0 +1,38 @@
+{
+  "id": "mr-intracranial-arteries-nc",
+  "templateId": "mr-intracranial-arteries-nc",
+  "name": "MR Angiography — Intracranial (TOF)",
+  "modality": "MR",
+  "bodyPart": "Intracranial Arteries",
+  "contrast": "None",
+  "status": "approved",
+  "subspecialty": "Neuro",
+  "rulebookId": "mr_intracranial_arteries_rp_v1",
+  "sections": [
+    {
+      "id": "indication",
+      "label": "Indication",
+      "placeholder": "Clinical question / referring concern."
+    },
+    {
+      "id": "technique",
+      "label": "Technique",
+      "placeholder": "Multiplanar, multisequence MRI of the intracranial arteries without intravenous gadolinium. State field strength, sequences, and any diffusion/dynamic series."
+    },
+    {
+      "id": "comparison",
+      "label": "Comparison",
+      "placeholder": "Date and type of relevant prior imaging, if available."
+    },
+    {
+      "id": "findings",
+      "label": "Findings",
+      "placeholder": "Acute infarct (DWI/ADC) — territory and volume: \nASPECTS: \nHaemorrhage (GRE/SWI): \nLarge-vessel occlusion / hyperdense vessel: \nChronic ischaemic change / prior infarct: \nMidline shift / mass effect: \nGrey–white differentiation: "
+    },
+    {
+      "id": "impression",
+      "label": "Impression",
+      "placeholder": "Concise, prioritised bulleted impression with any required scoring category and approved follow-up."
+    }
+  ]
+}

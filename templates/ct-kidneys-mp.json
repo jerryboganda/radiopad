@@ -1,0 +1,43 @@
+{
+  "id": "ct-kidneys-mp",
+  "templateId": "ct-kidneys-mp",
+  "name": "CT Kidneys (renal mass protocol)",
+  "modality": "CT",
+  "bodyPart": "Kidneys",
+  "contrast": "WithAndWithout",
+  "status": "approved",
+  "subspecialty": "Body",
+  "rulebookId": "ct_kidneys_rp_v1",
+  "sections": [
+    {
+      "id": "indication",
+      "label": "Indication",
+      "placeholder": "Clinical question / referring concern."
+    },
+    {
+      "id": "technique",
+      "label": "Technique",
+      "placeholder": "Multidetector CT of the kidneys acquired before and after intravenous iodinated contrast. Multiplanar reformats reviewed. State kVp/contrast volume/phase and DLP as per local dose policy."
+    },
+    {
+      "id": "comparison",
+      "label": "Comparison",
+      "placeholder": "Date and type of relevant prior imaging, if available."
+    },
+    {
+      "id": "findings",
+      "label": "Findings",
+      "placeholder": "Right kidney: pole-to-pole size, cortical thickness, any lesion. Left kidney: same.\nCystic lesion(s) — for EACH: size (mm), pre/post-contrast attenuation (enhancement = >=20 HU increase), wall thickness, number/thickness of septa, calcification, and any nodule, then assign Bosniak v2019 class:\n- I = thin (<=2 mm) smooth wall, no septa/calcification/enhancement (~0% malignant).\n- II = a few (1-3) thin (<=2 mm) septa or thin calcification; small hyperdense non-enhancing cyst (~0%).\n- IIF = smooth minimally thickened (3 mm) enhancing wall/septa, or >=4 thin (<=2 mm) enhancing smooth septa (~5%).\n- III = thick (>=4 mm) or irregular enhancing wall/septa (~50%).\n- IV = enhancing nodule (>=4 mm convex obtuse-margin protrusion, or any-size acute-margin protrusion) (~90%).\nSolid mass(es): size (mm), enhancement (HU), macroscopic fat (suggests AML), necrosis, and staging features (renal vein/IVC tumour thrombus, perinephric/sinus fat, nodes).\nCollecting systems / hydronephrosis.\nCalculi: size (mm), location, attenuation (HU); obstruction.\nUreters and bladder.\nPerinephric fat, adrenals, and vasculature."
+    },
+    {
+      "id": "impression",
+      "label": "Impression",
+      "placeholder": "Concise prioritised bullets. For each cystic lesion give the Bosniak v2019 class, laterality, and size (mm). Management implication: Bosniak I-II = benign, no follow-up; IIF = imaging surveillance (e.g. 6 and 12 months then annually to 5 years); III-IV = urology referral for surgery/ablation vs active surveillance. For a solid enhancing mass, state size and enhancement (HU) and recommend urology referral; note any renal vein/IVC tumour thrombus. Report obstructing or significant calculi (size, location, HU). Use only approved follow-up phrasing."
+    },
+    {
+      "id": "recommendations",
+      "label": "Recommendations",
+      "placeholder": "Evidence-based follow-up or correlation, drawn from approved phrasing, only if indicated."
+    }
+  ]
+}

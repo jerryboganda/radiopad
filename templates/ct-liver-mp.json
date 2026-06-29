@@ -1,0 +1,43 @@
+{
+  "id": "ct-liver-mp",
+  "templateId": "ct-liver-mp",
+  "name": "CT Liver (multiphase / triphasic)",
+  "modality": "CT",
+  "bodyPart": "Liver",
+  "contrast": "WithAndWithout",
+  "status": "approved",
+  "subspecialty": "Body",
+  "rulebookId": "liver_lirads_v1",
+  "sections": [
+    {
+      "id": "indication",
+      "label": "Indication",
+      "placeholder": "Clinical question / referring concern."
+    },
+    {
+      "id": "technique",
+      "label": "Technique",
+      "placeholder": "Multidetector CT of the liver acquired before and after intravenous iodinated contrast. Multiplanar reformats reviewed. State kVp/contrast volume/phase and DLP as per local dose policy."
+    },
+    {
+      "id": "comparison",
+      "label": "Comparison",
+      "placeholder": "Date and type of relevant prior imaging, if available."
+    },
+    {
+      "id": "findings",
+      "label": "Findings",
+      "placeholder": "Liver: size, contour, parenchymal attenuation (steatosis/iron), cirrhosis/portal hypertension signs.\nFocal observation(s) — for EACH: number, Couinaud segment, maximum diameter (mm).\nLI-RADS v2018 major features per observation: nonrim arterial-phase hyperenhancement (APHE) present/absent; nonperipheral \"washout\" on portal-venous/delayed phase; enhancing \"capsule\"; threshold growth (>=50% in <=6 mo / new >=10 mm / >=100% in >6 mo).\nAncillary features (favouring malignancy or benignity) and LR-M targetoid features (rim APHE, peripheral washout, delayed central enhancement) if present.\nAssigned LI-RADS category per observation (LR-1/2/3/4/5/M/TIV/NC).\nVascular: portal and hepatic veins — patency vs bland vs tumour-in-vein (LR-TIV).\nBiliary tree; gallbladder; spleen; pancreas; adrenals.\nAscites / varices / lymphadenopathy; treated observations (LR-TR viable/equivocal/nonviable) if prior locoregional therapy."
+    },
+    {
+      "id": "impression",
+      "label": "Impression",
+      "placeholder": "Concise prioritised bullets. Lead with the highest-category observation (LR-TIV > LR-5 > LR-M > LR-4 > LR-3), each stated with its LI-RADS v2018 category, Couinaud segment, and maximum diameter (mm). Management implication: LR-5 = definite HCC, refer to MDT/tumour board; LR-M = probable non-HCC malignancy, recommend biopsy/MDT; LR-4 = probably HCC, multidisciplinary review or short-interval follow-up; LR-3 = continue surveillance per approved interval; LR-1/2 = benign. Note any tumour-in-vein. Use only approved follow-up phrasing."
+    },
+    {
+      "id": "recommendations",
+      "label": "Recommendations",
+      "placeholder": "Evidence-based follow-up or correlation, drawn from approved phrasing, only if indicated."
+    }
+  ]
+}

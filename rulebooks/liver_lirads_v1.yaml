@@ -33,51 +33,47 @@ required_sections:
   - Impression
 terminology_refs:
   - system: li_rads
-    description: For at-risk patients, a LI-RADS category (LR-1, LR-2, LR-3, LR-4, LR-5, LR-M, LR-TIV, LR-NC) is required in the Impression.
+    description: Applies the ACR CT/MRI LI-RADS v2018 algorithm, valid only in patients at risk for HCC (cirrhosis, chronic hepatitis B, or current/prior HCC; exclude patients <18y, with cirrhosis from congenital hepatic fibrosis or vascular disorders, or with no HCC risk). Every focal observation receives a category — LR-1 (definitely benign), LR-2 (probably benign), LR-3 (intermediate probability of HCC), LR-4 (probably HCC), LR-5 (definitely HCC), LR-M (probably/definitely malignant, not HCC-specific), LR-TIV (definite tumour in vein), or LR-NC (cannot be categorised due to image degradation or omission) — and this category is required in the Impression.
 rules:
   - id: laterality_consistency
     severity: blocker
-    description: Lobe / segment laterality references must agree between Findings and Impression.
+    description: Lobe and Couinaud-segment localisation of every observation must be stated identically in Findings and Impression; a right-lobe/left-lobe or segment mismatch between sections is a blocker because it can misdirect ablation, resection, or transplant planning.
   - id: measurement_consistency
     severity: warning
-    description: Observation size (mm) and segment must match between Findings and Impression.
+    description: The longest outer-edge diameter of each observation in millimetres, and its assigned Couinaud segment, must agree between Findings and Impression — LI-RADS thresholds hinge on the 10 mm and 20 mm size breakpoints, so a transcription drift can change the category.
   - id: negation_conflict
     severity: blocker
-    description: A finding denied in Findings must not be asserted in Impression.
+    description: An observation, vascular invasion, or ancillary feature explicitly denied in Findings must not be asserted in the Impression, and vice versa; LI-RADS categorisation depends on the presence/absence of specific features, so contradiction is a blocker.
   - id: impression_bullet_count
     severity: warning
-    description: Impression should not exceed style.impression_max_bullets bullets.
+    description: The Impression should not exceed style.impression_max_bullets bullets; lead with the highest-category observation (LR-TIV > LR-5 > LR-M > LR-4 > LR-3) and consolidate stable benign observations.
   - id: critical_result_language
     severity: blocker
-    description: LR-5, LR-M, and LR-TIV findings require approved communication / escalation language.
+    description: LR-5 (definite HCC), LR-M (probable/definite non-HCC malignancy warranting biopsy consideration), and LR-TIV (tumour in vein) carry management-altering implications and require documented communication to the referring/MDT team with read-back, recorded date/time, and recipient.
   - id: lirads_category_required
     severity: warning
-    description: Studies for HCC surveillance or suspected HCC must state a LI-RADS category in the Impression.
+    description: Studies performed for HCC surveillance or for characterisation of a suspected HCC must state an explicit LI-RADS v2018 category in the Impression for each reported observation; a narrative description without a category is non-conformant.
   - id: lirads_observation_size_required
     severity: warning
-    description: Each described focal observation should include a maximum diameter in millimetres.
+    description: Each described focal observation must include a maximum diameter in millimetres measured on the sequence/phase where the margin is sharpest, because size (<10 mm, 10-19 mm, >=20 mm) is a primary axis of the diagnostic table together with the major features.
   - id: unauthorized_followup
     severity: warning
-    description: Recommendation phrases must come from style.approved_followups.
+    description: Follow-up and management phrasing must be drawn verbatim from style.approved_followups (e.g. LR-3 surveillance interval, LR-4 multidisciplinary review); free-text recommendations outside the approved list are flagged.
 
 prompt_blocks:
-  system: >
-    You are assisting a board-certified abdominal radiologist drafting a
-    structured liver LI-RADS report. Never invent findings. Preserve segment,
-    observation size, and LI-RADS category exactly as dictated. Use concise
-    clinical phrasing.
-  findings_to_impression: >
-    Generate a concise impression (max 5 bullets) faithful to the Findings
-    section. Always carry forward the LI-RADS category, observation size, and
-    segment localisation.
-  cleanup: >
-    Improve grammar and structure without changing clinical meaning, segment,
-    observation size, or LI-RADS code.
-  dictation_cleanup: >
-    Rewrite this dictation into clean grammatical prose for each report
-    section. Do not invent findings the radiologist did not dictate. Preserve
-    every measurement, laterality, and negation exactly. If a section was not
-    dictated, return an empty string for it.
+  system: |-
+    You are assisting a board-certified abdominal/hepatobiliary radiologist drafting a structured liver report. Write with the precision and economy of a senior subspecialty consultant. Never invent findings; report only what the images and dictation support. Preserve every Couinaud segment, observation diameter (mm), vascular finding, and assigned category exactly as dictated. Output only the requested section and never sign the report. Avoid the terms in style.avoid_terms.
+    Apply ACR CT/MRI LI-RADS v2018 (HCC-risk patients only — cirrhosis, chronic HBV, or current/prior HCC):
+    - Major features used to categorise: nonrim arterial-phase hyperenhancement (APHE); nonperipheral "washout" appearance (on portal-venous or delayed phase; for hepatobiliary agents washout is judged on the portal-venous phase only, NOT the transitional/hepatobiliary phase); enhancing "capsule"; and threshold growth (>=50% increase in <=6 months, new >=10 mm, or >=100% increase in >6 months).
+    - Diagnostic table: an observation with nonrim APHE plus one additional major feature is LR-5 if >=10 mm (or LR-4 if <10 mm); LR-4/LR-5 also reachable by size + feature combinations on the v2018 table. Use the table — do not guess.
+    - LR-M for targetoid morphology (rim APHE, peripheral washout, delayed central enhancement, targetoid diffusion restriction) or other features favouring non-HCC malignancy (e.g. iCCA, combined HCC-CCA) — recommend tissue diagnosis.
+    - LR-TIV when unequivocal enhancing soft tissue is present within a vein. LR-NC when image degradation/omission prevents categorisation. Ancillary features may adjust LR-3<->LR-4 by no more than one category and may not upgrade to LR-5.
+  findings_to_impression: |-
+    Generate a concise impression (max 5 bullets) faithful to the Findings. Carry forward, for each observation, the assigned LI-RADS v2018 category, the maximum diameter in millimetres, and the Couinaud segment, exactly as dictated. Lead with the highest-category observation (LR-TIV > LR-5 > LR-M > LR-4 > LR-3) and state the management implication: LR-5 → consistent with HCC, refer to multidisciplinary tumour board; LR-M → recommend biopsy/MDT; LR-4 → multidisciplinary review or short-interval follow-up; LR-3 → continue surveillance per approved interval. Use only style.approved_followups for recommendations.
+  cleanup: |-
+    Improve grammar, flow, and structure without changing clinical meaning. Preserve every Couinaud segment, observation diameter (mm), major/ancillary feature, vascular finding, and LI-RADS category exactly. Do not introduce or remove any observation, and do not alter an assigned category.
+  dictation_cleanup: |-
+    Rewrite this dictation into clean grammatical prose for each report section. Do not invent findings the radiologist did not dictate. Preserve every measurement, laterality, Couinaud segment, and negation exactly. If a section was not dictated, return an empty string for it.
 
 output_schema:
   type: object

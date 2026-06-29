@@ -95,10 +95,37 @@ public class DevSeedTemplateTests
         // The whole "sections" array is preserved verbatim as the SectionsJson blob.
         Assert.Contains("Indication", t.SectionsJson);
         Assert.Contains("Impression", t.SectionsJson);
-        // No status/variant in the JSON → entity defaults; both the Templates page
-        // and the editor scaffolding dropdown list every template regardless.
-        Assert.Equal(TemplateStatus.Draft, t.Status);
+        // Curated library content is production-ready: an unspecified status seeds as
+        // Approved so ResolveBindings (Approved-only) can bind it out-of-the-box.
+        Assert.Equal(TemplateStatus.Approved, t.Status);
         Assert.Equal(TemplateVariant.Normal, t.Variant);
+        // No "contrast" in the JSON → contrast-agnostic (empty), matches any selection.
+        Assert.Equal("", t.Contrast);
+    }
+
+    [Fact]
+    public async Task Honors_explicit_status_and_contrast_fields()
+    {
+        var dir = NewTemplatesDir();
+        await File.WriteAllTextAsync(Path.Combine(dir, "ct-abdo-pelvis-with.json"), """
+            {
+              "templateId": "ct-abdomen-pelvis-with",
+              "name": "CT Abdomen & Pelvis (with contrast)",
+              "modality": "CT",
+              "bodyPart": "Abdomen & Pelvis",
+              "contrast": "With",
+              "status": "draft",
+              "sections": [ { "id": "findings", "label": "Findings", "placeholder": "..." } ]
+            }
+            """);
+        using var db = await NewDbAsync();
+
+        await SeedAsync(db, dir);
+
+        var t = await db.Templates.SingleAsync(x => x.TemplateId == "ct-abdomen-pelvis-with");
+        Assert.Equal("With", t.Contrast);
+        // Explicit status is honored (overrides the Approved default).
+        Assert.Equal(TemplateStatus.Draft, t.Status);
     }
 
     [Fact]

@@ -1,0 +1,38 @@
+{
+  "id": "xr-bony-pelvis",
+  "templateId": "xr-bony-pelvis",
+  "name": "Pelvis X-ray",
+  "modality": "XR",
+  "bodyPart": "Bony Pelvis",
+  "contrast": "",
+  "status": "approved",
+  "subspecialty": "MSK",
+  "rulebookId": "xr_bony_pelvis_rp_v1",
+  "sections": [
+    {
+      "id": "indication",
+      "label": "Indication",
+      "placeholder": "Clinical question / referring concern."
+    },
+    {
+      "id": "technique",
+      "label": "Technique",
+      "placeholder": "Radiograph(s) of the bony pelvis. State projections obtained."
+    },
+    {
+      "id": "comparison",
+      "label": "Comparison",
+      "placeholder": "Date and type of relevant prior imaging, if available."
+    },
+    {
+      "id": "findings",
+      "label": "Findings",
+      "placeholder": "Bones (alignment, cortex, fracture — site/pattern/displacement/angulation, acuity): \nJoints (alignment, effusion, arthropathy): \nSoft tissues (swelling, foreign body, gas): \nHardware (if present): "
+    },
+    {
+      "id": "impression",
+      "label": "Impression",
+      "placeholder": "Concise, prioritised bulleted impression with any required scoring category and approved follow-up."
+    }
+  ]
+}

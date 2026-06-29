@@ -41,7 +41,7 @@ rules:
     description: A finding denied in Findings must not be asserted in Impression.
   - id: critical_result_language
     severity: blocker
-    description: Acute haemorrhage, herniation, or midline shift findings require documented communication / escalation language.
+    description: Acute intracranial haemorrhage (extra-axial — epidural/subdural/subarachnoid — or intraparenchymal/intraventricular), herniation, or midline shift findings require documented communication / escalation language.
   - id: impression_bullet_count
     severity: warning
     description: Impression should not exceed style.impression_max_bullets bullets.
@@ -50,7 +50,7 @@ rules:
     description: Alias of critical_result_language for trauma terminology — kept for documentation.
   - id: midline_shift_measured
     severity: info
-    description: Any midline shift should be measured in millimetres.
+    description: Any midline shift should be measured in millimetres at the septum pellucidum / foramen of Monro, alongside hematoma thickness and effacement of the basal cisterns.
   - id: gcs_documented
     severity: info
     description: When supplied by the ordering clinician, the Glasgow Coma Scale should appear in the Indication.
@@ -59,20 +59,11 @@ rules:
     description: Recommendation phrases must come from style.approved_followups.
 
 prompt_blocks:
-  system: >
-    You are assisting a board-certified neuroradiologist drafting a structured
-    non-contrast head CT report for a trauma patient. Preserve laterality,
-    hematoma thickness, midline shift in millimetres, and approved
-    communication language exactly as dictated.
-  findings_to_impression: >
-    Generate a concise impression (max 5 bullets) faithful to the Findings.
-    Always include critical-result communication language for any
-    intracranial haemorrhage, herniation, or midline shift.
-  cleanup: >
-    Improve grammar and structure without changing laterality, measurements,
-    or critical-result phrasing.
-
-  dictation_cleanup: >
-    Rewrite this dictation into clean grammatical prose for each report section.
-    Do not invent findings the radiologist did not dictate. Preserve every measurement,
-    laterality, and negation exactly. If a section was not dictated, return an empty string for it.
+  system: |-
+    You are assisting a board-certified neuroradiologist drafting a structured non-contrast head CT report with the discipline of a senior emergency consultant. Never invent findings; report only what the images and dictation support. Preserve laterality, hematoma thickness, midline shift in millimetres, and approved communication language exactly as dictated. Systematically interrogate the blood-and-brain checklist: extra-axial haemorrhage (epidural — biconvex, respecting sutures; subdural — crescentic, crossing sutures; subarachnoid; intraventricular), intraparenchymal haematoma and contusions, mass effect with sulcal/cisternal effacement and herniation patterns (subfalcine, uncal, tonsillar), and fractures (calvarial, skull base, with pneumocephalus). For suspected acute ischaemia on non-contrast CT, look for early signs — loss of grey–white differentiation, insular ribbon or basal-ganglia obscuration, sulcal effacement and a hyperdense vessel sign (e.g. hyperdense MCA / dot sign) — and quantify the established core using ASPECTS (10-point MCA territory score). Output only the requested section; do not sign the report.
+  impression: |-
+    Generate a concise impression (max 5 bullets) faithful to the Findings, leading with the most time-critical finding. State the presence or absence of acute intracranial haemorrhage by compartment, give hematoma thickness and midline shift in millimetres, and describe any mass effect or herniation explicitly. For suspected ischaemic stroke, report early ischaemic change, any hyperdense vessel sign and the ASPECTS (0–10; ≤6 indicating a large established core), and state that haemorrhage is excluded before thrombolysis/thrombectomy is considered. Include critical-result communication language for any haemorrhage, herniation or midline shift, and draw recommendations only from style.approved_followups. Add no findings absent from the Findings.
+  cleanup: |-
+    Improve grammar and structure without changing laterality, measurements, ASPECTS, or critical-result phrasing.
+  dictation_cleanup: |-
+    Rewrite this dictation into clean grammatical prose for each report section. Do not invent findings the radiologist did not dictate. Preserve every measurement, laterality, and negation exactly. If a section was not dictated, return an empty string for it.

@@ -1,0 +1,38 @@
+{
+  "id": "mg-breast-diag",
+  "templateId": "mg-breast-diag",
+  "name": "Mammography (diagnostic)",
+  "modality": "MG",
+  "bodyPart": "Breast",
+  "contrast": "",
+  "status": "approved",
+  "subspecialty": "Breast",
+  "rulebookId": "mammography_v1",
+  "sections": [
+    {
+      "id": "indication",
+      "label": "Indication",
+      "placeholder": "Clinical question / referring concern."
+    },
+    {
+      "id": "technique",
+      "label": "Technique",
+      "placeholder": "Digital mammography with standard projections (and tomosynthesis where performed). State views and any spot/magnification work."
+    },
+    {
+      "id": "comparison",
+      "label": "Comparison",
+      "placeholder": "Date and type of relevant prior imaging, if available."
+    },
+    {
+      "id": "findings",
+      "label": "Findings",
+      "placeholder": "Breast composition — ACR BI-RADS 5th ed (a almost entirely fatty / b scattered fibroglandular / c heterogeneously dense / d extremely dense): \nRight breast — mass (shape, margin, density), calcifications (morphology + distribution: benign vs suspicious — amorphous / coarse heterogeneous / fine pleomorphic / fine-linear-branching), asymmetry (focal / global / developing), architectural distortion; with size (mm) and clock-face/quadrant + depth: \nLeft breast: \nComparison with prior: \nAxillae (lymph nodes): \nBI-RADS final assessment category per breast (0/1/2/3/4A/4B/4C/5/6): "
+    },
+    {
+      "id": "impression",
+      "label": "Impression",
+      "placeholder": "Concise, prioritised bullets. State the ACR BI-RADS 5th ed final assessment category on its own line (0 incomplete — additional imaging/priors; 1 negative; 2 benign; 3 probably benign ≤2%, 6-month follow-up; 4A/4B/4C suspicious — biopsy; 5 highly suggestive ≥95% — biopsy; 6 known malignancy), consistent with composition and the most suspicious lesion, with management drawn from approved follow-up."
+    }
+  ]
+}

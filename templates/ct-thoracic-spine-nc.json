@@ -1,0 +1,38 @@
+{
+  "id": "ct-thoracic-spine-nc",
+  "templateId": "ct-thoracic-spine-nc",
+  "name": "CT Thoracic Spine",
+  "modality": "CT",
+  "bodyPart": "Thoracic Spine",
+  "contrast": "None",
+  "status": "approved",
+  "subspecialty": "MSK/Spine",
+  "rulebookId": "ct_thoracic_spine_rp_v1",
+  "sections": [
+    {
+      "id": "indication",
+      "label": "Indication",
+      "placeholder": "Clinical question / referring concern."
+    },
+    {
+      "id": "technique",
+      "label": "Technique",
+      "placeholder": "Multidetector CT of the thoracic spine acquired without intravenous contrast. Multiplanar reformats reviewed. State kVp/contrast volume/phase and DLP as per local dose policy."
+    },
+    {
+      "id": "comparison",
+      "label": "Comparison",
+      "placeholder": "Date and type of relevant prior imaging, if available."
+    },
+    {
+      "id": "findings",
+      "label": "Findings",
+      "placeholder": "Alignment / kyphosis: \nVertebral body heights and marrow: \nDiscs (level-by-level): \nSpinal cord / conus signal: \nCanal and foramina: \nParaspinal soft tissues: \nCostovertebral joints: "
+    },
+    {
+      "id": "impression",
+      "label": "Impression",
+      "placeholder": "Concise, prioritised bulleted impression with any required scoring category and approved follow-up."
+    }
+  ]
+}

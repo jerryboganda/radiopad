@@ -1,0 +1,43 @@
+{
+  "id": "ct-abdomen-and-pelvis-mp",
+  "templateId": "ct-abdomen-and-pelvis-mp",
+  "name": "CT Abdomen & Pelvis (multiphase)",
+  "modality": "CT",
+  "bodyPart": "Abdomen & Pelvis",
+  "contrast": "WithAndWithout",
+  "status": "approved",
+  "subspecialty": "Body",
+  "rulebookId": "ct_abdomen_and_pelvis_rp_v1",
+  "sections": [
+    {
+      "id": "indication",
+      "label": "Indication",
+      "placeholder": "Clinical question / referring concern."
+    },
+    {
+      "id": "technique",
+      "label": "Technique",
+      "placeholder": "Multidetector CT of the abdomen & pelvis acquired before and after intravenous iodinated contrast. Multiplanar reformats reviewed. State kVp/contrast volume/phase and DLP as per local dose policy."
+    },
+    {
+      "id": "comparison",
+      "label": "Comparison",
+      "placeholder": "Date and type of relevant prior imaging, if available."
+    },
+    {
+      "id": "findings",
+      "label": "Findings",
+      "placeholder": "Liver (size, contour, focal lesion with multiphase enhancement pattern; in trauma: AAST 2018 grade, laceration depth, haematoma, active arterial- vs portal-phase extravasation vs contained vascular injury): \nGallbladder and biliary tree: \nPancreas (duct, peripancreatic fluid): \nSpleen (in trauma: AAST 2018 grade, laceration/haematoma, pseudoaneurysm or active extravasation across phases): \nAdrenals: \nKidneys and ureters (corticomedullary/nephrographic/excretory correlation; in trauma: AAST 2018 grade, collecting-system/pedicle injury, devascularisation): \nBowel and appendix: \nBladder: \nPelvic organs (uterus/adnexa or prostate/seminal vesicles): \nPeritoneum / free fluid (haemoperitoneum volume and location) / free air: \nVasculature and lymph nodes: \nSkeleton and body wall: "
+    },
+    {
+      "id": "impression",
+      "label": "Impression",
+      "placeholder": "Concise, prioritised bulleted impression. Lead with the highest-grade solid-organ injury (AAST 2018 grade for spleen/liver/kidney) and state explicitly whether active extravasation (arterial vs delayed) or a contained vascular injury (pseudoaneurysm/AV fistula) is present, then haemoperitoneum burden and other significant findings; escalate via the critical-result pathway for active bleeding or high-grade injury, and close with approved follow-up phrasing only."
+    },
+    {
+      "id": "recommendations",
+      "label": "Recommendations",
+      "placeholder": "Evidence-based follow-up or correlation, drawn from approved phrasing, only if indicated."
+    }
+  ]
+}

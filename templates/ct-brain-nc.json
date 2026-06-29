@@ -1,0 +1,43 @@
+{
+  "id": "ct-brain-nc",
+  "templateId": "ct-brain-nc",
+  "name": "CT Brain (non-contrast)",
+  "modality": "CT",
+  "bodyPart": "Brain",
+  "contrast": "None",
+  "status": "approved",
+  "subspecialty": "Neuro",
+  "rulebookId": "head_ct_trauma_v1",
+  "sections": [
+    {
+      "id": "indication",
+      "label": "Indication",
+      "placeholder": "Clinical question / referring concern."
+    },
+    {
+      "id": "technique",
+      "label": "Technique",
+      "placeholder": "Multidetector CT of the brain acquired without intravenous contrast. Multiplanar reformats reviewed. State kVp/contrast volume/phase and DLP as per local dose policy."
+    },
+    {
+      "id": "comparison",
+      "label": "Comparison",
+      "placeholder": "Date and type of relevant prior imaging, if available."
+    },
+    {
+      "id": "findings",
+      "label": "Findings",
+      "placeholder": "Cerebral hemispheres / grey–white differentiation (state early ischaemic change — insular ribbon, basal-ganglia or cortical obscuration — and ASPECTS 0–10 if MCA-territory ischaemia suspected): \nIntracranial haemorrhage by compartment — extra-axial: epidural (biconvex) / subdural (crescentic) / subarachnoid; intraparenchymal / intraventricular (state thickness in mm): \nHyperdense vessel sign (e.g. hyperdense MCA / dot sign): \nVentricles and CSF spaces: \nMidline shift (mm at septum/foramen of Monro): \nBasal cisterns (patent vs effaced): \nMass effect / herniation (subfalcine, uncal, tonsillar): \nPosterior fossa and brainstem: \nVascular territories (acute infarct): \nCalvarium and skull base (fracture, pneumocephalus): \nVisualised paranasal sinuses / mastoids / orbits: "
+    },
+    {
+      "id": "impression",
+      "label": "Impression",
+      "placeholder": "Concise, prioritised bullets, most time-critical first. State presence/absence of acute intracranial haemorrhage by compartment with hematoma thickness and midline shift (mm), and any mass effect / herniation. For suspected ischaemic stroke report early ischaemic change, any hyperdense vessel sign and the ASPECTS (0–10; ≤6 = large established core), and confirm haemorrhage is excluded before thrombolysis/thrombectomy. Critical-result communication language and approved follow-up where indicated."
+    },
+    {
+      "id": "recommendations",
+      "label": "Recommendations",
+      "placeholder": "Evidence-based follow-up or correlation, drawn from approved phrasing, only if indicated."
+    }
+  ]
+}

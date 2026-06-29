@@ -31,43 +31,41 @@ required_sections:
   - Impression
 terminology_refs:
   - system: pi_rads
-    description: PI-RADS v2.1 (1..5) categorical assessment is required in the Impression.
+    description: Applies PI-RADS v2.1. A categorical assessment (1 very low to 5 very high likelihood of clinically significant cancer) is required in the Impression. DWI/ADC is the dominant sequence in the peripheral zone and T2W in the transition zone; DCE upgrades a peripheral-zone DWI-3 lesion to category 4 only when positive.
 rules:
   - id: measurement_consistency
     severity: warning
-    description: Index lesion size (mm) must match across Findings and Impression.
+    description: The maximum index-lesion diameter in millimetres (measured on ADC, or on T2W for transition-zone lesions) must match across Findings and Impression; the 15 mm threshold escalates a category-4 lesion to category 5.
   - id: negation_conflict
     severity: blocker
-    description: A finding denied in Findings must not be asserted in Impression.
+    description: A lesion, extraprostatic extension, or seminal vesicle invasion denied in Findings must not be asserted in the Impression, and vice versa.
   - id: critical_result_language
     severity: blocker
-    description: Suspected extraprostatic extension or seminal vesicle invasion in PI-RADS 5 lesions requires documented communication.
+    description: Suspected extraprostatic extension or seminal vesicle invasion in PI-RADS 5 lesions alters staging and surgical planning and requires documented communication to the referrer/MDT with read-back.
   - id: impression_bullet_count
     severity: warning
-    description: Impression should not exceed style.impression_max_bullets bullets.
+    description: The Impression should not exceed style.impression_max_bullets bullets; lead with the index lesion.
   - id: pirads_category_mandatory
     severity: info
-    description: A PI-RADS category (1..5) must accompany every described focal lesion in the Impression.
+    description: An explicit PI-RADS v2.1 category (1-5) must accompany every described focal lesion in the Impression; narrative suspicion without a category is non-conformant.
   - id: index_lesion_localized
     severity: info
-    description: The index lesion should be localised to a sector, clock face, or anatomic zone (PZ / TZ / CZ).  - id: unauthorized_followup
+    description: The index lesion should be localised using the PI-RADS 39-sector map — zone (PZ / TZ / CZ / AFS), side, and level (base / mid / apex); a clock-face descriptor may supplement but not replace it.
+  - id: unauthorized_followup
     severity: warning
-    description: Recommendation phrases must come from style.approved_followups.
+    description: Follow-up/management phrasing (e.g. targeted biopsy for category 4-5, consider biopsy or re-imaging for equivocal category 3) must come verbatim from style.approved_followups.
 
 prompt_blocks:
-  system: >
-    You are assisting a board-certified genitourinary radiologist drafting a
-    structured prostate MRI report. Preserve PI-RADS category, sector / zone
-    localisation, and lesion dimensions in millimetres exactly as dictated.
-  findings_to_impression: >
-    Generate a concise impression (max 5 bullets) faithful to the Findings.
-    Always carry forward the PI-RADS category, lesion size, and sector
-    localisation.
-  cleanup: >
-    Improve grammar and structure without changing PI-RADS code, lesion size,
-    or sector designations.
-
-  dictation_cleanup: >
-    Rewrite this dictation into clean grammatical prose for each report section.
-    Do not invent findings the radiologist did not dictate. Preserve every measurement,
-    laterality, and negation exactly. If a section was not dictated, return an empty string for it.
+  system: |-
+    You are assisting a board-certified genitourinary radiologist drafting a structured multiparametric prostate MRI report. Write with the precision and economy of a senior subspecialty consultant. Never invent findings; report only what the images and dictation support. Preserve the PI-RADS assessment category, the 39-sector/zone localisation, and every lesion dimension in millimetres exactly as dictated. Output only the requested section and never sign the report. Avoid the terms in style.avoid_terms.
+    Apply PI-RADS v2.1 scoring discipline:
+    - Peripheral zone (PZ): DWI/ADC is dominant. DWI 1-2 → category 1-2; DWI 3 → category 3, upgraded to category 4 when DCE is positive; DWI 4 → category 4; DWI 5 → category 5.
+    - Transition zone (TZ): T2W is dominant. T2 1-2 → category 1-2; T2 3 → category 3, upgraded to category 4 when DWI is 5; T2 4 (lenticular/non-circumscribed homogeneous moderate hypointensity, <1.5 cm) → category 4; T2 5 (same but >=1.5 cm or with extraprostatic extension) → category 5.
+    - Size rule: a category-4 lesion becomes category 5 at greatest dimension >=15 mm or with definite extraprostatic extension/invasion.
+    - Report prostate volume and PSA density, the index lesion, and any extraprostatic extension, seminal vesicle invasion, or suspicious nodes.
+  findings_to_impression: |-
+    Generate a concise impression (max 5 bullets) faithful to the Findings. Carry forward, for each lesion, the PI-RADS v2.1 category, the maximum diameter in millimetres, and the sector/zone localisation, exactly as dictated. Identify and lead with the index lesion. State management implication: category 1-2 → routine; category 3 → equivocal, consider targeted biopsy or short-interval re-imaging per local pathway; category 4-5 → targeted (+/- systematic) biopsy recommended. Note any extraprostatic extension or seminal vesicle invasion. Use only style.approved_followups for recommendations.
+  cleanup: |-
+    Improve grammar, flow, and structure without changing clinical meaning. Preserve every PI-RADS category, lesion diameter (mm), sequence score, sector/zone designation, and staging statement exactly. Do not add or remove lesions and do not alter an assigned category.
+  dictation_cleanup: |-
+    Rewrite this dictation into clean grammatical prose for each report section. Do not invent findings the radiologist did not dictate. Preserve every measurement, laterality, sector localisation, and negation exactly. If a section was not dictated, return an empty string for it.

@@ -24,6 +24,7 @@ type Draft = {
   name: string;
   modality: string;
   bodyPart: string;
+  contrast: string;
   subspecialty: string;
   sections: Section[];
 };
@@ -42,6 +43,7 @@ const EMPTY: Draft = {
   name: '',
   modality: 'CT',
   bodyPart: '',
+  contrast: '',
   subspecialty: '',
   sections: [
     { id: 'indication', label: 'Indication' },
@@ -95,6 +97,7 @@ export default function TemplatesPage() {
       name: t.name,
       modality: t.modality,
       bodyPart: t.bodyPart,
+      contrast: t.contrast ?? '',
       subspecialty: t.subspecialty ?? '',
       sections,
     });
@@ -109,6 +112,7 @@ export default function TemplatesPage() {
         name: draft.name,
         modality: draft.modality,
         bodyPart: draft.bodyPart,
+        contrast: draft.contrast,
         subspecialty: draft.subspecialty,
         sectionsJson: JSON.stringify({ sections: draft.sections }, null, 2),
       });
@@ -289,6 +293,15 @@ export default function TemplatesPage() {
               <label className="rp-field" style={{ flex: 1 }}>
                 <span>Body part</span>
                 <input className="rp-input" value={draft.bodyPart} onChange={(e) => setDraft({ ...draft, bodyPart: e.target.value })} />
+              </label>
+              <label className="rp-field" style={{ flex: 1 }}>
+                <span>Contrast</span>
+                <select className="rp-input" value={draft.contrast} onChange={(e) => setDraft({ ...draft, contrast: e.target.value })}>
+                  <option value="">Any / agnostic</option>
+                  <option value="None">Without contrast</option>
+                  <option value="With">With contrast</option>
+                  <option value="WithAndWithout">With and without</option>
+                </select>
               </label>
               <label className="rp-field" style={{ flex: 1 }}>
                 <span>Subspecialty</span>

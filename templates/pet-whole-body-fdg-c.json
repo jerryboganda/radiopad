@@ -1,0 +1,43 @@
+{
+  "id": "pet-whole-body-fdg-c",
+  "templateId": "pet-whole-body-fdg-c",
+  "name": "FDG PET/CT (oncology, whole body)",
+  "modality": "PET",
+  "bodyPart": "Whole Body",
+  "contrast": "With",
+  "status": "approved",
+  "subspecialty": "Nuclear/Onc",
+  "rulebookId": "pet_whole_body_rp_v1",
+  "sections": [
+    {
+      "id": "indication",
+      "label": "Indication",
+      "placeholder": "Clinical question / referring concern."
+    },
+    {
+      "id": "technique",
+      "label": "Technique",
+      "placeholder": "Whole-body PET/CT. State radiotracer, uptake time, blood glucose, and the CT component (low-dose attenuation vs diagnostic, contrast use)."
+    },
+    {
+      "id": "comparison",
+      "label": "Comparison",
+      "placeholder": "Date and type of relevant prior imaging, if available."
+    },
+    {
+      "id": "findings",
+      "label": "Findings",
+      "placeholder": "Tracer-avid disease (site, SUVmax, size): \nNodal stations: \nDistant metastatic sites: \nPhysiologic vs pathologic uptake: \nComparison with prior (Deauville / PERCIST where applicable): \nCT-component findings: "
+    },
+    {
+      "id": "impression",
+      "label": "Impression",
+      "placeholder": "Concise, prioritised bulleted impression with any required scoring category and approved follow-up."
+    },
+    {
+      "id": "recommendations",
+      "label": "Recommendations",
+      "placeholder": "Evidence-based follow-up or correlation, drawn from approved phrasing, only if indicated."
+    }
+  ]
+}

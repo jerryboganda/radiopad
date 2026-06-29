@@ -1,0 +1,38 @@
+{
+  "id": "mr-renal-arteries-c",
+  "templateId": "mr-renal-arteries-c",
+  "name": "MR Angiography — Renal",
+  "modality": "MR",
+  "bodyPart": "Renal Arteries",
+  "contrast": "With",
+  "status": "approved",
+  "subspecialty": "Vascular",
+  "rulebookId": "mr_renal_arteries_rp_v1",
+  "sections": [
+    {
+      "id": "indication",
+      "label": "Indication",
+      "placeholder": "Clinical question / referring concern."
+    },
+    {
+      "id": "technique",
+      "label": "Technique",
+      "placeholder": "Multiplanar, multisequence MRI of the renal arteries after intravenous gadolinium-based contrast. State field strength, sequences, and any diffusion/dynamic series."
+    },
+    {
+      "id": "comparison",
+      "label": "Comparison",
+      "placeholder": "Date and type of relevant prior imaging, if available."
+    },
+    {
+      "id": "findings",
+      "label": "Findings",
+      "placeholder": "Vessel patency and flow direction: \nPeak systolic / end-diastolic velocities: \nStenosis (% by velocity criteria): \nThrombus (acute vs chronic, compressibility for veins): \nPlaque morphology: \nWaveform analysis: "
+    },
+    {
+      "id": "impression",
+      "label": "Impression",
+      "placeholder": "Concise, prioritised bulleted impression with any required scoring category and approved follow-up."
+    }
+  ]
+}

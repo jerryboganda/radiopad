@@ -30,37 +30,37 @@ required_sections:
 rules:
   - id: laterality_consistency
     severity: blocker
-    description: Left/right findings must match impression.
+    description: Side-specific findings (right vs left lung, lobe, hilum, pleura) must be internally consistent and must agree between the Findings and the Impression; a lesion localised to one side in Findings must not migrate to the contralateral side in the Impression.
   - id: measurement_consistency
     severity: warning
-    description: Nodule measurements must match across sections.
+    description: Every nodule, mass and node dimension must be reported identically wherever it appears; the index lesion size and the Fleischner-relevant solid component must match exactly across Findings, Impression and any comparison sentence.
   - id: negation_conflict
     severity: blocker
-    description: Findings denials must not be asserted in impression.
+    description: A finding explicitly denied in the Findings (for example "no pulmonary embolism", "no pneumothorax", "no suspicious nodule") must not be asserted, implied or recommended for follow-up in the Impression, and vice versa.
   - id: modality_mismatch
     severity: warning
-    description: Avoid CT/MRI/US cross-talk in a CT report.
+    description: Describe only what this chest CT demonstrates; do not attribute findings to MRI, ultrasound, PET or radiography, and do not carry forward conclusions that depend on another modality without explicit correlation language.
   - id: impression_bullet_count
     severity: warning
-    description: Impression should not exceed style.impression_max_bullets bullets.
+    description: The Impression should remain a prioritised list not exceeding style.impression_max_bullets bullets, leading with the most clinically significant finding so the referrer can act on the top line.
   - id: critical_result_language
     severity: blocker
-    description: Critical findings require approved communication/escalation language.  - id: unauthorized_followup
+    description: Time-critical findings (large or tension pneumothorax, acute aortic syndrome, massive effusion, impending airway compromise, unexpected malignancy) require documented communication to the responsible clinician with read-back, naming the recipient and the time.
+  - id: unauthorized_followup
     severity: warning
-    description: Recommendation phrases must come from style.approved_followups.
+    description: Follow-up and correlation recommendations must be drawn verbatim from style.approved_followups; Fleischner-based surveillance intervals should be expressed through that approved phrasing rather than invented wording.
 
 prompt_blocks:
-  system: >
-    You are assisting a board-certified radiologist drafting a structured Chest CT report.
-    Never invent findings. Always preserve laterality and measurements exactly as dictated.
-    Use concise clinical phrasing. Avoid the terms in style.avoid_terms.
-  findings_to_impression: >
-    Generate a concise impression (max 5 bullets) faithful to the Findings section.
-    Do not introduce new clinical claims that are not present in the Findings.
-  cleanup: >
-    Improve grammar and structure without changing clinical meaning.
-
-  dictation_cleanup: >
-    Rewrite this dictation into clean grammatical prose for each report section.
-    Do not invent findings the radiologist did not dictate. Preserve every measurement,
-    laterality, and negation exactly. If a section was not dictated, return an empty string for it.
+  system: |-
+    You are assisting a board-certified consultant radiologist drafting a structured Chest CT report.
+    Write with the precision and economy of a senior thoracic consultant. Never invent findings; report only what is supported by the images and dictation. Preserve every measurement, laterality and negation exactly, and report nodules in three dimensions on the appropriate (lung) window with the attenuation type stated (solid, part-solid, or pure ground-glass). Adapt normal ranges and differential emphasis to the patient's age and sex. Output only the requested section; do not sign the report. Avoid the terms in style.avoid_terms.
+    Apply the relevant reporting framework(s):
+    - Fleischner Society 2017 (incidental pulmonary nodules): classify each nodule as solid or subsolid, give mean diameter (average of long and short axis to the nearest mm, ≥100 mm³ for volumetric), state risk category (low vs high), and translate the size/type into the recommended surveillance interval; the 6 mm (≈100 mm³) threshold separates "no routine follow-up" from active surveillance, and part-solid nodules are stratified by the solid-component size.
+  impression: |-
+    Generate a concise impression (max 5 bullets) faithful to the Findings. Lead with the most clinically significant finding, preserve the index lesion's three-dimensional size and attenuation, give actionable recommendations only from style.approved_followups, and include any required scoring category. Do not introduce clinical claims absent from the Findings.
+    Apply the relevant reporting framework(s):
+    - Fleischner Society 2017 (incidental pulmonary nodules): state the dominant nodule's size, solid/subsolid character and (for part-solid lesions) the solid-component size, then map this to the recommended follow-up category; sub-6 mm low-risk nodules need no routine follow-up, while growing, ≥8 mm solid, or persistent part-solid nodules warrant shorter-interval CT or further characterisation.
+  cleanup: |-
+    Rewrite the dictated text into clean grammatical clinical prose without changing meaning. Preserve all numbers, laterality, negations and units exactly. Return an empty string for any section that was not dictated.
+  dictation_cleanup: |-
+    Rewrite this dictation into clean grammatical prose for each report section. Do not invent findings the radiologist did not dictate. Preserve every measurement, laterality and negation exactly. If a section was not dictated, return an empty string for it.

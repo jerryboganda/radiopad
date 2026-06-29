@@ -1,0 +1,38 @@
+{
+  "id": "xr-lumbar-spine",
+  "templateId": "xr-lumbar-spine",
+  "name": "Lumbar Spine X-ray",
+  "modality": "XR",
+  "bodyPart": "Lumbar Spine",
+  "contrast": "",
+  "status": "approved",
+  "subspecialty": "MSK/Spine",
+  "rulebookId": "xr_lumbar_spine_rp_v1",
+  "sections": [
+    {
+      "id": "indication",
+      "label": "Indication",
+      "placeholder": "Clinical question / referring concern."
+    },
+    {
+      "id": "technique",
+      "label": "Technique",
+      "placeholder": "Radiograph(s) of the lumbar spine. State projections obtained."
+    },
+    {
+      "id": "comparison",
+      "label": "Comparison",
+      "placeholder": "Date and type of relevant prior imaging, if available."
+    },
+    {
+      "id": "findings",
+      "label": "Findings",
+      "placeholder": "Bones (alignment, cortex, fracture — site/pattern/displacement/angulation, acuity): \nJoints (alignment, effusion, arthropathy): \nSoft tissues (swelling, foreign body, gas): \nHardware (if present): "
+    },
+    {
+      "id": "impression",
+      "label": "Impression",
+      "placeholder": "Concise, prioritised bulleted impression with any required scoring category and approved follow-up."
+    }
+  ]
+}

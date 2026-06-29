@@ -1,0 +1,38 @@
+{
+  "id": "xr-chest",
+  "templateId": "xr-chest",
+  "name": "Chest X-ray",
+  "modality": "XR",
+  "bodyPart": "Chest",
+  "contrast": "",
+  "status": "approved",
+  "subspecialty": "Thoracic",
+  "rulebookId": "chest_xray_v1",
+  "sections": [
+    {
+      "id": "indication",
+      "label": "Indication",
+      "placeholder": "Clinical question / referring concern."
+    },
+    {
+      "id": "technique",
+      "label": "Technique",
+      "placeholder": "Radiograph(s) of the chest. State projections obtained."
+    },
+    {
+      "id": "comparison",
+      "label": "Comparison",
+      "placeholder": "Date and type of relevant prior imaging, if available."
+    },
+    {
+      "id": "findings",
+      "label": "Findings",
+      "placeholder": "Lungs (focal/diffuse opacity, nodule, volume): \nPleura (effusion, pneumothorax): \nHeart size and mediastinal contours: \nHila: \nBones and soft tissues: \nLines/tubes (position): \nUpper abdomen (free air): "
+    },
+    {
+      "id": "impression",
+      "label": "Impression",
+      "placeholder": "Concise, prioritised bulleted impression with any required scoring category and approved follow-up."
+    }
+  ]
+}

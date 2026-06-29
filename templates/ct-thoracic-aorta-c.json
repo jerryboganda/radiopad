@@ -1,0 +1,38 @@
+{
+  "id": "ct-thoracic-aorta-c",
+  "templateId": "ct-thoracic-aorta-c",
+  "name": "CT Angiography — Thoracic Aorta",
+  "modality": "CT",
+  "bodyPart": "Thoracic Aorta",
+  "contrast": "With",
+  "status": "approved",
+  "subspecialty": "Vascular",
+  "rulebookId": "ct_thoracic_aorta_rp_v1",
+  "sections": [
+    {
+      "id": "indication",
+      "label": "Indication",
+      "placeholder": "Clinical question / referring concern."
+    },
+    {
+      "id": "technique",
+      "label": "Technique",
+      "placeholder": "Multidetector CT of the thoracic aorta acquired after intravenous iodinated contrast. Multiplanar reformats reviewed. State kVp/contrast volume/phase and DLP as per local dose policy."
+    },
+    {
+      "id": "comparison",
+      "label": "Comparison",
+      "placeholder": "Date and type of relevant prior imaging, if available."
+    },
+    {
+      "id": "findings",
+      "label": "Findings",
+      "placeholder": "Aortic calibre (max diameter, level): \nMural thrombus / penetrating ulcer / dissection flap: \nBranch vessels (coeliac, SMA, renals, iliacs): \nAneurysm extent and relationship to renal arteries: \nPeri-aortic fat / rupture signs: "
+    },
+    {
+      "id": "impression",
+      "label": "Impression",
+      "placeholder": "Concise, prioritised bulleted impression with any required scoring category and approved follow-up."
+    }
+  ]
+}

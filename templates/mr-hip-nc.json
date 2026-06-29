@@ -1,0 +1,38 @@
+{
+  "id": "mr-hip-nc",
+  "templateId": "mr-hip-nc",
+  "name": "MRI Hip",
+  "modality": "MR",
+  "bodyPart": "Hip",
+  "contrast": "None",
+  "status": "approved",
+  "subspecialty": "MSK",
+  "rulebookId": "mr_hip_rp_v1",
+  "sections": [
+    {
+      "id": "indication",
+      "label": "Indication",
+      "placeholder": "Clinical question / referring concern."
+    },
+    {
+      "id": "technique",
+      "label": "Technique",
+      "placeholder": "Multiplanar, multisequence MRI of the hip without intravenous gadolinium. State field strength, sequences, and any diffusion/dynamic series."
+    },
+    {
+      "id": "comparison",
+      "label": "Comparison",
+      "placeholder": "Date and type of relevant prior imaging, if available."
+    },
+    {
+      "id": "findings",
+      "label": "Findings",
+      "placeholder": "Femoral head and acetabulum (cartilage, marrow): \nLabrum: \nFemoroacetabular morphology (CAM/pincer): \nMuscles and tendons (gluteal, iliopsoas, hamstrings): \nMarrow (AVN, fracture): \nJoint effusion / synovium: "
+    },
+    {
+      "id": "impression",
+      "label": "Impression",
+      "placeholder": "Concise, prioritised bulleted impression with any required scoring category and approved follow-up."
+    }
+  ]
+}

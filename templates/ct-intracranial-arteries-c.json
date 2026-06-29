@@ -1,0 +1,43 @@
+{
+  "id": "ct-intracranial-arteries-c",
+  "templateId": "ct-intracranial-arteries-c",
+  "name": "CT Angiography — Circle of Willis",
+  "modality": "CT",
+  "bodyPart": "Intracranial Arteries",
+  "contrast": "With",
+  "status": "approved",
+  "subspecialty": "Neuro",
+  "rulebookId": "ct_intracranial_arteries_rp_v1",
+  "sections": [
+    {
+      "id": "indication",
+      "label": "Indication",
+      "placeholder": "Clinical question / referring concern."
+    },
+    {
+      "id": "technique",
+      "label": "Technique",
+      "placeholder": "Multidetector CT of the intracranial arteries acquired after intravenous iodinated contrast. Multiplanar reformats reviewed. State kVp/contrast volume/phase and DLP as per local dose policy."
+    },
+    {
+      "id": "comparison",
+      "label": "Comparison",
+      "placeholder": "Date and type of relevant prior imaging, if available."
+    },
+    {
+      "id": "findings",
+      "label": "Findings",
+      "placeholder": "Acute infarct (DWI/ADC) — territory and volume: \nASPECTS: \nHaemorrhage (GRE/SWI): \nLarge-vessel occlusion / hyperdense vessel: \nChronic ischaemic change / prior infarct: \nMidline shift / mass effect: \nGrey–white differentiation: "
+    },
+    {
+      "id": "impression",
+      "label": "Impression",
+      "placeholder": "Concise, prioritised bulleted impression with any required scoring category and approved follow-up."
+    },
+    {
+      "id": "recommendations",
+      "label": "Recommendations",
+      "placeholder": "Evidence-based follow-up or correlation, drawn from approved phrasing, only if indicated."
+    }
+  ]
+}

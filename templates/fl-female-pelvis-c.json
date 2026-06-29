@@ -1,0 +1,33 @@
+{
+  "id": "fl-female-pelvis-c",
+  "templateId": "fl-female-pelvis-c",
+  "name": "Hysterosalpingogram (HSG)",
+  "modality": "FL",
+  "bodyPart": "Female Pelvis",
+  "contrast": "With",
+  "status": "approved",
+  "subspecialty": "GYN",
+  "rulebookId": "fl_female_pelvis_rp_v1",
+  "sections": [
+    {
+      "id": "indication",
+      "label": "Indication",
+      "placeholder": "Clinical question / referring concern."
+    },
+    {
+      "id": "technique",
+      "label": "Technique",
+      "placeholder": "Fluoroscopic examination of the female pelvis. State contrast medium, volume, screening time and DAP."
+    },
+    {
+      "id": "findings",
+      "label": "Findings",
+      "placeholder": "Contrast transit / opacification: \nMucosal pattern and distensibility: \nFilling defects / strictures / leaks: \nMotility: \nAnatomy-specific findings: "
+    },
+    {
+      "id": "impression",
+      "label": "Impression",
+      "placeholder": "Concise, prioritised bulleted impression with any required scoring category and approved follow-up."
+    }
+  ]
+}

@@ -1,0 +1,38 @@
+{
+  "id": "ct-wrist-nc",
+  "templateId": "ct-wrist-nc",
+  "name": "CT Wrist",
+  "modality": "CT",
+  "bodyPart": "Wrist",
+  "contrast": "None",
+  "status": "approved",
+  "subspecialty": "MSK",
+  "rulebookId": "ct_wrist_rp_v1",
+  "sections": [
+    {
+      "id": "indication",
+      "label": "Indication",
+      "placeholder": "Clinical question / referring concern."
+    },
+    {
+      "id": "technique",
+      "label": "Technique",
+      "placeholder": "Multidetector CT of the wrist acquired without intravenous contrast. Multiplanar reformats reviewed. State kVp/contrast volume/phase and DLP as per local dose policy."
+    },
+    {
+      "id": "comparison",
+      "label": "Comparison",
+      "placeholder": "Date and type of relevant prior imaging, if available."
+    },
+    {
+      "id": "findings",
+      "label": "Findings",
+      "placeholder": "Osseous structures (alignment, marrow, fracture): \nArticular cartilage: \nLigaments / tendons: \nFibrocartilage / labrum (where applicable): \nJoint effusion / synovium: \nMuscles and soft tissues: "
+    },
+    {
+      "id": "impression",
+      "label": "Impression",
+      "placeholder": "Concise, prioritised bulleted impression with any required scoring category and approved follow-up."
+    }
+  ]
+}

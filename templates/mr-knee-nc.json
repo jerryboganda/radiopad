@@ -1,0 +1,38 @@
+{
+  "id": "mr-knee-nc",
+  "templateId": "mr-knee-nc",
+  "name": "MRI Knee",
+  "modality": "MR",
+  "bodyPart": "Knee",
+  "contrast": "None",
+  "status": "approved",
+  "subspecialty": "MSK",
+  "rulebookId": "knee_mri_v1",
+  "sections": [
+    {
+      "id": "indication",
+      "label": "Indication",
+      "placeholder": "Clinical question / referring concern."
+    },
+    {
+      "id": "technique",
+      "label": "Technique",
+      "placeholder": "Multiplanar, multisequence MRI of the knee without intravenous gadolinium. State field strength, sequences, and any diffusion/dynamic series."
+    },
+    {
+      "id": "comparison",
+      "label": "Comparison",
+      "placeholder": "Date and type of relevant prior imaging, if available."
+    },
+    {
+      "id": "findings",
+      "label": "Findings",
+      "placeholder": "Menisci (medial, lateral — tear pattern and zone): \nACL / PCL: \nMCL / LCL and posterolateral corner: \nExtensor mechanism: \nArticular cartilage compartments: \nBone marrow (oedema, fracture): \nEffusion / Baker cyst / plicae: "
+    },
+    {
+      "id": "impression",
+      "label": "Impression",
+      "placeholder": "Concise, prioritised bulleted impression with any required scoring category and approved follow-up."
+    }
+  ]
+}

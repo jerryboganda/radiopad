@@ -1,0 +1,4130 @@
+{
+  "generatedExams": 146,
+  "exams": [
+    {
+      "examId": "ct-brain-nc",
+      "name": "CT Brain (non-contrast)",
+      "modality": "CT",
+      "bodyPart": "Brain",
+      "contrast": "None",
+      "sex": "",
+      "subspecialty": "Neuro",
+      "rulebookId": "head_ct_trauma_v1",
+      "rulebookSource": "existing",
+      "frameworks": [
+        "ASPECTS"
+      ],
+      "requiredSections": [
+        "Indication",
+        "Technique",
+        "Comparison",
+        "Findings",
+        "Impression",
+        "Recommendations"
+      ],
+      "validatorRules": []
+    },
+    {
+      "examId": "ct-brain-c",
+      "name": "CT Brain (post-contrast)",
+      "modality": "CT",
+      "bodyPart": "Brain",
+      "contrast": "With",
+      "sex": "",
+      "subspecialty": "Neuro",
+      "rulebookId": "head_ct_trauma_v1",
+      "rulebookSource": "existing",
+      "frameworks": [
+        "ASPECTS"
+      ],
+      "requiredSections": [
+        "Indication",
+        "Technique",
+        "Comparison",
+        "Findings",
+        "Impression",
+        "Recommendations"
+      ],
+      "validatorRules": []
+    },
+    {
+      "examId": "ct-brain-mp",
+      "name": "CT Brain (pre- and post-contrast)",
+      "modality": "CT",
+      "bodyPart": "Brain",
+      "contrast": "WithAndWithout",
+      "sex": "",
+      "subspecialty": "Neuro",
+      "rulebookId": "head_ct_trauma_v1",
+      "rulebookSource": "existing",
+      "frameworks": [
+        "ASPECTS"
+      ],
+      "requiredSections": [
+        "Indication",
+        "Technique",
+        "Comparison",
+        "Findings",
+        "Impression",
+        "Recommendations"
+      ],
+      "validatorRules": []
+    },
+    {
+      "examId": "ct-intracranial-arteries-c",
+      "name": "CT Angiography — Circle of Willis",
+      "modality": "CT",
+      "bodyPart": "Intracranial Arteries",
+      "contrast": "With",
+      "sex": "",
+      "subspecialty": "Neuro",
+      "rulebookId": "ct_intracranial_arteries_rp_v1",
+      "rulebookSource": "generated",
+      "frameworks": [
+        "ASPECTS"
+      ],
+      "requiredSections": [
+        "Indication",
+        "Technique",
+        "Comparison",
+        "Findings",
+        "Impression",
+        "Recommendations"
+      ],
+      "validatorRules": [
+        "laterality_consistency",
+        "negation_conflict",
+        "measurement_consistency",
+        "modality_mismatch",
+        "impression_bullet_count",
+        "critical_result_language",
+        "unauthorized_followup",
+        "prior_comparison_required",
+        "contrast_phase_documented",
+        "midline_shift_measured",
+        "critical_finding_language"
+      ]
+    },
+    {
+      "examId": "ct-paranasal-sinuses-nc",
+      "name": "CT Paranasal Sinuses",
+      "modality": "CT",
+      "bodyPart": "Paranasal Sinuses",
+      "contrast": "None",
+      "sex": "",
+      "subspecialty": "Head & Neck",
+      "rulebookId": "ct_paranasal_sinuses_rp_v1",
+      "rulebookSource": "generated",
+      "frameworks": [],
+      "requiredSections": [
+        "Indication",
+        "Technique",
+        "Comparison",
+        "Findings",
+        "Impression"
+      ],
+      "validatorRules": [
+        "laterality_consistency",
+        "negation_conflict",
+        "measurement_consistency",
+        "modality_mismatch",
+        "impression_bullet_count",
+        "critical_result_language",
+        "unauthorized_followup",
+        "prior_comparison_required"
+      ]
+    },
+    {
+      "examId": "ct-facial-bones-nc",
+      "name": "CT Facial Bones",
+      "modality": "CT",
+      "bodyPart": "Facial Bones",
+      "contrast": "None",
+      "sex": "",
+      "subspecialty": "Head & Neck",
+      "rulebookId": "ct_facial_bones_rp_v1",
+      "rulebookSource": "generated",
+      "frameworks": [],
+      "requiredSections": [
+        "Indication",
+        "Technique",
+        "Comparison",
+        "Findings",
+        "Impression"
+      ],
+      "validatorRules": [
+        "laterality_consistency",
+        "negation_conflict",
+        "measurement_consistency",
+        "modality_mismatch",
+        "impression_bullet_count",
+        "critical_result_language",
+        "unauthorized_followup",
+        "prior_comparison_required"
+      ]
+    },
+    {
+      "examId": "ct-temporal-bones-nc",
+      "name": "CT Temporal Bones",
+      "modality": "CT",
+      "bodyPart": "Temporal Bones",
+      "contrast": "None",
+      "sex": "",
+      "subspecialty": "Neuro",
+      "rulebookId": "ct_temporal_bones_rp_v1",
+      "rulebookSource": "generated",
+      "frameworks": [],
+      "requiredSections": [
+        "Indication",
+        "Technique",
+        "Comparison",
+        "Findings",
+        "Impression"
+      ],
+      "validatorRules": [
+        "laterality_consistency",
+        "negation_conflict",
+        "measurement_consistency",
+        "modality_mismatch",
+        "impression_bullet_count",
+        "critical_result_language",
+        "unauthorized_followup",
+        "prior_comparison_required"
+      ]
+    },
+    {
+      "examId": "ct-orbits-mp",
+      "name": "CT Orbits",
+      "modality": "CT",
+      "bodyPart": "Orbits",
+      "contrast": "WithAndWithout",
+      "sex": "",
+      "subspecialty": "Head & Neck",
+      "rulebookId": "ct_orbits_rp_v1",
+      "rulebookSource": "generated",
+      "frameworks": [],
+      "requiredSections": [
+        "Indication",
+        "Technique",
+        "Comparison",
+        "Findings",
+        "Impression"
+      ],
+      "validatorRules": [
+        "laterality_consistency",
+        "negation_conflict",
+        "measurement_consistency",
+        "modality_mismatch",
+        "impression_bullet_count",
+        "critical_result_language",
+        "unauthorized_followup",
+        "prior_comparison_required",
+        "contrast_phase_documented",
+        "midline_shift_measured"
+      ]
+    },
+    {
+      "examId": "ct-neck-c",
+      "name": "CT Neck (post-contrast)",
+      "modality": "CT",
+      "bodyPart": "Neck",
+      "contrast": "With",
+      "sex": "",
+      "subspecialty": "Head & Neck",
+      "rulebookId": "ct_neck_rp_v1",
+      "rulebookSource": "generated",
+      "frameworks": [
+        "NI-RADS"
+      ],
+      "requiredSections": [
+        "Indication",
+        "Technique",
+        "Comparison",
+        "Findings",
+        "Impression",
+        "Recommendations"
+      ],
+      "validatorRules": [
+        "laterality_consistency",
+        "negation_conflict",
+        "measurement_consistency",
+        "modality_mismatch",
+        "impression_bullet_count",
+        "critical_result_language",
+        "unauthorized_followup",
+        "prior_comparison_required",
+        "contrast_phase_documented"
+      ]
+    },
+    {
+      "examId": "ct-carotid-arteries-c",
+      "name": "CT Angiography — Carotids / Neck",
+      "modality": "CT",
+      "bodyPart": "Carotid Arteries",
+      "contrast": "With",
+      "sex": "",
+      "subspecialty": "Vascular",
+      "rulebookId": "ct_carotid_arteries_rp_v1",
+      "rulebookSource": "generated",
+      "frameworks": [],
+      "requiredSections": [
+        "Indication",
+        "Technique",
+        "Comparison",
+        "Findings",
+        "Impression"
+      ],
+      "validatorRules": [
+        "laterality_consistency",
+        "negation_conflict",
+        "measurement_consistency",
+        "modality_mismatch",
+        "impression_bullet_count",
+        "critical_result_language",
+        "unauthorized_followup",
+        "prior_comparison_required",
+        "contrast_phase_documented"
+      ]
+    },
+    {
+      "examId": "ct-cervical-spine-nc",
+      "name": "CT Cervical Spine",
+      "modality": "CT",
+      "bodyPart": "Cervical Spine",
+      "contrast": "None",
+      "sex": "",
+      "subspecialty": "MSK/Spine",
+      "rulebookId": "ct_cervical_spine_rp_v1",
+      "rulebookSource": "generated",
+      "frameworks": [],
+      "requiredSections": [
+        "Indication",
+        "Technique",
+        "Comparison",
+        "Findings",
+        "Impression"
+      ],
+      "validatorRules": [
+        "laterality_consistency",
+        "negation_conflict",
+        "measurement_consistency",
+        "modality_mismatch",
+        "impression_bullet_count",
+        "critical_result_language",
+        "unauthorized_followup",
+        "prior_comparison_required",
+        "level_consistency"
+      ]
+    },
+    {
+      "examId": "ct-thoracic-spine-nc",
+      "name": "CT Thoracic Spine",
+      "modality": "CT",
+      "bodyPart": "Thoracic Spine",
+      "contrast": "None",
+      "sex": "",
+      "subspecialty": "MSK/Spine",
+      "rulebookId": "ct_thoracic_spine_rp_v1",
+      "rulebookSource": "generated",
+      "frameworks": [],
+      "requiredSections": [
+        "Indication",
+        "Technique",
+        "Comparison",
+        "Findings",
+        "Impression"
+      ],
+      "validatorRules": [
+        "laterality_consistency",
+        "negation_conflict",
+        "measurement_consistency",
+        "modality_mismatch",
+        "impression_bullet_count",
+        "critical_result_language",
+        "unauthorized_followup",
+        "prior_comparison_required",
+        "level_consistency"
+      ]
+    },
+    {
+      "examId": "ct-lumbar-spine-nc",
+      "name": "CT Lumbar Spine",
+      "modality": "CT",
+      "bodyPart": "Lumbar Spine",
+      "contrast": "None",
+      "sex": "",
+      "subspecialty": "MSK/Spine",
+      "rulebookId": "ct_lumbar_spine_rp_v1",
+      "rulebookSource": "generated",
+      "frameworks": [],
+      "requiredSections": [
+        "Indication",
+        "Technique",
+        "Comparison",
+        "Findings",
+        "Impression"
+      ],
+      "validatorRules": [
+        "laterality_consistency",
+        "negation_conflict",
+        "measurement_consistency",
+        "modality_mismatch",
+        "impression_bullet_count",
+        "critical_result_language",
+        "unauthorized_followup",
+        "prior_comparison_required",
+        "level_consistency"
+      ]
+    },
+    {
+      "examId": "ct-chest-nc",
+      "name": "CT Chest (non-contrast)",
+      "modality": "CT",
+      "bodyPart": "Chest",
+      "contrast": "None",
+      "sex": "",
+      "subspecialty": "Thoracic",
+      "rulebookId": "chest_ct_v1",
+      "rulebookSource": "existing",
+      "frameworks": [
+        "Fleischner"
+      ],
+      "requiredSections": [
+        "Indication",
+        "Technique",
+        "Comparison",
+        "Findings",
+        "Impression",
+        "Recommendations"
+      ],
+      "validatorRules": []
+    },
+    {
+      "examId": "ct-chest-c",
+      "name": "CT Chest (post-contrast)",
+      "modality": "CT",
+      "bodyPart": "Chest",
+      "contrast": "With",
+      "sex": "",
+      "subspecialty": "Thoracic",
+      "rulebookId": "chest_ct_v1",
+      "rulebookSource": "existing",
+      "frameworks": [
+        "Fleischner"
+      ],
+      "requiredSections": [
+        "Indication",
+        "Technique",
+        "Comparison",
+        "Findings",
+        "Impression",
+        "Recommendations"
+      ],
+      "validatorRules": []
+    },
+    {
+      "examId": "ct-pulmonary-arteries-c",
+      "name": "CT Pulmonary Angiography (CTPA)",
+      "modality": "CT",
+      "bodyPart": "Pulmonary Arteries",
+      "contrast": "With",
+      "sex": "",
+      "subspecialty": "Thoracic",
+      "rulebookId": "ct_pulmonary_arteries_rp_v1",
+      "rulebookSource": "generated",
+      "frameworks": [
+        "PE-severity"
+      ],
+      "requiredSections": [
+        "Indication",
+        "Technique",
+        "Comparison",
+        "Findings",
+        "Impression",
+        "Recommendations"
+      ],
+      "validatorRules": [
+        "laterality_consistency",
+        "negation_conflict",
+        "measurement_consistency",
+        "modality_mismatch",
+        "impression_bullet_count",
+        "critical_result_language",
+        "unauthorized_followup",
+        "prior_comparison_required",
+        "contrast_phase_documented",
+        "critical_finding_language"
+      ]
+    },
+    {
+      "examId": "ct-coronary-arteries-c",
+      "name": "CT Coronary Angiography",
+      "modality": "CT",
+      "bodyPart": "Coronary Arteries",
+      "contrast": "With",
+      "sex": "",
+      "subspecialty": "Cardiac",
+      "rulebookId": "ct_coronary_arteries_rp_v1",
+      "rulebookSource": "generated",
+      "frameworks": [
+        "CAD-RADS"
+      ],
+      "requiredSections": [
+        "Indication",
+        "Technique",
+        "Comparison",
+        "Findings",
+        "Impression",
+        "Recommendations"
+      ],
+      "validatorRules": [
+        "laterality_consistency",
+        "negation_conflict",
+        "measurement_consistency",
+        "modality_mismatch",
+        "impression_bullet_count",
+        "critical_result_language",
+        "unauthorized_followup",
+        "prior_comparison_required",
+        "contrast_phase_documented"
+      ]
+    },
+    {
+      "examId": "ct-coronary-arteries-calcium-nc",
+      "name": "CT Coronary Calcium Score",
+      "modality": "CT",
+      "bodyPart": "Coronary Arteries",
+      "contrast": "None",
+      "sex": "",
+      "subspecialty": "Cardiac",
+      "rulebookId": "ct_coronary_arteries_rp_v1",
+      "rulebookSource": "generated",
+      "frameworks": [
+        "CAD-RADS"
+      ],
+      "requiredSections": [
+        "Indication",
+        "Technique",
+        "Comparison",
+        "Findings",
+        "Impression",
+        "Recommendations"
+      ],
+      "validatorRules": [
+        "laterality_consistency",
+        "negation_conflict",
+        "measurement_consistency",
+        "modality_mismatch",
+        "impression_bullet_count",
+        "critical_result_language",
+        "unauthorized_followup",
+        "prior_comparison_required",
+        "contrast_phase_documented"
+      ]
+    },
+    {
+      "examId": "ct-thoracic-aorta-c",
+      "name": "CT Angiography — Thoracic Aorta",
+      "modality": "CT",
+      "bodyPart": "Thoracic Aorta",
+      "contrast": "With",
+      "sex": "",
+      "subspecialty": "Vascular",
+      "rulebookId": "ct_thoracic_aorta_rp_v1",
+      "rulebookSource": "generated",
+      "frameworks": [],
+      "requiredSections": [
+        "Indication",
+        "Technique",
+        "Comparison",
+        "Findings",
+        "Impression"
+      ],
+      "validatorRules": [
+        "laterality_consistency",
+        "negation_conflict",
+        "measurement_consistency",
+        "modality_mismatch",
+        "impression_bullet_count",
+        "critical_result_language",
+        "unauthorized_followup",
+        "prior_comparison_required",
+        "contrast_phase_documented"
+      ]
+    },
+    {
+      "examId": "ct-abdomen-nc",
+      "name": "CT Abdomen (non-contrast)",
+      "modality": "CT",
+      "bodyPart": "Abdomen",
+      "contrast": "None",
+      "sex": "",
+      "subspecialty": "Body",
+      "rulebookId": "abdomen_ct_v1",
+      "rulebookSource": "existing",
+      "frameworks": [],
+      "requiredSections": [
+        "Indication",
+        "Technique",
+        "Comparison",
+        "Findings",
+        "Impression",
+        "Recommendations"
+      ],
+      "validatorRules": []
+    },
+    {
+      "examId": "ct-abdomen-c",
+      "name": "CT Abdomen (post-contrast)",
+      "modality": "CT",
+      "bodyPart": "Abdomen",
+      "contrast": "With",
+      "sex": "",
+      "subspecialty": "Body",
+      "rulebookId": "abdomen_ct_v1",
+      "rulebookSource": "existing",
+      "frameworks": [],
+      "requiredSections": [
+        "Indication",
+        "Technique",
+        "Comparison",
+        "Findings",
+        "Impression",
+        "Recommendations"
+      ],
+      "validatorRules": []
+    },
+    {
+      "examId": "ct-abdomen-and-pelvis-nc",
+      "name": "CT Abdomen & Pelvis (non-contrast)",
+      "modality": "CT",
+      "bodyPart": "Abdomen & Pelvis",
+      "contrast": "None",
+      "sex": "",
+      "subspecialty": "Body",
+      "rulebookId": "ct_abdomen_and_pelvis_rp_v1",
+      "rulebookSource": "generated",
+      "frameworks": [
+        "AAST"
+      ],
+      "requiredSections": [
+        "Indication",
+        "Technique",
+        "Comparison",
+        "Findings",
+        "Impression",
+        "Recommendations"
+      ],
+      "validatorRules": [
+        "laterality_consistency",
+        "negation_conflict",
+        "measurement_consistency",
+        "modality_mismatch",
+        "impression_bullet_count",
+        "critical_result_language",
+        "unauthorized_followup",
+        "prior_comparison_required",
+        "contrast_phase_documented",
+        "incidental_findings_listed",
+        "critical_finding_language"
+      ]
+    },
+    {
+      "examId": "ct-abdomen-and-pelvis-c",
+      "name": "CT Abdomen & Pelvis (portal-venous)",
+      "modality": "CT",
+      "bodyPart": "Abdomen & Pelvis",
+      "contrast": "With",
+      "sex": "",
+      "subspecialty": "Body",
+      "rulebookId": "ct_abdomen_and_pelvis_rp_v1",
+      "rulebookSource": "generated",
+      "frameworks": [
+        "AAST"
+      ],
+      "requiredSections": [
+        "Indication",
+        "Technique",
+        "Comparison",
+        "Findings",
+        "Impression",
+        "Recommendations"
+      ],
+      "validatorRules": [
+        "laterality_consistency",
+        "negation_conflict",
+        "measurement_consistency",
+        "modality_mismatch",
+        "impression_bullet_count",
+        "critical_result_language",
+        "unauthorized_followup",
+        "prior_comparison_required",
+        "contrast_phase_documented",
+        "incidental_findings_listed",
+        "critical_finding_language"
+      ]
+    },
+    {
+      "examId": "ct-abdomen-and-pelvis-mp",
+      "name": "CT Abdomen & Pelvis (multiphase)",
+      "modality": "CT",
+      "bodyPart": "Abdomen & Pelvis",
+      "contrast": "WithAndWithout",
+      "sex": "",
+      "subspecialty": "Body",
+      "rulebookId": "ct_abdomen_and_pelvis_rp_v1",
+      "rulebookSource": "generated",
+      "frameworks": [
+        "AAST"
+      ],
+      "requiredSections": [
+        "Indication",
+        "Technique",
+        "Comparison",
+        "Findings",
+        "Impression",
+        "Recommendations"
+      ],
+      "validatorRules": [
+        "laterality_consistency",
+        "negation_conflict",
+        "measurement_consistency",
+        "modality_mismatch",
+        "impression_bullet_count",
+        "critical_result_language",
+        "unauthorized_followup",
+        "prior_comparison_required",
+        "contrast_phase_documented",
+        "incidental_findings_listed",
+        "critical_finding_language"
+      ]
+    },
+    {
+      "examId": "ct-liver-mp",
+      "name": "CT Liver (multiphase / triphasic)",
+      "modality": "CT",
+      "bodyPart": "Liver",
+      "contrast": "WithAndWithout",
+      "sex": "",
+      "subspecialty": "Body",
+      "rulebookId": "liver_lirads_v1",
+      "rulebookSource": "existing",
+      "frameworks": [
+        "LI-RADS"
+      ],
+      "requiredSections": [
+        "Indication",
+        "Technique",
+        "Comparison",
+        "Findings",
+        "Impression",
+        "Recommendations"
+      ],
+      "validatorRules": []
+    },
+    {
+      "examId": "ct-pancreas-mp",
+      "name": "CT Pancreas (pancreatic protocol)",
+      "modality": "CT",
+      "bodyPart": "Pancreas",
+      "contrast": "WithAndWithout",
+      "sex": "",
+      "subspecialty": "Body",
+      "rulebookId": "ct_pancreas_rp_v1",
+      "rulebookSource": "generated",
+      "frameworks": [],
+      "requiredSections": [
+        "Indication",
+        "Technique",
+        "Comparison",
+        "Findings",
+        "Impression",
+        "Recommendations"
+      ],
+      "validatorRules": [
+        "laterality_consistency",
+        "negation_conflict",
+        "measurement_consistency",
+        "modality_mismatch",
+        "impression_bullet_count",
+        "critical_result_language",
+        "unauthorized_followup",
+        "prior_comparison_required",
+        "contrast_phase_documented"
+      ]
+    },
+    {
+      "examId": "ct-adrenals-mp",
+      "name": "CT Adrenal (washout protocol)",
+      "modality": "CT",
+      "bodyPart": "Adrenals",
+      "contrast": "WithAndWithout",
+      "sex": "",
+      "subspecialty": "Body",
+      "rulebookId": "ct_adrenals_rp_v1",
+      "rulebookSource": "generated",
+      "frameworks": [],
+      "requiredSections": [
+        "Indication",
+        "Technique",
+        "Comparison",
+        "Findings",
+        "Impression"
+      ],
+      "validatorRules": [
+        "laterality_consistency",
+        "negation_conflict",
+        "measurement_consistency",
+        "modality_mismatch",
+        "impression_bullet_count",
+        "critical_result_language",
+        "unauthorized_followup",
+        "prior_comparison_required",
+        "contrast_phase_documented"
+      ]
+    },
+    {
+      "examId": "ct-kidneys-mp",
+      "name": "CT Kidneys (renal mass protocol)",
+      "modality": "CT",
+      "bodyPart": "Kidneys",
+      "contrast": "WithAndWithout",
+      "sex": "",
+      "subspecialty": "Body",
+      "rulebookId": "ct_kidneys_rp_v1",
+      "rulebookSource": "generated",
+      "frameworks": [
+        "Bosniak"
+      ],
+      "requiredSections": [
+        "Indication",
+        "Technique",
+        "Comparison",
+        "Findings",
+        "Impression",
+        "Recommendations"
+      ],
+      "validatorRules": [
+        "laterality_consistency",
+        "negation_conflict",
+        "measurement_consistency",
+        "modality_mismatch",
+        "impression_bullet_count",
+        "critical_result_language",
+        "unauthorized_followup",
+        "prior_comparison_required",
+        "contrast_phase_documented",
+        "incidental_findings_listed"
+      ]
+    },
+    {
+      "examId": "ct-urinary-tract-mp",
+      "name": "CT Urography (CTU)",
+      "modality": "CT",
+      "bodyPart": "Urinary Tract",
+      "contrast": "WithAndWithout",
+      "sex": "",
+      "subspecialty": "Body",
+      "rulebookId": "ct_urinary_tract_rp_v1",
+      "rulebookSource": "generated",
+      "frameworks": [],
+      "requiredSections": [
+        "Indication",
+        "Technique",
+        "Comparison",
+        "Findings",
+        "Impression",
+        "Recommendations"
+      ],
+      "validatorRules": [
+        "laterality_consistency",
+        "negation_conflict",
+        "measurement_consistency",
+        "modality_mismatch",
+        "impression_bullet_count",
+        "critical_result_language",
+        "unauthorized_followup",
+        "prior_comparison_required",
+        "contrast_phase_documented",
+        "incidental_findings_listed"
+      ]
+    },
+    {
+      "examId": "ct-kub-nc",
+      "name": "CT KUB (renal colic / stone protocol)",
+      "modality": "CT",
+      "bodyPart": "KUB",
+      "contrast": "None",
+      "sex": "",
+      "subspecialty": "Body",
+      "rulebookId": "ct_kub_rp_v1",
+      "rulebookSource": "generated",
+      "frameworks": [],
+      "requiredSections": [
+        "Indication",
+        "Technique",
+        "Comparison",
+        "Findings",
+        "Impression"
+      ],
+      "validatorRules": [
+        "laterality_consistency",
+        "negation_conflict",
+        "measurement_consistency",
+        "modality_mismatch",
+        "impression_bullet_count",
+        "critical_result_language",
+        "unauthorized_followup",
+        "prior_comparison_required",
+        "incidental_findings_listed"
+      ]
+    },
+    {
+      "examId": "ct-small-bowel-c",
+      "name": "CT Enterography",
+      "modality": "CT",
+      "bodyPart": "Small Bowel",
+      "contrast": "With",
+      "sex": "",
+      "subspecialty": "Body",
+      "rulebookId": "ct_small_bowel_rp_v1",
+      "rulebookSource": "generated",
+      "frameworks": [],
+      "requiredSections": [
+        "Indication",
+        "Technique",
+        "Comparison",
+        "Findings",
+        "Impression",
+        "Recommendations"
+      ],
+      "validatorRules": [
+        "laterality_consistency",
+        "negation_conflict",
+        "measurement_consistency",
+        "modality_mismatch",
+        "impression_bullet_count",
+        "critical_result_language",
+        "unauthorized_followup",
+        "prior_comparison_required",
+        "contrast_phase_documented",
+        "incidental_findings_listed"
+      ]
+    },
+    {
+      "examId": "ct-pelvis-nc",
+      "name": "CT Pelvis (non-contrast)",
+      "modality": "CT",
+      "bodyPart": "Pelvis",
+      "contrast": "None",
+      "sex": "",
+      "subspecialty": "Body",
+      "rulebookId": "abdomen_ct_v1",
+      "rulebookSource": "existing",
+      "frameworks": [],
+      "requiredSections": [
+        "Indication",
+        "Technique",
+        "Comparison",
+        "Findings",
+        "Impression",
+        "Recommendations"
+      ],
+      "validatorRules": []
+    },
+    {
+      "examId": "ct-pelvis-c",
+      "name": "CT Pelvis (post-contrast)",
+      "modality": "CT",
+      "bodyPart": "Pelvis",
+      "contrast": "With",
+      "sex": "",
+      "subspecialty": "Body",
+      "rulebookId": "abdomen_ct_v1",
+      "rulebookSource": "existing",
+      "frameworks": [],
+      "requiredSections": [
+        "Indication",
+        "Technique",
+        "Comparison",
+        "Findings",
+        "Impression",
+        "Recommendations"
+      ],
+      "validatorRules": []
+    },
+    {
+      "examId": "ct-abdominal-aorta-c",
+      "name": "CT Angiography — Abdominal Aorta",
+      "modality": "CT",
+      "bodyPart": "Abdominal Aorta",
+      "contrast": "With",
+      "sex": "",
+      "subspecialty": "Vascular",
+      "rulebookId": "ct_abdominal_aorta_rp_v1",
+      "rulebookSource": "generated",
+      "frameworks": [],
+      "requiredSections": [
+        "Indication",
+        "Technique",
+        "Comparison",
+        "Findings",
+        "Impression"
+      ],
+      "validatorRules": [
+        "laterality_consistency",
+        "negation_conflict",
+        "measurement_consistency",
+        "modality_mismatch",
+        "impression_bullet_count",
+        "critical_result_language",
+        "unauthorized_followup",
+        "prior_comparison_required",
+        "contrast_phase_documented"
+      ]
+    },
+    {
+      "examId": "ct-peripheral-runoff-c",
+      "name": "CT Angiography — Peripheral Runoff",
+      "modality": "CT",
+      "bodyPart": "Peripheral Runoff",
+      "contrast": "With",
+      "sex": "",
+      "subspecialty": "Vascular",
+      "rulebookId": "ct_peripheral_runoff_rp_v1",
+      "rulebookSource": "generated",
+      "frameworks": [],
+      "requiredSections": [
+        "Indication",
+        "Technique",
+        "Comparison",
+        "Findings",
+        "Impression"
+      ],
+      "validatorRules": [
+        "laterality_consistency",
+        "negation_conflict",
+        "measurement_consistency",
+        "modality_mismatch",
+        "impression_bullet_count",
+        "critical_result_language",
+        "unauthorized_followup",
+        "prior_comparison_required",
+        "contrast_phase_documented"
+      ]
+    },
+    {
+      "examId": "ct-whole-body-c",
+      "name": "CT Whole Body (trauma / pan-scan)",
+      "modality": "CT",
+      "bodyPart": "Whole Body",
+      "contrast": "With",
+      "sex": "",
+      "subspecialty": "Trauma/Oncology",
+      "rulebookId": "ct_whole_body_rp_v1",
+      "rulebookSource": "generated",
+      "frameworks": [
+        "AAST"
+      ],
+      "requiredSections": [
+        "Indication",
+        "Technique",
+        "Comparison",
+        "Findings",
+        "Impression",
+        "Recommendations"
+      ],
+      "validatorRules": [
+        "laterality_consistency",
+        "negation_conflict",
+        "measurement_consistency",
+        "modality_mismatch",
+        "impression_bullet_count",
+        "critical_result_language",
+        "unauthorized_followup",
+        "prior_comparison_required",
+        "contrast_phase_documented",
+        "incidental_findings_listed",
+        "critical_finding_language"
+      ]
+    },
+    {
+      "examId": "ct-whole-body-onc-c",
+      "name": "CT Whole Body (oncology staging)",
+      "modality": "CT",
+      "bodyPart": "Whole Body",
+      "contrast": "With",
+      "sex": "",
+      "subspecialty": "Trauma/Oncology",
+      "rulebookId": "ct_whole_body_rp_v1",
+      "rulebookSource": "generated",
+      "frameworks": [
+        "AAST"
+      ],
+      "requiredSections": [
+        "Indication",
+        "Technique",
+        "Comparison",
+        "Findings",
+        "Impression",
+        "Recommendations"
+      ],
+      "validatorRules": [
+        "laterality_consistency",
+        "negation_conflict",
+        "measurement_consistency",
+        "modality_mismatch",
+        "impression_bullet_count",
+        "critical_result_language",
+        "unauthorized_followup",
+        "prior_comparison_required",
+        "contrast_phase_documented",
+        "incidental_findings_listed",
+        "critical_finding_language"
+      ]
+    },
+    {
+      "examId": "ct-shoulder-nc",
+      "name": "CT Shoulder",
+      "modality": "CT",
+      "bodyPart": "Shoulder",
+      "contrast": "None",
+      "sex": "",
+      "subspecialty": "MSK",
+      "rulebookId": "ct_shoulder_rp_v1",
+      "rulebookSource": "generated",
+      "frameworks": [],
+      "requiredSections": [
+        "Indication",
+        "Technique",
+        "Comparison",
+        "Findings",
+        "Impression"
+      ],
+      "validatorRules": [
+        "laterality_consistency",
+        "negation_conflict",
+        "measurement_consistency",
+        "modality_mismatch",
+        "impression_bullet_count",
+        "critical_result_language",
+        "unauthorized_followup",
+        "prior_comparison_required",
+        "fracture_acuity"
+      ]
+    },
+    {
+      "examId": "ct-wrist-nc",
+      "name": "CT Wrist",
+      "modality": "CT",
+      "bodyPart": "Wrist",
+      "contrast": "None",
+      "sex": "",
+      "subspecialty": "MSK",
+      "rulebookId": "ct_wrist_rp_v1",
+      "rulebookSource": "generated",
+      "frameworks": [],
+      "requiredSections": [
+        "Indication",
+        "Technique",
+        "Comparison",
+        "Findings",
+        "Impression"
+      ],
+      "validatorRules": [
+        "laterality_consistency",
+        "negation_conflict",
+        "measurement_consistency",
+        "modality_mismatch",
+        "impression_bullet_count",
+        "critical_result_language",
+        "unauthorized_followup",
+        "prior_comparison_required",
+        "fracture_acuity"
+      ]
+    },
+    {
+      "examId": "ct-hip-nc",
+      "name": "CT Hip",
+      "modality": "CT",
+      "bodyPart": "Hip",
+      "contrast": "None",
+      "sex": "",
+      "subspecialty": "MSK",
+      "rulebookId": "ct_hip_rp_v1",
+      "rulebookSource": "generated",
+      "frameworks": [],
+      "requiredSections": [
+        "Indication",
+        "Technique",
+        "Comparison",
+        "Findings",
+        "Impression"
+      ],
+      "validatorRules": [
+        "laterality_consistency",
+        "negation_conflict",
+        "measurement_consistency",
+        "modality_mismatch",
+        "impression_bullet_count",
+        "critical_result_language",
+        "unauthorized_followup",
+        "prior_comparison_required",
+        "fracture_acuity"
+      ]
+    },
+    {
+      "examId": "ct-knee-nc",
+      "name": "CT Knee",
+      "modality": "CT",
+      "bodyPart": "Knee",
+      "contrast": "None",
+      "sex": "",
+      "subspecialty": "MSK",
+      "rulebookId": "ct_knee_rp_v1",
+      "rulebookSource": "generated",
+      "frameworks": [],
+      "requiredSections": [
+        "Indication",
+        "Technique",
+        "Comparison",
+        "Findings",
+        "Impression"
+      ],
+      "validatorRules": [
+        "laterality_consistency",
+        "negation_conflict",
+        "measurement_consistency",
+        "modality_mismatch",
+        "impression_bullet_count",
+        "critical_result_language",
+        "unauthorized_followup",
+        "prior_comparison_required",
+        "fracture_acuity"
+      ]
+    },
+    {
+      "examId": "ct-foot-nc",
+      "name": "CT Foot / Ankle",
+      "modality": "CT",
+      "bodyPart": "Foot",
+      "contrast": "None",
+      "sex": "",
+      "subspecialty": "MSK",
+      "rulebookId": "ct_foot_rp_v1",
+      "rulebookSource": "generated",
+      "frameworks": [],
+      "requiredSections": [
+        "Indication",
+        "Technique",
+        "Comparison",
+        "Findings",
+        "Impression"
+      ],
+      "validatorRules": [
+        "laterality_consistency",
+        "negation_conflict",
+        "measurement_consistency",
+        "modality_mismatch",
+        "impression_bullet_count",
+        "critical_result_language",
+        "unauthorized_followup",
+        "prior_comparison_required",
+        "fracture_acuity"
+      ]
+    },
+    {
+      "examId": "mr-brain-nc",
+      "name": "MRI Brain (non-contrast)",
+      "modality": "MR",
+      "bodyPart": "Brain",
+      "contrast": "None",
+      "sex": "",
+      "subspecialty": "Neuro",
+      "rulebookId": "brain_mri_v1",
+      "rulebookSource": "existing",
+      "frameworks": [],
+      "requiredSections": [
+        "Indication",
+        "Technique",
+        "Comparison",
+        "Findings",
+        "Impression",
+        "Recommendations"
+      ],
+      "validatorRules": []
+    },
+    {
+      "examId": "mr-brain-c",
+      "name": "MRI Brain (post-contrast)",
+      "modality": "MR",
+      "bodyPart": "Brain",
+      "contrast": "With",
+      "sex": "",
+      "subspecialty": "Neuro",
+      "rulebookId": "brain_mri_v1",
+      "rulebookSource": "existing",
+      "frameworks": [],
+      "requiredSections": [
+        "Indication",
+        "Technique",
+        "Comparison",
+        "Findings",
+        "Impression",
+        "Recommendations"
+      ],
+      "validatorRules": []
+    },
+    {
+      "examId": "mr-brain-mp",
+      "name": "MRI Brain (pre- and post-contrast)",
+      "modality": "MR",
+      "bodyPart": "Brain",
+      "contrast": "WithAndWithout",
+      "sex": "",
+      "subspecialty": "Neuro",
+      "rulebookId": "brain_mri_v1",
+      "rulebookSource": "existing",
+      "frameworks": [],
+      "requiredSections": [
+        "Indication",
+        "Technique",
+        "Comparison",
+        "Findings",
+        "Impression",
+        "Recommendations"
+      ],
+      "validatorRules": []
+    },
+    {
+      "examId": "mr-brain-stroke-nc",
+      "name": "MRI Brain (stroke / DWI protocol)",
+      "modality": "MR",
+      "bodyPart": "Brain",
+      "contrast": "None",
+      "sex": "",
+      "subspecialty": "Neuro",
+      "rulebookId": "brain_mri_v1",
+      "rulebookSource": "existing",
+      "frameworks": [
+        "ASPECTS"
+      ],
+      "requiredSections": [
+        "Indication",
+        "Technique",
+        "Comparison",
+        "Findings",
+        "Impression",
+        "Recommendations"
+      ],
+      "validatorRules": []
+    },
+    {
+      "examId": "mr-pituitary-mp",
+      "name": "MRI Pituitary (dynamic)",
+      "modality": "MR",
+      "bodyPart": "Pituitary",
+      "contrast": "WithAndWithout",
+      "sex": "",
+      "subspecialty": "Neuro",
+      "rulebookId": "mr_pituitary_rp_v1",
+      "rulebookSource": "generated",
+      "frameworks": [],
+      "requiredSections": [
+        "Indication",
+        "Technique",
+        "Comparison",
+        "Findings",
+        "Impression"
+      ],
+      "validatorRules": [
+        "laterality_consistency",
+        "negation_conflict",
+        "measurement_consistency",
+        "modality_mismatch",
+        "impression_bullet_count",
+        "critical_result_language",
+        "unauthorized_followup",
+        "prior_comparison_required",
+        "contrast_phase_documented"
+      ]
+    },
+    {
+      "examId": "mr-orbits-mp",
+      "name": "MRI Orbits",
+      "modality": "MR",
+      "bodyPart": "Orbits",
+      "contrast": "WithAndWithout",
+      "sex": "",
+      "subspecialty": "Neuro",
+      "rulebookId": "mr_orbits_rp_v1",
+      "rulebookSource": "generated",
+      "frameworks": [],
+      "requiredSections": [
+        "Indication",
+        "Technique",
+        "Comparison",
+        "Findings",
+        "Impression"
+      ],
+      "validatorRules": [
+        "laterality_consistency",
+        "negation_conflict",
+        "measurement_consistency",
+        "modality_mismatch",
+        "impression_bullet_count",
+        "critical_result_language",
+        "unauthorized_followup",
+        "prior_comparison_required",
+        "contrast_phase_documented",
+        "midline_shift_measured"
+      ]
+    },
+    {
+      "examId": "mr-internal-auditory-canal-mp",
+      "name": "MRI Internal Auditory Canals",
+      "modality": "MR",
+      "bodyPart": "Internal Auditory Canal",
+      "contrast": "WithAndWithout",
+      "sex": "",
+      "subspecialty": "Neuro",
+      "rulebookId": "mr_internal_auditory_canal_rp_v1",
+      "rulebookSource": "generated",
+      "frameworks": [],
+      "requiredSections": [
+        "Indication",
+        "Technique",
+        "Comparison",
+        "Findings",
+        "Impression"
+      ],
+      "validatorRules": [
+        "laterality_consistency",
+        "negation_conflict",
+        "measurement_consistency",
+        "modality_mismatch",
+        "impression_bullet_count",
+        "critical_result_language",
+        "unauthorized_followup",
+        "prior_comparison_required",
+        "contrast_phase_documented"
+      ]
+    },
+    {
+      "examId": "mr-intracranial-arteries-nc",
+      "name": "MR Angiography — Intracranial (TOF)",
+      "modality": "MR",
+      "bodyPart": "Intracranial Arteries",
+      "contrast": "None",
+      "sex": "",
+      "subspecialty": "Neuro",
+      "rulebookId": "mr_intracranial_arteries_rp_v1",
+      "rulebookSource": "generated",
+      "frameworks": [],
+      "requiredSections": [
+        "Indication",
+        "Technique",
+        "Comparison",
+        "Findings",
+        "Impression"
+      ],
+      "validatorRules": [
+        "laterality_consistency",
+        "negation_conflict",
+        "measurement_consistency",
+        "modality_mismatch",
+        "impression_bullet_count",
+        "critical_result_language",
+        "unauthorized_followup",
+        "prior_comparison_required",
+        "midline_shift_measured",
+        "critical_finding_language"
+      ]
+    },
+    {
+      "examId": "mr-neck-mp",
+      "name": "MRI Neck (soft tissue)",
+      "modality": "MR",
+      "bodyPart": "Neck",
+      "contrast": "WithAndWithout",
+      "sex": "",
+      "subspecialty": "Head & Neck",
+      "rulebookId": "mr_neck_rp_v1",
+      "rulebookSource": "generated",
+      "frameworks": [
+        "NI-RADS"
+      ],
+      "requiredSections": [
+        "Indication",
+        "Technique",
+        "Comparison",
+        "Findings",
+        "Impression",
+        "Recommendations"
+      ],
+      "validatorRules": [
+        "laterality_consistency",
+        "negation_conflict",
+        "measurement_consistency",
+        "modality_mismatch",
+        "impression_bullet_count",
+        "critical_result_language",
+        "unauthorized_followup",
+        "prior_comparison_required",
+        "contrast_phase_documented"
+      ]
+    },
+    {
+      "examId": "mr-cervical-spine-nc",
+      "name": "MRI Cervical Spine",
+      "modality": "MR",
+      "bodyPart": "Cervical Spine",
+      "contrast": "None",
+      "sex": "",
+      "subspecialty": "MSK/Spine",
+      "rulebookId": "mr_cervical_spine_rp_v1",
+      "rulebookSource": "generated",
+      "frameworks": [],
+      "requiredSections": [
+        "Indication",
+        "Technique",
+        "Comparison",
+        "Findings",
+        "Impression",
+        "Recommendations"
+      ],
+      "validatorRules": [
+        "laterality_consistency",
+        "negation_conflict",
+        "measurement_consistency",
+        "modality_mismatch",
+        "impression_bullet_count",
+        "critical_result_language",
+        "unauthorized_followup",
+        "prior_comparison_required",
+        "contrast_phase_documented",
+        "level_consistency"
+      ]
+    },
+    {
+      "examId": "mr-cervical-spine-gad-mp",
+      "name": "MRI Cervical Spine (infection/tumour)",
+      "modality": "MR",
+      "bodyPart": "Cervical Spine",
+      "contrast": "WithAndWithout",
+      "sex": "",
+      "subspecialty": "MSK/Spine",
+      "rulebookId": "mr_cervical_spine_rp_v1",
+      "rulebookSource": "generated",
+      "frameworks": [],
+      "requiredSections": [
+        "Indication",
+        "Technique",
+        "Comparison",
+        "Findings",
+        "Impression",
+        "Recommendations"
+      ],
+      "validatorRules": [
+        "laterality_consistency",
+        "negation_conflict",
+        "measurement_consistency",
+        "modality_mismatch",
+        "impression_bullet_count",
+        "critical_result_language",
+        "unauthorized_followup",
+        "prior_comparison_required",
+        "contrast_phase_documented",
+        "level_consistency"
+      ]
+    },
+    {
+      "examId": "mr-thoracic-spine-nc",
+      "name": "MRI Thoracic Spine",
+      "modality": "MR",
+      "bodyPart": "Thoracic Spine",
+      "contrast": "None",
+      "sex": "",
+      "subspecialty": "MSK/Spine",
+      "rulebookId": "mr_thoracic_spine_rp_v1",
+      "rulebookSource": "generated",
+      "frameworks": [],
+      "requiredSections": [
+        "Indication",
+        "Technique",
+        "Comparison",
+        "Findings",
+        "Impression",
+        "Recommendations"
+      ],
+      "validatorRules": [
+        "laterality_consistency",
+        "negation_conflict",
+        "measurement_consistency",
+        "modality_mismatch",
+        "impression_bullet_count",
+        "critical_result_language",
+        "unauthorized_followup",
+        "prior_comparison_required",
+        "level_consistency"
+      ]
+    },
+    {
+      "examId": "mr-lumbar-spine-nc",
+      "name": "MRI Lumbar Spine",
+      "modality": "MR",
+      "bodyPart": "Lumbar Spine",
+      "contrast": "None",
+      "sex": "",
+      "subspecialty": "MSK/Spine",
+      "rulebookId": "mr_lumbar_spine_rp_v1",
+      "rulebookSource": "generated",
+      "frameworks": [],
+      "requiredSections": [
+        "Indication",
+        "Technique",
+        "Comparison",
+        "Findings",
+        "Impression",
+        "Recommendations"
+      ],
+      "validatorRules": [
+        "laterality_consistency",
+        "negation_conflict",
+        "measurement_consistency",
+        "modality_mismatch",
+        "impression_bullet_count",
+        "critical_result_language",
+        "unauthorized_followup",
+        "prior_comparison_required",
+        "contrast_phase_documented",
+        "level_consistency"
+      ]
+    },
+    {
+      "examId": "mr-lumbar-spine-gad-mp",
+      "name": "MRI Lumbar Spine (post-op / infection)",
+      "modality": "MR",
+      "bodyPart": "Lumbar Spine",
+      "contrast": "WithAndWithout",
+      "sex": "",
+      "subspecialty": "MSK/Spine",
+      "rulebookId": "mr_lumbar_spine_rp_v1",
+      "rulebookSource": "generated",
+      "frameworks": [],
+      "requiredSections": [
+        "Indication",
+        "Technique",
+        "Comparison",
+        "Findings",
+        "Impression",
+        "Recommendations"
+      ],
+      "validatorRules": [
+        "laterality_consistency",
+        "negation_conflict",
+        "measurement_consistency",
+        "modality_mismatch",
+        "impression_bullet_count",
+        "critical_result_language",
+        "unauthorized_followup",
+        "prior_comparison_required",
+        "contrast_phase_documented",
+        "level_consistency"
+      ]
+    },
+    {
+      "examId": "mr-whole-spine-mp",
+      "name": "MRI Whole Spine (screening)",
+      "modality": "MR",
+      "bodyPart": "Whole Spine",
+      "contrast": "WithAndWithout",
+      "sex": "",
+      "subspecialty": "MSK/Spine",
+      "rulebookId": "mr_whole_spine_rp_v1",
+      "rulebookSource": "generated",
+      "frameworks": [],
+      "requiredSections": [
+        "Indication",
+        "Technique",
+        "Comparison",
+        "Findings",
+        "Impression",
+        "Recommendations"
+      ],
+      "validatorRules": [
+        "laterality_consistency",
+        "negation_conflict",
+        "measurement_consistency",
+        "modality_mismatch",
+        "impression_bullet_count",
+        "critical_result_language",
+        "unauthorized_followup",
+        "prior_comparison_required",
+        "contrast_phase_documented",
+        "level_consistency"
+      ]
+    },
+    {
+      "examId": "mr-sacroiliac-joints-nc",
+      "name": "MRI Sacroiliac Joints (sacroiliitis)",
+      "modality": "MR",
+      "bodyPart": "Sacroiliac Joints",
+      "contrast": "None",
+      "sex": "",
+      "subspecialty": "MSK",
+      "rulebookId": "mr_sacroiliac_joints_rp_v1",
+      "rulebookSource": "generated",
+      "frameworks": [],
+      "requiredSections": [
+        "Indication",
+        "Technique",
+        "Comparison",
+        "Findings",
+        "Impression"
+      ],
+      "validatorRules": [
+        "laterality_consistency",
+        "negation_conflict",
+        "measurement_consistency",
+        "modality_mismatch",
+        "impression_bullet_count",
+        "critical_result_language",
+        "unauthorized_followup",
+        "prior_comparison_required",
+        "fracture_acuity"
+      ]
+    },
+    {
+      "examId": "mr-cardiac-mp",
+      "name": "MRI Cardiac (function & viability)",
+      "modality": "MR",
+      "bodyPart": "Cardiac",
+      "contrast": "WithAndWithout",
+      "sex": "",
+      "subspecialty": "Cardiac",
+      "rulebookId": "mr_cardiac_rp_v1",
+      "rulebookSource": "generated",
+      "frameworks": [],
+      "requiredSections": [
+        "Indication",
+        "Technique",
+        "Comparison",
+        "Findings",
+        "Impression",
+        "Recommendations"
+      ],
+      "validatorRules": [
+        "laterality_consistency",
+        "negation_conflict",
+        "measurement_consistency",
+        "modality_mismatch",
+        "impression_bullet_count",
+        "critical_result_language",
+        "unauthorized_followup",
+        "prior_comparison_required",
+        "contrast_phase_documented"
+      ]
+    },
+    {
+      "examId": "mr-breast-mp",
+      "name": "MRI Breast (dynamic contrast-enhanced)",
+      "modality": "MR",
+      "bodyPart": "Breast",
+      "contrast": "WithAndWithout",
+      "sex": "",
+      "subspecialty": "Breast",
+      "rulebookId": "mr_breast_rp_v1",
+      "rulebookSource": "generated",
+      "frameworks": [
+        "BI-RADS"
+      ],
+      "requiredSections": [
+        "Indication",
+        "Technique",
+        "Comparison",
+        "Findings",
+        "Impression",
+        "Recommendations"
+      ],
+      "validatorRules": [
+        "laterality_consistency",
+        "negation_conflict",
+        "measurement_consistency",
+        "modality_mismatch",
+        "impression_bullet_count",
+        "critical_result_language",
+        "unauthorized_followup",
+        "prior_comparison_required",
+        "contrast_phase_documented",
+        "birads_category_required",
+        "birads_assessment_in_impression"
+      ]
+    },
+    {
+      "examId": "mr-liver-mp",
+      "name": "MRI Liver (hepatobiliary contrast)",
+      "modality": "MR",
+      "bodyPart": "Liver",
+      "contrast": "WithAndWithout",
+      "sex": "",
+      "subspecialty": "Body",
+      "rulebookId": "liver_lirads_v1",
+      "rulebookSource": "existing",
+      "frameworks": [
+        "LI-RADS"
+      ],
+      "requiredSections": [
+        "Indication",
+        "Technique",
+        "Comparison",
+        "Findings",
+        "Impression",
+        "Recommendations"
+      ],
+      "validatorRules": []
+    },
+    {
+      "examId": "mr-biliary-system-nc",
+      "name": "MRCP (magnetic resonance cholangiopancreatography)",
+      "modality": "MR",
+      "bodyPart": "Biliary System",
+      "contrast": "None",
+      "sex": "",
+      "subspecialty": "Body",
+      "rulebookId": "mr_biliary_system_rp_v1",
+      "rulebookSource": "generated",
+      "frameworks": [],
+      "requiredSections": [
+        "Indication",
+        "Technique",
+        "Comparison",
+        "Findings",
+        "Impression"
+      ],
+      "validatorRules": [
+        "laterality_consistency",
+        "negation_conflict",
+        "measurement_consistency",
+        "modality_mismatch",
+        "impression_bullet_count",
+        "critical_result_language",
+        "unauthorized_followup",
+        "prior_comparison_required"
+      ]
+    },
+    {
+      "examId": "mr-pancreas-mp",
+      "name": "MRI Pancreas",
+      "modality": "MR",
+      "bodyPart": "Pancreas",
+      "contrast": "WithAndWithout",
+      "sex": "",
+      "subspecialty": "Body",
+      "rulebookId": "mr_pancreas_rp_v1",
+      "rulebookSource": "generated",
+      "frameworks": [],
+      "requiredSections": [
+        "Indication",
+        "Technique",
+        "Comparison",
+        "Findings",
+        "Impression",
+        "Recommendations"
+      ],
+      "validatorRules": [
+        "laterality_consistency",
+        "negation_conflict",
+        "measurement_consistency",
+        "modality_mismatch",
+        "impression_bullet_count",
+        "critical_result_language",
+        "unauthorized_followup",
+        "prior_comparison_required",
+        "contrast_phase_documented"
+      ]
+    },
+    {
+      "examId": "mr-abdomen-mp",
+      "name": "MRI Abdomen",
+      "modality": "MR",
+      "bodyPart": "Abdomen",
+      "contrast": "WithAndWithout",
+      "sex": "",
+      "subspecialty": "Body",
+      "rulebookId": "liver_lirads_v1",
+      "rulebookSource": "existing",
+      "frameworks": [],
+      "requiredSections": [
+        "Indication",
+        "Technique",
+        "Comparison",
+        "Findings",
+        "Impression",
+        "Recommendations"
+      ],
+      "validatorRules": []
+    },
+    {
+      "examId": "mr-adrenals-nc",
+      "name": "MRI Adrenal (chemical-shift)",
+      "modality": "MR",
+      "bodyPart": "Adrenals",
+      "contrast": "None",
+      "sex": "",
+      "subspecialty": "Body",
+      "rulebookId": "mr_adrenals_rp_v1",
+      "rulebookSource": "generated",
+      "frameworks": [],
+      "requiredSections": [
+        "Indication",
+        "Technique",
+        "Comparison",
+        "Findings",
+        "Impression"
+      ],
+      "validatorRules": [
+        "laterality_consistency",
+        "negation_conflict",
+        "measurement_consistency",
+        "modality_mismatch",
+        "impression_bullet_count",
+        "critical_result_language",
+        "unauthorized_followup",
+        "prior_comparison_required"
+      ]
+    },
+    {
+      "examId": "mr-urinary-tract-mp",
+      "name": "MR Urography",
+      "modality": "MR",
+      "bodyPart": "Urinary Tract",
+      "contrast": "WithAndWithout",
+      "sex": "",
+      "subspecialty": "Body",
+      "rulebookId": "mr_urinary_tract_rp_v1",
+      "rulebookSource": "generated",
+      "frameworks": [],
+      "requiredSections": [
+        "Indication",
+        "Technique",
+        "Comparison",
+        "Findings",
+        "Impression",
+        "Recommendations"
+      ],
+      "validatorRules": [
+        "laterality_consistency",
+        "negation_conflict",
+        "measurement_consistency",
+        "modality_mismatch",
+        "impression_bullet_count",
+        "critical_result_language",
+        "unauthorized_followup",
+        "prior_comparison_required",
+        "contrast_phase_documented",
+        "incidental_findings_listed"
+      ]
+    },
+    {
+      "examId": "mr-small-bowel-mp",
+      "name": "MR Enterography",
+      "modality": "MR",
+      "bodyPart": "Small Bowel",
+      "contrast": "WithAndWithout",
+      "sex": "",
+      "subspecialty": "Body",
+      "rulebookId": "mr_small_bowel_rp_v1",
+      "rulebookSource": "generated",
+      "frameworks": [],
+      "requiredSections": [
+        "Indication",
+        "Technique",
+        "Comparison",
+        "Findings",
+        "Impression",
+        "Recommendations"
+      ],
+      "validatorRules": [
+        "laterality_consistency",
+        "negation_conflict",
+        "measurement_consistency",
+        "modality_mismatch",
+        "impression_bullet_count",
+        "critical_result_language",
+        "unauthorized_followup",
+        "prior_comparison_required",
+        "contrast_phase_documented",
+        "incidental_findings_listed"
+      ]
+    },
+    {
+      "examId": "mr-female-pelvis-mp",
+      "name": "MRI Female Pelvis",
+      "modality": "MR",
+      "bodyPart": "Female Pelvis",
+      "contrast": "WithAndWithout",
+      "sex": "F",
+      "subspecialty": "Body",
+      "rulebookId": "mr_female_pelvis_rp_v1",
+      "rulebookSource": "generated",
+      "frameworks": [
+        "O-RADS"
+      ],
+      "requiredSections": [
+        "Indication",
+        "Technique",
+        "Comparison",
+        "Findings",
+        "Impression",
+        "Recommendations"
+      ],
+      "validatorRules": [
+        "laterality_consistency",
+        "negation_conflict",
+        "measurement_consistency",
+        "modality_mismatch",
+        "impression_bullet_count",
+        "critical_result_language",
+        "unauthorized_followup",
+        "prior_comparison_required",
+        "contrast_phase_documented",
+        "figo_staging_when_oncologic"
+      ]
+    },
+    {
+      "examId": "mr-prostate-mp",
+      "name": "MRI Prostate (multiparametric)",
+      "modality": "MR",
+      "bodyPart": "Prostate",
+      "contrast": "WithAndWithout",
+      "sex": "M",
+      "subspecialty": "Body",
+      "rulebookId": "prostate_mri_v1",
+      "rulebookSource": "existing",
+      "frameworks": [
+        "PI-RADS"
+      ],
+      "requiredSections": [
+        "Indication",
+        "Technique",
+        "Comparison",
+        "Findings",
+        "Impression",
+        "Recommendations"
+      ],
+      "validatorRules": []
+    },
+    {
+      "examId": "mr-rectum-mp",
+      "name": "MRI Rectum (cancer staging)",
+      "modality": "MR",
+      "bodyPart": "Rectum",
+      "contrast": "WithAndWithout",
+      "sex": "",
+      "subspecialty": "Body",
+      "rulebookId": "mr_rectum_rp_v1",
+      "rulebookSource": "generated",
+      "frameworks": [],
+      "requiredSections": [
+        "Indication",
+        "Technique",
+        "Comparison",
+        "Findings",
+        "Impression",
+        "Recommendations"
+      ],
+      "validatorRules": [
+        "laterality_consistency",
+        "negation_conflict",
+        "measurement_consistency",
+        "modality_mismatch",
+        "impression_bullet_count",
+        "critical_result_language",
+        "unauthorized_followup",
+        "prior_comparison_required",
+        "contrast_phase_documented"
+      ]
+    },
+    {
+      "examId": "mr-pelvis-fistula-mp",
+      "name": "MRI Pelvis (perianal fistula)",
+      "modality": "MR",
+      "bodyPart": "Pelvis",
+      "contrast": "WithAndWithout",
+      "sex": "",
+      "subspecialty": "Body",
+      "rulebookId": "pelvis_mri_v1",
+      "rulebookSource": "existing",
+      "frameworks": [],
+      "requiredSections": [
+        "Indication",
+        "Technique",
+        "Comparison",
+        "Findings",
+        "Impression",
+        "Recommendations"
+      ],
+      "validatorRules": []
+    },
+    {
+      "examId": "mr-shoulder-nc",
+      "name": "MRI Shoulder",
+      "modality": "MR",
+      "bodyPart": "Shoulder",
+      "contrast": "None",
+      "sex": "",
+      "subspecialty": "MSK",
+      "rulebookId": "shoulder_mri_v1",
+      "rulebookSource": "existing",
+      "frameworks": [],
+      "requiredSections": [
+        "Indication",
+        "Technique",
+        "Comparison",
+        "Findings",
+        "Impression"
+      ],
+      "validatorRules": []
+    },
+    {
+      "examId": "mr-shoulder-arthro-c",
+      "name": "MR Arthrogram Shoulder",
+      "modality": "MR",
+      "bodyPart": "Shoulder",
+      "contrast": "With",
+      "sex": "",
+      "subspecialty": "MSK",
+      "rulebookId": "shoulder_mri_v1",
+      "rulebookSource": "existing",
+      "frameworks": [],
+      "requiredSections": [
+        "Indication",
+        "Technique",
+        "Comparison",
+        "Findings",
+        "Impression"
+      ],
+      "validatorRules": []
+    },
+    {
+      "examId": "mr-elbow-nc",
+      "name": "MRI Elbow",
+      "modality": "MR",
+      "bodyPart": "Elbow",
+      "contrast": "None",
+      "sex": "",
+      "subspecialty": "MSK",
+      "rulebookId": "mr_elbow_rp_v1",
+      "rulebookSource": "generated",
+      "frameworks": [],
+      "requiredSections": [
+        "Indication",
+        "Technique",
+        "Comparison",
+        "Findings",
+        "Impression"
+      ],
+      "validatorRules": [
+        "laterality_consistency",
+        "negation_conflict",
+        "measurement_consistency",
+        "modality_mismatch",
+        "impression_bullet_count",
+        "critical_result_language",
+        "unauthorized_followup",
+        "prior_comparison_required",
+        "fracture_acuity"
+      ]
+    },
+    {
+      "examId": "mr-wrist-nc",
+      "name": "MRI Wrist",
+      "modality": "MR",
+      "bodyPart": "Wrist",
+      "contrast": "None",
+      "sex": "",
+      "subspecialty": "MSK",
+      "rulebookId": "mr_wrist_rp_v1",
+      "rulebookSource": "generated",
+      "frameworks": [],
+      "requiredSections": [
+        "Indication",
+        "Technique",
+        "Comparison",
+        "Findings",
+        "Impression"
+      ],
+      "validatorRules": [
+        "laterality_consistency",
+        "negation_conflict",
+        "measurement_consistency",
+        "modality_mismatch",
+        "impression_bullet_count",
+        "critical_result_language",
+        "unauthorized_followup",
+        "prior_comparison_required",
+        "fracture_acuity"
+      ]
+    },
+    {
+      "examId": "mr-hip-nc",
+      "name": "MRI Hip",
+      "modality": "MR",
+      "bodyPart": "Hip",
+      "contrast": "None",
+      "sex": "",
+      "subspecialty": "MSK",
+      "rulebookId": "mr_hip_rp_v1",
+      "rulebookSource": "generated",
+      "frameworks": [],
+      "requiredSections": [
+        "Indication",
+        "Technique",
+        "Comparison",
+        "Findings",
+        "Impression"
+      ],
+      "validatorRules": [
+        "laterality_consistency",
+        "negation_conflict",
+        "measurement_consistency",
+        "modality_mismatch",
+        "impression_bullet_count",
+        "critical_result_language",
+        "unauthorized_followup",
+        "prior_comparison_required",
+        "contrast_phase_documented"
+      ]
+    },
+    {
+      "examId": "mr-hip-arthro-c",
+      "name": "MR Arthrogram Hip",
+      "modality": "MR",
+      "bodyPart": "Hip",
+      "contrast": "With",
+      "sex": "",
+      "subspecialty": "MSK",
+      "rulebookId": "mr_hip_rp_v1",
+      "rulebookSource": "generated",
+      "frameworks": [],
+      "requiredSections": [
+        "Indication",
+        "Technique",
+        "Comparison",
+        "Findings",
+        "Impression"
+      ],
+      "validatorRules": [
+        "laterality_consistency",
+        "negation_conflict",
+        "measurement_consistency",
+        "modality_mismatch",
+        "impression_bullet_count",
+        "critical_result_language",
+        "unauthorized_followup",
+        "prior_comparison_required",
+        "contrast_phase_documented"
+      ]
+    },
+    {
+      "examId": "mr-knee-nc",
+      "name": "MRI Knee",
+      "modality": "MR",
+      "bodyPart": "Knee",
+      "contrast": "None",
+      "sex": "",
+      "subspecialty": "MSK",
+      "rulebookId": "knee_mri_v1",
+      "rulebookSource": "existing",
+      "frameworks": [],
+      "requiredSections": [
+        "Indication",
+        "Technique",
+        "Comparison",
+        "Findings",
+        "Impression"
+      ],
+      "validatorRules": []
+    },
+    {
+      "examId": "mr-ankle-nc",
+      "name": "MRI Ankle",
+      "modality": "MR",
+      "bodyPart": "Ankle",
+      "contrast": "None",
+      "sex": "",
+      "subspecialty": "MSK",
+      "rulebookId": "mr_ankle_rp_v1",
+      "rulebookSource": "generated",
+      "frameworks": [],
+      "requiredSections": [
+        "Indication",
+        "Technique",
+        "Comparison",
+        "Findings",
+        "Impression"
+      ],
+      "validatorRules": [
+        "laterality_consistency",
+        "negation_conflict",
+        "measurement_consistency",
+        "modality_mismatch",
+        "impression_bullet_count",
+        "critical_result_language",
+        "unauthorized_followup",
+        "prior_comparison_required",
+        "fracture_acuity"
+      ]
+    },
+    {
+      "examId": "mr-foot-nc",
+      "name": "MRI Foot",
+      "modality": "MR",
+      "bodyPart": "Foot",
+      "contrast": "None",
+      "sex": "",
+      "subspecialty": "MSK",
+      "rulebookId": "mr_foot_rp_v1",
+      "rulebookSource": "generated",
+      "frameworks": [],
+      "requiredSections": [
+        "Indication",
+        "Technique",
+        "Comparison",
+        "Findings",
+        "Impression"
+      ],
+      "validatorRules": [
+        "laterality_consistency",
+        "negation_conflict",
+        "measurement_consistency",
+        "modality_mismatch",
+        "impression_bullet_count",
+        "critical_result_language",
+        "unauthorized_followup",
+        "prior_comparison_required",
+        "fracture_acuity"
+      ]
+    },
+    {
+      "examId": "mr-femur-mp",
+      "name": "MRI Femur (marrow / tumour)",
+      "modality": "MR",
+      "bodyPart": "Femur",
+      "contrast": "WithAndWithout",
+      "sex": "",
+      "subspecialty": "MSK",
+      "rulebookId": "mr_femur_rp_v1",
+      "rulebookSource": "generated",
+      "frameworks": [],
+      "requiredSections": [
+        "Indication",
+        "Technique",
+        "Comparison",
+        "Findings",
+        "Impression",
+        "Recommendations"
+      ],
+      "validatorRules": [
+        "laterality_consistency",
+        "negation_conflict",
+        "measurement_consistency",
+        "modality_mismatch",
+        "impression_bullet_count",
+        "critical_result_language",
+        "unauthorized_followup",
+        "prior_comparison_required",
+        "contrast_phase_documented",
+        "fracture_acuity"
+      ]
+    },
+    {
+      "examId": "mr-renal-arteries-c",
+      "name": "MR Angiography — Renal",
+      "modality": "MR",
+      "bodyPart": "Renal Arteries",
+      "contrast": "With",
+      "sex": "",
+      "subspecialty": "Vascular",
+      "rulebookId": "mr_renal_arteries_rp_v1",
+      "rulebookSource": "generated",
+      "frameworks": [],
+      "requiredSections": [
+        "Indication",
+        "Technique",
+        "Comparison",
+        "Findings",
+        "Impression"
+      ],
+      "validatorRules": [
+        "laterality_consistency",
+        "negation_conflict",
+        "measurement_consistency",
+        "modality_mismatch",
+        "impression_bullet_count",
+        "critical_result_language",
+        "unauthorized_followup",
+        "prior_comparison_required",
+        "contrast_phase_documented"
+      ]
+    },
+    {
+      "examId": "us-abdomen",
+      "name": "Ultrasound Abdomen (complete)",
+      "modality": "US",
+      "bodyPart": "Abdomen",
+      "contrast": "",
+      "sex": "",
+      "subspecialty": "Body",
+      "rulebookId": "abdomen_us_v1",
+      "rulebookSource": "existing",
+      "frameworks": [],
+      "requiredSections": [
+        "Indication",
+        "Technique",
+        "Comparison",
+        "Findings",
+        "Impression"
+      ],
+      "validatorRules": []
+    },
+    {
+      "examId": "us-abdomen-ruq",
+      "name": "Ultrasound Right Upper Quadrant (gallbladder)",
+      "modality": "US",
+      "bodyPart": "Abdomen",
+      "contrast": "",
+      "sex": "",
+      "subspecialty": "Body",
+      "rulebookId": "abdomen_us_v1",
+      "rulebookSource": "existing",
+      "frameworks": [],
+      "requiredSections": [
+        "Indication",
+        "Technique",
+        "Comparison",
+        "Findings",
+        "Impression"
+      ],
+      "validatorRules": []
+    },
+    {
+      "examId": "us-kidneys",
+      "name": "Ultrasound Renal / KUB",
+      "modality": "US",
+      "bodyPart": "Kidneys",
+      "contrast": "",
+      "sex": "",
+      "subspecialty": "Body",
+      "rulebookId": "us_kidneys_rp_v1",
+      "rulebookSource": "generated",
+      "frameworks": [],
+      "requiredSections": [
+        "Indication",
+        "Technique",
+        "Comparison",
+        "Findings",
+        "Impression"
+      ],
+      "validatorRules": [
+        "laterality_consistency",
+        "negation_conflict",
+        "measurement_consistency",
+        "modality_mismatch",
+        "impression_bullet_count",
+        "critical_result_language",
+        "unauthorized_followup",
+        "prior_comparison_required",
+        "incidental_findings_listed"
+      ]
+    },
+    {
+      "examId": "us-female-pelvis",
+      "name": "Ultrasound Pelvis (transabdominal)",
+      "modality": "US",
+      "bodyPart": "Female Pelvis",
+      "contrast": "",
+      "sex": "F",
+      "subspecialty": "Body",
+      "rulebookId": "us_female_pelvis_rp_v1",
+      "rulebookSource": "generated",
+      "frameworks": [
+        "O-RADS"
+      ],
+      "requiredSections": [
+        "Indication",
+        "Technique",
+        "Comparison",
+        "Findings",
+        "Impression"
+      ],
+      "validatorRules": [
+        "laterality_consistency",
+        "negation_conflict",
+        "measurement_consistency",
+        "modality_mismatch",
+        "impression_bullet_count",
+        "critical_result_language",
+        "unauthorized_followup",
+        "prior_comparison_required",
+        "figo_staging_when_oncologic"
+      ]
+    },
+    {
+      "examId": "us-female-pelvis-tv",
+      "name": "Ultrasound Pelvis (transvaginal)",
+      "modality": "US",
+      "bodyPart": "Female Pelvis",
+      "contrast": "",
+      "sex": "F",
+      "subspecialty": "Body",
+      "rulebookId": "us_female_pelvis_rp_v1",
+      "rulebookSource": "generated",
+      "frameworks": [
+        "O-RADS"
+      ],
+      "requiredSections": [
+        "Indication",
+        "Technique",
+        "Comparison",
+        "Findings",
+        "Impression"
+      ],
+      "validatorRules": [
+        "laterality_consistency",
+        "negation_conflict",
+        "measurement_consistency",
+        "modality_mismatch",
+        "impression_bullet_count",
+        "critical_result_language",
+        "unauthorized_followup",
+        "prior_comparison_required",
+        "figo_staging_when_oncologic"
+      ]
+    },
+    {
+      "examId": "us-obstetric-t1",
+      "name": "Ultrasound Obstetric (first trimester)",
+      "modality": "US",
+      "bodyPart": "Obstetric",
+      "contrast": "",
+      "sex": "F",
+      "subspecialty": "OB/GYN",
+      "rulebookId": "us_obstetric_rp_v1",
+      "rulebookSource": "generated",
+      "frameworks": [],
+      "requiredSections": [
+        "Indication",
+        "Technique",
+        "Comparison",
+        "Findings",
+        "Impression"
+      ],
+      "validatorRules": [
+        "laterality_consistency",
+        "negation_conflict",
+        "measurement_consistency",
+        "modality_mismatch",
+        "impression_bullet_count",
+        "critical_result_language",
+        "unauthorized_followup",
+        "prior_comparison_required"
+      ]
+    },
+    {
+      "examId": "us-obstetric-t2",
+      "name": "Ultrasound Obstetric (second/third trimester)",
+      "modality": "US",
+      "bodyPart": "Obstetric",
+      "contrast": "",
+      "sex": "F",
+      "subspecialty": "OB/GYN",
+      "rulebookId": "us_obstetric_rp_v1",
+      "rulebookSource": "generated",
+      "frameworks": [],
+      "requiredSections": [
+        "Indication",
+        "Technique",
+        "Comparison",
+        "Findings",
+        "Impression"
+      ],
+      "validatorRules": [
+        "laterality_consistency",
+        "negation_conflict",
+        "measurement_consistency",
+        "modality_mismatch",
+        "impression_bullet_count",
+        "critical_result_language",
+        "unauthorized_followup",
+        "prior_comparison_required"
+      ]
+    },
+    {
+      "examId": "us-scrotum",
+      "name": "Ultrasound Scrotum",
+      "modality": "US",
+      "bodyPart": "Scrotum",
+      "contrast": "",
+      "sex": "M",
+      "subspecialty": "Body",
+      "rulebookId": "us_scrotum_rp_v1",
+      "rulebookSource": "generated",
+      "frameworks": [],
+      "requiredSections": [
+        "Indication",
+        "Technique",
+        "Comparison",
+        "Findings",
+        "Impression"
+      ],
+      "validatorRules": [
+        "laterality_consistency",
+        "negation_conflict",
+        "measurement_consistency",
+        "modality_mismatch",
+        "impression_bullet_count",
+        "critical_result_language",
+        "unauthorized_followup",
+        "prior_comparison_required"
+      ]
+    },
+    {
+      "examId": "us-thyroid",
+      "name": "Ultrasound Thyroid",
+      "modality": "US",
+      "bodyPart": "Thyroid",
+      "contrast": "",
+      "sex": "",
+      "subspecialty": "Head & Neck",
+      "rulebookId": "thyroid_us_v1",
+      "rulebookSource": "existing",
+      "frameworks": [
+        "TI-RADS"
+      ],
+      "requiredSections": [
+        "Indication",
+        "Technique",
+        "Comparison",
+        "Findings",
+        "Impression"
+      ],
+      "validatorRules": []
+    },
+    {
+      "examId": "us-neck",
+      "name": "Ultrasound Neck / Lymph Nodes",
+      "modality": "US",
+      "bodyPart": "Neck",
+      "contrast": "",
+      "sex": "",
+      "subspecialty": "Head & Neck",
+      "rulebookId": "thyroid_us_v1",
+      "rulebookSource": "existing",
+      "frameworks": [],
+      "requiredSections": [
+        "Indication",
+        "Technique",
+        "Comparison",
+        "Findings",
+        "Impression"
+      ],
+      "validatorRules": []
+    },
+    {
+      "examId": "us-breast",
+      "name": "Ultrasound Breast",
+      "modality": "US",
+      "bodyPart": "Breast",
+      "contrast": "",
+      "sex": "",
+      "subspecialty": "Breast",
+      "rulebookId": "us_breast_rp_v1",
+      "rulebookSource": "generated",
+      "frameworks": [
+        "BI-RADS"
+      ],
+      "requiredSections": [
+        "Indication",
+        "Technique",
+        "Comparison",
+        "Findings",
+        "Impression"
+      ],
+      "validatorRules": [
+        "laterality_consistency",
+        "negation_conflict",
+        "measurement_consistency",
+        "modality_mismatch",
+        "impression_bullet_count",
+        "critical_result_language",
+        "unauthorized_followup",
+        "prior_comparison_required",
+        "birads_category_required",
+        "birads_assessment_in_impression"
+      ]
+    },
+    {
+      "examId": "us-carotid-arteries",
+      "name": "Ultrasound Carotid Doppler",
+      "modality": "US",
+      "bodyPart": "Carotid Arteries",
+      "contrast": "",
+      "sex": "",
+      "subspecialty": "Vascular",
+      "rulebookId": "us_carotid_arteries_rp_v1",
+      "rulebookSource": "generated",
+      "frameworks": [],
+      "requiredSections": [
+        "Indication",
+        "Technique",
+        "Comparison",
+        "Findings",
+        "Impression"
+      ],
+      "validatorRules": [
+        "laterality_consistency",
+        "negation_conflict",
+        "measurement_consistency",
+        "modality_mismatch",
+        "impression_bullet_count",
+        "critical_result_language",
+        "unauthorized_followup",
+        "prior_comparison_required"
+      ]
+    },
+    {
+      "examId": "us-peripheral-runoff-venous",
+      "name": "Ultrasound Venous Doppler (DVT)",
+      "modality": "US",
+      "bodyPart": "Peripheral Runoff",
+      "contrast": "",
+      "sex": "",
+      "subspecialty": "Vascular",
+      "rulebookId": "us_peripheral_runoff_rp_v1",
+      "rulebookSource": "generated",
+      "frameworks": [],
+      "requiredSections": [
+        "Indication",
+        "Technique",
+        "Comparison",
+        "Findings",
+        "Impression"
+      ],
+      "validatorRules": [
+        "laterality_consistency",
+        "negation_conflict",
+        "measurement_consistency",
+        "modality_mismatch",
+        "impression_bullet_count",
+        "critical_result_language",
+        "unauthorized_followup",
+        "prior_comparison_required"
+      ]
+    },
+    {
+      "examId": "us-peripheral-runoff-arterial",
+      "name": "Ultrasound Arterial Doppler (lower limb)",
+      "modality": "US",
+      "bodyPart": "Peripheral Runoff",
+      "contrast": "",
+      "sex": "",
+      "subspecialty": "Vascular",
+      "rulebookId": "us_peripheral_runoff_rp_v1",
+      "rulebookSource": "generated",
+      "frameworks": [],
+      "requiredSections": [
+        "Indication",
+        "Technique",
+        "Comparison",
+        "Findings",
+        "Impression"
+      ],
+      "validatorRules": [
+        "laterality_consistency",
+        "negation_conflict",
+        "measurement_consistency",
+        "modality_mismatch",
+        "impression_bullet_count",
+        "critical_result_language",
+        "unauthorized_followup",
+        "prior_comparison_required"
+      ]
+    },
+    {
+      "examId": "us-liver",
+      "name": "Ultrasound Liver Doppler (portal)",
+      "modality": "US",
+      "bodyPart": "Liver",
+      "contrast": "",
+      "sex": "",
+      "subspecialty": "Body",
+      "rulebookId": "us_liver_rp_v1",
+      "rulebookSource": "generated",
+      "frameworks": [],
+      "requiredSections": [
+        "Indication",
+        "Technique",
+        "Comparison",
+        "Findings",
+        "Impression"
+      ],
+      "validatorRules": [
+        "laterality_consistency",
+        "negation_conflict",
+        "measurement_consistency",
+        "modality_mismatch",
+        "impression_bullet_count",
+        "critical_result_language",
+        "unauthorized_followup",
+        "prior_comparison_required",
+        "index_lesion_localized"
+      ]
+    },
+    {
+      "examId": "us-renal-arteries",
+      "name": "Ultrasound Renal Doppler",
+      "modality": "US",
+      "bodyPart": "Renal Arteries",
+      "contrast": "",
+      "sex": "",
+      "subspecialty": "Vascular",
+      "rulebookId": "us_renal_arteries_rp_v1",
+      "rulebookSource": "generated",
+      "frameworks": [],
+      "requiredSections": [
+        "Indication",
+        "Technique",
+        "Comparison",
+        "Findings",
+        "Impression"
+      ],
+      "validatorRules": [
+        "laterality_consistency",
+        "negation_conflict",
+        "measurement_consistency",
+        "modality_mismatch",
+        "impression_bullet_count",
+        "critical_result_language",
+        "unauthorized_followup",
+        "prior_comparison_required"
+      ]
+    },
+    {
+      "examId": "us-shoulder",
+      "name": "Ultrasound Shoulder (rotator cuff)",
+      "modality": "US",
+      "bodyPart": "Shoulder",
+      "contrast": "",
+      "sex": "",
+      "subspecialty": "MSK",
+      "rulebookId": "us_shoulder_rp_v1",
+      "rulebookSource": "generated",
+      "frameworks": [],
+      "requiredSections": [
+        "Indication",
+        "Technique",
+        "Comparison",
+        "Findings",
+        "Impression"
+      ],
+      "validatorRules": [
+        "laterality_consistency",
+        "negation_conflict",
+        "measurement_consistency",
+        "modality_mismatch",
+        "impression_bullet_count",
+        "critical_result_language",
+        "unauthorized_followup",
+        "prior_comparison_required",
+        "rotator_cuff_thickness_described",
+        "labrum_described"
+      ]
+    },
+    {
+      "examId": "us-hip",
+      "name": "Ultrasound Infant Hip (DDH)",
+      "modality": "US",
+      "bodyPart": "Hip",
+      "contrast": "",
+      "sex": "",
+      "subspecialty": "Paediatric",
+      "rulebookId": "us_hip_rp_v1",
+      "rulebookSource": "generated",
+      "frameworks": [],
+      "requiredSections": [
+        "Indication",
+        "Technique",
+        "Comparison",
+        "Findings",
+        "Impression"
+      ],
+      "validatorRules": [
+        "laterality_consistency",
+        "negation_conflict",
+        "measurement_consistency",
+        "modality_mismatch",
+        "impression_bullet_count",
+        "critical_result_language",
+        "unauthorized_followup",
+        "prior_comparison_required",
+        "fracture_acuity"
+      ]
+    },
+    {
+      "examId": "us-prostate",
+      "name": "Ultrasound Prostate (transrectal)",
+      "modality": "US",
+      "bodyPart": "Prostate",
+      "contrast": "",
+      "sex": "M",
+      "subspecialty": "Body",
+      "rulebookId": "us_prostate_rp_v1",
+      "rulebookSource": "generated",
+      "frameworks": [],
+      "requiredSections": [
+        "Indication",
+        "Technique",
+        "Comparison",
+        "Findings",
+        "Impression"
+      ],
+      "validatorRules": [
+        "laterality_consistency",
+        "negation_conflict",
+        "measurement_consistency",
+        "modality_mismatch",
+        "impression_bullet_count",
+        "critical_result_language",
+        "unauthorized_followup",
+        "prior_comparison_required",
+        "index_lesion_localized"
+      ]
+    },
+    {
+      "examId": "us-neonatal-head",
+      "name": "Ultrasound Neonatal Cranial",
+      "modality": "US",
+      "bodyPart": "Neonatal Head",
+      "contrast": "",
+      "sex": "",
+      "subspecialty": "Paediatric",
+      "rulebookId": "us_neonatal_head_rp_v1",
+      "rulebookSource": "generated",
+      "frameworks": [],
+      "requiredSections": [
+        "Indication",
+        "Technique",
+        "Comparison",
+        "Findings",
+        "Impression"
+      ],
+      "validatorRules": [
+        "laterality_consistency",
+        "negation_conflict",
+        "measurement_consistency",
+        "modality_mismatch",
+        "impression_bullet_count",
+        "critical_result_language",
+        "unauthorized_followup",
+        "prior_comparison_required",
+        "midline_shift_measured"
+      ]
+    },
+    {
+      "examId": "xr-chest",
+      "name": "Chest X-ray",
+      "modality": "XR",
+      "bodyPart": "Chest",
+      "contrast": "",
+      "sex": "",
+      "subspecialty": "Thoracic",
+      "rulebookId": "chest_xray_v1",
+      "rulebookSource": "existing",
+      "frameworks": [],
+      "requiredSections": [
+        "Indication",
+        "Technique",
+        "Comparison",
+        "Findings",
+        "Impression"
+      ],
+      "validatorRules": []
+    },
+    {
+      "examId": "xr-abdomen",
+      "name": "Abdominal X-ray (KUB / erect)",
+      "modality": "XR",
+      "bodyPart": "Abdomen",
+      "contrast": "",
+      "sex": "",
+      "subspecialty": "Body",
+      "rulebookId": "xr_abdomen_rp_v1",
+      "rulebookSource": "generated",
+      "frameworks": [],
+      "requiredSections": [
+        "Indication",
+        "Technique",
+        "Comparison",
+        "Findings",
+        "Impression"
+      ],
+      "validatorRules": [
+        "laterality_consistency",
+        "negation_conflict",
+        "measurement_consistency",
+        "modality_mismatch",
+        "impression_bullet_count",
+        "critical_result_language",
+        "unauthorized_followup",
+        "prior_comparison_required",
+        "fracture_acuity"
+      ]
+    },
+    {
+      "examId": "xr-cervical-spine",
+      "name": "Cervical Spine X-ray",
+      "modality": "XR",
+      "bodyPart": "Cervical Spine",
+      "contrast": "",
+      "sex": "",
+      "subspecialty": "MSK/Spine",
+      "rulebookId": "xr_cervical_spine_rp_v1",
+      "rulebookSource": "generated",
+      "frameworks": [],
+      "requiredSections": [
+        "Indication",
+        "Technique",
+        "Comparison",
+        "Findings",
+        "Impression"
+      ],
+      "validatorRules": [
+        "laterality_consistency",
+        "negation_conflict",
+        "measurement_consistency",
+        "modality_mismatch",
+        "impression_bullet_count",
+        "critical_result_language",
+        "unauthorized_followup",
+        "prior_comparison_required",
+        "fracture_acuity"
+      ]
+    },
+    {
+      "examId": "xr-thoracic-spine",
+      "name": "Thoracic Spine X-ray",
+      "modality": "XR",
+      "bodyPart": "Thoracic Spine",
+      "contrast": "",
+      "sex": "",
+      "subspecialty": "MSK/Spine",
+      "rulebookId": "xr_thoracic_spine_rp_v1",
+      "rulebookSource": "generated",
+      "frameworks": [],
+      "requiredSections": [
+        "Indication",
+        "Technique",
+        "Comparison",
+        "Findings",
+        "Impression"
+      ],
+      "validatorRules": [
+        "laterality_consistency",
+        "negation_conflict",
+        "measurement_consistency",
+        "modality_mismatch",
+        "impression_bullet_count",
+        "critical_result_language",
+        "unauthorized_followup",
+        "prior_comparison_required",
+        "fracture_acuity"
+      ]
+    },
+    {
+      "examId": "xr-lumbar-spine",
+      "name": "Lumbar Spine X-ray",
+      "modality": "XR",
+      "bodyPart": "Lumbar Spine",
+      "contrast": "",
+      "sex": "",
+      "subspecialty": "MSK/Spine",
+      "rulebookId": "xr_lumbar_spine_rp_v1",
+      "rulebookSource": "generated",
+      "frameworks": [],
+      "requiredSections": [
+        "Indication",
+        "Technique",
+        "Comparison",
+        "Findings",
+        "Impression"
+      ],
+      "validatorRules": [
+        "laterality_consistency",
+        "negation_conflict",
+        "measurement_consistency",
+        "modality_mismatch",
+        "impression_bullet_count",
+        "critical_result_language",
+        "unauthorized_followup",
+        "prior_comparison_required",
+        "fracture_acuity"
+      ]
+    },
+    {
+      "examId": "xr-whole-spine",
+      "name": "Whole Spine / Scoliosis X-ray",
+      "modality": "XR",
+      "bodyPart": "Whole Spine",
+      "contrast": "",
+      "sex": "",
+      "subspecialty": "MSK/Spine",
+      "rulebookId": "xr_whole_spine_rp_v1",
+      "rulebookSource": "generated",
+      "frameworks": [],
+      "requiredSections": [
+        "Indication",
+        "Technique",
+        "Comparison",
+        "Findings",
+        "Impression"
+      ],
+      "validatorRules": [
+        "laterality_consistency",
+        "negation_conflict",
+        "measurement_consistency",
+        "modality_mismatch",
+        "impression_bullet_count",
+        "critical_result_language",
+        "unauthorized_followup",
+        "prior_comparison_required",
+        "fracture_acuity"
+      ]
+    },
+    {
+      "examId": "xr-bony-pelvis",
+      "name": "Pelvis X-ray",
+      "modality": "XR",
+      "bodyPart": "Bony Pelvis",
+      "contrast": "",
+      "sex": "",
+      "subspecialty": "MSK",
+      "rulebookId": "xr_bony_pelvis_rp_v1",
+      "rulebookSource": "generated",
+      "frameworks": [],
+      "requiredSections": [
+        "Indication",
+        "Technique",
+        "Comparison",
+        "Findings",
+        "Impression"
+      ],
+      "validatorRules": [
+        "laterality_consistency",
+        "negation_conflict",
+        "measurement_consistency",
+        "modality_mismatch",
+        "impression_bullet_count",
+        "critical_result_language",
+        "unauthorized_followup",
+        "prior_comparison_required",
+        "fracture_acuity"
+      ]
+    },
+    {
+      "examId": "xr-hip",
+      "name": "Hip X-ray",
+      "modality": "XR",
+      "bodyPart": "Hip",
+      "contrast": "",
+      "sex": "",
+      "subspecialty": "MSK",
+      "rulebookId": "musculoskeletal_xr_v1",
+      "rulebookSource": "existing",
+      "frameworks": [],
+      "requiredSections": [
+        "Indication",
+        "Technique",
+        "Comparison",
+        "Findings",
+        "Impression"
+      ],
+      "validatorRules": []
+    },
+    {
+      "examId": "xr-knee",
+      "name": "Knee X-ray",
+      "modality": "XR",
+      "bodyPart": "Knee",
+      "contrast": "",
+      "sex": "",
+      "subspecialty": "MSK",
+      "rulebookId": "musculoskeletal_xr_v1",
+      "rulebookSource": "existing",
+      "frameworks": [],
+      "requiredSections": [
+        "Indication",
+        "Technique",
+        "Comparison",
+        "Findings",
+        "Impression"
+      ],
+      "validatorRules": []
+    },
+    {
+      "examId": "xr-ankle",
+      "name": "Ankle X-ray",
+      "modality": "XR",
+      "bodyPart": "Ankle",
+      "contrast": "",
+      "sex": "",
+      "subspecialty": "MSK",
+      "rulebookId": "musculoskeletal_xr_v1",
+      "rulebookSource": "existing",
+      "frameworks": [],
+      "requiredSections": [
+        "Indication",
+        "Technique",
+        "Comparison",
+        "Findings",
+        "Impression"
+      ],
+      "validatorRules": []
+    },
+    {
+      "examId": "xr-foot",
+      "name": "Foot X-ray",
+      "modality": "XR",
+      "bodyPart": "Foot",
+      "contrast": "",
+      "sex": "",
+      "subspecialty": "MSK",
+      "rulebookId": "musculoskeletal_xr_v1",
+      "rulebookSource": "existing",
+      "frameworks": [],
+      "requiredSections": [
+        "Indication",
+        "Technique",
+        "Comparison",
+        "Findings",
+        "Impression"
+      ],
+      "validatorRules": []
+    },
+    {
+      "examId": "xr-shoulder",
+      "name": "Shoulder X-ray",
+      "modality": "XR",
+      "bodyPart": "Shoulder",
+      "contrast": "",
+      "sex": "",
+      "subspecialty": "MSK",
+      "rulebookId": "musculoskeletal_xr_v1",
+      "rulebookSource": "existing",
+      "frameworks": [],
+      "requiredSections": [
+        "Indication",
+        "Technique",
+        "Comparison",
+        "Findings",
+        "Impression"
+      ],
+      "validatorRules": []
+    },
+    {
+      "examId": "xr-elbow",
+      "name": "Elbow X-ray",
+      "modality": "XR",
+      "bodyPart": "Elbow",
+      "contrast": "",
+      "sex": "",
+      "subspecialty": "MSK",
+      "rulebookId": "xr_elbow_rp_v1",
+      "rulebookSource": "generated",
+      "frameworks": [],
+      "requiredSections": [
+        "Indication",
+        "Technique",
+        "Comparison",
+        "Findings",
+        "Impression"
+      ],
+      "validatorRules": [
+        "laterality_consistency",
+        "negation_conflict",
+        "measurement_consistency",
+        "modality_mismatch",
+        "impression_bullet_count",
+        "critical_result_language",
+        "unauthorized_followup",
+        "prior_comparison_required",
+        "fracture_acuity"
+      ]
+    },
+    {
+      "examId": "xr-wrist",
+      "name": "Wrist X-ray",
+      "modality": "XR",
+      "bodyPart": "Wrist",
+      "contrast": "",
+      "sex": "",
+      "subspecialty": "MSK",
+      "rulebookId": "musculoskeletal_xr_v1",
+      "rulebookSource": "existing",
+      "frameworks": [],
+      "requiredSections": [
+        "Indication",
+        "Technique",
+        "Comparison",
+        "Findings",
+        "Impression"
+      ],
+      "validatorRules": []
+    },
+    {
+      "examId": "xr-hand",
+      "name": "Hand X-ray",
+      "modality": "XR",
+      "bodyPart": "Hand",
+      "contrast": "",
+      "sex": "",
+      "subspecialty": "MSK",
+      "rulebookId": "musculoskeletal_xr_v1",
+      "rulebookSource": "existing",
+      "frameworks": [],
+      "requiredSections": [
+        "Indication",
+        "Technique",
+        "Comparison",
+        "Findings",
+        "Impression"
+      ],
+      "validatorRules": []
+    },
+    {
+      "examId": "xr-humerus",
+      "name": "Humerus X-ray",
+      "modality": "XR",
+      "bodyPart": "Humerus",
+      "contrast": "",
+      "sex": "",
+      "subspecialty": "MSK",
+      "rulebookId": "xr_humerus_rp_v1",
+      "rulebookSource": "generated",
+      "frameworks": [],
+      "requiredSections": [
+        "Indication",
+        "Technique",
+        "Comparison",
+        "Findings",
+        "Impression"
+      ],
+      "validatorRules": [
+        "laterality_consistency",
+        "negation_conflict",
+        "measurement_consistency",
+        "modality_mismatch",
+        "impression_bullet_count",
+        "critical_result_language",
+        "unauthorized_followup",
+        "prior_comparison_required",
+        "fracture_acuity"
+      ]
+    },
+    {
+      "examId": "xr-forearm",
+      "name": "Forearm X-ray",
+      "modality": "XR",
+      "bodyPart": "Forearm",
+      "contrast": "",
+      "sex": "",
+      "subspecialty": "MSK",
+      "rulebookId": "xr_forearm_rp_v1",
+      "rulebookSource": "generated",
+      "frameworks": [],
+      "requiredSections": [
+        "Indication",
+        "Technique",
+        "Comparison",
+        "Findings",
+        "Impression"
+      ],
+      "validatorRules": [
+        "laterality_consistency",
+        "negation_conflict",
+        "measurement_consistency",
+        "modality_mismatch",
+        "impression_bullet_count",
+        "critical_result_language",
+        "unauthorized_followup",
+        "prior_comparison_required",
+        "fracture_acuity"
+      ]
+    },
+    {
+      "examId": "xr-femur",
+      "name": "Femur X-ray",
+      "modality": "XR",
+      "bodyPart": "Femur",
+      "contrast": "",
+      "sex": "",
+      "subspecialty": "MSK",
+      "rulebookId": "xr_femur_rp_v1",
+      "rulebookSource": "generated",
+      "frameworks": [],
+      "requiredSections": [
+        "Indication",
+        "Technique",
+        "Comparison",
+        "Findings",
+        "Impression"
+      ],
+      "validatorRules": [
+        "laterality_consistency",
+        "negation_conflict",
+        "measurement_consistency",
+        "modality_mismatch",
+        "impression_bullet_count",
+        "critical_result_language",
+        "unauthorized_followup",
+        "prior_comparison_required",
+        "fracture_acuity"
+      ]
+    },
+    {
+      "examId": "xr-tibia-and-fibula",
+      "name": "Tibia & Fibula X-ray",
+      "modality": "XR",
+      "bodyPart": "Tibia & Fibula",
+      "contrast": "",
+      "sex": "",
+      "subspecialty": "MSK",
+      "rulebookId": "xr_tibia_and_fibula_rp_v1",
+      "rulebookSource": "generated",
+      "frameworks": [],
+      "requiredSections": [
+        "Indication",
+        "Technique",
+        "Comparison",
+        "Findings",
+        "Impression"
+      ],
+      "validatorRules": [
+        "laterality_consistency",
+        "negation_conflict",
+        "measurement_consistency",
+        "modality_mismatch",
+        "impression_bullet_count",
+        "critical_result_language",
+        "unauthorized_followup",
+        "prior_comparison_required",
+        "fracture_acuity"
+      ]
+    },
+    {
+      "examId": "xr-facial-bones",
+      "name": "Facial Bones / Nasal X-ray",
+      "modality": "XR",
+      "bodyPart": "Facial Bones",
+      "contrast": "",
+      "sex": "",
+      "subspecialty": "Head & Neck",
+      "rulebookId": "xr_facial_bones_rp_v1",
+      "rulebookSource": "generated",
+      "frameworks": [],
+      "requiredSections": [
+        "Indication",
+        "Technique",
+        "Comparison",
+        "Findings",
+        "Impression"
+      ],
+      "validatorRules": [
+        "laterality_consistency",
+        "negation_conflict",
+        "measurement_consistency",
+        "modality_mismatch",
+        "impression_bullet_count",
+        "critical_result_language",
+        "unauthorized_followup",
+        "prior_comparison_required",
+        "fracture_acuity"
+      ]
+    },
+    {
+      "examId": "xr-whole-body",
+      "name": "Skeletal Survey",
+      "modality": "XR",
+      "bodyPart": "Whole Body",
+      "contrast": "",
+      "sex": "",
+      "subspecialty": "MSK",
+      "rulebookId": "xr_whole_body_rp_v1",
+      "rulebookSource": "generated",
+      "frameworks": [],
+      "requiredSections": [
+        "Indication",
+        "Technique",
+        "Comparison",
+        "Findings",
+        "Impression"
+      ],
+      "validatorRules": [
+        "laterality_consistency",
+        "negation_conflict",
+        "measurement_consistency",
+        "modality_mismatch",
+        "impression_bullet_count",
+        "critical_result_language",
+        "unauthorized_followup",
+        "prior_comparison_required",
+        "fracture_acuity"
+      ]
+    },
+    {
+      "examId": "xr-hand-boneage",
+      "name": "Bone Age (hand-wrist)",
+      "modality": "XR",
+      "bodyPart": "Hand",
+      "contrast": "",
+      "sex": "",
+      "subspecialty": "Paediatric",
+      "rulebookId": "musculoskeletal_xr_v1",
+      "rulebookSource": "existing",
+      "frameworks": [],
+      "requiredSections": [
+        "Indication",
+        "Technique",
+        "Comparison",
+        "Findings",
+        "Impression"
+      ],
+      "validatorRules": []
+    },
+    {
+      "examId": "mg-breast-screen",
+      "name": "Mammography (screening)",
+      "modality": "MG",
+      "bodyPart": "Breast",
+      "contrast": "",
+      "sex": "",
+      "subspecialty": "Breast",
+      "rulebookId": "mammography_v1",
+      "rulebookSource": "existing",
+      "frameworks": [
+        "BI-RADS"
+      ],
+      "requiredSections": [
+        "Indication",
+        "Technique",
+        "Comparison",
+        "Findings",
+        "Impression"
+      ],
+      "validatorRules": []
+    },
+    {
+      "examId": "mg-breast-diag",
+      "name": "Mammography (diagnostic)",
+      "modality": "MG",
+      "bodyPart": "Breast",
+      "contrast": "",
+      "sex": "",
+      "subspecialty": "Breast",
+      "rulebookId": "mammography_v1",
+      "rulebookSource": "existing",
+      "frameworks": [
+        "BI-RADS"
+      ],
+      "requiredSections": [
+        "Indication",
+        "Technique",
+        "Comparison",
+        "Findings",
+        "Impression"
+      ],
+      "validatorRules": []
+    },
+    {
+      "examId": "mg-breast-dbt",
+      "name": "Digital Breast Tomosynthesis",
+      "modality": "MG",
+      "bodyPart": "Breast",
+      "contrast": "",
+      "sex": "",
+      "subspecialty": "Breast",
+      "rulebookId": "mammography_v1",
+      "rulebookSource": "existing",
+      "frameworks": [
+        "BI-RADS"
+      ],
+      "requiredSections": [
+        "Indication",
+        "Technique",
+        "Comparison",
+        "Findings",
+        "Impression"
+      ],
+      "validatorRules": []
+    },
+    {
+      "examId": "nm-whole-body-bone",
+      "name": "Bone Scan (whole body)",
+      "modality": "NM",
+      "bodyPart": "Whole Body",
+      "contrast": "",
+      "sex": "",
+      "subspecialty": "Nuclear",
+      "rulebookId": "nm_whole_body_rp_v1",
+      "rulebookSource": "generated",
+      "frameworks": [],
+      "requiredSections": [
+        "Indication",
+        "Technique",
+        "Comparison",
+        "Findings",
+        "Impression"
+      ],
+      "validatorRules": [
+        "laterality_consistency",
+        "negation_conflict",
+        "measurement_consistency",
+        "modality_mismatch",
+        "impression_bullet_count",
+        "critical_result_language",
+        "unauthorized_followup",
+        "prior_comparison_required"
+      ]
+    },
+    {
+      "examId": "nm-thyroid",
+      "name": "Thyroid Scan / Uptake",
+      "modality": "NM",
+      "bodyPart": "Thyroid",
+      "contrast": "",
+      "sex": "",
+      "subspecialty": "Nuclear",
+      "rulebookId": "nm_thyroid_rp_v1",
+      "rulebookSource": "generated",
+      "frameworks": [],
+      "requiredSections": [
+        "Indication",
+        "Technique",
+        "Comparison",
+        "Findings",
+        "Impression"
+      ],
+      "validatorRules": [
+        "laterality_consistency",
+        "negation_conflict",
+        "measurement_consistency",
+        "modality_mismatch",
+        "impression_bullet_count",
+        "critical_result_language",
+        "unauthorized_followup",
+        "prior_comparison_required"
+      ]
+    },
+    {
+      "examId": "nm-kidneys-dynamic",
+      "name": "Renal Scan (MAG3/DTPA)",
+      "modality": "NM",
+      "bodyPart": "Kidneys",
+      "contrast": "",
+      "sex": "",
+      "subspecialty": "Nuclear",
+      "rulebookId": "nm_kidneys_rp_v1",
+      "rulebookSource": "generated",
+      "frameworks": [],
+      "requiredSections": [
+        "Indication",
+        "Technique",
+        "Comparison",
+        "Findings",
+        "Impression"
+      ],
+      "validatorRules": [
+        "laterality_consistency",
+        "negation_conflict",
+        "measurement_consistency",
+        "modality_mismatch",
+        "impression_bullet_count",
+        "critical_result_language",
+        "unauthorized_followup",
+        "prior_comparison_required"
+      ]
+    },
+    {
+      "examId": "nm-kidneys-dmsa",
+      "name": "Renal Cortical Scan (DMSA)",
+      "modality": "NM",
+      "bodyPart": "Kidneys",
+      "contrast": "",
+      "sex": "",
+      "subspecialty": "Nuclear",
+      "rulebookId": "nm_kidneys_rp_v1",
+      "rulebookSource": "generated",
+      "frameworks": [],
+      "requiredSections": [
+        "Indication",
+        "Technique",
+        "Comparison",
+        "Findings",
+        "Impression"
+      ],
+      "validatorRules": [
+        "laterality_consistency",
+        "negation_conflict",
+        "measurement_consistency",
+        "modality_mismatch",
+        "impression_bullet_count",
+        "critical_result_language",
+        "unauthorized_followup",
+        "prior_comparison_required"
+      ]
+    },
+    {
+      "examId": "nm-biliary-system",
+      "name": "Hepatobiliary Scan (HIDA)",
+      "modality": "NM",
+      "bodyPart": "Biliary System",
+      "contrast": "",
+      "sex": "",
+      "subspecialty": "Nuclear",
+      "rulebookId": "nm_biliary_system_rp_v1",
+      "rulebookSource": "generated",
+      "frameworks": [],
+      "requiredSections": [
+        "Indication",
+        "Technique",
+        "Comparison",
+        "Findings",
+        "Impression"
+      ],
+      "validatorRules": [
+        "laterality_consistency",
+        "negation_conflict",
+        "measurement_consistency",
+        "modality_mismatch",
+        "impression_bullet_count",
+        "critical_result_language",
+        "unauthorized_followup",
+        "prior_comparison_required"
+      ]
+    },
+    {
+      "examId": "nm-cardiac",
+      "name": "Myocardial Perfusion Scan",
+      "modality": "NM",
+      "bodyPart": "Cardiac",
+      "contrast": "",
+      "sex": "",
+      "subspecialty": "Nuclear",
+      "rulebookId": "nm_cardiac_rp_v1",
+      "rulebookSource": "generated",
+      "frameworks": [],
+      "requiredSections": [
+        "Indication",
+        "Technique",
+        "Comparison",
+        "Findings",
+        "Impression"
+      ],
+      "validatorRules": [
+        "laterality_consistency",
+        "negation_conflict",
+        "measurement_consistency",
+        "modality_mismatch",
+        "impression_bullet_count",
+        "critical_result_language",
+        "unauthorized_followup",
+        "prior_comparison_required"
+      ]
+    },
+    {
+      "examId": "nm-chest",
+      "name": "V/Q Lung Scan",
+      "modality": "NM",
+      "bodyPart": "Chest",
+      "contrast": "",
+      "sex": "",
+      "subspecialty": "Nuclear",
+      "rulebookId": "nm_chest_rp_v1",
+      "rulebookSource": "generated",
+      "frameworks": [],
+      "requiredSections": [
+        "Indication",
+        "Technique",
+        "Comparison",
+        "Findings",
+        "Impression"
+      ],
+      "validatorRules": [
+        "laterality_consistency",
+        "negation_conflict",
+        "measurement_consistency",
+        "modality_mismatch",
+        "impression_bullet_count",
+        "critical_result_language",
+        "unauthorized_followup",
+        "prior_comparison_required"
+      ]
+    },
+    {
+      "examId": "nm-neck-pth",
+      "name": "Parathyroid Scan (sestamibi)",
+      "modality": "NM",
+      "bodyPart": "Neck",
+      "contrast": "",
+      "sex": "",
+      "subspecialty": "Nuclear",
+      "rulebookId": "nm_neck_rp_v1",
+      "rulebookSource": "generated",
+      "frameworks": [],
+      "requiredSections": [
+        "Indication",
+        "Technique",
+        "Comparison",
+        "Findings",
+        "Impression"
+      ],
+      "validatorRules": [
+        "laterality_consistency",
+        "negation_conflict",
+        "measurement_consistency",
+        "modality_mismatch",
+        "impression_bullet_count",
+        "critical_result_language",
+        "unauthorized_followup",
+        "prior_comparison_required"
+      ]
+    },
+    {
+      "examId": "pet-whole-body-fdg-c",
+      "name": "FDG PET/CT (oncology, whole body)",
+      "modality": "PET",
+      "bodyPart": "Whole Body",
+      "contrast": "With",
+      "sex": "",
+      "subspecialty": "Nuclear/Onc",
+      "rulebookId": "pet_whole_body_rp_v1",
+      "rulebookSource": "generated",
+      "frameworks": [],
+      "requiredSections": [
+        "Indication",
+        "Technique",
+        "Comparison",
+        "Findings",
+        "Impression",
+        "Recommendations"
+      ],
+      "validatorRules": [
+        "laterality_consistency",
+        "negation_conflict",
+        "measurement_consistency",
+        "modality_mismatch",
+        "impression_bullet_count",
+        "critical_result_language",
+        "unauthorized_followup",
+        "prior_comparison_required",
+        "contrast_phase_documented"
+      ]
+    },
+    {
+      "examId": "pet-whole-body-psma-c",
+      "name": "PSMA PET/CT (prostate)",
+      "modality": "PET",
+      "bodyPart": "Whole Body",
+      "contrast": "With",
+      "sex": "M",
+      "subspecialty": "Nuclear/Onc",
+      "rulebookId": "pet_whole_body_rp_v1",
+      "rulebookSource": "generated",
+      "frameworks": [],
+      "requiredSections": [
+        "Indication",
+        "Technique",
+        "Comparison",
+        "Findings",
+        "Impression",
+        "Recommendations"
+      ],
+      "validatorRules": [
+        "laterality_consistency",
+        "negation_conflict",
+        "measurement_consistency",
+        "modality_mismatch",
+        "impression_bullet_count",
+        "critical_result_language",
+        "unauthorized_followup",
+        "prior_comparison_required",
+        "contrast_phase_documented"
+      ]
+    },
+    {
+      "examId": "pet-whole-body-dota-c",
+      "name": "DOTATATE PET/CT (neuroendocrine)",
+      "modality": "PET",
+      "bodyPart": "Whole Body",
+      "contrast": "With",
+      "sex": "",
+      "subspecialty": "Nuclear/Onc",
+      "rulebookId": "pet_whole_body_rp_v1",
+      "rulebookSource": "generated",
+      "frameworks": [],
+      "requiredSections": [
+        "Indication",
+        "Technique",
+        "Comparison",
+        "Findings",
+        "Impression",
+        "Recommendations"
+      ],
+      "validatorRules": [
+        "laterality_consistency",
+        "negation_conflict",
+        "measurement_consistency",
+        "modality_mismatch",
+        "impression_bullet_count",
+        "critical_result_language",
+        "unauthorized_followup",
+        "prior_comparison_required",
+        "contrast_phase_documented"
+      ]
+    },
+    {
+      "examId": "pet-brain-c",
+      "name": "FDG PET/CT Brain",
+      "modality": "PET",
+      "bodyPart": "Brain",
+      "contrast": "With",
+      "sex": "",
+      "subspecialty": "Nuclear",
+      "rulebookId": "pet_brain_rp_v1",
+      "rulebookSource": "generated",
+      "frameworks": [],
+      "requiredSections": [
+        "Indication",
+        "Technique",
+        "Comparison",
+        "Findings",
+        "Impression"
+      ],
+      "validatorRules": [
+        "laterality_consistency",
+        "negation_conflict",
+        "measurement_consistency",
+        "modality_mismatch",
+        "impression_bullet_count",
+        "critical_result_language",
+        "unauthorized_followup",
+        "prior_comparison_required",
+        "contrast_phase_documented"
+      ]
+    },
+    {
+      "examId": "fl-abdomen-swallow-c",
+      "name": "Barium Swallow",
+      "modality": "FL",
+      "bodyPart": "Abdomen",
+      "contrast": "With",
+      "sex": "",
+      "subspecialty": "GI",
+      "rulebookId": "fl_abdomen_rp_v1",
+      "rulebookSource": "generated",
+      "frameworks": [],
+      "requiredSections": [
+        "Indication",
+        "Technique",
+        "Findings",
+        "Impression"
+      ],
+      "validatorRules": [
+        "laterality_consistency",
+        "negation_conflict",
+        "measurement_consistency",
+        "modality_mismatch",
+        "impression_bullet_count",
+        "critical_result_language",
+        "unauthorized_followup",
+        "prior_comparison_required",
+        "contrast_phase_documented"
+      ]
+    },
+    {
+      "examId": "fl-abdomen-meal-c",
+      "name": "Barium Meal",
+      "modality": "FL",
+      "bodyPart": "Abdomen",
+      "contrast": "With",
+      "sex": "",
+      "subspecialty": "GI",
+      "rulebookId": "fl_abdomen_rp_v1",
+      "rulebookSource": "generated",
+      "frameworks": [],
+      "requiredSections": [
+        "Indication",
+        "Technique",
+        "Findings",
+        "Impression"
+      ],
+      "validatorRules": [
+        "laterality_consistency",
+        "negation_conflict",
+        "measurement_consistency",
+        "modality_mismatch",
+        "impression_bullet_count",
+        "critical_result_language",
+        "unauthorized_followup",
+        "prior_comparison_required",
+        "contrast_phase_documented"
+      ]
+    },
+    {
+      "examId": "fl-abdomen-followthrough-c",
+      "name": "Barium Follow-through",
+      "modality": "FL",
+      "bodyPart": "Abdomen",
+      "contrast": "With",
+      "sex": "",
+      "subspecialty": "GI",
+      "rulebookId": "fl_abdomen_rp_v1",
+      "rulebookSource": "generated",
+      "frameworks": [],
+      "requiredSections": [
+        "Indication",
+        "Technique",
+        "Findings",
+        "Impression"
+      ],
+      "validatorRules": [
+        "laterality_consistency",
+        "negation_conflict",
+        "measurement_consistency",
+        "modality_mismatch",
+        "impression_bullet_count",
+        "critical_result_language",
+        "unauthorized_followup",
+        "prior_comparison_required",
+        "contrast_phase_documented"
+      ]
+    },
+    {
+      "examId": "fl-abdomen-enema-c",
+      "name": "Barium / Contrast Enema",
+      "modality": "FL",
+      "bodyPart": "Abdomen",
+      "contrast": "With",
+      "sex": "",
+      "subspecialty": "GI",
+      "rulebookId": "fl_abdomen_rp_v1",
+      "rulebookSource": "generated",
+      "frameworks": [],
+      "requiredSections": [
+        "Indication",
+        "Technique",
+        "Findings",
+        "Impression"
+      ],
+      "validatorRules": [
+        "laterality_consistency",
+        "negation_conflict",
+        "measurement_consistency",
+        "modality_mismatch",
+        "impression_bullet_count",
+        "critical_result_language",
+        "unauthorized_followup",
+        "prior_comparison_required",
+        "contrast_phase_documented"
+      ]
+    },
+    {
+      "examId": "fl-urinary-tract-mcug-c",
+      "name": "Micturating Cystourethrogram (MCUG/VCUG)",
+      "modality": "FL",
+      "bodyPart": "Urinary Tract",
+      "contrast": "With",
+      "sex": "",
+      "subspecialty": "GU",
+      "rulebookId": "fl_urinary_tract_rp_v1",
+      "rulebookSource": "generated",
+      "frameworks": [],
+      "requiredSections": [
+        "Indication",
+        "Technique",
+        "Findings",
+        "Impression"
+      ],
+      "validatorRules": [
+        "laterality_consistency",
+        "negation_conflict",
+        "measurement_consistency",
+        "modality_mismatch",
+        "impression_bullet_count",
+        "critical_result_language",
+        "unauthorized_followup",
+        "prior_comparison_required",
+        "contrast_phase_documented"
+      ]
+    },
+    {
+      "examId": "fl-urinary-tract-ivu-c",
+      "name": "Intravenous Urogram (IVU)",
+      "modality": "FL",
+      "bodyPart": "Urinary Tract",
+      "contrast": "With",
+      "sex": "",
+      "subspecialty": "GU",
+      "rulebookId": "fl_urinary_tract_rp_v1",
+      "rulebookSource": "generated",
+      "frameworks": [],
+      "requiredSections": [
+        "Indication",
+        "Technique",
+        "Findings",
+        "Impression"
+      ],
+      "validatorRules": [
+        "laterality_consistency",
+        "negation_conflict",
+        "measurement_consistency",
+        "modality_mismatch",
+        "impression_bullet_count",
+        "critical_result_language",
+        "unauthorized_followup",
+        "prior_comparison_required",
+        "contrast_phase_documented"
+      ]
+    },
+    {
+      "examId": "fl-female-pelvis-c",
+      "name": "Hysterosalpingogram (HSG)",
+      "modality": "FL",
+      "bodyPart": "Female Pelvis",
+      "contrast": "With",
+      "sex": "F",
+      "subspecialty": "GYN",
+      "rulebookId": "fl_female_pelvis_rp_v1",
+      "rulebookSource": "generated",
+      "frameworks": [],
+      "requiredSections": [
+        "Indication",
+        "Technique",
+        "Findings",
+        "Impression"
+      ],
+      "validatorRules": [
+        "laterality_consistency",
+        "negation_conflict",
+        "measurement_consistency",
+        "modality_mismatch",
+        "impression_bullet_count",
+        "critical_result_language",
+        "unauthorized_followup",
+        "prior_comparison_required",
+        "contrast_phase_documented"
+      ]
+    }
+  ]
+}

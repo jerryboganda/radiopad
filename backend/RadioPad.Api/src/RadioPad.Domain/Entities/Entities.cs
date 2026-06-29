@@ -257,6 +257,14 @@ public class ReportTemplate : Entity
     public string Name { get; set; } = "";
     public string Modality { get; set; } = "";
     public string BodyPart { get; set; } = "";
+    /// <summary>
+    /// Hybrid contrast model — the contrast phase this template is written for.
+    /// "" (default) = contrast-agnostic: matches any selection. Otherwise one of
+    /// "None" | "With" | "WithAndWithout". Influences TEMPLATE resolution only
+    /// (rulebooks stay keyed on Modality+BodyPart) — see
+    /// <c>ReportingService.ResolveBindings</c>'s 3-tier contrast preference.
+    /// </summary>
+    public string Contrast { get; set; } = "";
     public string Subspecialty { get; set; } = "";
     /// <summary>JSON describing sections and structured fields.</summary>
     public string SectionsJson { get; set; } = "[]";
@@ -307,6 +315,13 @@ public class StudyContext
     public string AccessionNumber { get; set; } = "";
     public string Modality { get; set; } = "";
     public string BodyPart { get; set; } = "";
+    /// <summary>
+    /// Hybrid contrast model — the selected contrast phase for this study.
+    /// "" = unspecified; otherwise "None" | "With" | "WithAndWithout". Free-form
+    /// string (mirrors Modality/BodyPart/Gender), matched case-insensitively; the
+    /// UI constrains it to the fixed set. Drives contrast-aware template resolution.
+    /// </summary>
+    public string Contrast { get; set; } = "";
     /// <summary>Iter-36 — patient age in years. Null when unknown. Replaces the
     /// former study-context Indication field; the report-body Indication section
     /// (<see cref="Report.Indication"/>) remains the clinical indication of record.</summary>

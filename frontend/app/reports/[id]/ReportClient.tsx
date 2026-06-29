@@ -115,7 +115,7 @@ export default function ReportPage() {
   }, [id]);
 
   const update = useCallback(async (
-    patch: Partial<Report> & { modality?: string; bodyPart?: string; age?: number | null; gender?: string },
+    patch: Partial<Report> & { modality?: string; bodyPart?: string; contrast?: string; age?: number | null; gender?: string },
   ) => {
     if (!report) return;
     setSaving(true);

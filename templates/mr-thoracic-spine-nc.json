@@ -1,0 +1,43 @@
+{
+  "id": "mr-thoracic-spine-nc",
+  "templateId": "mr-thoracic-spine-nc",
+  "name": "MRI Thoracic Spine",
+  "modality": "MR",
+  "bodyPart": "Thoracic Spine",
+  "contrast": "None",
+  "status": "approved",
+  "subspecialty": "MSK/Spine",
+  "rulebookId": "mr_thoracic_spine_rp_v1",
+  "sections": [
+    {
+      "id": "indication",
+      "label": "Indication",
+      "placeholder": "Clinical question / referring concern."
+    },
+    {
+      "id": "technique",
+      "label": "Technique",
+      "placeholder": "Multiplanar, multisequence MRI of the thoracic spine without intravenous gadolinium. State field strength, sequences, and any diffusion/dynamic series."
+    },
+    {
+      "id": "comparison",
+      "label": "Comparison",
+      "placeholder": "Date and type of relevant prior imaging, if available."
+    },
+    {
+      "id": "findings",
+      "label": "Findings",
+      "placeholder": "Alignment / kyphosis: \nVertebral body heights and marrow: \nDiscs (level-by-level): \nSpinal cord / conus signal: \nCanal and foramina: \nParaspinal soft tissues: \nCostovertebral joints: "
+    },
+    {
+      "id": "impression",
+      "label": "Impression",
+      "placeholder": "Concise, prioritised bulleted impression with any required scoring category and approved follow-up."
+    },
+    {
+      "id": "recommendations",
+      "label": "Recommendations",
+      "placeholder": "Evidence-based follow-up or correlation, drawn from approved phrasing, only if indicated."
+    }
+  ]
+}

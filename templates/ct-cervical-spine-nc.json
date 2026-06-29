@@ -1,0 +1,38 @@
+{
+  "id": "ct-cervical-spine-nc",
+  "templateId": "ct-cervical-spine-nc",
+  "name": "CT Cervical Spine",
+  "modality": "CT",
+  "bodyPart": "Cervical Spine",
+  "contrast": "None",
+  "status": "approved",
+  "subspecialty": "MSK/Spine",
+  "rulebookId": "ct_cervical_spine_rp_v1",
+  "sections": [
+    {
+      "id": "indication",
+      "label": "Indication",
+      "placeholder": "Clinical question / referring concern."
+    },
+    {
+      "id": "technique",
+      "label": "Technique",
+      "placeholder": "Multidetector CT of the cervical spine acquired without intravenous contrast. Multiplanar reformats reviewed. State kVp/contrast volume/phase and DLP as per local dose policy."
+    },
+    {
+      "id": "comparison",
+      "label": "Comparison",
+      "placeholder": "Date and type of relevant prior imaging, if available."
+    },
+    {
+      "id": "findings",
+      "label": "Findings",
+      "placeholder": "Alignment / lordosis: \nVertebral body heights and marrow: \nDiscs C2–T1 (level-by-level: disc height, herniation, canal/foraminal stenosis): \nSpinal cord signal: \nCraniocervical junction: \nPrevertebral soft tissues: \nFacet joints: "
+    },
+    {
+      "id": "impression",
+      "label": "Impression",
+      "placeholder": "Concise, prioritised bulleted impression with any required scoring category and approved follow-up."
+    }
+  ]
+}

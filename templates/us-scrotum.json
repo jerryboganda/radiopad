@@ -1,0 +1,38 @@
+{
+  "id": "us-scrotum",
+  "templateId": "us-scrotum",
+  "name": "Ultrasound Scrotum",
+  "modality": "US",
+  "bodyPart": "Scrotum",
+  "contrast": "",
+  "status": "approved",
+  "subspecialty": "Body",
+  "rulebookId": "us_scrotum_rp_v1",
+  "sections": [
+    {
+      "id": "indication",
+      "label": "Indication",
+      "placeholder": "Clinical question / referring concern."
+    },
+    {
+      "id": "technique",
+      "label": "Technique",
+      "placeholder": "Real-time greyscale and colour/spectral Doppler ultrasound of the scrotum. State transducer and approach (e.g. transabdominal/endocavitary)."
+    },
+    {
+      "id": "comparison",
+      "label": "Comparison",
+      "placeholder": "Date and type of relevant prior imaging, if available."
+    },
+    {
+      "id": "findings",
+      "label": "Findings",
+      "placeholder": "Right testis (size, echotexture, vascularity): \nLeft testis: \nEpididymes: \nFocal lesions (size, vascularity): \nHydrocele / varicocele: \nInguinal regions: "
+    },
+    {
+      "id": "impression",
+      "label": "Impression",
+      "placeholder": "Concise, prioritised bulleted impression with any required scoring category and approved follow-up."
+    }
+  ]
+}

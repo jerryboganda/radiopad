@@ -1,0 +1,33 @@
+{
+  "id": "fl-abdomen-enema-c",
+  "templateId": "fl-abdomen-enema-c",
+  "name": "Barium / Contrast Enema",
+  "modality": "FL",
+  "bodyPart": "Abdomen",
+  "contrast": "With",
+  "status": "approved",
+  "subspecialty": "GI",
+  "rulebookId": "fl_abdomen_rp_v1",
+  "sections": [
+    {
+      "id": "indication",
+      "label": "Indication",
+      "placeholder": "Clinical question / referring concern."
+    },
+    {
+      "id": "technique",
+      "label": "Technique",
+      "placeholder": "Fluoroscopic examination of the abdomen. State contrast medium, volume, screening time and DAP."
+    },
+    {
+      "id": "findings",
+      "label": "Findings",
+      "placeholder": "Contrast transit / opacification: \nMucosal pattern and distensibility: \nFilling defects / strictures / leaks: \nMotility: \nAnatomy-specific findings: "
+    },
+    {
+      "id": "impression",
+      "label": "Impression",
+      "placeholder": "Concise, prioritised bulleted impression with any required scoring category and approved follow-up."
+    }
+  ]
+}

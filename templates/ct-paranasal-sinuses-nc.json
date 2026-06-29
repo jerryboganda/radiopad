@@ -1,0 +1,38 @@
+{
+  "id": "ct-paranasal-sinuses-nc",
+  "templateId": "ct-paranasal-sinuses-nc",
+  "name": "CT Paranasal Sinuses",
+  "modality": "CT",
+  "bodyPart": "Paranasal Sinuses",
+  "contrast": "None",
+  "status": "approved",
+  "subspecialty": "Head & Neck",
+  "rulebookId": "ct_paranasal_sinuses_rp_v1",
+  "sections": [
+    {
+      "id": "indication",
+      "label": "Indication",
+      "placeholder": "Clinical question / referring concern."
+    },
+    {
+      "id": "technique",
+      "label": "Technique",
+      "placeholder": "Multidetector CT of the paranasal sinuses acquired without intravenous contrast. Multiplanar reformats reviewed. State kVp/contrast volume/phase and DLP as per local dose policy."
+    },
+    {
+      "id": "comparison",
+      "label": "Comparison",
+      "placeholder": "Date and type of relevant prior imaging, if available."
+    },
+    {
+      "id": "findings",
+      "label": "Findings",
+      "placeholder": "Frontal sinuses: \nEthmoid air cells: \nMaxillary sinuses: \nSphenoid sinuses: \nOstiomeatal complexes: \nNasal septum / turbinates: \nBony walls and anatomic variants (concha bullosa, Haller cells): \nOrbits / skull base: "
+    },
+    {
+      "id": "impression",
+      "label": "Impression",
+      "placeholder": "Concise, prioritised bulleted impression with any required scoring category and approved follow-up."
+    }
+  ]
+}

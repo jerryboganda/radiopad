@@ -1,0 +1,43 @@
+{
+  "id": "ct-chest-nc",
+  "templateId": "ct-chest-nc",
+  "name": "CT Chest (non-contrast)",
+  "modality": "CT",
+  "bodyPart": "Chest",
+  "contrast": "None",
+  "status": "approved",
+  "subspecialty": "Thoracic",
+  "rulebookId": "chest_ct_v1",
+  "sections": [
+    {
+      "id": "indication",
+      "label": "Indication",
+      "placeholder": "Clinical question / referring concern."
+    },
+    {
+      "id": "technique",
+      "label": "Technique",
+      "placeholder": "Multidetector CT of the chest acquired without intravenous contrast. Multiplanar reformats reviewed. State kVp/contrast volume/phase and DLP as per local dose policy."
+    },
+    {
+      "id": "comparison",
+      "label": "Comparison",
+      "placeholder": "Date and type of relevant prior imaging, if available."
+    },
+    {
+      "id": "findings",
+      "label": "Findings",
+      "placeholder": "Lungs and airways (each nodule with 3D size, attenuation type [solid / part-solid / pure ground-glass], solid-component size if part-solid, and Fleischner 2017 surveillance interval; consolidation, emphysema, fibrosis): \nPleura (effusion, thickening, pneumothorax — note size/tension): \nMediastinum and hila (nodes with short-axis size in mm): \nHeart and pericardium: \nGreat vessels (calibre, aortic syndrome): \nThoracic skeleton and chest wall: \nUpper abdomen (visualised): "
+    },
+    {
+      "id": "impression",
+      "label": "Impression",
+      "placeholder": "Concise, prioritised bulleted impression. Lead with the dominant nodule (3D size, solid/subsolid character, solid-component size) and the Fleischner 2017 follow-up category, then other significant findings; close with approved follow-up phrasing only."
+    },
+    {
+      "id": "recommendations",
+      "label": "Recommendations",
+      "placeholder": "Evidence-based follow-up or correlation, drawn from approved phrasing, only if indicated."
+    }
+  ]
+}

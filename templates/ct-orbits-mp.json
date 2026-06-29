@@ -1,0 +1,38 @@
+{
+  "id": "ct-orbits-mp",
+  "templateId": "ct-orbits-mp",
+  "name": "CT Orbits",
+  "modality": "CT",
+  "bodyPart": "Orbits",
+  "contrast": "WithAndWithout",
+  "status": "approved",
+  "subspecialty": "Head & Neck",
+  "rulebookId": "ct_orbits_rp_v1",
+  "sections": [
+    {
+      "id": "indication",
+      "label": "Indication",
+      "placeholder": "Clinical question / referring concern."
+    },
+    {
+      "id": "technique",
+      "label": "Technique",
+      "placeholder": "Multidetector CT of the orbits acquired before and after intravenous iodinated contrast. Multiplanar reformats reviewed. State kVp/contrast volume/phase and DLP as per local dose policy."
+    },
+    {
+      "id": "comparison",
+      "label": "Comparison",
+      "placeholder": "Date and type of relevant prior imaging, if available."
+    },
+    {
+      "id": "findings",
+      "label": "Findings",
+      "placeholder": "Cerebral hemispheres / grey–white differentiation: \nVentricles and CSF spaces: \nMidline / no shift: \nBasal cisterns: \nPosterior fossa and brainstem: \nExtra-axial spaces (no collection): \nVascular territories (no acute infarct): \nNo intracranial haemorrhage: \nCalvarium and skull base: \nVisualised paranasal sinuses / mastoids / orbits: "
+    },
+    {
+      "id": "impression",
+      "label": "Impression",
+      "placeholder": "Concise, prioritised bulleted impression with any required scoring category and approved follow-up."
+    }
+  ]
+}

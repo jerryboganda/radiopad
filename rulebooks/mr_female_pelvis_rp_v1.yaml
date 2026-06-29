@@ -1,0 +1,90 @@
+rulebook_id: mr_female_pelvis_rp_v1
+name: "MR Female Pelvis Reporting Rulebook"
+version: 1.0.0
+owner: "Body Imaging Committee"
+status: approved
+applies_to:
+  modalities:
+    - MR
+  body_parts:
+    - "Female Pelvis"
+  report_types:
+    - diagnostic
+    - follow_up
+style:
+  tone: concise_clinical
+  impression_max_bullets: 5
+  avoid_terms:
+    - "unremarkable"
+    - "cannot rule out"
+    - "grossly normal"
+    - "questionable"
+    - "rule out"
+  approved_followups:
+    - "Recommend clinical correlation."
+    - "Recommend correlation with laboratory and clinical findings."
+    - "Recommend follow-up imaging as clinically indicated."
+    - "Recommend comparison with prior imaging when available."
+    - "Recommend specialty consultation if clinically warranted."
+required_sections:
+  - Indication
+  - Technique
+  - Comparison
+  - Findings
+  - Impression
+  - Recommendations
+rules:
+  - id: laterality_consistency
+    severity: blocker
+    description: "Right/left ovarian and adnexal findings must be internally consistent and match the Impression; a side error can misdirect surgery and is a blocker."
+  - id: negation_conflict
+    severity: blocker
+    description: "An adnexal lesion, enhancing solid tissue, peritoneal implant, or invasion denied in Findings must not be asserted in the Impression, and vice versa."
+  - id: measurement_consistency
+    severity: warning
+    description: "Lesion and organ measurements (mm), endometrial thickness, and ovarian volumes must agree across Findings and Impression."
+  - id: modality_mismatch
+    severity: warning
+    description: "Do not attribute these findings to a different modality; this is an MR Female Pelvis study and the prose must read as MRI-derived."
+  - id: impression_bullet_count
+    severity: warning
+    description: "The Impression should not exceed style.impression_max_bullets bullets; lead with the highest O-RADS category or the dominant oncologic finding."
+  - id: critical_result_language
+    severity: blocker
+    description: "Critical/urgent findings (e.g. suspected malignancy with peritoneal disease, ovarian torsion, ectopic pregnancy, large haemoperitoneum) require documented communication to the referrer/team with read-back, recipient, and date/time."
+  - id: unauthorized_followup
+    severity: warning
+    description: "Recommendation phrasing must be drawn verbatim from style.approved_followups (e.g. gynae-oncology MDT referral for O-RADS 4-5)."
+  - id: prior_comparison_required
+    severity: info
+    description: "Compare with relevant prior imaging when available; document interval change in lesion size and morphology, which informs O-RADS management."
+  - id: contrast_phase_documented
+    severity: warning
+    description: "Document the contrast phase(s) and dynamic (DCE) timing acquired, since the O-RADS MRI time-intensity-curve type depends on a correctly timed dynamic series."
+  - id: figo_staging_when_oncologic
+    severity: info
+    description: "Provide FIGO staging when an oncologic indication is present (e.g. endometrial, cervical, or ovarian carcinoma), reporting depth of myometrial invasion, cervical/parametrial involvement, and nodal/peritoneal disease as applicable."
+prompt_blocks:
+  system: |-
+    You are assisting a board-certified consultant radiologist drafting a structured MR Female Pelvis report.
+    Write with the precision and economy of a senior subspecialty consultant. Never invent findings; report only what is supported by the images and dictation. Preserve every measurement, laterality and negation exactly. Adapt normal ranges and differential emphasis to the patient's age and sex. Output only the requested section; do not sign the report. Avoid the terms in style.avoid_terms.
+    Apply ACR O-RADS MRI v1 for adnexal lesions:
+    - O-RADS MRI 0: incomplete evaluation.
+    - O-RADS MRI 1: normal ovary (follicle, corpus luteum, or no lesion) — not a true lesion.
+    - O-RADS MRI 2 (almost certainly benign, <0.5% malignancy): unilocular cyst with simple/endometriotic/dermoid/haemorrhagic content and no enhancing solid tissue; a wall/septation may enhance.
+    - O-RADS MRI 3 (low risk, ~5%): lesion with enhancing solid tissue showing a LOW-risk time-intensity curve (TIC), OR a lipid-containing lesion with enhancing solid tissue, OR a dilated tube with non-enhancing or low-TIC solid tissue.
+    - O-RADS MRI 4 (intermediate risk, ~50%): enhancing solid tissue with an INTERMEDIATE-risk TIC (no high-risk curve).
+    - O-RADS MRI 5 (high risk, ~90%): enhancing solid tissue with a HIGH-risk TIC, OR peritoneal/mesenteric/omental nodularity/implants.
+    - Characterise solid tissue, T1/T2/fat signal, diffusion, and DCE time-intensity-curve type; state the management implication of the category.
+  draft: |-
+    Generate a structured draft with the sections: Indication, Technique, Comparison, Findings, Impression, Recommendations. Populate Findings organ-by-organ using the scaffold (uterus with junctional-zone thickness and FIGO-relevant myometrial/cervical assessment; endometrium; both ovaries with size and follicle count; adnexal lesion characterisation; cul-de-sac fluid; bladder/bowel; nodes). Convert dictation into clean clinical prose without adding findings. Honour the stated contrast phase and DCE timing in Technique. Do not exceed the impression bullet limit.
+    Apply ACR O-RADS MRI v1: for each adnexal lesion assign O-RADS MRI 1-5 from the enhancing-solid-tissue and DCE time-intensity-curve criteria (2 almost certainly benign; 3 low ~5%; 4 intermediate ~50%; 5 high ~90% or peritoneal disease) and state the management implication.
+  impression: |-
+    Generate a concise impression (max 5 bullets) faithful to the Findings. Lead with the most clinically significant finding, give actionable recommendations only from style.approved_followups, and include any required scoring category.
+    Apply ACR O-RADS MRI v1: carry forward the O-RADS MRI category (1-5), lesion size in millimetres, and laterality. State management: O-RADS 2 → benign, no/interval follow-up per indication; O-RADS 3 → consider US correlation or gynaecology input; O-RADS 4-5 → refer to a gynaecological oncology MDT; provide FIGO staging when the indication is oncologic.
+  cleanup: |-
+    Rewrite the dictated text into clean grammatical clinical prose without changing meaning. Preserve all numbers, laterality, negations and units exactly. Return an empty string for any section that was not dictated.
+  follow_up: |-
+    Suggest up to three short, evidence-based follow-up recommendations, one per line, drawn only from approved follow-up phrasing and tied to a finding already present. No new diagnoses.
+  dictation_cleanup: |-
+    Rewrite this dictation into clean grammatical prose for each report section. Do not invent findings the radiologist did not dictate. Preserve every measurement, laterality and negation exactly. If a section was not dictated, return an empty string for it.

@@ -1,0 +1,38 @@
+{
+  "id": "ct-carotid-arteries-c",
+  "templateId": "ct-carotid-arteries-c",
+  "name": "CT Angiography — Carotids / Neck",
+  "modality": "CT",
+  "bodyPart": "Carotid Arteries",
+  "contrast": "With",
+  "status": "approved",
+  "subspecialty": "Vascular",
+  "rulebookId": "ct_carotid_arteries_rp_v1",
+  "sections": [
+    {
+      "id": "indication",
+      "label": "Indication",
+      "placeholder": "Clinical question / referring concern."
+    },
+    {
+      "id": "technique",
+      "label": "Technique",
+      "placeholder": "Multidetector CT of the carotid arteries acquired after intravenous iodinated contrast. Multiplanar reformats reviewed. State kVp/contrast volume/phase and DLP as per local dose policy."
+    },
+    {
+      "id": "comparison",
+      "label": "Comparison",
+      "placeholder": "Date and type of relevant prior imaging, if available."
+    },
+    {
+      "id": "findings",
+      "label": "Findings",
+      "placeholder": "Right ICA/CCA/ECA (PSV, EDV, ICA/CCA ratio, % stenosis): \nLeft ICA/CCA/ECA: \nPlaque (extent, surface, calcification): \nVertebral arteries (flow direction): \nStenosis category per NASCET/consensus criteria: "
+    },
+    {
+      "id": "impression",
+      "label": "Impression",
+      "placeholder": "Concise, prioritised bulleted impression with any required scoring category and approved follow-up."
+    }
+  ]
+}

@@ -1,0 +1,38 @@
+{
+  "id": "ct-adrenals-mp",
+  "templateId": "ct-adrenals-mp",
+  "name": "CT Adrenal (washout protocol)",
+  "modality": "CT",
+  "bodyPart": "Adrenals",
+  "contrast": "WithAndWithout",
+  "status": "approved",
+  "subspecialty": "Body",
+  "rulebookId": "ct_adrenals_rp_v1",
+  "sections": [
+    {
+      "id": "indication",
+      "label": "Indication",
+      "placeholder": "Clinical question / referring concern."
+    },
+    {
+      "id": "technique",
+      "label": "Technique",
+      "placeholder": "Multidetector CT of the adrenals acquired before and after intravenous iodinated contrast. Multiplanar reformats reviewed. State kVp/contrast volume/phase and DLP as per local dose policy."
+    },
+    {
+      "id": "comparison",
+      "label": "Comparison",
+      "placeholder": "Date and type of relevant prior imaging, if available."
+    },
+    {
+      "id": "findings",
+      "label": "Findings",
+      "placeholder": "Right adrenal (size, nodule): \nLeft adrenal: \nNodule characterisation (size, unenhanced HU, absolute/relative washout, signal drop on out-of-phase): \nBenign vs indeterminate statement: "
+    },
+    {
+      "id": "impression",
+      "label": "Impression",
+      "placeholder": "Concise, prioritised bulleted impression with any required scoring category and approved follow-up."
+    }
+  ]
+}

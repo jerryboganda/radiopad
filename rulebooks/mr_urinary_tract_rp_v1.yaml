@@ -1,0 +1,80 @@
+rulebook_id: mr_urinary_tract_rp_v1
+name: "MR Urinary Tract Reporting Rulebook"
+version: 1.0.0
+owner: "Body Imaging Committee"
+status: approved
+applies_to:
+  modalities:
+    - MR
+  body_parts:
+    - "Urinary Tract"
+  report_types:
+    - diagnostic
+    - follow_up
+style:
+  tone: concise_clinical
+  impression_max_bullets: 5
+  avoid_terms:
+    - "unremarkable"
+    - "cannot rule out"
+    - "grossly normal"
+    - "questionable"
+    - "rule out"
+  approved_followups:
+    - "Recommend clinical correlation."
+    - "Recommend correlation with laboratory and clinical findings."
+    - "Recommend follow-up imaging as clinically indicated."
+    - "Recommend comparison with prior imaging when available."
+    - "Recommend specialty consultation if clinically warranted."
+required_sections:
+  - Indication
+  - Technique
+  - Comparison
+  - Findings
+  - Impression
+  - Recommendations
+rules:
+  - id: laterality_consistency
+    severity: blocker
+    description: "Left/right findings must be internally consistent and match the impression."
+  - id: negation_conflict
+    severity: blocker
+    description: "A finding denied in Findings must not be asserted in the Impression (and vice versa)."
+  - id: measurement_consistency
+    severity: warning
+    description: "Measurements must agree across Findings and Impression."
+  - id: modality_mismatch
+    severity: warning
+    description: "Do not reference a different modality as the source of these findings."
+  - id: impression_bullet_count
+    severity: warning
+    description: "Impression should not exceed style.impression_max_bullets bullets."
+  - id: critical_result_language
+    severity: blocker
+    description: "Critical/urgent findings require documented communication and read-back language."
+  - id: unauthorized_followup
+    severity: warning
+    description: "Recommendation phrasing should be drawn from style.approved_followups."
+  - id: prior_comparison_required
+    severity: info
+    description: "Compare with relevant prior imaging when available."
+  - id: contrast_phase_documented
+    severity: warning
+    description: "Document the contrast phase(s) acquired."
+  - id: incidental_findings_listed
+    severity: info
+    description: "List actionable incidental findings."
+prompt_blocks:
+  system: |-
+    You are assisting a board-certified consultant radiologist drafting a structured MR Urinary Tract report.
+    Write with the precision and economy of a senior subspecialty consultant. Never invent findings; report only what is supported by the images and dictation. Preserve every measurement, laterality and negation exactly. Adapt normal ranges and differential emphasis to the patient's age and sex. Output only the requested section; do not sign the report. Avoid the terms in style.avoid_terms.
+  draft: |-
+    Generate a structured draft with the sections: Indication, Technique, Comparison, Findings, Impression, Recommendations. Populate Findings organ-by-organ using the scaffold; convert dictation into clean clinical prose without adding findings. Honour the stated contrast phase in Technique. Do not exceed the impression bullet limit.
+  impression: |-
+    Generate a concise impression (max 5 bullets) faithful to the Findings. Lead with the most clinically significant finding, give actionable recommendations only from style.approved_followups, and include any required scoring category.
+  cleanup: |-
+    Rewrite the dictated text into clean grammatical clinical prose without changing meaning. Preserve all numbers, laterality, negations and units exactly. Return an empty string for any section that was not dictated.
+  follow_up: |-
+    Suggest up to three short, evidence-based follow-up recommendations, one per line, drawn only from approved follow-up phrasing and tied to a finding already present. No new diagnoses.
+  dictation_cleanup: |-
+    Rewrite this dictation into clean grammatical prose for each report section. Do not invent findings the radiologist did not dictate. Preserve every measurement, laterality and negation exactly. If a section was not dictated, return an empty string for it.

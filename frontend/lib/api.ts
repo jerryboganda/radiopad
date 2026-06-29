@@ -389,6 +389,8 @@ export type Report = {
     accessionNumber: string;
     modality: string;
     bodyPart: string;
+    /** Hybrid contrast model — "" | "None" | "With" | "WithAndWithout". Drives contrast-aware template resolution. */
+    contrast: string;
     /** Iter-36 — patient age in years (null when unknown). Replaced study-context indication. */
     age: number | null;
     /** Iter-36 — patient gender (Male/Female/Other/Unknown). */
@@ -424,6 +426,8 @@ export type ReportTemplate = {
   name: string;
   modality: string;
   bodyPart: string;
+  /** Hybrid contrast model — "" (agnostic) | "None" | "With" | "WithAndWithout". */
+  contrast?: string;
   subspecialty: string;
   sectionsJson: string;
   updatedAt: string;
@@ -874,6 +878,7 @@ export const api = {
       body: Partial<Report> & {
         modality?: string;
         bodyPart?: string;
+        contrast?: string;
         age?: number | null;
         gender?: string;
       },
@@ -1254,6 +1259,7 @@ export const api = {
       name: string;
       modality: string;
       bodyPart: string;
+      contrast?: string;
       subspecialty?: string;
       sectionsJson: string;
     }) => request<ReportTemplate>('/api/templates', { method: 'POST', body: JSON.stringify(body) }),

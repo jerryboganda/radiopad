@@ -1,0 +1,38 @@
+{
+  "id": "mr-internal-auditory-canal-mp",
+  "templateId": "mr-internal-auditory-canal-mp",
+  "name": "MRI Internal Auditory Canals",
+  "modality": "MR",
+  "bodyPart": "Internal Auditory Canal",
+  "contrast": "WithAndWithout",
+  "status": "approved",
+  "subspecialty": "Neuro",
+  "rulebookId": "mr_internal_auditory_canal_rp_v1",
+  "sections": [
+    {
+      "id": "indication",
+      "label": "Indication",
+      "placeholder": "Clinical question / referring concern."
+    },
+    {
+      "id": "technique",
+      "label": "Technique",
+      "placeholder": "Multiplanar, multisequence MRI of the internal auditory canal before and after intravenous gadolinium-based contrast. State field strength, sequences, and any diffusion/dynamic series."
+    },
+    {
+      "id": "comparison",
+      "label": "Comparison",
+      "placeholder": "Date and type of relevant prior imaging, if available."
+    },
+    {
+      "id": "findings",
+      "label": "Findings",
+      "placeholder": "External auditory canals: \nMiddle ear / ossicular chain: \nMastoid air cells: \nInner ear (cochlea, vestibule, semicircular canals): \nFacial nerve canal: \nInternal auditory canals: \nTegmen / scutum: "
+    },
+    {
+      "id": "impression",
+      "label": "Impression",
+      "placeholder": "Concise, prioritised bulleted impression with any required scoring category and approved follow-up."
+    }
+  ]
+}

@@ -1,0 +1,43 @@
+{
+  "id": "mr-prostate-mp",
+  "templateId": "mr-prostate-mp",
+  "name": "MRI Prostate (multiparametric)",
+  "modality": "MR",
+  "bodyPart": "Prostate",
+  "contrast": "WithAndWithout",
+  "status": "approved",
+  "subspecialty": "Body",
+  "rulebookId": "prostate_mri_v1",
+  "sections": [
+    {
+      "id": "indication",
+      "label": "Indication",
+      "placeholder": "Clinical question / referring concern."
+    },
+    {
+      "id": "technique",
+      "label": "Technique",
+      "placeholder": "Multiplanar, multisequence MRI of the prostate before and after intravenous gadolinium-based contrast. State field strength, sequences, and any diffusion/dynamic series."
+    },
+    {
+      "id": "comparison",
+      "label": "Comparison",
+      "placeholder": "Date and type of relevant prior imaging, if available."
+    },
+    {
+      "id": "findings",
+      "label": "Findings",
+      "placeholder": "Prostate volume (ellipsoid, mL) and PSA density (PSA/volume).\nPeripheral zone (PZ): T2 signal; DWI/ADC as the dominant PZ sequence; DCE positive/negative.\nTransition zone (TZ): T2 morphology as the dominant TZ sequence (encapsulated nodule vs lenticular/non-circumscribed); DWI.\nIndex lesion — sector on the 39-sector map (zone PZ/TZ/CZ/AFS, side, level base/mid/apex), maximum diameter (mm on ADC, or T2 for TZ), per-sequence scores, and PI-RADS v2.1 category (1-5). Note: PZ DWI-3 upgrades to 4 if DCE positive; TZ T2-3 upgrades to 4 if DWI 5; a category-4 lesion becomes 5 at >=15 mm or with extraprostatic extension.\nSecond/additional lesion(s) with the same descriptors.\nExtraprostatic extension (capsular contact length/bulge), seminal vesicle invasion, neurovascular bundle and bladder-neck/apex/rectal involvement.\nLymph nodes (short-axis, morphology) and bones (focal marrow lesion)."
+    },
+    {
+      "id": "impression",
+      "label": "Impression",
+      "placeholder": "Concise prioritised bullets. Lead with the index lesion stated with its PI-RADS v2.1 category (1-5), sector/zone localisation, and maximum diameter (mm). Management implication: category 1-2 = clinically significant cancer unlikely, routine; category 3 = equivocal, consider targeted biopsy or short-interval re-imaging per local pathway; category 4-5 = targeted (+/- systematic) biopsy recommended. State extraprostatic extension or seminal vesicle invasion (staging/surgical relevance) and any suspicious nodes/bones. Report prostate volume and PSA density. Use only approved follow-up phrasing."
+    },
+    {
+      "id": "recommendations",
+      "label": "Recommendations",
+      "placeholder": "Evidence-based follow-up or correlation, drawn from approved phrasing, only if indicated."
+    }
+  ]
+}

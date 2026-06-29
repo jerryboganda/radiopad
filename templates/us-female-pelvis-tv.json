@@ -1,0 +1,38 @@
+{
+  "id": "us-female-pelvis-tv",
+  "templateId": "us-female-pelvis-tv",
+  "name": "Ultrasound Pelvis (transvaginal)",
+  "modality": "US",
+  "bodyPart": "Female Pelvis",
+  "contrast": "",
+  "status": "approved",
+  "subspecialty": "Body",
+  "rulebookId": "us_female_pelvis_rp_v1",
+  "sections": [
+    {
+      "id": "indication",
+      "label": "Indication",
+      "placeholder": "Clinical question / referring concern."
+    },
+    {
+      "id": "technique",
+      "label": "Technique",
+      "placeholder": "Real-time greyscale and colour/spectral Doppler ultrasound of the female pelvis. State transducer and approach (e.g. transabdominal/endocavitary)."
+    },
+    {
+      "id": "comparison",
+      "label": "Comparison",
+      "placeholder": "Date and type of relevant prior imaging, if available."
+    },
+    {
+      "id": "findings",
+      "label": "Findings",
+      "placeholder": "Uterus: size (3 dimensions), position/version, myometrium and any fibroids (number, location, size); adenomyosis features.\nEndometrium: thickness (double-layer, mm), echogenicity, cavity fluid; correlate with menopausal status.\nCervix.\nRight ovary: size/volume, follicles, any lesion. Left ovary: same.\nAdnexal lesion characterisation (O-RADS US v2022 lexicon, optimised on high-resolution transvaginal imaging): maximum diameter (mm), unilocular vs multilocular, smooth vs irregular wall/septa, solid component, number of papillary projections, acoustic shadowing, colour Doppler score (1-4), and assigned O-RADS US category 1-5.\nFree fluid / cul-de-sac; ascites or peritoneal nodularity.\nBladder and visualised bowel.\nLymph nodes if seen."
+    },
+    {
+      "id": "impression",
+      "label": "Impression",
+      "placeholder": "Concise prioritised bullets. For each adnexal lesion give the O-RADS US category (1-5), laterality, and maximum diameter (mm). Management implication: O-RADS 2 (almost certainly benign, <1%) = benign, follow-up only per protocol/symptoms; O-RADS 3 (low, 1-<10%) = US follow-up or consider MRI; O-RADS 4 (intermediate, 10-<50%) = MRI characterisation and/or gynaecology referral; O-RADS 5 (high, >=50%) = refer to gynaecological oncology MDT. Note endometrial thickness relative to menopausal status. Use only approved follow-up phrasing."
+    }
+  ]
+}

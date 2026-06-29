@@ -1,0 +1,43 @@
+{
+  "id": "ct-pulmonary-arteries-c",
+  "templateId": "ct-pulmonary-arteries-c",
+  "name": "CT Pulmonary Angiography (CTPA)",
+  "modality": "CT",
+  "bodyPart": "Pulmonary Arteries",
+  "contrast": "With",
+  "status": "approved",
+  "subspecialty": "Thoracic",
+  "rulebookId": "ct_pulmonary_arteries_rp_v1",
+  "sections": [
+    {
+      "id": "indication",
+      "label": "Indication",
+      "placeholder": "Clinical question / referring concern."
+    },
+    {
+      "id": "technique",
+      "label": "Technique",
+      "placeholder": "Multidetector CT of the pulmonary arteries acquired after intravenous iodinated contrast. Multiplanar reformats reviewed. State kVp/contrast volume/phase and DLP as per local dose policy."
+    },
+    {
+      "id": "comparison",
+      "label": "Comparison",
+      "placeholder": "Date and type of relevant prior imaging, if available."
+    },
+    {
+      "id": "findings",
+      "label": "Findings",
+      "placeholder": "Pulmonary arteries — central to subsegmental (filling defects; most proximal occluded level [saddle/main / lobar / segmental / subsegmental]; laterality; acute vs chronic/organised): \nClot burden (uni- vs bilateral, central vs peripheral): \nRight-heart strain (RV:LV short-axis ratio with >~1.0 as the threshold for RV dilatation, septal bowing/flattening, IVC/hepatic-vein contrast reflux, main PA calibre): \nLungs (pulmonary infarct, effusion): \nMediastinum / incidental: "
+    },
+    {
+      "id": "impression",
+      "label": "Impression",
+      "placeholder": "Concise, prioritised bulleted impression. Lead with presence/absence of acute PE, its most proximal level and laterality, then a right-heart strain line (RV:LV ratio relative to ~1.0, septal bowing, reflux); escalate via the critical-result pathway for central clot or strain, and close with approved follow-up phrasing only."
+    },
+    {
+      "id": "recommendations",
+      "label": "Recommendations",
+      "placeholder": "Evidence-based follow-up or correlation, drawn from approved phrasing, only if indicated."
+    }
+  ]
+}

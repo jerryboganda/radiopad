@@ -28,7 +28,8 @@ public class TemplatesController : TenantedController
     public record SaveTemplateDto(
         string TemplateId, string Name, string Modality, string BodyPart,
         string Subspecialty, string SectionsJson,
-        TemplateVariant? Variant = null, TemplateStatus? Status = null);
+        TemplateVariant? Variant = null, TemplateStatus? Status = null,
+        string? Contrast = null);
 
     [HttpPost]
     public async Task<IActionResult> Save([FromBody] SaveTemplateDto dto, CancellationToken ct)
@@ -45,6 +46,7 @@ public class TemplatesController : TenantedController
         existing.Name = dto.Name;
         existing.Modality = dto.Modality;
         existing.BodyPart = dto.BodyPart;
+        if (dto.Contrast is not null) existing.Contrast = dto.Contrast;
         existing.Subspecialty = dto.Subspecialty;
         existing.SectionsJson = dto.SectionsJson;
         if (dto.Variant is not null) existing.Variant = dto.Variant.Value;

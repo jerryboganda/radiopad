@@ -1,0 +1,43 @@
+{
+  "id": "mr-rectum-mp",
+  "templateId": "mr-rectum-mp",
+  "name": "MRI Rectum (cancer staging)",
+  "modality": "MR",
+  "bodyPart": "Rectum",
+  "contrast": "WithAndWithout",
+  "status": "approved",
+  "subspecialty": "Body",
+  "rulebookId": "mr_rectum_rp_v1",
+  "sections": [
+    {
+      "id": "indication",
+      "label": "Indication",
+      "placeholder": "Clinical question / referring concern."
+    },
+    {
+      "id": "technique",
+      "label": "Technique",
+      "placeholder": "Multiplanar, multisequence MRI of the rectum before and after intravenous gadolinium-based contrast. State field strength, sequences, and any diffusion/dynamic series."
+    },
+    {
+      "id": "comparison",
+      "label": "Comparison",
+      "placeholder": "Date and type of relevant prior imaging, if available."
+    },
+    {
+      "id": "findings",
+      "label": "Findings",
+      "placeholder": "Primary tumour (location from anal verge, length, T-stage, EMVI): \nMesorectal fascia involvement (CRM, shortest distance): \nMesorectal and lateral pelvic nodes: \nPeritoneal reflection relationship: \nSphincter complex: \nDistant visualised structures: "
+    },
+    {
+      "id": "impression",
+      "label": "Impression",
+      "placeholder": "Concise, prioritised bulleted impression with any required scoring category and approved follow-up."
+    },
+    {
+      "id": "recommendations",
+      "label": "Recommendations",
+      "placeholder": "Evidence-based follow-up or correlation, drawn from approved phrasing, only if indicated."
+    }
+  ]
+}

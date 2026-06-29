@@ -1,0 +1,43 @@
+{
+  "id": "ct-coronary-arteries-calcium-nc",
+  "templateId": "ct-coronary-arteries-calcium-nc",
+  "name": "CT Coronary Calcium Score",
+  "modality": "CT",
+  "bodyPart": "Coronary Arteries",
+  "contrast": "None",
+  "status": "approved",
+  "subspecialty": "Cardiac",
+  "rulebookId": "ct_coronary_arteries_rp_v1",
+  "sections": [
+    {
+      "id": "indication",
+      "label": "Indication",
+      "placeholder": "Clinical question / referring concern."
+    },
+    {
+      "id": "technique",
+      "label": "Technique",
+      "placeholder": "Multidetector CT of the coronary arteries acquired without intravenous contrast. Multiplanar reformats reviewed. State kVp/contrast volume/phase and DLP as per local dose policy."
+    },
+    {
+      "id": "comparison",
+      "label": "Comparison",
+      "placeholder": "Date and type of relevant prior imaging, if available."
+    },
+    {
+      "id": "findings",
+      "label": "Findings",
+      "placeholder": "Coronary dominance: \nPer-vessel calcification (left main, LAD, LCx, RCA): \nTotal Agatston calcium score and age/sex percentile (CAC=0 vs 1–99 vs 100–399 vs ≥400; risk category): \nPlaque burden inference (CAD-RADS 2.0 P1–P4 from calcium extent — note luminal stenosis is not assessable on a non-contrast calcium study): \nExtracoronary / aortic-valve calcification: \nCardiac chambers / pericardium (non-gated detail as visualised): "
+    },
+    {
+      "id": "impression",
+      "label": "Impression",
+      "placeholder": "Concise, prioritised bulleted impression. Lead with the total Agatston calcium score, its risk category and age/sex percentile, and the CAD-RADS 2.0 plaque-burden category (P1–P4) it implies; state that luminal stenosis is not graded on a non-contrast study, and close with approved follow-up phrasing only."
+    },
+    {
+      "id": "recommendations",
+      "label": "Recommendations",
+      "placeholder": "Evidence-based follow-up or correlation, drawn from approved phrasing, only if indicated."
+    }
+  ]
+}

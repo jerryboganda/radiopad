@@ -1,0 +1,38 @@
+{
+  "id": "us-thyroid",
+  "templateId": "us-thyroid",
+  "name": "Ultrasound Thyroid",
+  "modality": "US",
+  "bodyPart": "Thyroid",
+  "contrast": "",
+  "status": "approved",
+  "subspecialty": "Head & Neck",
+  "rulebookId": "thyroid_us_v1",
+  "sections": [
+    {
+      "id": "indication",
+      "label": "Indication",
+      "placeholder": "Clinical question / referring concern."
+    },
+    {
+      "id": "technique",
+      "label": "Technique",
+      "placeholder": "Real-time greyscale and colour/spectral Doppler ultrasound of the thyroid. State transducer and approach (e.g. transabdominal/endocavitary)."
+    },
+    {
+      "id": "comparison",
+      "label": "Comparison",
+      "placeholder": "Date and type of relevant prior imaging, if available."
+    },
+    {
+      "id": "findings",
+      "label": "Findings",
+      "placeholder": "Right lobe (size, echotexture): \nLeft lobe (size, echotexture): \nIsthmus: \nNodules — for each: location, size (3 planes, mm), and ACR TI-RADS feature points — composition (cystic/spongiform 0, mixed 1, solid 2) + echogenicity (anechoic 0, hyper/iso 1, hypo 2, very hypo 3) + shape (wider-than-tall 0, taller-than-wide 3) + margin (smooth/ill-defined 0, lobulated/irregular 2, extrathyroidal extension 3) + echogenic foci (none/large comet-tail 0, macrocalcification 1, peripheral/rim 2, punctate echogenic foci 3) = total points → level (TR1 0 / TR2 2 / TR3 3 / TR4 4–6 / TR5 ≥7): \nCervical lymph nodes (levels, morphology): "
+    },
+    {
+      "id": "impression",
+      "label": "Impression",
+      "placeholder": "Concise, prioritised bullets. For each nodule give its summed ACR TI-RADS points, TR level (TR1–TR5) and maximum dimension (mm), leading with the most suspicious. Apply the size thresholds: FNA when TR5 ≥1.0 cm / TR4 ≥1.5 cm / TR3 ≥2.5 cm; follow-up US when TR5 ≥0.5 cm / TR4 ≥1.0 cm / TR3 ≥1.5 cm; otherwise no follow-up. Recommendation from approved follow-up phrasing."
+    }
+  ]
+}

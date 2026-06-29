@@ -1,0 +1,43 @@
+{
+  "id": "ct-coronary-arteries-c",
+  "templateId": "ct-coronary-arteries-c",
+  "name": "CT Coronary Angiography",
+  "modality": "CT",
+  "bodyPart": "Coronary Arteries",
+  "contrast": "With",
+  "status": "approved",
+  "subspecialty": "Cardiac",
+  "rulebookId": "ct_coronary_arteries_rp_v1",
+  "sections": [
+    {
+      "id": "indication",
+      "label": "Indication",
+      "placeholder": "Clinical question / referring concern."
+    },
+    {
+      "id": "technique",
+      "label": "Technique",
+      "placeholder": "Multidetector CT of the coronary arteries acquired after intravenous iodinated contrast. Multiplanar reformats reviewed. State kVp/contrast volume/phase and DLP as per local dose policy."
+    },
+    {
+      "id": "comparison",
+      "label": "Comparison",
+      "placeholder": "Date and type of relevant prior imaging, if available."
+    },
+    {
+      "id": "findings",
+      "label": "Findings",
+      "placeholder": "Coronary dominance and anomalies: \nLeft main: \nLAD (proximal/mid/distal, diagonals): \nLCx (and OMs): \nRCA (and PDA): \nPer-vessel maximal stenosis grade (CAD-RADS 2.0: 0 none, 1 minimal 1–24%, 2 mild 25–49%, 3 moderate 50–69%, 4 severe 70–99% [4A / 4B-left main], 5 occluded) and plaque type: \nPlaque burden (P1–P4) and modifiers (N non-diagnostic, HRP high-risk plaque, I ischaemia/CT-FFR, S stent, G graft): \nOverall CAD-RADS category: \nCalcium (Agatston) score (if performed): \nCardiac chambers / valves / pericardium: "
+    },
+    {
+      "id": "impression",
+      "label": "Impression",
+      "placeholder": "Concise, prioritised bulleted impression. Lead with the overall per-patient CAD-RADS 2.0 category (0–5, from the most severe vessel) plus plaque burden (P1–P4) and active modifiers (N/HRP/I/S/G), then the guideline-aligned management tier; close with approved follow-up phrasing only."
+    },
+    {
+      "id": "recommendations",
+      "label": "Recommendations",
+      "placeholder": "Evidence-based follow-up or correlation, drawn from approved phrasing, only if indicated."
+    }
+  ]
+}

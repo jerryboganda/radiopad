@@ -1,0 +1,38 @@
+{
+  "id": "mr-pituitary-mp",
+  "templateId": "mr-pituitary-mp",
+  "name": "MRI Pituitary (dynamic)",
+  "modality": "MR",
+  "bodyPart": "Pituitary",
+  "contrast": "WithAndWithout",
+  "status": "approved",
+  "subspecialty": "Neuro",
+  "rulebookId": "mr_pituitary_rp_v1",
+  "sections": [
+    {
+      "id": "indication",
+      "label": "Indication",
+      "placeholder": "Clinical question / referring concern."
+    },
+    {
+      "id": "technique",
+      "label": "Technique",
+      "placeholder": "Multiplanar, multisequence MRI of the pituitary before and after intravenous gadolinium-based contrast. State field strength, sequences, and any diffusion/dynamic series."
+    },
+    {
+      "id": "comparison",
+      "label": "Comparison",
+      "placeholder": "Date and type of relevant prior imaging, if available."
+    },
+    {
+      "id": "findings",
+      "label": "Findings",
+      "placeholder": "Pituitary gland height and morphology: \nMicro-/macroadenoma (size, signal, enhancement): \nInfundibulum (midline?): \nOptic chiasm / suprasellar cistern: \nCavernous sinuses (no invasion): \nSphenoid sinus: "
+    },
+    {
+      "id": "impression",
+      "label": "Impression",
+      "placeholder": "Concise, prioritised bulleted impression with any required scoring category and approved follow-up."
+    }
+  ]
+}

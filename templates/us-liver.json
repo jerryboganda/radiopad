@@ -1,0 +1,38 @@
+{
+  "id": "us-liver",
+  "templateId": "us-liver",
+  "name": "Ultrasound Liver Doppler (portal)",
+  "modality": "US",
+  "bodyPart": "Liver",
+  "contrast": "",
+  "status": "approved",
+  "subspecialty": "Body",
+  "rulebookId": "us_liver_rp_v1",
+  "sections": [
+    {
+      "id": "indication",
+      "label": "Indication",
+      "placeholder": "Clinical question / referring concern."
+    },
+    {
+      "id": "technique",
+      "label": "Technique",
+      "placeholder": "Real-time greyscale and colour/spectral Doppler ultrasound of the liver. State transducer and approach (e.g. transabdominal/endocavitary)."
+    },
+    {
+      "id": "comparison",
+      "label": "Comparison",
+      "placeholder": "Date and type of relevant prior imaging, if available."
+    },
+    {
+      "id": "findings",
+      "label": "Findings",
+      "placeholder": "Hepatic size, contour and parenchyma: \nFocal observations (number, segment, size, APHE, washout, capsule, growth): \nLI-RADS category per observation: \nPortal/hepatic veins and patency: \nBiliary tree: \nGallbladder, spleen, pancreas: \nAscites / varices / nodes: "
+    },
+    {
+      "id": "impression",
+      "label": "Impression",
+      "placeholder": "Concise, prioritised bulleted impression with any required scoring category and approved follow-up."
+    }
+  ]
+}

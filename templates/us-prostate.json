@@ -1,0 +1,38 @@
+{
+  "id": "us-prostate",
+  "templateId": "us-prostate",
+  "name": "Ultrasound Prostate (transrectal)",
+  "modality": "US",
+  "bodyPart": "Prostate",
+  "contrast": "",
+  "status": "approved",
+  "subspecialty": "Body",
+  "rulebookId": "us_prostate_rp_v1",
+  "sections": [
+    {
+      "id": "indication",
+      "label": "Indication",
+      "placeholder": "Clinical question / referring concern."
+    },
+    {
+      "id": "technique",
+      "label": "Technique",
+      "placeholder": "Real-time greyscale and colour/spectral Doppler ultrasound of the prostate. State transducer and approach (e.g. transabdominal/endocavitary)."
+    },
+    {
+      "id": "comparison",
+      "label": "Comparison",
+      "placeholder": "Date and type of relevant prior imaging, if available."
+    },
+    {
+      "id": "findings",
+      "label": "Findings",
+      "placeholder": "Prostate volume and PSA density: \nPeripheral zone (DWI/ADC, T2): \nTransition zone (T2): \nIndex lesion (sector, size, sequence scores, PI-RADS category): \nSecond lesion: \nExtraprostatic extension / seminal vesicle invasion: \nNeurovascular bundles: \nLymph nodes and bones: "
+    },
+    {
+      "id": "impression",
+      "label": "Impression",
+      "placeholder": "Concise, prioritised bulleted impression with any required scoring category and approved follow-up."
+    }
+  ]
+}

@@ -1,0 +1,38 @@
+{
+  "id": "us-neck",
+  "templateId": "us-neck",
+  "name": "Ultrasound Neck / Lymph Nodes",
+  "modality": "US",
+  "bodyPart": "Neck",
+  "contrast": "",
+  "status": "approved",
+  "subspecialty": "Head & Neck",
+  "rulebookId": "thyroid_us_v1",
+  "sections": [
+    {
+      "id": "indication",
+      "label": "Indication",
+      "placeholder": "Clinical question / referring concern."
+    },
+    {
+      "id": "technique",
+      "label": "Technique",
+      "placeholder": "Real-time greyscale and colour/spectral Doppler ultrasound of the neck. State transducer and approach (e.g. transabdominal/endocavitary)."
+    },
+    {
+      "id": "comparison",
+      "label": "Comparison",
+      "placeholder": "Date and type of relevant prior imaging, if available."
+    },
+    {
+      "id": "findings",
+      "label": "Findings",
+      "placeholder": "Pharynx / larynx / supraglottis: \nThyroid and parathyroid beds: \nSalivary glands (parotid, submandibular): \nCervical lymph node levels (I–VII) with size: \nGreat vessels (carotid/jugular): \nAerodigestive tract: \nVisualised lung apices and skull base: "
+    },
+    {
+      "id": "impression",
+      "label": "Impression",
+      "placeholder": "Concise, prioritised bulleted impression with any required scoring category and approved follow-up."
+    }
+  ]
+}

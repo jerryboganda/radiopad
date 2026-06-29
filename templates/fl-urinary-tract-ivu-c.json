@@ -1,0 +1,33 @@
+{
+  "id": "fl-urinary-tract-ivu-c",
+  "templateId": "fl-urinary-tract-ivu-c",
+  "name": "Intravenous Urogram (IVU)",
+  "modality": "FL",
+  "bodyPart": "Urinary Tract",
+  "contrast": "With",
+  "status": "approved",
+  "subspecialty": "GU",
+  "rulebookId": "fl_urinary_tract_rp_v1",
+  "sections": [
+    {
+      "id": "indication",
+      "label": "Indication",
+      "placeholder": "Clinical question / referring concern."
+    },
+    {
+      "id": "technique",
+      "label": "Technique",
+      "placeholder": "Fluoroscopic examination of the urinary tract. State contrast medium, volume, screening time and DAP."
+    },
+    {
+      "id": "findings",
+      "label": "Findings",
+      "placeholder": "Contrast transit / opacification: \nMucosal pattern and distensibility: \nFilling defects / strictures / leaks: \nMotility: \nAnatomy-specific findings: "
+    },
+    {
+      "id": "impression",
+      "label": "Impression",
+      "placeholder": "Concise, prioritised bulleted impression with any required scoring category and approved follow-up."
+    }
+  ]
+}
