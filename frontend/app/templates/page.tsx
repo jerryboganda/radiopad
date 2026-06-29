@@ -1,9 +1,13 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import { api, type ReportTemplate } from '@/lib/api';
 import Container from '@/components/shell/Container';
 import PageHeader from '@/components/shell/PageHeader';
+import { TableSkeleton } from '@/components/ui/Skeleton';
+import EmptyState from '@/components/ui/EmptyState';
+import ErrorState from '@/components/ui/ErrorState';
+import Banner from '@/components/ui/Banner';
 
 type Section = { id: string; label: string; placeholder?: string; required?: boolean };
 
@@ -51,6 +55,8 @@ const EMPTY: Draft = {
 export default function TemplatesPage() {
   const [items, setItems] = useState<ExtTemplate[]>([]);
   const [error, setError] = useState<string | null>(null);
+  const [loadError, setLoadError] = useState<string | null>(null);
+  const [loading, setLoading] = useState(true);
   const [draft, setDraft] = useState<Draft | null>(null);
   const [saving, setSaving] = useState(false);
   const [preview, setPreview] = useState<PreviewState>(null);
@@ -60,11 +66,16 @@ export default function TemplatesPage() {
     setItems((await api.templates.list()) as ExtTemplate[]);
   }
 
-  useEffect(() => {
+  const load = useCallback(() => {
+    setLoading(true);
+    setLoadError(null);
     api.templates.list()
       .then((r) => setItems(r as ExtTemplate[]))
-      .catch((e: Error) => setError(e.message));
+      .catch((e: Error) => setLoadError(e.message))
+      .finally(() => setLoading(false));
   }, []);
+
+  useEffect(() => { load(); }, [load]);
 
   function newTemplate() {
     setDraft({ ...EMPTY, sections: EMPTY.sections.map((s) => ({ ...s })) });
@@ -136,57 +147,71 @@ export default function TemplatesPage() {
         primaryAction={<button className="primary" onClick={newTemplate}>+ New template</button>}
       />
 
-      {error && <div className="banner warn">{error}</div>}
-
-      <div className="rp-panel">
-        <div className="rp-panel-title">Your templates</div>
-        <table className="rp-table">
-          <thead>
-            <tr>
-              <th>ID</th>
-              <th>Name</th>
-              <th>Modality</th>
-              <th>Body part</th>
-              <th>Status</th>
-              <th></th>
-            </tr>
-          </thead>
-          <tbody>
-            {items.length === 0 && (
-              <tr><td colSpan={6} style={{ color: 'var(--text-muted)' }}>No custom templates yet.</td></tr>
-            )}
-            {items.map((t) => {
-              const status = templateStatusLabel(t.status);
-              return (
-                <tr key={t.id}>
-                  <td><code>{t.templateId}</code></td>
-                  <td>{t.name}</td>
-                  <td>{t.modality}</td>
-                  <td>{t.bodyPart}</td>
-                  <td><span className={`badge ${templateStatusClass(t.status)}`}>{status}</span></td>
-                  <td>
-                    <button className="subtle" onClick={() => editTemplate(t)}>Edit</button>
-                    <button className="subtle" onClick={() => showPreview(t)}>Preview</button>
-                    <button className="subtle" onClick={() => showUsage(t)}>Usage</button>
-                    {status !== 'Approved' && (
-                      <button className="primary-ghost" onClick={() => withRefresh(() => api.templates.submitForReview(t.id))}>Submit</button>
-                    )}
-                    {status !== 'Approved' && (
-                      <button className="primary-ghost" onClick={() => withRefresh(() => api.templates.approve(t.id))}>Approve</button>
-                    )}
-                    {status !== 'Deprecated' && (
-                      <button className="ghost" onClick={() => withRefresh(() => api.templates.deprecate(t.id))}>Deprecate</button>
-                    )}
-                  </td>
-                </tr>
-              );
-            })}
-          </tbody>
-        </table>
+      <div aria-live="polite">
+        {error && <Banner tone="warn" title="Action failed" onDismiss={() => setError(null)}>{error}</Banner>}
       </div>
 
+      {loadError ? (
+        <ErrorState title="Couldn't load templates" message={loadError} onRetry={load} />
+      ) : loading ? (
+        <div className="rp-panel" aria-busy="true">
+          <div className="rp-panel-title">Your templates</div>
+          <TableSkeleton rows={5} cols={6} />
+        </div>
+      ) : items.length === 0 ? (
+        <EmptyState
+          title="No custom templates yet"
+          description="Create a template to define the section structure for a study type. Built-in templates ship with the app."
+          action={<button className="primary" onClick={newTemplate}>Create your first template</button>}
+        />
+      ) : (
+        <div className="rp-panel rp-anim-fade-in-up">
+          <div className="rp-panel-title">Your templates</div>
+          <table className="rp-table">
+            <thead>
+              <tr>
+                <th>ID</th>
+                <th>Name</th>
+                <th>Modality</th>
+                <th>Body part</th>
+                <th>Status</th>
+                <th></th>
+              </tr>
+            </thead>
+            <tbody>
+              {items.map((t) => {
+                const status = templateStatusLabel(t.status);
+                return (
+                  <tr key={t.id}>
+                    <td><code>{t.templateId}</code></td>
+                    <td>{t.name}</td>
+                    <td>{t.modality}</td>
+                    <td>{t.bodyPart}</td>
+                    <td><span className={`badge ${templateStatusClass(t.status)}`}>{status}</span></td>
+                    <td>
+                      <button className="subtle" onClick={() => editTemplate(t)}>Edit</button>
+                      <button className="subtle" onClick={() => showPreview(t)}>Preview</button>
+                      <button className="subtle" onClick={() => showUsage(t)}>Usage</button>
+                      {status !== 'Approved' && (
+                        <button className="primary-ghost" onClick={() => withRefresh(() => api.templates.submitForReview(t.id))}>Submit</button>
+                      )}
+                      {status !== 'Approved' && (
+                        <button className="primary-ghost" onClick={() => withRefresh(() => api.templates.approve(t.id))}>Approve</button>
+                      )}
+                      {status !== 'Deprecated' && (
+                        <button className="ghost" onClick={() => withRefresh(() => api.templates.deprecate(t.id))}>Deprecate</button>
+                      )}
+                    </td>
+                  </tr>
+                );
+              })}
+            </tbody>
+          </table>
+        </div>
+      )}
+
       {preview && (
-        <div className="rp-panel">
+        <div className="rp-panel rp-anim-fade-in-up">
           <div className="rp-row between">
             <div className="rp-panel-title">Preview — {preview.name} <code>{preview.templateId}</code></div>
             <button className="ghost" onClick={() => setPreview(null)}>Close</button>
@@ -204,7 +229,7 @@ export default function TemplatesPage() {
       )}
 
       {usage && (
-        <div className="rp-panel">
+        <div className="rp-panel rp-anim-fade-in-up">
           <div className="rp-row between">
             <div className="rp-panel-title">Usage — <code>{usage.templateId}</code></div>
             <button className="ghost" onClick={() => setUsage(null)}>Close</button>
@@ -235,7 +260,7 @@ export default function TemplatesPage() {
 
       {draft && (
         <div className="rp-modal-backdrop" onClick={() => setDraft(null)} onKeyDown={(e) => { if (e.key === 'Escape') setDraft(null); }}>
-          <div className="rp-panel rp-modal" role="dialog" aria-modal="true" aria-label={draft.id ? 'Edit template' : 'New template'} onClick={(e) => e.stopPropagation()} style={{ width: 'min(720px, 100%)' }}>
+          <div className="rp-panel rp-modal rp-anim-scale-in" role="dialog" aria-modal="true" aria-label={draft.id ? 'Edit template' : 'New template'} onClick={(e) => e.stopPropagation()} style={{ width: 'min(720px, 100%)' }}>
             <div className="rp-panel-title">{draft.id ? 'Edit template' : 'New template'}</div>
 
             <label className="rp-field">
@@ -325,7 +350,8 @@ export default function TemplatesPage() {
 
             <div className="rp-row" style={{ justifyContent: 'flex-end', gap: 8, marginTop: 16 }}>
               <button className="ghost" onClick={() => setDraft(null)} disabled={saving}>Cancel</button>
-              <button className="primary" onClick={save} disabled={saving || !draft.templateId || !draft.name}>
+              <button className="primary" onClick={save} disabled={saving || !draft.templateId || !draft.name} aria-busy={saving}>
+                {saving && <span className="rp-spinner sm" aria-hidden />}
                 {saving ? 'Saving…' : 'Save'}
               </button>
             </div>

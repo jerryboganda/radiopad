@@ -7,6 +7,7 @@ import Container from '@/components/shell/Container';
 import PageHeader from '@/components/shell/PageHeader';
 import EmptyState from '@/components/ui/EmptyState';
 import ErrorState from '@/components/ui/ErrorState';
+import Banner from '@/components/ui/Banner';
 import { TableSkeleton } from '@/components/ui/Skeleton';
 import { api, type UbagJob, type UbagStatus, type UbagWorkflowRun } from '@/lib/api';
 
@@ -136,11 +137,16 @@ function UbagHubPageInner() {
       <PageHeader
         title="UBAG Hub"
         description="Run governed non-PHI browser AI automation through RadioPad's backend."
-        primaryAction={<button className="subtle" onClick={() => void refresh()} disabled={loading}>Refresh</button>}
+        primaryAction={
+          <button className="subtle" onClick={() => void refresh()} disabled={loading} aria-busy={loading}>
+            {loading && <span className="rp-spinner sm" aria-hidden />}
+            Refresh
+          </button>
+        }
       />
 
-      {error && !loading && <div className="banner warn">{error}</div>}
-      {info && <div className="banner ok">{info}</div>}
+      {error && !loading && <Banner tone="warn" onDismiss={() => setError(null)}>{error}</Banner>}
+      {info && <Banner tone="success" onDismiss={() => setInfo(null)}>{info}</Banner>}
 
       {loading && !status ? (
         <TableSkeleton rows={4} cols={3} />
@@ -148,7 +154,7 @@ function UbagHubPageInner() {
         <ErrorState title="Couldn't load UBAG" message={error} onRetry={() => { void refresh(); }} />
       ) : status ? (
         <>
-          <div className="rp-grid-3">
+          <div className="rp-grid-3 rp-stagger">
             <div className="rp-panel">
               <div className="rp-panel-title">Gateway</div>
               <span className={`badge ${statusBadge(status.health.ok)}`}>
@@ -192,19 +198,21 @@ function UbagHubPageInner() {
                     placeholder="Use de-identified project, research, or wording prompts only."
                   />
                 </label>
-                {promptBlock && <div className="banner warn">{promptBlock}</div>}
+                {promptBlock && <Banner tone="warn">{promptBlock}</Banner>}
                 <div className="rp-row" style={{ justifyContent: 'flex-end', gap: 8 }}>
-                  <button className="primary-ghost" onClick={() => void runOrderedWorkflow()} disabled={busy || !prompt.trim() || !!promptBlock}>
+                  <button className="primary-ghost" onClick={() => void runOrderedWorkflow()} disabled={busy || !prompt.trim() || !!promptBlock} aria-busy={busy}>
+                    {busy && <span className="rp-spinner sm" aria-hidden />}
                     {busy ? 'Running...' : 'Run ChatGPT -> Gemini -> DeepSeek'}
                   </button>
-                  <button className="primary" onClick={() => void submitJob()} disabled={busy || !prompt.trim() || !!promptBlock}>
+                  <button className="primary" onClick={() => void submitJob()} disabled={busy || !prompt.trim() || !!promptBlock} aria-busy={busy}>
+                    {busy && <span className="rp-spinner sm" aria-hidden />}
                     {busy ? 'Submitting...' : 'Submit job'}
                   </button>
                 </div>
               </div>
 
               {(job || run) && (
-                <div className="rp-panel" style={{ marginTop: 16 }}>
+                <div className="rp-panel rp-anim-fade-in-up" style={{ marginTop: 16 }} aria-live="polite" aria-busy={busy}>
                   <div className="rp-panel-title">Latest result</div>
                   {job && (
                     <>
@@ -215,10 +223,13 @@ function UbagHubPageInner() {
                         {job.manualAction && <span className="badge warn">manual action</span>}
                       </div>
                       <div className="rp-row" style={{ justifyContent: 'flex-end', marginTop: 8 }}>
-                        <button className="subtle" onClick={() => void pollJob()} disabled={busy || !job.id}>Refresh job</button>
+                        <button className="subtle" onClick={() => void pollJob()} disabled={busy || !job.id} aria-busy={busy}>
+                          {busy && <span className="rp-spinner sm" aria-hidden />}
+                          Refresh job
+                        </button>
                       </div>
                       {job.output && <div className="ai-mark" style={{ whiteSpace: 'pre-wrap', marginTop: 12 }}>{job.output}</div>}
-                      {job.error && <div className="banner warn">{job.error}</div>}
+                      {job.error && <Banner tone="warn">{job.error}</Banner>}
                     </>
                   )}
                   {run && (
@@ -229,10 +240,13 @@ function UbagHubPageInner() {
                         {run.manualAction && <span className="badge warn">manual action</span>}
                       </div>
                       <div className="rp-row" style={{ justifyContent: 'flex-end', marginTop: 8 }}>
-                        <button className="subtle" onClick={() => void pollRun()} disabled={busy || !run.id}>Refresh workflow</button>
+                        <button className="subtle" onClick={() => void pollRun()} disabled={busy || !run.id} aria-busy={busy}>
+                          {busy && <span className="rp-spinner sm" aria-hidden />}
+                          Refresh workflow
+                        </button>
                       </div>
                       {run.output && <div className="ai-mark" style={{ whiteSpace: 'pre-wrap', marginTop: 12 }}>{run.output}</div>}
-                      {run.error && <div className="banner warn">{run.error}</div>}
+                      {run.error && <Banner tone="warn">{run.error}</Banner>}
                     </>
                   )}
                 </div>

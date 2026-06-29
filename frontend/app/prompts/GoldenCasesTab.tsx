@@ -25,11 +25,13 @@ export default function GoldenCasesTab({ results, onRun, running, disabled }: Go
       </p>
 
       <div className="rp-actions rp-mb-md">
-        <button type="button" className="primary" disabled={running || disabled} onClick={onRun}>
+        <button type="button" className="primary" disabled={running || disabled} aria-busy={running} onClick={onRun}>
+          {running && <span className="rp-spinner sm" aria-hidden />}
           {running ? 'Running…' : 'Run all cases'}
         </button>
       </div>
 
+      <div aria-live="polite" aria-busy={running}>
       {summary ? (
         <div className="rp-stat-strip">
           <div className="rp-stat-tile">
@@ -82,6 +84,7 @@ export default function GoldenCasesTab({ results, onRun, running, disabled }: Go
       ) : results && results.length === 0 ? (
         <p className="rp-tab-intro">No golden cases are defined for this rulebook yet.</p>
       ) : null}
+      </div>
     </div>
   );
 }

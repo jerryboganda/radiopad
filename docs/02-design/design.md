@@ -632,8 +632,46 @@ gradient circle defined in `.brand-mark`.
 
 ## 6. Motion
 
-120ms cubic ease for hover/focus transitions on background, border, and
-shadow. No bouncy springs. No content reflows on hover.
+Motion is a **first-class, expressive layer** of the design system, not an
+afterthought. RadioPad should feel alive and responsive. (This supersedes the
+previous "calm, no bouncy springs" guidance.) Every animation is token-driven and
+**fully gated by `prefers-reduced-motion`** so it never compromises the clinical
+workflow.
+
+**Where it lives.** Tokens in `frontend/app/hallmark.css`; the keyframe library +
+entrance/stagger utilities + the motion-driven components (Banner, Toast, Reveal,
+PageTransition) in `frontend/app/motion.css`; Tailwind utilities mirrored in
+`frontend/tailwind.config.ts`.
+
+**Tokens.**
+- Easings: `--ease-out/in/in-out` (UI) + expressive `--ease-pop`, `--ease-snap`,
+  `--ease-spring`, `--ease-overshoot`.
+- Transition durations: `--dur-fast` 120ms, `--dur-base` 180ms, `--dur-slow` 260ms;
+  composed tokens `--transition-fast|base|slow|snap|spring`.
+- Animation durations: `--anim-fast` 160ms, `--anim-base` 260ms, `--anim-slow` 420ms,
+  `--anim-spin` 700ms.
+- Stagger scale: `--delay-1…8` (40ms steps); `.rp-stagger` cascades direct children.
+
+**Vocabulary.**
+- Entrance: `.rp-anim-fade-in[-up|-down]`, `.rp-anim-scale-in`, `.rp-anim-pop-in`,
+  `.rp-anim-slide-left|right`, `.rp-anim-spring-in`; route changes via `<PageTransition>`;
+  on-scroll via `<Reveal>`.
+- Interaction: hover/focus transitions on background/border/shadow/transform via the
+  `--transition-*` tokens; buttons get a tactile `:active` press; primary actions use
+  `--ease-pop`/`--ease-spring` for reveals.
+- Attention/feedback: `.rp-motion-pulse`, `.rp-motion-glow`, count-ups via
+  `<AnimatedNumber>`, status via `<Banner>` / toasts.
+
+**Discipline.** On the clinical report-editing/dictation canvas, motion is limited to
+entrance and state-change feedback — nothing animates continuously behind text being
+read, dictated, or signed. Motion never implies an action the system didn't take
+(RadioPad never auto-signs; AI text keeps `.ai-mark` until acknowledged).
+
+**Reduced motion.** A single global `@media (prefers-reduced-motion: reduce)` rule in
+`hallmark.css` neutralizes transitions/animations app-wide. Do not re-implement
+reduced-motion handling per component.
+
+Verify the full catalog and reduced-motion behavior at the dev route **`/design/motion`**.
 
 ---
 

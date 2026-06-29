@@ -10,6 +10,7 @@ import EmptyState from '@/components/ui/EmptyState';
 import ErrorState from '@/components/ui/ErrorState';
 import { TableSkeleton } from '@/components/ui/Skeleton';
 import StatusBadge, { reportStatusTone } from '@/components/ui/StatusBadge';
+import AnimatedNumber from '@/components/ui/AnimatedNumber';
 
 const PAGE_SIZE = 25;
 
@@ -82,6 +83,18 @@ export default function DashboardPage() {
     [reports],
   );
 
+  // Quick at-a-glance counts for the currently loaded page of reports.
+  const pageCounts = useMemo(() => {
+    const c = { draft: 0, validated: 0, signed: 0 };
+    for (const r of reports) {
+      const tone = reportStatusTone(r.status);
+      if (tone === 'neutral') c.draft += 1;
+      else if (tone === 'info') c.validated += 1;
+      else if (tone === 'success') c.signed += 1;
+    }
+    return c;
+  }, [reports]);
+
   const totalPages = Math.max(1, Math.ceil(total / PAGE_SIZE));
   const filtersActive = statusFilter !== 'all' || modalityFilter !== 'all' || search.trim() !== '';
 
@@ -95,7 +108,26 @@ export default function DashboardPage() {
         }
       />
 
-      <section className="rp-panel">
+      <div className="metric-grid rp-stagger" style={{ marginBottom: 16 }}>
+        <div className="metric-card" data-tone="info">
+          <div className="metric-card-label">Total reports</div>
+          <div className="metric-card-value"><AnimatedNumber value={total} /></div>
+        </div>
+        <div className="metric-card">
+          <div className="metric-card-label">Draft (this page)</div>
+          <div className="metric-card-value"><AnimatedNumber value={pageCounts.draft} /></div>
+        </div>
+        <div className="metric-card" data-tone="review">
+          <div className="metric-card-label">Validated (this page)</div>
+          <div className="metric-card-value"><AnimatedNumber value={pageCounts.validated} /></div>
+        </div>
+        <div className="metric-card" data-tone="ready">
+          <div className="metric-card-label">Signed / exported (this page)</div>
+          <div className="metric-card-value"><AnimatedNumber value={pageCounts.signed} /></div>
+        </div>
+      </div>
+
+      <section className="rp-panel rp-anim-fade-in-up" aria-live="polite" aria-busy={loading}>
         <div className="rp-toolbar" style={{ marginBottom: 16 }}>
           <input
             className="rp-input"
@@ -154,7 +186,7 @@ export default function DashboardPage() {
                 <th aria-label="Actions" />
               </tr>
             </thead>
-            <tbody>
+            <tbody className="rp-stagger">
               {reports.map((r) => (
                 <tr key={r.id}>
                   <td><code>{r.study.accessionNumber}</code></td>

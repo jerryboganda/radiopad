@@ -345,6 +345,7 @@ export default function PromptStudioPage() {
                 ))}
               </div>
 
+              <div className="rp-anim-fade-in" key={activeTab}>
               {activeTab === 'test' ? (
                 <TestRunnerTab
                   value={testInput}
@@ -390,6 +391,7 @@ export default function PromptStudioPage() {
                   onApprove={handleApprove}
                 />
               ) : null}
+              </div>
             </section>
           </div>
         </>

@@ -4,6 +4,7 @@ import { useState } from 'react';
 import Link from 'next/link';
 import { api } from '@/lib/api';
 import { reportHref } from '@/lib/routes';
+import Banner from '@/components/ui/Banner';
 
 type ImportSuccess = { reportId: string; status: string; warnings?: string[] };
 
@@ -54,18 +55,20 @@ export default function FhirImportPage() {
       <div className="rp-page-grid">
         <div className="rp-page-main">
 
-      {error && <div className="banner warn">{error}</div>}
+      {error && <Banner tone="warn" onDismiss={() => setError(null)}>{error}</Banner>}
       {result && (
-        <div className="banner info">
-          Imported as a {result.status} draft —{' '}
-          <Link href={reportHref(result.reportId)}>open it now</Link>
-          {result.warnings && result.warnings.length > 0 && (
-            <ul className="rp-list rp-mt-sm">
-              {result.warnings.map((w, i) => (
-                <li key={i} className="rp-divider-row">{w}</li>
-              ))}
-            </ul>
-          )}
+        <div className="rp-anim-fade-in-up">
+          <Banner tone="success">
+            Imported as a {result.status} draft —{' '}
+            <Link href={reportHref(result.reportId)}>open it now</Link>
+            {result.warnings && result.warnings.length > 0 && (
+              <ul className="rp-list rp-mt-sm">
+                {result.warnings.map((w, i) => (
+                  <li key={i} className="rp-divider-row">{w}</li>
+                ))}
+              </ul>
+            )}
+          </Banner>
         </div>
       )}
 
@@ -85,7 +88,8 @@ export default function FhirImportPage() {
           />
         </div>
         <div className="rp-toolbar rp-mt-sm">
-          <button className="primary" disabled={busy} onClick={importJson}>
+          <button className="primary" disabled={busy} onClick={importJson} aria-busy={busy}>
+            {busy && <span className="rp-spinner sm" aria-hidden />}
             {busy ? 'Importing…' : 'Import as draft'}
           </button>
           <button className="ghost" disabled={busy || !body} onClick={() => setBody('')}>

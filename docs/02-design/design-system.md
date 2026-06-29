@@ -68,9 +68,27 @@ Headings use the sans family by default; report bodies use serif. Do not introdu
 
 ## Motion
 
-- Easing: `cubic-bezier(0.2, 0.6, 0.2, 1)`.
-- Durations: 120 ms (micro), 200 ms (panel), 320 ms (modal).
-- Avoid spring/elastic curves; the warm-paper aesthetic is calm.
+Motion is a **first-class token layer** (defined in `app/hallmark.css`, keyframes +
+utilities in `app/motion.css`, mirrored as Tailwind utilities in `tailwind.config.ts`).
+RadioPad now uses a **lively, expressive** motion language; the old "calm, no springs"
+rule is retired. All motion stays purposeful and is fully `prefers-reduced-motion`-gated.
+
+- **Easings:** `--ease-out` / `--ease-in` / `--ease-in-out` (UI), plus expressive presets
+  `--ease-pop` (reveal/attention), `--ease-snap` (crisp state), `--ease-spring`,
+  `--ease-overshoot` (playful feedback).
+- **Durations:** transitions `--dur-fast` 120ms / `--dur-base` 180ms / `--dur-slow` 260ms;
+  entrance animations `--anim-fast` 160ms / `--anim-base` 260ms / `--anim-slow` 420ms;
+  spinners `--anim-spin` 700ms.
+- **Composed transition tokens:** `--transition-fast|base|slow|snap|spring` (duration +
+  easing) — use `transition: <prop> var(--transition-base)` instead of hardcoding.
+- **Stagger:** `--delay-1…8` (40ms steps) and the `.rp-stagger` container for cascades.
+- **Entrance utilities:** `.rp-anim-fade-in[-up|-down]`, `.rp-anim-scale-in`,
+  `.rp-anim-pop-in`, `.rp-anim-slide-left|right`, `.rp-anim-spring-in`.
+- **React primitives:** `<PageTransition>` (route changes), `<Reveal>` (scroll entrance),
+  `<AnimatedNumber>` (count-up), `<Banner>` + `<ToastProvider>`/`useToast`.
+- **Reduced motion:** one global `@media (prefers-reduced-motion: reduce)` rule in
+  `hallmark.css` neutralizes motion app-wide; do not re-implement per component.
+- Verify the full catalog at the dev route **`/design/motion`**.
 
 ## Adding tokens
 

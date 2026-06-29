@@ -5,6 +5,12 @@ import Link from 'next/link';
 import { api, publicEnv, type BillingInvoice, type BillingStatus, type BillingCredits } from '@/lib/api';
 import { isAuthError, useAuthSession } from '@/lib/useAuthSession';
 import SignInRequired from '@/components/ui/SignInRequired';
+import Container from '@/components/shell/Container';
+import PageHeader from '@/components/shell/PageHeader';
+import Banner from '@/components/ui/Banner';
+import EmptyState from '@/components/ui/EmptyState';
+import AnimatedNumber from '@/components/ui/AnimatedNumber';
+import Skeleton from '@/components/ui/Skeleton';
 
 type AnalyticsSummary = Awaited<ReturnType<typeof api.analytics.summary>>;
 type FeatureMap = Awaited<ReturnType<typeof api.billing.features>>;
@@ -152,61 +158,64 @@ export default function BillingDashboardPage() {
 
   if (session.signedOut) {
     return (
-      <div className="rp-container">
+      <Container>
         <h1 className="rp-page-title">Billing &amp; plan</h1>
         <SignInRequired surface="Please sign in to view your workspace billing." />
-      </div>
+      </Container>
     );
   }
 
   if (authBlocked) {
     return (
-      <div className="rp-container">
+      <Container>
         <h1 className="rp-page-title">Billing &amp; plan</h1>
         <SignInRequired
           surface="You don't have access to billing for this workspace."
           detail="Ask your Billing Admin, IT Admin, or Medical Director to give you access — or to handle this for you."
         />
-      </div>
+      </Container>
     );
   }
 
   if (statusUnavailable) {
     return (
-      <div className="rp-container">
+      <Container>
         <h1 className="rp-page-title">Billing &amp; plan</h1>
-        <div className="rp-panel">
-          <div className="rp-panel-title">Billing isn&apos;t set up yet</div>
-          <p className="rp-page-sub">
-            Billing hasn&apos;t been turned on for this workspace yet. Ask your
-            workspace admin to finish setup.
-          </p>
+        <div className="rp-panel rp-anim-fade-in-up">
+          <EmptyState
+            title="Billing isn't set up yet"
+            description="Billing hasn't been turned on for this workspace yet. Ask your workspace admin to finish setup."
+          />
         </div>
-      </div>
+      </Container>
     );
   }
 
   return (
-    <div className="rp-container">
-      <header className="rp-page-header">
-        <div className="rp-page-header-text">
-          <h1 className="rp-page-title">Billing &amp; plan</h1>
-          <p className="rp-page-sub">
-            Your current plan, this month&apos;s AI usage, invoices, and what each plan unlocks.
-          </p>
-        </div>
-      </header>
+    <Container>
+      <PageHeader
+        title="Billing & plan"
+        description="Your current plan, this month's AI usage, invoices, and what each plan unlocks."
+      />
 
-      {error && <div className="banner warn">{error}</div>}
-      {statusError && <div className="banner warn">{statusError}</div>}
+      <div aria-live="polite">
+        {error && (
+          <Banner tone="warn" title="Something went wrong" onDismiss={() => setError(null)}>
+            {error}
+          </Banner>
+        )}
+        {statusError && (
+          <Banner tone="warn" title="Couldn't load your plan">{statusError}</Banner>
+        )}
+      </div>
 
       <div className="rp-page-grid">
-        <div className="rp-page-main">
+        <div className="rp-page-main rp-stagger">
 
       {/* 1. Plan & status ------------------------------------------ */}
-      <section className="rp-panel">
+      <section className="rp-panel rp-anim-fade-in-up" aria-busy={!status && !statusError}>
         <div className="rp-panel-title">Your plan</div>
-        {!status && !statusError && <p className="rp-page-sub">Loading…</p>}
+        {!status && !statusError && <Skeleton variant="block" height={72} />}
         {status && (
           <>
             <div className="rp-row rp-row-wrap rp-gap-sm rp-mb-md">
@@ -227,14 +236,14 @@ export default function BillingDashboardPage() {
             </div>
 
             {status.gracePeriodUntil && (
-              <div className="banner warn">
-                A payment is overdue. You have until {fmtDate(status.gracePeriodUntil)} ({daysUntil(status.gracePeriodUntil)} days) before AI features pause.
-              </div>
+              <Banner tone="warn" title="Payment overdue">
+                You have until {fmtDate(status.gracePeriodUntil)} ({daysUntil(status.gracePeriodUntil)} days) before AI features pause.
+              </Banner>
             )}
             {status.suspendedAt && (
-              <div className="banner danger">
+              <Banner tone="danger" title="Workspace suspended">
                 This workspace was suspended on {fmtDate(status.suspendedAt)}. Pay the outstanding invoice to restore access.
-              </div>
+              </Banner>
             )}
             {!status.customerConfigured && (
               <p className="rp-page-sub">
@@ -259,17 +268,17 @@ export default function BillingDashboardPage() {
       </section>
 
       {/* 2. AI credits this period (BILL-002) ----------------- */}
-      <section className="rp-panel">
+      <section className="rp-panel rp-anim-fade-in-up" aria-busy={!credits && !creditsError}>
         <div className="rp-panel-title">AI credit usage this period</div>
-        {creditsError && <div className="banner warn">{creditsError}</div>}
-        {!credits && !creditsError && <p className="rp-page-sub">Loading…</p>}
+        {creditsError && <Banner tone="warn">{creditsError}</Banner>}
+        {!credits && !creditsError && <Skeleton variant="block" height={120} />}
         {credits && (
           <>
             <p className="rp-page-sub">
               {fmtDate(credits.periodStart)} – {fmtDate(credits.periodEnd)}{' '}
               · Plan <span className="badge info">{credits.plan}</span>
             </p>
-            <div className="rp-grid-3">
+            <div className="metric-grid rp-stagger">
               {(['calls', 'inputTokens', 'outputTokens'] as const).map((k) => {
                 const labels = { calls: 'AI requests', inputTokens: 'Words sent to AI', outputTokens: 'Words received from AI' } as const;
                 const used = credits.used[k];
@@ -277,14 +286,30 @@ export default function BillingDashboardPage() {
                 const remaining = credits.remaining[k];
                 const ratio = limit > 0 ? used / limit : 0;
                 const tone = ratio >= 1 ? 'danger' : ratio >= 0.9 ? 'warn' : 'ok';
+                const cardTone = ratio >= 1 ? 'blocked' : ratio >= 0.9 ? 'review' : 'ready';
                 const pct = Math.min(100, Math.round(ratio * 100));
                 return (
-                  <div key={k} className="rp-stat-tile">
+                  <div key={k} className="metric-card" data-tone={cardTone}>
                     <div className="rp-stat-tile-row">
-                      <span className="rp-stat-label">{labels[k]}</span>
+                      <span className="metric-card-label">{labels[k]}</span>
                       <span className={`badge ${tone}`}>{pct}%</span>
                     </div>
-                    <div className="rp-stat-value">{used.toLocaleString()}</div>
+                    <div className="metric-card-value">
+                      <AnimatedNumber value={used} />
+                    </div>
+                    <div
+                      style={{ height: 6, borderRadius: 3, overflow: 'hidden', background: 'var(--color-rule)' }}
+                      role="progressbar"
+                      aria-valuenow={pct}
+                      aria-valuemin={0}
+                      aria-valuemax={100}
+                      aria-label={`${labels[k]} used`}
+                    >
+                      <div
+                        className={`rp-bar-fill badge ${tone}`}
+                        style={{ width: `${pct}%`, height: '100%', borderRadius: 0 }}
+                      />
+                    </div>
                     <div className="rp-stat-sub">
                       of {limit.toLocaleString()} · {remaining.toLocaleString()} remaining
                     </div>
@@ -298,15 +323,15 @@ export default function BillingDashboardPage() {
 
       {/* 3. Trial countdown (BILL-007) ----------------------- */}
       {credits && credits.plan === 'Trial' && credits.trialEndsAt && (
-        <section className="rp-panel">
+        <section className="rp-panel rp-anim-fade-in-up">
           <div className="rp-panel-title">Free trial</div>
           {(() => {
             const days = daysUntil(credits.trialEndsAt!);
             if (days <= 3) {
               return (
-                <div className="rp-banner warn">
+                <Banner tone="warn" title="Free trial ending soon">
                   Your free trial ends in {days} day{days === 1 ? '' : 's'} (on {fmtDate(credits.trialEndsAt)}). Upgrade now to keep using AI drafting after that.
-                </div>
+                </Banner>
               );
             }
             return (
@@ -319,26 +344,28 @@ export default function BillingDashboardPage() {
       )}
 
       {/* 4. Usage this month --------------------------------------- */}
-      <section className="rp-panel">
+      <section className="rp-panel rp-anim-fade-in-up" aria-busy={!usage && !usageError}>
         <div className="rp-panel-title">AI activity this month</div>
-        {usageError && <div className="banner warn">{usageError}</div>}
-        {!usage && !usageError && <p className="rp-page-sub">Loading…</p>}
+        {usageError && <Banner tone="warn">{usageError}</Banner>}
+        {!usage && !usageError && <Skeleton variant="block" height={96} />}
         {usage && (
           <>
-            <div className="rp-grid-3 rp-mb-md">
-              <div>
-                <div className="rp-stat-label">AI requests</div>
-                <div className="rp-stat-value">{usage.ai.totalRequests.toLocaleString()}</div>
+            <div className="metric-grid rp-mb-md rp-stagger">
+              <div className="metric-card" data-tone="info">
+                <div className="metric-card-label">AI requests</div>
+                <div className="metric-card-value">
+                  <AnimatedNumber value={usage.ai.totalRequests} />
+                </div>
               </div>
-              <div>
-                <div className="rp-stat-label">Blocked for safety / errors</div>
-                <div className="rp-stat-value">
+              <div className="metric-card">
+                <div className="metric-card-label">Blocked for safety / errors</div>
+                <div className="metric-card-value">
                   {usage.ai.blockedCount.toLocaleString()} / {usage.ai.errorCount.toLocaleString()}
                 </div>
               </div>
-              <div>
-                <div className="rp-stat-label">Average speed</div>
-                <div className="rp-stat-value">
+              <div className="metric-card">
+                <div className="metric-card-label">Average speed</div>
+                <div className="metric-card-value">
                   {Math.round(usage.ai.avgLatencyMs).toLocaleString()} ms
                 </div>
               </div>
@@ -376,11 +403,14 @@ export default function BillingDashboardPage() {
       </section>
 
       {/* 3. Invoices ------------------------------------------------ */}
-      <section className="rp-panel">
+      <section className="rp-panel rp-anim-fade-in-up">
         <div className="rp-panel-title">Invoices</div>
-        {invoicesError && <div className="banner warn">{invoicesError}</div>}
+        {invoicesError && <Banner tone="warn">{invoicesError}</Banner>}
         {!invoicesError && invoices.length === 0 && (
-          <p className="rp-page-sub">No invoices issued yet.</p>
+          <EmptyState
+            title="No invoices issued yet"
+            description="Invoices will appear here once your first billing period closes."
+          />
         )}
         {invoices.length > 0 && (
           <ul className="rp-list">
@@ -419,9 +449,9 @@ export default function BillingDashboardPage() {
       </section>
 
       {/* 4. Plan-feature flags ------------------------------------- */}
-      <section className="rp-panel">
+      <section className="rp-panel rp-anim-fade-in-up" aria-busy={!features}>
         <div className="rp-panel-title">What&apos;s included in your plan</div>
-        {!features && <p className="rp-page-sub">Loading…</p>}
+        {!features && <Skeleton variant="block" height={96} />}
         {features && (
           <>
             <p className="rp-page-sub">
@@ -449,7 +479,7 @@ export default function BillingDashboardPage() {
       </section>
 
       {/* 5. Bulk export ------------------------------------------- */}
-      <section className="rp-panel">
+      <section className="rp-panel rp-anim-fade-in-up">
         <div className="rp-panel-title">Download invoices in bulk</div>
         <p className="rp-page-sub">
           Pick a date range to download all invoices from that period — as one
@@ -496,7 +526,9 @@ export default function BillingDashboardPage() {
             className="primary-ghost"
             disabled={bulkBusy || !bulkFrom || !bulkTo}
             onClick={runBulkExport}
+            aria-busy={bulkBusy}
           >
+            {bulkBusy && <span className="rp-spinner sm" aria-hidden />}
             {bulkBusy ? 'Preparing…' : 'Download'}
           </button>
         </div>
@@ -515,7 +547,7 @@ export default function BillingDashboardPage() {
           </div>
         </aside>
       </div>
-    </div>
+    </Container>
   );
 }
 

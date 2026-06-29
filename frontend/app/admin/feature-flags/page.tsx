@@ -8,8 +8,13 @@ import PermissionGate from '@/components/ui/PermissionGate';
  * describing what each flag gates.
  */
 
-import { useEffect, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import { api } from '@/lib/api';
+import Container from '@/components/shell/Container';
+import PageHeader from '@/components/shell/PageHeader';
+import { TableSkeleton } from '@/components/ui/Skeleton';
+import EmptyState from '@/components/ui/EmptyState';
+import ErrorState from '@/components/ui/ErrorState';
 
 type FeatureMap = Awaited<ReturnType<typeof api.billing.features>>;
 
@@ -77,75 +82,97 @@ function FeatureFlagsPageInner() {
   const [data, setData] = useState<FeatureMap | null>(null);
   const [error, setError] = useState<string | null>(null);
 
-  useEffect(() => {
+  const load = useCallback(() => {
+    setError(null);
+    setData(null);
     api.billing.features().then(setData).catch((e: Error) => setError(e.message));
   }, []);
 
+  useEffect(() => {
+    load();
+  }, [load]);
+
+  const featureEntries = data ? Object.entries(data.features) : [];
+
   return (
-    <div className="rp-container">
-      <header className="rp-page-header">
-        <div className="rp-page-header-text">
-          <h1 className="rp-page-title">What&apos;s included in your plan</h1>
-          <p className="rp-page-sub">
-            A read-only list of features your workspace can use today, and what each one unlocks.
-          </p>
-        </div>
-      </header>
+    <Container>
+      <PageHeader
+        title="What's included in your plan"
+        description="A read-only list of features your workspace can use today, and what each one unlocks."
+      />
 
-      {error && <div className="banner warn">{error}</div>}
-      {!data && !error && <p className="rp-page-sub">Loading…</p>}
-
-      {data && (
-        <>
-          <div className="rp-panel">
-            <div className="rp-panel-title">
-              Your plan
-              <span className="badge info" style={{ marginLeft: 8 }}>{data.plan}</span>
-            </div>
-            <p className="rp-page-sub">
-              To change plans, go to <a href="/admin/billing">Billing &amp; plan</a>.
-            </p>
+      <div className="section-block" aria-live="polite" aria-busy={!data && !error}>
+        {error && (
+          <div className="rp-panel rp-anim-fade-in-up">
+            <ErrorState
+              title="Couldn't load your plan features"
+              message={error}
+              onRetry={load}
+            />
           </div>
+        )}
 
+        {!data && !error && (
           <div className="rp-panel">
             <div className="rp-panel-title">Features</div>
-            <table className="rp-table">
-              <thead>
-                <tr>
-                  <th>Feature</th>
-                  <th>Status</th>
-                  <th>What it does</th>
-                </tr>
-              </thead>
-              <tbody>
-                {Object.keys(data.features).length === 0 && (
-                  <tr>
-                    <td colSpan={3} className="rp-page-sub">No features to show.</td>
-                  </tr>
-                )}
-                {Object.entries(data.features).map(([flag, enabled]) => {
-                  const meta = describe(flag);
-                  return (
-                    <tr key={flag}>
-                      <td>
-                        <strong>{meta.label}</strong>
-                      </td>
-                      <td>
-                        {enabled ? (
-                          <span className="badge ok">Included</span>
-                        ) : (
-                          <span className="badge">Not on this plan</span>
-                        )}
-                      </td>
-                      <td>{meta.gates}</td>
-                    </tr>
-                  );
-                })}
-              </tbody>
-            </table>
+            <TableSkeleton rows={6} cols={3} />
           </div>
-        </>
-      )}
-    </div>
+        )}
+
+        {data && (
+          <>
+            <div className="rp-panel rp-anim-fade-in-up">
+              <div className="rp-panel-title">
+                Your plan
+                <span className="badge info" style={{ marginLeft: 8 }}>{data.plan}</span>
+              </div>
+              <p className="rp-page-sub">
+                To change plans, go to <a href="/admin/billing">Billing &amp; plan</a>.
+              </p>
+            </div>
+
+            <div className="rp-panel rp-anim-fade-in-up">
+              <div className="rp-panel-title">Features</div>
+              {featureEntries.length === 0 ? (
+                <EmptyState
+                  title="No features to show"
+                  description="Your plan doesn't expose any feature flags yet."
+                />
+              ) : (
+                <table className="rp-table">
+                  <thead>
+                    <tr>
+                      <th>Feature</th>
+                      <th>Status</th>
+                      <th>What it does</th>
+                    </tr>
+                  </thead>
+                  <tbody className="rp-stagger">
+                    {featureEntries.map(([flag, enabled]) => {
+                      const meta = describe(flag);
+                      return (
+                        <tr key={flag}>
+                          <td>
+                            <strong>{meta.label}</strong>
+                          </td>
+                          <td>
+                            {enabled ? (
+                              <span className="badge ok">Included</span>
+                            ) : (
+                              <span className="badge">Not on this plan</span>
+                            )}
+                          </td>
+                          <td>{meta.gates}</td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
+              )}
+            </div>
+          </>
+        )}
+      </div>
+    </Container>
   );
 }

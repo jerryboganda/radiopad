@@ -2,6 +2,9 @@
 
 import { useEffect, useState } from 'react';
 import { api, type RadLexHit, type RadsEntry } from '@/lib/api';
+import Container from '@/components/shell/Container';
+import PageHeader from '@/components/shell/PageHeader';
+import Banner from '@/components/ui/Banner';
 
 const RADS_SYSTEMS = [
   { id: 'BI-RADS', label: 'BI-RADS (breast)' },
@@ -56,15 +59,11 @@ export default function TerminologyPage() {
   }, [radsSystem, tab]);
 
   return (
-    <div className="rp-container">
-      <header className="rp-page-header">
-        <div className="rp-page-header-text">
-          <h1 className="rp-page-title">Terminology</h1>
-          <p className="rp-page-sub">
-            Look up the official term for a finding (RadLex) or the standard categories used in structured reporting (RADS). For reference only — not clinical advice.
-          </p>
-        </div>
-      </header>
+    <Container>
+      <PageHeader
+        title="Terminology"
+        description="Look up the official term for a finding (RadLex) or the standard categories used in structured reporting (RADS). For reference only — not clinical advice."
+      />
 
       <div className="rp-tabs" role="tablist" aria-label="Terminology source">
         <button
@@ -87,10 +86,12 @@ export default function TerminologyPage() {
         </button>
       </div>
 
-      {error && <div className="banner warn">{error}</div>}
+      <div aria-live="polite">
+        {error && <Banner tone="warn" title="Lookup failed">{error}</Banner>}
+      </div>
 
       {tab === 'radlex' && (
-        <div className="rp-panel">
+        <div className="rp-panel rp-anim-fade-in" key="radlex">
           <div className="rp-panel-title">RadLex search</div>
           <div className="section-block">
             <label htmlFor="radlex-q">Term</label>
@@ -103,7 +104,7 @@ export default function TerminologyPage() {
               autoFocus
             />
           </div>
-          <ul className="rp-list">
+          <ul className="rp-list" aria-live="polite" aria-busy={busy}>
             <li className="rp-row between rp-divider-row">
               <span className="rp-stat-label rp-cell f1">Code</span>
               <span className="rp-stat-label rp-cell f2">Preferred name</span>
@@ -134,7 +135,7 @@ export default function TerminologyPage() {
       )}
 
       {tab === 'rads' && (
-        <div className="rp-panel">
+        <div className="rp-panel rp-anim-fade-in" key="rads">
           <div className="rp-panel-title">RADS categories</div>
           <div className="section-block">
             <label htmlFor="rads-sys">System</label>
@@ -152,7 +153,7 @@ export default function TerminologyPage() {
             </select>
           </div>
 
-          <ul className="rp-list">
+          <ul className="rp-list" aria-live="polite" aria-busy={busy}>
             <li className="rp-row between rp-divider-row">
               <span className="rp-stat-label rp-cell f1">Code</span>
               <span className="rp-stat-label rp-cell f2">Label</span>
@@ -174,6 +175,6 @@ export default function TerminologyPage() {
           </ul>
         </div>
       )}
-    </div>
+    </Container>
   );
 }

@@ -78,7 +78,7 @@ export default function SectionsPanel({ sections, onChange }: Props) {
             onDragEnd={onDragEnd}
             onDragOver={(e) => onDragOver(e, idx)}
             onDrop={(e) => onDrop(e, idx)}
-            className={`rp-row rp-gap-sm${dragOverIdx === idx ? ' rp-drag-active' : ''}`}
+            className={`rp-row rp-gap-sm${dragOverIdx === idx ? ' rp-drag-active rp-drop-zone' : ''}`}
             style={{
               padding: '8px 6px',
               borderBottom: '1px solid var(--border-soft)',

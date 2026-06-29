@@ -4,6 +4,10 @@ import { useEffect, useState } from 'react';
 import { api, PLAN_LABELS, publicEnv } from '@/lib/api';
 import { isAuthError, useAuthSession } from '@/lib/useAuthSession';
 import SignInRequired from '@/components/ui/SignInRequired';
+import Container from '@/components/shell/Container';
+import PageHeader from '@/components/shell/PageHeader';
+import Banner from '@/components/ui/Banner';
+import Skeleton from '@/components/ui/Skeleton';
 
 type Settings = Awaited<ReturnType<typeof api.tenant.settings.get>>;
 
@@ -127,54 +131,68 @@ export default function SettingsPage() {
 
   if (session.signedOut) {
     return (
-      <div className="rp-container">
+      <Container>
         <h1 className="rp-page-title">Workspace settings</h1>
         <SignInRequired surface="Please sign in to manage your workspace settings." />
-      </div>
+      </Container>
     );
   }
 
   if (authBlocked) {
     return (
-      <div className="rp-container">
+      <Container>
         <h1 className="rp-page-title">Workspace settings</h1>
         <SignInRequired
           surface="You don't have access to workspace settings."
           detail="Ask your Medical Director, Reporting Admin, or IT Admin to update these settings, or to give you access."
         />
-      </div>
+      </Container>
     );
   }
 
   if (!s) {
     return (
-      <div className="rp-container">
+      <Container>
         <h1 className="rp-page-title">Workspace settings</h1>
-        {error && <div className="banner warn">{error}</div>}
-        {!error && <p className="rp-page-sub">Loading…</p>}
-      </div>
+        <div aria-live="polite" aria-busy={!error}>
+          {error ? (
+            <Banner tone="warn" title="Couldn't load your settings">{error}</Banner>
+          ) : (
+            <div className="rp-panel">
+              <Skeleton variant="text" width="40%" />
+              <Skeleton variant="block" height={72} style={{ marginTop: 12 }} />
+              <Skeleton variant="block" height={72} style={{ marginTop: 12 }} />
+            </div>
+          )}
+        </div>
+      </Container>
     );
   }
 
   return (
-    <div className="rp-container">
-      <header className="rp-page-header">
-        <div className="rp-page-header-text">
-          <h1 className="rp-page-title">Workspace settings</h1>
-          <p className="rp-page-sub">
-            Controls that apply to everyone in your workspace — AI safety,
-            your subscription, and connections to your hospital systems.
-          </p>
-        </div>
-      </header>
+    <Container>
+      <PageHeader
+        title="Workspace settings"
+        description="Controls that apply to everyone in your workspace — AI safety, your subscription, and connections to your hospital systems."
+      />
 
-      {error && <div className="banner warn">{error}</div>}
-      {info && <div className="banner ok">{info}</div>}
+      <div aria-live="polite">
+        {error && (
+          <Banner tone="warn" title="Something went wrong" onDismiss={() => setError(null)}>
+            {error}
+          </Banner>
+        )}
+        {info && (
+          <Banner tone="success" onDismiss={() => setInfo(null)}>
+            {info}
+          </Banner>
+        )}
+      </div>
 
       <div className="rp-page-grid">
-        <div className="rp-page-main">
+        <div className="rp-page-main rp-stagger">
           {/* ---------- AI safety ---------- */}
-          <div className="rp-panel">
+          <div className="rp-panel rp-anim-fade-in-up">
             <div className="rp-panel-title">AI safety check</div>
             <p className="rp-page-sub">
               When you ask the AI to draft an Impression, RadioPad re-reads it
@@ -248,7 +266,7 @@ export default function SettingsPage() {
           </div>
 
           {/* ---------- Subscription ---------- */}
-          <div className="rp-panel">
+          <div className="rp-panel rp-anim-fade-in-up">
             <div className="rp-panel-title">Your subscription</div>
             <p className="rp-page-sub">
               You&apos;re currently on the{' '}
@@ -296,7 +314,7 @@ export default function SettingsPage() {
           </div>
 
           {/* ---------- Hospital connections ---------- */}
-          <div className="rp-panel">
+          <div className="rp-panel rp-anim-fade-in-up">
             <div className="rp-panel-title">Hospital connections</div>
             <p className="rp-page-sub">
               Connect RadioPad to your hospital&apos;s ordering system and imaging
@@ -359,7 +377,7 @@ export default function SettingsPage() {
           </div>
 
           {/* ---------- Encryption key (advanced, optional) ---------- */}
-          <details className="rp-panel" open={!!s.cmk?.configured}>
+          <details className="rp-panel rp-anim-fade-in-up" open={!!s.cmk?.configured}>
             <summary className="rp-panel-title" style={{ cursor: 'pointer' }}>
               Encryption key (optional, for compliance teams)
             </summary>
@@ -393,7 +411,9 @@ export default function SettingsPage() {
                 className="primary-ghost"
                 onClick={verifyKms}
                 disabled={verifying || !s.cmk?.configured}
+                aria-busy={verifying}
               >
+                {verifying && <span className="rp-spinner sm" aria-hidden />}
                 {verifying ? 'Checking…' : 'Test the key'}
               </button>
               <span className="rp-page-sub">
@@ -406,7 +426,7 @@ export default function SettingsPage() {
           </details>
 
           {/* ---------- Developer features (very advanced) ---------- */}
-          <details className="rp-panel">
+          <details className="rp-panel rp-anim-fade-in-up">
             <summary className="rp-panel-title" style={{ cursor: 'pointer' }}>
               Developer features
             </summary>
@@ -425,7 +445,8 @@ export default function SettingsPage() {
           </details>
 
           <div className="rp-row" style={{ justifyContent: 'flex-end', marginTop: 16 }}>
-            <button className="primary" onClick={save} disabled={saving}>
+            <button className="primary" onClick={save} disabled={saving} aria-busy={saving}>
+              {saving && <span className="rp-spinner sm" aria-hidden />}
               {saving ? 'Saving…' : 'Save changes'}
             </button>
           </div>
@@ -466,6 +487,6 @@ export default function SettingsPage() {
           </div>
         </aside>
       </div>
-    </div>
+    </Container>
   );
 }

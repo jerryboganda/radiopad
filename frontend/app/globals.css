@@ -43,9 +43,11 @@ button {
   border-radius: var(--radius-sm);
   padding: 6px 12px;
   cursor: pointer;
-  transition: background 120ms ease, border-color 120ms ease, color 120ms ease, box-shadow 120ms ease;
+  transition: background var(--transition-fast), border-color var(--transition-fast),
+    color var(--transition-fast), box-shadow var(--transition-fast), transform var(--transition-fast);
 }
 button:hover:not(:disabled) { background: var(--bg-subtle); border-color: var(--border-strong); }
+button:active:not(:disabled) { transform: scale(0.98); }
 button:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
 
 button.primary {
@@ -84,7 +86,28 @@ button.subtle:hover:not(:disabled),
 select.subtle:hover:not(:disabled) { background: var(--bg-muted); }
 
 button.icon-btn { padding: 6px 10px; font-size: 13px; }
-button:disabled { opacity: 0.5; cursor: not-allowed; }
+button.icon-btn:active:not(:disabled) { transform: scale(0.92); }
+button:disabled { opacity: 0.6; cursor: not-allowed; transform: none; }
+/* Text-style buttons get a clearer faint colour when disabled (opacity alone
+   can fail WCAG contrast). Solid .primary stays dimmed via opacity. */
+button.ghost:disabled,
+button.subtle:disabled,
+button.primary-ghost:disabled { color: var(--text-faint); border-color: var(--border-soft); opacity: 0.9; }
+button[aria-busy="true"] { cursor: wait; }
+
+/* Inline spinner for an in-button loading state. Inherits the button's text
+   colour via currentColor; pair with aria-busy="true" + disabled. Keyframe
+   `rp-rotate` is defined in motion.css. */
+.rp-spinner {
+  display: inline-block;
+  width: 1em; height: 1em;
+  border: 2px solid currentColor;
+  border-top-color: transparent;
+  border-radius: 50%;
+  animation: rp-rotate var(--anim-spin) linear infinite;
+  vertical-align: -0.15em;
+}
+.rp-spinner.sm { width: 0.85em; height: 0.85em; border-width: 1.5px; }
 
 /* -------- Inputs ---------------------------------------------------- */
 input, textarea, select {
@@ -126,17 +149,20 @@ textarea { resize: vertical; font-family: inherit; }
   border-radius: var(--radius-sm);
   padding: 7px 10px;
   cursor: pointer;
-  transition: border-color 120ms ease, box-shadow 120ms ease;
+  transition: border-color var(--transition-fast), box-shadow var(--transition-fast), transform var(--transition-fast);
 }
+.rp-combobox-trigger:hover:not(:disabled) { border-color: var(--border-strong); }
 .rp-combobox-trigger:focus-visible {
   outline: none;
   border-color: var(--accent);
   box-shadow: 0 0 0 3px var(--accent-soft);
 }
+.rp-combobox-trigger[aria-expanded="true"] { border-color: var(--accent); box-shadow: 0 0 0 3px var(--accent-soft); }
+.rp-combobox-trigger[aria-expanded="true"] .rp-combobox-caret { transform: rotate(180deg); }
 .rp-combobox-trigger:disabled { opacity: 0.5; cursor: not-allowed; }
 .rp-combobox-value { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .rp-combobox-value[data-placeholder="true"] { color: var(--text-faint); }
-.rp-combobox-caret { flex: none; color: var(--text-muted); font-size: 10px; }
+.rp-combobox-caret { flex: none; color: var(--text-muted); font-size: 10px; transition: transform var(--transition-base); }
 
 .rp-combobox-panel {
   position: absolute;
@@ -152,6 +178,8 @@ textarea { resize: vertical; font-family: inherit; }
   border: 1px solid var(--border);
   border-radius: var(--radius);
   box-shadow: var(--shadow-md);
+  transform-origin: top center;
+  animation: rp-popover-in var(--anim-fast) var(--ease-pop) both;
 }
 .rp-combobox-search { box-sizing: border-box; }
 .rp-combobox-list { list-style: none; margin: 0; padding: 0; max-height: 260px; overflow-y: auto; }
@@ -163,9 +191,10 @@ textarea { resize: vertical; font-family: inherit; }
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
+  transition: background var(--transition-fast), color var(--transition-fast);
 }
 .rp-combobox-option:hover,
-.rp-combobox-option.is-active { background: var(--bg-subtle); }
+.rp-combobox-option.is-active { background: var(--accent-tint); color: var(--accent-strong); }
 .rp-combobox-option[aria-selected="true"] { color: var(--accent-strong); font-weight: 600; }
 .rp-combobox-option[aria-disabled="true"] { color: var(--text-faint); cursor: not-allowed; background: transparent; }
 .rp-combobox-empty { padding: 10px; text-align: center; color: var(--text-faint); font-size: 12px; }

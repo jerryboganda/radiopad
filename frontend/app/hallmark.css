@@ -93,6 +93,43 @@
   --ease-out: cubic-bezier(0.16, 1, 0.3, 1);
   --ease-in: cubic-bezier(0.7, 0, 0.84, 0);
   --ease-in-out: cubic-bezier(0.65, 0, 0.35, 1);
+
+  /* ---- Motion system (first-class layer; see docs/02-design/design.md §6).
+         Expressive easings, composed transition tokens, animation-duration
+         tokens, and a stagger/delay scale. Used app-wide via motion.css and
+         the Tailwind motion utilities. ---- */
+
+  /* Expressive easing presets — the "calm, no springs" doctrine is replaced
+     by a purposeful, lively motion language. */
+  --ease-pop: cubic-bezier(0.21, 1.02, 0.73, 1);      /* attention / reveal */
+  --ease-snap: cubic-bezier(0.2, 0, 0.2, 1);          /* crisp ui state */
+  --ease-spring: cubic-bezier(0.175, 0.885, 0.32, 1.275); /* springy entrance */
+  --ease-overshoot: cubic-bezier(0.34, 1.56, 0.64, 1);    /* playful feedback */
+
+  /* Composed transition tokens (duration + easing). Use as
+     `transition: <prop> var(--transition-base)`. */
+  --transition-fast: var(--dur-fast) var(--ease-out);
+  --transition-base: var(--dur-base) var(--ease-out);
+  --transition-slow: var(--dur-slow) var(--ease-out);
+  --transition-snap: var(--dur-fast) var(--ease-snap);
+  --transition-spring: var(--dur-slow) var(--ease-spring);
+
+  /* Animation durations — decoupled from transitions so entrance animations
+     can run slower than micro-interactions. */
+  --anim-fast: 160ms;
+  --anim-base: 260ms;
+  --anim-slow: 420ms;
+  --anim-spin: 700ms;
+
+  /* Stagger / delay scale (40ms steps) for cascade entrances. */
+  --delay-1: 40ms;
+  --delay-2: 80ms;
+  --delay-3: 120ms;
+  --delay-4: 160ms;
+  --delay-5: 200ms;
+  --delay-6: 240ms;
+  --delay-7: 280ms;
+  --delay-8: 320ms;
 }
 
 /* ============================================================
@@ -179,10 +216,16 @@ body {
   border-radius: var(--hm-radius-sm);
 }
 
+/* Single, robust reduced-motion idiom for the whole app. Neutralizes
+   transitions, collapses animations to a single frame (so infinite spinners
+   stop instead of spinning at 0.001ms), and disables smooth scroll. Per-
+   component code should NOT re-implement reduced-motion handling. */
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after {
     animation-duration: 0.001ms !important;
+    animation-iteration-count: 1 !important;
     transition-duration: 0.001ms !important;
+    scroll-behavior: auto !important;
   }
 }
 

@@ -113,7 +113,7 @@ export default function ReportRibbon(props: ReportRibbonProps) {
 
 function HomeTab(p: ReportRibbonProps) {
   return (
-    <div className="rp-ribbon-surface" role="tabpanel">
+    <div className="rp-ribbon-surface rp-anim-fade-in" role="tabpanel">
       <div className="rp-ribbon-group">
         <div className="rp-ribbon-group-controls">
           <div className="rp-ribbon-field">
@@ -160,7 +160,8 @@ function HomeTab(p: ReportRibbonProps) {
       {p.canEdit && (
         <div className="rp-ribbon-group">
           <div className="rp-ribbon-group-controls">
-            <button className="primary" type="button" disabled={p.aiBusy || !p.providerId} onClick={p.onGenerate}>
+            <button className="primary" type="button" disabled={p.aiBusy || !p.providerId} aria-busy={p.aiBusy} onClick={p.onGenerate}>
+              {p.aiBusy && <span className="rp-spinner sm" aria-hidden />}
               {p.aiBusy ? 'Generating…' : 'Generate impression'}
             </button>
           </div>
@@ -178,10 +179,12 @@ function HomeTab(p: ReportRibbonProps) {
                 className="primary-ghost"
                 type="button"
                 disabled={p.rewriteBusy}
+                aria-busy={p.rewriteBusy}
                 aria-haspopup="menu"
                 aria-expanded={p.rewriteOpen}
                 onClick={p.onToggleRewrite}
               >
+                {p.rewriteBusy && <span className="rp-spinner sm" aria-hidden />}
                 {p.rewriteBusy ? 'Rewriting…' : 'Rewrite ▾'}
               </button>
               {p.rewriteOpen && (
@@ -247,7 +250,7 @@ function HomeTab(p: ReportRibbonProps) {
 
 function ReviewTab(p: ReportRibbonProps) {
   return (
-    <div className="rp-ribbon-surface" role="tabpanel">
+    <div className="rp-ribbon-surface rp-anim-fade-in" role="tabpanel">
       <div className="rp-ribbon-group">
         <div className="rp-ribbon-group-controls">
           {p.canValidate && (
@@ -265,7 +268,7 @@ function ReviewTab(p: ReportRibbonProps) {
 
 function ExportTab(p: ReportRibbonProps) {
   return (
-    <div className="rp-ribbon-surface" role="tabpanel">
+    <div className="rp-ribbon-surface rp-anim-fade-in" role="tabpanel">
       <div className="rp-ribbon-group">
         <div className="rp-ribbon-group-controls">
           <CopyToRisButton reportId={p.reportId} />
@@ -317,7 +320,7 @@ function ExportTab(p: ReportRibbonProps) {
 
 function FinalizeTab(p: ReportRibbonProps) {
   return (
-    <div className="rp-ribbon-surface" role="tabpanel">
+    <div className="rp-ribbon-surface rp-anim-fade-in" role="tabpanel">
       {p.canEdit && (
         <div className="rp-ribbon-group">
           <div className="rp-ribbon-group-controls">

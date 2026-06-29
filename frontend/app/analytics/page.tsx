@@ -1,7 +1,15 @@
 'use client';
 
 import { useEffect, useState, useCallback } from 'react';
+import { ArrowRight } from 'lucide-react';
 import { api } from '@/lib/api';
+import Container from '@/components/shell/Container';
+import PageHeader from '@/components/shell/PageHeader';
+import { TableSkeleton } from '@/components/ui/Skeleton';
+import EmptyState from '@/components/ui/EmptyState';
+import ErrorState from '@/components/ui/ErrorState';
+import Banner from '@/components/ui/Banner';
+import AnimatedNumber from '@/components/ui/AnimatedNumber';
 
 type Summary = Awaited<ReturnType<typeof api.analytics.summary>>;
 
@@ -62,21 +70,24 @@ export default function AnalyticsPage() {
   }
 
   return (
-    <div className="rp-container">
-      <h1 className="rp-page-title">Analytics Dashboard</h1>
-      <p className="rp-page-sub">
-        PRD §18 — Product &amp; Governance KPIs. Tenant-scoped.
-      </p>
-
-      {/* ── Quality Trends link ─────────────────────────────────── */}
-      <div style={{ marginBottom: 16 }}>
-        <a href="/analytics/quality" className="ghost active" style={{ textDecoration: 'none' }}>
-          Quality Trends →
-        </a>
-      </div>
+    <Container>
+      <PageHeader
+        title="Analytics Dashboard"
+        description="PRD §18 — Product & Governance KPIs. Tenant-scoped."
+        secondaryActions={
+          <a
+            href="/analytics/quality"
+            className="ghost"
+            style={{ textDecoration: 'none', display: 'inline-flex', alignItems: 'center', gap: 6 }}
+          >
+            Quality Trends
+            <ArrowRight size={15} strokeWidth={1.8} aria-hidden />
+          </a>
+        }
+      />
 
       {/* ── Date range picker ───────────────────────────────────── */}
-      <div className="rp-panel" style={{ marginBottom: 24 }}>
+      <div className="rp-panel rp-anim-fade-in-up" style={{ marginBottom: 24 }}>
         <div className="rp-panel-title">Time Window</div>
         <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', alignItems: 'center' }}>
           {(['7d', '30d', '90d'] as const).map((p) => (
@@ -109,7 +120,8 @@ export default function AnalyticsPage() {
                 value={toDate}
                 onChange={(e) => setToDate(e.target.value)}
               />
-              <button className="ghost" onClick={load}>
+              <button className="ghost" onClick={load} disabled={loading} aria-busy={loading}>
+                {loading && <span className="rp-spinner sm" aria-hidden />}
                 Apply
               </button>
             </>
@@ -123,15 +135,27 @@ export default function AnalyticsPage() {
         )}
       </div>
 
-      {err && <div className="banner warn">{err}</div>}
-      {loading && !s && <p className="rp-page-sub">Loading…</p>}
+      {err && !s && <ErrorState message={err} onRetry={load} />}
+      {err && s && (
+        <Banner tone="warn" title="Couldn’t refresh analytics">
+          {err}
+        </Banner>
+      )}
+
+      <div aria-live="polite" aria-busy={loading}>
+        {loading && !s && (
+          <div className="rp-panel">
+            <TableSkeleton rows={5} cols={3} />
+          </div>
+        )}
+      </div>
 
       {s && (
         <>
           {/* ── Product KPIs (§18.1) ──────────────────────────────── */}
-          <div className="rp-panel">
+          <div className="rp-panel rp-anim-fade-in-up">
             <div className="rp-panel-title">Productivity &amp; quality</div>
-            <div className="rp-grid-3">
+            <div className="rp-grid-3 rp-stagger">
               <Kpi
                 label="Draft acceptance rate"
                 value={pct(s.product.draftAcceptanceRate)}
@@ -199,9 +223,9 @@ export default function AnalyticsPage() {
           </div>
 
           {/* ── Governance KPIs (§18.2) ───────────────────────────── */}
-          <div className="rp-panel">
+          <div className="rp-panel rp-anim-fade-in-up">
             <div className="rp-panel-title">Governance KPIs (§18.2)</div>
-            <div className="rp-grid-3">
+            <div className="rp-grid-3 rp-stagger">
               <Kpi
                 label="Unapproved prompt usage"
                 value={s.governance.unapprovedPromptUsage}
@@ -231,9 +255,9 @@ export default function AnalyticsPage() {
           </div>
 
           {/* ── AI Usage (from existing UsageSummary) ─────────────── */}
-          <div className="rp-panel">
+          <div className="rp-panel rp-anim-fade-in-up">
             <div className="rp-panel-title">AI Usage</div>
-            <div className="rp-grid-3">
+            <div className="rp-grid-3 rp-stagger">
               <Kpi label="AI requests" value={s.ai.totalRequests} />
               <Kpi label="OK" value={s.ai.okCount} />
               <Kpi label="Blocked" value={s.ai.blockedCount} />
@@ -247,7 +271,14 @@ export default function AnalyticsPage() {
                 severity="info"
               />
             </div>
-            {s.ai.byProvider.length > 0 && (
+            {s.ai.byProvider.length === 0 ? (
+              <div style={{ marginTop: 16 }}>
+                <EmptyState
+                  title="No provider activity yet"
+                  description="AI requests in this window will break down by provider here."
+                />
+              </div>
+            ) : (
               <table className="rp-table" style={{ marginTop: 16 }}>
                 <thead>
                   <tr>
@@ -281,7 +312,7 @@ export default function AnalyticsPage() {
           </div>
         </>
       )}
-    </div>
+    </Container>
   );
 }
 
@@ -302,7 +333,7 @@ function Kpi({
         {label}
       </div>
       <div className="rp-kpi-value">
-        {value}{' '}
+        {typeof value === 'number' ? <AnimatedNumber value={value} /> : value}{' '}
         {severity && <span className={`badge ${severity}`}>{severity}</span>}
       </div>
     </div>

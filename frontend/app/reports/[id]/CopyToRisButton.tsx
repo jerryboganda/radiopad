@@ -10,6 +10,8 @@
 
 import { useEffect, useRef, useState } from 'react';
 import { api } from '@/lib/api';
+import StatusBadge from '@/components/ui/StatusBadge';
+import { useToast } from '@/components/ui/ToastProvider';
 
 type Props = {
   reportId: string;
@@ -24,6 +26,7 @@ export default function CopyToRisButton({ reportId, disabled }: Props) {
   const [status, setStatus] = useState<'idle' | 'copied' | 'error'>('idle');
   const [error, setError] = useState<string | null>(null);
   const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const { toast } = useToast();
 
   useEffect(() => () => {
     if (timerRef.current) clearTimeout(timerRef.current);
@@ -64,6 +67,7 @@ export default function CopyToRisButton({ reportId, disabled }: Props) {
         clearBrowserClipboardLater(text);
       }
       setStatus('copied');
+      toast({ tone: 'success', title: 'Copied for RIS', message: 'Clipboard auto-clears in 30s.' });
       if (timerRef.current) clearTimeout(timerRef.current);
       timerRef.current = setTimeout(() => setStatus('idle'), CLEAR_MS);
     } catch (e) {
@@ -81,18 +85,20 @@ export default function CopyToRisButton({ reportId, disabled }: Props) {
         className="ghost"
         onClick={copy}
         disabled={busy || disabled}
+        aria-busy={busy}
         aria-label="Copy report to clipboard for RIS"
       >
+        {busy && <span className="rp-spinner sm" aria-hidden />}
         {busy ? 'Copying…' : 'Copy for RIS'}
       </button>
       {status === 'copied' && (
-        <span className="badge ok" role="status">
-          Copied (auto-clears in 30s)
+        <span role="status">
+          <StatusBadge tone="success">Copied (auto-clears in 30s)</StatusBadge>
         </span>
       )}
       {status === 'error' && error && (
-        <span className="badge danger" role="alert">
-          {error}
+        <span role="alert">
+          <StatusBadge tone="danger">{error}</StatusBadge>
         </span>
       )}
     </>

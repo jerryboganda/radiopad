@@ -4,6 +4,9 @@ import PermissionGate from '@/components/ui/PermissionGate';
 
 import { useEffect, useState } from 'react';
 import { api } from '@/lib/api';
+import Banner from '@/components/ui/Banner';
+import EmptyState from '@/components/ui/EmptyState';
+import Skeleton, { TableSkeleton } from '@/components/ui/Skeleton';
 
 type PacsHealth = {
   dicomWeb: { configured: boolean; reachable: boolean };
@@ -104,12 +107,12 @@ function PacsAdminPageInner() {
       <div className="rp-page-grid">
         <div className="rp-page-main">
 
-      {error && <div className="banner warn">{error}</div>}
+      {error && <Banner tone="warn" onDismiss={() => setError(null)}>{error}</Banner>}
 
       <div className="rp-panel">
         <div className="rp-panel-title">Hospital imaging archive</div>
         {tenant === null ? (
-          <p className="rp-page-sub">Loading…</p>
+          <Skeleton variant="block" height={72} />
         ) : (
           <>
             <p className="rp-page-sub">
@@ -143,7 +146,8 @@ function PacsAdminPageInner() {
                   ))}
                 </select>
               </label>
-              <button className="primary" type="button" onClick={saveVendor} disabled={savingVendor}>
+              <button className="primary" type="button" onClick={saveVendor} disabled={savingVendor} aria-busy={savingVendor}>
+                {savingVendor && <span className="rp-spinner sm" aria-hidden />}
                 {savingVendor ? 'Saving…' : 'Save vendor'}
               </button>
             </details>
@@ -157,7 +161,7 @@ function PacsAdminPageInner() {
           An optional sample image server, useful for trying out RadioPad without connecting to your real archive.
         </p>
         {health === null ? (
-          <p className="rp-page-sub">Loading…</p>
+          <Skeleton variant="text" width="40%" />
         ) : (
           <p className="rp-page-sub">
             Status:{' '}
@@ -183,9 +187,12 @@ function PacsAdminPageInner() {
           Plug-ins from your imaging vendor (Sectra, AGFA, Visage, Merge, Hyland) that let RadioPad open studies in the way that&apos;s native to your hospital.
         </p>
         {plugins === null ? (
-          <p className="rp-page-sub">Loading…</p>
+          <TableSkeleton rows={3} cols={6} />
         ) : plugins.length === 0 ? (
-          <p className="rp-page-sub">No add-ons installed yet.</p>
+          <EmptyState
+            title="No add-ons installed yet"
+            description="Vendor plug-ins advertised by the desktop bridge will appear here once installed."
+          />
         ) : (
           <table className="rp-table">
             <thead>

@@ -4,6 +4,9 @@ import { useEffect, useMemo, useState } from 'react';
 import { api, type UserRow } from '@/lib/api';
 import { isAuthError, useAuthSession } from '@/lib/useAuthSession';
 import SignInRequired from '@/components/ui/SignInRequired';
+import { TableSkeleton } from '@/components/ui/Skeleton';
+import EmptyState from '@/components/ui/EmptyState';
+import Banner from '@/components/ui/Banner';
 
 function humanizeRole(role: string): string {
   return role.replace(/([a-z])([A-Z])/g, '$1 $2');
@@ -190,11 +193,11 @@ export default function UsersAdminPage() {
         </div>
       </header>
 
-      {error && <div className="banner danger" role="alert">{error}</div>}
-      {info && <div className="banner ok" role="status">{info}</div>}
+      {error && <Banner tone="danger" onDismiss={() => setError(null)}>{error}</Banner>}
+      {info && <Banner tone="success" onDismiss={() => setInfo(null)}>{info}</Banner>}
 
       {credential && (
-        <div className="rp-panel rp-cred-callout">
+        <div className="rp-panel rp-cred-callout rp-anim-fade-in-up">
           <div className="rp-panel-title">
             {credential.kind === 'created' ? 'User created' : 'Temporary password issued'}
           </div>
@@ -242,19 +245,27 @@ export default function UsersAdminPage() {
           </div>
           <div className="rp-row" style={{ justifyContent: 'flex-end', gap: 8, marginTop: 12 }}>
             <button type="button" className="ghost" onClick={() => setShowAdd(false)} disabled={adding}>Cancel</button>
-            <button type="submit" className="primary" disabled={adding}>{adding ? 'Creating…' : 'Create user'}</button>
+            <button type="submit" className="primary" disabled={adding} aria-busy={adding}>
+              {adding && <span className="rp-spinner sm" aria-hidden />}
+              {adding ? 'Creating…' : 'Create user'}
+            </button>
           </div>
         </form>
       )}
 
-      {!sorted && !error && <p className="rp-page-sub">Loading…</p>}
+      {!sorted && !error && (
+        <div className="rp-panel"><TableSkeleton rows={6} cols={5} /></div>
+      )}
 
       {sorted && sorted.length === 0 && (
-        <div className="rp-panel"><p className="rp-page-sub">No users yet. Use “Add user” to create the first one.</p></div>
+        <EmptyState
+          title="No users yet"
+          description="Use “Add user” to create the first account for your organization."
+        />
       )}
 
       {sorted && sorted.length > 0 && (
-        <div className="rp-panel" style={{ padding: 0, overflowX: 'auto' }}>
+        <div className="rp-panel rp-anim-fade-in-up" style={{ padding: 0, overflowX: 'auto' }} aria-live="polite">
           <table className="rp-table rp-users-table">
             <thead>
               <tr>
@@ -299,12 +310,13 @@ export default function UsersAdminPage() {
                         : <span className="badge info">Not set up</span>}
                     </td>
                     <td>
-                      <div className="rp-user-actions">
-                        <button className="subtle" disabled={busy} onClick={() => resetPassword(u)}>Reset password</button>
-                        <button className="subtle" disabled={busy || !u.mfaEnabled} onClick={() => resetMfa(u)}>Reset 2FA</button>
-                        <button className="subtle" disabled={busy} onClick={() => toggleActive(u)}>{u.isActive ? 'Deactivate' : 'Reactivate'}</button>
-                        <button className="subtle" disabled={busy} onClick={() => revokeSessions(u)}>Revoke sessions</button>
-                        <button className="subtle rp-danger-action" disabled={busy} onClick={() => removeUser(u)}>Remove</button>
+                      <div className="rp-user-actions" aria-busy={busy}>
+                        {busy && <span className="rp-spinner sm" aria-hidden />}
+                        <button className="subtle" disabled={busy} aria-busy={busy} onClick={() => resetPassword(u)}>Reset password</button>
+                        <button className="subtle" disabled={busy || !u.mfaEnabled} aria-busy={busy} onClick={() => resetMfa(u)}>Reset 2FA</button>
+                        <button className="subtle" disabled={busy} aria-busy={busy} onClick={() => toggleActive(u)}>{u.isActive ? 'Deactivate' : 'Reactivate'}</button>
+                        <button className="subtle" disabled={busy} aria-busy={busy} onClick={() => revokeSessions(u)}>Revoke sessions</button>
+                        <button className="subtle rp-danger-action" disabled={busy} aria-busy={busy} onClick={() => removeUser(u)}>Remove</button>
                       </div>
                     </td>
                   </tr>

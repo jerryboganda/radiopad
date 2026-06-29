@@ -105,7 +105,7 @@ export default function PromptBlockEditor({
           description="This rulebook has no prompt blocks yet. Add one to start authoring AI instructions."
         />
       ) : (
-        <div className="rp-block-list" data-testid="prompt-block-list">
+        <div className="rp-block-list rp-stagger" data-testid="prompt-block-list">
           {blocks.map((block) => (
             <BlockCard
               key={block.key}

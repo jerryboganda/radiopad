@@ -40,7 +40,7 @@ export default function PromptBlocksPanel({ blocks, onChange }: Props) {
     <div className="rp-editor-block">
       <div className="rp-panel-title">Prompt Blocks</div>
 
-      <div>
+      <div className="rp-stagger">
         {blocks.map((b, idx) => (
           <div
             key={b.key}

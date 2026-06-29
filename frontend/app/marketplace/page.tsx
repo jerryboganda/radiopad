@@ -2,6 +2,10 @@
 
 import { useEffect, useState } from 'react';
 import { api, type MarketplaceSubmission } from '@/lib/api';
+import Container from '@/components/shell/Container';
+import PageHeader from '@/components/shell/PageHeader';
+import EmptyState from '@/components/ui/EmptyState';
+import Banner from '@/components/ui/Banner';
 
 /**
  * PRD §16 + Enterprise GA #13 Marketplace catalogue with submission &
@@ -158,15 +162,11 @@ export default function MarketplacePage() {
   const ownSubmissions = submissions;
 
   return (
-    <div className="rp-container">
-      <div className="rp-panel">
-        <div className="panel-header">
-          <div>
-            <h1 className="rp-page-title">Marketplace</h1>
-            <p className="rp-page-sub">
-              Browse and install rulebooks, templates, and prompt packs shared by other clinics. You can also publish your own.
-            </p>
-          </div>
+    <Container>
+      <PageHeader
+        title="Marketplace"
+        description="Browse and install rulebooks, templates, and prompt packs shared by other clinics. You can also publish your own."
+        primaryAction={
           <button
             type="button"
             className="primary-ghost"
@@ -174,34 +174,46 @@ export default function MarketplacePage() {
           >
             Publish something
           </button>
-        </div>
+        }
+      />
 
+      <div className="rp-panel">
         {/* Tab bar */}
-        <div className="rp-row" style={{ gap: '0.5rem', marginBottom: '1rem' }}>
+        <div className="tab-list" role="tablist" aria-label="Marketplace sections" style={{ marginBottom: '1rem' }}>
           <button
             type="button"
-            className={tab === 'browse' ? 'primary' : 'subtle'}
+            role="tab"
+            aria-selected={tab === 'browse'}
+            className="tab-button"
             onClick={() => setTab('browse')}
           >
             Browse
           </button>
           <button
             type="button"
-            className={tab === 'submissions' ? 'primary' : 'subtle'}
+            role="tab"
+            aria-selected={tab === 'submissions'}
+            className="tab-button"
             onClick={() => setTab('submissions')}
           >
             My Submissions
           </button>
           <button
             type="button"
-            className={tab === 'review' ? 'primary' : 'subtle'}
+            role="tab"
+            aria-selected={tab === 'review'}
+            className="tab-button"
             onClick={() => setTab('review')}
           >
             Review ({pendingSubmissions.length})
           </button>
         </div>
 
-        {error ? <div className="banner warn">{error}</div> : null}
+        {error ? (
+          <Banner tone="warn" onDismiss={() => setError(null)}>
+            {error}
+          </Banner>
+        ) : null}
 
         {/* Submit form */}
         {showSubmitForm ? (
@@ -246,8 +258,10 @@ export default function MarketplacePage() {
                 type="button"
                 className="primary"
                 disabled={busy === 'submit' || !submitSourceId}
+                aria-busy={busy === 'submit'}
                 onClick={handleSubmit}
               >
+                {busy === 'submit' && <span className="rp-spinner sm" aria-hidden />}
                 Submit for Review
               </button>
             </div>
@@ -256,132 +270,148 @@ export default function MarketplacePage() {
 
         {/* Browse tab */}
         {tab === 'browse' ? (
-          <div className="rp-grid-3">
-            {items.map((item) => (
-              <div key={item.id} className="rp-panel">
-                <div className="rp-panel-title">
-                  {item.name} <span className="badge ok">{item.kind}</span>
-                  {item.installCount != null && item.installCount > 0 ? (
-                    <span className="badge">{item.installCount} installs</span>
-                  ) : null}
-                </div>
-                <p className="rp-page-sub">{item.description}</p>
-                <div className="rp-row">
-                  <strong>
-                    {item.priceCents === 0
-                      ? 'Free'
-                      : `$${(item.priceCents / 100).toFixed(2)}`}
-                  </strong>
-                  <button
-                    type="button"
-                    className="primary"
-                    disabled={busy === item.id}
-                    onClick={() => installListing(item.id)}
-                  >
-                    Install
-                  </button>
-                  {item.priceCents > 0 ? (
+          items.length === 0 && !error ? (
+            <EmptyState
+              title="No approved listings yet"
+              description="When clinics publish rulebooks, templates, or prompt packs, they'll appear here for you to install."
+            />
+          ) : (
+            <div className="rp-grid-3 rp-stagger" aria-live="polite">
+              {items.map((item) => (
+                <div key={item.id} className="rp-panel">
+                  <div className="rp-panel-title">
+                    {item.name} <span className="badge ok">{item.kind}</span>
+                    {item.installCount != null && item.installCount > 0 ? (
+                      <span className="badge">{item.installCount} installs</span>
+                    ) : null}
+                  </div>
+                  <p className="rp-page-sub">{item.description}</p>
+                  <div className="rp-row">
+                    <strong>
+                      {item.priceCents === 0
+                        ? 'Free'
+                        : `$${(item.priceCents / 100).toFixed(2)}`}
+                    </strong>
                     <button
                       type="button"
-                      className="subtle"
+                      className="primary"
                       disabled={busy === item.id}
-                      onClick={() => buy(item.id)}
+                      aria-busy={busy === item.id}
+                      onClick={() => installListing(item.id)}
                     >
-                      Buy
+                      {busy === item.id && <span className="rp-spinner sm" aria-hidden />}
+                      Install
                     </button>
-                  ) : null}
+                    {item.priceCents > 0 ? (
+                      <button
+                        type="button"
+                        className="subtle"
+                        disabled={busy === item.id}
+                        onClick={() => buy(item.id)}
+                      >
+                        Buy
+                      </button>
+                    ) : null}
+                  </div>
                 </div>
-              </div>
-            ))}
-            {items.length === 0 && !error ? (
-              <div className="rp-page-sub">No approved listings yet.</div>
-            ) : null}
-          </div>
+              ))}
+            </div>
+          )
         ) : null}
 
         {/* My Submissions tab */}
         {tab === 'submissions' ? (
-          <div className="rp-grid-3">
-            {ownSubmissions.map((sub) => (
-              <div key={sub.id} className="rp-panel">
-                <div className="rp-panel-title">
-                  {sub.name}{' '}
-                  <span className={statusBadgeClass(sub.status)}>
-                    {statusLabel(sub.status)}
-                  </span>
-                </div>
-                <p className="rp-page-sub">{sub.description}</p>
-                <div className="rp-row">
-                  <span className="badge info">{sub.kind}</span>
-                  <span className="badge">v{sub.version}</span>
-                  {sub.installCount > 0 ? (
-                    <span className="badge">{sub.installCount} installs</span>
+          ownSubmissions.length === 0 ? (
+            <EmptyState
+              title="No submissions yet"
+              description="Publish a rulebook, template, or prompt pack and track its review status here."
+            />
+          ) : (
+            <div className="rp-grid-3 rp-stagger" aria-live="polite">
+              {ownSubmissions.map((sub) => (
+                <div key={sub.id} className="rp-panel">
+                  <div className="rp-panel-title">
+                    {sub.name}{' '}
+                    <span className={statusBadgeClass(sub.status)}>
+                      {statusLabel(sub.status)}
+                    </span>
+                  </div>
+                  <p className="rp-page-sub">{sub.description}</p>
+                  <div className="rp-row">
+                    <span className="badge info">{sub.kind}</span>
+                    <span className="badge">v{sub.version}</span>
+                    {sub.installCount > 0 ? (
+                      <span className="badge">{sub.installCount} installs</span>
+                    ) : null}
+                  </div>
+                  {sub.reviewNotes ? (
+                    <p className="rp-page-sub">
+                      <strong>Review notes:</strong> {sub.reviewNotes}
+                    </p>
                   ) : null}
                 </div>
-                {sub.reviewNotes ? (
-                  <p className="rp-page-sub">
-                    <strong>Review notes:</strong> {sub.reviewNotes}
-                  </p>
-                ) : null}
-              </div>
-            ))}
-            {ownSubmissions.length === 0 ? (
-              <div className="rp-page-sub">No submissions yet.</div>
-            ) : null}
-          </div>
+              ))}
+            </div>
+          )
         ) : null}
 
         {/* Review tab (Admin/MedicalDirector) */}
         {tab === 'review' ? (
-          <div className="rp-grid-3">
-            {pendingSubmissions.map((sub) => (
-              <div key={sub.id} className="rp-panel">
-                <div className="rp-panel-title">
-                  {sub.name}{' '}
-                  <span className={statusBadgeClass(sub.status)}>
-                    {statusLabel(sub.status)}
-                  </span>
-                </div>
-                <p className="rp-page-sub">{sub.description}</p>
-                <div className="rp-row">
-                  <span className="badge info">{sub.kind}</span>
-                  <span className="badge">v{sub.version}</span>
-                </div>
-                <div className="rp-list">
-                  <textarea
-                    placeholder="Review notes (optional)"
-                    value={rejectNotes[sub.id] ?? ''}
-                    onChange={(e) =>
-                      setRejectNotes((prev) => ({ ...prev, [sub.id]: e.target.value }))
-                    }
-                  />
+          pendingSubmissions.length === 0 ? (
+            <EmptyState
+              title="Nothing to review"
+              description="Submissions awaiting approval will show up here."
+            />
+          ) : (
+            <div className="rp-grid-3 rp-stagger" aria-live="polite">
+              {pendingSubmissions.map((sub) => (
+                <div key={sub.id} className="rp-panel">
+                  <div className="rp-panel-title">
+                    {sub.name}{' '}
+                    <span className={statusBadgeClass(sub.status)}>
+                      {statusLabel(sub.status)}
+                    </span>
+                  </div>
+                  <p className="rp-page-sub">{sub.description}</p>
                   <div className="rp-row">
-                    <button
-                      type="button"
-                      className="primary"
-                      disabled={busy === sub.id}
-                      onClick={() => approveSubmission(sub.id)}
-                    >
-                      Approve
-                    </button>
-                    <button
-                      type="button"
-                      className="subtle"
-                      disabled={busy === sub.id}
-                      onClick={() => rejectSubmission(sub.id)}
-                    >
-                      Reject
-                    </button>
+                    <span className="badge info">{sub.kind}</span>
+                    <span className="badge">v{sub.version}</span>
+                  </div>
+                  <div className="rp-list">
+                    <textarea
+                      placeholder="Review notes (optional)"
+                      value={rejectNotes[sub.id] ?? ''}
+                      onChange={(e) =>
+                        setRejectNotes((prev) => ({ ...prev, [sub.id]: e.target.value }))
+                      }
+                    />
+                    <div className="rp-row">
+                      <button
+                        type="button"
+                        className="primary"
+                        disabled={busy === sub.id}
+                        aria-busy={busy === sub.id}
+                        onClick={() => approveSubmission(sub.id)}
+                      >
+                        {busy === sub.id && <span className="rp-spinner sm" aria-hidden />}
+                        Approve
+                      </button>
+                      <button
+                        type="button"
+                        className="subtle"
+                        disabled={busy === sub.id}
+                        onClick={() => rejectSubmission(sub.id)}
+                      >
+                        Reject
+                      </button>
+                    </div>
                   </div>
                 </div>
-              </div>
-            ))}
-            {pendingSubmissions.length === 0 ? (
-              <div className="rp-page-sub">No submissions pending review.</div>
-            ) : null}
-          </div>
+              ))}
+            </div>
+          )
         ) : null}
       </div>
-    </div>
+    </Container>
   );
 }

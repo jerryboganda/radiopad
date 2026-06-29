@@ -40,7 +40,7 @@ export default function ApprovalTab({ overrides, canApprove, approvingId, onAppr
         drafting.
       </p>
 
-      <ul className="rp-approval-list">
+      <ul className="rp-approval-list rp-stagger">
         {sorted.map((ov) => {
           const meta = getBlockMeta(ov.blockKey);
           const isDraft = ov.status === 'Draft';
@@ -64,8 +64,10 @@ export default function ApprovalTab({ overrides, canApprove, approvingId, onAppr
                     type="button"
                     className="primary"
                     disabled={approvingId === ov.id}
+                    aria-busy={approvingId === ov.id}
                     onClick={() => onApprove(ov.id)}
                   >
+                    {approvingId === ov.id && <span className="rp-spinner sm" aria-hidden />}
                     {approvingId === ov.id ? 'Approving…' : 'Approve'}
                   </button>
                 ) : isDraft ? (

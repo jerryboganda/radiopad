@@ -3,6 +3,12 @@
 import { useEffect, useState, useCallback } from 'react';
 import { api } from '@/lib/api';
 import type { QualityTrendsResponse } from '@/lib/api';
+import Container from '@/components/shell/Container';
+import PageHeader from '@/components/shell/PageHeader';
+import { TableSkeleton } from '@/components/ui/Skeleton';
+import EmptyState from '@/components/ui/EmptyState';
+import ErrorState from '@/components/ui/ErrorState';
+import AnimatedNumber from '@/components/ui/AnimatedNumber';
 
 type GroupBy = 'day' | 'week';
 
@@ -64,14 +70,14 @@ export default function QualityDashboardPage() {
     totalReports > 0 ? ((reportsAbove80 / totalReports) * 100).toFixed(1) : '0.0';
 
   return (
-    <div className="rp-container">
-      <h1 className="rp-page-title">Quality Score Dashboard</h1>
-      <p className="rp-page-sub">
-        C7 — Heuristic quality trends computed from report validation data.
-      </p>
+    <Container>
+      <PageHeader
+        title="Quality Score Dashboard"
+        description="C7 — Heuristic quality trends computed from report validation data."
+      />
 
       {/* ── Controls ─────────────────────────────────────────────── */}
-      <div className="rp-panel" style={{ marginBottom: 24 }}>
+      <div className="rp-panel rp-anim-fade-in-up" style={{ marginBottom: 24 }}>
         <div className="rp-panel-title">Time Window</div>
         <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', alignItems: 'center' }}>
           <input
@@ -99,25 +105,33 @@ export default function QualityDashboardPage() {
           >
             Weekly
           </button>
-          <button className="ghost" onClick={load}>
+          <button className="ghost" onClick={load} disabled={loading} aria-busy={loading}>
+            {loading && <span className="rp-spinner sm" aria-hidden />}
             Apply
           </button>
         </div>
       </div>
 
-      {err && <div className="banner warn">{err}</div>}
-      {loading && !data && <p className="rp-page-sub">Loading…</p>}
+      {err && !data && <ErrorState message={err} onRetry={load} />}
+
+      <div aria-live="polite" aria-busy={loading}>
+        {loading && !data && (
+          <div className="rp-panel">
+            <TableSkeleton rows={6} cols={4} />
+          </div>
+        )}
+      </div>
 
       {data && (
         <>
           {/* ── Summary row ────────────────────────────────────────── */}
-          <div className="rp-grid-3" style={{ marginBottom: 24 }}>
+          <div className="rp-grid-3 rp-stagger" style={{ marginBottom: 24 }}>
             <div className="panel" style={{ padding: 16 }}>
               <div className="rp-page-sub" style={{ marginBottom: 4 }}>
                 Average Quality Score
               </div>
               <div style={{ fontSize: 36, fontFamily: 'var(--serif)' }}>
-                {avgScore ?? '—'}
+                {avgScore !== null ? <AnimatedNumber value={avgScore} /> : '—'}
                 {avgScore !== null && (
                   <span
                     className={`badge ${
@@ -135,7 +149,7 @@ export default function QualityDashboardPage() {
                 Reports with Blockers
               </div>
               <div style={{ fontSize: 36, fontFamily: 'var(--serif)' }}>
-                {totalBlockers}
+                <AnimatedNumber value={totalBlockers} />
                 <span className="rp-page-sub" style={{ fontSize: 14, marginLeft: 4 }}>
                   / {totalReports}
                 </span>
@@ -146,70 +160,77 @@ export default function QualityDashboardPage() {
                 Reports Scoring ≥80
               </div>
               <div style={{ fontSize: 36, fontFamily: 'var(--serif)' }}>
-                {pctAbove80}%
+                <AnimatedNumber value={Number(pctAbove80)} decimals={1} />%
               </div>
             </div>
           </div>
 
           {/* ── Trend chart (CSS bar chart) ────────────────────────── */}
-          <div className="rp-panel" style={{ marginBottom: 24 }}>
+          <div className="rp-panel rp-anim-fade-in-up" style={{ marginBottom: 24 }}>
             <div className="rp-panel-title">Quality Trend</div>
-            {data.trends.length === 0 && (
-              <p className="rp-page-sub">No data for the selected window.</p>
-            )}
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
-              {data.trends.map((t) => (
-                <div
-                  key={t.period}
-                  style={{ display: 'flex', alignItems: 'center', gap: 8 }}
-                >
-                  <code style={{ width: 100, flexShrink: 0, fontSize: 12 }}>
-                    {t.period}
-                  </code>
+            {data.trends.length === 0 ? (
+              <EmptyState
+                title="No quality data"
+                description="No reports were validated in the selected window."
+              />
+            ) : (
+              <div className="rp-stagger" style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+                {data.trends.map((t) => (
                   <div
-                    style={{
-                      flex: 1,
-                      height: 22,
-                      borderRadius: 4,
-                      overflow: 'hidden',
-                    }}
-                    className="panel"
+                    key={t.period}
+                    style={{ display: 'flex', alignItems: 'center', gap: 8 }}
                   >
+                    <code style={{ width: 100, flexShrink: 0, fontSize: 12 }}>
+                      {t.period}
+                    </code>
                     <div
-                      className={`badge ${
-                        t.avgScore >= 80
-                          ? 'ok'
-                          : t.avgScore >= 50
-                            ? 'warn'
-                            : 'danger'
-                      }`}
                       style={{
-                        width: `${t.avgScore}%`,
-                        height: '100%',
-                        display: 'flex',
-                        alignItems: 'center',
-                        paddingLeft: 6,
-                        fontSize: 11,
-                        borderRadius: 0,
-                        whiteSpace: 'nowrap',
+                        flex: 1,
+                        height: 22,
+                        borderRadius: 4,
+                        overflow: 'hidden',
                       }}
+                      className="panel"
                     >
-                      {t.avgScore}
+                      <div
+                        className={`rp-bar-fill badge ${
+                          t.avgScore >= 80
+                            ? 'ok'
+                            : t.avgScore >= 50
+                              ? 'warn'
+                              : 'danger'
+                        }`}
+                        style={{
+                          width: `${t.avgScore}%`,
+                          height: '100%',
+                          display: 'flex',
+                          alignItems: 'center',
+                          paddingLeft: 6,
+                          fontSize: 11,
+                          borderRadius: 0,
+                          whiteSpace: 'nowrap',
+                        }}
+                      >
+                        {t.avgScore}
+                      </div>
                     </div>
+                    <span className="rp-page-sub" style={{ fontSize: 11, width: 80 }}>
+                      {t.reportCount} reports
+                    </span>
                   </div>
-                  <span className="rp-page-sub" style={{ fontSize: 11, width: 80 }}>
-                    {t.reportCount} reports
-                  </span>
-                </div>
-              ))}
-            </div>
+                ))}
+              </div>
+            )}
           </div>
 
           {/* ── By Radiologist table ───────────────────────────────── */}
-          <div className="rp-panel" style={{ marginBottom: 24 }}>
+          <div className="rp-panel rp-anim-fade-in-up" style={{ marginBottom: 24 }}>
             <div className="rp-panel-title">By Radiologist</div>
             {data.byRadiologist.length === 0 ? (
-              <p className="rp-page-sub">No radiologist data.</p>
+              <EmptyState
+                title="No radiologist data"
+                description="Per-radiologist quality scores will appear once reports are validated."
+              />
             ) : (
               <table className="rp-table">
                 <thead>
@@ -249,10 +270,13 @@ export default function QualityDashboardPage() {
           </div>
 
           {/* ── By Rulebook table ──────────────────────────────────── */}
-          <div className="rp-panel">
+          <div className="rp-panel rp-anim-fade-in-up">
             <div className="rp-panel-title">By Rulebook</div>
             {data.byRulebook.length === 0 ? (
-              <p className="rp-page-sub">No rulebook data.</p>
+              <EmptyState
+                title="No rulebook data"
+                description="Per-rulebook quality scores will appear once reports are validated."
+              />
             ) : (
               <table className="rp-table">
                 <thead>
@@ -292,6 +316,6 @@ export default function QualityDashboardPage() {
           </div>
         </>
       )}
-    </div>
+    </Container>
   );
 }

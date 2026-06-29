@@ -86,7 +86,7 @@ export default function RulesPanel({ rules, onChange }: Props) {
     <div className="rp-editor-block">
       <div className="rp-panel-title">Validation Rules</div>
 
-      <div>
+      <div className="rp-stagger">
         {rules.map((r, idx) => (
           <div
             key={r.id}
@@ -95,7 +95,7 @@ export default function RulesPanel({ rules, onChange }: Props) {
             onDragEnd={onDragEnd}
             onDragOver={(e) => onDragOver(e, idx)}
             onDrop={(e) => onDrop(e, idx)}
-            className={`rp-editor-block${dragOverIdx === idx ? ' rp-drag-active' : ''}`}
+            className={`rp-editor-block${dragOverIdx === idx ? ' rp-drag-active rp-drop-zone' : ''}`}
             style={{ marginBottom: 8, cursor: 'grab' }}
           >
             <div className="rp-row between">

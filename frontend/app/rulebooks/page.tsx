@@ -93,7 +93,7 @@ export default function RulebooksPage() {
           </div>
 
           {loading ? (
-            <div className="rp-card-grid">
+            <div className="rp-card-grid" aria-busy="true" aria-live="polite">
               {Array.from({ length: 6 }).map((_, i) => (
                 <div key={i} className="rp-panel" style={{ margin: 0 }}>
                   <Skeleton variant="block" height={96} />
@@ -112,7 +112,7 @@ export default function RulebooksPage() {
               description={`No rulebooks match "${query.trim()}"${status !== 'All' ? ` in ${status}` : ''}.`}
             />
           ) : (
-            <div className="rp-card-grid">
+            <div className="rp-card-grid rp-stagger" aria-live="polite">
               {filtered.map((rb) => {
                 const chips = [...splitCsv(rb.appliesToModalities), ...splitCsv(rb.appliesToBodyParts)];
                 const updated = relativeTime(rb.updatedAt);

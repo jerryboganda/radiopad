@@ -104,7 +104,8 @@ export default function OutputDiffTab({
                 ))}
               </select>
             </div>
-            <button type="button" className="primary" onClick={onCompare} disabled={running}>
+            <button type="button" className="primary" onClick={onCompare} disabled={running} aria-busy={running}>
+              {running && <span className="rp-spinner sm" aria-hidden />}
               Compare
             </button>
           </div>

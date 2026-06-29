@@ -11,6 +11,9 @@
 
 import { useEffect, useState } from 'react';
 import { api, type ComparePriorResult, type Report } from '@/lib/api';
+import Banner from '@/components/ui/Banner';
+import StatusBadge from '@/components/ui/StatusBadge';
+import Skeleton from '@/components/ui/Skeleton';
 
 type Props = {
   reportId: string;
@@ -60,13 +63,24 @@ export default function PriorComparePanel({ reportId }: Props) {
     return () => { cancelled = true; };
   }, [reportId]);
 
-  if (loading) return <p className="rp-page-sub">Loading prior report…</p>;
-  if (error) return <div className="banner warn">{error}</div>;
+  if (loading) {
+    return (
+      <div className="rp-panel rp-anim-scale-in" role="status" aria-live="polite" aria-busy="true">
+        <div className="rp-panel-title">Prior comparison</div>
+        <Skeleton variant="text" width="60%" />
+        <div style={{ marginTop: 12 }}>
+          <Skeleton variant="block" height={72} />
+        </div>
+        <span className="rp-sr-only">Loading prior report…</span>
+      </div>
+    );
+  }
+  if (error) return <Banner tone="warn" className="rp-anim-scale-in">{error}</Banner>;
   if (!data) return null;
 
   if (!data.prior) {
     return (
-      <div className="rp-panel">
+      <div className="rp-panel rp-anim-scale-in">
         <div className="rp-panel-title">Prior comparison</div>
         <p className="rp-page-sub">
           No prior report on file for body part <code>{data.current.bodyPart}</code>.
@@ -78,13 +92,13 @@ export default function PriorComparePanel({ reportId }: Props) {
   const changedCount = data.sections.filter((s) => s.changed).length;
 
   return (
-    <div className="rp-panel">
+    <div className="rp-panel rp-anim-scale-in">
       <div className="rp-panel-title">
         Prior comparison
         {changedCount > 0 ? (
-          <span className="badge info">{changedCount} changed</span>
+          <StatusBadge tone="info">{changedCount} changed</StatusBadge>
         ) : (
-          <span className="badge ok">Identical sections</span>
+          <StatusBadge tone="success">Identical sections</StatusBadge>
         )}
       </div>
       <p className="rp-page-sub">
@@ -92,7 +106,7 @@ export default function PriorComparePanel({ reportId }: Props) {
         <code>{fmtDate(data.prior.createdAt)}</code>.
       </p>
 
-      <div className="rp-grid-2">
+      <div className="rp-grid-2 rp-stagger">
         <div className="rp-stat-label">Current</div>
         <div className="rp-stat-label">Prior</div>
         {data.sections.map((s) => {
@@ -103,7 +117,7 @@ export default function PriorComparePanel({ reportId }: Props) {
               <div className="section-block">
                 <label>
                   {label}
-                  {s.changed && <span className="badge info" style={{ marginLeft: 8 }}>changed</span>}
+                  {s.changed && <span style={{ marginLeft: 8 }}><StatusBadge tone="info">changed</StatusBadge></span>}
                 </label>
                 <pre className={`rp-rewrite-pre ${s.changed ? 'rp-diff-add' : ''}`}>
                   {s.current || '(empty)'}

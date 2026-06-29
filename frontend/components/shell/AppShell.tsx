@@ -10,6 +10,8 @@ import { PageActionsProvider } from './PageActionsSlot';
 import AuthGate from './AuthGate';
 import BillingStatusBanner from '@/components/BillingStatusBanner';
 import DesktopStatusBanner from '@/components/DesktopStatusBanner';
+import PageTransition from '@/components/ui/PageTransition';
+import { ToastProvider } from '@/components/ui/ToastProvider';
 
 function ShellRoot({ children }: { children: ReactNode }) {
   const { collapsed } = useShell();
@@ -21,7 +23,9 @@ function ShellRoot({ children }: { children: ReactNode }) {
         <BillingStatusBanner />
         <Topbar />
         <DesktopStatusBanner />
-        <main className="rp-shell-content">{children}</main>
+        <main className="rp-shell-content">
+          <PageTransition>{children}</PageTransition>
+        </main>
       </div>
     </div>
   );
@@ -35,19 +39,25 @@ export default function AppShell({ children }: { children: ReactNode }) {
 
   if (publicAuthRoute) {
     return (
-      <PageActionsProvider>
-        <main className="rp-public-auth-content">{children}</main>
-      </PageActionsProvider>
+      <ToastProvider>
+        <PageActionsProvider>
+          <main className="rp-public-auth-content">
+            <PageTransition>{children}</PageTransition>
+          </main>
+        </PageActionsProvider>
+      </ToastProvider>
     );
   }
 
   return (
-    <ShellProvider>
-      <PageActionsProvider>
-        <AuthGate>
-          <ShellRoot>{children}</ShellRoot>
-        </AuthGate>
-      </PageActionsProvider>
-    </ShellProvider>
+    <ToastProvider>
+      <ShellProvider>
+        <PageActionsProvider>
+          <AuthGate>
+            <ShellRoot>{children}</ShellRoot>
+          </AuthGate>
+        </PageActionsProvider>
+      </ShellProvider>
+    </ToastProvider>
   );
 }

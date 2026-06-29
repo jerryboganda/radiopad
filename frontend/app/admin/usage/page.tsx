@@ -12,6 +12,11 @@ import { useEffect, useMemo, useState } from 'react';
 import { api, type UsageSummary } from '@/lib/api';
 import { isAuthError, useAuthSession } from '@/lib/useAuthSession';
 import SignInRequired from '@/components/ui/SignInRequired';
+import Container from '@/components/shell/Container';
+import PageHeader from '@/components/shell/PageHeader';
+import Banner from '@/components/ui/Banner';
+import AnimatedNumber from '@/components/ui/AnimatedNumber';
+import { TableSkeleton } from '@/components/ui/Skeleton';
 
 type AnalyticsSummary = Awaited<ReturnType<typeof api.analytics.summary>>;
 
@@ -103,47 +108,45 @@ export default function UsageDashboardPage() {
 
   if (session.signedOut) {
     return (
-      <div className="rp-container">
+      <Container>
         <h1 className="rp-page-title">Usage</h1>
         <SignInRequired surface="Please sign in to view usage for your workspace." />
-      </div>
+      </Container>
     );
   }
 
   if (authBlocked) {
     return (
-      <div className="rp-container">
+      <Container>
         <h1 className="rp-page-title">Usage</h1>
         <SignInRequired
           surface="You don't have access to usage analytics."
           detail="Ask your Medical Director, IT Admin, or Billing Admin for access."
         />
-      </div>
+      </Container>
     );
   }
 
   return (
-    <div className="rp-container">
-      <header className="rp-page-header">
-        <div className="rp-page-header-text">
-          <h1 className="rp-page-title">Usage</h1>
-          <p className="rp-page-sub">
-            How much your workspace has used RadioPad each month — active radiologists, AI requests, and reports.
-          </p>
-        </div>
-      </header>
+    <Container>
+      <PageHeader
+        title="Usage"
+        description="How much your workspace has used RadioPad each month — active radiologists, AI requests, and reports."
+      />
 
-      {error && <div className="banner warn">{error}</div>}
-      {loading && <p className="rp-page-sub">Loading…</p>}
+      <div aria-live="polite" aria-busy={loading}>
+        {error && <Banner tone="warn" title="Couldn't load usage">{error}</Banner>}
+        {loading && !error && <TableSkeleton rows={6} cols={4} />}
+      </div>
 
       {windowed && lifetime && (
-        <div className="rp-panel">
+        <div className="rp-panel rp-anim-fade-in-up">
           <div className="rp-panel-title">Last 30 days</div>
-          <div className="rp-grid-3">
-            <Stat label="Active radiologists" value={windowed.product.activeRadiologists} />
-            <Stat label="Reports passing review" value={`${(windowed.product.validationPassRate * 100).toFixed(1)}%`} />
-            <Stat label="Rulebook usage" value={`${(windowed.product.rulebookAdoption * 100).toFixed(1)}%`} />
-            <Stat label="AI requests" value={windowed.ai.totalRequests} />
+          <div className="metric-grid rp-stagger">
+            <Stat label="Active radiologists" value={windowed.product.activeRadiologists} numeric tone="info" />
+            <Stat label="Reports passing review" value={`${(windowed.product.validationPassRate * 100).toFixed(1)}%`} percent={windowed.product.validationPassRate * 100} />
+            <Stat label="Rulebook usage" value={`${(windowed.product.rulebookAdoption * 100).toFixed(1)}%`} percent={windowed.product.rulebookAdoption * 100} />
+            <Stat label="AI requests" value={windowed.ai.totalRequests} numeric />
             <Stat label="AI words (in / out)" value={fmtTokens(windowed.ai.inputTokens, windowed.ai.outputTokens)} />
             <Stat label="Average AI speed" value={`${windowed.ai.avgLatencyMs} ms`} />
             <Stat label="AI cost" value={`$${fmtUsd(windowed.ai.costTotalUsd)}`} />
@@ -161,7 +164,7 @@ export default function UsageDashboardPage() {
         </div>
       )}
 
-      <div className="rp-panel">
+      <div className="rp-panel rp-anim-fade-in-up">
         <div className="rp-panel-title">Month by month</div>
         <table className="rp-table">
           <thead>
@@ -175,7 +178,7 @@ export default function UsageDashboardPage() {
               <th>Words out</th>
             </tr>
           </thead>
-          <tbody>
+          <tbody className="rp-stagger">
             {rows.length === 0 && !loading && (
               <tr>
                 <td colSpan={7} className="rp-page-sub">No data yet.</td>
@@ -197,7 +200,7 @@ export default function UsageDashboardPage() {
       </div>
 
       {rows.some((r) => r.ai && r.ai.byProvider.length > 0) && (
-        <details className="rp-panel rp-advanced">
+        <details className="rp-panel rp-advanced rp-anim-fade-in-up">
           <summary className="rp-panel-title" style={{ cursor: 'pointer' }}>Last month broken down by AI model</summary>
           {(() => {
             const last = rows[rows.length - 1];
@@ -241,15 +244,47 @@ export default function UsageDashboardPage() {
           })()}
         </details>
       )}
-    </div>
+    </Container>
   );
 }
 
-function Stat({ label, value }: { label: string; value: string | number }) {
+function Stat({
+  label,
+  value,
+  numeric,
+  percent,
+  tone,
+}: {
+  label: string;
+  value: string | number;
+  /** Render the value with a count-up animation. */
+  numeric?: boolean;
+  /** When set (0–100), show a fill bar beneath the value. */
+  percent?: number;
+  tone?: 'ready' | 'review' | 'blocked' | 'info';
+}) {
+  const pct = percent != null ? Math.max(0, Math.min(100, percent)) : null;
   return (
-    <div>
-      <div className="rp-stat-label">{label}</div>
-      <div className="rp-stat-value">{typeof value === 'number' ? value.toLocaleString() : value}</div>
+    <div className="metric-card" {...(tone ? { 'data-tone': tone } : {})}>
+      <div className="metric-card-label">{label}</div>
+      <div className="metric-card-value">
+        {numeric && typeof value === 'number' ? <AnimatedNumber value={value} /> : value}
+      </div>
+      {pct != null && (
+        <div
+          style={{ height: 6, borderRadius: 3, overflow: 'hidden', background: 'var(--color-rule)' }}
+          role="progressbar"
+          aria-valuenow={Math.round(pct)}
+          aria-valuemin={0}
+          aria-valuemax={100}
+          aria-label={label}
+        >
+          <div
+            className={`rp-bar-fill badge ${pct >= 80 ? 'ok' : pct >= 50 ? 'warn' : 'danger'}`}
+            style={{ width: `${pct}%`, height: '100%', borderRadius: 0 }}
+          />
+        </div>
+      )}
     </div>
   );
 }

@@ -4,6 +4,11 @@ import PermissionGate from '@/components/ui/PermissionGate';
 
 import { useEffect, useState } from 'react';
 import { api } from '@/lib/api';
+import Container from '@/components/shell/Container';
+import PageHeader from '@/components/shell/PageHeader';
+import Banner from '@/components/ui/Banner';
+import EmptyState from '@/components/ui/EmptyState';
+import Skeleton, { TableSkeleton } from '@/components/ui/Skeleton';
 
 type SinkStatus = {
   name: string;
@@ -132,23 +137,29 @@ function SecurityAdminPageInner() {
   }
 
   return (
-    <div className="rp-container">
-      <header className="rp-page-header">
-        <div className="rp-page-header-text">
-          <h1 className="rp-page-title">Security</h1>
-          <p className="rp-page-sub">
-            Restrict who can access RadioPad, see recent security alerts, and forward audit events to your security team&apos;s tools.
-          </p>
-        </div>
-      </header>
+    <Container>
+      <PageHeader
+        title="Security"
+        description="Restrict who can access RadioPad, see recent security alerts, and forward audit events to your security team's tools."
+      />
 
-      {error && <div className="banner warn">{error}</div>}
-      {info && <div className="banner ok">{info}</div>}
+      <div aria-live="polite">
+        {error && (
+          <Banner tone="warn" title="Something went wrong" onDismiss={() => setError(null)}>
+            {error}
+          </Banner>
+        )}
+        {info && (
+          <Banner tone="success" onDismiss={() => setInfo(null)}>
+            {info}
+          </Banner>
+        )}
+      </div>
 
       <div className="rp-page-grid">
-        <div className="rp-page-main">
+        <div className="rp-page-main rp-stagger">
 
-      <div className="rp-panel">
+      <div className="rp-panel rp-anim-fade-in-up">
         <div className="rp-panel-title">Allowed networks</div>
         <p className="rp-page-sub">
           Only let users sign in from specific office networks. Leave blank to allow any network.
@@ -168,8 +179,9 @@ function SecurityAdminPageInner() {
             onChange={(e) => { setAllowlistJson(e.target.value); setAllowlistDirty(true); }}
           />
           <div className="rp-row" style={{ marginTop: 8 }}>
-            <button className="primary" onClick={saveAllowlist} disabled={busy || !allowlistDirty}>
-              Save
+            <button className="primary" onClick={saveAllowlist} disabled={busy || !allowlistDirty} aria-busy={busy}>
+              {busy && <span className="rp-spinner sm" aria-hidden />}
+              {busy ? 'Saving…' : 'Save'}
             </button>
             <button className="ghost" onClick={refresh} disabled={busy} style={{ marginLeft: 8 }}>
               Refresh
@@ -178,13 +190,16 @@ function SecurityAdminPageInner() {
         </details>
       </div>
 
-      <div className="rp-panel">
+      <div className="rp-panel rp-anim-fade-in-up">
         <div className="rp-panel-title">Recent security alerts</div>
         <p className="rp-page-sub">
           Unusual activity our system flagged — like many failed sign-in attempts in a short window.
         </p>
         {alerts.length === 0 ? (
-          <p className="rp-page-sub">No alerts to report. Things look quiet.</p>
+          <EmptyState
+            title="No alerts to report"
+            description="Things look quiet. We'll surface unusual activity here as soon as it's flagged."
+          />
         ) : (
           <table className="rp-table">
             <thead>
@@ -193,7 +208,7 @@ function SecurityAdminPageInner() {
                 <th>Reason</th>
               </tr>
             </thead>
-            <tbody>
+            <tbody className="rp-stagger">
               {alerts.map((a) => (
                 <tr key={a.id}>
                   <td>{new Date(a.createdAt).toLocaleString()}</td>
@@ -205,13 +220,14 @@ function SecurityAdminPageInner() {
         )}
       </div>
 
-      <div className="rp-panel">
+      <div className="rp-panel rp-anim-fade-in-up">
         <div className="rp-panel-title">Alert your security team</div>
         <p className="rp-page-sub">
           When something suspicious happens, RadioPad can send an automatic notification to your hospital&apos;s security team.
         </p>
-        <button className="primary-ghost" onClick={testWebhook} disabled={busy}>
-          Send test alert
+        <button className="primary-ghost" onClick={testWebhook} disabled={busy} aria-busy={busy}>
+          {busy && <span className="rp-spinner sm" aria-hidden />}
+          {busy ? 'Sending…' : 'Send test alert'}
         </button>
         <details className="rp-advanced">
           <summary>For IT teams — webhook configuration</summary>
@@ -223,17 +239,19 @@ function SecurityAdminPageInner() {
         </details>
       </div>
 
-      <div className="rp-panel">
+      <div className="rp-panel rp-anim-fade-in-up" aria-live="polite" aria-busy={availability === null && !availabilityError}>
         <div className="rp-panel-title">System availability</div>
-        {availabilityError && <div className="rp-banner danger">{availabilityError}</div>}
-        {availability === null ? (
-          <p className="rp-page-sub">Loading…</p>
-        ) : (
+        {availabilityError && (
+          <Banner tone="danger" title="Couldn't load availability">{availabilityError}</Banner>
+        )}
+        {availability === null && !availabilityError ? (
+          <Skeleton variant="block" height={92} />
+        ) : availability === null ? null : (
           <>
             {availability.errorRate > AVAILABILITY_BURN_THRESHOLD && (
-              <div className="rp-banner warn">
+              <Banner tone="warn">
                 System health check warning — RadioPad is responding more slowly than expected. Ask IT to take a look.
-              </div>
+              </Banner>
             )}
             <div className="rp-grid-3">
               <div className="rp-stat-tile">
@@ -266,7 +284,7 @@ function SecurityAdminPageInner() {
         )}
       </div>
 
-      <details className="rp-panel rp-advanced">
+      <details className="rp-panel rp-advanced rp-anim-fade-in-up">
         <summary className="rp-panel-title" style={{ cursor: 'pointer' }}>Advanced — rate limits &amp; SIEM forwarding</summary>
         <p className="rp-page-sub rp-mt-sm"><strong>Rate limits (per minute):</strong> 100 per IP, 5000 per workspace. Override via{' '}
           <code>RADIOPAD_RATE_LIMIT_IP_PER_MIN</code> /{' '}
@@ -276,9 +294,12 @@ function SecurityAdminPageInner() {
           <strong>SIEM forwarding:</strong> audit events are forwarded continuously to Splunk HEC / Sentinel Log Analytics / Elastic / Syslog when sink env vars are set. PHI is excluded — only ids, action codes, timestamps and integrity hashes ship.
         </p>
         {sinks === null ? (
-          <p className="rp-page-sub">Loading…</p>
+          <TableSkeleton rows={4} cols={5} />
         ) : sinks.length === 0 ? (
-          <p className="rp-page-sub">No SIEM destinations registered.</p>
+          <EmptyState
+            title="No SIEM destinations registered"
+            description="Set the sink environment variables on the API host to forward audit events to Splunk, Sentinel, Elastic, or Syslog."
+          />
         ) : (
           <table className="rp-table">
             <thead>
@@ -290,7 +311,7 @@ function SecurityAdminPageInner() {
                 <th>Errors</th>
               </tr>
             </thead>
-            <tbody>
+            <tbody className="rp-stagger">
               {sinks.map((s) => (
                 <tr key={s.name}>
                   <td>{s.name}</td>
@@ -321,7 +342,7 @@ function SecurityAdminPageInner() {
           </div>
         </aside>
       </div>
-    </div>
+    </Container>
   );
 }
 

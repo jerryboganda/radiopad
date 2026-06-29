@@ -10,6 +10,11 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import type { CatalogItem } from '@/lib/api';
 import { usePermissions, type PermissionKey } from '@/lib/permissions';
+import Container from '@/components/shell/Container';
+import PageHeader from '@/components/shell/PageHeader';
+import EmptyState from '@/components/ui/EmptyState';
+import Banner from '@/components/ui/Banner';
+import { TableSkeleton } from '@/components/ui/Skeleton';
 
 type CatalogClient = {
   list: () => Promise<CatalogItem[]>;
@@ -94,18 +99,13 @@ export default function CatalogManager({ title, subtitle, itemNoun, client, mana
   }
 
   return (
-    <div className="rp-container">
-      <header className="rp-page-header">
-        <div className="rp-page-header-text">
-          <h1 className="rp-page-title">{title}</h1>
-          <p className="rp-page-sub">{subtitle}</p>
-        </div>
-      </header>
+    <Container>
+      <PageHeader title={title} description={subtitle} />
 
-      {error && <div className="banner warn">{error}</div>}
+      {error && <Banner tone="warn" onDismiss={() => setError(null)}>{error}</Banner>}
 
       {canManage && (
-        <div className="rp-panel" ref={formRef}>
+        <div className="rp-panel rp-anim-fade-in-up" ref={formRef}>
           <div className="rp-panel-title">{editingId ? `Edit ${itemNoun}` : `Add ${itemNoun}`}</div>
           <div className="rp-row rp-gap-sm">
             <div className="section-block" style={{ flex: 1 }}>
@@ -131,8 +131,9 @@ export default function CatalogManager({ title, subtitle, itemNoun, client, mana
             </div>
           </div>
           <div className="rp-toolbar">
-            <button className="primary" type="button" disabled={saving || !code.trim()} onClick={save}>
-              {saving ? '…' : editingId ? 'Save changes' : `Add ${itemNoun}`}
+            <button className="primary" type="button" disabled={saving || !code.trim()} aria-busy={saving} onClick={save}>
+              {saving && <span className="rp-spinner sm" aria-hidden />}
+              {saving ? 'Saving…' : editingId ? 'Save changes' : `Add ${itemNoun}`}
             </button>
             {editingId && (
               <button className="ghost" type="button" disabled={saving} onClick={resetForm}>
@@ -143,32 +144,37 @@ export default function CatalogManager({ title, subtitle, itemNoun, client, mana
         </div>
       )}
 
-      <div className="rp-panel">
+      <div className="rp-panel" aria-live="polite" aria-busy={items === null}>
         <div className="rp-panel-title">{title}</div>
-        <ul className="rp-list">
-          <li className="rp-row between rp-divider-row">
-            <span className="rp-stat-label rp-cell f1">Code</span>
-            <span className="rp-stat-label rp-cell f2">Display name</span>
-            {canManage && <span className="rp-stat-label rp-cell f1 r">Actions</span>}
-          </li>
-          {items === null && <li className="rp-page-sub rp-divider-row">Loading…</li>}
-          {items !== null && items.length === 0 && (
-            <li className="rp-page-sub rp-divider-row">No {itemNoun} entries yet.</li>
-          )}
-          {(items ?? []).map((item) => (
-            <li key={item.id} className="rp-row between rp-divider-row">
-              <span className="rp-cell f1"><code>{item.code}</code></span>
-              <span className="rp-cell f2">{item.name || '—'}</span>
-              {canManage && (
-                <span className="rp-cell f1 r rp-row rp-gap-sm" style={{ justifyContent: 'flex-end' }}>
-                  <button className="ghost" type="button" onClick={() => startEdit(item)}>Edit</button>
-                  <button className="ghost" type="button" onClick={() => remove(item)}>Delete</button>
-                </span>
-              )}
+        {items === null ? (
+          <TableSkeleton rows={5} cols={canManage ? 3 : 2} />
+        ) : items.length === 0 ? (
+          <EmptyState
+            title={`No ${itemNoun} entries yet`}
+            description={canManage ? `Add your first ${itemNoun} using the form above.` : `No ${itemNoun} entries have been configured yet.`}
+          />
+        ) : (
+          <ul className="rp-list">
+            <li className="rp-row between rp-divider-row">
+              <span className="rp-stat-label rp-cell f1">Code</span>
+              <span className="rp-stat-label rp-cell f2">Display name</span>
+              {canManage && <span className="rp-stat-label rp-cell f1 r">Actions</span>}
             </li>
-          ))}
-        </ul>
+            {items.map((item) => (
+              <li key={item.id} className="rp-row between rp-divider-row">
+                <span className="rp-cell f1"><code>{item.code}</code></span>
+                <span className="rp-cell f2">{item.name || '—'}</span>
+                {canManage && (
+                  <span className="rp-cell f1 r rp-row rp-gap-sm" style={{ justifyContent: 'flex-end' }}>
+                    <button className="ghost" type="button" onClick={() => startEdit(item)}>Edit</button>
+                    <button className="ghost" type="button" onClick={() => remove(item)}>Delete</button>
+                  </span>
+                )}
+              </li>
+            ))}
+          </ul>
+        )}
       </div>
-    </div>
+    </Container>
   );
 }

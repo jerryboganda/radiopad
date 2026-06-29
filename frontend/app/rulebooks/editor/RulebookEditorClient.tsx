@@ -6,6 +6,7 @@ import { api } from '@/lib/api';
 import { readQueryParam } from '@/lib/browserParams';
 import { statusBadge } from '@/lib/rulebookStatus';
 import Container from '@/components/shell/Container';
+import Banner from '@/components/ui/Banner';
 import {
   type RulebookEditorState,
   emptyEditorState,
@@ -109,26 +110,32 @@ export default function RulebookEditorClient() {
         </div>
         <div className="rp-row rp-gap-sm">
           <button className="ghost" onClick={handleCancel} disabled={busy}>Cancel</button>
-          <button className="ghost" onClick={handleValidate} disabled={busy}>Validate</button>
-          <button className="primary" onClick={handleSave} disabled={busy}>Save</button>
-          <button className="primary-ghost" onClick={handlePublish} disabled={busy}>Publish</button>
+          <button className="ghost" onClick={handleValidate} disabled={busy} aria-busy={busy}>
+            {busy && <span className="rp-spinner sm" aria-hidden />} Validate
+          </button>
+          <button className="primary" onClick={handleSave} disabled={busy} aria-busy={busy}>
+            {busy && <span className="rp-spinner sm" aria-hidden />} Save
+          </button>
+          <button className="primary-ghost" onClick={handlePublish} disabled={busy} aria-busy={busy}>
+            {busy && <span className="rp-spinner sm" aria-hidden />} Publish
+          </button>
         </div>
       </div>
 
-      {error && <div className="banner danger">{error}</div>}
-      {problems !== null && problems.length === 0 && (
-        <div className="banner ok" style={{ marginBottom: 12 }}>
-          <span className="badge ok">OK — schema valid</span>
-        </div>
-      )}
-      {problems !== null && problems.length > 0 && (
-        <div style={{ marginBottom: 12 }}>
-          {problems.map((p, i) => <div key={i} className="finding warning">{p}</div>)}
-        </div>
-      )}
+      <div aria-live="polite">
+        {error && <Banner tone="danger" title="Couldn't complete that">{error}</Banner>}
+        {problems !== null && problems.length === 0 && (
+          <Banner tone="success" title="Schema valid">No problems found.</Banner>
+        )}
+        {problems !== null && problems.length > 0 && (
+          <div style={{ marginBottom: 12 }}>
+            {problems.map((p, i) => <div key={i} className="finding warning">{p}</div>)}
+          </div>
+        )}
+      </div>
 
       {/* Main split layout */}
-      <div className="split rp-editor-split">
+      <div className="split rp-editor-split rp-anim-fade-in-up">
         {/* Left pane — visual editor */}
         <section className="pane" style={{ overflow: 'auto', maxHeight: 'calc(100vh - 200px)' }}>
           <MetadataPanel data={state} onChange={setState} />

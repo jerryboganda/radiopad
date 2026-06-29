@@ -8,6 +8,7 @@ import PageHeader from '@/components/shell/PageHeader';
 import EmptyState from '@/components/ui/EmptyState';
 import ErrorState from '@/components/ui/ErrorState';
 import Skeleton from '@/components/ui/Skeleton';
+import Banner from '@/components/ui/Banner';
 
 /**
  * Iter-35 PROV-007 — admin surface for the per-provider OAuth refresh-token
@@ -144,13 +145,13 @@ export default function ProviderOAuthAdminPage() {
         description="Some AI models need an extra sign-in token that lets RadioPad reconnect to them automatically. Tokens are stored encrypted and never shown back to anyone, including IT."
       />
 
-      {error && <div className="banner warn">{error}</div>}
-      {info && <div className="banner ok">{info}</div>}
+      {error && <Banner tone="warn" onDismiss={() => setError(null)}>{error}</Banner>}
+      {info && <Banner tone="success" onDismiss={() => setInfo(null)}>{info}</Banner>}
 
-      <div className="rp-panel">
+      <div className="rp-panel rp-anim-fade-in-up">
         <div className="rp-panel-title">Status</div>
         {status === null ? (
-          <p className="rp-page-sub">Loading…</p>
+          <Skeleton variant="block" height={120} />
         ) : (
           <ul className="rp-list">
             <li>
@@ -165,14 +166,19 @@ export default function ProviderOAuthAdminPage() {
           </ul>
         )}
         <div className="rp-row" style={{ marginTop: 8 }}>
-          <button className="ghost" onClick={refresh} disabled={busy}>Refresh</button>
+          <button className="ghost" onClick={refresh} disabled={busy} aria-busy={busy}>
+            {busy && <span className="rp-spinner sm" aria-hidden />}
+            Refresh
+          </button>
           {status?.hasToken && (
             <button
               className="subtle"
               style={{ marginLeft: 8 }}
               onClick={remove}
               disabled={busy}
+              aria-busy={busy}
             >
+              {busy && <span className="rp-spinner sm" aria-hidden />}
               Delete token
             </button>
           )}
@@ -221,7 +227,8 @@ export default function ProviderOAuthAdminPage() {
           <option value="never">never — manual rotation only</option>
         </select>
         <div className="rp-row" style={{ marginTop: 12 }}>
-          <button className="primary" onClick={save} disabled={busy || !token}>
+          <button className="primary" onClick={save} disabled={busy || !token} aria-busy={busy}>
+            {busy && <span className="rp-spinner sm" aria-hidden />}
             {status?.hasToken ? 'Replace token' : 'Save token'}
           </button>
         </div>

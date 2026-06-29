@@ -2,8 +2,12 @@
 
 import PermissionGate from '@/components/ui/PermissionGate';
 
-import { useEffect, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import { api, type WebAuthnCredentialRow } from '@/lib/api';
+import Container from '@/components/shell/Container';
+import PageHeader from '@/components/shell/PageHeader';
+import Banner from '@/components/ui/Banner';
+import EmptyState from '@/components/ui/EmptyState';
 
 type Profile = {
   name: string;
@@ -60,29 +64,37 @@ function SsoAdminPageInner() {
   const [error, setError] = useState<string | null>(null);
   const profile = PRESETS.find((p) => p.name === selected) ?? PRESETS[0];
 
-  useEffect(() => {
+  const loadCreds = useCallback(() => {
+    setError(null);
     api.auth.webAuthnCredentials()
       .then(setCreds)
       .catch((e: Error) => setError(e.message));
   }, []);
 
-  return (
-    <div className="rp-container">
-      <header className="rp-page-header">
-        <div className="rp-page-header-text">
-          <h1 className="rp-page-title">Single sign-on (SSO)</h1>
-          <p className="rp-page-sub">
-            Let your team sign in to RadioPad using your hospital&apos;s existing identity system, so they don&apos;t need a separate password.
-          </p>
-        </div>
-      </header>
+  useEffect(() => {
+    loadCreds();
+  }, [loadCreds]);
 
-      {error && <div className="banner warn">{error}</div>}
+  return (
+    <Container>
+      <PageHeader
+        title="Single sign-on (SSO)"
+        description="Let your team sign in to RadioPad using your hospital's existing identity system, so they don't need a separate password."
+      />
+
+      <div aria-live="polite">
+        {error && (
+          <Banner tone="warn" title="Couldn't load passkey enrolments">
+            {error}{' '}
+            <button type="button" className="subtle" onClick={loadCreds}>Try again</button>
+          </Banner>
+        )}
+      </div>
 
       <div className="rp-page-grid">
-        <div className="rp-page-main">
+        <div className="rp-page-main rp-stagger">
 
-      <div className="rp-panel">
+      <div className="rp-panel rp-anim-fade-in-up">
         <div className="rp-panel-title">Identity system setup</div>
         <p className="rp-page-sub">
           Pick the identity system your hospital uses, then share the notes below with your IT team. They&apos;ll finish the setup.
@@ -120,7 +132,7 @@ function SsoAdminPageInner() {
         </details>
       </div>
 
-      <details className="rp-panel rp-advanced">
+      <details className="rp-panel rp-advanced rp-anim-fade-in-up">
         <summary className="rp-panel-title" style={{ cursor: 'pointer' }}>SAML 2.0 (IT team only)</summary>
         <p className="rp-page-sub">
           The service-provider metadata document is at{' '}
@@ -134,14 +146,17 @@ function SsoAdminPageInner() {
         </a>
       </details>
 
-      <div className="rp-panel">
+      <div className="rp-panel rp-anim-fade-in-up">
         <div className="rp-panel-title">Passkeys / fingerprint sign-in</div>
         <p className="rp-page-sub">
           Lets each radiologist sign in with a fingerprint or device PIN instead of a password.
           Users enrol from their own profile page. You can see who&apos;s enrolled below.
         </p>
         {creds.length === 0 ? (
-          <p className="rp-page-sub">No one&apos;s enrolled a passkey yet.</p>
+          <EmptyState
+            title="No passkeys enrolled yet"
+            description="Radiologists enrol a fingerprint or device PIN from their own profile page. Once they do, they'll appear here."
+          />
         ) : (
           <table className="rp-table">
             <thead>
@@ -176,6 +191,6 @@ function SsoAdminPageInner() {
           </div>
         </aside>
       </div>
-    </div>
+    </Container>
   );
 }

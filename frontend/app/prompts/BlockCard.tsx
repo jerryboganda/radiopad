@@ -70,11 +70,12 @@ export default function BlockCard({
       <div className="rp-block-footer">
         <span className="rp-block-count">{body.length.toLocaleString()} chars</span>
         {dirty ? (
-          <div className="rp-block-actions">
+          <div className="rp-block-actions rp-anim-slide-left">
             <button type="button" className="subtle" onClick={onReset} disabled={saving}>
               Reset
             </button>
-            <button type="button" className="primary" onClick={onSave} disabled={saving}>
+            <button type="button" className="primary" onClick={onSave} disabled={saving} aria-busy={saving}>
+              {saving && <span className="rp-spinner sm" aria-hidden />}
               {saving ? 'Saving…' : 'Save draft'}
             </button>
           </div>

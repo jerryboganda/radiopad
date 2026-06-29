@@ -1,5 +1,6 @@
 import './globals.css';
 import './hallmark.css';
+import './motion.css';
 import './radiopad.css';
 import './shell.css';
 import type { ReactNode } from 'react';

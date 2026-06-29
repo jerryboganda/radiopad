@@ -11,6 +11,8 @@
 
 import { useState } from 'react';
 import { api } from '@/lib/api';
+import Banner from '@/components/ui/Banner';
+import StatusBadge from '@/components/ui/StatusBadge';
 
 type Props = {
   reportId: string;
@@ -79,10 +81,10 @@ export default function RewriteStylePanel({
   }
 
   return (
-    <div className="rp-panel">
+    <div className="rp-panel rp-anim-scale-in">
       <div className="rp-panel-title">
         Rewrite in my style
-        <span className="badge ai">AI</span>
+        <StatusBadge tone="ai">AI</StatusBadge>
       </div>
       <p className="rp-page-sub">
         Paste {MIN_SAMPLES}–{MAX_SAMPLES} of your prior reports below. RadioPad
@@ -92,7 +94,7 @@ export default function RewriteStylePanel({
         applies.
       </p>
 
-      {error && <div className="banner warn">{error}</div>}
+      {error && <Banner tone="warn" onDismiss={() => setError(null)}>{error}</Banner>}
 
       <ul className="rp-list">
         {samples.map((s, i) => (
@@ -129,7 +131,8 @@ export default function RewriteStylePanel({
         >
           + Add sample
         </button>
-        <button className="primary" onClick={learnAndRewrite} disabled={!canLearn}>
+        <button className="primary-ghost" onClick={learnAndRewrite} disabled={!canLearn} aria-busy={busy}>
+          {busy && <span className="rp-spinner sm" aria-hidden />}
           {busy ? 'Learning…' : 'Learn my style'}
         </button>
         <span className="rp-page-sub">
@@ -138,10 +141,10 @@ export default function RewriteStylePanel({
       </div>
 
       {draft && (
-        <>
+        <div className="rp-anim-fade-in-up">
           <div className="rp-panel-title rp-mt-sm">
             Proposed rewrite
-            <span className="badge ai">AI draft</span>
+            <StatusBadge tone="ai">AI draft</StatusBadge>
           </div>
           {draft.fingerprint && (
             <p className="rp-page-sub">
@@ -173,7 +176,7 @@ export default function RewriteStylePanel({
               {showDiff ? 'Hide diff' : 'Diff'}
             </button>
           </div>
-        </>
+        </div>
       )}
     </div>
   );

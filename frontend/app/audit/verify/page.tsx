@@ -2,6 +2,9 @@
 
 import { useEffect, useState } from 'react';
 import { api } from '@/lib/api';
+import Container from '@/components/shell/Container';
+import PageHeader from '@/components/shell/PageHeader';
+import ErrorState from '@/components/ui/ErrorState';
 
 type AuditEvent = {
   id: string;
@@ -55,29 +58,41 @@ export default function AuditVerifyPage() {
   const broken = results.filter((r) => !r.ok).length;
 
   return (
-    <div className="rp-container">
-      <h1 className="rp-page-title">Audit chain verifier</h1>
-      <p className="rp-page-sub">
-        Recomputes the SHA-256 hash chain in your browser and flags any row whose stored{' '}
-        <code>integrityChain</code> diverges from the recomputed value. Tampering with any prior
-        row breaks the chain at that row and at every row after it.
-      </p>
+    <Container>
+      <PageHeader
+        title="Audit chain verifier"
+        description={
+          <>
+            Recomputes the SHA-256 hash chain in your browser and flags any row whose stored{' '}
+            <code>integrityChain</code> diverges from the recomputed value. Tampering with any prior
+            row breaks the chain at that row and at every row after it.
+          </>
+        }
+      />
 
-      {error && <div className="banner warn">{error}</div>}
+      {error && <ErrorState message={error} />}
 
       <div className="rp-toolbar">
-        <button className="primary" onClick={verify} disabled={busy || events.length === 0}>
+        <button
+          className="primary"
+          onClick={verify}
+          disabled={busy || events.length === 0}
+          aria-busy={busy}
+        >
+          {busy && <span className="rp-spinner sm" aria-hidden />}
           {busy ? 'Verifying…' : `Verify ${events.length} events`}
         </button>
-        {results.length > 0 && (
-          broken === 0
-            ? <span className="badge ok">Chain intact ({results.length} rows)</span>
-            : <span className="badge danger">{broken} broken row{broken === 1 ? '' : 's'}</span>
-        )}
+        <span aria-live="polite">
+          {results.length > 0 && (
+            broken === 0
+              ? <span className="badge ok">Chain intact ({results.length} rows)</span>
+              : <span className="badge danger">{broken} broken row{broken === 1 ? '' : 's'}</span>
+          )}
+        </span>
       </div>
 
       {results.length > 0 && (
-        <div className="rp-panel">
+        <div className="rp-panel rp-anim-fade-in-up">
           <table className="rp-table">
             <thead>
               <tr><th>Event</th><th>Expected (stored)</th><th>Computed</th><th>Status</th></tr>
@@ -95,6 +110,6 @@ export default function AuditVerifyPage() {
           </table>
         </div>
       )}
-    </div>
+    </Container>
   );
 }

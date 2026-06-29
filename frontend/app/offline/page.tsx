@@ -8,6 +8,10 @@ import {
   saveOfflineDraft,
   type OfflineDraft,
 } from '@/lib/offlineDrafts';
+import Container from '@/components/shell/Container';
+import PageHeader from '@/components/shell/PageHeader';
+import EmptyState from '@/components/ui/EmptyState';
+import Banner from '@/components/ui/Banner';
 
 /**
  * PRD MOB-005 — visibility into the offline-draft buffer. Lets the radiologist
@@ -63,33 +67,32 @@ export default function OfflineDraftsPage() {
   }
 
   return (
-    <div>
-      <header className="rp-page-header">
-        <div className="rp-page-header-text">
-          <h1 className="rp-page-title">Offline drafts</h1>
-          <p className="rp-page-sub">
-            Drafts you wrote while your device was offline. They&apos;ll sync back to the server automatically when you reconnect — or you can sync them now.
-          </p>
-        </div>
-      </header>
+    <Container>
+      <PageHeader
+        title="Offline drafts"
+        description="Drafts you wrote while your device was offline. They'll sync back to the server automatically when you reconnect — or you can sync them now."
+      />
 
-      <div className="rp-panel">
+      <div className="rp-panel" aria-live="polite" aria-busy={busy}>
         <div className="rp-panel-title">
           {drafts.length} draft{drafts.length === 1 ? '' : 's'} waiting
         </div>
         <div style={{ display: 'flex', gap: 8, marginBottom: 12 }}>
-          <button className="primary" disabled={busy} onClick={onSync}>
+          <button className="primary" disabled={busy} aria-busy={busy} onClick={onSync}>
+            {busy && <span className="rp-spinner sm" aria-hidden />}
             {busy ? 'Syncing…' : 'Sync now'}
           </button>
           <button className="ghost" onClick={refresh}>Refresh</button>
         </div>
-        {msg && <p className="rp-page-sub">{msg}</p>}
+        {msg && <Banner tone="success">{msg}</Banner>}
 
-        {drafts.length === 0 && (
-          <p className="rp-page-sub">No offline drafts. Any new drafts you write while offline will appear here.</p>
-        )}
-
-        <ul style={{ listStyle: 'none', padding: 0, margin: 0 }}>
+        {drafts.length === 0 ? (
+          <EmptyState
+            title="No offline drafts"
+            description="Any new drafts you write while offline will appear here, ready to sync when you reconnect."
+          />
+        ) : (
+        <ul className="rp-stagger" style={{ listStyle: 'none', padding: 0, margin: 0 }}>
           {drafts.map((d) => (
             <li key={d.localId} className="rp-panel" style={{ marginTop: 12 }}>
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 12 }}>
@@ -112,10 +115,11 @@ export default function OfflineDraftsPage() {
             </li>
           ))}
         </ul>
+        )}
       </div>
 
       {editingId && draftBuf && (
-        <div className="rp-panel">
+        <div className="rp-panel rp-anim-fade-in-up">
           <div className="rp-panel-title">Edit draft</div>
           <label className="rp-field">
             <span>Findings</span>
@@ -150,6 +154,6 @@ export default function OfflineDraftsPage() {
           </div>
         </div>
       )}
-    </div>
+    </Container>
   );
 }

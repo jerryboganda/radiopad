@@ -1,6 +1,7 @@
 'use client';
 
 import type { ValidationResult } from '@/lib/api';
+import Banner from '@/components/ui/Banner';
 
 type ValidationFindingSeverity = ValidationResult['findings'][number]['severity'];
 
@@ -68,13 +69,16 @@ export default function TestRunnerTab({
           type="button"
           className="primary"
           disabled={running || disabled || !value.trim()}
+          aria-busy={running}
           onClick={onRun}
         >
+          {running && <span className="rp-spinner sm" aria-hidden />}
           {running ? 'Running…' : 'Run test'}
         </button>
       </div>
 
-      {error ? <div className="rp-banner danger">{error}</div> : null}
+      <div aria-live="polite" aria-busy={running}>
+      {error ? <Banner tone="danger" title="Test failed">{error}</Banner> : null}
 
       {result ? (
         <>
@@ -100,7 +104,7 @@ export default function TestRunnerTab({
           </div>
 
           {result.findings.length > 0 ? (
-            <ul className="rp-list rp-mt-sm">
+            <ul className="rp-list rp-mt-sm rp-stagger">
               {result.findings.map((f, i) => (
                 <li key={`${f.ruleId}-${i}`} className={`finding ${severityClass(f.severity)}`}>
                   {f.message}
@@ -113,6 +117,7 @@ export default function TestRunnerTab({
           )}
         </>
       ) : null}
+      </div>
     </div>
   );
 }

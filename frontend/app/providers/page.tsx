@@ -6,6 +6,7 @@ import Container from '@/components/shell/Container';
 import PageHeader from '@/components/shell/PageHeader';
 import EmptyState from '@/components/ui/EmptyState';
 import ErrorState from '@/components/ui/ErrorState';
+import Banner from '@/components/ui/Banner';
 import { TableSkeleton } from '@/components/ui/Skeleton';
 import OnDeviceModels from './OnDeviceModels';
 
@@ -179,18 +180,20 @@ export default function ProvidersPage() {
         primaryAction={tab === 'cloud' ? <button className="primary" onClick={newProvider}>+ Add a model</button> : undefined}
       />
 
-      <div className="rp-row" style={{ gap: 8, marginBottom: 16 }}>
-        <button className={tab === 'cloud' ? 'primary' : 'subtle'} onClick={() => selectTab('cloud')}>Cloud providers</button>
-        <button className={tab === 'on-device' ? 'primary' : 'subtle'} onClick={() => selectTab('on-device')}>On-device models</button>
+      <div className="tab-list" role="tablist" aria-label="Provider types" style={{ marginBottom: 16 }}>
+        <button className="tab-button" role="tab" aria-selected={tab === 'cloud'} onClick={() => selectTab('cloud')}>Cloud providers</button>
+        <button className="tab-button" role="tab" aria-selected={tab === 'on-device'} onClick={() => selectTab('on-device')}>On-device models</button>
       </div>
 
       {tab === 'on-device' && <OnDeviceModels />}
 
       {tab === 'cloud' && (
       <>
-      {error && items.length > 0 && <div className="banner warn">{error}</div>}
+      {error && items.length > 0 && (
+        <Banner tone="warn" onDismiss={() => setError(null)}>{error}</Banner>
+      )}
 
-      <div className="rp-panel">
+      <div className="rp-panel" aria-live="polite" aria-busy={loading}>
         <div className="rp-panel-title">Available models</div>
         {loading && items.length === 0 ? (
           <TableSkeleton rows={6} cols={8} />
@@ -253,7 +256,7 @@ export default function ProvidersPage() {
 
       {draft && (
         <div className="rp-modal-backdrop" onClick={() => setDraft(null)}>
-          <div className="rp-panel rp-modal" onClick={(e) => e.stopPropagation()}>
+          <div className="rp-panel rp-modal rp-anim-scale-in" role="dialog" aria-modal="true" onClick={(e) => e.stopPropagation()}>
             <div className="rp-panel-title">{draft.id ? 'Edit provider' : 'New provider'}</div>
 
             <label className="rp-field">
@@ -391,7 +394,8 @@ export default function ProvidersPage() {
 
             <div className="rp-row" style={{ justifyContent: 'flex-end', gap: 8, marginTop: 12 }}>
               <button className="ghost" onClick={() => setDraft(null)} disabled={saving}>Cancel</button>
-              <button className="primary" onClick={save} disabled={saving || !draft.name}>
+              <button className="primary" onClick={save} disabled={saving || !draft.name} aria-busy={saving}>
+                {saving && <span className="rp-spinner sm" aria-hidden />}
                 {saving ? 'Saving…' : 'Save'}
               </button>
             </div>
@@ -467,7 +471,7 @@ function SandboxComparePanel({ providers }: { providers: Provider[] }) {
         Draft outputs stay governed by workspace policy.
       </p>
 
-      {err && <div className="banner warn">{err}</div>}
+      {err && <Banner tone="warn">{err}</Banner>}
 
       {reportsLoading ? (
         <TableSkeleton rows={2} cols={3} />
@@ -521,13 +525,14 @@ function SandboxComparePanel({ providers }: { providers: Provider[] }) {
       </div>
 
       <div className="rp-row" style={{ justifyContent: 'flex-end', gap: 8, marginTop: 12 }}>
-        <button className="primary" onClick={run} disabled={!canRun}>
+        <button className="primary" onClick={run} disabled={!canRun} aria-busy={busy}>
+          {busy && <span className="rp-spinner sm" aria-hidden />}
           {busy ? 'Comparing…' : 'Compare'}
         </button>
       </div>
 
       {runs && (
-        <div className={cols} style={{ marginTop: 12 }}>
+        <div className={`${cols} rp-stagger`} style={{ marginTop: 12 }} aria-live="polite">
           {runs.map((r) => (
             <div key={r.providerId} className="rp-panel">
               <div className="rp-panel-title" style={{ marginBottom: 4 }}>{r.provider}</div>

@@ -124,6 +124,7 @@
 }
 
 .rp-sidebar-item {
+  position: relative;
   display: flex;
   align-items: center;
   gap: 10px;
@@ -133,9 +134,24 @@
   color: var(--text);
   text-decoration: none;
   border: 1px solid transparent;
-  transition: background 120ms ease, color 120ms ease, border-color 120ms ease;
+  transition: background var(--transition-fast), color var(--transition-fast),
+    border-color var(--transition-fast), transform var(--transition-fast);
   min-width: 0;
   white-space: nowrap;
+}
+
+/* Animated active indicator — an accent bar that grows in on the leading edge. */
+.rp-sidebar-item::before {
+  content: '';
+  position: absolute;
+  inset-inline-start: 2px;
+  top: 50%;
+  width: 3px;
+  height: 0;
+  border-radius: var(--radius-pill);
+  background: var(--accent);
+  transform: translateY(-50%);
+  transition: height var(--transition-base);
 }
 
 .rp-sidebar-item .rp-sidebar-icon {
@@ -145,6 +161,7 @@
   color: var(--text-muted);
   display: grid;
   place-items: center;
+  transition: transform var(--transition-fast), color var(--transition-fast);
 }
 
 /* lucide-react renders <svg width=24>; pin it to the 16px icon box. */
@@ -160,6 +177,8 @@
   background: var(--bg-subtle);
   color: var(--text-strong);
 }
+.rp-sidebar-item:hover .rp-sidebar-icon { color: var(--accent); transform: scale(1.12); }
+.rp-sidebar-item:active { transform: scale(0.99); }
 
 .rp-sidebar-item:focus-visible {
   outline: 2px solid var(--accent);
@@ -167,9 +186,15 @@
 }
 
 .rp-sidebar-item.active {
-  background: var(--color-accent-soft);
-  color: var(--color-accent-deep);
+  background: var(--accent-tint);
+  color: var(--accent-strong);
   font-weight: 600;
+}
+.rp-sidebar-item.active::before { height: 58%; }
+/* Keep the active affordance visible while hovering the active item. */
+.rp-sidebar-item.active:hover {
+  background: color-mix(in oklch, var(--accent-tint), var(--accent-soft) 45%);
+  color: var(--accent-strong);
 }
 
 .rp-sidebar-item.active .rp-sidebar-icon { color: var(--accent); }
@@ -308,12 +333,27 @@
 }
 
 .rp-breadcrumbs a {
+  position: relative;
   color: var(--text-muted);
   text-decoration: none;
   white-space: nowrap;
+  transition: color var(--transition-fast);
+}
+.rp-breadcrumbs a::after {
+  content: '';
+  position: absolute;
+  inset-inline-start: 0;
+  bottom: -2px;
+  width: 100%;
+  height: 1.5px;
+  background: var(--accent);
+  transform: scaleX(0);
+  transform-origin: left center;
+  transition: transform var(--transition-base);
 }
 
 .rp-breadcrumbs a:hover { color: var(--text); }
+.rp-breadcrumbs a:hover::after { transform: scaleX(1); }
 
 .rp-breadcrumbs .rp-breadcrumb-sep {
   color: var(--text-faint);
@@ -382,6 +422,7 @@
 .rp-update-btn:disabled { cursor: default; color: var(--text-muted); }
 
 .rp-update.is-available .rp-update-btn { color: var(--accent); border-color: var(--accent); }
+.rp-update.is-available .rp-update-dot { animation: rp-pulse-soft 1.6s var(--ease-in-out) infinite; }
 .rp-update.is-uptodate .rp-update-btn { color: var(--green); }
 .rp-update.is-error .rp-update-btn { color: var(--red); }
 
@@ -525,6 +566,15 @@
   flex: 0 0 auto;
 }
 
+/* Page-header entrance — title / subtitle / actions stagger in on mount
+   (replays on every route change via <PageTransition>). */
+.rp-page-title { animation: rp-fade-in-up var(--anim-base) var(--ease-out) both; }
+.rp-page-sub { animation: rp-fade-in-up var(--anim-base) var(--ease-out) both; animation-delay: var(--delay-1); }
+.rp-page-actions { animation: rp-fade-in var(--anim-base) var(--ease-out) both; animation-delay: var(--delay-2); }
+@media (prefers-reduced-motion: reduce) {
+  .rp-page-title, .rp-page-sub, .rp-page-actions { animation: none !important; }
+}
+
 /* -------- Mobile drawer ------------------------------------------- */
 .rp-drawer-backdrop {
   position: fixed;
@@ -584,6 +634,8 @@
   flex-direction: column;
   gap: 2px;
   z-index: calc(var(--rp-shell-z-drawer) + 1);
+  transform-origin: bottom center;
+  animation: rp-pop-in var(--anim-fast) var(--ease-pop) both;
 }
 
 .rp-profile-popover-item {
@@ -600,7 +652,9 @@
   text-align: left;
   text-decoration: none;
 }
+.rp-profile-popover-item { transition: background var(--transition-fast), color var(--transition-fast), transform var(--transition-fast); }
 .rp-profile-popover-item:hover { background: var(--bg-subtle); }
+.rp-profile-popover-item:active { transform: scale(0.985); }
 .rp-profile-popover-item:focus-visible { outline: 2px solid var(--accent); outline-offset: -2px; }
 
 /* Checkbox rows (Dictation): the labels wrap to 2–3 lines in the narrow
@@ -685,6 +739,7 @@
   border-radius: var(--radius);
   background: var(--bg-panel);
   color: var(--text-muted);
+  animation: rp-fade-in-up var(--anim-base) var(--ease-out) both;
 }
 
 .rp-empty-icon,
@@ -697,6 +752,12 @@
   background: var(--bg-subtle);
   color: var(--text-soft);
   margin-bottom: 4px;
+  animation: rp-scale-in var(--anim-slow) var(--ease-spring) both;
+  animation-delay: 70ms;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .rp-empty, .rp-error, .rp-empty-icon, .rp-error-icon { animation: none !important; }
 }
 
 .rp-error-icon { background: var(--red-bg); color: var(--red); }

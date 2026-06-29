@@ -32,6 +32,9 @@ import {
 } from '@/lib/api';
 import { ROLE_LABELS } from '@/lib/roles';
 import { can } from '@/lib/permissions';
+import Banner from '@/components/ui/Banner';
+import AnimatedNumber from '@/components/ui/AnimatedNumber';
+import { TableSkeleton } from '@/components/ui/Skeleton';
 
 type Me = Awaited<ReturnType<typeof api.me>>;
 type AnalyticsSummary = Awaited<ReturnType<typeof api.analytics.summary>>;
@@ -119,7 +122,8 @@ export default function AdminGovernancePage() {
   if (loading) {
     return (
       <div className="rp-container">
-        <p className="rp-page-sub">Loading governance signals…</p>
+        <h1 className="rp-page-title">Oversight dashboard</h1>
+        <div className="rp-panel"><TableSkeleton rows={6} cols={6} /></div>
       </div>
     );
   }
@@ -180,10 +184,28 @@ export default function AdminGovernancePage() {
       </p>
 
       {errors.length > 0 && (
-        <div className="banner warn">
-          Some signals could not be loaded: {errors.join('; ')}.
-        </div>
+        <Banner tone="warn">Some signals could not be loaded: {errors.join('; ')}.</Banner>
       )}
+
+      {/* Summary metrics --------------------------------------------------- */}
+      <div className="metric-grid rp-stagger rp-mb-md" data-testid="governance-summary">
+        <div className="metric-card" data-tone="info">
+          <div className="metric-card-value"><AnimatedNumber value={aiRequests} /></div>
+          <div className="metric-card-label">AI requests · window</div>
+        </div>
+        <div className="metric-card" data-tone={phiBlocks > 0 ? 'review' : 'ready'}>
+          <div className="metric-card-value"><AnimatedNumber value={phiBlocks} /></div>
+          <div className="metric-card-label">PHI requests blocked</div>
+        </div>
+        <div className="metric-card" data-tone="ready">
+          <div className="metric-card-value"><AnimatedNumber value={validationTotals.passed} /></div>
+          <div className="metric-card-label">Validation passed</div>
+        </div>
+        <div className="metric-card" data-tone={validationTotals.failed > 0 ? 'blocked' : 'ready'}>
+          <div className="metric-card-value"><AnimatedNumber value={validationTotals.failed} /></div>
+          <div className="metric-card-label">Validation failed</div>
+        </div>
+      </div>
 
       {/* 1 — Model inventory ------------------------------------------------ */}
       <div className="rp-panel" data-testid="panel-model-inventory">
@@ -226,9 +248,15 @@ export default function AdminGovernancePage() {
                         ) : (
                           <span className="rp-faint">not yet probed</span>
                         )}
-                        <button className="subtle" onClick={() => probeHealth(p)}>
-                          Probe
-                        </button>
+                        {(() => {
+                          const probing = health?.message === 'probing…';
+                          return (
+                            <button className="subtle" onClick={() => probeHealth(p)} disabled={probing} aria-busy={probing}>
+                              {probing && <span className="rp-spinner sm" aria-hidden />}
+                              Probe
+                            </button>
+                          );
+                        })()}
                       </div>
                     </td>
                   </tr>

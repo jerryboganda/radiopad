@@ -29,6 +29,8 @@ import {
 } from '@/lib/api';
 import { ROLE_LABELS } from '@/lib/roles';
 import { can } from '@/lib/permissions';
+import Banner from '@/components/ui/Banner';
+import { TableSkeleton } from '@/components/ui/Skeleton';
 
 type Me = Awaited<ReturnType<typeof api.me>>;
 type ValidationPackRow = Awaited<ReturnType<typeof api.validationPacks.list>>[number];
@@ -161,7 +163,8 @@ export default function AdminModelEvalPage() {
   if (loading) {
     return (
       <div className="rp-container">
-        <p className="rp-page-sub">Loading model-eval harness…</p>
+        <h1 className="rp-page-title">Compare AI models</h1>
+        <div className="rp-panel"><TableSkeleton rows={5} cols={4} /></div>
       </div>
     );
   }
@@ -198,9 +201,7 @@ export default function AdminModelEvalPage() {
       </p>
 
       {errors.length > 0 && (
-        <div className="banner warn">
-          {errors.join('; ')}
-        </div>
+        <Banner tone="warn">{errors.join('; ')}</Banner>
       )}
 
       {/* Configuration form ------------------------------------------------ */}
@@ -309,7 +310,9 @@ export default function AdminModelEvalPage() {
             disabled={!canRun}
             onClick={runEvaluation}
             data-testid="run-eval"
+            aria-busy={running}
           >
+            {running && <span className="rp-spinner sm" aria-hidden />}
             {running ? 'Running…' : 'Run evaluation'}
           </button>
         </div>
@@ -317,7 +320,7 @@ export default function AdminModelEvalPage() {
 
       {/* Validation pack result -------------------------------------------- */}
       {packResult && (
-        <div className="rp-panel" data-testid="panel-pack-result">
+        <div className="rp-panel rp-anim-fade-in-up" data-testid="panel-pack-result" aria-live="polite">
           <div className="rp-panel-title">Golden-case validation</div>
           <div className="rp-row rp-gap-sm">
             <span className="badge ok">{packResult.passed} passed</span>
@@ -331,7 +334,7 @@ export default function AdminModelEvalPage() {
 
       {/* Per-provider results table ---------------------------------------- */}
       {evalRows.length > 0 && (
-        <div className="rp-panel" data-testid="panel-eval-results">
+        <div className="rp-panel rp-anim-fade-in-up" data-testid="panel-eval-results" aria-live="polite">
           <div className="rp-panel-title">Per-provider comparison</div>
           <table className="rp-table">
             <thead>
@@ -391,7 +394,9 @@ export default function AdminModelEvalPage() {
               disabled={!rulebookId || promoteState.status === 'pending'}
               onClick={promoteToProduction}
               data-testid="promote-btn"
+              aria-busy={promoteState.status === 'pending'}
             >
+              {promoteState.status === 'pending' && <span className="rp-spinner sm" aria-hidden />}
               {promoteState.status === 'pending' ? 'Promoting…' : 'Promote rulebook'}
             </button>
           </div>
@@ -402,10 +407,14 @@ export default function AdminModelEvalPage() {
           </div>
         )}
         {promoteState.status === 'ok' && (
-          <div className="banner info rp-mt-sm">{promoteState.message}</div>
+          <div className="rp-mt-sm rp-anim-fade-in-up">
+            <Banner tone="success">{promoteState.message}</Banner>
+          </div>
         )}
         {promoteState.status === 'err' && (
-          <div className="banner danger rp-mt-sm">{promoteState.message}</div>
+          <div className="rp-mt-sm rp-anim-fade-in-up">
+            <Banner tone="danger">{promoteState.message}</Banner>
+          </div>
         )}
       </div>
     </div>

@@ -203,8 +203,9 @@ describe('admin/governance', () => {
     // Validation totals: 5 passed / 1 failed.
     expect(screen.getByText('5 passed')).toBeInTheDocument();
     expect(screen.getByText('1 failed')).toBeInTheDocument();
-    // PHI block count from analytics.
-    expect(screen.getByText('3')).toBeInTheDocument();
+    // PHI block count from analytics — now surfaced both in the top summary
+    // metric cards and the PHI-routing panel, so assert it appears (>=1).
+    expect(screen.getAllByText('3').length).toBeGreaterThan(0);
   });
 
   it('renders read-only for Compliance Reviewer (no provider mutation UI)', async () => {

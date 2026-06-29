@@ -10,6 +10,7 @@ import Container from '@/components/shell/Container';
 import PageHeader from '@/components/shell/PageHeader';
 import Skeleton from '@/components/ui/Skeleton';
 import ErrorState from '@/components/ui/ErrorState';
+import Banner from '@/components/ui/Banner';
 
 function splitCsv(csv?: string): string[] {
   return (csv || '').split(',').map((s) => s.trim()).filter(Boolean);
@@ -156,7 +157,9 @@ export default function RulebookDetailPage() {
         }
       />
 
-      {error && <div className="banner danger">{error}</div>}
+      <div aria-live="polite">
+        {error && <Banner tone="danger" title="Couldn't complete that">{error}</Banner>}
+      </div>
 
       {/* Metadata strip */}
       <div className="rp-panel">
@@ -188,10 +191,18 @@ export default function RulebookDetailPage() {
 
       {/* Lifecycle toolbar */}
       <div className="rp-toolbar">
-        <button className="ghost" onClick={validate} disabled={busy}>Validate</button>
-        <button className="primary" onClick={save} disabled={busy}>Save new version</button>
-        <button className="primary-ghost" onClick={approve} disabled={busy || status === 'Approved'}>Approve</button>
-        <button className="subtle" onClick={deprecate} disabled={busy || status === 'Deprecated'}>Deprecate</button>
+        <button className="ghost" onClick={validate} disabled={busy} aria-busy={busy}>
+          {busy && <span className="rp-spinner sm" aria-hidden />} Validate
+        </button>
+        <button className="primary" onClick={save} disabled={busy} aria-busy={busy}>
+          {busy && <span className="rp-spinner sm" aria-hidden />} Save new version
+        </button>
+        <button className="primary-ghost" onClick={approve} disabled={busy || status === 'Approved'} aria-busy={busy}>
+          {busy && <span className="rp-spinner sm" aria-hidden />} Approve
+        </button>
+        <button className="subtle" onClick={deprecate} disabled={busy || status === 'Deprecated'} aria-busy={busy}>
+          {busy && <span className="rp-spinner sm" aria-hidden />} Deprecate
+        </button>
         {versions.length > 0 && (
           <span className="rp-row" style={{ gap: 6, marginLeft: 'auto' }}>
             <select
@@ -206,7 +217,9 @@ export default function RulebookDetailPage() {
                 <option key={v.id} value={v.version}>v{v.version}</option>
               ))}
             </select>
-            <button className="subtle" onClick={rollback} disabled={busy || !rollbackVersion}>Rollback</button>
+            <button className="subtle" onClick={rollback} disabled={busy || !rollbackVersion} aria-busy={busy}>
+              {busy && <span className="rp-spinner sm" aria-hidden />} Rollback
+            </button>
           </span>
         )}
       </div>
@@ -227,7 +240,7 @@ export default function RulebookDetailPage() {
       </div>
 
       {tab === 'yaml' ? (
-        <div className="rp-panel">
+        <div className="rp-panel rp-anim-fade-in" key="yaml">
           <div className="rp-panel-title">YAML source</div>
           <textarea
             value={yaml}
@@ -235,7 +248,7 @@ export default function RulebookDetailPage() {
             style={{ minHeight: 480, fontFamily: 'var(--mono)', fontSize: 12.5 }}
           />
           {problems !== null && (
-            <div style={{ marginTop: 12 }}>
+            <div style={{ marginTop: 12 }} aria-live="polite">
               {problems.length === 0
                 ? <span className="badge ok">OK — schema valid</span>
                 : problems.map((p, i) => <div key={i} className="finding warning">{p}</div>)}
@@ -243,7 +256,7 @@ export default function RulebookDetailPage() {
           )}
         </div>
       ) : (
-        <div className="rp-panel">
+        <div className="rp-panel rp-anim-fade-in" key="visual">
           <div className="rp-panel-title">Visual</div>
           <p className="rp-page-sub" style={{ marginTop: 0 }}>
             Read-only summary of the parsed rulebook. Edit the YAML tab and re-save, or use the visual editor, to change these fields.

@@ -4,6 +4,8 @@ import PermissionGate from '@/components/ui/PermissionGate';
 
 import { useEffect, useState } from 'react';
 import { api, type McpToolRow } from '@/lib/api';
+import Banner from '@/components/ui/Banner';
+import EmptyState from '@/components/ui/EmptyState';
 
 const STATUS_LABEL: Record<number, string> = { 0: 'Submitted', 1: 'Approved', 2: 'Blocked' };
 const STATUS_BADGE: Record<number, string> = { 0: 'info', 1: 'ok', 2: 'danger' };
@@ -150,8 +152,8 @@ function McpAdminPageInner() {
         </div>
       </header>
 
-      {error && <div className="banner warn">{error}</div>}
-      {info && <div className="banner ok">{info}</div>}
+      {error && <Banner tone="warn" onDismiss={() => setError(null)}>{error}</Banner>}
+      {info && <Banner tone="success" onDismiss={() => setInfo(null)}>{info}</Banner>}
 
       <div className="rp-page-grid">
         <div className="rp-page-main">
@@ -161,7 +163,7 @@ function McpAdminPageInner() {
           Registered tools
           <button
             type="button"
-            className="primary"
+            className="primary-ghost"
             style={{ marginLeft: 'auto' }}
             onClick={() => setShowRegister((v) => !v)}
           >
@@ -206,9 +208,12 @@ function McpAdminPageInner() {
         )}
 
         {tools.length === 0 ? (
-          <p className="rp-page-sub">No external tools registered yet.</p>
+          <EmptyState
+            title="No external tools registered yet"
+            description="Use “Add a tool” to register an add-on. Every tool stays blocked until you approve it."
+          />
         ) : (
-          <ul className="rp-list">
+          <ul className="rp-list rp-stagger">
             {tools.map((t) => (
               <li key={t.id} className="rp-list-row">
                 <div>
@@ -269,7 +274,7 @@ function McpAdminPageInner() {
             Run test
           </button>
           {testResult && (
-            <div className="rp-field" style={{ marginTop: 12 }}>
+            <div className="rp-field rp-anim-fade-in-up" style={{ marginTop: 12 }} aria-live="polite">
               <span>
                 Result:{' '}
                 <span className={`badge ${testResult.status === 'ok' ? 'ok' : 'danger'}`}>

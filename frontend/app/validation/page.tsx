@@ -6,6 +6,11 @@ import { api, type Report, type ValidationResult } from '@/lib/api';
 import { reportHref } from '@/lib/routes';
 import Container from '@/components/shell/Container';
 import PageHeader from '@/components/shell/PageHeader';
+import Banner from '@/components/ui/Banner';
+import ErrorState from '@/components/ui/ErrorState';
+import { TableSkeleton } from '@/components/ui/Skeleton';
+import EmptyState from '@/components/ui/EmptyState';
+import AnimatedNumber from '@/components/ui/AnimatedNumber';
 
 type Row = {
   report: Report;
@@ -77,40 +82,51 @@ export default function ValidationCenterPage() {
         description={<>Spots problems in your team&apos;s draft reports — things like missing key findings or contradictions. Severity: <span className="badge danger">stop — must fix</span> <span className="badge warn">should review</span> <span className="badge info">heads-up</span>.</>}
       />
 
-      {err && <div className="banner warn">{err}</div>}
+      {err && <Banner tone="warn">{err}</Banner>}
 
       <div className="rp-panel">
         <div className="rp-panel-title">Summary</div>
-        <div className="rp-grid-3">
-          <div className="rp-panel" style={{ padding: 16 }}>
-            <div className="rp-page-sub">Drafts checked</div>
-            <div style={{ fontSize: 28, fontFamily: 'var(--serif)' }}>{rows.length}</div>
+        <div className="metric-grid rp-stagger" aria-live="polite" aria-busy={busy}>
+          <div className="metric-card" data-tone="info">
+            <div className="metric-card-value"><AnimatedNumber value={rows.length} /></div>
+            <div className="metric-card-label">Drafts checked</div>
           </div>
-          <div className="rp-panel" style={{ padding: 16 }}>
-            <div className="rp-page-sub">Must-fix issues</div>
-            <div style={{ fontSize: 28, fontFamily: 'var(--serif)' }}>
-              {totals.blockers}{' '}
+          <div className="metric-card" data-tone={totals.blockers > 0 ? 'blocked' : 'ready'}>
+            <div className="metric-card-value">
+              <AnimatedNumber value={totals.blockers} />{' '}
               <span className={`badge ${totals.blockers > 0 ? 'danger' : 'ok'}`}>
                 {totals.blockers > 0 ? 'needs attention' : 'all clear'}
               </span>
             </div>
+            <div className="metric-card-label">Must-fix issues</div>
           </div>
-          <div className="rp-panel" style={{ padding: 16 }}>
-            <div className="rp-page-sub">Warnings / heads-up</div>
-            <div style={{ fontSize: 28, fontFamily: 'var(--serif)' }}>
-              {totals.warnings} / {totals.infos}
+          <div className="metric-card" data-tone="review">
+            <div className="metric-card-value">
+              <AnimatedNumber value={totals.warnings} /> / <AnimatedNumber value={totals.infos} />
             </div>
+            <div className="metric-card-label">Warnings / heads-up</div>
           </div>
         </div>
         <div style={{ marginTop: 12 }}>
-          <button className="ghost" onClick={refresh} disabled={busy}>
+          <button className="ghost" onClick={refresh} disabled={busy} aria-busy={busy}>
+            {busy && <span className="rp-spinner sm" aria-hidden />}
             {busy ? 'Re-checking…' : 'Re-run check'}
           </button>
         </div>
       </div>
 
-      <div className="rp-panel">
+      <div className="rp-panel" aria-live="polite" aria-busy={busy}>
         <div className="rp-panel-title">Drafts</div>
+        {busy && rows.length === 0 ? (
+          <TableSkeleton rows={6} cols={5} />
+        ) : err && rows.length === 0 ? (
+          <ErrorState title="Couldn't run the quality check" message={err} onRetry={refresh} />
+        ) : rows.length === 0 ? (
+          <EmptyState
+            title="No drafts to check right now"
+            description="Once your team has draft reports, their validation status will appear here."
+          />
+        ) : (
         <table className="rp-table">
           <thead>
             <tr>
@@ -122,9 +138,6 @@ export default function ValidationCenterPage() {
             </tr>
           </thead>
           <tbody>
-            {rows.length === 0 && !busy && (
-              <tr><td colSpan={5} style={{ color: 'var(--text-muted)' }}>No drafts to check right now.</td></tr>
-            )}
             {rows.map(({ report, result, err: e }) => {
               const findings = result?.findings ?? [];
               const blockers = findings.filter((f) => {
@@ -157,6 +170,7 @@ export default function ValidationCenterPage() {
             })}
           </tbody>
         </table>
+        )}
       </div>
     </Container>
   );

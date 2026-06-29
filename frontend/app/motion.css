@@ -1,0 +1,193 @@
+/* ============================================================
+   RadioPad — Motion library (first-class motion layer, Phase 0).
+
+   Net-new, token-driven keyframes + entrance/attention utility
+   classes used app-wide. Imported in app/layout.tsx AFTER hallmark.css
+   (so it can reference --anim-* / --ease-* / --delay-* tokens) and
+   BEFORE radiopad.css / shell.css.
+
+   Everything here is purely additive and degrades gracefully under the
+   global `prefers-reduced-motion` rule in hallmark.css; the explicit
+   parity block at the end guarantees entrance animations never leave
+   content hidden when motion is reduced.
+
+   Keyframe names are deliberately collision-free with the legacy
+   `rp-spin` / `rp-shimmer` (shell.css) and the unprefixed keyframes in
+   globals.css. Phase 2 converges the legacy duplicates onto this file.
+
+   See docs/02-design/design.md §6 (Motion system).
+   ============================================================ */
+
+/* ---- Canonical keyframes ------------------------------------------------ */
+@keyframes rp-fade-in { from { opacity: 0; } to { opacity: 1; } }
+
+@keyframes rp-fade-in-up {
+  from { opacity: 0; transform: translateY(10px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+@keyframes rp-fade-in-down {
+  from { opacity: 0; transform: translateY(-10px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+@keyframes rp-scale-in {
+  from { opacity: 0; transform: scale(0.96); }
+  to   { opacity: 1; transform: scale(1); }
+}
+@keyframes rp-pop-in {
+  0%   { opacity: 0; transform: translateY(6px) scale(0.98); }
+  100% { opacity: 1; transform: translateY(0) scale(1); }
+}
+@keyframes rp-slide-in-left {
+  from { opacity: 0; transform: translateX(-12px); }
+  to   { opacity: 1; transform: translateX(0); }
+}
+@keyframes rp-slide-in-right {
+  from { opacity: 0; transform: translateX(12px); }
+  to   { opacity: 1; transform: translateX(0); }
+}
+@keyframes rp-popover-in {
+  from { opacity: 0; transform: translateY(-8px) scale(0.97); }
+  to   { opacity: 1; transform: translateY(0) scale(1); }
+}
+
+/* Attention / looping */
+@keyframes rp-pulse-soft {
+  0%, 100% { opacity: 1; }
+  50%      { opacity: 0.55; }
+}
+@keyframes rp-pulse-ring {
+  0%   { box-shadow: 0 0 0 0 color-mix(in oklch, var(--color-danger), transparent 35%); }
+  70%  { box-shadow: 0 0 0 9px color-mix(in oklch, var(--color-danger), transparent 100%); }
+  100% { box-shadow: 0 0 0 0 color-mix(in oklch, var(--color-danger), transparent 100%); }
+}
+@keyframes rp-glow {
+  0%, 100% { box-shadow: 0 0 0 0 color-mix(in oklch, var(--accent), transparent 70%); }
+  50%      { box-shadow: 0 0 0 6px color-mix(in oklch, var(--accent), transparent 100%); }
+}
+@keyframes rp-shimmer-sweep {
+  from { background-position: -150% 0; }
+  to   { background-position: 250% 0; }
+}
+@keyframes rp-rotate { to { transform: rotate(360deg); } }
+@keyframes rp-bar-fill { from { transform: scaleX(0); } to { transform: scaleX(1); } }
+
+/* ---- Entrance utility classes ------------------------------------------- */
+.rp-anim-fade-in      { animation: rp-fade-in var(--anim-base) var(--ease-out) both; }
+.rp-anim-fade-in-up   { animation: rp-fade-in-up var(--anim-base) var(--ease-out) both; }
+.rp-anim-fade-in-down { animation: rp-fade-in-down var(--anim-base) var(--ease-out) both; }
+.rp-anim-scale-in     { animation: rp-scale-in var(--anim-base) var(--ease-pop) both; }
+.rp-anim-pop-in       { animation: rp-pop-in var(--anim-base) var(--ease-pop) both; }
+.rp-anim-slide-left   { animation: rp-slide-in-left var(--anim-base) var(--ease-out) both; }
+.rp-anim-slide-right  { animation: rp-slide-in-right var(--anim-base) var(--ease-out) both; }
+.rp-anim-spring-in    { animation: rp-pop-in var(--anim-slow) var(--ease-spring) both; }
+
+/* ---- Stagger: incremental animation-delay for direct children ----------- */
+.rp-stagger > * { animation: rp-fade-in-up var(--anim-base) var(--ease-out) both; }
+.rp-stagger > *:nth-child(1) { animation-delay: var(--delay-1); }
+.rp-stagger > *:nth-child(2) { animation-delay: var(--delay-2); }
+.rp-stagger > *:nth-child(3) { animation-delay: var(--delay-3); }
+.rp-stagger > *:nth-child(4) { animation-delay: var(--delay-4); }
+.rp-stagger > *:nth-child(5) { animation-delay: var(--delay-5); }
+.rp-stagger > *:nth-child(6) { animation-delay: var(--delay-6); }
+.rp-stagger > *:nth-child(7) { animation-delay: var(--delay-7); }
+.rp-stagger > *:nth-child(8) { animation-delay: var(--delay-8); }
+.rp-stagger > *:nth-child(n+9) { animation-delay: var(--delay-8); }
+
+/* ---- Reusable helpers --------------------------------------------------- */
+.rp-motion-pulse { animation: rp-pulse-soft 1.6s var(--ease-in-out) infinite; }
+.rp-motion-spin  { animation: rp-rotate var(--anim-spin) linear infinite; }
+.rp-motion-glow  { animation: rp-glow 1.8s var(--ease-in-out) infinite; }
+
+/* A bar/fill that animates its width in via a scaleX transform-origin left.
+   Wrap the colored fill in an element with this class. */
+.rp-bar-fill { transform-origin: left center; animation: rp-bar-fill var(--anim-slow) var(--ease-out) both; }
+
+/* ---- Reduced-motion parity ---------------------------------------------- */
+/* The global rule in hallmark.css collapses durations; this block additionally
+   guarantees `both`-filled entrance animations never strand content at
+   opacity:0 / off-position when the user prefers reduced motion. */
+@media (prefers-reduced-motion: reduce) {
+  .rp-anim-fade-in, .rp-anim-fade-in-up, .rp-anim-fade-in-down,
+  .rp-anim-scale-in, .rp-anim-pop-in, .rp-anim-slide-left,
+  .rp-anim-slide-right, .rp-anim-spring-in, .rp-bar-fill,
+  .rp-stagger > * {
+    animation: none !important;
+    opacity: 1 !important;
+    transform: none !important;
+  }
+}
+
+/* ============================================================
+   Motion-driven components (Phase 0).
+   Net-new, app-wide components whose look is intrinsically tied to motion:
+   the page-transition wrapper, the scroll Reveal helper, the standardized
+   Banner, and the Toast region. Token-driven; semantic tones map to the
+   locked palette (info→marine, success→green, warn→amber, danger→red,
+   ai→purple).
+   ============================================================ */
+
+/* Page transition wrapper — block-level so the entrance animation never
+   collapses page layout. */
+.rp-page-transition { display: block; }
+
+/* Reveal — hidden until scrolled into view (JS adds `.is-visible`). */
+.rp-reveal:not(.is-visible) { opacity: 0; }
+@media (prefers-reduced-motion: reduce) { .rp-reveal { opacity: 1 !important; } }
+
+/* ---- Banner ---- */
+.rp-banner {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--space-3);
+  padding: var(--space-3) var(--space-4);
+  border: 1px solid var(--border);
+  border-inline-start: 3px solid var(--border-strong);
+  border-radius: var(--radius);
+  background: var(--bg-panel);
+  color: var(--text);
+  font-size: var(--text-sm);
+}
+.rp-banner-icon { display: inline-flex; flex: none; margin-block-start: 1px; }
+.rp-banner-body { display: grid; gap: 2px; min-width: 0; flex: 1; }
+.rp-banner-title { margin: 0; font-weight: 700; color: var(--text-strong); }
+.rp-banner-text { margin: 0; color: var(--text-muted); }
+.rp-banner-text p { margin: 0; }
+.rp-banner-dismiss {
+  flex: none;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 1.6rem; height: 1.6rem;
+  margin: -2px -4px 0 0;
+  border: 0; border-radius: var(--radius-sm);
+  background: transparent; color: var(--text-soft); cursor: pointer;
+  transition: background var(--transition-fast), color var(--transition-fast), transform var(--transition-fast);
+}
+.rp-banner-dismiss:hover { background: color-mix(in oklch, var(--text), transparent 90%); color: var(--text); }
+.rp-banner-dismiss:active { transform: scale(0.92); }
+
+.rp-banner-info    { border-inline-start-color: var(--blue);   background: var(--blue-bg);   }
+.rp-banner-info    .rp-banner-icon { color: var(--blue); }
+.rp-banner-success { border-inline-start-color: var(--green);  background: var(--green-bg);  }
+.rp-banner-success .rp-banner-icon { color: var(--green); }
+.rp-banner-warn    { border-inline-start-color: var(--amber);  background: var(--amber-bg);  }
+.rp-banner-warn    .rp-banner-icon { color: var(--amber); }
+.rp-banner-danger  { border-inline-start-color: var(--red);    background: var(--red-bg);    }
+.rp-banner-danger  .rp-banner-icon { color: var(--red); }
+.rp-banner-ai      { border-inline-start-color: var(--purple); background: var(--purple-bg); }
+.rp-banner-ai      .rp-banner-icon { color: var(--purple); }
+
+/* ---- Toast region ---- */
+.rp-toast-region {
+  position: fixed;
+  inset-block-end: var(--space-4);
+  inset-inline-end: var(--space-4);
+  z-index: 80;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  width: min(360px, calc(100vw - 2 * var(--space-4)));
+  pointer-events: none;
+}
+.rp-toast { pointer-events: auto; }
+.rp-toast .rp-banner { box-shadow: var(--shadow-md); }

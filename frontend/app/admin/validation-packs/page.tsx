@@ -4,6 +4,8 @@ import PermissionGate from '@/components/ui/PermissionGate';
 
 import { useEffect, useMemo, useState } from 'react';
 import { api } from '@/lib/api';
+import Banner from '@/components/ui/Banner';
+import EmptyState from '@/components/ui/EmptyState';
 
 type Pack = Awaited<ReturnType<typeof api.validationPacks.list>>[number];
 type RunSummary = Awaited<ReturnType<typeof api.validationPacks.run>>;
@@ -114,8 +116,8 @@ function ValidationPacksPageInner() {
         </div>
       </header>
 
-      {error && <div className="banner warn">{error}</div>}
-      {info && <div className="banner ok">{info}</div>}
+      {error && <Banner tone="warn" onDismiss={() => setError(null)}>{error}</Banner>}
+      {info && <Banner tone="success" onDismiss={() => setInfo(null)}>{info}</Banner>}
 
       <div className="rp-panel">
         <div className="rp-panel-title">
@@ -135,11 +137,13 @@ function ValidationPacksPageInner() {
       </div>
 
       {grouped.length === 0 && (
-        <div className="rp-panel">
-          <p className="rp-page-sub">No quality check packs yet for your workspace.</p>
-        </div>
+        <EmptyState
+          title="No quality check packs yet"
+          description="Packs appear here once they are created for a rulebook in your workspace."
+        />
       )}
 
+      <div className="rp-stagger">
       {grouped.map(([rb, list]) => (
         <div className="rp-panel" key={rb}>
           <div className="rp-panel-title">
@@ -167,7 +171,7 @@ function ValidationPacksPageInner() {
                       {p.approvedAt && <> · approved {new Date(p.approvedAt).toLocaleString()}</>}
                     </div>
                     {lastRun && (
-                      <div className="rp-page-sub">
+                      <div className="rp-page-sub rp-anim-fade-in-up" aria-live="polite">
                         Last run:{' '}
                         <span className={`badge ${lastRun.failed === 0 ? 'ok' : 'danger'}`}>
                           {lastRun.passed}/{lastRun.totalCases} passed
@@ -191,13 +195,15 @@ function ValidationPacksPageInner() {
                       </div>
                     )}
                   </div>
-                  <div style={{ display: 'flex', gap: 8 }}>
+                  <div style={{ display: 'flex', gap: 8 }} aria-busy={busy === p.id}>
                     <button
                       type="button"
                       className="primary-ghost"
                       disabled={busy === p.id}
+                      aria-busy={busy === p.id}
                       onClick={() => run(p.id)}
                     >
+                      {busy === p.id && <span className="rp-spinner sm" aria-hidden />}
                       Run check
                     </button>
                     {p.status === 'Draft' && (
@@ -205,8 +211,10 @@ function ValidationPacksPageInner() {
                         type="button"
                         className="primary"
                         disabled={busy === p.id}
+                        aria-busy={busy === p.id}
                         onClick={() => approve(p.id)}
                       >
+                        {busy === p.id && <span className="rp-spinner sm" aria-hidden />}
                         Approve
                       </button>
                     )}
@@ -215,8 +223,10 @@ function ValidationPacksPageInner() {
                         type="button"
                         className="ghost"
                         disabled={busy === p.id}
+                        aria-busy={busy === p.id}
                         onClick={() => deprecate(p.id)}
                       >
+                        {busy === p.id && <span className="rp-spinner sm" aria-hidden />}
                         Retire
                       </button>
                     )}
@@ -227,6 +237,7 @@ function ValidationPacksPageInner() {
           </ul>
         </div>
       ))}
+      </div>
     </div>
   );
 }
