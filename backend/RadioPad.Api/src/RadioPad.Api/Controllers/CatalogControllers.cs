@@ -33,8 +33,10 @@ public class ModalitiesController : TenantedController
     }
 
     // Nullable fields so an empty body is model-valid: the permission gate must run
-    // before any field validation (RBAC matrix enforcement relies on this).
-    public record SaveModalityDto(string? Code, string? Name, bool? Active, int? SortOrder);
+    // before any field validation (RBAC matrix enforcement relies on this). When `Id`
+    // is supplied the row is updated in place (the code may be renamed); when it is
+    // null a new row is created.
+    public record SaveModalityDto(Guid? Id, string? Code, string? Name, bool? Active, int? SortOrder);
 
     [HttpPost]
     public async Task<IActionResult> Save([FromBody] SaveModalityDto dto, CancellationToken ct)
@@ -46,10 +48,21 @@ public class ModalitiesController : TenantedController
         var code = (dto.Code ?? "").Trim();
         if (code.Length == 0) return BadRequest(new { error = "Code is required.", kind = "validation" });
 
-        var existing = await _db.Modalities.FirstOrDefaultAsync(
-            m => m.TenantId == tenant.Id && m.Code == code, ct);
-        if (existing is null)
+        Modality existing;
+        if (dto.Id is Guid id)
         {
+            var found = await _db.Modalities.FirstOrDefaultAsync(m => m.Id == id && m.TenantId == tenant.Id, ct);
+            if (found is null) return NotFound(new { error = "Modality not found.", kind = "not_found" });
+            var clash = await _db.Modalities.AnyAsync(
+                m => m.TenantId == tenant.Id && m.Code == code && m.Id != id, ct);
+            if (clash) return Conflict(new { error = $"Code “{code}” is already in use.", kind = "conflict" });
+            found.Code = code;
+            existing = found;
+        }
+        else
+        {
+            var clash = await _db.Modalities.AnyAsync(m => m.TenantId == tenant.Id && m.Code == code, ct);
+            if (clash) return Conflict(new { error = $"Code “{code}” already exists.", kind = "conflict" });
             existing = new Modality { TenantId = tenant.Id, Code = code };
             _db.Modalities.Add(existing);
         }
@@ -98,7 +111,8 @@ public class BodyPartsController : TenantedController
         return Ok(rows);
     }
 
-    public record SaveBodyPartDto(string? Code, string? Name, bool? Active, int? SortOrder);
+    // See SaveModalityDto: `Id` null → create, `Id` present → update (rename allowed).
+    public record SaveBodyPartDto(Guid? Id, string? Code, string? Name, bool? Active, int? SortOrder);
 
     [HttpPost]
     public async Task<IActionResult> Save([FromBody] SaveBodyPartDto dto, CancellationToken ct)
@@ -110,10 +124,21 @@ public class BodyPartsController : TenantedController
         var code = (dto.Code ?? "").Trim();
         if (code.Length == 0) return BadRequest(new { error = "Code is required.", kind = "validation" });
 
-        var existing = await _db.BodyParts.FirstOrDefaultAsync(
-            b => b.TenantId == tenant.Id && b.Code == code, ct);
-        if (existing is null)
+        BodyPart existing;
+        if (dto.Id is Guid id)
         {
+            var found = await _db.BodyParts.FirstOrDefaultAsync(b => b.Id == id && b.TenantId == tenant.Id, ct);
+            if (found is null) return NotFound(new { error = "Body part not found.", kind = "not_found" });
+            var clash = await _db.BodyParts.AnyAsync(
+                b => b.TenantId == tenant.Id && b.Code == code && b.Id != id, ct);
+            if (clash) return Conflict(new { error = $"Code “{code}” is already in use.", kind = "conflict" });
+            found.Code = code;
+            existing = found;
+        }
+        else
+        {
+            var clash = await _db.BodyParts.AnyAsync(b => b.TenantId == tenant.Id && b.Code == code, ct);
+            if (clash) return Conflict(new { error = $"Code “{code}” already exists.", kind = "conflict" });
             existing = new BodyPart { TenantId = tenant.Id, Code = code };
             _db.BodyParts.Add(existing);
         }

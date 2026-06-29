@@ -7,13 +7,13 @@
  * `manage` permission (backend still enforces).
  */
 
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import type { CatalogItem } from '@/lib/api';
 import { usePermissions, type PermissionKey } from '@/lib/permissions';
 
 type CatalogClient = {
   list: () => Promise<CatalogItem[]>;
-  save: (body: { code: string; name?: string; active?: boolean; sortOrder?: number }) => Promise<CatalogItem>;
+  save: (body: { id?: string; code: string; name?: string; active?: boolean; sortOrder?: number }) => Promise<CatalogItem>;
   remove: (id: string) => Promise<void>;
 };
 
@@ -36,6 +36,8 @@ export default function CatalogManager({ title, subtitle, itemNoun, client, mana
   const [name, setName] = useState('');
   const [editingId, setEditingId] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
+  const codeInputRef = useRef<HTMLInputElement>(null);
+  const formRef = useRef<HTMLDivElement>(null);
 
   const reload = useCallback(() => {
     setError(null);
@@ -54,6 +56,11 @@ export default function CatalogManager({ title, subtitle, itemNoun, client, mana
     setEditingId(item.id);
     setCode(item.code);
     setName(item.name);
+    setError(null);
+    // Bring the (now-active) edit form into view and focus it — the form lives at
+    // the top of the page, away from the row the operator just clicked.
+    formRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    codeInputRef.current?.focus();
   }
 
   async function save() {
@@ -62,7 +69,7 @@ export default function CatalogManager({ title, subtitle, itemNoun, client, mana
     setSaving(true);
     setError(null);
     try {
-      await client.save({ code: trimmed, name: name.trim() });
+      await client.save({ id: editingId ?? undefined, code: trimmed, name: name.trim() });
       resetForm();
       reload();
     } catch (e) {
@@ -98,18 +105,18 @@ export default function CatalogManager({ title, subtitle, itemNoun, client, mana
       {error && <div className="banner warn">{error}</div>}
 
       {canManage && (
-        <div className="rp-panel">
+        <div className="rp-panel" ref={formRef}>
           <div className="rp-panel-title">{editingId ? `Edit ${itemNoun}` : `Add ${itemNoun}`}</div>
           <div className="rp-row rp-gap-sm">
             <div className="section-block" style={{ flex: 1 }}>
               <label htmlFor="cat-code">Code</label>
               <input
                 id="cat-code"
+                ref={codeInputRef}
                 className="rp-input"
                 placeholder="e.g. CT"
                 value={code}
                 onChange={(e) => setCode(e.target.value)}
-                disabled={editingId !== null}
               />
             </div>
             <div className="section-block" style={{ flex: 2 }}>

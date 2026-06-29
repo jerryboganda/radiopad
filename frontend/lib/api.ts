@@ -1290,7 +1290,7 @@ export const api = {
    */
   modalities: {
     list: () => request<CatalogItem[]>('/api/modalities'),
-    save: (body: { code: string; name?: string; active?: boolean; sortOrder?: number }) =>
+    save: (body: { id?: string; code: string; name?: string; active?: boolean; sortOrder?: number }) =>
       request<CatalogItem>('/api/modalities', { method: 'POST', body: JSON.stringify(body) }),
     remove: (id: string) =>
       request<void>(`/api/modalities/${id}`, { method: 'DELETE' }),
@@ -1298,7 +1298,7 @@ export const api = {
   /** Iter-36 — admin-managed body-part catalog (tenant-scoped). Mirrors `modalities`. */
   bodyParts: {
     list: () => request<CatalogItem[]>('/api/body-parts'),
-    save: (body: { code: string; name?: string; active?: boolean; sortOrder?: number }) =>
+    save: (body: { id?: string; code: string; name?: string; active?: boolean; sortOrder?: number }) =>
       request<CatalogItem>('/api/body-parts', { method: 'POST', body: JSON.stringify(body) }),
     remove: (id: string) =>
       request<void>(`/api/body-parts/${id}`, { method: 'DELETE' }),
