@@ -1305,7 +1305,9 @@
   display: flex;
   flex: 1 1 auto;
   width: 100%;
-  min-height: 100vh;
+  height: 100vh;
+  min-height: 0;
+  overflow: hidden; /* panes manage their own overflow — no page scroll */
 }
 
 /* ---- Left showcase pane (hidden < 880px) ------------------------- */
@@ -1313,11 +1315,12 @@
   position: relative;
   flex: 1 1 46%;
   max-width: 600px;
-  padding: 56px 56px 44px;
+  height: 100%;
+  padding: clamp(28px, 4.2vh, 52px) clamp(36px, 3.4vw, 56px);
   display: flex;
   flex-direction: column;
   justify-content: space-between;
-  gap: 44px;
+  gap: clamp(20px, 3vh, 40px);
   border-right: 1px solid var(--border);
   background:
     radial-gradient(135% 90% at 0% 0%, var(--accent-tint) 0%, transparent 58%),
@@ -1351,48 +1354,69 @@
 .rp-auth-brand .brand-mark-letter { font-size: 18px; }
 .rp-auth-brand-name { font: 600 18px/1 var(--sans); letter-spacing: -0.01em; color: var(--text-strong); }
 
-.rp-auth-aside-body { position: relative; z-index: 1; display: flex; flex-direction: column; gap: 20px; }
+.rp-auth-aside-body { position: relative; z-index: 1; display: flex; flex-direction: column; gap: clamp(14px, 2vh, 20px); }
 .rp-auth-headline {
   margin: 0;
-  max-width: 16ch;
-  font: 600 32px/1.16 var(--serif);
-  letter-spacing: -0.02em;
+  max-width: 17ch;
+  font: 600 clamp(26px, 3.4vh, 34px)/1.12 var(--serif);
+  letter-spacing: -0.022em;
   color: var(--text-strong);
 }
-.rp-auth-tagline { margin: 0; max-width: 40ch; font: 400 15px/1.55 var(--sans); color: var(--text-muted); }
+.rp-auth-tagline { margin: 0; max-width: 42ch; font: 400 clamp(13.5px, 1.7vh, 15px)/1.55 var(--sans); color: var(--text-muted); }
 
-.rp-auth-features { list-style: none; margin: 10px 0 0; padding: 0; display: flex; flex-direction: column; gap: 10px; }
+.rp-auth-features { list-style: none; margin: clamp(4px, 1.4vh, 12px) 0 0; padding: 0; display: flex; flex-direction: column; gap: clamp(7px, 1.1vh, 11px); }
 .rp-auth-feature {
+  position: relative;
   display: flex;
-  gap: 12px;
-  align-items: flex-start;
-  padding: 12px 14px;
-  background: var(--bg-panel);
+  gap: 13px;
+  align-items: center;
+  padding: clamp(10px, 1.4vh, 13px) 15px clamp(10px, 1.4vh, 13px) 16px;
+  background: linear-gradient(180deg, var(--bg-panel), color-mix(in oklch, var(--bg-panel), var(--bg-subtle) 45%));
   border: 1px solid var(--border-soft);
-  border-radius: var(--radius);
+  border-radius: calc(var(--radius) + 1px);
   box-shadow: var(--shadow-xs);
+  overflow: hidden;
+}
+/* Accent rail — a quiet terracotta tab that grows on hover. */
+.rp-auth-feature::before {
+  content: "";
+  position: absolute;
+  left: 0;
+  top: 14%;
+  bottom: 14%;
+  width: 3px;
+  border-radius: 0 3px 3px 0;
+  background: linear-gradient(var(--accent), var(--accent-strong));
+  transform: scaleY(0);
+  transform-origin: center;
+  opacity: 0;
 }
 @media (prefers-reduced-motion: no-preference) {
-  .rp-auth-feature { transition: transform 0.18s ease, border-color 0.18s ease, box-shadow 0.18s ease; }
-  .rp-auth-feature:hover { transform: translateY(-1px); border-color: var(--accent-soft); box-shadow: var(--shadow-sm); }
+  .rp-auth-feature { transition: transform 0.2s ease, border-color 0.2s ease, box-shadow 0.2s ease; }
+  .rp-auth-feature::before { transition: transform 0.22s cubic-bezier(0.16, 1, 0.3, 1), opacity 0.2s ease; }
+  .rp-auth-feature:hover { transform: translateY(-2px); border-color: var(--accent-soft); box-shadow: var(--shadow-sm); }
+  .rp-auth-feature:hover::before { transform: scaleY(1); opacity: 1; }
+  .rp-auth-feature:hover .rp-auth-feature-icon { color: #fff; background: linear-gradient(150deg, var(--accent), var(--accent-strong)); border-color: var(--accent-strong); }
 }
 .rp-auth-feature-icon {
-  width: 34px;
-  height: 34px;
-  border-radius: 10px;
-  background: var(--accent-tint);
+  width: 38px;
+  height: 38px;
+  border-radius: 11px;
+  background: linear-gradient(150deg, var(--accent-tint), color-mix(in oklch, var(--accent-tint), var(--accent) 16%));
   border: 1px solid var(--accent-soft);
-  color: var(--accent);
+  color: var(--accent-strong);
   display: grid;
   place-items: center;
   flex: 0 0 auto;
+  transition: background 0.2s ease, color 0.2s ease, border-color 0.2s ease;
 }
-.rp-auth-feature-text { display: flex; flex-direction: column; gap: 2px; }
-.rp-auth-feature-title { font: 600 13.5px/1.3 var(--sans); color: var(--text-strong); }
+.rp-auth-feature-icon svg { width: 18px; height: 18px; }
+.rp-auth-feature-text { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+.rp-auth-feature-title { font: 600 13.5px/1.3 var(--sans); letter-spacing: -0.005em; color: var(--text-strong); }
 .rp-auth-feature-sub { font: 400 12.5px/1.45 var(--sans); color: var(--text-muted); }
 
 /* Compact trust strip — factual compliance chips under the feature cards. */
-.rp-auth-trust { list-style: none; margin: 16px 0 0; padding: 0; display: flex; flex-wrap: wrap; gap: 8px; }
+.rp-auth-trust { list-style: none; margin: clamp(8px, 1.6vh, 16px) 0 0; padding: 0; display: flex; flex-wrap: wrap; gap: 8px; }
 .rp-auth-trust-item {
   font: 500 11.5px/1 var(--sans);
   letter-spacing: 0.01em;
@@ -1412,8 +1436,9 @@
   display: flex;
   align-items: center;
   justify-content: center;
-  padding: 48px 24px;
-  min-height: 100vh;
+  padding: clamp(28px, 4vh, 48px) 24px;
+  height: 100%;
+  overflow-y: auto; /* if a tall step ever exceeds the viewport, the card scrolls — not the window */
 }
 /* Desktop "Check for updates" — pinned top-right of the auth pane. The inner
    CheckUpdatesButton renders only inside the Tauri shell, so this slot is empty

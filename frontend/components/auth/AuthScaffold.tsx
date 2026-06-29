@@ -14,8 +14,8 @@ export type AuthVariant = 'signin' | 'register' | 'pair';
 
 const COPY: Record<AuthVariant, { headline: string; tagline: string }> = {
   signin: {
-    headline: 'Sign in to your reporting workspace.',
-    tagline: 'AI-assisted radiology reporting — draft, validate, and sign with confidence.',
+    headline: 'Report at the speed of thought.',
+    tagline: 'RadioPad drafts your impression, checks it against your rulebooks, and hands you the pen — every line stays yours to sign.',
   },
   register: {
     headline: 'Start reporting in minutes.',
