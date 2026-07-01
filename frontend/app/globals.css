@@ -169,6 +169,8 @@ textarea { resize: vertical; font-family: inherit; }
   top: calc(100% + 4px);
   left: 0;
   min-width: 100%;
+  width: max-content;
+  max-width: min(360px, calc(100vw - 32px));
   z-index: 50;
   display: flex;
   flex-direction: column;

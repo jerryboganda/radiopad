@@ -652,7 +652,7 @@
   color: var(--text-faint);
 }
 .rp-ribbon-field > select { width: 190px; min-width: 190px; }
-.rp-ribbon-field > .rp-ribbon-combobox { width: 190px; min-width: 190px; }
+.rp-ribbon-field > .rp-ribbon-combobox { width: 280px; min-width: 280px; }
 
 /* Body grid: document + inspector */
 .rp-report-body {
@@ -660,6 +660,10 @@
   grid-template-columns: minmax(0, 1fr) minmax(260px, 340px);
   gap: 16px;
   align-items: start;
+  /* Reserve space below the last field so the fixed-bottom DictationOverlay
+     (.rp-dictation, z-index:70) never visually sits on top of the inspector's
+     last Context-tab fields or the doc's last section on short viewports. */
+  padding-bottom: 140px;
 }
 @media (max-width: 960px) {
   .rp-report-body { grid-template-columns: 1fr; }
@@ -944,8 +948,8 @@
   50% { transform: scale(1.25); box-shadow: 0 0 0 5px color-mix(in oklch, var(--red), transparent 100%); }
 }
 .rp-dictation-fix {
-  border-radius: 999px;
-  padding: 10px 14px;
+  border-radius: var(--radius-sm);
+  padding: 6px 12px;
   font: 600 13px/1 var(--sans);
   box-shadow: var(--shadow-xs);
   pointer-events: auto;

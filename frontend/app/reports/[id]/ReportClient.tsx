@@ -76,6 +76,7 @@ export default function ReportPage() {
     useState<'findings' | 'impression' | 'recommendations'>('impression');
   const [showPrior, setShowPrior] = useState(false);
   const [voiceCommandMode, setVoiceCommandMode] = useState(false);
+  const [dictating, setDictating] = useState(false);
   const [voiceCommandPills, setVoiceCommandPills] = useState<Array<{ id: number; command: VoiceCommand }>>([]);
   const [ribbonTab, setRibbonTab] = useState<RibbonTab>('home');
   const [inspectorTab, setInspectorTab] = useState<InspectorTab>('context');
@@ -594,6 +595,19 @@ export default function ReportPage() {
     };
   }, [id, report?.id, providerId]);
 
+  // Mirror the floating DictationOverlay's listening state so the ribbon's own
+  // Dictate button (a remote trigger for the same toggle) shows the same
+  // pressed/label state instead of looking inert while dictation is live.
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    const onDictateState = (e: Event) => {
+      const detail = (e as CustomEvent<{ listening: boolean }>).detail;
+      if (detail) setDictating(detail.listening);
+    };
+    window.addEventListener('radiopad:dictate-listening', onDictateState);
+    return () => window.removeEventListener('radiopad:dictate-listening', onDictateState);
+  }, []);
+
   const primarySigned = useMemo(
     () => signatures.some((s) => normalizeRole(s.role) === 'Primary'),
     [signatures],
@@ -648,6 +662,7 @@ export default function ReportPage() {
         stylePanelOpen={stylePanelOpen}
         onToggleStylePanel={() => setStylePanelOpen((v) => !v)}
         onDictate={() => window.dispatchEvent(new CustomEvent('radiopad:dictate'))}
+        dictating={dictating}
         voiceCommandMode={voiceCommandMode}
         onToggleVoiceCommand={() => setVoiceCommandMode((v) => !v)}
         voiceCommandPills={voiceCommandPills}

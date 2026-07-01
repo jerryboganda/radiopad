@@ -34,6 +34,7 @@ import { STT_MODES, useSttMode } from '@/lib/dictation/sttMode';
 import { readQueryParam } from '@/lib/browserParams';
 
 const DICTATE_EVENT = 'radiopad:dictate';
+const DICTATE_STATE_EVENT = 'radiopad:dictate-listening';
 const CLEANUP_EVENT = 'radiopad:dictation-cleanup';
 const CLEANUP_RESULT_EVENT = 'radiopad:dictation-cleanup-result';
 
@@ -72,6 +73,12 @@ export default function DictationOverlay() {
   const recognizerRef = useRef<SpeechRecognitionLike | null>(null);
   const listeningRef = useRef(false);
   listeningRef.current = listening;
+
+  // Broadcast so other controls (the ribbon's own Dictate button) can mirror
+  // this state without owning it — this overlay stays the single source of truth.
+  useEffect(() => {
+    window.dispatchEvent(new CustomEvent(DICTATE_STATE_EVENT, { detail: { listening } }));
+  }, [listening]);
 
   // High-accuracy (HQ) path: record mic audio with MediaRecorder, send to the
   // backend transcribe endpoint (UBAG-routed), and insert the transcript. This

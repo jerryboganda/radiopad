@@ -179,7 +179,7 @@ export default function SearchableSelect({
           }
         }}
       >
-        <span className="rp-combobox-value" data-placeholder={isPlaceholder ? 'true' : undefined}>
+        <span className="rp-combobox-value" data-placeholder={isPlaceholder ? 'true' : undefined} title={triggerLabel}>
           {triggerLabel}
         </span>
         <span className="rp-combobox-caret" aria-hidden="true">▾</span>
@@ -214,6 +214,7 @@ export default function SearchableSelect({
                   role="option"
                   aria-selected={(value ?? NONE_VALUE) === row.value}
                   aria-disabled={row.disabled || undefined}
+                  title={row.label}
                   className={`rp-combobox-option${i === activeIndex ? ' is-active' : ''}`}
                   onMouseEnter={() => !row.disabled && setActiveIndex(i)}
                   onMouseDown={(e) => {

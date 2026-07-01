@@ -71,6 +71,7 @@ export default function Sidebar() {
                   href={item.href}
                   className={`rp-sidebar-item ${active ? 'active' : ''}`}
                   aria-current={active ? 'page' : undefined}
+                  title={tNav(item.labelKey)}
                 >
                   <span className="rp-sidebar-icon">
                     <Icon />

@@ -51,6 +51,7 @@ export interface ReportRibbonProps {
   stylePanelOpen: boolean;
   onToggleStylePanel: () => void;
   onDictate: () => void;
+  dictating: boolean;
   voiceCommandMode: boolean;
   onToggleVoiceCommand: () => void;
   voiceCommandPills: Array<{ id: number; command: string }>;
@@ -228,7 +229,9 @@ function HomeTab(p: ReportRibbonProps) {
 
       <div className="rp-ribbon-group">
         <div className="rp-ribbon-group-controls">
-          <button className="ghost" type="button" onClick={p.onDictate}>Dictate</button>
+          <button className="ghost" type="button" onClick={p.onDictate} aria-pressed={p.dictating}>
+            {p.dictating ? 'Listening…' : 'Dictate'}
+          </button>
           <button
             className="ghost"
             type="button"
@@ -344,7 +347,7 @@ function FinalizeTab(p: ReportRibbonProps) {
         <div className="rp-ribbon-group">
           <div className="rp-ribbon-group-controls">
             <button className="primary" type="button" onClick={p.onGoToSignoff}>
-              {p.primarySigned ? 'Sign-off' : 'Sign as Primary'}
+              {p.primarySigned ? 'Sign-off' : 'Review & sign'}
             </button>
           </div>
           <div className="rp-ribbon-group-label">Sign</div>
