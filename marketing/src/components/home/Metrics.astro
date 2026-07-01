@@ -1,0 +1,27 @@
+---
+// Stakes / metrics band. Numbers are ILLUSTRATIVE (labeled). Replace with measured data.
+const metrics = [
+  { count: "48", suffix: "%", label: "less time from study to first draft" },
+  { count: "3.2", suffix: "x", label: "faster turnaround on routine reads" },
+  { count: "0", suffix: "", label: "reports signed without a radiologist" },
+];
+---
+<section class="metrics">
+  <div class="wrap">
+    <div class="metrics-head reveal">
+      <p class="eyebrow" style="margin-bottom:.9rem">The bottleneck</p>
+      <h2>Reporting should not be the slowest step in the read.</h2>
+    </div>
+    <div class="metrics-grid">
+      {
+        metrics.map((m) => (
+          <div class="metric reveal">
+            <div class="num" data-count={m.count} data-suffix={m.suffix}>0{m.suffix}</div>
+            <p class="lbl">{m.label}</p>
+          </div>
+        ))
+      }
+    </div>
+    <p class="metrics-foot">Illustrative figures. Replace with your measured results.</p>
+  </div>
+</section>

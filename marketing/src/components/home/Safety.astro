@@ -1,0 +1,26 @@
+---
+// Safety principle — hairline list (no cards).
+const principles = [
+  { k: "01", h: "Marked until you approve it", p: "AI-written text stays visually flagged inside the report until a radiologist accepts it. You always know what you wrote and what the model suggested." },
+  { k: "02", h: "Nothing exports unsigned", p: "A report cannot leave RadioPad without a human signature. There is no auto-send, no silent finalization, no exception." },
+  { k: "03", h: "Every change is recorded", p: "The audit trail is append-only and exportable, so every edit, flag, and signature stays accountable long after sign-off." },
+];
+---
+<section class="safety">
+  <div class="wrap">
+    <h2 class="reveal">The AI drafts. The <em>radiologist</em> signs.</h2>
+    <div class="principles">
+      {
+        principles.map((pr) => (
+          <div class="principle reveal">
+            <span class="k">{pr.k}</span>
+            <div>
+              <h3>{pr.h}</h3>
+              <p>{pr.p}</p>
+            </div>
+          </div>
+        ))
+      }
+    </div>
+  </div>
+</section>

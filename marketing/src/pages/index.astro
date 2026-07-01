@@ -1,0 +1,43 @@
+---
+import { site } from "../lib/site";
+import BaseLayout from "../layouts/BaseLayout.astro";
+import Hero from "../components/home/Hero.astro";
+import TrustMarquee from "../components/home/TrustMarquee.astro";
+import Metrics from "../components/home/Metrics.astro";
+import Features from "../components/home/Features.astro";
+import HowItWorks from "../components/home/HowItWorks.astro";
+import Safety from "../components/home/Safety.astro";
+import Security from "../components/home/Security.astro";
+import Testimonials from "../components/home/Testimonials.astro";
+import Pricing from "../components/home/Pricing.astro";
+import Faq from "../components/home/Faq.astro";
+import FinalCta from "../components/home/FinalCta.astro";
+import Motion from "../components/Motion.svelte";
+
+const orgJsonLd = {
+  "@context": "https://schema.org",
+  "@type": "Organization",
+  name: site.name,
+  url: site.url,
+  description: site.description,
+  email: site.email,
+  logo: new URL("/og-default.png", site.url).href,
+};
+---
+
+<BaseLayout title={site.name} jsonLd={[orgJsonLd]}>
+  <main id="main">
+    <Hero />
+    <TrustMarquee />
+    <Metrics />
+    <Features />
+    <HowItWorks />
+    <Safety />
+    <Security />
+    <Testimonials />
+    <Pricing />
+    <Faq />
+    <FinalCta />
+  </main>
+  <Motion client:load mode="home" />
+</BaseLayout>

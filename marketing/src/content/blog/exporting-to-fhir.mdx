@@ -1,0 +1,37 @@
+---
+title: "Exporting to FHIR without losing structure"
+description: "Mapping a signed report to a FHIR DiagnosticReport while keeping sections, coding, and provenance intact."
+date: 2026-05-06
+tags: ["Interoperability", "Product"]
+cover: "../../assets/blog/exporting-to-fhir.jpg"
+coverAlt: "Connected nodes representing structured data moving between systems"
+author:
+  name: "Tomas Rieder"
+  role: "Engineering, RadioPad"
+  avatar: "/authors/tomas-rieder.jpg"
+readingTime: "8 min read"
+---
+
+A radiology report is structured long before it becomes a PDF: findings, impression, comparison, technique. The trouble is that most exports flatten that structure into a single blob of text, and the receiving system has to guess where one section ends and the next begins. FHIR gives us a place to keep the structure, if we map to it carefully.
+
+## Sections stay sections
+
+RadioPad maps each report section to its own entry rather than concatenating everything into a single narrative. Findings and impression travel as distinct, coded parts, so a downstream system can pull the impression without parsing prose.
+
+```json
+{
+  "resourceType": "DiagnosticReport",
+  "status": "final",
+  "category": [{ "text": "Radiology" }],
+  "conclusion": "No acute cardiopulmonary process.",
+  "presentedForm": [{ "contentType": "text/plain" }]
+}
+```
+
+## Provenance travels with the report
+
+The export carries who signed the report and when, drawn straight from the audit trail. That means the receiving system does not have to trust the document on its own; the signature and its author are part of the payload.
+
+## One report, many formats
+
+FHIR is not a replacement for the PDF or the DOCX. It sits alongside them. The same signed report exports as a structured DiagnosticReport for systems that want data, and as a human-readable document for people who want to read it. Both come from the same source, so they never disagree.

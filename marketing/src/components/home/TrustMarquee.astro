@@ -1,0 +1,28 @@
+---
+// Trust strip — the ONE marquee. Logos only (no category labels).
+// Invented, plausible institutions as monogram lettermarks (placeholder). Replace with
+// real customer logos (Simple Icons / provided SVGs) when available.
+const logos = [
+  { name: "Meridian Health", initials: "M" },
+  { name: "St. Aldwin's Imaging", initials: "SA" },
+  { name: "Nordic Radiology", initials: "N" },
+  { name: "Cedar Valley Medical", initials: "CV" },
+  { name: "Auckland Diagnostic", initials: "AD" },
+];
+const doubled = [...logos, ...logos];
+---
+<section class="trust" aria-label="Trusted by">
+  <p class="trust-label">Trusted by radiology teams at</p>
+  <div class="marquee">
+    <div class="marquee-track">
+      {
+        doubled.map((l, i) => (
+          <span class="logo" aria-hidden={i >= logos.length ? "true" : undefined}>
+            <span class="logo-mark">{l.initials}</span>
+            <span>{l.name}</span>
+          </span>
+        ))
+      }
+    </div>
+  </div>
+</section>

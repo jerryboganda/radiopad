@@ -1,0 +1,47 @@
+---
+// Hero — asymmetric split. Product visual is a real component preview in the real
+// tokens (not a fake screenshot). Phase 4: replace with a real screenshot or astro:assets.
+---
+<section class="hero">
+  <div class="wrap">
+    <div class="hero-copy">
+      <p class="eyebrow">For radiology teams</p>
+      <h1 id="heroH1">
+        <span class="line"><span>Radiology reports,</span></span>
+        <span class="line"><span>drafted in seconds.</span></span>
+        <span class="line"><span><em>Signed by you.</em></span></span>
+      </h1>
+      <p class="lead">RadioPad turns your dictation and findings into a validated draft. You review, correct, and sign. It never signs for you.</p>
+      <div class="hero-cta">
+        <a class="btn btn-primary btn-lg" href="/#demo" id="magnetic">Book a demo</a>
+        <a class="btn btn-ghost btn-lg" href="/#how">See how it works <span class="arrow">&rarr;</span></a>
+      </div>
+      <p class="hero-note">Drafts stay unsigned until a radiologist approves them.</p>
+    </div>
+
+    <div class="preview" aria-hidden="true">
+      <div class="preview-card" id="previewCard">
+        <div class="preview-bar">
+          <span class="dot" style="background:var(--danger)"></span>
+          <span class="dot" style="background:var(--saffron)"></span>
+          <span class="dot" style="background:var(--success)"></span>
+          <span class="tabs"><span class="tab active">CT Chest w/o contrast</span></span>
+        </div>
+        <div class="preview-body">
+          <div class="field">Findings</div>
+          <p>Lungs are clear without focal consolidation. No <span class="flag flag-red">left</span> pleural effusion. Heart size is within normal limits.</p>
+          <div class="field">Impression</div>
+          <p><span class="mark-ai">No acute cardiopulmonary process.</span> Follow up as clinically indicated.</p>
+          <div class="vdemo" style="font-size:.72rem">
+            <div class="vrow"><span class="vstate" style="background:var(--danger)"></span> Laterality mismatch: prior states right</div>
+            <div class="vrow"><span class="vstate" style="background:var(--saffron)"></span> Impression uses AI-drafted text</div>
+          </div>
+        </div>
+        <div class="preview-foot">
+          <span class="chip chip-ok">2 checks resolved</span>
+          <span class="preview-sign">Awaiting signature</span>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>

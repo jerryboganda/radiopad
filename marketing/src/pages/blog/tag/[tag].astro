@@ -1,0 +1,53 @@
+---
+import { getCollection } from "astro:content";
+import BaseLayout from "../../../layouts/BaseLayout.astro";
+import PostCard from "../../../components/blog/PostCard.astro";
+import Motion from "../../../components/Motion.svelte";
+
+export async function getStaticPaths() {
+  const posts = await getCollection("blog", ({ data }) => !data.draft);
+  const tags = [...new Set(posts.flatMap((p) => p.data.tags))];
+  return tags.map((tag) => ({
+    params: { tag: tag.toLowerCase() },
+    props: {
+      tag,
+      posts: posts
+        .filter((p) => p.data.tags.includes(tag))
+        .sort((a, b) => b.data.date.valueOf() - a.data.date.valueOf()),
+      allTags: [...tags].sort(),
+    },
+  }));
+}
+
+const { tag, posts, allTags } = Astro.props;
+---
+
+<BaseLayout title={`${tag} posts`} description={`RadioPad blog posts tagged ${tag}.`} navCurrent="Blog">
+  <main id="main">
+    <section class="blog-head">
+      <div class="wrap">
+        <p class="eyebrow">Tag</p>
+        <h1>Posts on {tag}.</h1>
+        <p>{posts.length} {posts.length === 1 ? "post" : "posts"} tagged {tag}.</p>
+      </div>
+    </section>
+
+    <nav class="filter" aria-label="Filter posts by tag">
+      <div class="wrap">
+        <a class="pill" href="/blog">All</a>
+        {allTags.map((t) => (
+          <a class="pill" href={`/blog/tag/${t.toLowerCase()}/`} aria-current={t === tag ? "page" : undefined}>{t}</a>
+        ))}
+      </div>
+    </nav>
+
+    <section class="grid-sec">
+      <div class="wrap">
+        <div class="post-grid">
+          {posts.map((post) => <PostCard post={post} />)}
+        </div>
+      </div>
+    </section>
+  </main>
+  <Motion client:visible mode="index" />
+</BaseLayout>

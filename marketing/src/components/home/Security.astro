@@ -1,0 +1,29 @@
+---
+// Security & compliance — the single image+text split, with a checklist panel.
+const checks = [
+  "FHIR DiagnosticReport export",
+  "Append-only audit log",
+  "On-premise or self-hosted deployment",
+  "Patient data stays in your environment",
+  "Role-based access control",
+];
+---
+<section class="security" id="security">
+  <div class="wrap">
+    <div class="reveal">
+      <p class="eyebrow" style="margin-bottom:.9rem">Security and compliance</p>
+      <h2>Built for the constraints radiology actually has.</h2>
+      <p>Run RadioPad on-premise or fully local, so patient data stays inside your environment. Reports export as FHIR DiagnosticReport, and access is scoped by role.</p>
+    </div>
+    <ul class="checklist reveal">
+      {
+        checks.map((c) => (
+          <li>
+            <span class="tick"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round"><path d="M5 13l4 4L19 7"/></svg></span>
+            {c}
+          </li>
+        ))
+      }
+    </ul>
+  </div>
+</section>

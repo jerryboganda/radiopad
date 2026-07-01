@@ -1,0 +1,31 @@
+---
+// How it works — pinned sticky-stack (Motion island pins .step elements).
+const steps = [
+  { n: "Step 01", title: "Draft", body: "Speak or paste your findings. RadioPad returns a structured report in your template.", cls: "step-1", glyph: `<path d="M12 2a3 3 0 00-3 3v6a3 3 0 006 0V5a3 3 0 00-3-3z"/><path d="M5 11a7 7 0 0014 0M12 18v3"/>` },
+  { n: "Step 02", title: "Validate", body: "Every draft is checked against your rulebook for laterality, contradictions, missing sections, and unsupported claims.", cls: "step-2", glyph: `<path d="M12 3l7 4v5c0 5-3 7-7 9-4-2-7-4-7-9V7z"/><path d="M9 12l2 2 4-4"/>` },
+  { n: "Step 03", title: "Sign", body: "You see each flag, fix it inline, and sign. Nothing leaves RadioPad unsigned.", cls: "step-3", glyph: `<path d="M4 18c4-1 5-9 8-9s3 5 5 5 3-2 3-2"/><path d="M3 21h18"/>` },
+];
+---
+<section class="how" id="how">
+  <div class="wrap">
+    <div class="how-head reveal"><h2>Three steps from study to signature.</h2></div>
+  </div>
+  <div class="wrap stack">
+    {
+      steps.map((s) => (
+        <div class={`step ${s.cls}`}>
+          <div class="step-inner">
+            <div>
+              <span class="step-num">{s.n}</span>
+              <h3>{s.title}</h3>
+              <p>{s.body}</p>
+            </div>
+            <div class="step-visual">
+              <svg class="glyph" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" set:html={s.glyph} />
+            </div>
+          </div>
+        </div>
+      ))
+    }
+  </div>
+</section>

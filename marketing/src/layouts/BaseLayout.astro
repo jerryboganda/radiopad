@@ -1,0 +1,32 @@
+---
+import "../styles/app.css";
+import { site } from "../lib/site";
+import BaseHead from "../components/BaseHead.astro";
+import Nav from "../components/Nav.svelte";
+import Footer from "../components/Footer.astro";
+
+interface Props {
+  title: string;
+  description?: string;
+  image?: string;
+  type?: "website" | "article";
+  noindex?: boolean;
+  jsonLd?: Record<string, unknown>[];
+  navCurrent?: string;
+}
+
+const { title, description, image, type, noindex, jsonLd, navCurrent = "" } = Astro.props;
+---
+
+<!doctype html>
+<html lang="en">
+  <head>
+    <BaseHead title={title} description={description} image={image} type={type} noindex={noindex} jsonLd={jsonLd} />
+  </head>
+  <body>
+    <a class="skip-link" href="#main">Skip to content</a>
+    <Nav client:load nav={site.nav} cta={site.cta} current={navCurrent} />
+    <slot />
+    <Footer />
+  </body>
+</html>

@@ -1,0 +1,64 @@
+---
+import { site } from "../lib/site";
+
+interface Props {
+  title: string;
+  description?: string;
+  image?: string;
+  type?: "website" | "article";
+  noindex?: boolean;
+  jsonLd?: Record<string, unknown>[];
+}
+
+const {
+  title,
+  description = site.description,
+  image = "/og-default.png",
+  type = "website",
+  noindex = false,
+  jsonLd = [],
+} = Astro.props;
+
+const canonical = new URL(Astro.url.pathname, site.url).href;
+const ogImage = new URL(image, site.url).href;
+// Home passes title === site.name -> use the full tagline title.
+const fullTitle =
+  title === site.name
+    ? `${site.name}: Radiology reports, drafted in seconds. Signed by you.`
+    : `${title} | ${site.name}`;
+---
+
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<!-- JS flag: only hide reveal elements when JS can animate them back in -->
+<script is:inline>document.documentElement.classList.add("js");</script>
+<title>{fullTitle}</title>
+<meta name="description" content={description} />
+<link rel="canonical" href={canonical} />
+{noindex && <meta name="robots" content="noindex, nofollow" />}
+
+<link rel="icon" href="/favicon.svg" type="image/svg+xml" />
+
+<!-- Preload the two critical display/body faces for LCP -->
+<link rel="preload" as="font" type="font/woff2" href="/fonts/clash-display-600.woff2" crossorigin />
+<link rel="preload" as="font" type="font/woff2" href="/fonts/general-sans-400.woff2" crossorigin />
+
+<!-- Open Graph -->
+<meta property="og:type" content={type} />
+<meta property="og:site_name" content={site.name} />
+<meta property="og:title" content={fullTitle} />
+<meta property="og:description" content={description} />
+<meta property="og:url" content={canonical} />
+<meta property="og:image" content={ogImage} />
+
+<!-- Twitter -->
+<meta name="twitter:card" content="summary_large_image" />
+<meta name="twitter:title" content={fullTitle} />
+<meta name="twitter:description" content={description} />
+<meta name="twitter:image" content={ogImage} />
+
+<meta name="generator" content={Astro.generator} />
+<link rel="sitemap" href="/sitemap-index.xml" />
+<link rel="alternate" type="application/rss+xml" title={`${site.name} Blog`} href="/rss.xml" />
+
+{jsonLd.map((obj) => <script type="application/ld+json" set:html={JSON.stringify(obj)} />)}

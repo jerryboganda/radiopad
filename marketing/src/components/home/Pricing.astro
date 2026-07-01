@@ -1,0 +1,39 @@
+---
+// Pricing — 3 tiers. INDICATIVE dummy prices (from $100), visibly tagged.
+// Operator replaces with real figures.
+const tiers = [
+  { name: "Practice", price: "$100", unit: "/ radiologist / mo", who: "For small practices getting started with assisted reporting.", popular: false,
+    features: ["Draft from dictation and findings", "Core validation checks", "PDF and DOCX export", "Web and desktop apps"] },
+  { name: "Department", price: "$300", unit: "/ radiologist / mo", who: "For departments standardizing reporting across a team.", popular: true,
+    features: ["Everything in Practice", "Custom rulebooks and templates", "Full validation engine", "FHIR export and audit log"] },
+  { name: "Health System", price: "$750", unit: "/ radiologist / mo", who: "For multi-site systems with on-premise and compliance needs.", popular: false,
+    features: ["Everything in Department", "On-premise or self-hosted", "SSO and role-based access", "Priority support and onboarding"] },
+];
+---
+<section class="pricing" id="pricing">
+  <div class="wrap">
+    <div class="pricing-head reveal">
+      <p class="eyebrow">Pricing</p>
+      <h2>Pricing that scales with your department.</h2>
+      <p class="note">Indicative pricing shown for layout. Final pricing is set with your team.</p>
+    </div>
+    <div class="tiers">
+      {
+        tiers.map((t) => (
+          <div class={`tier reveal${t.popular ? " popular" : ""}`}>
+            {t.popular && <span class="badge">Most popular</span>}
+            <h3>{t.name}</h3>
+            <div class="price">{t.price}<small> {t.unit}</small></div>
+            <p class="who">{t.who}</p>
+            <ul>
+              {t.features.map((f) => (
+                <li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round"><path d="M5 13l4 4L19 7"/></svg> {f}</li>
+              ))}
+            </ul>
+            <a class="btn btn-ghost" href="/#demo">Book a demo</a>
+          </div>
+        ))
+      }
+    </div>
+  </div>
+</section>

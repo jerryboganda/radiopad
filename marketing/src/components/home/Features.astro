@@ -1,0 +1,57 @@
+---
+// Features — bento (6 items -> 6 cells, diverse backgrounds).
+---
+<section class="features" id="features">
+  <div class="wrap">
+    <div class="features-head reveal">
+      <p class="eyebrow">What it does</p>
+      <h2>Everything between dictation and signature.</h2>
+    </div>
+    <div class="bento">
+      <div class="cell c-draft reveal">
+        <div class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><path d="M12 3v10"/><path d="M8 9l4 4 4-4"/><rect x="5" y="15" width="14" height="5" rx="2"/></svg></div>
+        <h3>Draft from dictation</h3>
+        <p>Speak or paste your findings. RadioPad returns a structured report in your own template, ready to read.</p>
+        <div class="draft-lines">
+          <div class="dl w1"></div><div class="dl w3"></div><div class="dl accent w2"></div><div class="dl w4"></div>
+        </div>
+      </div>
+      <div class="cell c-rule reveal">
+        <div class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><path d="M4 6h16M4 12h10M4 18h13"/></svg></div>
+        <h3>Rulebook engine</h3>
+        <p>Your department&rsquo;s standards, encoded once and applied to every report.</p>
+      </div>
+      <div class="cell c-valid reveal">
+        <div class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><path d="M12 3l7 4v5c0 5-3 7-7 9-4-2-7-4-7-9V7z"/><path d="M9 12l2 2 4-4"/></svg></div>
+        <h3>Validation engine</h3>
+        <p>Catches laterality slips, contradictions, missing sections, and unsupported claims before sign-off.</p>
+        <div class="vdemo" id="vdemo">
+          <div class="vrow"><span class="vstate" style="background:var(--danger)"></span><span class="vtext">laterality: left vs right</span></div>
+          <div class="vrow"><span class="vstate" style="background:var(--saffron)"></span><span class="vtext">missing: comparison</span></div>
+          <div class="vrow"><span class="vstate" style="background:var(--success)"></span><span class="vtext">impression supported</span></div>
+        </div>
+      </div>
+      <div class="cell c-export reveal">
+        <div class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><path d="M12 15V4"/><path d="M8 8l4-4 4 4"/><path d="M4 15v3a2 2 0 002 2h12a2 2 0 002-2v-3"/></svg></div>
+        <h3>Structured export</h3>
+        <p>One signed report, many formats.</p>
+        <div class="export-list"><span class="chip">FHIR</span><span class="chip">PDF</span><span class="chip">DOCX</span><span class="chip">Plain text</span></div>
+      </div>
+      <div class="cell c-audit reveal">
+        <div class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><path d="M12 8v4l3 2"/><circle cx="12" cy="12" r="9"/></svg></div>
+        <h3>Immutable audit trail</h3>
+        <p>Every edit and signature recorded in an append-only log you can export.</p>
+      </div>
+      <div class="cell c-surface reveal">
+        <div class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><rect x="3" y="4" width="18" height="12" rx="2"/><path d="M8 20h8"/></svg></div>
+        <h3>Everywhere you read</h3>
+        <p>Web, desktop, mobile, and a command-line tool.</p>
+        <div class="surface-list">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><rect x="2" y="4" width="20" height="14" rx="2"/><path d="M8 21h8"/></svg>
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><rect x="7" y="2" width="10" height="20" rx="2"/><path d="M11 18h2"/></svg>
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M4 5h16v14H4z"/><path d="M7 9l3 3-3 3M13 15h4"/></svg>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>

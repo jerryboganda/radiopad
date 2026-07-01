@@ -1,0 +1,25 @@
+---
+// FAQ — native <details> accordion. First item open by default.
+const faqs = [
+  { q: "Does the AI ever sign reports?", a: "No. RadioPad drafts and validates, but a radiologist reviews and signs every report. There is no setting that lets the model sign or send on its own.", open: true },
+  { q: "Where is patient data stored?", a: "You can run RadioPad on-premise or fully local, so protected health information never has to leave your environment. Cloud deployment is optional, not required." },
+  { q: "Which modalities does it support?", a: "RadioPad works across CT, MRI, X-ray, ultrasound, and more. Reporting is driven by your templates and rulebooks, so it adapts to how your department reads." },
+  { q: "Can we use our own templates and rulebooks?", a: "Yes. The rulebook engine encodes your department’s standards, and reports are generated into your existing templates rather than a fixed house style." },
+  { q: "Does it integrate with our PACS or RIS?", a: "RadioPad exports FHIR DiagnosticReport alongside PDF, DOCX, and plain text, so it fits into existing PACS and RIS workflows. Integration scope is confirmed during onboarding." },
+];
+---
+<section class="faq">
+  <div class="wrap">
+    <h2 class="reveal">Questions radiology teams ask first.</h2>
+    <div class="acc reveal">
+      {
+        faqs.map((f) => (
+          <details open={f.open}>
+            <summary>{f.q} <span class="pm" aria-hidden="true"></span></summary>
+            <div class="answer">{f.a}</div>
+          </details>
+        ))
+      }
+    </div>
+  </div>
+</section>

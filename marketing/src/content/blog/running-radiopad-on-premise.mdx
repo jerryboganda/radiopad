@@ -1,0 +1,29 @@
+---
+title: "Running RadioPad fully on-premise"
+description: "A reference setup for teams that need patient data to stay inside their own environment."
+date: 2026-03-27
+tags: ["Deployment", "Safety"]
+cover: "../../assets/blog/running-radiopad-on-premise.jpg"
+coverAlt: "Server racks representing an on-premise deployment"
+author:
+  name: "Tomas Rieder"
+  role: "Engineering, RadioPad"
+  avatar: "/authors/tomas-rieder.jpg"
+readingTime: "7 min read"
+---
+
+For many radiology departments, the first question is not about features. It is about where the data lives. RadioPad can run entirely inside your environment, with no patient data leaving your network. Here is what that setup looks like.
+
+## What runs where
+
+A full on-premise install keeps three things local: the application, the report data, and the model inference. Nothing about a report has to touch an external service. The audit trail, the rulebooks, and the exports all live on infrastructure you control.
+
+## The model stays inside the walls
+
+On-premise means the drafting model runs on hardware in your environment rather than calling out to a hosted API. That is the part that makes the data-residency question simple to answer: the text of a report never leaves the network it was created on.
+
+## Same guarantees, same workflow
+
+On-premise does not change how RadioPad behaves. The radiologist still signs every report. AI-drafted text is still marked until accepted. The audit trail is still append-only. Deployment is a decision about where the software runs, not about what it is allowed to do. Those guarantees hold the same way in a cloud install and a fully local one.
+
+Teams usually start with a scoped pilot on a single reading room, confirm the data path, and expand from there. The setup is deliberately boring, which is what you want from the part of the stack that holds patient data.

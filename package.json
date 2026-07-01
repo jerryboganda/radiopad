@@ -13,7 +13,9 @@
     "backend:run": "dotnet run --project backend/RadioPad.Api/src/RadioPad.Api",
     "backend:test": "dotnet test backend/RadioPad.Api/RadioPad.Api.sln",
     "cli": "dotnet run --project cli/RadioPad.Cli --",
-    "release:desktop": "node scripts/release-desktop.mjs"
+    "release:desktop": "node scripts/release-desktop.mjs",
+    "marketing:dev": "pnpm --filter @radiopad/marketing dev",
+    "marketing:build": "pnpm --filter @radiopad/marketing build"
   },
   "engines": {
     "node": ">=20.9.0",

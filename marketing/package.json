@@ -1,0 +1,24 @@
+{
+  "name": "@radiopad/marketing",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "RadioPad marketing site (landing + blog). Astro + Svelte islands + GSAP. Brand-locked to the Hallmark palette (see BRAND-LOCK.md).",
+  "scripts": {
+    "dev": "astro dev",
+    "build": "astro build",
+    "preview": "astro preview"
+  },
+  "dependencies": {
+    "astro": "^5.0.0",
+    "@astrojs/svelte": "^7.0.0",
+    "@astrojs/mdx": "^4.0.0",
+    "@astrojs/sitemap": "^3.0.0",
+    "@astrojs/rss": "^4.0.0",
+    "svelte": "^5.0.0",
+    "gsap": "^3.12.0",
+    "tailwindcss": "^4.0.0",
+    "@tailwindcss/vite": "^4.0.0",
+    "sharp": "^0.33.0"
+  }
+}

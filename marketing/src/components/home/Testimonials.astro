@@ -1,0 +1,28 @@
+---
+// Testimonials — carousel (scroll-snap). PLACEHOLDER quotes with fictional names,
+// clearly labeled. Avatars use pravatar (placeholder); replace with real assets.
+const quotes = [
+  { text: "RadioPad cut our turnaround without changing how we read. The validation catches the small misses before sign-off.", name: "Dr. Priya Nair", role: "Consultant Radiologist, Meridian Health", img: "/testimonials/priya-nair.jpg" },
+  { text: "The rulebook engine finally made our reports consistent across the whole department.", name: "Dr. Marcus Feld", role: "Head of Imaging, Cedar Valley Medical", img: "/testimonials/marcus-feld.jpg" },
+  { text: "I still sign every report. RadioPad just gets me to a clean draft faster than dictation ever did.", name: "Dr. Sofia Almeida", role: "Neuroradiologist, Nordic Radiology", img: "/testimonials/sofia-almeida.jpg" },
+];
+---
+<section class="quotes">
+  <div class="wrap">
+    <h2 class="reveal">Radiologists stay in control. The draft just arrives sooner.</h2>
+    <div class="q-track">
+      {
+        quotes.map((q) => (
+          <figure class="q-card reveal">
+            <blockquote>{q.text}</blockquote>
+            <figcaption class="q-attrib">
+              <img src={q.img} alt="" width="44" height="44" loading="lazy" />
+              <span><span class="q-name">{q.name}</span><br /><span class="q-role">{q.role}</span></span>
+            </figcaption>
+          </figure>
+        ))
+      }
+    </div>
+    <p class="q-note">Placeholder testimonials with fictional names, shown for layout. Replace with real, attributed quotes.</p>
+  </div>
+</section>

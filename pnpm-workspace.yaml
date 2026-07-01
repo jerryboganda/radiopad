@@ -1,6 +1,12 @@
 packages:
   - frontend
   - mobile
+  - marketing
 allowBuilds:
   esbuild: set this to true or false
   sharp: set this to true or false
+# Native deps that need their build/postinstall to run (pnpm v10 blocks these by default).
+onlyBuiltDependencies:
+  - esbuild
+  - sharp
+  - '@tailwindcss/oxide'

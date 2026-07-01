@@ -1,0 +1,36 @@
+---
+import { site } from "../lib/site";
+const year = 2026;
+---
+
+<footer class="footer">
+  <div class="wrap">
+    <div class="cols">
+      <div class="brand-col">
+        <a class="brand" href="/" aria-label="RadioPad home">
+          <span class="mark" aria-hidden="true">
+            <svg viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2.4" stroke-linecap="round"><path d="M4 12h3l2 5 4-12 2 7h5" /></svg>
+          </span>
+          RadioPad
+        </a>
+        <p class="about">{site.tagline}</p>
+      </div>
+      {
+        Object.entries(site.footer).map(([heading, links]) => (
+          <div>
+            <h4>{heading}</h4>
+            <ul>
+              {links.map((l) => (
+                <li><a href={l.href}>{l.label}</a></li>
+              ))}
+            </ul>
+          </div>
+        ))
+      }
+    </div>
+    <div class="base">
+      <span>&copy; {year} {site.name}. Licensed under Apache 2.0.</span>
+      <span>{site.email}</span>
+    </div>
+  </div>
+</footer>

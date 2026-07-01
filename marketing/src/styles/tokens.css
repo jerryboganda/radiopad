@@ -1,0 +1,60 @@
+/* Alias layer + non-color design tokens.
+   The canonical --color-* tokens live in the Tailwind @theme block (app.css) and are
+   emitted as :root custom properties there. This file mirrors hallmark.css's pattern:
+   short brand-friendly aliases point at the locked --color-* values, so component CSS
+   can use var(--paper) / var(--accent) while Tailwind utilities (bg-paper, text-ink)
+   resolve to the exact same locked values. */
+
+:root {
+  /* color aliases -> locked --color-* (defined in @theme) */
+  --paper: var(--color-paper);
+  --paper-soft: var(--color-paper-soft);
+  --paper-warm: var(--color-paper-warm);
+  --ink: var(--color-ink);
+  --ink-soft: var(--color-ink-soft);
+  --ink-mute: var(--color-ink-mute);
+  --rule: var(--color-rule);
+  --rule-soft: var(--color-rule-soft);
+  --accent: var(--color-accent);
+  --accent-deep: var(--color-accent-deep);
+  --accent-soft: var(--color-accent-soft);
+  --success: var(--color-success);
+  --success-soft: var(--color-success-soft);
+  --marine: var(--color-marine);
+  --marine-soft: var(--color-marine-soft);
+  --danger: var(--color-danger);
+  --danger-soft: var(--color-danger-soft);
+  --saffron: var(--color-saffron);
+  --saffron-soft: var(--color-saffron-soft);
+  --ai: var(--color-ai);
+  --ai-soft: var(--color-ai-soft);
+  --focus: var(--color-focus);
+
+  /* fluid type scale (pushed larger for the production build).
+     --t-display is capped so the 8-word hero headline keeps 3 clean lines and the
+     CTAs stay above the fold (taste-skill hero hard-rule). Boldness lives in the
+     section headers, metric numbers, and motion instead. */
+  --t-display: clamp(2.3rem, 1.4rem + 3vw, 3.5rem);
+  --t-h1: clamp(2.35rem, 1.5rem + 3.6vw, 4rem);
+  --t-h2: clamp(1.85rem, 1.3rem + 2.5vw, 2.9rem);
+  --t-h3: clamp(1.25rem, 1.05rem + 0.9vw, 1.6rem);
+  --t-lg: 1.2rem;
+  --t-body: 1.0625rem;
+  --t-sm: 0.9375rem;
+  --t-mono: 0.8125rem;
+
+  /* spacing / shape */
+  --maxw: 1200px;
+  --gutter: clamp(1.25rem, 4vw, 3rem);
+  --section-y: clamp(5rem, 10vh, 9.5rem);
+  --radius: 14px;
+  --radius-lg: 22px;
+  --radius-pill: 999px;
+
+  /* motion — house easing reused from the product (hallmark.css --ease-out) */
+  --ease: cubic-bezier(0.16, 1, 0.3, 1);
+  --shadow: 0 1px 2px color-mix(in oklch, var(--ink), transparent 92%),
+            0 18px 50px color-mix(in oklch, var(--ink), transparent 90%);
+  --shadow-sm: 0 1px 2px color-mix(in oklch, var(--ink), transparent 90%),
+               0 8px 24px color-mix(in oklch, var(--ink), transparent 93%);
+}

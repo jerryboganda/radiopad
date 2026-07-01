@@ -1,0 +1,33 @@
+---
+// Final conversion — the one high-contrast (reverse ink) band, now with a working
+// demo-request form. DemoForm is an island; set its `endpoint` to a real handler to wire it.
+import DemoForm from "../DemoForm.svelte";
+const points = [
+  "A 30-minute walkthrough tailored to your workflow",
+  "On-premise, PHI, and compliance questions answered",
+  "See the validation engine on your kind of reports",
+];
+---
+<section class="demo" id="demo">
+  <div class="wrap">
+    <div class="demo-band">
+      <div class="demo-copy">
+        <h2>Put a clean draft on every radiologist&rsquo;s screen.</h2>
+        <p>See how RadioPad drafts, validates, and hands the report back to you for signature. Tell us a little and we will set up a demo around your modalities and rulebooks.</p>
+        <ul class="demo-points">
+          {
+            points.map((p) => (
+              <li>
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"><path d="M5 13l4 4L19 7" /></svg>
+                {p}
+              </li>
+            ))
+          }
+        </ul>
+      </div>
+      <div class="demo-form-card">
+        <DemoForm client:visible />
+      </div>
+    </div>
+  </div>
+</section>

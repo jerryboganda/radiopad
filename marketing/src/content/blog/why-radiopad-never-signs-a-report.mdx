@@ -1,0 +1,62 @@
+---
+title: "Why RadioPad never signs a report"
+description: "The signature is the one thing we will not automate. How RadioPad is built so a radiologist is always the last step, by design and not by policy."
+date: 2026-06-24
+tags: ["Safety", "Product"]
+cover: "../../assets/blog/why-radiopad-never-signs-a-report.jpg"
+coverAlt: "Abstract editorial image representing a signature held back until review"
+author:
+  name: "Dr. Priya Nair"
+  role: "Consultant Radiologist"
+  avatar: "/authors/priya-nair.jpg"
+featured: true
+readingTime: "7 min read"
+---
+
+Most debates about AI in radiology circle the same question: how much should the model be allowed to do? Our answer starts from the other end. We decided first what the model is **never** allowed to do, and built everything else around that line.
+
+The line is the signature. RadioPad can draft a report, check it against your rulebook, and surface every issue it finds. It cannot sign. It cannot send. A radiologist does both, every time.
+
+## Where the line sits
+
+A signed radiology report is a legal and clinical document. Someone is accountable for it. When an AI system finalizes that document, accountability gets blurry in exactly the situations where it matters most. So the signature stays with the person whose name is on the report.
+
+In practice that means three guarantees hold across web, desktop, mobile, and the command line:
+
+- AI-drafted text is visually marked until a radiologist accepts it.
+- No report can leave the system without a human signature.
+- Every edit, flag, and signature is written to an append-only audit trail.
+
+> The model gets you to a clean draft. The radiologist decides whether that draft becomes a report.
+
+## Marked until accepted
+
+When RadioPad drafts a sentence, that sentence carries a marker. In the editor it reads as clearly model-authored, and it keeps that marker until a radiologist edits or explicitly accepts it. There is no moment where machine text quietly becomes indistinguishable from yours.
+
+<div class="callout">
+  <span class="ic" aria-hidden="true"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><circle cx="12" cy="12" r="9"/><path d="M12 8h.01M11 12h1v4h1"/></svg></span>
+  <p>The marker is not decoration. Downstream export strips draft text that was never accepted, so an unreviewed suggestion cannot slip into a signed report.</p>
+</div>
+
+## Validation before signature
+
+Between draft and signature sits the validation engine. It reads the draft against the rulebook for the study and raises anything that looks wrong: a laterality mismatch against the prior, a contradiction between findings and impression, a required section left empty, or a claim the images do not support.
+
+Rulebooks are just structured files, so a department can encode its own standard. A simplified laterality check looks like this:
+
+```yaml
+# chest_ct_v1.yaml (excerpt)
+checks:
+  - id: laterality-consistency
+    when: finding.side != prior.side
+    severity: blocker
+    message: "Side disagrees with the prior study"
+```
+
+A `blocker` severity means the report cannot be signed until the radiologist resolves it. Lighter issues surface as warnings that inform the read without stopping it.
+
+## An audit trail that stayed honest
+
+Every action is appended to a log that cannot be edited after the fact. That record is what makes the first two guarantees verifiable rather than promised. If a report was signed, the trail shows who signed it, what the draft looked like, and which flags were resolved on the way there.
+
+None of this makes the model less useful. It makes the useful part trustworthy. The draft still arrives in seconds. The radiologist still stays the final authority.

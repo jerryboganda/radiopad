@@ -1,0 +1,48 @@
+---
+title: "Encoding a chest CT rulebook, line by line"
+description: "What it takes to turn a department's reporting standard into rules the validation engine can actually enforce."
+date: 2026-05-30
+tags: ["Rulebooks", "Validation"]
+cover: "../../assets/blog/encoding-a-chest-ct-rulebook.jpg"
+coverAlt: "Structured document lines representing an encoded reporting rulebook"
+author:
+  name: "Tomas Rieder"
+  role: "Engineering, RadioPad"
+  avatar: "/authors/tomas-rieder.jpg"
+readingTime: "9 min read"
+---
+
+Every department has a reporting standard. Most of the time it lives in a shared document that new registrars are told to read once. A rulebook is that same standard, written so the software can check it on every report instead of hoping everyone remembers.
+
+## Start from what actually goes wrong
+
+Do not encode the whole standard on day one. Start from the mistakes that reach sign-off: a missing comparison, an impression that contradicts the findings, a side that disagrees with the prior. Those are the checks that earn their place first.
+
+For a chest CT, the first three rules we usually write are:
+
+```yaml
+# chest_ct_v1.yaml
+checks:
+  - id: comparison-present
+    when: sections.comparison == empty
+    severity: warning
+    message: "No comparison recorded"
+  - id: impression-present
+    when: sections.impression == empty
+    severity: blocker
+    message: "Impression is required before signing"
+  - id: laterality-consistency
+    when: finding.side != prior.side
+    severity: blocker
+    message: "Side disagrees with the prior study"
+```
+
+## Severity is a workflow decision, not a technical one
+
+A `blocker` stops a signature. A `warning` informs the read without getting in the way. Deciding which is which is a conversation with the reading team, not something the engine should assume. Set too many blockers and people learn to click past them. Set too few and the rulebook stops meaning anything.
+
+## Keep it versioned
+
+Rulebooks change as the standard changes. Every rulebook carries a version, and reports record which version validated them. When you tighten a rule, older reports still show the standard they were held to, which matters the first time someone reviews a report from two years ago.
+
+The goal is not a rulebook that covers everything. It is a rulebook the department trusts enough to leave switched on.

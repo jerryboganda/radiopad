@@ -1,0 +1,150 @@
+---
+import { getCollection, render } from "astro:content";
+import { Image } from "astro:assets";
+import { site } from "../../lib/site";
+import BaseLayout from "../../layouts/BaseLayout.astro";
+import Motion from "../../components/Motion.svelte";
+
+export async function getStaticPaths() {
+  const posts = await getCollection("blog", ({ data }) => !data.draft);
+  return posts.map((post) => ({ params: { slug: post.id }, props: { post, posts } }));
+}
+
+const { post, posts } = Astro.props;
+const { data } = post;
+const { Content, headings } = await render(post);
+const toc = headings.filter((h) => h.depth === 2);
+
+const dateStr = data.date.toLocaleDateString("en-US", { year: "numeric", month: "long", day: "numeric" });
+
+const related = posts
+  .filter((p) => p.id !== post.id && p.data.tags.some((t) => data.tags.includes(t)))
+  .slice(0, 3);
+
+const canonical = new URL(`/blog/${post.id}/`, site.url).href;
+const coverUrl = new URL(data.cover.src, site.url).href;
+
+const jsonLd = [
+  {
+    "@context": "https://schema.org",
+    "@type": "BlogPosting",
+    headline: data.title,
+    description: data.description,
+    datePublished: data.date.toISOString(),
+    dateModified: (data.updated ?? data.date).toISOString(),
+    author: { "@type": "Person", name: data.author.name },
+    image: coverUrl,
+    mainEntityOfPage: canonical,
+    publisher: { "@type": "Organization", name: site.name, url: site.url },
+  },
+  {
+    "@context": "https://schema.org",
+    "@type": "BreadcrumbList",
+    itemListElement: [
+      { "@type": "ListItem", position: 1, name: "Home", item: new URL("/", site.url).href },
+      { "@type": "ListItem", position: 2, name: "Blog", item: new URL("/blog", site.url).href },
+      { "@type": "ListItem", position: 3, name: data.title },
+    ],
+  },
+];
+---
+
+<BaseLayout title={data.title} description={data.description} image={data.cover.src} type="article" navCurrent="Blog" jsonLd={jsonLd}>
+  <div class="progress" id="progress" aria-hidden="true"></div>
+
+  <nav class="crumbs" aria-label="Breadcrumb">
+    <div class="wrap">
+      <ol>
+        <li><a href="/">Home</a></li>
+        <li aria-hidden="true">/</li>
+        <li><a href="/blog">Blog</a></li>
+        <li aria-hidden="true">/</li>
+        <li aria-current="page">{data.title}</li>
+      </ol>
+    </div>
+  </nav>
+
+  <article id="main">
+    <header class="post-header">
+      <div class="wrap">
+        <div class="inner">
+          <span class="tag">{data.tags[0]}</span>
+          <h1>{data.title}</h1>
+          <p class="standfirst">{data.description}</p>
+          <div class="byline">
+            <img src={data.author.avatar} alt="" width="46" height="46" />
+            <div>
+              <div class="who">{data.author.name}</div>
+              <div class="sub">{dateStr} &middot; {data.readingTime}</div>
+            </div>
+          </div>
+        </div>
+        <div class="cover-hero">
+          <Image src={data.cover} alt={data.coverAlt} widths={[760, 1200]} sizes="(max-width: 1200px) 100vw, 1200px" loading="eager" />
+        </div>
+      </div>
+    </header>
+
+    <div class="layout">
+      <div class="wrap">
+        <div class="prose">
+          <Content />
+        </div>
+        {
+          toc.length > 0 && (
+            <aside class="toc" aria-label="On this page">
+              <h4>On this page</h4>
+              <ul>
+                {toc.map((h) => (
+                  <li><a href={`#${h.slug}`}>{h.text}</a></li>
+                ))}
+              </ul>
+            </aside>
+          )
+        }
+      </div>
+    </div>
+
+    <section class="bio">
+      <div class="wrap">
+        <div class="card">
+          <img src={data.author.avatar} alt="" width="64" height="64" />
+          <div>
+            <div class="name">{data.author.name}</div>
+            <div class="role">{data.author.role}</div>
+            <p>Writes about assisted reporting and clinical safety. Placeholder author bio for this build.</p>
+          </div>
+        </div>
+      </div>
+    </section>
+  </article>
+
+  {
+    related.length > 0 && (
+      <section class="related">
+        <div class="wrap">
+          <h2>Related reading</h2>
+          <div class="rel-grid">
+            {related.map((p) => (
+              <a class="rel" href={`/blog/${p.id}/`}>
+                <div class="cover"><Image src={p.data.cover} alt={p.data.coverAlt} widths={[320, 640]} sizes="(max-width: 820px) 100vw, 33vw" loading="lazy" /></div>
+                <div class="body"><span class="tag">{p.data.tags[0]}</span><h3>{p.data.title}</h3></div>
+              </a>
+            ))}
+          </div>
+        </div>
+      </section>
+    )
+  }
+
+  <section class="cta">
+    <div class="wrap">
+      <div class="cta-band">
+        <h2>See how the draft reaches your screen.</h2>
+        <a class="btn btn-primary btn-lg" href="/#demo">Book a demo</a>
+      </div>
+    </div>
+  </section>
+
+  <Motion client:load mode="post" />
+</BaseLayout>

@@ -1,0 +1,29 @@
+---
+title: "How the validation engine catches laterality errors"
+description: "Left and right are the two most expensive words in radiology. Here is how RadioPad flags a mismatch before sign-off."
+date: 2026-05-18
+tags: ["Validation", "Safety"]
+cover: "../../assets/blog/validation-engine-laterality.jpg"
+coverAlt: "Two mirrored shapes representing left and right laterality"
+author:
+  name: "Dr. Priya Nair"
+  role: "Consultant Radiologist"
+  avatar: "/authors/priya-nair.jpg"
+readingTime: "6 min read"
+---
+
+A laterality error is easy to make and hard to catch by rereading your own words. You know which side you meant, so your eyes supply it even when the text says the opposite. That is exactly the kind of mistake software is good at catching, because software has no idea which side you meant.
+
+## Three places a side can disagree
+
+RadioPad compares laterality across three sources: within the report itself, against the current study metadata, and against the prior report. A mismatch in any pair is worth a flag.
+
+- Findings say left, impression says right.
+- The report says left, the study is coded right.
+- The report says right, the prior said left, and nothing explains the change.
+
+## A flag, not a correction
+
+The engine does not rewrite the report. It raises the disagreement and shows both sides, then leaves the decision to the radiologist. Sometimes the side genuinely changed and the report is correct. The point is that the change was seen and confirmed, not missed.
+
+When the disagreement is against the prior study, RadioPad treats it as a blocker by default, because a silent side flip between reports is the case most worth stopping. Teams can soften that to a warning, but most leave it where it is.
