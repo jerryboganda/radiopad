@@ -127,8 +127,10 @@
    ============================================================ */
 
 /* Page transition wrapper — block-level so the entrance animation never
-   collapses page layout. */
-.rp-page-transition { display: block; }
+   collapses page layout. Explicit width so it still stretches to fill a
+   flex-row ancestor (e.g. the public auth shell) instead of shrinking to
+   its content's fit-content width. */
+.rp-page-transition { display: block; width: 100%; }
 
 /* Reveal — hidden until scrolled into view (JS adds `.is-visible`). */
 .rp-reveal:not(.is-visible) { opacity: 0; }
