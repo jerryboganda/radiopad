@@ -26,6 +26,12 @@
       "sourceType": "autoskills-registry",
       "computedHash": "808c2d86afd16bccaba5f6d499361eb1da4d3e687a3305aa376ad4d40382e27d"
     },
+    "design-taste-frontend": {
+      "source": "Leonxlnx/taste-skill",
+      "sourceType": "github",
+      "skillPath": "skills/taste-skill/SKILL.md",
+      "computedHash": "899b84384f74f540ea5284d9b2e9234e050998b42eacc805410b518d4226c0b3"
+    },
     "dotnet-best-practices": {
       "source": "github/awesome-copilot",
       "sourceType": "autoskills-registry",
