@@ -340,6 +340,21 @@ public class Report : Entity
     public Guid CreatedByUserId { get; set; }
     public Guid? RulebookId { get; set; }
     public Guid? TemplateId { get; set; }
+
+    /// <summary>
+    /// Manual-override pin for <see cref="TemplateId"/> — set when the caller
+    /// explicitly selected the template (create pin or PATCH override). While
+    /// pinned, study-context changes never auto-rebind the template; clearing
+    /// the pin (reset-to-auto) re-resolves it from the selection key.
+    /// </summary>
+    public bool TemplatePinned { get; set; }
+
+    /// <summary>
+    /// Manual-override pin for <see cref="RulebookId"/> — same semantics as
+    /// <see cref="TemplatePinned"/>.
+    /// </summary>
+    public bool RulebookPinned { get; set; }
+
     public ReportStatus Status { get; set; } = ReportStatus.Draft;
 
     public StudyContext Study { get; set; } = new();

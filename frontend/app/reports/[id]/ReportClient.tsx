@@ -24,7 +24,7 @@ import RewriteStylePanel from './RewriteStylePanel';
 import PriorComparePanel from './PriorComparePanel';
 import ReportRibbon, { type RibbonTab, type ExportFormat } from './ReportRibbon';
 import ReportInspector, { type InspectorTab } from './ReportInspector';
-import { SECTIONS, statusLabel, statusTone, normalizeRole } from './reportShared';
+import { SECTIONS, SECTION_FIELD_MAP, normalizeScaffold, statusLabel, statusTone, normalizeRole } from './reportShared';
 import { usePermissions } from '@/lib/permissions';
 import SectionEditor from '@/components/editor/SectionEditor';
 import { useRichEditorEnabled } from '@/lib/editor/richEditorFlag';
@@ -215,50 +215,140 @@ export default function ReportPage() {
     setInspectorTab('checks');
   }
 
-  // Iter-36 — fill empty report sections from a template's scaffolding. The
-  // template binding itself is resolved server-side from modality + body part;
-  // this only fills blanks (never overwrites the radiologist's text) and skips
-  // the PATCH entirely when there is nothing to fill, so auto-apply on load /
-  // selection-key change never writes spurious versions.
-  const applyTemplate = useCallback(async (templatePk: string) => {
-    const current = reportRef.current;
-    if (!current || !templatePk) return;
-    const t = templates.find((x) => x.id === templatePk);
-    if (!t) return;
+  // Scaffold-swap — keep the report body in sync with the bound template. The
+  // binding itself is resolved server-side from the (modality, body part,
+  // contrast) selection key (or pinned manually); whenever it changes, sections
+  // that are still untouched scaffold (empty, or verbatim equal to a known
+  // template placeholder) are replaced with the NEW template's scaffolding.
+  // Sections the radiologist edited are never touched — they're listed in a
+  // dismissible notice instead, so stale "chest technique under a brain study"
+  // text can no longer survive a context change while real prose always does.
+  const parseTemplateSections = useCallback((t: ReportTemplate) => {
     let sections: Array<{ id: string; placeholder?: string }> = [];
     try {
       const parsed = JSON.parse(t.sectionsJson) as { sections?: typeof sections } | typeof sections;
       sections = Array.isArray(parsed) ? parsed : parsed.sections ?? [];
-    } catch { return; }
-    const patch: Partial<Report> = {};
-    const map: Record<string, keyof Report> = {
-      indication: 'indication', technique: 'technique', comparison: 'comparison',
-      findings: 'findings', impression: 'impression', recommendations: 'recommendations',
-    };
-    for (const s of sections) {
-      const key = map[s.id];
-      if (!key) continue;
-      const value = (current as Record<string, unknown>)[key as string];
-      if (!value || (typeof value === 'string' && value.trim().length === 0)) {
-        (patch as Record<string, unknown>)[key as string] = s.placeholder ?? '';
+    } catch { return null; }
+    return sections;
+  }, []);
+
+  // Whitespace-normalized placeholder index across ALL loaded templates. A
+  // section matching ANY known placeholder is treated as untouched scaffold —
+  // robust to reports whose source template is no longer knowable (created
+  // before this fix, rapid context flips, reload mid-swap).
+  const placeholderIndex = useMemo(() => {
+    const idx = new Map<string, Set<string>>();
+    for (const t of templates) {
+      const sections = parseTemplateSections(t);
+      if (!sections) continue;
+      for (const s of sections) {
+        const key = SECTION_FIELD_MAP[s.id];
+        if (!key) continue;
+        const ph = normalizeScaffold(s.placeholder ?? '');
+        if (!ph) continue;
+        let set = idx.get(key as string);
+        if (!set) { set = new Set(); idx.set(key as string, set); }
+        set.add(ph);
       }
     }
-    if (Object.keys(patch).length === 0) return;
-    await update(patch);
-  }, [templates, update]);
+    return idx;
+  }, [templates, parseTemplateSections]);
 
-  // Auto-apply scaffolding once per resolved template id. The server binds
-  // report.templateId from the (modality, body part) key on create + on change;
-  // when that id appears (and its template is loaded) we fill empty sections.
-  const appliedTemplateRef = useRef<string | null>(null);
+  const [scaffoldNotice, setScaffoldNotice] = useState<{ templateName: string; kept: string[] } | null>(null);
+
+  const swapScaffold = useCallback(async (templatePk: string, showNotice: boolean) => {
+    const current = reportRef.current;
+    if (!current || !templatePk) return;
+    // Bindings are locked after primary sign-off; never rewrite a signed body.
+    if (signatures.some((s) => normalizeRole(s.role) === 'Primary')) return;
+    const t = templates.find((x) => x.id === templatePk);
+    if (!t) return;
+    const sections = parseTemplateSections(t);
+    if (!sections) return;
+    const nextPlaceholders = new Map<string, string>();
+    for (const s of sections) {
+      const key = SECTION_FIELD_MAP[s.id];
+      if (key) nextPlaceholders.set(key as string, s.placeholder ?? '');
+    }
+
+    const patch: Partial<Report> = {};
+    const kept: string[] = [];
+    for (const { key, label } of SECTIONS) {
+      const cur = String((current as Record<string, unknown>)[key as string] ?? '');
+      const curNorm = normalizeScaffold(cur);
+      const isScaffold = curNorm.length === 0 || (placeholderIndex.get(key as string)?.has(curNorm) ?? false);
+      // New template may not carry this section — clear stale scaffold to "".
+      const next = nextPlaceholders.get(key as string) ?? '';
+      if (isScaffold) {
+        if (normalizeScaffold(next) !== curNorm) {
+          (patch as Record<string, unknown>)[key as string] = next;
+        }
+      } else if (normalizeScaffold(next) !== curNorm) {
+        kept.push(label);
+      }
+    }
+
+    if (showNotice) setScaffoldNotice(kept.length > 0 ? { templateName: t.name, kept } : null);
+    if (Object.keys(patch).length === 0) return;
+    setSaving(true);
+    try {
+      const next = await api.reports.patch(current.id, patch);
+      // Response-merge: for sections NOT in the swap patch, keep the live
+      // on-screen value (sections persist on blur, so the server copy may be
+      // older than what the radiologist is typing/dictating right now).
+      const live = reportRef.current;
+      const merged: Report = { ...next };
+      if (live) {
+        for (const { key } of SECTIONS) {
+          if (!(key in patch)) {
+            (merged as Record<string, unknown>)[key as string] =
+              (live as Record<string, unknown>)[key as string];
+          }
+        }
+      }
+      setReport(merged);
+    } finally {
+      setSaving(false);
+    }
+  }, [templates, placeholderIndex, parseTemplateSections, signatures]);
+
+  // Serialize swaps: if the binding changes again while a swap PATCH is in
+  // flight (rapid context flips), queue the latest id and run it once after.
+  const swapBusyRef = useRef(false);
+  const pendingSwapRef = useRef<{ tid: string; showNotice: boolean } | null>(null);
+  const runSwap = useCallback(async (tid: string, showNotice: boolean) => {
+    if (swapBusyRef.current) {
+      pendingSwapRef.current = { tid, showNotice };
+      return;
+    }
+    swapBusyRef.current = true;
+    try {
+      await swapScaffold(tid, showNotice);
+    } finally {
+      swapBusyRef.current = false;
+      const pending = pendingSwapRef.current;
+      pendingSwapRef.current = null;
+      if (pending && pending.tid !== tid) void runSwap(pending.tid, pending.showNotice);
+    }
+  }, [swapScaffold]);
+
+  // Fire the swap whenever the bound template id changes (auto re-bind from a
+  // study-context change, manual override, or reset-to-auto) — including when
+  // an id recurs after flipping away and back. Waits until the bound template
+  // is present in the loaded template list; the effect re-fires on load.
+  const prevTemplateIdRef = useRef<string | null>(null);
   useEffect(() => {
-    const tid = report?.templateId;
+    const tid = report?.templateId ?? null;
     if (!tid) return;
-    if (appliedTemplateRef.current === tid) return;
+    if (prevTemplateIdRef.current === tid) return;
     if (!templates.some((t) => t.id === tid)) return;
-    appliedTemplateRef.current = tid;
-    void applyTemplate(tid);
-  }, [report?.templateId, templates, applyTemplate]);
+    const hadPrevious = prevTemplateIdRef.current !== null;
+    prevTemplateIdRef.current = tid;
+    // On initial load (no previous id this session) the swap silently fills
+    // empty/stale scaffold; the "kept your text" notice only makes sense when
+    // the binding visibly changed under the user.
+    void runSwap(tid, hadPrevious);
+  }, [report?.templateId, templates, runSwap]);
 
   async function acknowledge() {
     if (!report) return;
@@ -819,6 +909,21 @@ export default function ReportPage() {
             </div>
           )}
 
+          {scaffoldNotice && (
+            <div className="banner info" data-testid="scaffold-notice">
+              Template changed to “{scaffoldNotice.templateName}” — kept your text in:{' '}
+              {scaffoldNotice.kept.join(', ')}.
+              <button
+                className="ghost"
+                type="button"
+                style={{ marginLeft: 8 }}
+                onClick={() => setScaffoldNotice(null)}
+              >
+                Dismiss
+              </button>
+            </div>
+          )}
+
           {SECTIONS.map(({ key, label, cls }) => {
             const isNarrative = key === 'findings' || key === 'impression' || key === 'recommendations';
             return (
@@ -886,6 +991,11 @@ export default function ReportPage() {
           bodyParts={bodyParts}
           rulebooks={rulebooks}
           onStudyChange={(patch) => update(patch)}
+          onTemplateChange={(templateId) => update({ templateId, templatePinned: true })}
+          onTemplateReset={() => update({ templatePinned: false })}
+          onRulebookChange={(rulebookId) => update({ rulebookId, rulebookPinned: true })}
+          onRulebookReset={() => update({ rulebookPinned: false })}
+          canEdit={canEdit}
           findings={findings}
           qualityScore={qualityScore}
           blockers={blockers}

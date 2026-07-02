@@ -13,6 +13,33 @@ export const SECTIONS: Array<{ key: keyof Report; label: string; cls?: string }>
   { key: 'recommendations', label: 'Recommendations' },
 ];
 
+// Template section ids (templates/*.json → sectionsJson) → report body fields.
+export const SECTION_FIELD_MAP: Record<string, keyof Report> = {
+  indication: 'indication',
+  technique: 'technique',
+  comparison: 'comparison',
+  findings: 'findings',
+  impression: 'impression',
+  recommendations: 'recommendations',
+};
+
+// Canonical form for comparing report text against template scaffolding: a
+// section still equal (modulo whitespace) to a known placeholder is untouched
+// scaffold and safe to swap when the bound template changes.
+export function normalizeScaffold(text: string): string {
+  return text.trim().replace(/\s+/g, ' ');
+}
+
+// Shared contrast token → user-facing label (tokens: "" | None | With | WithAndWithout).
+export function contrastLabel(token: string): string {
+  switch (token) {
+    case 'None': return 'Without contrast';
+    case 'With': return 'With contrast';
+    case 'WithAndWithout': return 'With and without contrast';
+    default: return 'Any contrast';
+  }
+}
+
 export const REWRITE_MODES: Array<{ mode: RewriteMode; label: string; hint: string }> = [
   { mode: 'concise', label: 'Concise', hint: 'Shorter, denser prose' },
   { mode: 'formal', label: 'Formal', hint: 'Strict radiology register' },

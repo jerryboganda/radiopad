@@ -153,17 +153,13 @@ public class ReportsController : TenantedController
         // pin Approved templates.
         if (dto.TemplateId is { } tplId)
         {
-            var tpl = await _db.Templates.FirstOrDefaultAsync(t => t.Id == tplId && t.TenantId == tenant.Id, ct);
-            if (tpl is null)
-                return BadRequest(new { error = "Template not found in this tenant.", kind = "validation" });
-            if (tpl.Status != TemplateStatus.Approved && !tenant.AllowSandboxRulebooks)
-            {
-                return BadRequest(new
-                {
-                    error = $"Template '{tpl.TemplateId}' is in status '{tpl.Status}' and the tenant does not allow sandbox templates.",
-                    kind = "template_not_approved",
-                });
-            }
+            var tplError = await ValidateTemplateAsync(tenant, tplId, ct);
+            if (tplError is not null) return tplError;
+        }
+        if (dto.RulebookId is { } rbId)
+        {
+            var rbError = await ValidateRulebookAsync(tenant, rbId, ct);
+            if (rbError is not null) return rbError;
         }
 
         var report = new Report
@@ -172,6 +168,10 @@ public class ReportsController : TenantedController
             CreatedByUserId = user.Id,
             RulebookId = dto.RulebookId,
             TemplateId = dto.TemplateId,
+            // Caller-supplied bindings are explicit choices — pin them so later
+            // study-context changes never auto-rebind over them.
+            RulebookPinned = dto.RulebookId is not null,
+            TemplatePinned = dto.TemplateId is not null,
             Status = ReportStatus.Draft,
             Indication = dto.Indication ?? "",
             Study = new StudyContext
@@ -190,7 +190,7 @@ public class ReportsController : TenantedController
         // caller did not pin a template/rulebook, auto-resolve the Approved pair
         // for this (modality, body part) so scaffolding + prompts are bound from
         // creation. Caller-supplied pins always win.
-        await ApplyAutoBindingsAsync(tenant, report, overwriteExisting: false, ct);
+        await ApplyAutoBindingsAsync(tenant, report, overwriteTemplate: false, overwriteRulebook: false, ct);
 
         _db.Reports.Add(report);
         await _db.SaveChangesAsync(ct);
@@ -201,11 +201,11 @@ public class ReportsController : TenantedController
     /// Iter-36 — bind the report to the Approved template + rulebook that match its
     /// (modality, body part) selection key. Loads tenant-scoped Approved candidates
     /// and delegates the pick to the pure <see cref="ReportingService.ResolveBindings"/>.
-    /// When <paramref name="overwriteExisting"/> is false an existing pin is preserved
-    /// (creation with a caller-supplied template/rulebook); when true the binding is
-    /// refreshed (the selection key changed on PATCH).
+    /// Each binding refreshes independently: when its overwrite flag is false an
+    /// existing binding is preserved (caller pin / manual override), otherwise it is
+    /// re-resolved from the selection key. Either way a null binding is always filled.
     /// </summary>
-    private async Task ApplyAutoBindingsAsync(Tenant tenant, Report report, bool overwriteExisting, CancellationToken ct)
+    private async Task ApplyAutoBindingsAsync(Tenant tenant, Report report, bool overwriteTemplate, bool overwriteRulebook, CancellationToken ct)
     {
         if (string.IsNullOrWhiteSpace(report.Study.Modality) || string.IsNullOrWhiteSpace(report.Study.BodyPart))
             return;
@@ -220,10 +220,46 @@ public class ReportsController : TenantedController
         var (template, rulebook) = ReportingService.ResolveBindings(
             templates, rulebooks, report.Study.Modality, report.Study.BodyPart, report.Study.Contrast);
 
-        if (template is not null && (overwriteExisting || report.TemplateId is null))
+        if (template is not null && (overwriteTemplate || report.TemplateId is null))
             report.TemplateId = template.Id;
-        if (rulebook is not null && (overwriteExisting || report.RulebookId is null))
+        if (rulebook is not null && (overwriteRulebook || report.RulebookId is null))
             report.RulebookId = rulebook.Id;
+    }
+
+    /// <summary>
+    /// Iter-32 TMP-005 — shared gate for explicitly selected templates (create pin
+    /// or PATCH manual override): must exist in the tenant and be Approved unless
+    /// the tenant allows sandbox content. Returns null when valid.
+    /// </summary>
+    private async Task<IActionResult?> ValidateTemplateAsync(Tenant tenant, Guid templateId, CancellationToken ct)
+    {
+        var tpl = await _db.Templates.FirstOrDefaultAsync(t => t.Id == templateId && t.TenantId == tenant.Id, ct);
+        if (tpl is null)
+            return BadRequest(new { error = "Template not found in this tenant.", kind = "validation" });
+        if (tpl.Status != TemplateStatus.Approved && !tenant.AllowSandboxRulebooks)
+        {
+            return BadRequest(new
+            {
+                error = $"Template '{tpl.TemplateId}' is in status '{tpl.Status}' and the tenant does not allow sandbox templates.",
+                kind = "template_not_approved",
+            });
+        }
+        return null;
+    }
+
+    /// <summary>
+    /// Tenant-membership gate for explicitly selected rulebooks. Unlike templates
+    /// (TMP-005 blocks non-Approved at attach time), RB-010 governance for draft
+    /// rulebooks is enforced at AI-run time, so status is deliberately NOT checked
+    /// here — only that the rulebook exists in the caller's tenant. Returns null
+    /// when valid.
+    /// </summary>
+    private async Task<IActionResult?> ValidateRulebookAsync(Tenant tenant, Guid rulebookId, CancellationToken ct)
+    {
+        var exists = await _db.Rulebooks.AnyAsync(r => r.Id == rulebookId && r.TenantId == tenant.Id, ct);
+        if (!exists)
+            return BadRequest(new { error = "Rulebook not found in this tenant.", kind = "validation" });
+        return null;
     }
 
     [HttpGet("{id:guid}")]
@@ -254,6 +290,8 @@ public class ReportsController : TenantedController
             createdByUserId = report.CreatedByUserId,
             rulebookId = report.RulebookId,
             templateId = report.TemplateId,
+            rulebookPinned = report.RulebookPinned,
+            templatePinned = report.TemplatePinned,
             status = report.Status,
             study = report.Study,
             indication = report.Indication,
@@ -275,7 +313,10 @@ public class ReportsController : TenantedController
         string? Findings, string? Impression, string? Recommendations,
         string? AiHighlightsJson, Guid? RulebookId,
         // Iter-36 — study-context fields editable from the reporting panel.
-        string? Modality, string? BodyPart, int? Age, string? Gender, string? Contrast);
+        string? Modality, string? BodyPart, int? Age, string? Gender, string? Contrast,
+        // Manual binding overrides — an explicit id pins the binding; sending
+        // TemplatePinned/RulebookPinned = false clears the pin (reset-to-auto).
+        Guid? TemplateId = null, bool? TemplatePinned = null, bool? RulebookPinned = null);
 
     [HttpPatch("{id:guid}")]
     public async Task<IActionResult> Patch(Guid id, [FromBody] PatchReportDto dto, CancellationToken ct)
@@ -285,6 +326,26 @@ public class ReportsController : TenantedController
         if (deny is not null) return deny;
         var report = await _db.Reports.FirstOrDefaultAsync(r => r.Id == id && r.TenantId == tenant.Id, ct);
         if (report is null) return NotFound();
+
+        // Binding lock — once a Primary signature exists the signed hash covers the
+        // bound template/rulebook, so binding + pin mutations are rejected. Section
+        // text stays editable (the addendum flow governs post-sign content changes).
+        var mutatesBindings = dto.TemplateId is not null || dto.RulebookId is not null
+            || dto.TemplatePinned is not null || dto.RulebookPinned is not null;
+        if (mutatesBindings)
+        {
+            var primarySigned = await _db.ReportSignatures.AnyAsync(
+                s => s.TenantId == tenant.Id && s.ReportId == report.Id && s.Role == SignatureRole.Primary, ct);
+            if (primarySigned)
+            {
+                return Conflict(new
+                {
+                    error = "Report has a primary signature; template/rulebook bindings are locked.",
+                    kind = "signed_locked",
+                });
+            }
+        }
+
         if (dto.Indication is not null) report.Indication = dto.Indication;
         if (dto.Technique is not null) report.Technique = dto.Technique;
         if (dto.Comparison is not null) report.Comparison = dto.Comparison;
@@ -292,7 +353,28 @@ public class ReportsController : TenantedController
         if (dto.Impression is not null) report.Impression = dto.Impression;
         if (dto.Recommendations is not null) report.Recommendations = dto.Recommendations;
         if (dto.AiHighlightsJson is not null) report.AiHighlightsJson = dto.AiHighlightsJson;
-        if (dto.RulebookId is not null) report.RulebookId = dto.RulebookId;
+
+        // Manual binding overrides. An explicit id is a deliberate user choice:
+        // validate it, apply it, and pin it so later selection-key changes don't
+        // rebind over it. Pinned=false clears the pin and re-resolves below.
+        if (dto.TemplateId is { } tplId)
+        {
+            var tplError = await ValidateTemplateAsync(tenant, tplId, ct);
+            if (tplError is not null) return tplError;
+            report.TemplateId = tplId;
+            report.TemplatePinned = true;
+        }
+        if (dto.RulebookId is { } rbId)
+        {
+            var rbError = await ValidateRulebookAsync(tenant, rbId, ct);
+            if (rbError is not null) return rbError;
+            report.RulebookId = rbId;
+            report.RulebookPinned = true;
+        }
+        var templatePinCleared = dto.TemplatePinned == false && report.TemplatePinned;
+        var rulebookPinCleared = dto.RulebookPinned == false && report.RulebookPinned;
+        if (templatePinCleared) report.TemplatePinned = false;
+        if (rulebookPinCleared) report.RulebookPinned = false;
 
         // Iter-36 — study-context demographics + the modality/body-part selection key.
         if (dto.Age is not null) report.Study.Age = dto.Age;
@@ -303,12 +385,16 @@ public class ReportsController : TenantedController
         if (dto.Modality is not null) report.Study.Modality = dto.Modality;
         if (dto.BodyPart is not null) report.Study.BodyPart = dto.BodyPart;
         if (dto.Contrast is not null) report.Study.Contrast = dto.Contrast;
-        // When the selection key changes (modality, body part, or contrast), re-bind
-        // the matching Approved template + rulebook (which carries the prompts). An
-        // explicit RulebookId in the same PATCH still wins — auto-bind never
-        // overwrites a caller pin.
-        if (modalityChanged || bodyPartChanged || contrastChanged)
-            await ApplyAutoBindingsAsync(tenant, report, overwriteExisting: dto.RulebookId is null, ct);
+        // When the selection key changes (modality, body part, or contrast) — or a
+        // pin was just cleared back to auto — re-resolve the matching Approved
+        // template + rulebook. Each binding refreshes independently and a pinned
+        // binding is never overwritten.
+        if (modalityChanged || bodyPartChanged || contrastChanged || templatePinCleared || rulebookPinCleared)
+        {
+            await ApplyAutoBindingsAsync(tenant, report,
+                overwriteTemplate: !report.TemplatePinned,
+                overwriteRulebook: !report.RulebookPinned, ct);
+        }
 
         report.UpdatedAt = DateTimeOffset.UtcNow;
 

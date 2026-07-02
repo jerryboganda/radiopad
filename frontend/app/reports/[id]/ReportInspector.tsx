@@ -3,9 +3,12 @@
 // Tabbed right-hand inspector for the report editor. Folds the former three
 // stacked right-pane panels (study context, validation, sign & addendum) into
 // one persistent panel with Context / Checks / Sign-off tabs so they never sit
-// at uneven heights. Purely presentational — state + handlers come from props.
+// at uneven heights. Presentational except for the local "show all" toggles —
+// state + handlers come from props.
+import { useState } from 'react';
 import type { Report, ValidationFinding, ReportTemplate, ReportSignature, CatalogItem, Rulebook } from '@/lib/api';
 import {
+  contrastLabel,
   groupBySeverity,
   normalizeRole,
   roleBadge,
@@ -29,6 +32,13 @@ export interface ReportInspectorProps {
   bodyParts: CatalogItem[];
   rulebooks: Rulebook[];
   onStudyChange: (patch: { modality?: string; bodyPart?: string; contrast?: string; age?: number | null; gender?: string }) => void;
+  // Manual binding overrides — selecting pins the binding (survives later
+  // study-context changes); reset clears the pin and re-resolves automatically.
+  onTemplateChange: (templateId: string) => void;
+  onTemplateReset: () => void;
+  onRulebookChange: (rulebookId: string) => void;
+  onRulebookReset: () => void;
+  canEdit: boolean;
 
   // Checks
   findings: ValidationFinding[];
@@ -88,11 +98,59 @@ export default function ReportInspector(p: ReportInspectorProps) {
 
 function ContextPanel(p: ReportInspectorProps) {
   const study = p.report.study;
-  // Modality + body part are the single selection key. They are admin-managed
-  // dropdowns; changing either re-binds the matching template (scaffolding) and
-  // rulebook (prompts) server-side, shown read-only below.
+  // Modality + body part + contrast are the selection key. They are admin-managed
+  // dropdowns; changing any re-binds the matching template (scaffolding) and
+  // rulebook (prompts) server-side — unless the radiologist manually pinned a
+  // binding via the override dropdowns below.
   const matchedTemplate = p.templates.find((t) => t.id === p.report.templateId);
   const matchedRulebook = p.rulebooks.find((r) => r.id === p.report.rulebookId);
+
+  // Candidate lists default to the current study context (151 raw templates is
+  // unusable); "Show all" is the escape hatch for deliberate off-context picks
+  // (e.g. the matched trauma rulebook is wrong for a delayed-milestones study).
+  const [showAllTemplates, setShowAllTemplates] = useState(false);
+  const [showAllRulebooks, setShowAllRulebooks] = useState(false);
+  const eq = (a: string, b: string) => a.trim().toLowerCase() === b.trim().toLowerCase();
+  const csvHas = (csv: string, value: string) =>
+    csv.split(',').some((part) => eq(part, value));
+
+  const templateOptions = p.templates
+    .filter((t) => t.status === undefined || t.status === 1) // Approved only
+    .filter((t) =>
+      showAllTemplates ||
+      t.id === p.report.templateId ||
+      (eq(t.modality, study.modality) && eq(t.bodyPart, study.bodyPart)))
+    .sort((a, b) => a.name.localeCompare(b.name));
+  // Keep a bound-but-off-list template selectable (mirrors the catalog trick).
+  if (matchedTemplate && !templateOptions.some((t) => t.id === matchedTemplate.id)) {
+    templateOptions.unshift(matchedTemplate);
+  }
+
+  const rulebookOptions = p.rulebooks
+    .filter((r) =>
+      showAllRulebooks ||
+      r.id === p.report.rulebookId ||
+      (csvHas(r.appliesToModalities, study.modality) && csvHas(r.appliesToBodyParts, study.bodyPart)))
+    .sort((a, b) => a.name.localeCompare(b.name));
+  if (matchedRulebook && !rulebookOptions.some((r) => r.id === matchedRulebook.id)) {
+    rulebookOptions.unshift(matchedRulebook);
+  }
+
+  // Contrast-tier hint — surfaces which resolution tier the bound template came
+  // from (exact / agnostic / closest-available fallback).
+  const tplContrast = matchedTemplate?.contrast ?? '';
+  const studyContrast = study.contrast || '';
+  const contrastHint = !matchedTemplate ? null
+    : !tplContrast
+      ? { text: 'Contrast-agnostic template', warn: false }
+      : eq(tplContrast, studyContrast)
+        ? { text: `Exact contrast match — ${contrastLabel(tplContrast)}`, warn: false }
+        : {
+            text: `Closest available — template is “${contrastLabel(tplContrast)}”, study is ${studyContrast ? `“${contrastLabel(studyContrast)}”` : 'unspecified'}`,
+            warn: true,
+          };
+
+  const bindingsLocked = p.primarySigned || !p.canEdit;
 
   // Keep a PACS/legacy value selectable even if it's no longer in the catalog.
   const modalityOptions = study.modality && !p.modalities.some((m) => m.code === study.modality)
@@ -180,16 +238,71 @@ function ContextPanel(p: ReportInspectorProps) {
         </div>
       </div>
       <div className="section-block">
-        <label>Matched template</label>
-        <input className="rp-input" value={matchedTemplate ? matchedTemplate.name : '— none —'} readOnly />
+        <div className="rp-row between">
+          <label>Matched template</label>
+          <span className={`badge ${p.report.templatePinned ? 'info' : ''}`}>
+            {p.report.templatePinned ? 'Manual' : 'Auto'}
+          </span>
+        </div>
+        <select
+          className="rp-input"
+          aria-label="Matched template"
+          value={p.report.templateId ?? ''}
+          disabled={bindingsLocked}
+          onChange={(e) => { if (e.target.value) p.onTemplateChange(e.target.value); }}
+        >
+          <option value="">— none —</option>
+          {p.report.templateId && !matchedTemplate && (
+            <option value={p.report.templateId}>(unavailable template)</option>
+          )}
+          {templateOptions.map((t) => (
+            <option key={t.id} value={t.id}>{t.name}</option>
+          ))}
+        </select>
+        {contrastHint && (
+          <p className="rp-page-sub" style={{ marginTop: 4 }}>
+            {contrastHint.warn && <span className="badge warn">Closest</span>} {contrastHint.text}
+          </p>
+        )}
+        <div className="rp-row" style={{ gap: 8, marginTop: 4 }}>
+          <button className="ghost" type="button" onClick={() => setShowAllTemplates((v) => !v)}>
+            {showAllTemplates ? 'Matching only' : 'Show all templates'}
+          </button>
+          {p.report.templatePinned && !bindingsLocked && (
+            <button className="ghost" type="button" onClick={p.onTemplateReset}>Reset to auto</button>
+          )}
+        </div>
       </div>
       <div className="section-block">
-        <label>Matched rulebook (prompts)</label>
-        <input
+        <div className="rp-row between">
+          <label>Matched rulebook (prompts)</label>
+          <span className={`badge ${p.report.rulebookPinned ? 'info' : ''}`}>
+            {p.report.rulebookPinned ? 'Manual' : 'Auto'}
+          </span>
+        </div>
+        <select
           className="rp-input"
-          value={matchedRulebook ? `${matchedRulebook.name} · v${matchedRulebook.version}` : '— none —'}
-          readOnly
-        />
+          aria-label="Matched rulebook"
+          value={p.report.rulebookId ?? ''}
+          disabled={bindingsLocked}
+          onChange={(e) => { if (e.target.value) p.onRulebookChange(e.target.value); }}
+        >
+          <option value="">— none —</option>
+          {p.report.rulebookId && !matchedRulebook && (
+            <option value={p.report.rulebookId}>(unavailable rulebook)</option>
+          )}
+          {rulebookOptions.map((r) => (
+            <option key={r.id} value={r.id}>{r.name} · v{r.version}</option>
+          ))}
+        </select>
+        <div className="rp-row" style={{ gap: 8, marginTop: 4 }}>
+          <button className="ghost" type="button" onClick={() => setShowAllRulebooks((v) => !v)}>
+            {showAllRulebooks ? 'Matching only' : 'Show all rulebooks'}
+          </button>
+          {p.report.rulebookPinned && !bindingsLocked && (
+            <button className="ghost" type="button" onClick={p.onRulebookReset}>Reset to auto</button>
+          )}
+        </div>
       </div>
     </div>
   );

@@ -385,6 +385,11 @@ export type Report = {
   status: 'Draft' | 'Validated' | 'Acknowledged' | 'Exported' | number;
   rulebookId: string | null;
   templateId: string | null;
+  /** Manual-override pins — true when the radiologist explicitly selected the
+   * binding. While pinned, study-context changes never auto-rebind it; PATCHing
+   * the pin to false resets the binding to auto-resolution. */
+  rulebookPinned: boolean;
+  templatePinned: boolean;
   study: {
     accessionNumber: string;
     modality: string;
