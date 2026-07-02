@@ -3,10 +3,9 @@
 // Tabbed right-hand inspector for the report editor. Folds the former three
 // stacked right-pane panels (study context, validation, sign & addendum) into
 // one persistent panel with Context / Checks / Sign-off tabs so they never sit
-// at uneven heights. Presentational except for the local "show all" toggles —
-// state + handlers come from props.
-import { useState } from 'react';
+// at uneven heights. Purely presentational — state + handlers come from props.
 import type { Report, ValidationFinding, ReportTemplate, ReportSignature, CatalogItem, Rulebook } from '@/lib/api';
+import SearchableSelect from '@/components/ui/SearchableSelect';
 import {
   contrastLabel,
   groupBySeverity,
@@ -105,33 +104,36 @@ function ContextPanel(p: ReportInspectorProps) {
   const matchedTemplate = p.templates.find((t) => t.id === p.report.templateId);
   const matchedRulebook = p.rulebooks.find((r) => r.id === p.report.rulebookId);
 
-  // Candidate lists default to the current study context (151 raw templates is
-  // unusable); "Show all" is the escape hatch for deliberate off-context picks
-  // (e.g. the matched trauma rulebook is wrong for a delayed-milestones study).
-  const [showAllTemplates, setShowAllTemplates] = useState(false);
-  const [showAllRulebooks, setShowAllRulebooks] = useState(false);
+  // One flat, searchable list per binding (same pattern as the ribbon's AI
+  // provider picker): click → search box + every option. Options matching the
+  // current study context sort first so the likely picks lead, but nothing is
+  // hidden behind a toggle — an off-context pick (e.g. swapping the trauma
+  // head-CT rulebook for delayed milestones) is just a search away.
   const eq = (a: string, b: string) => a.trim().toLowerCase() === b.trim().toLowerCase();
   const csvHas = (csv: string, value: string) =>
     csv.split(',').some((part) => eq(part, value));
 
+  const templateMatchesStudy = (t: ReportTemplate) =>
+    eq(t.modality, study.modality) && eq(t.bodyPart, study.bodyPart);
   const templateOptions = p.templates
     .filter((t) => t.status === undefined || t.status === 1) // Approved only
-    .filter((t) =>
-      showAllTemplates ||
-      t.id === p.report.templateId ||
-      (eq(t.modality, study.modality) && eq(t.bodyPart, study.bodyPart)))
-    .sort((a, b) => a.name.localeCompare(b.name));
+    .sort((a, b) => {
+      const am = templateMatchesStudy(a) ? 0 : 1;
+      const bm = templateMatchesStudy(b) ? 0 : 1;
+      return am !== bm ? am - bm : a.name.localeCompare(b.name);
+    });
   // Keep a bound-but-off-list template selectable (mirrors the catalog trick).
   if (matchedTemplate && !templateOptions.some((t) => t.id === matchedTemplate.id)) {
     templateOptions.unshift(matchedTemplate);
   }
 
-  const rulebookOptions = p.rulebooks
-    .filter((r) =>
-      showAllRulebooks ||
-      r.id === p.report.rulebookId ||
-      (csvHas(r.appliesToModalities, study.modality) && csvHas(r.appliesToBodyParts, study.bodyPart)))
-    .sort((a, b) => a.name.localeCompare(b.name));
+  const rulebookMatchesStudy = (r: Rulebook) =>
+    csvHas(r.appliesToModalities, study.modality) && csvHas(r.appliesToBodyParts, study.bodyPart);
+  const rulebookOptions = [...p.rulebooks].sort((a, b) => {
+    const am = rulebookMatchesStudy(a) ? 0 : 1;
+    const bm = rulebookMatchesStudy(b) ? 0 : 1;
+    return am !== bm ? am - bm : a.name.localeCompare(b.name);
+  });
   if (matchedRulebook && !rulebookOptions.some((r) => r.id === matchedRulebook.id)) {
     rulebookOptions.unshift(matchedRulebook);
   }
@@ -239,70 +241,72 @@ function ContextPanel(p: ReportInspectorProps) {
       </div>
       <div className="section-block">
         <div className="rp-row between">
-          <label>Matched template</label>
+          <label htmlFor="rp-ctx-template">Matched template</label>
           <span className={`badge ${p.report.templatePinned ? 'info' : ''}`}>
             {p.report.templatePinned ? 'Manual' : 'Auto'}
           </span>
         </div>
-        <select
-          className="rp-input"
-          aria-label="Matched template"
-          value={p.report.templateId ?? ''}
+        <SearchableSelect
+          id="rp-ctx-template"
+          ariaLabel="Matched template"
+          value={p.report.templateId}
           disabled={bindingsLocked}
-          onChange={(e) => { if (e.target.value) p.onTemplateChange(e.target.value); }}
-        >
-          <option value="">— none —</option>
-          {p.report.templateId && !matchedTemplate && (
-            <option value={p.report.templateId}>(unavailable template)</option>
-          )}
-          {templateOptions.map((t) => (
-            <option key={t.id} value={t.id}>{t.name}</option>
-          ))}
-        </select>
+          placeholder="— none —"
+          searchPlaceholder="Search templates…"
+          options={[
+            ...(p.report.templateId && !matchedTemplate
+              ? [{ value: p.report.templateId, label: '(unavailable template)' }]
+              : []),
+            ...templateOptions.map((t) => ({
+              value: t.id,
+              label: t.name,
+              searchText: `${t.modality} ${t.bodyPart} ${contrastLabel(t.contrast ?? '')} ${t.subspecialty}`,
+            })),
+          ]}
+          onChange={(v) => { if (v) p.onTemplateChange(v); }}
+        />
         {contrastHint && (
           <p className="rp-page-sub" style={{ marginTop: 4 }}>
             {contrastHint.warn && <span className="badge warn">Closest</span>} {contrastHint.text}
           </p>
         )}
-        <div className="rp-row" style={{ gap: 8, marginTop: 4 }}>
-          <button className="ghost" type="button" onClick={() => setShowAllTemplates((v) => !v)}>
-            {showAllTemplates ? 'Matching only' : 'Show all templates'}
+        {p.report.templatePinned && !bindingsLocked && (
+          <button className="ghost" type="button" style={{ marginTop: 4 }} onClick={p.onTemplateReset}>
+            Reset to auto
           </button>
-          {p.report.templatePinned && !bindingsLocked && (
-            <button className="ghost" type="button" onClick={p.onTemplateReset}>Reset to auto</button>
-          )}
-        </div>
+        )}
       </div>
       <div className="section-block">
         <div className="rp-row between">
-          <label>Matched rulebook (prompts)</label>
+          <label htmlFor="rp-ctx-rulebook">Matched rulebook (prompts)</label>
           <span className={`badge ${p.report.rulebookPinned ? 'info' : ''}`}>
             {p.report.rulebookPinned ? 'Manual' : 'Auto'}
           </span>
         </div>
-        <select
-          className="rp-input"
-          aria-label="Matched rulebook"
-          value={p.report.rulebookId ?? ''}
+        <SearchableSelect
+          id="rp-ctx-rulebook"
+          ariaLabel="Matched rulebook"
+          value={p.report.rulebookId}
           disabled={bindingsLocked}
-          onChange={(e) => { if (e.target.value) p.onRulebookChange(e.target.value); }}
-        >
-          <option value="">— none —</option>
-          {p.report.rulebookId && !matchedRulebook && (
-            <option value={p.report.rulebookId}>(unavailable rulebook)</option>
-          )}
-          {rulebookOptions.map((r) => (
-            <option key={r.id} value={r.id}>{r.name} · v{r.version}</option>
-          ))}
-        </select>
-        <div className="rp-row" style={{ gap: 8, marginTop: 4 }}>
-          <button className="ghost" type="button" onClick={() => setShowAllRulebooks((v) => !v)}>
-            {showAllRulebooks ? 'Matching only' : 'Show all rulebooks'}
+          placeholder="— none —"
+          searchPlaceholder="Search rulebooks…"
+          options={[
+            ...(p.report.rulebookId && !matchedRulebook
+              ? [{ value: p.report.rulebookId, label: '(unavailable rulebook)' }]
+              : []),
+            ...rulebookOptions.map((r) => ({
+              value: r.id,
+              label: `${r.name} · v${r.version}`,
+              searchText: `${r.appliesToModalities} ${r.appliesToBodyParts}`,
+            })),
+          ]}
+          onChange={(v) => { if (v) p.onRulebookChange(v); }}
+        />
+        {p.report.rulebookPinned && !bindingsLocked && (
+          <button className="ghost" type="button" style={{ marginTop: 4 }} onClick={p.onRulebookReset}>
+            Reset to auto
           </button>
-          {p.report.rulebookPinned && !bindingsLocked && (
-            <button className="ghost" type="button" onClick={p.onRulebookReset}>Reset to auto</button>
-          )}
-        </div>
+        )}
       </div>
     </div>
   );
