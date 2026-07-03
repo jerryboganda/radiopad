@@ -246,6 +246,28 @@ async function fetchWithAuthRetry(
   return res;
 }
 
+/**
+ * Extract a non-OK response's body for the thrown API error. The body stream
+ * can only be consumed ONCE, so read it as text first and then attempt JSON —
+ * `res.json()` followed by a fallback `res.text()` throws
+ * "body stream already read" and masks the real server error (seen when a
+ * not-yet-deployed endpoint returned an empty-body 404).
+ */
+async function errorBody(res: Response): Promise<unknown> {
+  let raw = '';
+  try {
+    raw = await res.text();
+  } catch {
+    return null;
+  }
+  if (!raw) return null;
+  try {
+    return JSON.parse(raw);
+  } catch {
+    return raw;
+  }
+}
+
 async function request<T>(path: string, init?: RequestInit): Promise<T> {
   const headers = new Headers(init?.headers || {});
   if (!headers.has('Content-Type')) headers.set('Content-Type', 'application/json');
@@ -258,13 +280,7 @@ async function request<T>(path: string, init?: RequestInit): Promise<T> {
     credentials: requestCredentials(base, init?.credentials),
   }, headers);
   if (!res.ok) {
-    let body: unknown = null;
-    try {
-      body = await res.json();
-    } catch {
-      body = await res.text();
-    }
-    throw Object.assign(new Error(`API ${res.status} ${res.statusText}`), { status: res.status, body });
+    throw Object.assign(new Error(`API ${res.status} ${res.statusText}`), { status: res.status, body: await errorBody(res) });
   }
   if (res.status === 204) return undefined as unknown as T;
   const ct = res.headers.get('content-type') || '';
@@ -298,9 +314,7 @@ async function requestBlob(path: string): Promise<Blob> {
     credentials: requestCredentials(base),
   }, headers);
   if (!res.ok) {
-    let body: unknown = null;
-    try { body = await res.json(); } catch { body = await res.text(); }
-    throw Object.assign(new Error(`API ${res.status} ${res.statusText}`), { status: res.status, body });
+    throw Object.assign(new Error(`API ${res.status} ${res.statusText}`), { status: res.status, body: await errorBody(res) });
   }
   return await res.blob();
 }
@@ -318,9 +332,7 @@ async function requestForm<T>(path: string, form: FormData): Promise<T> {
     credentials: requestCredentials(base),
   }, headers);
   if (!res.ok) {
-    let body: unknown = null;
-    try { body = await res.json(); } catch { body = await res.text(); }
-    throw Object.assign(new Error(`API ${res.status} ${res.statusText}`), { status: res.status, body });
+    throw Object.assign(new Error(`API ${res.status} ${res.statusText}`), { status: res.status, body: await errorBody(res) });
   }
   const ct = res.headers.get('content-type') || '';
   if (ct.includes('application/json')) return (await res.json()) as T;
@@ -336,9 +348,7 @@ async function requestForm<T>(path: string, form: FormData): Promise<T> {
 async function requestFormTo<T>(base: string, path: string, form: FormData): Promise<T> {
   const res = await fetch(`${base}${path}`, { method: 'POST', body: form, credentials: 'omit' });
   if (!res.ok) {
-    let body: unknown = null;
-    try { body = await res.json(); } catch { body = await res.text(); }
-    throw Object.assign(new Error(`API ${res.status} ${res.statusText}`), { status: res.status, body });
+    throw Object.assign(new Error(`API ${res.status} ${res.statusText}`), { status: res.status, body: await errorBody(res) });
   }
   const ct = res.headers.get('content-type') || '';
   if (ct.includes('application/json')) return (await res.json()) as T;
@@ -356,9 +366,7 @@ async function requestTo<T>(base: string, path: string, init?: RequestInit): Pro
   if (init?.body && !headers.has('Content-Type')) headers.set('Content-Type', 'application/json');
   const res = await fetch(`${base}${path}`, { ...init, headers, credentials: 'omit' });
   if (!res.ok) {
-    let body: unknown = null;
-    try { body = await res.json(); } catch { body = await res.text(); }
-    throw Object.assign(new Error(`API ${res.status} ${res.statusText}`), { status: res.status, body });
+    throw Object.assign(new Error(`API ${res.status} ${res.statusText}`), { status: res.status, body: await errorBody(res) });
   }
   if (res.status === 204) return undefined as unknown as T;
   const ct = res.headers.get('content-type') || '';
@@ -1469,9 +1477,7 @@ export const api = {
         credentials: requestCredentials(base),
       });
       if (!res.ok) {
-        let body: unknown = null;
-        try { body = await res.json(); } catch { body = await res.text(); }
-        throw Object.assign(new Error(`API ${res.status} ${res.statusText}`), { status: res.status, body });
+        throw Object.assign(new Error(`API ${res.status} ${res.statusText}`), { status: res.status, body: await errorBody(res) });
       }
       return (await res.json()) as { upserts: number; removed: number };
     },
