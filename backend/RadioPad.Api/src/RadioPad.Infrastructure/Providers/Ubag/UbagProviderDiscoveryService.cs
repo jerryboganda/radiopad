@@ -186,6 +186,17 @@ public sealed class UbagProviderDiscoveryHostedService : BackgroundService
                     "Catalog backfill: seeded {Count} modality/body-part row(s) across {Tenants} tenant(s)",
                     catalogRows, allTenantIds.Count);
 
+            // Same one-time, all-tenant backfill for the Gemini CLI (OAuth) provider so
+            // pre-existing orgs get it in the report intake's provider dropdown. Idempotent
+            // on absence; an operator who deletes it keeps it deleted until next restart.
+            var cliSeeded = 0;
+            foreach (var tid in allTenantIds)
+                cliSeeded += await Seeding.CliProviderSeed.EnsureGeminiCliAsync(db, tid, stoppingToken);
+            if (cliSeeded > 0)
+                _logger.LogInformation(
+                    "Gemini CLI backfill: seeded {Count} provider row(s) across {Tenants} tenant(s)",
+                    cliSeeded, allTenantIds.Count);
+
             // Policy change (2026-06-27): UBAG is PHI-approved. Promote any rows
             // that were seeded as Sandbox before this change so existing orgs'
             // AI features (cleanup/impression/rewrite/cross-check) stop being

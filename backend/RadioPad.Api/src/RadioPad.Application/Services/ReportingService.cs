@@ -120,6 +120,132 @@ public class ReportingService
         }, ct);
     }
 
+    /// <summary>
+    /// The six report sections a full generation produces, plus provider metadata.
+    /// Empty strings mark sections the model had nothing to say about.
+    /// </summary>
+    public sealed record StructuredReportResult(
+        string Indication, string Technique, string Comparison,
+        string Findings, string Impression, string Recommendations,
+        string Provider, string Model, int LatencyMs, string PromptVersion);
+
+    /// <summary>
+    /// Whole-report generation for the guided intake flow. Unlike the free-text
+    /// <c>draft</c> mode, this asks the model for a strict section-keyed JSON object
+    /// (Indication/Technique/Comparison/Findings/Impression/Recommendations) so the
+    /// editor can adopt each section independently — mirroring
+    /// <see cref="DictationCleanupService"/>. Rulebook governance (RB-010), tenant
+    /// prompt overrides, and the PHI policy in <see cref="IAiGateway"/> are all
+    /// enforced exactly as in <see cref="RunAsync"/>.
+    /// </summary>
+    public async Task<StructuredReportResult> GenerateStructuredAsync(
+        Tenant tenant, User user, Report report, ProviderConfig provider, CancellationToken ct)
+    {
+        // RB-010 — a non-Approved rulebook may not drive a production AI run unless
+        // the tenant opts in to sandbox rulebooks.
+        var rulebookEntity = await ResolveRulebookEntityAsync(tenant, report, ct);
+        if (rulebookEntity is { Status: not RulebookStatus.Approved } && !tenant.AllowSandboxRulebooks)
+        {
+            throw new RulebookGovernanceException(
+                $"Rulebook '{rulebookEntity.RulebookId}@{rulebookEntity.Version}' is in status " +
+                $"'{rulebookEntity.Status}' and the tenant does not allow sandbox rulebooks.");
+        }
+
+        var rulebook = rulebookEntity is null ? null : RulebookSpec.FromYaml(rulebookEntity.SourceYaml);
+        IReadOnlyDictionary<string, string> overrides = _overrides is null || rulebookEntity is null
+            ? new Dictionary<string, string>()
+            : await _overrides.LoadAsync(tenant.Id, rulebookEntity.RulebookId, ct);
+
+        string? Resolve(string key) =>
+            (overrides.TryGetValue(key, out var ov) && !string.IsNullOrWhiteSpace(ov))
+                ? ov
+                : rulebook?.PromptBlocks.GetValueOrDefault(key);
+
+        var system = Resolve("system")
+            ?? "You are assisting a board-certified radiologist drafting a structured radiology report. " +
+               "Never invent findings beyond those provided. Preserve every measurement, laterality, and " +
+               "negation exactly. Output only the requested JSON object — no preface, no trailing prose.";
+
+        // Prefer a rulebook-authored `generate` block, then the existing `draft`
+        // block, then a clinically conservative default.
+        var instructions = Resolve("generate") ?? Resolve("draft")
+            ?? "Generate a complete, structured radiology report from the study metadata, the patient's " +
+               "clinical history, and the dictated positive findings below. Populate every section you can " +
+               "justify from the inputs; use an empty string for a section with nothing to report. " +
+               "Do not invent findings the radiologist did not dictate.";
+
+        var age = report.Study.Age is int a ? a.ToString() : "Unknown";
+        var gender = string.IsNullOrWhiteSpace(report.Study.Gender) ? "Unknown" : report.Study.Gender;
+        var contrast = string.IsNullOrWhiteSpace(report.Study.Contrast) ? "Unspecified" : report.Study.Contrast;
+
+        var userPrompt = $$"""
+            Modality: {{report.Study.Modality}}
+            Body part: {{report.Study.BodyPart}}
+            Contrast: {{contrast}}
+            Patient: age {{age}}, gender {{gender}}
+
+            CLINICAL HISTORY / INDICATION:
+            {{report.Indication}}
+
+            POSITIVE FINDINGS (dictated):
+            {{report.Findings}}
+
+            INSTRUCTION:
+            {{instructions}}
+
+            Respond with a single JSON object exactly matching this schema (use an empty string for a section with nothing to report):
+            {
+              "indication": "",
+              "technique": "",
+              "comparison": "",
+              "findings": "",
+              "impression": "",
+              "recommendations": ""
+            }
+            """;
+
+        var containsPhi = ContainsPhi(report) || ContainsPhiText(system, userPrompt);
+        var result = await _gateway.RouteAsync(tenant, new AiCompletionRequest(
+            Provider: provider,
+            SystemPrompt: system,
+            UserPrompt: userPrompt,
+            PromptVersion: PromptVersion,
+            ContainsPhi: containsPhi)
+        {
+            RulebookId = rulebookEntity?.Id,
+            RulebookVersion = rulebookEntity?.Version,
+        }, ct);
+
+        var sections = ReportSectionJson.Parse(result.Text);
+        return new StructuredReportResult(
+            Indication: sections.GetValueOrDefault("indication", string.Empty),
+            Technique: sections.GetValueOrDefault("technique", string.Empty),
+            Comparison: sections.GetValueOrDefault("comparison", string.Empty),
+            Findings: sections.GetValueOrDefault("findings", string.Empty),
+            Impression: sections.GetValueOrDefault("impression", string.Empty),
+            Recommendations: sections.GetValueOrDefault("recommendations", string.Empty),
+            Provider: result.Provider,
+            Model: result.Model,
+            LatencyMs: result.LatencyMs,
+            PromptVersion: result.PromptVersion);
+    }
+
+    /// <summary>
+    /// Auto-routed variant of <see cref="GenerateStructuredAsync"/> (PRD AI-010) —
+    /// selects the cheapest matching provider via <see cref="IProviderRouter"/>.
+    /// </summary>
+    public async Task<(StructuredReportResult result, ProviderConfig provider)> GenerateStructuredAutoAsync(
+        Tenant tenant, User user, Report report, CancellationToken ct)
+    {
+        if (_router is null)
+            throw new InvalidOperationException("Auto-routing requested but no IProviderRouter is configured.");
+        var provider = await _router.SelectAsync(tenant, ContainsPhi(report), ct)
+            ?? throw new ProviderPolicyException(
+                "No enabled provider matches the tenant's PHI / compliance requirements.");
+        var result = await GenerateStructuredAsync(tenant, user, report, provider, ct);
+        return (result, provider);
+    }
+
     internal static (string system, string instructions, string userPrompt) BuildPromptForMode(
         Report report, RulebookSpec? rulebook, string mode,
         IReadOnlyDictionary<string, string>? overrides = null)

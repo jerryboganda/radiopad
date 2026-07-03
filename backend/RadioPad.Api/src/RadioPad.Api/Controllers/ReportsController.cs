@@ -604,6 +604,117 @@ public class ReportsController : TenantedController
         }
     }
 
+    public record GenerateReportDto(Guid? ProviderId);
+
+    /// <summary>
+    /// Whole-report generation for the guided intake flow (`/reports/new`). Runs the
+    /// structured generation prompt through the selected provider (or auto-routes when
+    /// no provider id is supplied), then adopts each non-empty AI section onto the
+    /// report — marking it <c>.ai-mark</c> — and snapshots a version so the change is
+    /// auditable. Sections the model leaves empty keep whatever the intake seeded
+    /// (e.g. the dictated positive findings). Returns the updated report so the wizard
+    /// can redirect straight into the pre-populated editor.
+    /// </summary>
+    [HttpPost("{id:guid}/generate")]
+    [Microsoft.AspNetCore.RateLimiting.EnableRateLimiting("ai")]
+    public async Task<IActionResult> Generate(Guid id, [FromBody] GenerateReportDto dto, CancellationToken ct)
+    {
+        var (tenant, user) = await ResolveContextAsync(_db, ct);
+        var deny = RequirePermission(user, RbacPermission.ReportsEdit);
+        if (deny is not null) return deny;
+        var report = await _db.Reports.FirstOrDefaultAsync(r => r.Id == id && r.TenantId == tenant.Id, ct);
+        if (report is null) return NotFound();
+
+        try
+        {
+            ReportingService.StructuredReportResult result;
+            if (dto.ProviderId is { } pid && pid != Guid.Empty)
+            {
+                var provider = await _db.Providers.FirstOrDefaultAsync(
+                    p => p.Id == pid && p.TenantId == tenant.Id, ct)
+                    ?? throw new InvalidOperationException("provider_not_found");
+                result = await _reporting.GenerateStructuredAsync(tenant, user, report, provider, ct);
+            }
+            else
+            {
+                (result, _) = await _reporting.GenerateStructuredAutoAsync(tenant, user, report, ct);
+            }
+
+            // Adopt each non-empty AI section and flag it for the .ai-mark review
+            // style; empty sections keep whatever the intake seeded.
+            var highlights = ParseHighlights(report.AiHighlightsJson);
+            void Adopt(string key, string value, Action<string> set)
+            {
+                if (string.IsNullOrWhiteSpace(value)) return;
+                set(value);
+                highlights[key] = true;
+            }
+            Adopt("indication", result.Indication, v => report.Indication = v);
+            Adopt("technique", result.Technique, v => report.Technique = v);
+            Adopt("comparison", result.Comparison, v => report.Comparison = v);
+            Adopt("findings", result.Findings, v => report.Findings = v);
+            Adopt("impression", result.Impression, v => report.Impression = v);
+            Adopt("recommendations", result.Recommendations, v => report.Recommendations = v);
+            report.AiHighlightsJson = System.Text.Json.JsonSerializer.Serialize(highlights);
+            report.UpdatedAt = DateTimeOffset.UtcNow;
+
+            // Version snapshot mirrors PATCH so the editor's history/diff captures
+            // the generation as an authored step.
+            var nextSeq = await _db.ReportVersions.Where(v => v.ReportId == report.Id).CountAsync(ct);
+            _db.ReportVersions.Add(new Domain.Entities.ReportVersion
+            {
+                ReportId = report.Id,
+                Sequence = nextSeq + 1,
+                AuthorUserId = user.Id,
+                Action = "generate",
+                RulebookId = report.RulebookId,
+                SnapshotJson = System.Text.Json.JsonSerializer.Serialize(new
+                {
+                    report.Indication, report.Technique, report.Comparison,
+                    report.Findings, report.Impression, report.Recommendations,
+                    report.AiHighlightsJson,
+                }),
+            });
+            await _db.SaveChangesAsync(ct);
+
+            return Ok(report);
+        }
+        catch (InvalidOperationException ioe) when (ioe.Message == "provider_not_found")
+        {
+            return BadRequest(new { error = "Provider not found.", kind = "not_found" });
+        }
+        catch (Application.Services.ProviderPolicyException pex)
+        {
+            return StatusCode(StatusCodes.Status403Forbidden, new { error = pex.Message, kind = "provider_policy" });
+        }
+        catch (Application.Services.ProviderTransportException tex)
+        {
+            return StatusCode(StatusCodes.Status502BadGateway, new
+            {
+                error = $"The AI provider could not complete the report: {tex.Message}",
+                kind = "provider_transport",
+            });
+        }
+        catch (Application.Services.RulebookGovernanceException rge)
+        {
+            return Conflict(new { error = rge.Message, kind = "rulebook_governance" });
+        }
+    }
+
+    /// <summary>Read the report's AiHighlights map (section key → generated?) tolerantly.</summary>
+    private static Dictionary<string, bool> ParseHighlights(string? json)
+    {
+        if (string.IsNullOrWhiteSpace(json)) return new();
+        try
+        {
+            return System.Text.Json.JsonSerializer.Deserialize<Dictionary<string, bool>>(json) ?? new();
+        }
+        catch (System.Text.Json.JsonException)
+        {
+            return new();
+        }
+    }
+
     [HttpPost("{id:guid}/acknowledge")]
     public async Task<IActionResult> Acknowledge(Guid id, CancellationToken ct)
     {

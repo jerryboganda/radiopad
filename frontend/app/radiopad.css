@@ -1792,3 +1792,260 @@
 .rp-danger-action { color: var(--red); }
 .rp-danger-action:hover:not(:disabled) { background: color-mix(in oklch, var(--red), transparent 88%); }
 .rp-user-inactive { opacity: 0.62; }
+
+/* ============================================================================
+   New-report intake wizard (/reports/new) — stepper, panels, rich editor
+   toolbar, and the staged generation overlay. Tokens only; light-only.
+   ============================================================================ */
+
+/* Stepper */
+.rp-wizard-steps {
+  list-style: none;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin: 0 0 16px;
+  padding: 0;
+}
+.rp-wizard-step { flex: 1 1 160px; }
+.rp-wizard-step-btn {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 12px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: var(--bg-panel);
+  color: var(--text-dim, var(--text));
+  cursor: pointer;
+  text-align: left;
+  transition: border-color var(--transition-fast), background var(--transition-fast), color var(--transition-fast);
+}
+.rp-wizard-step-btn:hover:not(:disabled) { border-color: var(--border-strong); }
+.rp-wizard-step-btn:disabled { opacity: 0.5; cursor: not-allowed; }
+.rp-wizard-step.current .rp-wizard-step-btn {
+  border-color: var(--accent);
+  box-shadow: 0 0 0 3px var(--accent-soft);
+  color: var(--text-strong, var(--text));
+}
+.rp-wizard-step-num {
+  flex: 0 0 auto;
+  width: 24px;
+  height: 24px;
+  display: grid;
+  place-items: center;
+  border-radius: 999px;
+  background: var(--bg-muted);
+  color: var(--text);
+  font: 600 12.5px/1 var(--sans);
+}
+.rp-wizard-step.current .rp-wizard-step-num { background: var(--accent); color: var(--accent-fg, #fff); }
+.rp-wizard-step.done .rp-wizard-step-num { background: var(--green, #2e7d32); color: #fff; }
+.rp-wizard-step-label { font-size: 13.5px; font-weight: 500; }
+
+/* Panel + layout */
+.rp-wizard-panel { padding: 20px; }
+.rp-wizard-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 16px;
+}
+@media (max-width: 640px) { .rp-wizard-grid { grid-template-columns: 1fr; } }
+.rp-wizard-help {
+  margin: 4px 0 10px;
+  font-size: 12.5px;
+  line-height: 1.5;
+  color: var(--text-dim, var(--text));
+}
+.rp-wizard-help code {
+  font-family: var(--mono, monospace);
+  background: var(--bg-muted);
+  padding: 0 4px;
+  border-radius: var(--radius-sm);
+}
+.rp-wizard-footer {
+  display: flex;
+  justify-content: space-between;
+  gap: 8px;
+  margin-top: 20px;
+  padding-top: 16px;
+  border-top: 1px solid var(--border);
+}
+.rp-wizard-provider-meta {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+  margin-top: 8px;
+}
+.rp-wizard-summary {
+  margin-top: 18px;
+  padding: 14px 16px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: var(--bg-subtle);
+}
+.rp-wizard-summary h3 { margin: 0 0 8px; font-size: 13px; text-transform: uppercase; letter-spacing: 0.04em; color: var(--text-dim, var(--text)); }
+.rp-wizard-summary ul { margin: 0; padding-left: 18px; font-size: 13.5px; line-height: 1.7; }
+
+/* Rich text editor (toolbar + surface) */
+.rp-rte {
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: var(--bg-panel);
+  overflow: hidden;
+}
+.rp-rte-toolbar {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  padding: 6px;
+  border-bottom: 1px solid var(--border);
+  background: var(--bg-subtle);
+}
+.rp-rte-btn {
+  display: grid;
+  place-items: center;
+  width: 30px;
+  height: 30px;
+  padding: 0;
+  border: 1px solid transparent;
+  border-radius: var(--radius-sm);
+  background: transparent;
+  color: var(--text-dim, var(--text));
+  cursor: pointer;
+  transition: background var(--transition-fast), color var(--transition-fast), border-color var(--transition-fast);
+}
+.rp-rte-btn:hover:not(:disabled) { background: var(--bg-muted); color: var(--text); }
+.rp-rte-btn:disabled { opacity: 0.4; cursor: not-allowed; }
+.rp-rte-btn.is-active {
+  background: var(--accent-soft);
+  color: var(--accent-strong, var(--accent));
+  border-color: var(--accent);
+}
+.rp-rte-divider { width: 1px; height: 18px; margin: 0 4px; background: var(--border); }
+/* The Tiptap surface reuses .rp-section-editor base styling; drop its border since
+   the .rp-rte wrapper owns the frame. */
+.rp-rte .rp-rte-surface {
+  border: 0;
+  border-radius: 0;
+  min-height: 132px;
+}
+.rp-rte .rp-rte-surface.rp-rte-tall { min-height: 200px; }
+.rp-rte .rp-rte-surface.ProseMirror-focused,
+.rp-rte .rp-rte-surface:focus-within { box-shadow: none; }
+.rp-rte:focus-within { border-color: var(--accent); box-shadow: 0 0 0 3px var(--accent-soft); }
+/* Rich content inside the editor */
+.rp-rte-surface h2 { font: 600 16px/1.4 var(--sans); margin: 6px 0 4px; }
+.rp-rte-surface h3 { font: 600 14.5px/1.4 var(--sans); margin: 6px 0 4px; }
+.rp-rte-surface ul,
+.rp-rte-surface ol { margin: 4px 0; padding-left: 22px; }
+.rp-rte-surface li { margin: 2px 0; }
+.rp-rte-surface li > p { margin: 0; }
+.rp-rte-surface strong { font-weight: 700; }
+.rp-rte-surface em { font-style: italic; }
+
+/* Staged generation overlay */
+.rp-genoverlay {
+  position: fixed;
+  inset: 0;
+  z-index: 200;
+  display: grid;
+  place-items: center;
+  padding: 24px;
+  background: color-mix(in oklch, var(--bg), transparent 22%);
+  backdrop-filter: blur(6px);
+  animation: rp-genoverlay-fade var(--anim-fast, 160ms) var(--ease-out, ease) both;
+}
+.rp-genoverlay-card {
+  width: min(460px, 100%);
+  padding: 28px 26px;
+  border: 1px solid var(--border);
+  border-radius: 16px;
+  background: var(--bg-panel);
+  box-shadow: 0 24px 60px color-mix(in oklch, var(--text), transparent 82%);
+  text-align: center;
+}
+.rp-genoverlay-title { margin: 4px 0 6px; font: 600 19px/1.3 var(--serif); color: var(--text-strong, var(--text)); }
+.rp-genoverlay-sub { margin: 0 0 18px; font-size: 13.5px; color: var(--text-dim, var(--text)); }
+
+/* Orbiting loader */
+.rp-genoverlay-orb {
+  position: relative;
+  width: 68px;
+  height: 68px;
+  margin: 4px auto 14px;
+}
+.rp-genoverlay-orb-ring {
+  position: absolute;
+  inset: 0;
+  border-radius: 999px;
+  border: 2px solid transparent;
+  border-top-color: var(--accent);
+  animation: rp-genoverlay-spin 1.1s linear infinite;
+}
+.rp-genoverlay-orb-ring.d2 {
+  inset: 10px;
+  border-top-color: color-mix(in oklch, var(--accent), transparent 45%);
+  animation-duration: 1.7s;
+  animation-direction: reverse;
+}
+.rp-genoverlay-orb-core {
+  position: absolute;
+  inset: 24px;
+  border-radius: 999px;
+  background: var(--accent);
+  opacity: 0.9;
+  animation: rp-genoverlay-pulse 1.6s var(--ease-in-out, ease-in-out) infinite;
+}
+.rp-genoverlay-orb.done .rp-genoverlay-orb-ring { animation: none; border-top-color: var(--green, #2e7d32); border-color: color-mix(in oklch, var(--green, #2e7d32), transparent 70%); }
+.rp-genoverlay-orb.done .rp-genoverlay-orb-core { background: var(--green, #2e7d32); animation: none; }
+
+/* Step checklist */
+.rp-genoverlay-steps { list-style: none; margin: 0 0 16px; padding: 0; text-align: left; }
+.rp-genoverlay-step {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 5px 2px;
+  font-size: 13.5px;
+  color: var(--text-dim, var(--text));
+  transition: color var(--transition-base, 180ms);
+}
+.rp-genoverlay-step.active { color: var(--text-strong, var(--text)); font-weight: 600; }
+.rp-genoverlay-step.done { color: var(--text); }
+.rp-genoverlay-step-mark { flex: 0 0 auto; width: 18px; height: 18px; display: grid; place-items: center; color: var(--green, #2e7d32); }
+.rp-genoverlay-step.active .rp-genoverlay-step-mark { color: var(--accent); }
+.rp-genoverlay-step-dot { width: 7px; height: 7px; border-radius: 999px; background: var(--border-strong, var(--border)); }
+.rp-genoverlay-step-spin {
+  width: 14px; height: 14px; border-radius: 999px;
+  border: 2px solid var(--accent-soft);
+  border-top-color: var(--accent);
+  animation: rp-genoverlay-spin 0.8s linear infinite;
+}
+
+/* Progress bar + timer */
+.rp-genoverlay-bar { height: 6px; border-radius: 999px; background: var(--bg-muted); overflow: hidden; }
+.rp-genoverlay-bar-fill {
+  display: block;
+  height: 100%;
+  border-radius: 999px;
+  background: linear-gradient(90deg, var(--accent), color-mix(in oklch, var(--accent), transparent 35%));
+  transition: width 0.6s var(--ease-out, ease);
+}
+.rp-genoverlay-bar-fill.done { background: var(--green, #2e7d32); }
+.rp-genoverlay-meta { display: flex; justify-content: flex-end; margin-top: 8px; }
+.rp-genoverlay-timer { font: 500 12.5px/1 var(--mono, monospace); color: var(--text-dim, var(--text)); }
+
+/* Error state */
+.rp-genoverlay-icon { margin: 0 auto 8px; width: 48px; height: 48px; display: grid; place-items: center; border-radius: 999px; }
+.rp-genoverlay-icon.error { background: var(--red-bg); color: var(--red); }
+.rp-genoverlay-actions { display: flex; justify-content: center; gap: 8px; margin-top: 16px; }
+
+@keyframes rp-genoverlay-spin { to { transform: rotate(360deg); } }
+@keyframes rp-genoverlay-pulse {
+  0%, 100% { transform: scale(1); opacity: 0.9; }
+  50% { transform: scale(0.78); opacity: 0.6; }
+}
+@keyframes rp-genoverlay-fade { from { opacity: 0; } to { opacity: 1; } }

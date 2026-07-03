@@ -97,7 +97,7 @@ public class DictationCleanupService : IDictationCleanupService
             PromptVersion: PromptVersion,
             ContainsPhi: containsPhi), ct);
 
-        var sections = ParseSections(result.Text);
+        var sections = ReportSectionJson.Parse(result.Text);
         return new DictationCleanupResult(
             Indication: sections.GetValueOrDefault("indication", string.Empty),
             Technique: sections.GetValueOrDefault("technique", string.Empty),
@@ -123,39 +123,5 @@ public class DictationCleanupService : IDictationCleanupService
         if (System.Text.RegularExpressions.Regex.IsMatch(blob, @"\b\d{1,2}/\d{1,2}/\d{2,4}\b")) return true;
         if (System.Text.RegularExpressions.Regex.IsMatch(blob, @"\b(Mr|Mrs|Ms|Dr)\.\s+[A-Z][a-z]+\b")) return true;
         return false;
-    }
-
-    private static Dictionary<string, string> ParseSections(string? body)
-    {
-        var map = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
-        if (string.IsNullOrWhiteSpace(body)) return map;
-        var trimmed = body.Trim();
-        // Strip code fences if the model wrapped JSON in ```json ... ```
-        if (trimmed.StartsWith("```"))
-        {
-            var nl = trimmed.IndexOf('\n');
-            if (nl >= 0) trimmed = trimmed[(nl + 1)..];
-            if (trimmed.EndsWith("```")) trimmed = trimmed[..^3];
-            trimmed = trimmed.Trim();
-        }
-        try
-        {
-            using var doc = System.Text.Json.JsonDocument.Parse(trimmed);
-            foreach (var prop in doc.RootElement.EnumerateObject())
-            {
-                if (prop.Value.ValueKind == System.Text.Json.JsonValueKind.String)
-                {
-                    map[prop.Name] = prop.Value.GetString() ?? string.Empty;
-                }
-            }
-        }
-        catch (System.Text.Json.JsonException)
-        {
-            // Model returned free text — surface it as the Findings section so
-            // the radiologist can still see something useful, but leave the
-            // remaining sections empty so the editor does not overwrite them.
-            map["findings"] = body;
-        }
-        return map;
     }
 }

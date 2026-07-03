@@ -925,6 +925,17 @@ export const api = {
         `/api/reports/${id}/ai`,
         { method: 'POST', body: JSON.stringify(body) },
       ),
+    /**
+     * Whole-report generation for the guided intake flow (`/reports/new`). Runs the
+     * structured generation prompt through the selected provider (or auto-routes when
+     * `providerId` is omitted) and returns the report with every AI-populated section
+     * filled and flagged `.ai-mark`. Empty sections keep the intake-seeded text.
+     */
+    generate: (id: string, body: { providerId?: string } = {}) =>
+      request<Report>(`/api/reports/${id}/generate`, {
+        method: 'POST',
+        body: JSON.stringify(body.providerId ? { providerId: body.providerId } : {}),
+      }),
     prior: (id: string) =>
       request<{ current: { id: string; bodyPart: string }; prior: Report | null }>(
         `/api/reports/${id}/prior`,

@@ -107,6 +107,11 @@ public static class DevSeed
             // bearer from the RADIOPAD_UBAG_* environment. Gemini is the unattended
             // PRIMARY (higher Quality); DeepSeek is the enabled secondary.
             db.Providers.AddRange(UbagPrimarySeed.CuratedPrimaries(tenant.Id));
+
+            // Gemini CLI (OAuth / Pro-subscription) — surfaced in the report intake's
+            // provider dropdown. Same single-source-of-truth pattern as UbagPrimarySeed
+            // so every org (not just dev) gets it via the startup backfill.
+            db.Providers.Add(CliProviderSeed.CuratedGeminiCli(tenant.Id));
         }
 
         // Bundled clinical content (rulebooks + templates + the admin catalogs) for

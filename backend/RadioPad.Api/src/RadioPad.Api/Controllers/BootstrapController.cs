@@ -128,6 +128,10 @@ public class BootstrapController : ControllerBase
         try { await UbagPrimarySeed.EnsureCuratedPrimariesAsync(_db, tenant.Id, ct); }
         catch (Exception ex) { _log.LogWarning(ex, "UBAG primary seeding failed for bootstrapped org {Slug}", slug); }
 
+        // Gemini CLI (OAuth) provider — visible in the report intake dropdown from day one.
+        try { await CliProviderSeed.EnsureGeminiCliAsync(_db, tenant.Id, ct); }
+        catch (Exception ex) { _log.LogWarning(ex, "Gemini CLI seeding failed for bootstrapped org {Slug}", slug); }
+
         // Iter-36 — seed the admin Modality + BodyPart catalogs for the bootstrapped org.
         try { await CatalogSeed.EnsureCatalogAsync(_db, tenant.Id, ct); }
         catch (Exception ex) { _log.LogWarning(ex, "Catalog seeding failed for bootstrapped org {Slug}", slug); }

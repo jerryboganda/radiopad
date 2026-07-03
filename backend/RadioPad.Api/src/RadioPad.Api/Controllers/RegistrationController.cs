@@ -208,6 +208,10 @@ public class RegistrationController : ControllerBase
         try { await UbagPrimarySeed.EnsureCuratedPrimariesAsync(_db, tenant.Id, ct); }
         catch (Exception ex) { _log.LogWarning(ex, "UBAG primary seeding failed for new org {Slug}", slug); }
 
+        // Gemini CLI (OAuth) provider — visible in the report intake dropdown from day one.
+        try { await CliProviderSeed.EnsureGeminiCliAsync(_db, tenant.Id, ct); }
+        catch (Exception ex) { _log.LogWarning(ex, "Gemini CLI seeding failed for new org {Slug}", slug); }
+
         // Iter-36 — seed the admin Modality + BodyPart catalogs so the new org's
         // reporting module has selectable defaults from day one. Idempotent + isolated.
         try { await CatalogSeed.EnsureCatalogAsync(_db, tenant.Id, ct); }

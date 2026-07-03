@@ -65,9 +65,11 @@ export default function DashboardPage() {
   // Reset to page 0 whenever filters change.
   useEffect(() => { setPage(0); }, [statusFilter, modalityFilter, search]);
 
-  const newReport = useCallback(async () => {
-    const r = await api.reports.create({ modality: 'CT', bodyPart: 'Chest', indication: 'New report' });
-    location.href = reportHref(r.id);
+  // "+ New report" now opens the guided intake wizard (study context → findings →
+  // history → provider → generate) instead of dropping into an empty editor. The
+  // wizard creates the draft itself once the radiologist hits Generate.
+  const newReport = useCallback(() => {
+    location.href = '/reports/new';
   }, []);
 
   useEffect(() => {
