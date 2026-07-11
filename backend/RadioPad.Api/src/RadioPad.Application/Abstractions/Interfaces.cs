@@ -91,6 +91,14 @@ public interface IUbagClient
     Task<IReadOnlyList<UbagBrowserContext>> ListBrowserContextsAsync(CancellationToken ct);
     Task<UbagJob> CreateJobAsync(UbagJobRequest request, string idempotencyKey, CancellationToken ct);
     Task<UbagJob> GetJobAsync(string jobId, CancellationToken ct);
+
+    /// <summary>
+    /// Best-effort hard cancel (<c>POST /v1/jobs/{id}/cancel</c>) for a job
+    /// RadioPad has given up on (poll timeout / caller abort), so abandoned
+    /// browser jobs stop occupying the gateway's worker instead of running to
+    /// their own timeout. Callers treat failures as non-fatal.
+    /// </summary>
+    Task CancelJobAsync(string jobId, CancellationToken ct);
     Task<UbagWorkflow> CreateWorkflowAsync(UbagWorkflowRequest request, string idempotencyKey, CancellationToken ct);
     Task<UbagWorkflowRun> RunWorkflowAsync(string workflowId, string idempotencyKey, CancellationToken ct);
     Task<UbagWorkflowRun> GetWorkflowRunAsync(string runId, CancellationToken ct);
@@ -326,6 +334,23 @@ public interface IProviderRouter
         Tenant tenant,
         bool containsPhi,
         CancellationToken ct);
+
+    /// <summary>
+    /// Every eligible provider ordered best-first — the failover chain for
+    /// auto-routed AI calls (transport failure on one candidate falls through
+    /// to the next; see <see cref="Services.ProviderFailover"/>). The default
+    /// implementation preserves single-provider semantics for routers that do
+    /// not rank (test fakes), returning the <see cref="SelectAsync"/> winner
+    /// as a one-element chain.
+    /// </summary>
+    async Task<IReadOnlyList<ProviderConfig>> SelectRankedAsync(
+        Tenant tenant,
+        bool containsPhi,
+        CancellationToken ct)
+    {
+        var winner = await SelectAsync(tenant, containsPhi, ct);
+        return winner is null ? Array.Empty<ProviderConfig>() : new[] { winner };
+    }
 }
 
 /// <summary>

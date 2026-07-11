@@ -63,17 +63,18 @@ public class ReportingService
 
     /// <summary>
     /// PRD AI-010 — auto-routes to the cheapest matching provider via
-    /// <see cref="IProviderRouter"/>. Throws when no provider matches.
+    /// <see cref="IProviderRouter"/>, failing over down the ranked chain on
+    /// transport failures (<see cref="ProviderFailover"/>). Throws when no
+    /// provider matches or the whole chain is exhausted.
     /// </summary>
     public async Task<(AiResult result, ProviderConfig provider)> RunAutoAsync(
         Tenant tenant, User user, Report report, string mode, CancellationToken ct)
     {
         if (_router is null)
             throw new InvalidOperationException("Auto-routing requested but no IProviderRouter is configured.");
-        var provider = await _router.SelectAsync(tenant, ContainsPhi(report), ct)
-            ?? throw new ProviderPolicyException(
-                "No enabled provider matches the tenant's PHI / compliance requirements.");
-        var result = await RunAsync(tenant, user, report, provider, mode, ct);
+        var ranked = await _router.SelectRankedAsync(tenant, ContainsPhi(report), ct);
+        var (result, provider) = await ProviderFailover.RunAsync(
+            ranked, p => RunAsync(tenant, user, report, p, mode, ct), _log, ct);
         return (result, provider);
     }
 
@@ -232,17 +233,17 @@ public class ReportingService
 
     /// <summary>
     /// Auto-routed variant of <see cref="GenerateStructuredAsync"/> (PRD AI-010) —
-    /// selects the cheapest matching provider via <see cref="IProviderRouter"/>.
+    /// walks the router's ranked chain, failing over on transport failures
+    /// (<see cref="ProviderFailover"/>).
     /// </summary>
     public async Task<(StructuredReportResult result, ProviderConfig provider)> GenerateStructuredAutoAsync(
         Tenant tenant, User user, Report report, CancellationToken ct)
     {
         if (_router is null)
             throw new InvalidOperationException("Auto-routing requested but no IProviderRouter is configured.");
-        var provider = await _router.SelectAsync(tenant, ContainsPhi(report), ct)
-            ?? throw new ProviderPolicyException(
-                "No enabled provider matches the tenant's PHI / compliance requirements.");
-        var result = await GenerateStructuredAsync(tenant, user, report, provider, ct);
+        var ranked = await _router.SelectRankedAsync(tenant, ContainsPhi(report), ct);
+        var (result, provider) = await ProviderFailover.RunAsync(
+            ranked, p => GenerateStructuredAsync(tenant, user, report, p, ct), _log, ct);
         return (result, provider);
     }
 
@@ -490,8 +491,8 @@ public class ReportingService
         Tenant tenant, User user, Report report, CancellationToken ct)
     {
         if (_router is null) return Array.Empty<string>();
-        var provider = await _router.SelectAsync(tenant, ContainsPhi(report), ct);
-        if (provider is null) return Array.Empty<string>();
+        var ranked = await _router.SelectRankedAsync(tenant, ContainsPhi(report), ct);
+        if (ranked.Count == 0) return Array.Empty<string>();
 
         var rulebookEntity = await ResolveRulebookEntityAsync(tenant, report, ct);
         var rulebook = rulebookEntity is null ? null : RulebookSpec.FromYaml(rulebookEntity.SourceYaml);
@@ -523,16 +524,19 @@ public class ReportingService
             {instructions}
             """;
 
-        var result = await _gateway.RouteAsync(tenant, new AiCompletionRequest(
-            Provider: provider,
-            SystemPrompt: system,
-            UserPrompt: userPrompt,
-            PromptVersion: PromptVersion,
-            ContainsPhi: ContainsPhi(report))
-        {
-            RulebookId = rulebookEntity?.Id,
-            RulebookVersion = rulebookEntity?.Version,
-        }, ct);
+        var (result, _) = await ProviderFailover.RunAsync(
+            ranked,
+            p => _gateway.RouteAsync(tenant, new AiCompletionRequest(
+                Provider: p,
+                SystemPrompt: system,
+                UserPrompt: userPrompt,
+                PromptVersion: PromptVersion,
+                ContainsPhi: ContainsPhi(report))
+            {
+                RulebookId = rulebookEntity?.Id,
+                RulebookVersion = rulebookEntity?.Version,
+            }, ct),
+            _log, ct);
 
         var lines = (result.Text ?? string.Empty)
             .Split('\n', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)

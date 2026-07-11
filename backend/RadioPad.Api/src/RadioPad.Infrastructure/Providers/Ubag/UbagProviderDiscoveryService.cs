@@ -5,6 +5,7 @@ using Microsoft.Extensions.Logging;
 using RadioPad.Application.Abstractions;
 using RadioPad.Application.Services;
 using RadioPad.Domain.Entities;
+using RadioPad.Domain.Enums;
 using RadioPad.Infrastructure.Persistence;
 using RadioPad.Infrastructure.Seeding;
 
@@ -36,15 +37,21 @@ public sealed class UbagProviderDiscoveryService
     private readonly IUbagClient _client;
     private readonly RadioPadDbContext _db;
     private readonly ILogger<UbagProviderDiscoveryService> _logger;
+    private readonly UbagOperatorAlertService? _alerts;
+    private readonly IAuditLog? _audit;
 
     public UbagProviderDiscoveryService(
         IUbagClient client,
         RadioPadDbContext db,
-        ILogger<UbagProviderDiscoveryService> logger)
+        ILogger<UbagProviderDiscoveryService> logger,
+        UbagOperatorAlertService? alerts = null,
+        IAuditLog? audit = null)
     {
         _client = client;
         _db = db;
         _logger = logger;
+        _alerts = alerts;
+        _audit = audit;
     }
 
     /// <summary>
@@ -59,16 +66,25 @@ public sealed class UbagProviderDiscoveryService
         try
         {
             var health = await _client.GetHealthAsync(ct);
-            if (!health.Ok) return 0;
+            if (!health.Ok)
+            {
+                _alerts?.RecordGatewayState(reachable: false);
+                return 0;
+            }
             targets = await _client.ListTargetsAsync(ct);
             contexts = await _client.ListBrowserContextsAsync(ct);
         }
         catch (Exception ex) when (
             ex is ProviderTransportException or HttpRequestException or TaskCanceledException)
         {
+            // Per-sweep visibility lives in the alert service (throttled WARNING +
+            // "unreachable since" in the Hub status); Debug here would hide a
+            // multi-day outage at production log levels.
+            _alerts?.RecordGatewayState(reachable: false);
             _logger.LogDebug(ex, "UBAG discovery skipped for tenant {TenantId}: gateway unreachable", tenantId);
             return 0;
         }
+        _alerts?.RecordGatewayState(reachable: true);
 
         var merged = UbagProviderAdapter.MergeTargetReadiness(targets, contexts);
         var existing = await _db.Providers
@@ -76,12 +92,30 @@ public sealed class UbagProviderDiscoveryService
             .ToListAsync(ct);
 
         var changes = 0;
+        var loginLost = new List<string>();
         foreach (var t in merged)
         {
-            if (Excluded.Contains(t.Id) || Pinned.Contains(t.Id)) continue;
+            if (Excluded.Contains(t.Id)) continue;
 
             var row = existing.FirstOrDefault(
                 p => string.Equals(p.Model, t.Id, StringComparison.OrdinalIgnoreCase));
+
+            if (Pinned.Contains(t.Id))
+            {
+                // Curated primaries stay DevSeed-owned (never created or renamed
+                // here), but their Enabled flag now mirrors live login state too
+                // (2026-07-11): a logged-out Gemini must stop receiving traffic
+                // instead of failing every routed request until a human notices.
+                if (row is not null && row.Enabled != t.Ready)
+                {
+                    row.Enabled = t.Ready;
+                    changes++;
+                    if (!t.Ready) loginLost.Add(t.Id);
+                }
+                if (t.Ready) _alerts?.RecordTargetAuthenticated(t.Id);
+                continue;
+            }
+
             if (row is null)
             {
                 // Only materialise a row once the operator has actually logged in, so
@@ -108,7 +142,9 @@ public sealed class UbagProviderDiscoveryService
                 // Mirror live login state: logging out hides it, logging back in restores it.
                 row.Enabled = t.Ready;
                 changes++;
+                if (!t.Ready) loginLost.Add(t.Id);
             }
+            if (t.Ready) _alerts?.RecordTargetAuthenticated(t.Id);
         }
 
         if (changes > 0)
@@ -121,6 +157,42 @@ public sealed class UbagProviderDiscoveryService
             {
                 _logger.LogWarning(ex, "UBAG discovery save failed for tenant {TenantId}", tenantId);
                 return 0;
+            }
+
+            // Alert AFTER the disable is durably saved: audit the transition in
+            // this tenant's trail, light the Hub banner, and email the operator
+            // (throttled per target per day). Manual noVNC re-login is the only
+            // remedy — UBAG policy forbids automated login — so the first signal
+            // must not be a radiologist's failed request.
+            foreach (var target in loginLost)
+            {
+                _logger.LogWarning(
+                    "UBAG target {Target} logged out — provider disabled for tenant {TenantId} until re-login",
+                    target, tenantId);
+                if (_audit is not null)
+                {
+                    try
+                    {
+                        await _audit.AppendAsync(new AuditEvent
+                        {
+                            TenantId = tenantId,
+                            Action = AuditAction.SystemAlert,
+                            DetailsJson = System.Text.Json.JsonSerializer.Serialize(new
+                            {
+                                kind = "ubag_login_lost",
+                                target,
+                                adapter = UbagProviderAdapter.AdapterId,
+                                remedy = "manual re-login via UBAG browser viewer (noVNC)",
+                            }),
+                        }, ct);
+                    }
+                    catch (Exception ex)
+                    {
+                        _logger.LogWarning(ex, "Failed to audit UBAG login-lost for tenant {TenantId}", tenantId);
+                    }
+                }
+                if (_alerts is not null)
+                    await _alerts.NotifyTargetLoggedOutAsync(target, ct);
             }
         }
         return changes;

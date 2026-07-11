@@ -33,6 +33,19 @@ public class GlobalExceptionMiddleware
             _log.LogWarning(pp, "Provider policy rejected request {Path}", ctx.Request.Path);
             await Write(ctx, HttpStatusCode.Conflict, "policy/provider", pp.Message);
         }
+        catch (ProviderTransportException pt)
+        {
+            // 2026-07-11 UBAG hardening — a provider being down/slow/broken is
+            // NOT an internal server error. 502 + kind=provider_transport lets
+            // the frontend show "AI provider unavailable — retry / pick
+            // another provider" instead of a generic failure, on EVERY AI
+            // endpoint (previously only endpoints with local handling did).
+            _log.LogWarning(pt, "Provider transport failure on {Path} (status={Status})",
+                ctx.Request.Path, pt.StatusCode);
+            await Write(ctx, HttpStatusCode.BadGateway, "provider/transport",
+                $"AI provider transport failure: {pt.Message}. " +
+                "The provider may be down or logged out; auto-routed requests already tried the failover chain.");
+        }
         catch (QuotaExceededException qx)
         {
             // PRD BILL-001..006 — plan quota breached; map to RFC-7807 / 402

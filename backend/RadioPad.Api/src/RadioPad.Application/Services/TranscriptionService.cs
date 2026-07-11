@@ -28,6 +28,12 @@ public sealed class TranscriptionService : ITranscriptionService
     /// <summary>Single-path-segment artifact key the worker waits on.</summary>
     public const string AudioArtifactKey = "dictation.webm";
 
+    /// <summary>
+    /// Adapter id of the UBAG provider rows (mirrors the Infrastructure-side
+    /// <c>UbagProviderAdapter.AdapterId</c> across the layering boundary).
+    /// </summary>
+    private const string UbagAdapterId = "ubag";
+
     /// <summary>Hard cap on a single dictation upload (32 MiB).</summary>
     public const long MaxAudioBytes = 32L * 1024 * 1024;
 
@@ -100,14 +106,21 @@ public sealed class TranscriptionService : ITranscriptionService
 
         // PHI routing mirrors DictationCleanupService exactly: report content
         // drives provider selection, and the router refuses to hand PHI content to
-        // a non-PHI-approved provider (returning null -> the throw below). There is
-        // deliberately NO extra audio-specific gate: the spoken dictation is the
-        // radiologist's de-identified findings, handled like every other AI call.
+        // a non-PHI-approved provider. There is deliberately NO extra
+        // audio-specific gate: the spoken dictation is the radiologist's
+        // de-identified findings, handled like every other AI call.
+        // Cloud transcription runs the UBAG medical_transcription flow, so the
+        // provider must be a UBAG one — the router's overall winner may be a
+        // non-UBAG adapter whose Model is NOT a UBAG target (audit finding,
+        // 2026-07-11). Take the best-RANKED UBAG provider instead.
         var containsPhi = ReportingService.ContainsPhi(report);
 
-        var provider = await _router.SelectAsync(tenant, containsPhi, ct)
+        var ranked = await _router.SelectRankedAsync(tenant, containsPhi, ct);
+        var provider = ranked.FirstOrDefault(p =>
+                string.Equals(p.Adapter, UbagAdapterId, StringComparison.OrdinalIgnoreCase))
             ?? throw new ProviderPolicyException(
-                "No enabled provider matches the tenant's PHI / compliance requirements.");
+                "No enabled UBAG provider matches the tenant's PHI / compliance requirements " +
+                "for cloud transcription (and no on-device STT engine is available).");
 
         var target = ResolveTarget(provider);
         var idempotencyKey = BuildIdempotencyKey(tenant.Id, report.Id, fileName, sizeBytes);
@@ -216,12 +229,42 @@ public sealed class TranscriptionService : ITranscriptionService
         timeout.CancelAfter(timeoutMs);
 
         var current = initial;
-        while (!current.Terminal && !string.IsNullOrWhiteSpace(current.Id))
+        try
         {
-            await Task.Delay(PollDelay, timeout.Token);
-            current = await _ubag.GetJobAsync(current.Id, timeout.Token);
+            while (!current.Terminal && !string.IsNullOrWhiteSpace(current.Id))
+            {
+                await Task.Delay(PollDelay, timeout.Token);
+                current = await _ubag.GetJobAsync(current.Id, timeout.Token);
+            }
+            return current;
         }
-        return current;
+        catch (OperationCanceledException) when (!ct.IsCancellationRequested)
+        {
+            // Poll budget exhausted: best-effort cancel so the abandoned browser
+            // job stops occupying the gateway worker, then surface as transport
+            // failure (the caller falls back to local STT / shows a clear error).
+            await TryCancelJobAsync(current.Id);
+            throw new ProviderTransportException($"ubag: transcription_job_timeout_after_{timeoutMs}ms");
+        }
+        catch (OperationCanceledException)
+        {
+            await TryCancelJobAsync(current.Id);
+            throw;
+        }
+    }
+
+    private async Task TryCancelJobAsync(string jobId)
+    {
+        if (string.IsNullOrWhiteSpace(jobId)) return;
+        try
+        {
+            using var cancelCts = new CancellationTokenSource(TimeSpan.FromSeconds(10));
+            await _ubag.CancelJobAsync(jobId, cancelCts.Token);
+        }
+        catch (Exception ex) when (ex is ProviderTransportException or HttpRequestException or OperationCanceledException)
+        {
+            // Best-effort only — the gateway's own job timeout is the backstop.
+        }
     }
 
     /// <summary>

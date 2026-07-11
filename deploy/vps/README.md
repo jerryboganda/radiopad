@@ -159,6 +159,40 @@ docker compose -f deploy/vps/docker-compose.yml --env-file ../.secrets.env up -d
 docker compose -f deploy/vps/docker-compose.yml --env-file ../.secrets.env ps
 ```
 
+## UBAG AI-orchestrator wiring (2026-07-11)
+
+RadioPad consumes the UBAG gateway (compose project `ubag-small` at
+`/opt/ubag`) as its browser-driving AI provider layer. The wiring is codified
+in the compose files so a re-up can never silently sever it:
+
+1. Add to `/opt/radiopad/.secrets.env`:
+
+   ```bash
+   RADIOPAD_UBAG_BASE_URL=http://ubag-small-gateway-1:8080
+   RADIOPAD_UBAG_AUTH_SECRET=<UBAG_APP_SECRET from /opt/ubag/deploy/small/env.local>
+   RADIOPAD_UBAG_ALLOWED_TARGETS=gemini_web,deepseek_web,mock
+   RADIOPAD_UBAG_ORDERED_TARGETS=gemini_web,deepseek_web
+   # Operator inbox for login-lost / gateway-down alert emails (throttled 1/provider/day):
+   RADIOPAD_OPERATOR_ALERT_EMAIL=ops@example.com
+   ```
+
+2. Bring the stack up WITH the UBAG overlay so `radiopad-api` joins UBAG's
+   private network (external network `ubag-small_ubag-private`):
+
+   ```bash
+   cd /opt/radiopad/src
+   docker compose -f deploy/vps/docker-compose.yml \
+                  -f deploy/vps/docker-compose.ubag.yml \
+                  --env-file ../.secrets.env up -d
+   ```
+
+   On hosts without UBAG, omit the overlay — the UBAG env vars are harmless
+   when empty and RadioPad fails over to its non-UBAG providers.
+
+3. Verify: `curl -s http://127.0.0.1:8093/api/ubag/status` (authenticated)
+   shows `health.ok: true`, per-target login state, and any operator alerts
+   (`alerts[]`, `gatewayUnreachableSince`).
+
 ## NPM Proxy Host
 
 Add a proxy host in Nginx Proxy Manager:

@@ -75,18 +75,60 @@ builder.Services.AddSingleton<IEmailSender, RadioPad.Infrastructure.Email.HttpEm
 // Iter-31 — shared HttpClient pool for production AI provider adapters
 // (Azure OpenAI, AWS Bedrock, Vertex AI, OpenAI direct, OpenAI-compatible).
 // Per-adapter timeout is 60 s; overrideable via RADIOPAD_AI_HTTP_TIMEOUT_SEC.
+// 2026-07-11 UBAG hardening — resilience pipeline on both AI HttpClients:
+// transient retry, circuit breaker, and per-attempt timeout. The pipeline
+// owns the timing budget, so HttpClient.Timeout is raised to sit ABOVE the
+// pipeline's TotalRequestTimeout (it is only the last-resort backstop).
+// The circuit breaker is tuned for this low-traffic deployment: it opens
+// only when nearly every call in the sampling window fails, and recovers in
+// seconds — it stops a dead gateway from being hammered without ever
+// tripping on a routine bad request.
+var aiTimeoutSec = int.TryParse(Environment.GetEnvironmentVariable("RADIOPAD_AI_HTTP_TIMEOUT_SEC"), out var aiSec) && aiSec > 0 ? aiSec : 60;
 builder.Services.AddHttpClient("ai", c =>
 {
-    var sec = int.TryParse(Environment.GetEnvironmentVariable("RADIOPAD_AI_HTTP_TIMEOUT_SEC"), out var t) && t > 0 ? t : 60;
-    c.Timeout = TimeSpan.FromSeconds(sec);
-}).ConfigurePrimaryHttpMessageHandler(() => new HttpClientHandler { AllowAutoRedirect = false });
+    c.Timeout = TimeSpan.FromSeconds(aiTimeoutSec + 40);
+}).ConfigurePrimaryHttpMessageHandler(() => new HttpClientHandler { AllowAutoRedirect = false })
+.AddStandardResilienceHandler(o =>
+{
+    // A full-length LLM completion must never be cut short by the attempt
+    // timeout — it equals the operator-configured per-call budget; the retry
+    // only helps calls that fail FAST (connect refused, 5xx). Clamped so the
+    // options stay valid for any configured value (see the ubag pipeline).
+    var attemptSec = Math.Max(1, aiTimeoutSec);
+    o.AttemptTimeout.Timeout = TimeSpan.FromSeconds(attemptSec);
+    o.TotalRequestTimeout.Timeout = TimeSpan.FromSeconds(attemptSec + 30);
+    o.Retry.MaxRetryAttempts = 1;
+    o.CircuitBreaker.SamplingDuration = TimeSpan.FromSeconds(Math.Max(attemptSec * 2, 30));
+    o.CircuitBreaker.MinimumThroughput = 8;
+    o.CircuitBreaker.FailureRatio = 0.9;
+    o.CircuitBreaker.BreakDuration = TimeSpan.FromSeconds(15);
+});
+var ubagTimeoutMs = int.TryParse(Environment.GetEnvironmentVariable("RADIOPAD_UBAG_TIMEOUT_MS"), out var ubagMs) && ubagMs > 0 ? ubagMs : 120_000;
 builder.Services.AddHttpClient(RadioPad.Infrastructure.Providers.Ubag.UbagClient.HttpClientName, c =>
 {
     var baseUrl = Environment.GetEnvironmentVariable("RADIOPAD_UBAG_BASE_URL") ?? "https://ubag.polytronx.com";
     c.BaseAddress = new Uri(baseUrl.TrimEnd('/') + "/");
-    var ms = int.TryParse(Environment.GetEnvironmentVariable("RADIOPAD_UBAG_TIMEOUT_MS"), out var t) && t > 0 ? t : 120_000;
-    c.Timeout = TimeSpan.FromMilliseconds(ms);
-}).ConfigurePrimaryHttpMessageHandler(() => new HttpClientHandler { AllowAutoRedirect = false });
+    c.Timeout = TimeSpan.FromMilliseconds(ubagTimeoutMs + 15_000);
+}).ConfigurePrimaryHttpMessageHandler(() => new HttpClientHandler { AllowAutoRedirect = false })
+.AddStandardResilienceHandler(o =>
+{
+    // Individual gateway calls (job create, 2 s polls, artifact upload) are
+    // short; 45 s covers the worst artifact upload while leaving room for a
+    // retry inside the job-poll budget. Retried POSTs are safe — every
+    // mutating call carries an Idempotency-Key. The clamps keep the options
+    // VALID for any operator-supplied timeout (total must exceed attempt,
+    // sampling must be at least double the attempt) — options validation
+    // failing at startup would take the whole API down.
+    var totalMs = Math.Max(ubagTimeoutMs, 2_000);
+    var attemptMs = Math.Min(45_000, totalMs / 2);
+    o.AttemptTimeout.Timeout = TimeSpan.FromMilliseconds(attemptMs);
+    o.TotalRequestTimeout.Timeout = TimeSpan.FromMilliseconds(totalMs);
+    o.Retry.MaxRetryAttempts = 2;
+    o.CircuitBreaker.SamplingDuration = TimeSpan.FromMilliseconds(Math.Max(attemptMs * 2, 30_000));
+    o.CircuitBreaker.MinimumThroughput = 8;
+    o.CircuitBreaker.FailureRatio = 0.9;
+    o.CircuitBreaker.BreakDuration = TimeSpan.FromSeconds(15);
+});
 
 // AI provider adapters
 builder.Services.AddSingleton<IAiProviderAdapter, MockAiAdapter>();
@@ -113,6 +155,10 @@ builder.Services.AddSingleton<IAiProviderAdapter, RadioPad.Infrastructure.Provid
 builder.Services.AddSingleton<IAiProviderAdapter, RadioPad.Infrastructure.Providers.Cli.CodexCliProvider>();
 builder.Services.AddSingleton<IUbagClient, RadioPad.Infrastructure.Providers.Ubag.UbagClient>();
 builder.Services.AddSingleton<IAiProviderAdapter, RadioPad.Infrastructure.Providers.Ubag.UbagProviderAdapter>();
+// 2026-07-11 UBAG hardening — operator alerting (Hub banner + throttled email)
+// for logged-out browser sessions and an unreachable gateway. Singleton: banner
+// and throttle state must survive across the scoped discovery sweeps.
+builder.Services.AddSingleton<RadioPad.Infrastructure.Providers.Ubag.UbagOperatorAlertService>();
 // Dynamic UBAG provider auto-discovery: keeps each tenant's UBAG provider rows in sync
 // with the gateway's live target catalog + login state, so any web AI the operator logs
 // into via the UBAG Chromium session appears in the picker automatically (no dev needed).

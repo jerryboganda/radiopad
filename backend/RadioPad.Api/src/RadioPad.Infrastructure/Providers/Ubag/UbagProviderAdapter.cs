@@ -32,7 +32,12 @@ public sealed class UbagProviderAdapter : IAiProviderAdapter, IAiProviderHealthP
         EnforceRequestPolicy(request);
         var target = ResolveTarget(request.Provider);
         var prompt = ComposePrompt(request.SystemPrompt, request.UserPrompt);
-        var idempotencyKey = $"radiopad-ai-{request.Provider.Id:N}-{Hash(prompt)[..16]}";
+        // Per-invocation nonce: the key's job is to dedupe TRANSPORT retries of
+        // this one submission (the resilience pipeline re-sends the same
+        // request/headers), NOT to fuse separate user attempts. A prompt-hash
+        // key made a user's retry after a timeout replay the already-cancelled
+        // gateway job forever (audit finding, 2026-07-11).
+        var idempotencyKey = $"radiopad-ai-{request.Provider.Id:N}-{Guid.NewGuid():N}"[..48];
 
         var created = await _client.CreateJobAsync(
             new UbagJobRequest(target, prompt, ClientRequestId: idempotencyKey),
@@ -40,8 +45,12 @@ public sealed class UbagProviderAdapter : IAiProviderAdapter, IAiProviderHealthP
             cancellationToken);
 
         var terminal = await WaitForJobAsync(created, cancellationToken);
+        // manual_action (logged-out session / interstitial) is NOT a policy
+        // block — it means THIS provider is temporarily unusable. Classify as
+        // transport so the auto-routing failover chain tries the next provider
+        // (discovery disables the row within one sweep; this covers the gap).
         if (!string.IsNullOrWhiteSpace(terminal.ManualAction))
-            throw new ProviderPolicyException($"{AdapterId}: manual_action_required");
+            throw new ProviderTransportException($"{AdapterId}: manual_action_required:{target}");
         if (!string.IsNullOrWhiteSpace(terminal.Error) || terminal.Status.Equals("failed", StringComparison.OrdinalIgnoreCase))
             throw new ProviderTransportException($"{AdapterId}: {terminal.Error ?? terminal.Status}");
         if (string.IsNullOrWhiteSpace(terminal.Output))
@@ -177,13 +186,52 @@ public sealed class UbagProviderAdapter : IAiProviderAdapter, IAiProviderHealthP
         timeout.CancelAfter(timeoutMs);
 
         var current = initial;
-        while (!current.Terminal && !string.IsNullOrWhiteSpace(current.Id))
+        try
         {
-            await Task.Delay(PollDelay, timeout.Token);
-            current = await _client.GetJobAsync(current.Id, timeout.Token);
+            while (!current.Terminal && !string.IsNullOrWhiteSpace(current.Id))
+            {
+                await Task.Delay(PollDelay, timeout.Token);
+                current = await _client.GetJobAsync(current.Id, timeout.Token);
+            }
+            return current;
         }
-        return current;
+        catch (OperationCanceledException) when (!ct.IsCancellationRequested)
+        {
+            // Poll budget exhausted (not a caller abort): the browser job is
+            // still running on the gateway. Best-effort cancel it so it stops
+            // occupying the shared worker, then surface a TRANSPORT failure —
+            // that classification is what lets the auto-routing failover chain
+            // try the next provider instead of bubbling a bare cancellation.
+            await TryCancelJobAsync(current.Id, timeoutMs);
+            throw new ProviderTransportException($"{AdapterId}: job_timeout_after_{timeoutMs}ms:{ResolveTargetOrDefault(current)}");
+        }
+        catch (OperationCanceledException)
+        {
+            // Caller aborted (request cancelled / shutdown): still release the
+            // gateway job, then propagate the cancellation unchanged.
+            await TryCancelJobAsync(current.Id, timeoutMs);
+            throw;
+        }
     }
+
+    private async Task TryCancelJobAsync(string jobId, int timeoutMs)
+    {
+        if (string.IsNullOrWhiteSpace(jobId)) return;
+        try
+        {
+            // Fresh short-lived token: both the caller's token and the poll
+            // budget are already cancelled at this point.
+            using var cancelCts = new CancellationTokenSource(TimeSpan.FromSeconds(10));
+            await _client.CancelJobAsync(jobId, cancelCts.Token);
+        }
+        catch (Exception ex) when (ex is ProviderTransportException or HttpRequestException or OperationCanceledException)
+        {
+            // Best-effort only — the gateway's own job timeout is the backstop.
+        }
+    }
+
+    private static string ResolveTargetOrDefault(UbagJob job)
+        => string.IsNullOrWhiteSpace(job.Target) ? "unknown" : job.Target;
 
     private static string ComposePrompt(string? systemPrompt, string? userPrompt)
     {

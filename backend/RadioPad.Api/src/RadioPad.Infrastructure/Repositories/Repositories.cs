@@ -211,6 +211,12 @@ public class EfAiUsageStore : IAiUsageStore
 /// </summary>
 public class EfProviderRouter : IProviderRouter
 {
+    /// <summary>Trailing window the routing-level circuit breaker inspects.</summary>
+    public static readonly TimeSpan RecentFailureWindow = TimeSpan.FromMinutes(10);
+
+    /// <summary>Error rows (with zero ok) in the window before a provider is skipped.</summary>
+    public const int FailureStreakThreshold = 3;
+
     private readonly RadioPadDbContext _db;
     public EfProviderRouter(RadioPadDbContext db) => _db = db;
 
@@ -219,6 +225,22 @@ public class EfProviderRouter : IProviderRouter
     {
         var ranked = await ScoreAsync(tenant, containsPhi, estimatedInputTokens: 1000, estimatedOutputTokens: 500, ct);
         return ranked.Where(r => r.Eligible).OrderByDescending(r => r.Composite).FirstOrDefault()?.Provider;
+    }
+
+    /// <summary>
+    /// The full eligible candidate list ordered by composite score (best first) —
+    /// the failover chain consumed by <see cref="RadioPad.Application.Services.ProviderFailover"/>.
+    /// Same scoring pass as <see cref="SelectAsync"/>; the winner is element 0.
+    /// </summary>
+    public async Task<IReadOnlyList<ProviderConfig>> SelectRankedAsync(
+        Tenant tenant, bool containsPhi, CancellationToken ct)
+    {
+        var ranked = await ScoreAsync(tenant, containsPhi, estimatedInputTokens: 1000, estimatedOutputTokens: 500, ct);
+        return ranked
+            .Where(r => r.Eligible)
+            .OrderByDescending(r => r.Composite)
+            .Select(r => r.Provider)
+            .ToList();
     }
 
     /// <summary>
@@ -252,6 +274,28 @@ public class EfProviderRouter : IProviderRouter
             .GroupBy(r => r.Provider, StringComparer.Ordinal)
             .ToDictionary(g => g.Key, g => Percentile(g.Select(r => r.LatencyMs).ToList(), 0.95), StringComparer.Ordinal);
 
+        // 2026-07-11 UBAG hardening — routing-level circuit breaker. A provider
+        // whose trailing window shows only failures (>= FailureStreakThreshold
+        // errors, zero ok) is excluded from ranking, so the failover chain and
+        // the winner both skip it. Self-healing: the window slides past the
+        // failures, and any success immediately clears the streak. "blocked"
+        // rows (policy denials) do NOT count — a healthy provider a policy
+        // rejected must not look broken.
+        var failureSince = DateTimeOffset.UtcNow - RecentFailureWindow;
+        var recentRows = await _db.AiRequests.AsNoTracking()
+            .Where(r => r.TenantId == tenant.Id
+                     && r.CreatedAt >= failureSince
+                     && (r.Status == "ok" || r.Status == "error")
+                     && providerNames.Contains(r.Provider))
+            .Select(r => new { r.Provider, r.Status })
+            .ToListAsync(ct);
+        var failingProviders = recentRows
+            .GroupBy(r => r.Provider, StringComparer.Ordinal)
+            .Where(g => g.Count(r => r.Status == "error") >= FailureStreakThreshold
+                     && !g.Any(r => r.Status == "ok"))
+            .Select(g => g.Key)
+            .ToHashSet(StringComparer.Ordinal);
+
         // Eligibility filters mirror the legacy router's rules.
         var rankings = new List<ProviderRanking>(providers.Count);
         foreach (var p in providers)
@@ -264,6 +308,8 @@ public class EfProviderRouter : IProviderRouter
             else if (!containsPhi && tenant.RequirePhiApprovedProvider
                      && p.Compliance is not (ProviderComplianceClass.PhiApproved or ProviderComplianceClass.LocalOnly or ProviderComplianceClass.DeIdentifiedOnly))
                 ineligible = "tenant_requires_phi_grade_provider";
+            else if (failingProviders.Contains(p.Name))
+                ineligible = "recent_failures";
 
             var costPerCall = (p.CostPerInputKToken * estimatedInputTokens / 1000m)
                             + (p.CostPerOutputKToken * estimatedOutputTokens / 1000m);

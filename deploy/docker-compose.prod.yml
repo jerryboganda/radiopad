@@ -76,6 +76,22 @@ services:
       RADIOPAD_GMAIL_REFRESH_TOKEN: ${RADIOPAD_GMAIL_REFRESH_TOKEN:-}
       # For non-Gmail providers only:
       RADIOPAD_EMAIL_API_KEY: ${RADIOPAD_EMAIL_API_KEY:-}
+      # ── UBAG AI-orchestrator wiring (2026-07-11) ─────────────────────────
+      # Codified so a compose re-up can never silently sever the integration;
+      # harmless empty when UBAG is absent. Container-DNS access to the
+      # gateway additionally needs an external-network overlay (see
+      # deploy/vps/docker-compose.ubag.yml for the pattern).
+      RADIOPAD_UBAG_BASE_URL: ${RADIOPAD_UBAG_BASE_URL:-}
+      RADIOPAD_UBAG_AUTH_SECRET: ${RADIOPAD_UBAG_AUTH_SECRET:-}
+      RADIOPAD_UBAG_AUTH_SECRET_REF: ${RADIOPAD_UBAG_AUTH_SECRET_REF:-}
+      RADIOPAD_UBAG_AUTH_HEADER: ${RADIOPAD_UBAG_AUTH_HEADER:-}
+      RADIOPAD_UBAG_AUTH_SCHEME: ${RADIOPAD_UBAG_AUTH_SCHEME:-}
+      RADIOPAD_UBAG_API_VERSION: ${RADIOPAD_UBAG_API_VERSION:-}
+      RADIOPAD_UBAG_ALLOWED_TARGETS: ${RADIOPAD_UBAG_ALLOWED_TARGETS:-}
+      RADIOPAD_UBAG_ORDERED_TARGETS: ${RADIOPAD_UBAG_ORDERED_TARGETS:-}
+      RADIOPAD_UBAG_TIMEOUT_MS: ${RADIOPAD_UBAG_TIMEOUT_MS:-}
+      # Operator inbox for UBAG login-lost / gateway-down alert emails.
+      RADIOPAD_OPERATOR_ALERT_EMAIL: ${RADIOPAD_OPERATOR_ALERT_EMAIL:-}
     networks:
       - internal
       - proxy

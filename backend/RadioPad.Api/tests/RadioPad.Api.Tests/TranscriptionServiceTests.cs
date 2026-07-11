@@ -198,6 +198,14 @@ public class TranscriptionServiceTests
         public Task<UbagJob> GetJobAsync(string jobId, CancellationToken ct) =>
             Task.FromResult(new UbagJob(jobId, "gemini_web", "completed", true, "transcript text", null, null, 30, "{}"));
 
+        public List<string> CancelledJobIds { get; } = new();
+
+        public Task CancelJobAsync(string jobId, CancellationToken ct)
+        {
+            CancelledJobIds.Add(jobId);
+            return Task.CompletedTask;
+        }
+
         // Unused members.
         public Task<UbagHealth> GetHealthAsync(CancellationToken ct) => throw new NotImplementedException();
         public Task<UbagBrowserSummary> GetBrowserSummaryAsync(CancellationToken ct) => throw new NotImplementedException();

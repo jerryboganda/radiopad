@@ -1,0 +1,23 @@
+# UBAG overlay (2026-07-11) — joins radiopad-api to the UBAG compose project's
+# private network so the API reaches the gateway by container DNS
+# (RADIOPAD_UBAG_BASE_URL=http://ubag-small-gateway-1:8080). Kept as a separate
+# overlay because the network is EXTERNAL: a plain `docker-compose.yml` up must
+# keep working on hosts that do not run UBAG.
+#
+#   docker compose -f deploy/vps/docker-compose.yml \
+#                  -f deploy/vps/docker-compose.ubag.yml \
+#                  --env-file ../.secrets.env up -d
+#
+# The network name matches UBAG's compose project (`name: ubag-small` +
+# network `ubag-private`); override UBAG_NETWORK_NAME if that project is
+# deployed under a different name.
+services:
+  radiopad-api:
+    networks:
+      - radiopad
+      - ubag-private
+
+networks:
+  ubag-private:
+    external: true
+    name: ${UBAG_NETWORK_NAME:-ubag-small_ubag-private}

@@ -46,9 +46,9 @@ public class DictationCleanupService : IDictationCleanupService
         var containsPhi = ReportingService.ContainsPhi(report)
             || LooksLikePhi(rawDictation);
 
-        var provider = await _router.SelectAsync(tenant, containsPhi, ct)
-            ?? throw new ProviderPolicyException(
-                "No enabled provider matches the tenant's PHI / compliance requirements.");
+        var ranked = await _router.SelectRankedAsync(tenant, containsPhi, ct);
+        if (ranked.Count == 0)
+            throw new ProviderPolicyException(ProviderFailover.NoProviderMessage);
 
         var rulebookEntity = report.RulebookId is null
             ? null
@@ -90,12 +90,15 @@ public class DictationCleanupService : IDictationCleanupService
             }
             """;
 
-        var result = await _gateway.RouteAsync(tenant, new AiCompletionRequest(
-            Provider: provider,
-            SystemPrompt: system,
-            UserPrompt: userPrompt,
-            PromptVersion: PromptVersion,
-            ContainsPhi: containsPhi), ct);
+        var (result, _) = await ProviderFailover.RunAsync(
+            ranked,
+            p => _gateway.RouteAsync(tenant, new AiCompletionRequest(
+                Provider: p,
+                SystemPrompt: system,
+                UserPrompt: userPrompt,
+                PromptVersion: PromptVersion,
+                ContainsPhi: containsPhi), ct),
+            _log, ct);
 
         var sections = ReportSectionJson.Parse(result.Text);
         return new DictationCleanupResult(

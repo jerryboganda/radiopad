@@ -19,21 +19,30 @@ public class UbagController : TenantedController
     private readonly IUbagClient _ubag;
     private readonly IAuditLog _audit;
     private readonly UbagProviderDiscoveryService _discovery;
+    private readonly UbagOperatorAlertService? _alerts;
 
-    public UbagController(RadioPadDbContext db, IUbagClient ubag, IAuditLog audit, UbagProviderDiscoveryService discovery)
+    public UbagController(
+        RadioPadDbContext db, IUbagClient ubag, IAuditLog audit, UbagProviderDiscoveryService discovery,
+        UbagOperatorAlertService? alerts = null)
     {
         _db = db;
         _ubag = ubag;
         _audit = audit;
         _discovery = discovery;
+        _alerts = alerts;
     }
+
+    /// <summary>One operator-actionable condition surfaced as a Hub banner.</summary>
+    public record UbagAlertDto(string Kind, string Target, DateTimeOffset Since, string Remedy);
 
     public record UbagStatusDto(
         UbagHealth Health,
         UbagBrowserSummary Browser,
         IReadOnlyList<UbagTarget> Targets,
         IReadOnlyList<string> AllowedTargets,
-        IReadOnlyList<string> OrderedTargets);
+        IReadOnlyList<string> OrderedTargets,
+        IReadOnlyList<UbagAlertDto> Alerts,
+        DateTimeOffset? GatewayUnreachableSince);
 
     public record SubmitJobDto(string Target, string Prompt);
     public record RunWorkflowDto(string Prompt, string? Name = null);
@@ -45,13 +54,30 @@ public class UbagController : TenantedController
         var deny = RequireRole(user, UserRole.ItAdmin, UserRole.ReportingAdmin, UserRole.MedicalDirector, UserRole.ComplianceReviewer);
         if (deny is not null) return deny;
 
-        var health = await _ubag.GetHealthAsync(ct);
-        var browser = await _ubag.GetBrowserSummaryAsync(ct);
-        var targets = await _ubag.ListTargetsAsync(ct);
-        var contexts = await _ubag.ListBrowserContextsAsync(ct);
-        // Derive per-target readiness from browser contexts (login_state == "authenticated").
-        // /v1/targets carries no readiness field; the source of truth is /v1/browser/contexts.
-        var mergedTargets = UbagProviderAdapter.MergeTargetReadiness(targets, contexts);
+        // The status endpoint must keep answering when the gateway is DOWN —
+        // that is precisely when the operator opens the Hub — so gateway calls
+        // degrade to an unhealthy DTO instead of a 5xx, and the alert banners
+        // (logged-out targets, unreachable-since) always ride along.
+        UbagHealth health;
+        UbagBrowserSummary browser;
+        IReadOnlyList<UbagTarget> mergedTargets;
+        try
+        {
+            health = await _ubag.GetHealthAsync(ct);
+            browser = await _ubag.GetBrowserSummaryAsync(ct);
+            var targets = await _ubag.ListTargetsAsync(ct);
+            var contexts = await _ubag.ListBrowserContextsAsync(ct);
+            // Derive per-target readiness from browser contexts (login_state == "authenticated").
+            // /v1/targets carries no readiness field; the source of truth is /v1/browser/contexts.
+            mergedTargets = UbagProviderAdapter.MergeTargetReadiness(targets, contexts);
+        }
+        catch (Exception ex) when (ex is Application.Services.ProviderTransportException or HttpRequestException or TaskCanceledException)
+        {
+            _alerts?.RecordGatewayState(reachable: false);
+            health = new UbagHealth(false, "unreachable", null, ex.Message);
+            browser = new UbagBrowserSummary(0, 0, 0, "unreachable", "{}");
+            mergedTargets = Array.Empty<UbagTarget>();
+        }
         // AllowedTargets reflects the LIVE catalog (capped only if the operator set an
         // explicit RADIOPAD_UBAG_ALLOWED_TARGETS), so the Hub dropdown and the provider
         // admin page automatically list every web AI the gateway can drive — including
@@ -61,12 +87,22 @@ public class UbagController : TenantedController
                 ? mergedTargets.Select(t => t.Id)
                 : mergedTargets.Where(t => cap.Contains(t.Id, StringComparer.OrdinalIgnoreCase)).Select(t => t.Id))
             .ToList();
+        var alerts = (_alerts?.LoggedOutTargets ?? new Dictionary<string, DateTimeOffset>())
+            .Select(kv => new UbagAlertDto(
+                Kind: "login_lost",
+                Target: kv.Key,
+                Since: kv.Value,
+                Remedy: "Log the provider back in via the UBAG browser viewer (noVNC); it re-enables automatically."))
+            .OrderBy(a => a.Target, StringComparer.OrdinalIgnoreCase)
+            .ToList();
         return Ok(new UbagStatusDto(
             health,
             browser,
             mergedTargets,
             allowedTargets,
-            OrderedTargets()));
+            OrderedTargets(),
+            alerts,
+            _alerts?.GatewayUnreachableSince));
     }
 
     /// <summary>

@@ -63,6 +63,37 @@ public class UbagProviderAdapterTests
         Assert.StartsWith("radiopad-ai-", fake.IdempotencyKey, StringComparison.Ordinal);
     }
 
+    [Fact]
+    public async Task CompleteAsync_PollTimeout_CancelsGatewayJob_AndThrowsTransport()
+    {
+        // 2026-07-11 hardening — a job that never terminates must (a) be
+        // best-effort cancelled on the gateway so the shared browser worker is
+        // released, and (b) surface as a TRANSPORT failure so the auto-routing
+        // failover chain can try the next provider.
+        using var env = EnvVarScope.Set("RADIOPAD_UBAG_TIMEOUT_MS", "250");
+        var fake = new FakeUbagClient { JobsNeverComplete = true };
+        var adapter = new UbagProviderAdapter(fake);
+        var request = new AiCompletionRequest(Provider("gemini_web"), "sys", "deidentified prompt", "v1", ContainsPhi: false);
+
+        var ex = await Assert.ThrowsAsync<ProviderTransportException>(() => adapter.CompleteAsync(request, default));
+
+        Assert.Contains("job_timeout", ex.Message);
+        Assert.Contains("job_1", fake.CancelledJobIds);
+    }
+
+    [Fact]
+    public async Task CompleteAsync_CallerCancellation_CancelsGatewayJob_AndPropagates()
+    {
+        var fake = new FakeUbagClient { JobsNeverComplete = true };
+        var adapter = new UbagProviderAdapter(fake);
+        var request = new AiCompletionRequest(Provider("gemini_web"), "sys", "deidentified prompt", "v1", ContainsPhi: false);
+        using var cts = new CancellationTokenSource(TimeSpan.FromMilliseconds(250));
+
+        await Assert.ThrowsAnyAsync<OperationCanceledException>(() => adapter.CompleteAsync(request, cts.Token));
+
+        Assert.Contains("job_1", fake.CancelledJobIds);
+    }
+
     // ── ProbeAsync context-based readiness ────────────────────────────────────
 
     [Fact]
@@ -236,15 +267,30 @@ public class UbagProviderAdapterTests
         public Task<IReadOnlyList<UbagBrowserContext>> ListBrowserContextsAsync(CancellationToken ct) =>
             Task.FromResult(_contexts);
 
+        /// <summary>When true, jobs never reach a terminal status (poll-timeout path).</summary>
+        public bool JobsNeverComplete { get; set; }
+
         public Task<UbagJob> CreateJobAsync(UbagJobRequest request, string idempotencyKey, CancellationToken ct)
         {
             CreatedTarget = request.Target;
             IdempotencyKey = idempotencyKey;
-            return Task.FromResult(new UbagJob("job_1", request.Target, "completed", true, "ubag response", null, null, 25, "{}"));
+            return Task.FromResult(JobsNeverComplete
+                ? new UbagJob("job_1", request.Target, "running", false, null, null, null, null, "{}")
+                : new UbagJob("job_1", request.Target, "completed", true, "ubag response", null, null, 25, "{}"));
         }
 
         public Task<UbagJob> GetJobAsync(string jobId, CancellationToken ct) =>
-            Task.FromResult(new UbagJob(jobId, "gemini_web", "completed", true, "ubag response", null, null, 25, "{}"));
+            Task.FromResult(JobsNeverComplete
+                ? new UbagJob(jobId, "gemini_web", "running", false, null, null, null, null, "{}")
+                : new UbagJob(jobId, "gemini_web", "completed", true, "ubag response", null, null, 25, "{}"));
+
+        public List<string> CancelledJobIds { get; } = new();
+
+        public Task CancelJobAsync(string jobId, CancellationToken ct)
+        {
+            CancelledJobIds.Add(jobId);
+            return Task.CompletedTask;
+        }
 
         public Task<UbagJob> CreateTranscriptionJobAsync(UbagTranscriptionRequest request, string idempotencyKey, CancellationToken ct)
         {

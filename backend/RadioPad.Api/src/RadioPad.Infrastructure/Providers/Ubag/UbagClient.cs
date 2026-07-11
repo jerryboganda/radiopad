@@ -24,14 +24,42 @@ public sealed class UbagClient : IUbagClient
 
     public async Task<UbagHealth> GetHealthAsync(CancellationToken ct)
     {
-        using var doc = await SendAsync(HttpMethod.Get, "/v1/health", null, null, ct);
-        var root = doc.RootElement;
-        var status = ReadString(root, "status") ?? "ok";
+        // Prefer /v1/ready — it verifies the job store, idempotency store,
+        // EXECUTOR, artifact store, and webhook outbox are all wired, and
+        // returns 503 when any is not. /v1/health is bare process liveness: a
+        // gateway with a dead executor still answers "ok" there, which made
+        // RadioPad's discovery/probes mirror fiction (audit finding,
+        // 2026-07-11). Fall back to /v1/health only when /v1/ready does not
+        // exist (older gateway builds).
+        try
+        {
+            using var doc = await SendAsync(HttpMethod.Get, "/v1/ready", null, null, ct);
+            var root = doc.RootElement;
+            var status = ReadString(root, "status") ?? "ok";
+            return new UbagHealth(
+                Ok: IsOkStatus(status) || ReadBool(root, "ok") == true || ReadBool(root, "ready") == true,
+                Status: status,
+                Version: ReadString(root, "api_version") ?? ReadString(root, "version"),
+                Error: ReadString(root, "error"));
+        }
+        catch (ProviderTransportException ex) when (ex.StatusCode is 503)
+        {
+            // Not ready — a definitive UNHEALTHY answer, not a transport fault.
+            return new UbagHealth(Ok: false, Status: "not_ready", Version: null, Error: Truncate(ex.ResponseBody ?? ex.Message));
+        }
+        catch (ProviderTransportException ex) when (ex.StatusCode is 404 or 405)
+        {
+            // Older gateway without /v1/ready — fall through to /v1/health below.
+        }
+
+        using var healthDoc = await SendAsync(HttpMethod.Get, "/v1/health", null, null, ct);
+        var healthRoot = healthDoc.RootElement;
+        var healthStatus = ReadString(healthRoot, "status") ?? "ok";
         return new UbagHealth(
-            Ok: IsOkStatus(status) || ReadBool(root, "ok") == true,
-            Status: status,
-            Version: ReadString(root, "api_version") ?? ReadString(root, "version"),
-            Error: ReadString(root, "error"));
+            Ok: IsOkStatus(healthStatus) || ReadBool(healthRoot, "ok") == true,
+            Status: healthStatus,
+            Version: ReadString(healthRoot, "api_version") ?? ReadString(healthRoot, "version"),
+            Error: ReadString(healthRoot, "error"));
     }
 
     public async Task<UbagBrowserSummary> GetBrowserSummaryAsync(CancellationToken ct)
@@ -187,6 +215,16 @@ public sealed class UbagClient : IUbagClient
         return ParseJob(doc.RootElement, "");
     }
 
+    public async Task CancelJobAsync(string jobId, CancellationToken ct)
+    {
+        // Gateway hard cancel: cooperative signal + immediate status force.
+        // The body carries only the api_version envelope, matching the
+        // workflow-run POST shape.
+        var body = new { api_version = ApiVersion() };
+        using var _ = await SendAsync(
+            HttpMethod.Post, $"/v1/jobs/{Uri.EscapeDataString(jobId)}/cancel", body, null, ct);
+    }
+
     public async Task<UbagWorkflow> CreateWorkflowAsync(UbagWorkflowRequest request, string idempotencyKey, CancellationToken ct)
     {
         // NOTE: the gateway's POST /v1/workflows schema is {api_version, name, steps[]}
@@ -316,7 +354,7 @@ public sealed class UbagClient : IUbagClient
             req.Content = new StringContent(json, Encoding.UTF8, "application/json");
         }
 
-        using var res = await client.SendAsync(req, HttpCompletionOption.ResponseHeadersRead, ct);
+        using var res = await SendClassifiedAsync(client, req, ct);
         var text = await res.Content.ReadAsStringAsync(ct);
         if (!res.IsSuccessStatusCode)
         {
@@ -337,6 +375,30 @@ public sealed class UbagClient : IUbagClient
         }
     }
 
+    /// <summary>
+    /// Sends the request and classifies every non-caller-initiated failure —
+    /// DNS/socket errors, the resilience pipeline's circuit-breaker-open and
+    /// attempt-timeout exceptions — as <see cref="ProviderTransportException"/>,
+    /// the taxonomy the AI gateway maps to <c>provider_transport</c> and the
+    /// failover chain retries on. Caller cancellation propagates unchanged.
+    /// </summary>
+    private static async Task<HttpResponseMessage> SendClassifiedAsync(
+        HttpClient client, HttpRequestMessage req, CancellationToken ct)
+    {
+        try
+        {
+            return await client.SendAsync(req, HttpCompletionOption.ResponseHeadersRead, ct);
+        }
+        catch (OperationCanceledException) when (ct.IsCancellationRequested)
+        {
+            throw;
+        }
+        catch (Exception ex)
+        {
+            throw new ProviderTransportException($"ubag: {ex.GetType().Name}: {ex.Message}", inner: ex);
+        }
+    }
+
     private async Task<JsonDocument> SendBinaryAsync(
         string path, Stream content, string contentType, long contentLength, string? idempotencyKey, CancellationToken ct)
     {
@@ -353,12 +415,21 @@ public sealed class UbagClient : IUbagClient
         req.Headers.TryAddWithoutValidation("Ubag-Api-Version", ApiVersion());
         ApplyAuth(req);
 
-        var body = new StreamContent(content);
+        // Buffer the payload (interface caps it at 32 MiB) so the resilience
+        // pipeline can REPLAY the request on retry — StreamContent over a
+        // consumed, non-seekable stream cannot be re-sent.
+        byte[] buffered;
+        using (var ms = new MemoryStream(contentLength is > 0 and <= int.MaxValue ? (int)contentLength : 0))
+        {
+            await content.CopyToAsync(ms, ct);
+            buffered = ms.ToArray();
+        }
+        var body = new ByteArrayContent(buffered);
         body.Headers.ContentType = new MediaTypeHeaderValue(contentType);
-        body.Headers.ContentLength = contentLength;
+        body.Headers.ContentLength = buffered.LongLength;
         req.Content = body;
 
-        using var res = await client.SendAsync(req, HttpCompletionOption.ResponseHeadersRead, ct);
+        using var res = await SendClassifiedAsync(client, req, ct);
         var text = await res.Content.ReadAsStringAsync(ct);
         if (!res.IsSuccessStatusCode)
         {

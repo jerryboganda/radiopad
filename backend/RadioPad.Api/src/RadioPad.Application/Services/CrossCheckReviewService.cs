@@ -37,10 +37,14 @@ public sealed class CrossCheckReviewService : ICrossCheckReviewService
             return new CrossCheckReviewResult(Array.Empty<CrossCheckCorrection>(), "none", "none", 0);
 
         var containsPhi = ReportingService.ContainsPhi(report);
-        var provider = forcedProvider
-            ?? await _router.SelectAsync(tenant, containsPhi, ct)
-            ?? throw new ProviderPolicyException(
-                "No enabled provider matches the tenant's PHI / compliance requirements.");
+        // An explicitly forced provider (the opt-in UBAG route) is a contract:
+        // fail fast rather than silently substituting another model (operator
+        // decision 2026-07-11). Auto-routed calls walk the ranked failover chain.
+        var ranked = forcedProvider is not null
+            ? new[] { forcedProvider }
+            : await _router.SelectRankedAsync(tenant, containsPhi, ct);
+        if (ranked.Count == 0)
+            throw new ProviderPolicyException(ProviderFailover.NoProviderMessage);
 
         const string system =
             "You are a board-certified radiologist performing a careful QA pass on a " +
@@ -68,12 +72,15 @@ public sealed class CrossCheckReviewService : ICrossCheckReviewService
             Use "safety" for laterality, negation, and measurement errors.
             """;
 
-        var result = await _gateway.RouteAsync(tenant, new AiCompletionRequest(
-            Provider: provider,
-            SystemPrompt: system,
-            UserPrompt: userPrompt,
-            PromptVersion: PromptVersion,
-            ContainsPhi: containsPhi), ct);
+        var (result, _) = await ProviderFailover.RunAsync(
+            ranked,
+            p => _gateway.RouteAsync(tenant, new AiCompletionRequest(
+                Provider: p,
+                SystemPrompt: system,
+                UserPrompt: userPrompt,
+                PromptVersion: PromptVersion,
+                ContainsPhi: containsPhi), ct),
+            _log, ct);
 
         var items = CrossCheckDiff.ParseLlmCorrections(result.Text);
         var corrections = CrossCheckDiff.AnchorLlmCorrections(text, items, sectionKey);

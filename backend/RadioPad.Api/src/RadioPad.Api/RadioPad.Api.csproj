@@ -36,5 +36,8 @@
          affected window per `dotnet package search` against nuget.org. -->
     <PackageReference Include="OpenTelemetry.Extensions.Hosting" Version="1.15.3" />
     <PackageReference Include="OpenTelemetry.Exporter.OpenTelemetryProtocol" Version="1.15.3" />
+    <!-- 2026-07-11 UBAG hardening — retry / circuit-breaker / per-attempt
+         timeout pipelines on the "ubag" and "ai" named HttpClients. -->
+    <PackageReference Include="Microsoft.Extensions.Http.Resilience" Version="10.0.0" />
   </ItemGroup>
 </Project>
