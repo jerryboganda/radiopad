@@ -29,9 +29,16 @@ RUN apt-get update \
     && rm -rf /var/lib/apt/lists/*
 COPY --from=geminicli /usr/local/bin/node /usr/local/bin/node
 COPY --from=geminicli /usr/local/lib/node_modules /usr/local/lib/node_modules
+# Auth: gemini-api-key (Google discontinued oauth-personal for this CLI,
+# 2026-07: IneligibleTierError UNSUPPORTED_CLIENT). The key itself comes from
+# GEMINI_API_KEY in the VPS .secrets.env — never baked into the image. The
+# trust env silences the headless workspace-trust gate.
 RUN ln -sf /usr/local/lib/node_modules/@google/gemini-cli/dist/index.js /usr/local/bin/gemini \
     && chmod +x /usr/local/lib/node_modules/@google/gemini-cli/dist/index.js \
-    && /usr/local/bin/gemini --version
+    && /usr/local/bin/gemini --version \
+    && mkdir -p /root/.gemini \
+    && printf '{\n  "selectedAuthType": "gemini-api-key",\n  "security": { "auth": { "selectedType": "gemini-api-key" } }\n}\n' > /root/.gemini/settings.json
+ENV GEMINI_CLI_TRUST_WORKSPACE=true
 COPY --from=build /out ./
 ENV ASPNETCORE_ENVIRONMENT=Production
 ENV RADIOPAD_BIND=http://0.0.0.0:7457
