@@ -565,12 +565,15 @@ public sealed class UbagClient : IUbagClient
         return null;
     }
 
-    // Gateway terminal statuses (jobs + workflow runs). "failed_retryable" is intentionally
-    // NOT terminal so polling continues until it resolves or the caller's timeout fires.
+    // Gateway terminal statuses (jobs + workflow runs). "failed_retryable" IS
+    // terminal: the gateway's own TerminalStatus() includes it and NO layer
+    // ever retries such a job (audit finding, 2026-07-11) — treating it as
+    // non-terminal made RadioPad poll a dead job for the full 120 s budget
+    // instead of failing over immediately.
     private static readonly string[] TerminalStatuses =
     {
         "completed", "complete", "completed_with_warnings", "succeeded",
-        "failed", "failed_terminal", "dead_letter", "cancelled", "canceled", "timed_out",
+        "failed", "failed_retryable", "failed_terminal", "dead_letter", "cancelled", "canceled", "timed_out",
     };
 
     private static bool IsTerminal(string status)

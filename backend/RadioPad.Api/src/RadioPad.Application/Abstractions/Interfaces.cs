@@ -251,7 +251,22 @@ public sealed record UbagJob(
     string? Error,
     string? ManualAction,
     int? LatencyMs,
-    string RawJson);
+    string RawJson)
+{
+    /// <summary>
+    /// True for every non-success terminal status — <c>failed</c>,
+    /// <c>failed_retryable</c> (the gateway treats it as terminal and nothing
+    /// retries it), <c>failed_terminal</c>, <c>dead_letter</c>,
+    /// <c>cancelled</c>/<c>canceled</c>, <c>timed_out</c> — so callers fail
+    /// over instead of mistaking a dead job for one with merely empty output.
+    /// </summary>
+    public bool Failed =>
+        Status.StartsWith("failed", StringComparison.OrdinalIgnoreCase)
+        || Status.Equals("dead_letter", StringComparison.OrdinalIgnoreCase)
+        || Status.Equals("cancelled", StringComparison.OrdinalIgnoreCase)
+        || Status.Equals("canceled", StringComparison.OrdinalIgnoreCase)
+        || Status.Equals("timed_out", StringComparison.OrdinalIgnoreCase);
+}
 
 public sealed record UbagWorkflowRequest(
     string Name,

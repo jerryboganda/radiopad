@@ -82,6 +82,19 @@ public class UbagProviderAdapterTests
     }
 
     [Fact]
+    public void FailedRetryable_IsTerminal_AndClassifiedAsFailure()
+    {
+        // The gateway's TerminalStatus() includes failed_retryable and no layer
+        // retries it (audit, 2026-07-11) — RadioPad must fail over immediately
+        // instead of polling the dead job to its 120 s budget.
+        var job = new UbagJob("job_x", "gemini_web", "failed_retryable", Terminal: true, null, null, null, null, "{}");
+        Assert.True(job.Failed);
+        Assert.True(new UbagJob("j", "t", "dead_letter", true, null, null, null, null, "{}").Failed);
+        Assert.True(new UbagJob("j", "t", "timed_out", true, null, null, null, null, "{}").Failed);
+        Assert.False(new UbagJob("j", "t", "completed", true, "out", null, null, null, "{}").Failed);
+    }
+
+    [Fact]
     public async Task CompleteAsync_CallerCancellation_CancelsGatewayJob_AndPropagates()
     {
         var fake = new FakeUbagClient { JobsNeverComplete = true };

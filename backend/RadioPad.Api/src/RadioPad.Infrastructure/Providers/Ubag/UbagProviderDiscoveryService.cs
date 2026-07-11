@@ -195,7 +195,56 @@ public sealed class UbagProviderDiscoveryService
                     await _alerts.NotifyTargetLoggedOutAsync(target, ct);
             }
         }
+
+        // Real-traffic failure alerting (2026-07-11): the gateway's topology
+        // login_state can be SYNTHETIC (a cron upserts "authenticated"), so a
+        // dead session may never show as logged out. Failing traffic is the
+        // trustworthy signal — mirror the router's circuit-breaker window and
+        // alert on any enabled UBAG provider whose recent requests all failed.
+        if (_alerts is not null)
+            await AlertOnFailureStreaksAsync(tenantId, existing, ct);
+
         return changes;
+    }
+
+    private async Task AlertOnFailureStreaksAsync(
+        Guid tenantId, IReadOnlyList<ProviderConfig> ubagRows, CancellationToken ct)
+    {
+        try
+        {
+            var enabled = ubagRows.Where(p => p.Enabled).ToList();
+            if (enabled.Count == 0) return;
+            var names = enabled.Select(p => p.Name).ToHashSet(StringComparer.Ordinal);
+            var since = DateTimeOffset.UtcNow - Repositories.EfProviderRouter.RecentFailureWindow;
+            var recent = await _db.AiRequests.AsNoTracking()
+                .Where(r => r.TenantId == tenantId
+                         && r.CreatedAt >= since
+                         && (r.Status == "ok" || r.Status == "error")
+                         && names.Contains(r.Provider))
+                .Select(r => new { r.Provider, r.Status })
+                .ToListAsync(ct);
+            var byName = recent.GroupBy(r => r.Provider, StringComparer.Ordinal)
+                .ToDictionary(g => g.Key, g => g.ToList(), StringComparer.Ordinal);
+            foreach (var row in enabled)
+            {
+                var target = string.IsNullOrWhiteSpace(row.Model) ? row.Name : row.Model;
+                if (byName.TryGetValue(row.Name, out var rows)
+                    && rows.Count(r => r.Status == "error") >= Repositories.EfProviderRouter.FailureStreakThreshold
+                    && !rows.Any(r => r.Status == "ok"))
+                {
+                    await _alerts!.NotifyTargetFailingAsync(target, ct);
+                }
+                else
+                {
+                    _alerts!.RecordTargetRecovered(target);
+                }
+            }
+        }
+        catch (Exception ex)
+        {
+            // Alerting must never break the sweep.
+            _logger.LogDebug(ex, "UBAG failure-streak alert pass failed for tenant {TenantId}", tenantId);
+        }
     }
 }
 

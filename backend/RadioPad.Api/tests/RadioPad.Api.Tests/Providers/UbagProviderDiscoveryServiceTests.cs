@@ -164,6 +164,66 @@ public class UbagProviderDiscoveryServiceTests
     }
 
     [Fact]
+    public async Task Failure_streak_on_enabled_provider_alerts_operator_and_clears_on_recovery()
+    {
+        using var db = CreateDb();
+        db.Providers.Add(new ProviderConfig
+        {
+            TenantId = Tenant,
+            Name = "UBAG Gemini Web",
+            Adapter = "ubag",
+            Model = "gemini_web",
+            Compliance = ProviderComplianceClass.PhiApproved,
+            Enabled = true,
+        });
+        for (var i = 0; i < 3; i++)
+            db.AiRequests.Add(new AiRequest
+            {
+                TenantId = Tenant,
+                Provider = "UBAG Gemini Web",
+                Status = "error",
+                CreatedAt = DateTimeOffset.UtcNow.AddMinutes(-1),
+            });
+        await db.SaveChangesAsync();
+
+        var email = new RecordingEmailSender();
+        var alerts = new UbagOperatorAlertService(email, NullLogger<UbagOperatorAlertService>.Instance);
+        // Gateway reports the session authenticated — the point of this signal
+        // is that failing REAL traffic alerts even when login-state is fiction.
+        var client = new FakeClient(
+            targets: new[] { new UbagTarget("gemini_web", "Gemini Web", "listed", false, null) },
+            contexts: new[] { new UbagBrowserContext("gemini_web", "authenticated") });
+        var service = new UbagProviderDiscoveryService(
+            client, db, NullLogger<UbagProviderDiscoveryService>.Instance, alerts);
+
+        Environment.SetEnvironmentVariable(UbagOperatorAlertService.OperatorEmailEnvVar, "ops@example.test");
+        try
+        {
+            await service.SyncAsync(Tenant, default);
+
+            Assert.True(alerts.FailingTargets.ContainsKey("gemini_web"));
+            var sent = Assert.Single(email.Sent);
+            Assert.Contains("failing", sent.Subject, StringComparison.OrdinalIgnoreCase);
+
+            // A success within the window clears the streak and the banner.
+            db.AiRequests.Add(new AiRequest
+            {
+                TenantId = Tenant,
+                Provider = "UBAG Gemini Web",
+                Status = "ok",
+                CreatedAt = DateTimeOffset.UtcNow,
+            });
+            await db.SaveChangesAsync();
+            await service.SyncAsync(Tenant, default);
+            Assert.False(alerts.FailingTargets.ContainsKey("gemini_web"));
+        }
+        finally
+        {
+            Environment.SetEnvironmentVariable(UbagOperatorAlertService.OperatorEmailEnvVar, null);
+        }
+    }
+
+    [Fact]
     public async Task Gateway_unreachable_is_tracked_and_cleared()
     {
         using var db = CreateDb();

@@ -157,8 +157,9 @@ function UbagHubPageInner() {
         </Banner>
       )}
       {status?.alerts?.map((a) => (
-        <Banner key={a.target} tone="warn" data-testid={`ubag-alert-${a.target}`}>
-          <strong>{a.target}</strong> logged out since {new Date(a.since).toLocaleString()} — {a.remedy}
+        <Banner key={`${a.kind}:${a.target}`} tone="warn" data-testid={`ubag-alert-${a.target}`}>
+          <strong>{a.target}</strong> {a.kind === 'failing' ? 'failing all requests' : 'logged out'} since{' '}
+          {new Date(a.since).toLocaleString()} — {a.remedy}
         </Banner>
       ))}
 

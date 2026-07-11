@@ -93,6 +93,12 @@ public class UbagController : TenantedController
                 Target: kv.Key,
                 Since: kv.Value,
                 Remedy: "Log the provider back in via the UBAG browser viewer (noVNC); it re-enables automatically."))
+            .Concat((_alerts?.FailingTargets ?? new Dictionary<string, DateTimeOffset>())
+                .Select(kv => new UbagAlertDto(
+                    Kind: "failing",
+                    Target: kv.Key,
+                    Since: kv.Value,
+                    Remedy: "All recent requests failed — check the session in the browser viewer (noVNC) or the worker; it re-enters rotation on the next success.")))
             .OrderBy(a => a.Target, StringComparer.OrdinalIgnoreCase)
             .ToList();
         return Ok(new UbagStatusDto(

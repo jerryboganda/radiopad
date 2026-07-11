@@ -51,7 +51,7 @@ public sealed class UbagProviderAdapter : IAiProviderAdapter, IAiProviderHealthP
         // (discovery disables the row within one sweep; this covers the gap).
         if (!string.IsNullOrWhiteSpace(terminal.ManualAction))
             throw new ProviderTransportException($"{AdapterId}: manual_action_required:{target}");
-        if (!string.IsNullOrWhiteSpace(terminal.Error) || terminal.Status.Equals("failed", StringComparison.OrdinalIgnoreCase))
+        if (!string.IsNullOrWhiteSpace(terminal.Error) || terminal.Failed)
             throw new ProviderTransportException($"{AdapterId}: {terminal.Error ?? terminal.Status}");
         if (string.IsNullOrWhiteSpace(terminal.Output))
             throw new ProviderTransportException($"{AdapterId}: empty_output");

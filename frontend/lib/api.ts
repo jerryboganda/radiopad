@@ -529,7 +529,7 @@ export type UbagWorkflowRun = {
 };
 
 export type UbagAlert = {
-  kind: 'login_lost';
+  kind: 'login_lost' | 'failing';
   target: string;
   since: string;
   remedy: string;

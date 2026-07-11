@@ -37,6 +37,17 @@ public sealed class UbagOperatorAlertService
     public IReadOnlyDictionary<string, DateTimeOffset> LoggedOutTargets =>
         new Dictionary<string, DateTimeOffset>(_loggedOutSince, StringComparer.OrdinalIgnoreCase);
 
+    /// <summary>
+    /// Targets whose recent real traffic is ALL failures (the router's
+    /// circuit-breaker signal). Tracked separately from login state because the
+    /// gateway's topology login_state can be synthetic — real traffic failing
+    /// is the trustworthy signal.
+    /// </summary>
+    public IReadOnlyDictionary<string, DateTimeOffset> FailingTargets =>
+        new Dictionary<string, DateTimeOffset>(_failingSince, StringComparer.OrdinalIgnoreCase);
+
+    private readonly ConcurrentDictionary<string, DateTimeOffset> _failingSince = new(StringComparer.OrdinalIgnoreCase);
+
     /// <summary>Set while discovery sweeps cannot reach the gateway; null when healthy.</summary>
     public DateTimeOffset? GatewayUnreachableSince => _gatewayUnreachableSince;
 
@@ -78,10 +89,51 @@ public sealed class UbagOperatorAlertService
     /// per target. The audit event is appended by the caller — it owns the
     /// tenant scope; this service owns the global banner + email state.
     /// </summary>
-    public async Task NotifyTargetLoggedOutAsync(string targetId, CancellationToken ct)
+    public Task NotifyTargetLoggedOutAsync(string targetId, CancellationToken ct)
     {
         var since = _loggedOutSince.GetOrAdd(targetId, DateTimeOffset.UtcNow);
+        return SendThrottledAlertAsync(
+            targetId,
+            $"[RadioPad] UBAG provider '{targetId}' needs re-login",
+            $"<p>The UBAG browser session for <b>{targetId}</b> is logged out (detected {since:u}).</p>" +
+            "<p>RadioPad has stopped routing AI traffic to it; auto-routed requests fail over to the " +
+            "next-ranked provider. To restore it, open the UBAG browser viewer (noVNC) and log the " +
+            "provider back in — discovery re-enables it automatically within 5 minutes.</p>",
+            $"UBAG target {targetId} logged out since {since:u}",
+            ct);
+    }
 
+    /// <summary>
+    /// Records that a target's recent REAL traffic is all failures (router
+    /// circuit-breaker signal) and emails the operator, throttled per target.
+    /// This fires even when the gateway's login_state reporting is fiction —
+    /// failing traffic is the ground truth.
+    /// </summary>
+    public Task NotifyTargetFailingAsync(string targetId, CancellationToken ct)
+    {
+        var since = _failingSince.GetOrAdd(targetId, DateTimeOffset.UtcNow);
+        return SendThrottledAlertAsync(
+            targetId,
+            $"[RadioPad] UBAG provider '{targetId}' is failing all requests",
+            $"<p>Every recent AI request to <b>{targetId}</b> has failed (since {since:u}).</p>" +
+            "<p>The routing circuit breaker has excluded it, and auto-routed requests fail over to the " +
+            "next-ranked provider. Likely causes: an expired login (check the UBAG browser viewer over " +
+            "noVNC), a drifted provider UI, or the browser worker being wedged. It re-enters rotation " +
+            "automatically once a request succeeds.</p>",
+            $"UBAG target {targetId} failing all recent requests since {since:u}",
+            ct);
+    }
+
+    /// <summary>Clears the failing banner once a target's traffic recovers.</summary>
+    public void RecordTargetRecovered(string targetId)
+    {
+        if (_failingSince.TryRemove(targetId, out var since))
+            _log.LogInformation("UBAG target {Target} serving again (was failing since {Since:u})", targetId, since);
+    }
+
+    private async Task SendThrottledAlertAsync(
+        string targetId, string subject, string bodyHtml, string logLine, CancellationToken ct)
+    {
         var last = _lastEmailByTarget.GetValueOrDefault(targetId, DateTimeOffset.MinValue);
         var now = DateTimeOffset.UtcNow;
         if (now - last < EmailThrottle) return;
@@ -91,20 +143,13 @@ public sealed class UbagOperatorAlertService
         var to = Environment.GetEnvironmentVariable(OperatorEmailEnvVar);
         if (string.IsNullOrWhiteSpace(to))
         {
-            _log.LogWarning(
-                "UBAG target {Target} logged out since {Since:u} — set {EnvVar} to receive operator emails",
-                targetId, since, OperatorEmailEnvVar);
+            _log.LogWarning("{LogLine} — set {EnvVar} to receive operator emails", logLine, OperatorEmailEnvVar);
             return;
         }
 
         try
         {
-            var subject = $"[RadioPad] UBAG provider '{targetId}' needs re-login";
-            var body =
-                $"<p>The UBAG browser session for <b>{targetId}</b> is logged out (detected {since:u}).</p>" +
-                "<p>RadioPad has stopped routing AI traffic to it; auto-routed requests fail over to the " +
-                "next-ranked provider. To restore it, open the UBAG browser viewer (noVNC) and log the " +
-                "provider back in — discovery re-enables it automatically within 5 minutes.</p>" +
+            var body = bodyHtml +
                 $"<p>This alert is throttled to one email per provider per {EmailThrottle.TotalHours:0} h.</p>";
             var sent = await _email.SendAsync(new EmailMessage(to.Trim(), subject, body), ct);
             if (!sent)

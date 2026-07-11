@@ -156,8 +156,7 @@ public sealed class TranscriptionService : ITranscriptionService
 
         if (!string.IsNullOrWhiteSpace(terminal.ManualAction))
             throw new ProviderPolicyException("ubag: manual_action_required");
-        if (!string.IsNullOrWhiteSpace(terminal.Error)
-            || terminal.Status.Equals("failed", StringComparison.OrdinalIgnoreCase))
+        if (!string.IsNullOrWhiteSpace(terminal.Error) || terminal.Failed)
             throw new ProviderTransportException($"ubag: {terminal.Error ?? terminal.Status}");
         if (string.IsNullOrWhiteSpace(terminal.Output))
             throw new ProviderTransportException("ubag: empty_transcript");
