@@ -60,6 +60,14 @@ jobs:
         run: |
           set -euo pipefail
           TAG="${{ github.event.inputs.tag }}"
+          if [ -z "$TAG" ] && [ "${{ github.event_name }}" = "workflow_run" ]; then
+            TAG="${{ github.event.workflow_run.head_branch }}"
+          fi
+          # workflow_run.head_branch is the release tag for tag-triggered bundle
+          # runs. Fall back to the newest release only for legacy/manual runs.
+          if [[ -n "$TAG" && "$TAG" != v* ]]; then
+            TAG=""
+          fi
           if [ -z "$TAG" ]; then
             TAG=$(gh release list --limit 1 --json tagName -q '.[0].tagName')
           fi
@@ -124,4 +132,8 @@ jobs:
         if: steps.gate.outputs.secrets_present == '1' && steps.meta.outputs.tag != ''
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        run: gh release upload "${{ steps.meta.outputs.tag }}" dist/latest.json --clobber
+        run: |
+          gh release upload "${{ steps.meta.outputs.tag }}" dist/latest.json --clobber
+          # The bundle workflow deliberately creates a draft. Publish only after
+          # latest.json exists, so /releases/latest is never temporarily broken.
+          gh release edit "${{ steps.meta.outputs.tag }}" --draft=false
