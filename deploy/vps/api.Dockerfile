@@ -33,8 +33,8 @@ COPY --from=geminicli /usr/local/lib/node_modules /usr/local/lib/node_modules
 # 2026-07: IneligibleTierError UNSUPPORTED_CLIENT). The key itself comes from
 # GEMINI_API_KEY in the VPS .secrets.env — never baked into the image. The
 # trust env silences the headless workspace-trust gate.
-RUN ln -sf /usr/local/lib/node_modules/@google/gemini-cli/dist/index.js /usr/local/bin/gemini \
-    && chmod +x /usr/local/lib/node_modules/@google/gemini-cli/dist/index.js \
+RUN ln -sf /usr/local/lib/node_modules/@google/gemini-cli/bundle/gemini.js /usr/local/bin/gemini \
+    && chmod +x /usr/local/lib/node_modules/@google/gemini-cli/bundle/gemini.js \
     && /usr/local/bin/gemini --version \
     && mkdir -p /root/.gemini \
     && printf '{\n  "selectedAuthType": "gemini-api-key",\n  "security": { "auth": { "selectedType": "gemini-api-key" } }\n}\n' > /root/.gemini/settings.json
