@@ -148,6 +148,20 @@ function UbagHubPageInner() {
       {error && !loading && <Banner tone="warn" onDismiss={() => setError(null)}>{error}</Banner>}
       {info && <Banner tone="success" onDismiss={() => setInfo(null)}>{info}</Banner>}
 
+      {/* Persistent operator alerts — no dismiss: they clear only when the
+          underlying condition (re-login / gateway back up) is resolved. */}
+      {status?.gatewayUnreachableSince && (
+        <Banner tone="warn" data-testid="ubag-alert-gateway">
+          UBAG gateway unreachable since {new Date(status.gatewayUnreachableSince).toLocaleString()}.
+          AI requests fail over to non-UBAG providers until it returns.
+        </Banner>
+      )}
+      {status?.alerts?.map((a) => (
+        <Banner key={a.target} tone="warn" data-testid={`ubag-alert-${a.target}`}>
+          <strong>{a.target}</strong> logged out since {new Date(a.since).toLocaleString()} — {a.remedy}
+        </Banner>
+      ))}
+
       {loading && !status ? (
         <TableSkeleton rows={4} cols={3} />
       ) : error && !status ? (

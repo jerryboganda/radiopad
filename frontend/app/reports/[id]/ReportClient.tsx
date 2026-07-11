@@ -59,6 +59,8 @@ export default function ReportPage() {
   // Cross-check suggestions keyed by section, plus the processing-badge state.
   const [corrections, setCorrections] = useState<Record<string, CrossCheckCorrection[]>>({});
   const [xc, setXc] = useState<{ status: 'running' | 'completed' | 'failed'; stage: string } | null>(null);
+  // Guards runCrossCheck against concurrent invocation (button + voice command).
+  const xcBusyRef = useRef(false);
   const [providerId, setProviderId] = useState<string>('');
   const [error, setError] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
@@ -504,11 +506,15 @@ export default function ReportPage() {
   async function runCrossCheck() {
     const current = reportRef.current;
     if (!current) return;
+    // Re-entrancy guard: a second invocation (button + voice command) while a
+    // run is in flight would interleave state updates.
+    if (xcBusyRef.current) return;
     const sess = getSessionAudio(current.id);
     if (!sess) {
       setError('Record a dictation with the HQ button first, then Cross Check.');
       return;
     }
+    xcBusyRef.current = true;
     setError(null);
     setXc({ status: 'running', stage: 're-running engines' });
     try {
@@ -519,18 +525,24 @@ export default function ReportPage() {
         useUbag,
       });
 
-      // Poll the on-device ASR cross-check job (~2 min budget).
+      // Poll the on-device ASR cross-check job (~2 min budget). A poll budget
+      // that runs dry is a TIMEOUT, not "no changes" — report it as a failure
+      // so the radiologist never mistakes an unfinished QA pass for a clean one.
       let asr: CrossCheckCorrection[] = [];
+      let asrDone = false;
       for (let i = 0; i < 150; i++) {
         await new Promise((r) => setTimeout(r, 800));
         const s = await api.reports.crossCheckStatus(current.id, jobId);
         setXc({ status: s.status === 'completed' || s.status === 'failed' ? s.status : 'running', stage: s.stage });
-        if (s.status === 'completed') { asr = s.corrections ?? []; break; }
+        if (s.status === 'completed') { asr = s.corrections ?? []; asrDone = true; break; }
         if (s.status === 'failed') throw new Error(s.error || 'cross-check failed');
       }
+      if (!asrDone) throw new Error('Cross-check timed out — the engines did not finish. Try again.');
 
-      // Hosted LLM medical-accuracy review on the same base text (best-effort).
+      // Hosted LLM medical-accuracy review on the same base text (best-effort,
+      // but its absence is SURFACED in the result badge rather than silent).
       let llm: CrossCheckCorrection[] = [];
+      let reviewFailed = false;
       setXc({ status: 'running', stage: 'medical review' });
       try {
         const r = await api.reports.crossCheckReview(current.id, {
@@ -540,18 +552,21 @@ export default function ReportPage() {
         });
         llm = r.corrections ?? [];
       } catch {
-        /* review is best-effort — keep the ASR corrections */
+        reviewFailed = true;
       }
 
       const merged = [...asr, ...llm];
       setCorrections({ [sess.sectionKey]: merged });
+      const summary = merged.length ? `${merged.length} suggestion${merged.length === 1 ? '' : 's'}` : 'no changes';
       setXc({
         status: 'completed',
-        stage: merged.length ? `${merged.length} suggestion${merged.length === 1 ? '' : 's'}` : 'no changes',
+        stage: reviewFailed ? `${summary} · medical review unavailable` : summary,
       });
     } catch (e) {
       setError((e as Error).message);
       setXc({ status: 'failed', stage: 'cross-check failed' });
+    } finally {
+      xcBusyRef.current = false;
     }
   }
 
@@ -670,8 +685,10 @@ export default function ReportPage() {
     // Dictation is now a global floating overlay (see DictationOverlay). The
     // editor only reacts to the overlay's "Fix" action, which cleans the
     // dictated prose into structured medical sections via UBAG.
-    const cleanup = () => { void runDictationCleanup(); };
-    const crossCheck = () => { void runCrossCheck(); };
+    // preventDefault marks the event HANDLED — the overlay dispatches these as
+    // cancelable events and shows "open a report first" when nothing claims them.
+    const cleanup = (e: Event) => { e.preventDefault(); void runDictationCleanup(); };
+    const crossCheck = (e: Event) => { e.preventDefault(); void runCrossCheck(); };
 
     window.addEventListener('radiopad:generate-impression', generate);
     window.addEventListener('radiopad:rewrite', rewrite);

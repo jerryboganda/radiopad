@@ -528,12 +528,21 @@ export type UbagWorkflowRun = {
   rawJson: string;
 };
 
+export type UbagAlert = {
+  kind: 'login_lost';
+  target: string;
+  since: string;
+  remedy: string;
+};
+
 export type UbagStatus = {
   health: UbagHealth;
   browser: UbagBrowserSummary;
   targets: UbagTarget[];
   allowedTargets: string[];
   orderedTargets: string[];
+  alerts: UbagAlert[];
+  gatewayUnreachableSince?: string | null;
 };
 
 export type ValidationFinding = {

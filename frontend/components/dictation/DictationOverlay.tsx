@@ -173,7 +173,20 @@ export default function DictationOverlay() {
   const transcribeAudio = useCallback(async (blob: Blob) => {
     const reportId = readQueryParam('id');
     const hasTarget = !!getLastFocusedSectionEditor() || !!getLastFocusedEditable();
-    if (!reportId || !hasTarget || blob.size === 0) return;
+    // Guard failures must SAY why the recording went nowhere — the audio the
+    // radiologist just spoke is otherwise silently discarded.
+    if (!reportId) {
+      setSttError('HQ dictation needs an open report — the recording was not transcribed.');
+      return;
+    }
+    if (!hasTarget) {
+      setSttError('Click into a report section first so the transcript has somewhere to go — the recording was not transcribed.');
+      return;
+    }
+    if (blob.size === 0) {
+      setSttError('No audio was captured (empty recording). Check the microphone and try again.');
+      return;
+    }
     setTranscribing(true);
     setSttError(null);
     try {
@@ -244,8 +257,18 @@ export default function DictationOverlay() {
       mediaRecorderRef.current = rec;
       rec.start();
       setAudioRecording(true);
-    } catch {
+    } catch (e) {
       setAudioRecording(false);
+      // A denied/absent microphone must not look like a button that does
+      // nothing — say what blocked the HQ recording.
+      const name = (e as { name?: string })?.name;
+      setSttError(
+        name === 'NotAllowedError' || name === 'SecurityError'
+          ? 'Microphone access is blocked. Allow the microphone to record HQ dictation.'
+          : name === 'NotFoundError'
+            ? 'No microphone was found on this machine.'
+            : 'Could not start the HQ recording. Check the microphone and try again.',
+      );
     }
   }, [transcribeAudio]);
 
@@ -395,7 +418,15 @@ export default function DictationOverlay() {
           aria-busy={fixBusy}
           disabled={fixBusy}
           onMouseDown={(e) => e.preventDefault()}
-          onClick={() => window.dispatchEvent(new CustomEvent(CLEANUP_EVENT))}
+          onClick={() => {
+            // Cancelable dispatch: the report editor claims the event with
+            // preventDefault. If nothing claims it (e.g. on /reports/new),
+            // say so instead of silently doing nothing.
+            const claimed = !window.dispatchEvent(new CustomEvent(CLEANUP_EVENT, { cancelable: true }));
+            if (!claimed) {
+              setFixStatus({ status: 'error', message: 'Open a report to use Fix — it cleans up the report editor’s dictation.' });
+            }
+          }}
         >
           {fixBusy ? (
             <>
@@ -423,7 +454,10 @@ export default function DictationOverlay() {
               ) {
                 return;
               }
-              window.dispatchEvent(new CustomEvent('radiopad:cross-check'));
+              const claimed = !window.dispatchEvent(new CustomEvent('radiopad:cross-check', { cancelable: true }));
+              if (!claimed) {
+                setFixStatus({ status: 'error', message: 'Open a report to use Cross Check — it verifies the report editor’s dictation.' });
+              }
             }}
           >
             Cross Check
