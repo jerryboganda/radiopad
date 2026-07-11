@@ -96,6 +96,10 @@ public sealed class UbagProviderDiscoveryService
         foreach (var t in merged)
         {
             if (Excluded.Contains(t.Id)) continue;
+            // Never materialise a picker row for a target the operator cap
+            // (RADIOPAD_UBAG_ALLOWED_TARGETS) would reject at request time —
+            // that row would fail 100% of requests (audit finding, 2026-07-11).
+            if (!UbagProviderAdapter.IsTargetAllowed(t.Id)) continue;
 
             var row = existing.FirstOrDefault(
                 p => string.Equals(p.Model, t.Id, StringComparison.OrdinalIgnoreCase));
