@@ -322,6 +322,15 @@ public sealed class UbagProviderDiscoveryHostedService : BackgroundService
                     "Gemini CLI backfill: seeded {Count} provider row(s) across {Tenants} tenant(s)",
                     cliSeeded, allTenantIds.Count);
 
+            // Operator promotion (2026-07-12): Gemini CLI is PhiApproved (it runs
+            // under the operator's own Google OAuth login; the workflow routes
+            // de-identified text). Promote rows seeded as Sandbox before this
+            // change. Idempotent — only non-PhiApproved rows.
+            var cliPromoted = await Seeding.CliProviderSeed.EnsureGeminiCliComplianceAsync(db, stoppingToken);
+            if (cliPromoted > 0)
+                _logger.LogInformation(
+                    "Gemini CLI compliance backfill: promoted {Count} row(s) to PhiApproved", cliPromoted);
+
             // Policy change (2026-06-27): UBAG is PHI-approved. Promote any rows
             // that were seeded as Sandbox before this change so existing orgs'
             // AI features (cleanup/impression/rewrite/cross-check) stop being

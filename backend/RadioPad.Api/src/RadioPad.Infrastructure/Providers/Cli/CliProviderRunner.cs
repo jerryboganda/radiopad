@@ -16,10 +16,11 @@ namespace RadioPad.Infrastructure.Providers.Cli;
 ///   <item>Prompt sanitation — refuses NUL / control characters that could
 ///   break stdin framing.</item>
 /// </list>
-/// Both CLI adapters default to <see cref="ProviderComplianceClass.Sandbox"/>
-/// because the local binary may forward the prompt to a vendor cloud. Operators
-/// must explicitly mark a configured provider <c>PhiApproved</c> before PHI may
-/// flow through it.
+/// CLI adapters default to <see cref="ProviderComplianceClass.Sandbox"/>
+/// because the local binary may forward the prompt to a vendor cloud —
+/// except <see cref="GeminiCliProvider"/>, promoted to <c>PhiApproved</c> by
+/// operator decision 2026-07-12 (it runs under the operator's own Google
+/// OAuth login and the workflow routes de-identified text).
 /// </summary>
 internal static class CliProviderRunner
 {
@@ -83,9 +84,16 @@ internal static class CliProviderRunner
         return s;
     }
 
-    public static void EnforceRequestPolicy(string adapterId, AiCompletionRequest request)
+    /// <summary>
+    /// <paramref name="allowPhi"/> lets an adapter that has been explicitly
+    /// promoted to PhiApproved (operator decision — currently only
+    /// <see cref="GeminiCliProvider"/>, 2026-07-12) bypass the CLI-level PHI
+    /// refusal; the tenant/provider compliance gates in AiGateway still apply.
+    /// The secret screen is never bypassed.
+    /// </summary>
+    public static void EnforceRequestPolicy(string adapterId, AiCompletionRequest request, bool allowPhi = false)
     {
-        if (request.ContainsPhi)
+        if (request.ContainsPhi && !allowPhi)
             throw new ProviderPolicyException($"{adapterId}: phi_not_supported");
         if (LooksLikeSecret(request.SystemPrompt) || LooksLikeSecret(request.UserPrompt))
             throw new ProviderPolicyException($"{adapterId}: secret_not_supported");

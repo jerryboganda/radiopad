@@ -14,15 +14,21 @@ namespace RadioPad.Infrastructure.Providers.Cli;
 /// <c>gemini</c>; override with <c>RADIOPAD_GEMINI_BIN</c>. The prompt is
 /// piped on stdin; the model id (when present) is forwarded via
 /// <c>--model</c>. Compliance class defaults to
-/// <see cref="ProviderComplianceClass.Sandbox"/> because the CLI may call a
-/// vendor cloud.
+/// <see cref="ProviderComplianceClass.PhiApproved"/> per the 2026-07-12
+/// operator promotion (see <see cref="DefaultComplianceClass"/>).
 /// </summary>
 public sealed class GeminiCliProvider : IAiProviderAdapter, IAiProviderHealthProbe
 {
     public const string AdapterId = "gemini-cli";
     public const string BinaryEnvVar = "RADIOPAD_GEMINI_BIN";
     public const string DefaultBinary = "gemini";
-    public const ProviderComplianceClass DefaultComplianceClass = CliProviderRunner.DefaultComplianceClass;
+    // Operator decision (2026-07-12): the Gemini CLI runs under the operator's
+    // own Google OAuth login and the reporting workflow routes de-identified
+    // text, so this adapter is promoted out of the CLI Sandbox default — it
+    // must not be blocked by the PHI / compliance gates. Mirrors the UBAG
+    // promotion of 2026-06-27 (UbagProviderAdapter.DefaultComplianceClass).
+    // CodexCliProvider intentionally keeps the Sandbox default.
+    public const ProviderComplianceClass DefaultComplianceClass = ProviderComplianceClass.PhiApproved;
 
     private readonly IProcessLauncher _launcher;
     private readonly ILogger<GeminiCliProvider> _log;
@@ -43,7 +49,7 @@ public sealed class GeminiCliProvider : IAiProviderAdapter, IAiProviderHealthPro
 
     public async Task<AiResult> CompleteAsync(AiCompletionRequest request, CancellationToken cancellationToken)
     {
-        CliProviderRunner.EnforceRequestPolicy(AdapterId, request);
+        CliProviderRunner.EnforceRequestPolicy(AdapterId, request, allowPhi: true);
         var p = request.Provider;
         var bin = CliProviderRunner.ResolveBinary(BinaryEnvVar, DefaultBinary);
         CliProviderRunner.EnforceBinaryAllowlist(AdapterId, bin);

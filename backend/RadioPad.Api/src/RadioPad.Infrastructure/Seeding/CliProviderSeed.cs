@@ -20,9 +20,9 @@ public static class CliProviderSeed
 {
     /// <summary>
     /// The curated Gemini CLI provider for <paramref name="tenantId"/>. Compliance
-    /// defaults to <see cref="GeminiCliProvider.DefaultComplianceClass"/> (Sandbox)
-    /// because the CLI may forward the prompt to a vendor cloud — the PHI gate keeps
-    /// patient-identifying text off it unless an operator explicitly promotes it.
+    /// follows <see cref="GeminiCliProvider.DefaultComplianceClass"/> — PhiApproved
+    /// since the 2026-07-12 operator promotion (the CLI runs under the operator's
+    /// own Google OAuth login; the workflow routes de-identified text).
     /// Quality/Priority sit just below the UBAG primaries so auto-routing still
     /// prefers UBAG; this row exists mainly for the manual dropdown selection.
     /// </summary>
@@ -53,5 +53,26 @@ public static class CliProviderSeed
         db.Providers.Add(CuratedGeminiCli(tenantId));
         await db.SaveChangesAsync(ct);
         return 1;
+    }
+
+    /// <summary>
+    /// Operator promotion (2026-07-12): Gemini CLI is PhiApproved. Promotes any
+    /// rows seeded as Sandbox before this change so existing orgs' AI features
+    /// stop being blocked by the PHI gates. Idempotent — only touches rows that
+    /// are not already PhiApproved. Mirrors
+    /// <see cref="UbagPrimarySeed.EnsureCuratedComplianceAsync"/>.
+    /// </summary>
+    public static async Task<int> EnsureGeminiCliComplianceAsync(
+        RadioPadDbContext db, CancellationToken ct)
+    {
+        var stale = await db.Providers
+            .Where(p => p.Adapter == GeminiCliProvider.AdapterId
+                     && p.Compliance != Domain.Enums.ProviderComplianceClass.PhiApproved)
+            .ToListAsync(ct);
+        if (stale.Count == 0) return 0;
+        foreach (var p in stale)
+            p.Compliance = Domain.Enums.ProviderComplianceClass.PhiApproved;
+        await db.SaveChangesAsync(ct);
+        return stale.Count;
     }
 }

@@ -15,11 +15,23 @@ RUN dotnet publish backend/RadioPad.Api/src/RadioPad.Api/RadioPad.Api.csproj -c 
     && cp -R rulebooks/. /out/rulebooks/ \
     && cp -R templates/. /out/templates/
 
+# Gemini CLI (provider adapter gemini-cli) — Node runtime + globally installed
+# @google/gemini-cli. Version pinned so image rebuilds are reproducible.
+# OAuth credentials are NOT baked in: the container mounts the operator's
+# ~/.gemini (oauth_creds.json) as a volume — see the VPS docker-compose.yml.
+FROM node:22-bookworm-slim AS geminicli
+RUN npm install -g @google/gemini-cli@0.50.0
+
 FROM mcr.microsoft.com/dotnet/aspnet:8.0
 WORKDIR /app
 RUN apt-get update \
     && apt-get install -y --no-install-recommends curl \
     && rm -rf /var/lib/apt/lists/*
+COPY --from=geminicli /usr/local/bin/node /usr/local/bin/node
+COPY --from=geminicli /usr/local/lib/node_modules /usr/local/lib/node_modules
+RUN ln -sf /usr/local/lib/node_modules/@google/gemini-cli/dist/index.js /usr/local/bin/gemini \
+    && chmod +x /usr/local/lib/node_modules/@google/gemini-cli/dist/index.js \
+    && /usr/local/bin/gemini --version
 COPY --from=build /out ./
 ENV ASPNETCORE_ENVIRONMENT=Production
 ENV RADIOPAD_BIND=http://0.0.0.0:7457

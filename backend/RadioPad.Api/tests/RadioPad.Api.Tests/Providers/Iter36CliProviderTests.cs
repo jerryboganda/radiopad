@@ -128,9 +128,10 @@ public class Iter36CliProviderTests
     }
 
     [Fact]
-    public void Gemini_DefaultComplianceClass_IsSandbox()
+    public void Gemini_DefaultComplianceClass_IsPhiApproved()
     {
-        Assert.Equal(ProviderComplianceClass.Sandbox, GeminiCliProvider.DefaultComplianceClass);
+        // Operator promotion 2026-07-12 — mirrors the UBAG PhiApproved decision.
+        Assert.Equal(ProviderComplianceClass.PhiApproved, GeminiCliProvider.DefaultComplianceClass);
         Assert.Equal("gemini-cli", GeminiCliProvider.AdapterId);
     }
 
@@ -241,7 +242,7 @@ public class Iter36CliProviderTests
     }
 
     [Fact]
-    public async Task CliProviders_RefusePhiEvenIfMisclassifiedAsPhiApproved()
+    public async Task Gemini_AllowsPhi_PerOperatorPromotion_CodexStillRefuses()
     {
         static AiCompletionRequest PhiRequest(string adapter) => new(
             new ProviderConfig
@@ -256,9 +257,16 @@ public class Iter36CliProviderTests
             "v1",
             ContainsPhi: true);
 
-        var gemini = new GeminiCliProvider(StubLauncher.Ok("never"), NullLogger<GeminiCliProvider>.Instance);
+        // Operator promotion 2026-07-12: gemini-cli is PhiApproved and must not
+        // refuse PHI at the CLI layer (AiGateway compliance gates still apply).
+        var gemini = new GeminiCliProvider(StubLauncher.Ok("phi ok"), NullLogger<GeminiCliProvider>.Instance);
+        var r = await gemini.CompleteAsync(PhiRequest(GeminiCliProvider.AdapterId), CancellationToken.None);
+        Assert.Equal("phi ok", r.Text);
 
-        await Assert.ThrowsAsync<ProviderPolicyException>(() => gemini.CompleteAsync(PhiRequest(GeminiCliProvider.AdapterId), CancellationToken.None));
+        // Codex keeps the Sandbox default and the CLI-level PHI refusal.
+        using var env = EnvVarScope.Set("RADIOPAD_CODEX_CLI_ENABLED", "1");
+        var codex = new CodexCliProvider(StubLauncher.Ok("never"), NullLogger<CodexCliProvider>.Instance);
+        await Assert.ThrowsAsync<ProviderPolicyException>(() => codex.CompleteAsync(PhiRequest(CodexCliProvider.AdapterId), CancellationToken.None));
     }
 
     // -----------------------------------------------------------------
