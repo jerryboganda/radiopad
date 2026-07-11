@@ -267,13 +267,15 @@ public sealed class TranscriptionService : ITranscriptionService
     }
 
     /// <summary>
-    /// Deterministic idempotency key over (tenant, report, fileName, size) so a
-    /// retried upload of the same audio reuses the same gateway job. The key is
-    /// a single path-safe token (no slash, backslash, or percent).
+    /// Per-invocation idempotency key (path-safe single token). The SAME key is
+    /// used for the job-create and artifact-upload of one attempt so HTTP-level
+    /// retries inside the resilience pipeline dedupe safely — but a NEW user
+    /// attempt gets a fresh key, so retrying after a timeout can never replay
+    /// the already-cancelled gateway job (audit finding, 2026-07-11).
     /// </summary>
     private static string BuildIdempotencyKey(Guid tenantId, Guid reportId, string fileName, long sizeBytes)
     {
-        var material = $"{tenantId:N}|{reportId:N}|{fileName}|{sizeBytes}";
+        var material = $"{tenantId:N}|{reportId:N}|{fileName}|{sizeBytes}|{Guid.NewGuid():N}";
         return $"radiopad-transcribe-{Sha256(material)[..32]}";
     }
 
