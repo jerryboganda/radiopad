@@ -8,6 +8,11 @@ const providersListMock = vi.fn();
 const createMock = vi.fn();
 const patchMock = vi.fn();
 const generateMock = vi.fn();
+const routerPushMock = vi.fn();
+
+vi.mock('next/navigation', () => ({
+  useRouter: () => ({ push: routerPushMock }),
+}));
 
 vi.mock('@/lib/api', () => ({
   COMPLIANCE_LABELS: { 0: 'Blocked', 1: 'No patient data', 3: 'Safe for patient data', 4: 'Runs on-site' },
@@ -67,6 +72,7 @@ describe('new report wizard', () => {
     createMock.mockReset().mockResolvedValue({ id: 'r1' });
     patchMock.mockReset().mockResolvedValue({ id: 'r1' });
     generateMock.mockReset().mockResolvedValue({ id: 'r1' });
+    routerPushMock.mockReset();
   });
 
   it('walks intake → generate and calls create, patch(findings), and generate(provider)', async () => {
@@ -105,6 +111,7 @@ describe('new report wizard', () => {
 
     // The staged overlay reaches its ready state.
     await waitFor(() => expect(screen.getByText('Report ready')).toBeInTheDocument());
+    await waitFor(() => expect(routerPushMock).toHaveBeenCalledWith('/reports/view?id=r1'), { timeout: 1_500 });
   });
 
   it('keeps Generate disabled until findings are provided', async () => {

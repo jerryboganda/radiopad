@@ -8,6 +8,7 @@
 // report; on success we redirect straight into the pre-populated /reports editor.
 
 import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useRouter } from 'next/navigation';
 import { api, COMPLIANCE_LABELS, type CatalogItem, type Provider } from '@/lib/api';
 import Container from '@/components/shell/Container';
 import PageHeader from '@/components/shell/PageHeader';
@@ -32,6 +33,7 @@ function catalogOptions(items: CatalogItem[]) {
 }
 
 export default function NewReportWizard() {
+  const router = useRouter();
   const [step, setStep] = useState<Step>(1);
 
   const [modalities, setModalities] = useState<CatalogItem[]>([]);
@@ -116,13 +118,13 @@ export default function NewReportWizard() {
       setDone(true);
       // Brief beat on "Report ready" before opening the pre-populated editor.
       window.setTimeout(() => {
-        window.location.href = reportHref(created.id);
+        router.push(reportHref(created.id));
       }, 750);
     } catch (e) {
       const err = e as { body?: { error?: string }; message?: string };
       setGenError(err.body?.error || err.message || 'Report generation failed. Please try again.');
     }
-  }, [modality, bodyPart, contrast, age, gender, history, findings, providerId]);
+  }, [modality, bodyPart, contrast, age, gender, history, findings, providerId, router]);
 
   return (
     <Container>

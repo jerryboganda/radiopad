@@ -2,6 +2,7 @@
 
 import Link from 'next/link';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useRouter } from 'next/navigation';
 import { api, type Report } from '@/lib/api';
 import { reportHref } from '@/lib/routes';
 import Container from '@/components/shell/Container';
@@ -23,6 +24,7 @@ const STATUS_TO_INT: Record<string, number | undefined> = {
 };
 
 export default function DashboardPage() {
+  const router = useRouter();
   const handledNewReport = useRef(false);
   const [reports, setReports] = useState<Report[]>([]);
   const [total, setTotal] = useState(0);
@@ -69,8 +71,8 @@ export default function DashboardPage() {
   // history → provider → generate) instead of dropping into an empty editor. The
   // wizard creates the draft itself once the radiologist hits Generate.
   const newReport = useCallback(() => {
-    location.href = '/reports/new';
-  }, []);
+    router.push('/reports/new');
+  }, [router]);
 
   useEffect(() => {
     if (typeof window === 'undefined') return;
