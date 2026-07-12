@@ -233,17 +233,40 @@ async function fetchOnce(url: string, init: RequestInit, headers: Headers): Prom
   throw lastErr;
 }
 
+/**
+ * Map a raw network failure (fetch's TypeError "Failed to fetch") to a message
+ * a radiologist can act on. The raw text leaked into UI banners during the
+ * 2026-07-12 incident (proxy killed a long AI call mid-flight).
+ *
+ * `status` deliberately stays undefined: useAuthSession and usePermissions
+ * classify `status === undefined` as "signed out / unreachable" and stamping a
+ * number here flips AuthGate/PermissionGate into a misleading
+ * "no permission" state on any network blip. Transport-level detection keys
+ * on `kind === 'network'` instead (used by the AI job poll loop).
+ */
+function friendlyNetworkError(e: unknown): Error {
+  return Object.assign(
+    new Error('Could not reach the RadioPad server — the connection dropped or the request timed out. Check your connection and try again.'),
+    { kind: 'network', cause: e },
+  );
+}
+
 async function fetchWithAuthRetry(
   url: string,
   init: RequestInit,
   headers: Headers,
 ): Promise<Response> {
-  let res = await fetchOnce(url, init, headers);
-  if ((res.status === 401 || res.status === 403) && !cachedAuthToken && await hydrateAuthTokenFromSecureStore()) {
-    applyAuthHeader(headers);
-    res = await fetchOnce(url, init, headers);
+  try {
+    let res = await fetchOnce(url, init, headers);
+    if ((res.status === 401 || res.status === 403) && !cachedAuthToken && await hydrateAuthTokenFromSecureStore()) {
+      applyAuthHeader(headers);
+      res = await fetchOnce(url, init, headers);
+    }
+    return res;
+  } catch (e) {
+    if (e instanceof TypeError) throw friendlyNetworkError(e);
+    throw e;
   }
-  return res;
 }
 
 /**
@@ -288,6 +311,82 @@ async function request<T>(path: string, init?: RequestInit): Promise<T> {
     return (await res.json()) as T;
   }
   return (await res.text()) as unknown as T;
+}
+
+/** Envelope returned by GET /api/reports/{id}/ai/jobs/{jobId}. */
+type AiJobEnvelope<T> = {
+  jobId: string;
+  kind: 'ai' | 'generate';
+  mode: string;
+  status: 'running' | 'ok' | 'error';
+  elapsedMs: number;
+  result: T | null;
+  error: string | null;
+  errorKind: string | null;
+};
+
+const AI_JOB_POLL_MS = 2_000;
+const AI_JOB_FIRST_POLL_MS = 300;
+const AI_JOB_MAX_WAIT_MS = 10 * 60_000;
+
+/** Poll-side statuses worth retrying: the GET is idempotent and the job keeps
+ * running server-side, so a proxy reload 502/503/504, a rate-limit 429/408, or
+ * a transient 500 (SQLite busy under the detached job's write) must not abandon
+ * a multi-minute generation. Deterministic failures (401/403, 404
+ * job_not_found after a server restart) fail fast. */
+function isTransientPollError(e: unknown): boolean {
+  const { status, kind } = e as { status?: number; kind?: string };
+  if (kind === 'network') return true;
+  return status === 408 || status === 429 || status === 500 || status === 502 || status === 503 || status === 504;
+}
+
+/**
+ * Submit an async report-AI job and poll it to a terminal state. Each poll is
+ * a fast GET, so no proxy or webview timeout can kill the generation; transient
+ * poll failures are retried until the overall deadline (the job keeps running
+ * server-side). Terminal errors are re-thrown in the same `{status, body}`
+ * shape `request()` produces, so existing catch blocks
+ * (`e.body?.error ?? e.message`) render them unchanged. The poll interval
+ * ramps 300ms → 2s so fast completions (policy rejections, cached/API-backed
+ * providers) don't pay a fixed 2s tax.
+ */
+async function runReportAiJob<T>(reportId: string, submitPath: string, body: unknown): Promise<T> {
+  const submitted = await request<{ jobId: string }>(submitPath, {
+    method: 'POST',
+    body: JSON.stringify(body),
+  });
+  const started = Date.now();
+  let waitMs = AI_JOB_FIRST_POLL_MS;
+  for (;;) {
+    await new Promise((r) => setTimeout(r, waitMs));
+    waitMs = Math.min(waitMs * 2, AI_JOB_POLL_MS);
+    let s: AiJobEnvelope<T>;
+    try {
+      s = await request<AiJobEnvelope<T>>(`/api/reports/${reportId}/ai/jobs/${submitted.jobId}`);
+    } catch (e) {
+      if (isTransientPollError(e) && Date.now() - started < AI_JOB_MAX_WAIT_MS) continue;
+      throw e;
+    }
+    if (s.status === 'ok' && s.result != null) return s.result;
+    if (s.status === 'error') {
+      throw Object.assign(new Error(s.error || 'AI generation failed.'), {
+        status: 502,
+        body: { error: s.error || 'AI generation failed.', kind: s.errorKind || 'ai_job_failed' },
+      });
+    }
+    if (Date.now() - started > AI_JOB_MAX_WAIT_MS) {
+      // Only the generate kind persists its result server-side; a runAi result
+      // lives in the job payload and is lost once this loop gives up — never
+      // promise it will show up on the report.
+      const message = submitPath.includes('/generate/')
+        ? 'The generation is taking unusually long. It may still finish in the background — reopen the report in a minute, or try again.'
+        : 'The AI request is taking unusually long and the wait was abandoned. Please try again.';
+      throw Object.assign(new Error(message), {
+        status: 504,
+        body: { error: message, kind: 'timeout' },
+      });
+    }
+  }
 }
 
 async function requestPaged<T>(path: string): Promise<{ items: T[]; total: number }> {
@@ -924,6 +1023,15 @@ export const api = {
       });
     },
     validate: (id: string) => request<ValidationResult>(`/api/reports/${id}/validate`, { method: 'POST' }),
+    /**
+     * AI section generation via the async job endpoints (submit + poll,
+     * 2026-07-12). The old synchronous POST held the connection open for the
+     * whole provider call — minutes on UBAG browser-driven targets — so any
+     * proxy timeout or the webview's ~300s kill surfaced as "Failed to fetch"
+     * AND cancelled the in-flight generation. Submit returns a job id
+     * immediately; each poll is a fast request; a dropped poll no longer
+     * cancels the run. Same return shape as the old call.
+     */
     runAi: (
       id: string,
       body: {
@@ -938,21 +1046,24 @@ export const api = {
         providerId: string;
       },
     ) =>
-      request<{ text: string; provider: string; model: string; latencyMs: number; promptVersion: string; mode: string }>(
-        `/api/reports/${id}/ai`,
-        { method: 'POST', body: JSON.stringify(body) },
+      runReportAiJob<{ text: string; provider: string; model: string; latencyMs: number; promptVersion: string; mode: string }>(
+        id,
+        `/api/reports/${id}/ai/jobs`,
+        body,
       ),
     /**
      * Whole-report generation for the guided intake flow (`/reports/new`). Runs the
      * structured generation prompt through the selected provider (or auto-routes when
      * `providerId` is omitted) and returns the report with every AI-populated section
      * filled and flagged `.ai-mark`. Empty sections keep the intake-seeded text.
+     * Uses the async job endpoints — see `runAi`.
      */
     generate: (id: string, body: { providerId?: string } = {}) =>
-      request<Report>(`/api/reports/${id}/generate`, {
-        method: 'POST',
-        body: JSON.stringify(body.providerId ? { providerId: body.providerId } : {}),
-      }),
+      runReportAiJob<Report>(
+        id,
+        `/api/reports/${id}/generate/jobs`,
+        body.providerId ? { providerId: body.providerId } : {},
+      ),
     prior: (id: string) =>
       request<{ current: { id: string; bodyPart: string }; prior: Report | null }>(
         `/api/reports/${id}/prior`,

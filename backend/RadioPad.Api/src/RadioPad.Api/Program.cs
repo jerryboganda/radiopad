@@ -159,6 +159,10 @@ builder.Services.AddSingleton<IAiProviderAdapter, RadioPad.Infrastructure.Provid
 // for logged-out browser sessions and an unreachable gateway. Singleton: banner
 // and throttle state must survive across the scoped discovery sweeps.
 builder.Services.AddSingleton<RadioPad.Infrastructure.Providers.Ubag.UbagOperatorAlertService>();
+// Async report-AI jobs (submit + poll): generation must survive proxy timeouts
+// and client disconnects, so it runs detached from the HTTP request. Singleton:
+// poll requests arrive on different scopes than the submit.
+builder.Services.AddSingleton<RadioPad.Api.Services.AiJobRegistry>();
 // Dynamic UBAG provider auto-discovery: keeps each tenant's UBAG provider rows in sync
 // with the gateway's live target catalog + login state, so any web AI the operator logs
 // into via the UBAG Chromium session appears in the picker automatically (no dev needed).

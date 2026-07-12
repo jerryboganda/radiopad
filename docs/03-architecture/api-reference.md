@@ -60,7 +60,10 @@ Controller-handled provider policy failures return 403 `kind:"provider_policy"`.
 | PATCH  | `/api/reports/{id}`             | Update sections. Each call also appends a `ReportVersion` snapshot. |
 | GET    | `/api/reports/{id}/versions`    | Recent edit history (most-recent 50). |
 | POST   | `/api/reports/{id}/validate`    | Run rulebook validation. Returns `ValidationFinding[]`. |
-| POST   | `/api/reports/{id}/ai`          | Body `{ mode: "impression" \| "cleanup" \| "draft" \| "concise" \| "formal" \| "patient_friendly" \| "referring_summary", providerId? }`; omitted `providerId` uses auto-routing. **Rate-limited** (`ai` policy: 60/min/tenant). |
+| POST   | `/api/reports/{id}/ai`          | Body `{ mode: "impression" \| "cleanup" \| "draft" \| "concise" \| "formal" \| "patient_friendly" \| "referring_summary", providerId? }`; omitted `providerId` uses auto-routing. **Rate-limited** (`ai` policy: 60/min/tenant). Synchronous — holds the connection for the whole provider call; kept for older desktop builds. New clients use the async job pair below. |
+| POST   | `/api/reports/{id}/ai/jobs`     | Async variant of `/ai` (2026-07-12): same body/validation, returns `202 { jobId, status:"running" }` immediately. Generation runs detached from the connection — a dropped client no longer cancels it. **Rate-limited** (`ai`). |
+| POST   | `/api/reports/{id}/generate/jobs` | Async variant of `/generate`: returns `202 { jobId }`; on completion the poll's `result` is the updated `Report` (sections adopted + version snapshot, like the sync endpoint). **Rate-limited** (`ai`). |
+| GET    | `/api/reports/{id}/ai/jobs/{jobId}` | Poll a job (both kinds): `{ jobId, kind, mode, status: "running"\|"ok"\|"error", elapsedMs, result?, error?, errorKind? }`. Fast request; NOT `ai`-rate-limited. 404 `kind:"job_not_found"` after a server restart (jobs are in-memory; results retained ~15 min). |
 | POST   | `/api/reports/{id}/acknowledge` | Mark as Acknowledged. Blocked with 409 `kind:"validation_blockers"` when strict validation has any `Blocker`. |
 | GET    | `/api/reports/{id}/export/text` | Plain-text export. `preview=true` is draft-safe and does not audit/export; final export requires Acknowledged/Exported. |
 | GET    | `/api/reports/{id}/export/json` | Structured JSON report export. Requires Acknowledged/Exported and audits `ReportExported`. |
