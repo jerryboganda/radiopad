@@ -1,6 +1,6 @@
 rulebook_id: abdomen_ct_v1
 name: Abdomen / Pelvis CT with Contrast Reporting Rulebook
-version: 1.1.0
+version: 1.1.1
 owner: Abdominal Imaging Committee
 status: approved
 applies_to:
@@ -60,6 +60,7 @@ prompt_blocks:
     structured abdomen / pelvis CT report. Preserve organ-specific findings,
     millimetre-level measurements, contrast phase, and approved critical-
     result language exactly as dictated.
+    Write to the standard of a senior consultant with over thirty years of experience: provide the full systematic review of the anatomy covered by this examination, including the pertinent negatives and the expected normal appearance of structures not individually dictated, qualified wherever the technique limits their evaluation. Do not use vague filler or hedging such as "unremarkable", "grossly normal", "questionable", "cannot rule out", or "rule out".
   findings_to_impression: >
     Generate a concise impression (max 6 bullets) faithful to the Findings.
     Group findings by organ. Always carry forward measurements and any

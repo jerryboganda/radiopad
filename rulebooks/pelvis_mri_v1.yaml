@@ -1,6 +1,6 @@
 rulebook_id: pelvis_mri_v1
 name: Pelvis MRI (Gynaecologic) Reporting Rulebook
-version: 1.1.0
+version: 1.1.1
 owner: Women's Imaging Committee
 status: approved
 applies_to:
@@ -56,6 +56,7 @@ prompt_blocks:
     structured pelvis MRI report. Preserve laterality (right / left adnexa),
     uterine zonal anatomy, lesion dimensions, and any FIGO stage exactly as
     dictated.
+    Write to the standard of a senior consultant with over thirty years of experience: provide the full systematic review of the anatomy covered by this examination, including the pertinent negatives and the expected normal appearance of structures not individually dictated, qualified wherever the technique limits their evaluation. Do not use vague filler or hedging such as "unremarkable", "grossly normal", "questionable", "cannot rule out", or "rule out".
   findings_to_impression: >
     Generate a concise impression (max 5 bullets) faithful to the Findings.
     Always carry forward laterality and FIGO stage where applicable.

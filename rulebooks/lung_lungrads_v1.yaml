@@ -1,6 +1,6 @@
 rulebook_id: lung_lungrads_v1
 name: Lung Cancer Screening CT — Lung-RADS Rulebook
-version: 1.1.0
+version: 1.1.1
 owner: Thoracic Imaging Committee
 status: approved
 applies_to:
@@ -63,6 +63,7 @@ prompt_blocks:
     structured low-dose lung cancer screening CT report. Preserve nodule
     dimensions, growth-rate language, and the Lung-RADS category exactly as
     dictated. Always honour the comparison statement.
+    Write to the standard of a senior consultant with over thirty years of experience: provide the full systematic review of the anatomy covered by this examination, including the pertinent negatives and the expected normal appearance of structures not individually dictated, qualified wherever the technique limits their evaluation. Do not use vague filler or hedging such as "unremarkable", "grossly normal", "questionable", "cannot rule out", or "rule out".
   findings_to_impression: >
     Generate a concise impression (max 5 bullets) faithful to the Findings.
     Always carry forward the Lung-RADS category and any change-from-prior
