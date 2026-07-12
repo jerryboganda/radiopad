@@ -25,8 +25,33 @@ import {
   type SectionEditorHandle,
 } from '@/lib/editor/sectionEditorRegistry';
 import type { EditorCorrection } from '@/lib/editor/corrections';
+import { clinicalLineRole } from '@/lib/editor/clinicalStructure';
 
 const correctionPluginKey = new PluginKey<DecorationSet>('rpCorrections');
+
+const ClinicalStructure = Extension.create({
+  name: 'rpClinicalStructure',
+  addProseMirrorPlugins() {
+    return [
+      new Plugin({
+        props: {
+          decorations(state) {
+            const decorations: Decoration[] = [];
+            state.doc.descendants((node, pos) => {
+              if (node.type.name !== 'paragraph') return;
+              const role = clinicalLineRole(node.textContent);
+              if (role === 'body') return;
+              decorations.push(Decoration.node(pos, pos + node.nodeSize, {
+                class: `rp-clinical-${role}`,
+              }));
+            });
+            return DecorationSet.create(state.doc, decorations);
+          },
+        },
+      }),
+    ];
+  },
+});
 
 // Holds the ephemeral correction-highlight DecorationSet. Decorations are pushed
 // in via a meta transaction; on every other transaction they are remapped
@@ -86,7 +111,7 @@ export default function SectionEditor({
 
   const editor = useEditor({
     immediatelyRender: false, // avoid Next SSR hydration mismatch
-    extensions: [Document, Paragraph, Text, History, CorrectionHighlight],
+    extensions: [Document, Paragraph, Text, History, ClinicalStructure, CorrectionHighlight],
     content: stringToDoc(value),
     editorProps: {
       attributes: {

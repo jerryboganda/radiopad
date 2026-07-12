@@ -196,6 +196,13 @@ public class ReportingService
             INSTRUCTION:
             {{instructions}}
 
+            FINDINGS FORMAT (required):
+            Organize the findings as a concise clinical outline. Put each anatomy/system heading on its
+            own line in uppercase, followed by a colon. Put each finding beneath its heading on a separate
+            line beginning with the Unicode bullet "•". Insert one blank line between anatomy groups.
+            Never run a heading into the preceding or following sentence. Do not use Markdown markers,
+            tables, decorative symbols, or redundant prose. Preserve all measurements, laterality, and negations.
+
             Respond with a single JSON object exactly matching this schema. The recommendations value must not be empty:
             {
               "indication": "",
@@ -236,13 +243,50 @@ public class ReportingService
             Indication: sections.GetValueOrDefault("indication", string.Empty),
             Technique: sections.GetValueOrDefault("technique", string.Empty),
             Comparison: string.Empty,
-            Findings: sections.GetValueOrDefault("findings", string.Empty),
+            Findings: FormatGeneratedFindings(sections.GetValueOrDefault("findings", string.Empty)),
             Impression: sections.GetValueOrDefault("impression", string.Empty),
             Recommendations: recommendations,
             Provider: result.Provider,
             Model: result.Model,
             LatencyMs: result.LatencyMs,
             PromptVersion: result.PromptVersion);
+    }
+
+    public static string FormatGeneratedFindings(string? findings)
+    {
+        var text = (findings ?? string.Empty).Replace("\r\n", "\n").Replace('\r', '\n').Trim();
+        if (text.Length == 0) return string.Empty;
+
+        var matches = System.Text.RegularExpressions.Regex.Matches(
+            text,
+            @"(?<![A-Za-z0-9])(?<heading>[A-Z][A-Z0-9 /&(),'-]{2,}:)(?=\s|$)");
+        if (matches.Count == 0)
+            return text;
+
+        var blocks = new List<string>();
+        var preamble = text[..matches[0].Index].Trim();
+        if (preamble.Length > 0) blocks.Add(preamble);
+
+        for (var index = 0; index < matches.Count; index++)
+        {
+            var match = matches[index];
+            var bodyStart = match.Index + match.Length;
+            var bodyEnd = index + 1 < matches.Count ? matches[index + 1].Index : text.Length;
+            var body = text[bodyStart..bodyEnd].Trim();
+            var lines = body
+                .Split('\n', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)
+                .Where(line => line.Length > 0)
+                .Select(line => System.Text.RegularExpressions.Regex.IsMatch(line, @"^(?:•|[-–—]|\d+[.)])\s+")
+                    ? line
+                    : $"• {line}")
+                .ToArray();
+
+            blocks.Add(lines.Length == 0
+                ? match.Groups["heading"].Value
+                : $"{match.Groups["heading"].Value}\n{string.Join("\n", lines)}");
+        }
+
+        return string.Join("\n\n", blocks);
     }
 
     private async Task<string> GenerateMissingRecommendationsAsync(

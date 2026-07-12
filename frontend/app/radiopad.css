@@ -178,8 +178,33 @@
 .rp-section-editor.impression { min-height: 132px; }
 .rp-narrative .rp-section-editor {
   font-family: var(--serif);
-  font-size: 14.5px;
-  line-height: 1.6;
+  font-size: 1rem;
+  line-height: 1.65;
+  font-kerning: normal;
+  text-wrap: pretty;
+}
+.rp-narrative .rp-section-editor p {
+  max-width: 72ch;
+  margin-block: 0 0.75rem;
+}
+.rp-narrative .rp-section-editor p:last-child { margin-bottom: 0; }
+.rp-narrative .rp-section-editor .rp-clinical-heading {
+  font-family: var(--sans);
+  font-size: 0.875rem;
+  font-weight: 700;
+  line-height: 1.35;
+  letter-spacing: 0.045em;
+  color: var(--text);
+  margin-block: 1.35rem 0.4rem;
+}
+.rp-narrative .rp-section-editor .rp-clinical-heading:first-child {
+  margin-top: 0.15rem;
+}
+.rp-narrative .rp-section-editor .rp-clinical-bullet,
+.rp-narrative .rp-section-editor .rp-clinical-numbered {
+  padding-left: 1.25rem;
+  text-indent: -1.25rem;
+  margin-bottom: 0.45rem;
 }
 .ai-mark .rp-section-editor {
   background: transparent;
