@@ -79,6 +79,9 @@ public class Iter36CliProviderTests
         Assert.Equal("ok response", r.Text);
         var spec = stub.Captured[0];
         Assert.Equal("gemini", spec.FileName);
+        // --skip-trust: gemini runs headless in a scrubbed env + temp cwd, so the
+        // "trusted folder" check must be bypassed (else exit 55).
+        Assert.Contains("--skip-trust", spec.Arguments);
         Assert.Contains("--output-format", spec.Arguments);
         Assert.Contains("json", spec.Arguments);
         Assert.Contains("--model", spec.Arguments);
@@ -144,6 +147,8 @@ public class Iter36CliProviderTests
         // the exact "gemini exited with code 41" the operator hit.
         Assert.Contains("GEMINI_API_KEY", DefaultProcessLauncher.BaseEnvAllowlist);
         Assert.Contains("GOOGLE_API_KEY", DefaultProcessLauncher.BaseEnvAllowlist);
+        // Trust-workspace flag: without it gemini-cli aborts headless with exit 55.
+        Assert.Contains("GEMINI_CLI_TRUST_WORKSPACE", DefaultProcessLauncher.BaseEnvAllowlist);
     }
 
     // -----------------------------------------------------------------

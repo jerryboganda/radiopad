@@ -58,7 +58,13 @@ public sealed class GeminiCliProvider : IAiProviderAdapter, IAiProviderHealthPro
             CliProviderRunner.Sanitise(AdapterId, request.SystemPrompt),
             CliProviderRunner.Sanitise(AdapterId, request.UserPrompt));
 
-        var args = new List<string> { "--output-format", "json" };
+        // --skip-trust: the launcher spawns gemini in a scrubbed environment and a
+        // dedicated temp working directory, so gemini-cli's "trusted folder" check
+        // has no project config to guard and (in headless mode) would otherwise
+        // abort with exit 55 ("not running in a trusted directory"). We also allow
+        // GEMINI_CLI_TRUST_WORKSPACE through the env scrub (IProcessLauncher) as a
+        // belt-and-suspenders; the flag makes the provider work regardless of env.
+        var args = new List<string> { "--skip-trust", "--output-format", "json" };
         if (!string.IsNullOrWhiteSpace(p.Model))
         {
             args.Add("--model");

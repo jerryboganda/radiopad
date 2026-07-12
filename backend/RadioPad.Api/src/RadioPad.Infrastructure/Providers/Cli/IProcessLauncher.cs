@@ -161,6 +161,10 @@ public sealed class DefaultProcessLauncher : IProcessLauncher
         "TEMP",
         "GEMINI_API_KEY",
         "GOOGLE_API_KEY",
+        // Lets the operator's GEMINI_CLI_TRUST_WORKSPACE=true reach the child so
+        // gemini-cli's headless "trusted folder" check passes (else exit 55). The
+        // provider also passes --skip-trust, so this is defense-in-depth.
+        "GEMINI_CLI_TRUST_WORKSPACE",
     };
 
     private static void ScrubEnvironment(ProcessStartInfo psi)
