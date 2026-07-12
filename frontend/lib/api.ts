@@ -39,6 +39,15 @@ export type CompanionSessionInit = {
   expiresAt: string;
   /** Relative WebSocket path for the relay, e.g. `/ws/companion`. */
   wsUrl: string;
+  /**
+   * Short-lived (2h) bearer the desktop embeds in its pairing QR. The phone
+   * scans the QR, adopts this as its auth token, and pairs — so there is NO
+   * separate phone login. Authenticates as `tenantSlug`/`userEmail` only and is
+   * revoked when the session ends. Absent on older backends (pre-QR-login).
+   */
+  companionToken?: string;
+  tenantSlug?: string;
+  userEmail?: string;
 };
 
 /** Result of the phone pairing to a desktop session by code. */
@@ -143,6 +152,17 @@ export function companionBase(): string {
     return (resolvedCompanionBase = CONFIGURED_API_BASE);
   }
   return (resolvedCompanionBase = DEFAULT_COMPANION_BASE);
+}
+
+/**
+ * Override the resolved companion relay base at runtime. The phone calls this
+ * with the `base` carried in the pairing QR so its `pair` REST call and the WS
+ * relay both address the exact cloud host the desktop advertised — rather than
+ * relying on a build-time default. Passing an empty value re-arms auto-resolution.
+ */
+export function setCompanionBase(base: string): void {
+  const cleaned = (base || '').replace(/\/+$/, '');
+  resolvedCompanionBase = cleaned || null;
 }
 
 /** The companion relay as a `ws(s)://…` origin (for the raw WebSocket client). */

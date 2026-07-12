@@ -37,7 +37,12 @@ export default function AppShell({ children }: { children: ReactNode }) {
   const pathname = usePathname();
   const publicAuthRoute = pathname === '/login' || pathname?.startsWith('/login/')
     || pathname === '/register' || pathname?.startsWith('/register/')
-    || pathname === '/pair' || pathname?.startsWith('/pair/');
+    || pathname === '/pair' || pathname?.startsWith('/pair/')
+    // The mobile companion pairs by scanning the desktop QR, which carries its
+    // OWN short-lived bearer — the phone is intentionally signed out until it
+    // scans. Gating /companion behind AuthGate would bounce it to /login and it
+    // could never reach the scanner. It renders its own pair/scan chrome.
+    || pathname === '/companion' || pathname?.startsWith('/companion/');
 
   if (publicAuthRoute) {
     return (

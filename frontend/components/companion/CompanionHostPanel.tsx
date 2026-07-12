@@ -15,7 +15,8 @@
 
 import { useCallback, useEffect, useRef, useState } from 'react';
 import QRCode from 'qrcode';
-import { api } from '@/lib/api';
+import { api, companionBase } from '@/lib/api';
+import { encodeCompanionPairing } from '@/lib/companionPairing';
 import {
   connectCompanion,
   type CompanionConnection,
@@ -88,7 +89,20 @@ export default function CompanionHostPanel() {
       sessionIdRef.current = session.sessionId;
       setCode(session.pairingCode);
       try {
-        setQr(await QRCode.toDataURL(session.pairingCode, { margin: 1, width: 176 }));
+        // Encode the whole pairing payload (relay base + code + short-lived
+        // companion bearer + identity) so the phone authenticates AND pairs from
+        // one scan — no separate phone login. If the backend didn't return a
+        // token (older build), fall back to the bare code so the QR still shows.
+        const qrText = session.companionToken
+          ? encodeCompanionPairing({
+              base: companionBase(),
+              code: session.pairingCode,
+              token: session.companionToken,
+              tenant: session.tenantSlug ?? '',
+              user: session.userEmail ?? '',
+            })
+          : session.pairingCode;
+        setQr(await QRCode.toDataURL(qrText, { margin: 1, width: 200, errorCorrectionLevel: 'M' }));
       } catch {
         setQr('');
       }
@@ -162,14 +176,17 @@ export default function CompanionHostPanel() {
             </>
           ) : phase === 'advertising' ? (
             <>
-              <p className="rp-page-sub">On the RadioPad phone app, enter this code:</p>
+              <p className="rp-page-sub">Open the RadioPad phone app and <strong>scan this QR</strong> to pair — no phone sign-in needed:</p>
+              {qr && (
+                // eslint-disable-next-line @next/next/no-img-element
+                <img src={qr} alt="Pairing QR code" width={200} height={200} style={{ display: 'block', margin: '12px auto' }} />
+              )}
+              <p className="rp-page-sub" style={{ textAlign: 'center' }}>
+                Can’t scan? Enter this code on the phone:
+              </p>
               <div className="section-block rp-pair-code-tile" style={{ textAlign: 'center' }}>
                 <code className="rp-pair-code">{code}</code>
               </div>
-              {qr && (
-                // eslint-disable-next-line @next/next/no-img-element
-                <img src={qr} alt="Pairing QR code" width={176} height={176} style={{ display: 'block', margin: '12px auto' }} />
-              )}
               <p className="rp-auth-hint">Waiting for your phone to join…</p>
               <button className="ghost" type="button" onClick={stop}>Cancel</button>
             </>

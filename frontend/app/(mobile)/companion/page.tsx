@@ -3,26 +3,32 @@
 /**
  * Mobile companion — the entire mobile app.
  *
- * The phone pairs to a *live desktop session* (by the short code the desktop
- * shows) and then acts as a wireless dictation microphone + remote for the
- * report open on that desktop. Spoken text is streamed over the companion relay
- * ({@link connectCompanion}) to the desktop, which inserts it into the focused
- * section. There is NO standalone reporting here — no editing, no signing.
+ * The phone pairs to a *live desktop session* and then acts as a wireless
+ * dictation microphone + remote for the report open on that desktop. Pairing is
+ * by **scanning the QR the desktop shows**: that QR carries a short-lived
+ * companion bearer, so scanning it BOTH authenticates the phone (as the same
+ * radiologist) AND joins the session — there is no separate phone login. (Before
+ * this, the phone had no way to authenticate, so every pair attempt 401'd and
+ * surfaced as "Pairing failed".) Spoken text is streamed over the companion
+ * relay ({@link connectCompanion}) to the desktop, which inserts it into the
+ * focused section. There is NO standalone reporting here — no editing, no signing.
  *
  * Uses the Web Speech API where available (with the native
- * `@capacitor-community/speech-recognition` plugin as the on-device path), the
- * same approach as the legacy mobile dictation page. Locked mobile classes:
- * `.rp-mobile`, `.rp-mic-btn`, `.rp-transcript`, `.rp-page-title`,
- * `.rp-page-sub`, `.banner`, `.primary`, `.ghost`, `.subtle`.
+ * `@capacitor-community/speech-recognition` plugin as the on-device path). Locked
+ * mobile classes: `.rp-mobile`, `.rp-mic-btn`, `.rp-transcript`, `.rp-page-title`,
+ * `.rp-page-sub`, `.banner`, `.primary`, `.ghost`, `.subtle`, `.rp-input`.
  */
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { api } from '@/lib/api';
+import { api, setActiveAuthToken, setCompanionBase } from '@/lib/api';
+import { setAuthToken } from '@/lib/secureAuth';
 import {
   connectCompanion,
   type CompanionConnection,
   type CompanionCommand,
 } from '@/lib/companion';
+import { decodeCompanionPairing, type CompanionPairingPayload } from '@/lib/companionPairing';
+import { nativeScanAvailable, webScanAvailable, scanNative, scanWebcam } from '@/lib/companionScan';
 
 type SpeechRecognitionLike = {
   lang: string;
@@ -69,8 +75,10 @@ type Phase = 'pair' | 'connecting' | 'live' | 'ended';
 export default function MobileCompanionPage() {
   const Ctor = useMemo(getSpeechRecognitionCtor, []);
   const [phase, setPhase] = useState<Phase>('pair');
-  const [code, setCode] = useState('');
   const [pairing, setPairing] = useState(false);
+  const [scanning, setScanning] = useState(false);
+  const [showPaste, setShowPaste] = useState(false);
+  const [pasteText, setPasteText] = useState('');
   const [error, setError] = useState<string | null>(null);
   const [hostName, setHostName] = useState<string>('');
   const [section, setSection] = useState<string>('');
@@ -79,55 +87,145 @@ export default function MobileCompanionPage() {
 
   const connRef = useRef<CompanionConnection | null>(null);
   const recognitionRef = useRef<SpeechRecognitionLike | null>(null);
+  const videoRef = useRef<HTMLVideoElement | null>(null);
+  const scanAbortRef = useRef<AbortController | null>(null);
+
+  const stopScan = useCallback(() => {
+    scanAbortRef.current?.abort();
+    scanAbortRef.current = null;
+    setScanning(false);
+  }, []);
 
   const teardown = useCallback(() => {
     try { recognitionRef.current?.stop(); } catch { /* noop */ }
     recognitionRef.current = null;
     connRef.current?.close();
     connRef.current = null;
+    scanAbortRef.current?.abort();
+    scanAbortRef.current = null;
   }, []);
 
   useEffect(() => () => teardown(), [teardown]);
 
-  const pair = useCallback(async () => {
-    const trimmed = code.trim().toUpperCase();
-    if (trimmed.length < 4) {
-      setError('Enter the code shown on your desktop.');
-      return;
-    }
+  /** Map a pair-call failure to a message the radiologist can act on. */
+  const describePairError = useCallback((e: unknown): string => {
+    const ex = e as { status?: number; kind?: string; body?: { error?: string; detail?: string } };
+    if (ex.kind === 'network') return 'Could not reach RadioPad. Check your connection and try again.';
+    if (ex.status === 401) return 'This pairing expired. On your desktop choose “Start pairing” again, then re-scan.';
+    if (ex.status === 404) return 'That pairing code is invalid or has expired. Re-scan the desktop QR.';
+    return ex.body?.error ?? ex.body?.detail ?? 'Pairing failed. Re-scan the desktop QR.';
+  }, []);
+
+  /** Open the relay once the REST pair succeeds. */
+  const connectAfterPair = useCallback((sessionId: string, host: string) => {
+    setHostName(host);
+    setPhase('connecting');
+    const conn = connectCompanion({
+      sessionId,
+      role: 'companion',
+      onOpen: () => setPhase('live'),
+      // On an INVOLUNTARY end (relay drop or desktop unpair) tear everything down —
+      // critically, stop the running SpeechRecognition so the phone microphone can
+      // never stay live after the UI says the session ended.
+      onClose: () => { teardown(); setPhase('ended'); },
+      onMessage: (msg) => {
+        if (msg.type === 'section_context') {
+          setSection(msg.sectionTitle || msg.sectionKey || '');
+        } else if (msg.type === 'session_ended') {
+          teardown();
+          setPhase('ended');
+        }
+      },
+      onError: () => setError('Connection interrupted. Re-pair to continue.'),
+    });
+    connRef.current = conn;
+  }, [teardown]);
+
+  /**
+   * Adopt a scanned/pasted pairing payload: point at the advertised relay, take
+   * on its short-lived bearer (in memory + secure store so a reload survives),
+   * then join the session by its code. The bearer is what makes the pair call
+   * authenticate — without it the backend 401s (the original bug).
+   */
+  const pairFromPayload = useCallback(async (payload: CompanionPairingPayload) => {
+    stopScan();
+    setShowPaste(false);
     setPairing(true);
     setError(null);
     try {
-      const res = await api.companion.pair(trimmed, deviceName());
-      setHostName(res.hostDeviceName);
-      setPhase('connecting');
-      const conn = connectCompanion({
-        sessionId: res.sessionId,
-        role: 'companion',
-        onOpen: () => setPhase('live'),
-        // On an INVOLUNTARY end (relay drop or desktop unpair) tear everything
-        // down — critically, stop the running SpeechRecognition so the phone
-        // microphone can never stay live after the UI says the session ended.
-        onClose: () => { teardown(); setPhase('ended'); },
-        onMessage: (msg) => {
-          if (msg.type === 'section_context') {
-            setSection(msg.sectionTitle || msg.sectionKey || '');
-          } else if (msg.type === 'session_ended') {
-            teardown();
-            setPhase('ended');
-          }
-        },
-        onError: () => setError('Connection interrupted. Re-pair to continue.'),
-      });
-      connRef.current = conn;
+      if (payload.base) setCompanionBase(payload.base);
+      setActiveAuthToken(payload.token);
+      if (typeof localStorage !== 'undefined') {
+        localStorage.setItem('radiopad.tenant', payload.tenant);
+        localStorage.setItem('radiopad.user', payload.user);
+      }
+      // Best-effort persist so the token survives a webview reload within its life.
+      void setAuthToken(payload.token).catch(() => undefined);
+
+      const res = await api.companion.pair(payload.code, deviceName());
+      connectAfterPair(res.sessionId, res.hostDeviceName);
     } catch (e) {
-      const ex = e as { status?: number; body?: { error?: string } };
-      setError(ex.status === 404 ? 'That code is invalid or expired.' : (ex.body?.error ?? 'Pairing failed.'));
+      setActiveAuthToken(null);
+      setError(describePairError(e));
       setPhase('pair');
     } finally {
       setPairing(false);
     }
-  }, [code, teardown]);
+  }, [connectAfterPair, describePairError, stopScan]);
+
+  /** Scan the desktop QR — native camera on the phone, webcam in a browser. */
+  const startScan = useCallback(async () => {
+    setError(null);
+    setShowPaste(false);
+    if (nativeScanAvailable()) {
+      setPairing(true);
+      try {
+        const payload = await scanNative();
+        if (payload) {
+          await pairFromPayload(payload);
+        } else {
+          setError('No RadioPad pairing code found. Point the camera at the QR on your desktop.');
+        }
+      } catch {
+        setError('Could not open the camera. Grant camera access, or use “Paste pairing link”.');
+      } finally {
+        setPairing(false);
+      }
+      return;
+    }
+    if (!webScanAvailable()) {
+      setShowPaste(true);
+      setError('This device can’t scan. Use “Paste pairing link” instead.');
+      return;
+    }
+    // Web/browser: live-preview webcam scan.
+    const controller = new AbortController();
+    scanAbortRef.current = controller;
+    setScanning(true);
+    // Defer so the <video> element is mounted before we attach the stream.
+    setTimeout(async () => {
+      const video = videoRef.current;
+      if (!video) { setScanning(false); return; }
+      try {
+        const payload = await scanWebcam(video, controller.signal);
+        if (payload) await pairFromPayload(payload);
+        else if (!controller.signal.aborted) setScanning(false);
+      } catch {
+        setScanning(false);
+        setError('Could not open the camera. Grant camera access, or use “Paste pairing link”.');
+      }
+    }, 0);
+  }, [pairFromPayload]);
+
+  /** Manual fallback: paste the pairing link/text shown under the desktop QR. */
+  const pairFromPaste = useCallback(async () => {
+    const payload = decodeCompanionPairing(pasteText);
+    if (!payload) {
+      setError('That doesn’t look like a RadioPad pairing link. Copy it from the desktop and try again.');
+      return;
+    }
+    await pairFromPayload(payload);
+  }, [pasteText, pairFromPayload]);
 
   const startRecording = useCallback(() => {
     if (!Ctor || !connRef.current) return;
@@ -179,34 +277,63 @@ export default function MobileCompanionPage() {
   }, []);
 
   if (phase === 'pair' || phase === 'connecting') {
+    const busy = pairing || phase === 'connecting';
     return (
       <div className="rp-mobile">
         <h1 className="rp-page-title">Pair with desktop</h1>
         <p className="rp-page-sub">
-          Open a report on your RadioPad desktop, choose <strong>Pair phone</strong>, and enter the
-          code shown there. Your phone becomes a wireless dictation mic for that report.
+          Open a report on your RadioPad desktop, choose <strong>Pair phone</strong>, then
+          <strong> scan the QR</strong> shown there. Your phone becomes a wireless dictation mic for
+          that report — no sign-in needed.
         </p>
         {error && <div className="banner warn" role="alert">{error}</div>}
-        <input
-          className="rp-input"
-          inputMode="text"
-          autoCapitalize="characters"
-          autoCorrect="off"
-          placeholder="Pairing code"
-          aria-label="Pairing code"
-          value={code}
-          onChange={(e) => setCode(e.target.value.toUpperCase())}
-          disabled={pairing || phase === 'connecting'}
-          style={{ letterSpacing: '0.25em', textAlign: 'center', fontSize: '1.5rem' }}
-        />
-        <button
-          className="primary"
-          type="button"
-          onClick={pair}
-          disabled={pairing || phase === 'connecting'}
-        >
-          {phase === 'connecting' ? 'Connecting…' : pairing ? 'Pairing…' : 'Pair'}
-        </button>
+
+        {scanning ? (
+          <>
+            {/* eslint-disable-next-line jsx-a11y/media-has-caption */}
+            <video
+              ref={videoRef}
+              playsInline
+              muted
+              style={{ width: '100%', maxHeight: '60vh', borderRadius: 12, background: '#000', objectFit: 'cover' }}
+            />
+            <p className="rp-page-sub" style={{ textAlign: 'center' }}>Point the camera at the desktop QR…</p>
+            <button className="ghost" type="button" onClick={stopScan}>Cancel</button>
+          </>
+        ) : (
+          <>
+            <button className="primary" type="button" onClick={startScan} disabled={busy}>
+              {phase === 'connecting' ? 'Connecting…' : pairing ? 'Pairing…' : 'Scan QR to pair'}
+            </button>
+
+            <button
+              className="subtle"
+              type="button"
+              onClick={() => { setShowPaste((v) => !v); setError(null); }}
+              disabled={busy}
+            >
+              Can’t scan? Paste pairing link
+            </button>
+
+            {showPaste && (
+              <>
+                <textarea
+                  className="rp-input"
+                  rows={3}
+                  placeholder="Paste the pairing link shown under the desktop QR"
+                  aria-label="Pairing link"
+                  value={pasteText}
+                  onChange={(e) => setPasteText(e.target.value)}
+                  disabled={busy}
+                  style={{ width: '100%', fontFamily: 'monospace', fontSize: '0.85rem' }}
+                />
+                <button className="primary" type="button" onClick={pairFromPaste} disabled={busy || !pasteText.trim()}>
+                  Pair from link
+                </button>
+              </>
+            )}
+          </>
+        )}
       </div>
     );
   }
@@ -215,8 +342,8 @@ export default function MobileCompanionPage() {
     return (
       <div className="rp-mobile">
         <h1 className="rp-page-title">Session ended</h1>
-        <p className="rp-page-sub">The desktop session closed. Pair again to keep dictating.</p>
-        <button className="primary" type="button" onClick={() => { setPhase('pair'); setCode(''); setError(null); }}>
+        <p className="rp-page-sub">The desktop session closed. Scan again to keep dictating.</p>
+        <button className="primary" type="button" onClick={() => { setPhase('pair'); setPasteText(''); setError(null); }}>
           Pair again
         </button>
       </div>

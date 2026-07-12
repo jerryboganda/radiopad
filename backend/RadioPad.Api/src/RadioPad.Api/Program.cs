@@ -484,9 +484,14 @@ builder.Services.AddCors(o => o.AddDefaultPolicy(p => p
     // Tauri serves the desktop webview from tauri://localhost on macOS/Linux but
     // from http(s)://tauri.localhost on Windows — the latter must be allow-listed
     // or the bundled desktop shell's fetches are blocked by CORS ("Failed to fetch").
+    // Capacitor serves the mobile companion webview from capacitor://localhost on
+    // iOS and https://localhost on Android (capacitor.config androidScheme:'https')
+    // — BOTH must be listed or the phone's cross-origin companion calls (pair +
+    // the cloud relay handshake) are blocked before the bearer is even checked.
     .WithOrigins(
         "http://localhost:3000", "http://127.0.0.1:3000",
         "tauri://localhost", "capacitor://localhost",
+        "https://localhost", "http://localhost",
         "http://tauri.localhost", "https://tauri.localhost")
     .AllowAnyHeader().AllowAnyMethod().AllowCredentials()));
 

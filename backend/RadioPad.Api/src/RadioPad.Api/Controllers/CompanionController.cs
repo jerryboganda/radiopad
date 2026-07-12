@@ -2,10 +2,13 @@ using System.Globalization;
 using System.Net.WebSockets;
 using System.Text.Json;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.EntityFrameworkCore;
+using RadioPad.Api.Auth;
 using RadioPad.Api.Services;
 using RadioPad.Application.Abstractions;
 using RadioPad.Domain.Entities;
 using RadioPad.Domain.Enums;
+using RadioPad.Infrastructure.Identity;
 using RadioPad.Infrastructure.Persistence;
 
 namespace RadioPad.Api.Controllers;
@@ -23,33 +26,66 @@ namespace RadioPad.Api.Controllers;
 [Route("api/companion")]
 public class CompanionController : TenantedController
 {
+    /// <summary>
+    /// Lifetime of the companion bearer embedded in the desktop's pairing QR. It
+    /// authenticates the phone as the SAME (tenant, user) that advertised the
+    /// session, so it is deliberately SHORT — long enough for a realistic
+    /// dictation session but bounding the exposure if the QR is photographed off
+    /// the desktop screen. Ending / unpairing the session revokes it immediately
+    /// (see <see cref="End"/>); the 12h WS relay cap is the hard backstop.
+    /// </summary>
+    private static readonly TimeSpan CompanionTokenLifetime = TimeSpan.FromHours(2);
+
+    /// <summary><see cref="AuthSession.Method"/> tag for companion bearers, so
+    /// ending a session can revoke exactly these (and not the radiologist's
+    /// desktop/web sessions).</summary>
+    private const string CompanionAuthMethod = "companion";
+
     private readonly RadioPadDbContext _db;
     private readonly CompanionSessionService _sessions;
     private readonly CompanionRelayRegistry _relay;
     private readonly IAuditLog _audit;
+    private readonly IWebHostEnvironment _env;
 
     public CompanionController(
         RadioPadDbContext db,
         CompanionSessionService sessions,
         CompanionRelayRegistry relay,
-        IAuditLog audit)
+        IAuditLog audit,
+        IWebHostEnvironment env)
     {
         _db = db;
         _sessions = sessions;
         _relay = relay;
         _audit = audit;
+        _env = env;
     }
 
     public record CreateSessionDto(string? DeviceName);
     public record PairDto(string? PairingCode, string? DeviceName);
 
     /// <summary>Desktop advertises a new pairing session and gets back a short code
-    /// plus the relative relay URL the frontend resolves against its own host.</summary>
+    /// plus a short-lived <c>companionToken</c> the desktop embeds in its pairing QR.
+    /// The phone scans the QR, adopts the token as its bearer, and pairs — so it never
+    /// needs a separate phone login. The token authenticates as THIS (tenant, user)
+    /// only, expires in <see cref="CompanionTokenLifetime"/>, and is revoked when the
+    /// session ends.</summary>
     [HttpPost("sessions")]
     public async Task<IActionResult> Create([FromBody] CreateSessionDto dto, CancellationToken ct)
     {
         var (tenant, user) = await ResolveContextAsync(_db, ct);
         var session = await _sessions.CreateAsync(tenant.Id, user.Id, dto.DeviceName ?? "Desktop", ct);
+
+        // Mint the pairing credential the phone will adopt off the QR. It is a
+        // normal rp_ bearer for this same identity (so the existing bearer
+        // middleware + WS relay validate it with no special-casing), just
+        // short-lived and recorded as a revocable AuthSession so ending the
+        // session can kill it (see End()).
+        var now = DateTimeOffset.UtcNow;
+        var companionToken = RadioPadBearerTokens.Mint(
+            tenant.Slug, user.Email, user.SessionEpoch, _env, now, CompanionTokenLifetime);
+        await EnterpriseIdentityBridge.RecordAuthSessionAsync(
+            _db, user, companionToken, CompanionAuthMethod, now.Add(CompanionTokenLifetime), ct);
 
         return Ok(new
         {
@@ -57,6 +93,11 @@ public class CompanionController : TenantedController
             pairingCode = session.PairingCode,
             expiresAt = session.ExpiresAt.ToString("o", CultureInfo.InvariantCulture),
             wsUrl = "/ws/companion",
+            // The phone adopts these to authenticate + address the cloud relay off
+            // the QR. tenantSlug/userEmail are the bearer's context headers.
+            companionToken,
+            tenantSlug = tenant.Slug,
+            userEmail = user.Email,
         });
     }
 
@@ -96,6 +137,28 @@ public class CompanionController : TenantedController
     {
         var (tenant, user) = await ResolveContextAsync(_db, ct);
         await _sessions.EndAsync(tenant.Id, user.Id, sessionId, ct);
+
+        // Revoke the companion bearer(s) minted for this identity so a phone paired
+        // off the QR loses ALL API access the moment the radiologist unpairs — not
+        // just when the 2h token would have expired. We revoke every live companion
+        // session for this (tenant, user) rather than correlating one token to one
+        // pairing: it needs no extra schema and errs safe (unpair drops every
+        // companion phone for this user, which is the intended "sign my phone out"
+        // gesture). Desktop/web sessions (other Method tags) are untouched.
+        var now = DateTimeOffset.UtcNow;
+        var live = await _db.AuthSessions
+            .Where(s => s.TenantId == tenant.Id
+                && s.UserId == user.Id
+                && s.Method == CompanionAuthMethod
+                && s.RevokedAt == null)
+            .ToListAsync(ct);
+        foreach (var s in live)
+        {
+            s.RevokedAt = now;
+            s.RevocationReason = "companion_session_ended";
+        }
+        if (live.Count > 0)
+            await _db.SaveChangesAsync(ct);
 
         // Notify + close both peers if they are connected (best effort — the relay
         // is in-memory and process-local).
