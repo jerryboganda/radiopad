@@ -1,6 +1,6 @@
 rulebook_id: lung_lungrads_v1
 name: Lung Cancer Screening CT — Lung-RADS Rulebook
-version: 1.0.0
+version: 1.1.0
 owner: Thoracic Imaging Committee
 status: approved
 applies_to:

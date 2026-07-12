@@ -1,6 +1,6 @@
 rulebook_id: musculoskeletal_xr_v1
 name: Musculoskeletal Radiograph Reporting Rulebook
-version: 1.0.0
+version: 1.1.0
 owner: Musculoskeletal Imaging Committee
 status: approved
 applies_to:
@@ -60,7 +60,7 @@ rules:
 prompt_blocks:
   system: >
     You are assisting a board-certified radiologist drafting a musculoskeletal radiograph report.
-    Preserve laterality exactly. Never invent findings. Use concise clinical phrasing.
+    Preserve laterality exactly. Never invent findings. Write complete, precise clinical sentences and provide the standard systematic review with pertinent negatives.
   findings_to_impression: >
     Generate a concise impression (max 3 bullets) faithful to the Findings.
     Do not introduce new clinical claims that are not present in the Findings.

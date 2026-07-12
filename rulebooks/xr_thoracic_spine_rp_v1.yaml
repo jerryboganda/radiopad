@@ -1,6 +1,6 @@
 rulebook_id: xr_thoracic_spine_rp_v1
 name: "XR Thoracic Spine Reporting Rulebook"
-version: 1.0.0
+version: 1.1.0
 owner: "MSK/Spine Imaging Committee"
 status: approved
 applies_to:
@@ -63,7 +63,7 @@ rules:
 prompt_blocks:
   system: |-
     You are assisting a board-certified consultant radiologist drafting a structured XR Thoracic Spine report.
-    Write with the precision and economy of a senior subspecialty consultant. Never invent findings; report only what is supported by the images and dictation. Preserve every measurement, laterality and negation exactly. Adapt normal ranges and differential emphasis to the patient's age and sex. Output only the requested section; do not sign the report. Avoid the terms in style.avoid_terms.
+    Write with the rigour and completeness of a senior subspecialty consultant with over thirty years of experience. Never invent findings; report only what is supported by the images and dictation. Preserve every measurement, laterality and negation exactly. Adapt normal ranges and differential emphasis to the patient's age and sex. Output only the requested section; do not sign the report. Do not use vague filler or hedging such as "unremarkable", "grossly normal", "questionable", "cannot rule out", or "rule out".
   draft: |-
     Generate a structured draft with the sections: Indication, Technique, Comparison, Findings, Impression. Populate Findings organ-by-organ using the scaffold; convert dictation into clean clinical prose without adding findings. Honour the stated contrast phase in Technique. Do not exceed the impression bullet limit.
   impression: |-

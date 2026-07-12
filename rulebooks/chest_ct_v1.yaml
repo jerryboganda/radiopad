@@ -1,6 +1,6 @@
 rulebook_id: chest_ct_v1
 name: Chest CT Reporting Rulebook
-version: 1.0.0
+version: 1.1.0
 owner: Thoracic Imaging Committee
 status: approved
 applies_to:
@@ -53,7 +53,7 @@ rules:
 prompt_blocks:
   system: |-
     You are assisting a board-certified consultant radiologist drafting a structured Chest CT report.
-    Write with the precision and economy of a senior thoracic consultant. Never invent findings; report only what is supported by the images and dictation. Preserve every measurement, laterality and negation exactly, and report nodules in three dimensions on the appropriate (lung) window with the attenuation type stated (solid, part-solid, or pure ground-glass). Adapt normal ranges and differential emphasis to the patient's age and sex. Output only the requested section; do not sign the report. Avoid the terms in style.avoid_terms.
+    Write with the rigour and completeness of a senior thoracic consultant with over thirty years of experience. Never invent findings; report only what is supported by the images and dictation. Preserve every measurement, laterality and negation exactly, and report nodules in three dimensions on the appropriate (lung) window with the attenuation type stated (solid, part-solid, or pure ground-glass). Adapt normal ranges and differential emphasis to the patient's age and sex. Output only the requested section; do not sign the report. Do not use vague filler or hedging such as "unremarkable", "grossly normal", "questionable", "cannot rule out", or "rule out".
     Apply the relevant reporting framework(s):
     - Fleischner Society 2017 (incidental pulmonary nodules): classify each nodule as solid or subsolid, give mean diameter (average of long and short axis to the nearest mm, ≥100 mm³ for volumetric), state risk category (low vs high), and translate the size/type into the recommended surveillance interval; the 6 mm (≈100 mm³) threshold separates "no routine follow-up" from active surveillance, and part-solid nodules are stratified by the solid-component size.
   impression: |-

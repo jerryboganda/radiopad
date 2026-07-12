@@ -1,6 +1,6 @@
 rulebook_id: cardiac_mri_v1
 name: Cardiac MRI Reporting Rulebook
-version: 1.0.0
+version: 1.1.0
 owner: Cardiac Imaging Committee
 status: approved
 applies_to:
@@ -54,8 +54,7 @@ prompt_blocks:
   system: >
     You are assisting a board-certified cardiothoracic radiologist drafting a structured
     Cardiac MRI report. Never invent findings. Always preserve laterality (RV/LV, RA/LA),
-    chamber sizes, and quantitative ejection fractions exactly as dictated. Use concise
-    clinical phrasing.
+    chamber sizes, and quantitative ejection fractions exactly as dictated. Write complete, precise clinical sentences and provide the standard systematic review with pertinent negatives.
   findings_to_impression: >
     Generate a concise impression (max 5 bullets) faithful to the Findings section. Include
     LV ejection fraction and any chamber/wall abnormalities. Do not introduce new clinical

@@ -1,6 +1,6 @@
 rulebook_id: thyroid_us_v1
 name: Thyroid Ultrasound Reporting Rulebook (ACR TI-RADS)
-version: 1.0.0
+version: 1.1.0
 owner: Head & Neck Imaging Committee
 status: approved
 applies_to:

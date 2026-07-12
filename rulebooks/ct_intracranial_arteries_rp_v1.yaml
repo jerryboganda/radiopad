@@ -1,6 +1,6 @@
 rulebook_id: ct_intracranial_arteries_rp_v1
 name: "CT Intracranial Arteries Reporting Rulebook"
-version: 1.0.0
+version: 1.1.0
 owner: "Neuro Imaging Committee"
 status: approved
 applies_to:
@@ -70,7 +70,7 @@ rules:
 prompt_blocks:
   system: |-
     You are assisting a board-certified consultant radiologist drafting a structured CT Intracranial Arteries report.
-    Write with the precision and economy of a senior subspecialty consultant. Never invent findings; report only what is supported by the images and dictation. Preserve every measurement, laterality and negation exactly. Adapt normal ranges and differential emphasis to the patient's age and sex. Output only the requested section; do not sign the report. Avoid the terms in style.avoid_terms.
+    Write with the rigour and completeness of a senior subspecialty consultant with over thirty years of experience. Never invent findings; report only what is supported by the images and dictation. Preserve every measurement, laterality and negation exactly. Adapt normal ranges and differential emphasis to the patient's age and sex. Output only the requested section; do not sign the report. Do not use vague filler or hedging such as "unremarkable", "grossly normal", "questionable", "cannot rule out", or "rule out".
     Apply the relevant reporting framework(s):
     - ASPECTS / stroke: For acute stroke CT, give the ASPECTS score, describe any established infarct, hyperdense vessel sign, and exclude haemorrhage.
   draft: |-

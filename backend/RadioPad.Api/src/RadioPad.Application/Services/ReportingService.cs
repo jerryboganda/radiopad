@@ -46,7 +46,7 @@ public class ReportingService
         _overrides = overrides;
     }
 
-    public const string PromptVersion = "v1.2026.05";
+    public const string PromptVersion = "v2.2026.07";
 
     /// <summary>
     /// PRD modes (RPT-005, RPT-006, RPT-007, AI-001, AI-002).
@@ -164,18 +164,44 @@ public class ReportingService
                 : rulebook?.PromptBlocks.GetValueOrDefault(key);
 
         var system = Resolve("system")
-            ?? "You are assisting a board-certified radiologist drafting a structured radiology report. " +
-               "Never invent findings beyond those provided. Preserve every measurement, laterality, and " +
-               "negation exactly. Output only the requested JSON object — no preface, no trailing prose.";
+            ?? "You are a senior consultant radiologist with subspecialty fellowship training and more than thirty " +
+               "years of reporting experience in a tertiary-care academic centre, drafting a formal diagnostic report " +
+               "for the referring clinician. Write in polished, grammatically complete clinical sentences, organised " +
+               "under the heading-and-bullet layout specified in the report requirements. The dictated positive findings " +
+               "are authoritative: preserve every measurement, laterality, attenuation, signal-intensity, or echogenicity " +
+               "descriptor, and negation exactly, and never omit or contradict them. Never invent a positive finding, and " +
+               "do not introduce diagnoses or urgency unsupported by the dictated findings. Provide the standard systematic " +
+               "review of all anatomy covered by this examination — including normal descriptions and pertinent negatives — " +
+               "exactly as a senior consultant would: a structure not mentioned in the dictation but routinely assessed on " +
+               "this examination is reported with its expected normal appearance, qualified wherever the technique limits its " +
+               "evaluation (for example, \"normal in morphology within the limits of a non-contrast examination\"). Your entire " +
+               "reply must be a single JSON object exactly as specified at the end of the message; the complete report lives " +
+               "inside the JSON string values, and nothing is written outside the object.";
 
-        // Prefer a rulebook-authored `generate` block, then the existing `draft`
-        // block, then a clinically conservative default.
-        var instructions = Resolve("generate") ?? Resolve("draft")
-            ?? "Generate a complete, structured radiology report from the study metadata, the patient's " +
-               "clinical history, and the dictated positive findings below. Populate every section you can " +
-               "justify from the inputs. Recommendations must be clinically relevant, explicitly tied to " +
-               "documented findings, and include a brief rationale. Do not invent findings, diagnoses, urgency, " +
-               "or follow-up intervals. If no follow-up is justified, state that no specific follow-up is indicated.";
+        // Prefer a rulebook-authored `generate` block, then a consultant-grade
+        // default. NOTE: the older `draft` block is deliberately NOT a fallback
+        // here — it is a terse dictation-cleanup instruction ("convert dictation
+        // into clean prose without adding findings") that suppressed the
+        // systematic review + pertinent negatives, producing junior-resident-grade
+        // reports. Whole-report generation always uses the consultant doctrine.
+        var instructions = Resolve("generate")
+            ?? "Generate a complete, consultant-grade structured radiology report from the study metadata, clinical " +
+               "history, and dictated positive findings, written to the standard of a senior subspecialty consultant. " +
+               "Populate the indication as a concise, formal restatement of the provided clinical history; never leave it " +
+               "empty when the history supplies it. Describe the technique in generic terms consistent with the stated " +
+               "modality, body part, and contrast status — for example the region covered, plane of acquisition, and use of " +
+               "multiplanar reconstructions where standard — but do not state specific protocol parameters (slice thickness, " +
+               "kVp, dose, sequence names, contrast agent, volume, or timing) that were not provided. In the findings, " +
+               "integrate every dictated positive finding into a full systematic review of the anatomy covered by the " +
+               "examination: describe each involved structure precisely (site, size, morphology, attenuation or signal where " +
+               "given), follow it with the relevant pertinent negatives for that structure stated as explicit absences, and " +
+               "report all remaining routinely reviewed structures with their expected normal appearance, qualified wherever " +
+               "the technique limits their evaluation. The impression must synthesise — not repeat — the findings into at most " +
+               "five numbered conclusions ordered by clinical significance, each a diagnosis-level interpretation with relevant " +
+               "qualifiers (for example obstructive versus non-obstructive, complicated versus uncomplicated). Recommendations " +
+               "must be clinically relevant, tied to documented findings, and include a brief rationale; do not invent diagnoses, " +
+               "urgency, or follow-up intervals. If no follow-up is warranted, state that no specific follow-up is indicated — " +
+               "never leave the recommendations empty.";
 
         var age = report.Study.Age is int a ? a.ToString() : "Unknown";
         var gender = string.IsNullOrWhiteSpace(report.Study.Gender) ? "Unknown" : report.Study.Gender;
@@ -196,14 +222,32 @@ public class ReportingService
             INSTRUCTION:
             {{instructions}}
 
-            FINDINGS FORMAT (required):
-            Organize the findings as a concise clinical outline. Put each anatomy/system heading on its
-            own line in uppercase, followed by a colon. Put each finding beneath its heading on a separate
-            line beginning with the Unicode bullet "•". Insert one blank line between anatomy groups.
-            Never run a heading into the preceding or following sentence. Do not use Markdown markers,
-            tables, decorative symbols, or redundant prose. Preserve all measurements, laterality, and negations.
+            REPORT REQUIREMENTS (mandatory):
+            1. Depth: write at the standard of a senior consultant radiologist in a tertiary-care centre — complete,
+            grammatical clinical sentences and precise anatomical terminology, never telegraphic fragments. Do not use
+            vague filler or hedging such as "unremarkable", "grossly normal", "questionable", "cannot rule out", or
+            "rule out"; state specifically what is normal (for example "normal in size, contour, and attenuation") and
+            express any uncertainty as an explicit differential with its likelihood.
+            2. Systematic coverage: the findings must review every organ and structure normally assessed on this
+            examination, grouped by anatomy or system. Structures with dictated positive findings come first within their
+            group, each followed by its pertinent negatives stated as explicit absences (for example, for renal calculi:
+            explicitly state the absence of hydronephrosis, hydroureter, perinephric stranding, and ureteric obstruction
+            unless the dictation states otherwise). Structures without dictated findings are reported with their expected
+            normal appearance, qualified wherever the technique limits their evaluation (for example, "the liver, spleen,
+            pancreas, and adrenal glands are normal in morphology within the limits of a non-contrast examination"). Never
+            invent a positive finding.
+            3. Layout of the findings text: put each anatomy/system heading on its own line in UPPERCASE followed by a
+            colon. Beneath each heading, each statement begins with the Unicode bullet "• " and occupies exactly one line —
+            when a statement contains several sentences, keep them all on that same single line and never insert a line
+            break inside a bullet. Insert one blank line between anatomy groups. Within the findings text use no Markdown
+            markers (#, *, -, bold), tables, or decorative symbols — only the UPPERCASE headings and • bullets described here.
+            4. Fidelity: preserve every dictated measurement, laterality, attenuation or signal value, and negation exactly.
+            The impression must not assert anything absent from the findings.
+            5. Impression: at most five numbered statements, each on its own single line beginning "1.", "2.", and so on
+            (a digit, a period, then a space), ordered by clinical significance, each a diagnosis-level synthesis (not a
+            restatement) with relevant qualifiers grounded in the findings. Never break a numbered statement across lines.
 
-            Respond with a single JSON object exactly matching this schema. The recommendations value must not be empty:
+            Respond with a single JSON object exactly matching this schema:
             {
               "indication": "",
               "technique": "",
@@ -211,6 +255,11 @@ public class ReportingService
               "impression": "",
               "recommendations": ""
             }
+            Return the raw JSON object only — do not wrap it in a Markdown code fence, do not prefix it with a language
+            label such as "json", and write nothing before or after the object. The complete, full-depth report lives
+            inside the string values — never shorten a section because it sits inside a JSON string. Escape every line
+            break inside a string value as \n; never emit a raw newline inside a quoted string. The recommendations value
+            must not be empty.
             """;
 
         var containsPhi = ContainsPhi(report) || ContainsPhiText(system, userPrompt);
