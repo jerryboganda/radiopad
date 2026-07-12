@@ -147,7 +147,6 @@ export default function ReportPage() {
     const next = await api.reports.patch(current.id, {
       indication: current.indication,
       technique: current.technique,
-      comparison: current.comparison,
       findings: current.findings,
       impression: current.impression,
       recommendations: current.recommendations,
@@ -459,7 +458,7 @@ export default function ReportPage() {
         return;
       }
       const raw = [
-        current.indication, current.technique, current.comparison,
+        current.indication, current.technique,
         current.findings, current.impression, current.recommendations,
       ]
         .map((s) => (s ?? '').trim())

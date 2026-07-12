@@ -122,7 +122,8 @@ public class ReportingService
     }
 
     /// <summary>
-    /// The six report sections a full generation produces, plus provider metadata.
+    /// The five generated report sections, plus provider metadata. Comparison is
+    /// retained on the result for API compatibility but is no longer AI-generated.
     /// Empty strings mark sections the model had nothing to say about.
     /// </summary>
     public sealed record StructuredReportResult(
@@ -133,7 +134,7 @@ public class ReportingService
     /// <summary>
     /// Whole-report generation for the guided intake flow. Unlike the free-text
     /// <c>draft</c> mode, this asks the model for a strict section-keyed JSON object
-    /// (Indication/Technique/Comparison/Findings/Impression/Recommendations) so the
+    /// (Indication/Technique/Findings/Impression/Recommendations) so the
     /// editor can adopt each section independently — mirroring
     /// <see cref="DictationCleanupService"/>. Rulebook governance (RB-010), tenant
     /// prompt overrides, and the PHI policy in <see cref="IAiGateway"/> are all
@@ -172,8 +173,9 @@ public class ReportingService
         var instructions = Resolve("generate") ?? Resolve("draft")
             ?? "Generate a complete, structured radiology report from the study metadata, the patient's " +
                "clinical history, and the dictated positive findings below. Populate every section you can " +
-               "justify from the inputs; use an empty string for a section with nothing to report. " +
-               "Do not invent findings the radiologist did not dictate.";
+               "justify from the inputs. Recommendations must be clinically relevant, explicitly tied to " +
+               "documented findings, and include a brief rationale. Do not invent findings, diagnoses, urgency, " +
+               "or follow-up intervals. If no follow-up is justified, state that no specific follow-up is indicated.";
 
         var age = report.Study.Age is int a ? a.ToString() : "Unknown";
         var gender = string.IsNullOrWhiteSpace(report.Study.Gender) ? "Unknown" : report.Study.Gender;
@@ -194,11 +196,10 @@ public class ReportingService
             INSTRUCTION:
             {{instructions}}
 
-            Respond with a single JSON object exactly matching this schema (use an empty string for a section with nothing to report):
+            Respond with a single JSON object exactly matching this schema. The recommendations value must not be empty:
             {
               "indication": "",
               "technique": "",
-              "comparison": "",
               "findings": "",
               "impression": "",
               "recommendations": ""
@@ -218,17 +219,77 @@ public class ReportingService
         }, ct);
 
         var sections = ReportSectionJson.Parse(result.Text);
+        var recommendations = sections.GetValueOrDefault("recommendations", string.Empty).Trim();
+        if (recommendations.Length == 0)
+        {
+            recommendations = await GenerateMissingRecommendationsAsync(
+                tenant,
+                provider,
+                report,
+                sections.GetValueOrDefault("findings", report.Findings),
+                sections.GetValueOrDefault("impression", report.Impression),
+                rulebookEntity,
+                ct);
+        }
+
         return new StructuredReportResult(
             Indication: sections.GetValueOrDefault("indication", string.Empty),
             Technique: sections.GetValueOrDefault("technique", string.Empty),
-            Comparison: sections.GetValueOrDefault("comparison", string.Empty),
+            Comparison: string.Empty,
             Findings: sections.GetValueOrDefault("findings", string.Empty),
             Impression: sections.GetValueOrDefault("impression", string.Empty),
-            Recommendations: sections.GetValueOrDefault("recommendations", string.Empty),
+            Recommendations: recommendations,
             Provider: result.Provider,
             Model: result.Model,
             LatencyMs: result.LatencyMs,
             PromptVersion: result.PromptVersion);
+    }
+
+    private async Task<string> GenerateMissingRecommendationsAsync(
+        Tenant tenant,
+        ProviderConfig provider,
+        Report report,
+        string findings,
+        string impression,
+        Rulebook? rulebookEntity,
+        CancellationToken ct)
+    {
+        var prompt = $"""
+            Modality: {report.Study.Modality}
+            Body part: {report.Study.BodyPart}
+
+            FINDINGS:
+            {findings}
+
+            IMPRESSION:
+            {impression}
+
+            Write only the Recommendations section. Give contextually relevant, clinically conservative
+            follow-up recommendations justified by the documented findings, with a brief rationale for each.
+            Do not invent diagnoses, urgency, tests, specialist referrals, or follow-up intervals. If no
+            recommendation is justified, respond exactly: No specific follow-up recommendation is indicated
+            based on the documented findings.
+            """;
+
+        var retry = await _gateway.RouteAsync(tenant, new AiCompletionRequest(
+            Provider: provider,
+            SystemPrompt: "You are assisting a board-certified radiologist. Output only a safe Recommendations section grounded in the supplied report.",
+            UserPrompt: prompt,
+            PromptVersion: PromptVersion,
+            ContainsPhi: ContainsPhi(report) || ContainsPhiText(string.Empty, prompt))
+        {
+            RulebookId = rulebookEntity?.Id,
+            RulebookVersion = rulebookEntity?.Version,
+        }, ct);
+
+        var parsed = ReportSectionJson.Parse(retry.Text);
+        var recommendation = parsed.GetValueOrDefault("recommendations", string.Empty).Trim();
+        if (recommendation.Length == 0)
+            recommendation = (retry.Text ?? string.Empty).Trim().Trim('`').Trim();
+
+        return recommendation.Length > 0
+            ? recommendation
+            : "No specific follow-up recommendation is indicated based on the documented findings.";
     }
 
     /// <summary>
@@ -275,9 +336,9 @@ public class ReportingService
                 "Rewrite the dictated text into clean grammar without changing clinical meaning. Preserve all numbers, laterality, and negations exactly.",
                 $"DICTATION:\n{report.Findings}"),
             "draft" => (
-                "Generate a structured draft report from the dictation and metadata, with sections: Indication, Technique, Comparison, Findings, Impression. " +
-                "Do not invent findings beyond what is dictated.",
-                $"Modality: {report.Study.Modality}\nBody part: {report.Study.BodyPart}\nContrast: {report.Study.Contrast}\nIndication: {report.Indication}\nComparison: {report.Study.Comparison}\nDICTATION:\n{report.Findings}"),
+                "Generate a structured draft report from the dictation and metadata, with sections: Indication, Technique, Findings, Impression, Recommendations. " +
+                "Recommendations must be justified by a documented finding; do not invent findings or follow-up.",
+                $"Modality: {report.Study.Modality}\nBody part: {report.Study.BodyPart}\nContrast: {report.Study.Contrast}\nIndication: {report.Indication}\nDICTATION:\n{report.Findings}"),
             "concise" => (
                 "Rewrite the impression to be more concise. Do not change clinical meaning, negations, or measurements.",
                 $"IMPRESSION:\n{report.Impression}"),

@@ -7,7 +7,6 @@ import { getSectionEditor } from '@/lib/editor/sectionEditorRegistry';
 export const SECTIONS: Array<{ key: keyof Report; label: string; cls?: string }> = [
   { key: 'indication', label: 'Indication' },
   { key: 'technique', label: 'Technique' },
-  { key: 'comparison', label: 'Comparison' },
   { key: 'findings', label: 'Findings', cls: 'findings' },
   { key: 'impression', label: 'Impression', cls: 'impression' },
   { key: 'recommendations', label: 'Recommendations' },
@@ -17,7 +16,6 @@ export const SECTIONS: Array<{ key: keyof Report; label: string; cls?: string }>
 export const SECTION_FIELD_MAP: Record<string, keyof Report> = {
   indication: 'indication',
   technique: 'technique',
-  comparison: 'comparison',
   findings: 'findings',
   impression: 'impression',
   recommendations: 'recommendations',

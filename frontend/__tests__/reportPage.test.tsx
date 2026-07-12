@@ -15,7 +15,6 @@ import * as React from 'react';
 const SECTIONS = [
   { key: 'indication', label: 'Indication' },
   { key: 'technique', label: 'Technique' },
-  { key: 'comparison', label: 'Comparison' },
   { key: 'findings', label: 'Findings' },
   { key: 'impression', label: 'Impression' },
   { key: 'recommendations', label: 'Recommendations' },
@@ -105,11 +104,12 @@ function ReportPage({
 /* ── Tests ────────────────────────────────────────────────────────── */
 
 describe('report page', () => {
-  it('renders all 6 sections (Indication, Technique, Comparison, Findings, Impression, Recommendations)', () => {
+  it('renders the five generated report sections without Comparison', () => {
     const { container } = render(<ReportPage />);
-    for (const section of ['indication', 'technique', 'comparison', 'findings', 'impression', 'recommendations']) {
+    for (const section of ['indication', 'technique', 'findings', 'impression', 'recommendations']) {
       expect(container.querySelector(`[data-section="${section}"]`)).not.toBeNull();
     }
+    expect(container.querySelector('[data-section="comparison"]')).toBeNull();
   });
 
   it('AI "Generate Impression" button triggers API call', () => {
