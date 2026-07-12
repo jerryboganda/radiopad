@@ -579,6 +579,12 @@
 
 /* Ribbon shell + tab bar */
 .rp-ribbon {
+  /* The active ribbon surface is animated, so it forms its own stacking
+     context. Elevate the whole ribbon above the document/inspector siblings;
+     otherwise their later paint order slices through Export, Rewrite, and
+     SearchableSelect popovers even when those popovers have a high z-index. */
+  position: relative;
+  z-index: 20;
   background: var(--bg-panel);
   border: 1px solid var(--border);
   border-radius: var(--radius);
