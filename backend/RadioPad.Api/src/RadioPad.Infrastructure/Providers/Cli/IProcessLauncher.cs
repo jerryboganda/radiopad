@@ -138,21 +138,34 @@ public sealed class DefaultProcessLauncher : IProcessLauncher
         return dir;
     }
 
+    /// <summary>
+    /// The env vars a CLI provider subprocess inherits. Everything else is scrubbed
+    /// so the launcher never leaks unrelated container secrets to a spawned binary.
+    /// Includes the Gemini CLI's API-key vars: gemini-cli authenticates with a key
+    /// read from the environment (Google retired oauth-personal → UNSUPPORTED_CLIENT),
+    /// so without these the scrubbed child has no key and exits 41
+    /// (FatalAuthenticationError). Passing them is the whole point of the provider.
+    /// Extend at deploy time via <c>RADIOPAD_CLI_PROVIDER_ENV_ALLOWLIST</c>.
+    /// </summary>
+    public static readonly IReadOnlyList<string> BaseEnvAllowlist = new[]
+    {
+        "PATH",
+        "PATHEXT",
+        "SystemRoot",
+        "WINDIR",
+        "HOME",
+        "USERPROFILE",
+        "APPDATA",
+        "LOCALAPPDATA",
+        "TMP",
+        "TEMP",
+        "GEMINI_API_KEY",
+        "GOOGLE_API_KEY",
+    };
+
     private static void ScrubEnvironment(ProcessStartInfo psi)
     {
-        var names = new HashSet<string>(StringComparer.OrdinalIgnoreCase)
-        {
-            "PATH",
-            "PATHEXT",
-            "SystemRoot",
-            "WINDIR",
-            "HOME",
-            "USERPROFILE",
-            "APPDATA",
-            "LOCALAPPDATA",
-            "TMP",
-            "TEMP",
-        };
+        var names = new HashSet<string>(BaseEnvAllowlist, StringComparer.OrdinalIgnoreCase);
         var extra = Environment.GetEnvironmentVariable("RADIOPAD_CLI_PROVIDER_ENV_ALLOWLIST");
         if (!string.IsNullOrWhiteSpace(extra))
         {

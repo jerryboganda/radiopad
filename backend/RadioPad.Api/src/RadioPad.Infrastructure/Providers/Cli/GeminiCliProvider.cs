@@ -22,12 +22,13 @@ public sealed class GeminiCliProvider : IAiProviderAdapter, IAiProviderHealthPro
     public const string AdapterId = "gemini-cli";
     public const string BinaryEnvVar = "RADIOPAD_GEMINI_BIN";
     public const string DefaultBinary = "gemini";
-    // Operator decision (2026-07-12): the Gemini CLI runs under the operator's
-    // own Google OAuth login and the reporting workflow routes de-identified
-    // text, so this adapter is promoted out of the CLI Sandbox default — it
-    // must not be blocked by the PHI / compliance gates. Mirrors the UBAG
+    // Operator decision (2026-07-12): the reporting workflow routes de-identified
+    // text through this provider, so it is promoted out of the CLI Sandbox default
+    // — it must not be blocked by the PHI / compliance gates. Mirrors the UBAG
     // promotion of 2026-06-27 (UbagProviderAdapter.DefaultComplianceClass).
-    // CodexCliProvider intentionally keeps the Sandbox default.
+    // Auth is via GEMINI_API_KEY (Google retired oauth-personal); the launcher
+    // must allow that env var through to the child process (IProcessLauncher
+    // ScrubEnvironment). CodexCliProvider intentionally keeps the Sandbox default.
     public const ProviderComplianceClass DefaultComplianceClass = ProviderComplianceClass.PhiApproved;
 
     private readonly IProcessLauncher _launcher;

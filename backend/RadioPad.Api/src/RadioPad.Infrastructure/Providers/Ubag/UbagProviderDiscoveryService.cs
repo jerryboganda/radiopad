@@ -331,6 +331,15 @@ public sealed class UbagProviderDiscoveryHostedService : BackgroundService
                 _logger.LogInformation(
                     "Gemini CLI compliance backfill: promoted {Count} row(s) to PhiApproved", cliPromoted);
 
+            // Rename backfill (2026-07-13): the provider authenticates with an API
+            // key now, not OAuth, so the legacy "Gemini CLI (OAuth)" name is
+            // misleading. Rename rows that still carry the exact legacy default.
+            var cliRenamed = await Seeding.CliProviderSeed.EnsureGeminiCliNameAsync(db, stoppingToken);
+            if (cliRenamed > 0)
+                _logger.LogInformation(
+                    "Gemini CLI name backfill: renamed {Count} row(s) to '{Name}'",
+                    cliRenamed, Seeding.CliProviderSeed.ProviderName);
+
             // Policy change (2026-06-27): UBAG is PHI-approved. Promote any rows
             // that were seeded as Sandbox before this change so existing orgs'
             // AI features (cleanup/impression/rewrite/cross-check) stop being

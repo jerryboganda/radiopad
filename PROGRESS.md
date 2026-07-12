@@ -1902,6 +1902,15 @@ Total tracked PRD ids: **129** (was 112; iter-32 added 17 finer-grained sub-ids)
 - **Tests**: +7 `AiJobRegistryTests` (state machine, single-flight scoping, cap-eviction floor); backend 783→790 green; frontend 226 green; typecheck clean.
 - **Scope**: backend + frontend → backend deployed BEFORE the desktop release (hard rule), then `pnpm release:desktop`.
 
+## Iter-53 - Gemini API provider fix (env-scrub dropped the key) + OAuth→API rename
+
+- **Date**: 2026-07-13
+- **Trigger**: Operator report — generating with the "Gemini CLI (OAuth)" provider failed: `gemini-cli: gemini exited with code 41`; and the provider was still misnamed "OAuth" though it now uses an API key.
+- **Root cause (proven in prod)**: `DefaultProcessLauncher.ScrubEnvironment` clears the spawned CLI's environment and re-adds only an allow-list (`PATH`/`HOME`/`TMP`/…). `GEMINI_API_KEY` was NOT on it, and `RADIOPAD_CLI_PROVIDER_ENV_ALLOWLIST` was unset — so the `gemini` child saw no key, fell back to the retired oauth-personal path (UNSUPPORTED_CLIENT), and exited **41 = FatalAuthenticationError** ("When using Gemini API, you must specify the GEMINI_API_KEY environment variable"). The key itself is valid (models API → 200; direct `docker exec … gemini` with the env → full report, exit 0). It worked under the old OAuth auth because creds lived in `HOME/.gemini` (HOME *is* allow-listed); the switch to API-key auth broke it. Confirmed: `unset GEMINI_API_KEY; … | gemini` → 41; with key → 0.
+- **Fix**: added `GEMINI_API_KEY` + `GOOGLE_API_KEY` to the launcher allow-list (`BaseEnvAllowlist`, now public+regression-tested). Renamed the provider "Gemini CLI (OAuth)" → **"Gemini API"** (`CliProviderSeed.ProviderName`); added `EnsureGeminiCliNameAsync` startup backfill (renames only rows carrying the exact legacy default — operator-renamed rows untouched), wired alongside the compliance backfill in `UbagProviderDiscoveryService`. Corrected the now-false OAuth rationale comments (GeminiCliProvider, DevSeed).
+- **Tests**: +5 (`Launcher_EnvAllowlist_PassesGeminiApiKey`; `CliProviderSeedTests` seed/idempotency/rename-backfill/operator-name-preserved). Full backend suite 815 green.
+- **Scope**: backend only → no desktop release; ships via `web-deploy-images` → VPS `docker load` + `compose up -d`.
+
 ## Iter-52 - Consultant-grade report generation (depth + systematic review + pertinent negatives)
 
 - **Date**: 2026-07-12

@@ -135,6 +135,17 @@ public class Iter36CliProviderTests
         Assert.Equal("gemini-cli", GeminiCliProvider.AdapterId);
     }
 
+    [Fact]
+    public void Launcher_EnvAllowlist_PassesGeminiApiKey()
+    {
+        // Regression guard (2026-07-13): the launcher scrubs the child env to an
+        // allow-list; if GEMINI_API_KEY is dropped, gemini-cli finds no key, falls
+        // back to the retired OAuth path, and exits 41 (FatalAuthenticationError) —
+        // the exact "gemini exited with code 41" the operator hit.
+        Assert.Contains("GEMINI_API_KEY", DefaultProcessLauncher.BaseEnvAllowlist);
+        Assert.Contains("GOOGLE_API_KEY", DefaultProcessLauncher.BaseEnvAllowlist);
+    }
+
     // -----------------------------------------------------------------
     // Codex CLI
     // -----------------------------------------------------------------

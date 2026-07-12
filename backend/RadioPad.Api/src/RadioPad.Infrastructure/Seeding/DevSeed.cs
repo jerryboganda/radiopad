@@ -108,7 +108,7 @@ public static class DevSeed
             // PRIMARY (higher Quality); DeepSeek is the enabled secondary.
             db.Providers.AddRange(UbagPrimarySeed.CuratedPrimaries(tenant.Id));
 
-            // Gemini CLI (OAuth / Pro-subscription) — surfaced in the report intake's
+            // Gemini API (gemini CLI + GEMINI_API_KEY) — surfaced in the report intake's
             // provider dropdown. Same single-source-of-truth pattern as UbagPrimarySeed
             // so every org (not just dev) gets it via the startup backfill.
             db.Providers.Add(CliProviderSeed.CuratedGeminiCli(tenant.Id));
