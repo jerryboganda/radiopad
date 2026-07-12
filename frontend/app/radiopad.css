@@ -1778,6 +1778,45 @@
 .rp-auth-steplist { list-style: none; margin: 0 0 22px; padding: 0; display: flex; flex-direction: column; gap: 14px; }
 .rp-auth-steplist li { display: flex; gap: 12px; align-items: flex-start; font: 400 14px/1.5 var(--sans); color: var(--text-muted); }
 .rp-auth-steplist strong { color: var(--text-strong); font-weight: 600; }
+
+/* ---- Height-adaptive compaction ----------------------------------
+   The auth entrance must fit the viewport with NO pane scrolling (the
+   split is 100vh / overflow hidden by design). The card's comfortable
+   rhythm needs ~1000px; on shorter viewports (laptop screens, browser
+   chrome + taskbar) tighten the vertical rhythm instead of scrolling.
+   Scoped strictly to .rp-auth-* / the auth card — never global controls. */
+@media (max-height: 1020px) {
+  .rp-auth-main { padding-top: 16px; padding-bottom: 16px; }
+  .rp-pair-steps { margin-bottom: 12px; }
+  .rp-pair-step { gap: 5px; }
+  .rp-pair-step-dot { width: 22px; height: 22px; font-size: 11px; }
+  .rp-auth-head { margin-bottom: 14px; }
+  .rp-auth-eyebrow { margin-bottom: 6px; }
+  .rp-auth-title { font-size: 21px; }
+  .rp-auth-sub { font-size: 13px; line-height: 1.45; }
+  .rp-auth-card .section-block { margin-bottom: 10px; }
+  .rp-auth-card .section-block label { margin-bottom: 4px; }
+  .rp-auth-card .rp-field-hint { margin-top: 4px; }
+  .rp-auth-actions { gap: 8px; }
+  .rp-auth-actions > button { padding: 8px 16px; }
+  .rp-auth-divider { margin: 12px 0; }
+  .rp-auth-foot { margin-top: 12px; padding-top: 12px; font-size: 12.5px; }
+  .rp-auth-mobile-brand { margin-bottom: 16px; }
+  .rp-auth-steplist { margin-bottom: 14px; gap: 10px; }
+}
+/* Very short viewports (small laptops, split screens): shed the aside's
+   secondary copy so the left pane also stays inside 100vh. */
+@media (max-height: 840px) {
+  .rp-auth-main { padding-top: 10px; padding-bottom: 10px; }
+  .rp-auth-head { margin-bottom: 10px; }
+  .rp-auth-title { font-size: 19px; }
+  .rp-auth-card .section-block { margin-bottom: 8px; }
+  .rp-auth-divider { margin: 9px 0; }
+  .rp-auth-foot { margin-top: 9px; padding-top: 9px; }
+  .rp-auth-feature-sub { display: none; }
+  .rp-auth-aside-foot { display: none; }
+  .rp-auth-tagline { display: none; }
+}
 .rp-auth-steplist-num {
   flex: 0 0 auto;
   width: 24px;

@@ -872,6 +872,16 @@ new colours, no dark mode):
 `.ghost` variants. Feature and step icons are inline 1.7-stroke `currentColor`
 SVGs (no emoji-as-icon, per §8).
 
+**Viewport fit (no page scroll).** `.rp-auth-split` is `100vh`/`overflow:
+hidden` — the entrance must always fit the viewport whole. The card's
+comfortable rhythm needs ~1000px of height, so two `max-height` compaction
+tiers (scoped strictly to `.rp-auth-*` / the auth card, never global controls)
+tighten the vertical rhythm on shorter viewports: **≤ 1020px** shrinks card
+margins/paddings, the step rail, title size, and button padding; **≤ 840px**
+additionally sheds the aside's secondary copy (`.rp-auth-tagline`,
+`.rp-auth-feature-sub`, `.rp-auth-aside-foot`) so the showcase pane also stays
+inside the viewport. Verified overflow-free at 720/841/945/1021px heights.
+
 **Functional model (passwordless).** Sign-in offers SSO (when
 `NEXT_PUBLIC_ENABLE_SSO=true`), the email magic link (primary), device pairing,
 and the dev bearer (when `NEXT_PUBLIC_ALLOW_DEV_LOGIN=true`). "Register" is
