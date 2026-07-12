@@ -60,7 +60,7 @@ vi.mock('@/components/ui/SearchableSelect', () => ({
   ),
 }));
 
-import NewReportWizard from '@/app/reports/new/NewReportWizard';
+import NewReportWizard from '@/app/(desktop)/reports/new/NewReportWizard';
 
 describe('new report wizard', () => {
   beforeEach(() => {

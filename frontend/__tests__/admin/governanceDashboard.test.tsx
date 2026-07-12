@@ -51,7 +51,7 @@ vi.mock('next/link', () => ({
   ),
 }));
 
-import AdminGovernancePage from '@/app/admin/governance/page';
+import AdminGovernancePage from '@/app/(web)/admin/governance/page';
 
 const SAMPLE_USAGE = {
   totalRequests: 42,

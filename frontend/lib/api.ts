@@ -32,6 +32,29 @@ export type CrossCheckCorrection = {
   severity: 'safety' | 'warning' | 'info';
 };
 
+/** Desktop-created companion session (returned to the desktop host). */
+export type CompanionSessionInit = {
+  sessionId: string;
+  pairingCode: string;
+  expiresAt: string;
+  /** Relative WebSocket path for the relay, e.g. `/ws/companion`. */
+  wsUrl: string;
+};
+
+/** Result of the phone pairing to a desktop session by code. */
+export type CompanionPairResult = {
+  sessionId: string;
+  hostDeviceName: string;
+};
+
+/** Companion session status snapshot. */
+export type CompanionSessionInfo = {
+  sessionId: string;
+  status: string;
+  hostDeviceName: string;
+  companionDeviceName: string | null;
+};
+
 /** Poll result for an async cross-check job. */
 export type CrossCheckStatus = {
   jobId: string;
@@ -95,6 +118,36 @@ async function apiBase(): Promise<string> {
 export async function apiUrl(path: string): Promise<string> {
   const base = await apiBase();
   return `${base}${path}`;
+}
+
+/**
+ * Base URL of the CLOUD companion relay. The desktop↔phone companion channel
+ * must meet on a host BOTH devices can reach — never the desktop's local
+ * `127.0.0.1` sidecar. Resolution order:
+ *   1. `NEXT_PUBLIC_COMPANION_BASE` (explicit override).
+ *   2. `NEXT_PUBLIC_API_BASE` when it is a remote http(s) origin (the phone and
+ *      cloud-backed desktops already point here).
+ *   3. The known production relay host (matches the desktop CSP allow-list).
+ * Companion REST + WebSocket both use this so the session the desktop creates is
+ * the one the phone can pair to. NOTE: the caller's bearer must be valid on the
+ * cloud relay — a purely local-only desktop needs cloud connectivity for
+ * companion mode (see the surface-companion design note).
+ */
+const DEFAULT_COMPANION_BASE = 'https://radiopad.polytronx.com';
+let resolvedCompanionBase: string | null = null;
+export function companionBase(): string {
+  if (resolvedCompanionBase !== null) return resolvedCompanionBase;
+  const override = (publicEnv('NEXT_PUBLIC_COMPANION_BASE') || '').replace(/\/+$/, '');
+  if (override) return (resolvedCompanionBase = override);
+  if (CONFIGURED_API_BASE && /^https?:\/\//i.test(CONFIGURED_API_BASE)) {
+    return (resolvedCompanionBase = CONFIGURED_API_BASE);
+  }
+  return (resolvedCompanionBase = DEFAULT_COMPANION_BASE);
+}
+
+/** The companion relay as a `ws(s)://…` origin (for the raw WebSocket client). */
+export function companionWsBase(): string {
+  return companionBase().replace(/^http/i, 'ws');
 }
 
 /**
@@ -464,6 +517,31 @@ async function requestTo<T>(base: string, path: string, init?: RequestInit): Pro
   const headers = new Headers(init?.headers || {});
   if (init?.body && !headers.has('Content-Type')) headers.set('Content-Type', 'application/json');
   const res = await fetch(`${base}${path}`, { ...init, headers, credentials: 'omit' });
+  if (!res.ok) {
+    throw Object.assign(new Error(`API ${res.status} ${res.statusText}`), { status: res.status, body: await errorBody(res) });
+  }
+  if (res.status === 204) return undefined as unknown as T;
+  const ct = res.headers.get('content-type') || '';
+  if (ct.includes('application/json')) return (await res.json()) as T;
+  return (await res.text()) as unknown as T;
+}
+
+/**
+ * Like `request`, but targets the cloud companion relay (`companionBase()`)
+ * while still carrying the caller's auth + tenant headers — the companion
+ * endpoints are tenant-scoped. Used only by `api.companion.*`.
+ */
+async function requestCompanion<T>(path: string, init?: RequestInit): Promise<T> {
+  const headers = new Headers(init?.headers || {});
+  if (!headers.has('Content-Type')) headers.set('Content-Type', 'application/json');
+  applyTenantHeaders(headers);
+  applyAuthHeader(headers);
+  const base = companionBase();
+  const res = await fetch(`${base}${normalizeRequestPath(path, init)}`, {
+    ...init,
+    headers,
+    credentials: base ? 'include' : 'same-origin',
+  });
   if (!res.ok) {
     throw Object.assign(new Error(`API ${res.status} ${res.statusText}`), { status: res.status, body: await errorBody(res) });
   }
@@ -2238,6 +2316,28 @@ export const api = {
         `/api/mcp/tools/${id}/test`,
         { method: 'POST', body: JSON.stringify({ inputJson }) },
       ),
+  },
+  /**
+   * Desktop↔phone companion pairing. The desktop (report open) advertises a
+   * session and shows the code; the phone pairs by code and then streams
+   * dictation over the WebSocket relay (`lib/companion.ts`). No PHI is sent to
+   * these REST endpoints — only device names and the short-lived pairing code.
+   */
+  companion: {
+    createSession: (deviceName: string) =>
+      requestCompanion<CompanionSessionInit>('/api/companion/sessions', {
+        method: 'POST',
+        body: JSON.stringify({ deviceName }),
+      }),
+    pair: (pairingCode: string, deviceName: string) =>
+      requestCompanion<CompanionPairResult>('/api/companion/pair', {
+        method: 'POST',
+        body: JSON.stringify({ pairingCode, deviceName }),
+      }),
+    endSession: (sessionId: string) =>
+      requestCompanion<void>(`/api/companion/sessions/${sessionId}`, { method: 'DELETE' }),
+    getSession: (sessionId: string) =>
+      requestCompanion<CompanionSessionInfo>(`/api/companion/sessions/${sessionId}`),
   },
 };
 

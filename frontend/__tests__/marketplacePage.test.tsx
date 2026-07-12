@@ -28,7 +28,7 @@ vi.mock('@/lib/api', () => ({
   },
 }));
 
-import MarketplacePage from '@/app/marketplace/page';
+import MarketplacePage from '@/app/(desktop)/marketplace/page';
 
 const SAMPLE_LISTINGS = [
   {

@@ -4,10 +4,10 @@
   "version": "0.1.62",
   "identifier": "com.radiopad.desktop",
   "build": {
-    "frontendDist": "../../frontend/out",
+    "frontendDist": "../../frontend/out-desktop",
     "devUrl": "http://localhost:3000",
     "beforeDevCommand": "pnpm --filter @radiopad/frontend dev",
-    "beforeBuildCommand": "pnpm --filter @radiopad/frontend build"
+    "beforeBuildCommand": "pnpm --filter @radiopad/frontend build:desktop"
   },
   "app": {
     "withGlobalTauri": true,
@@ -24,7 +24,7 @@
       }
     ],
     "security": {
-      "csp": "default-src 'self'; connect-src 'self' https://radiopad.polytronx.com http://127.0.0.1:7457 ipc: tauri:; img-src 'self' data:; style-src 'self' 'unsafe-inline'; font-src 'self' data:"
+      "csp": "default-src 'self'; connect-src 'self' https://radiopad.polytronx.com wss://radiopad.polytronx.com http://127.0.0.1:7457 ws://127.0.0.1:7457 ipc: tauri:; img-src 'self' data:; style-src 'self' 'unsafe-inline'; font-src 'self' data:"
     }
   },
   "bundle": {

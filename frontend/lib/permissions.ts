@@ -61,6 +61,44 @@ export function can(
   return !!permissions && permissions.includes(key);
 }
 
+/**
+ * Permissions that grant access to the master-admin (web) surface. A signed-in
+ * user holding NONE of these is clinical-only — the web app has no reporting
+ * workspace for them, so they are shown the "use the desktop app" notice. These
+ * are administrative capabilities (manage / approve / verify), never the plain
+ * read/draft/edit permissions a reporting radiologist also holds.
+ */
+// IMPORTANT: keep this list to unambiguous ADMIN capabilities only. A plain
+// Radiologist holds `users.read`, `billing.read`, `mcp_tools.invoke`, and
+// `audit.read` (see backend RolePermissionMap), so including any of those here
+// would fail OPEN and let a clinical user into the admin console. Every entry
+// below is a manage/approve/verify/export capability that no purely-clinical
+// role (Radiologist, Resident, Fellow, Subspecialist, Researcher) is granted;
+// every admin role (ReportingAdmin, ItAdmin, BillingAdmin, ComplianceReviewer,
+// Auditor, MedicalDirector, platform super-admin) holds at least one.
+export const WEB_ADMIN_PERMISSIONS: readonly PermissionKey[] = [
+  'users.manage',
+  'users.revoke_sessions',
+  'tenant_settings.manage',
+  'security.manage',
+  'billing.manage',
+  'providers.manage',
+  'mcp_tools.manage',
+  'validation_packs.manage',
+  'audit.verify',
+  'audit.export',
+  'rulebooks.approve',
+  'templates.approve',
+  'prompt_overrides.approve',
+];
+
+/** Whether this permission set may use the master-admin (web) surface. */
+export function hasWebAdminAccess(
+  permissions: readonly string[] | null | undefined,
+): boolean {
+  return !!permissions && WEB_ADMIN_PERMISSIONS.some((k) => permissions.includes(k));
+}
+
 export interface PermissionState {
   /** True until the /me probe resolves. */
   loading: boolean;

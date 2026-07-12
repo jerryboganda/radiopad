@@ -35,7 +35,7 @@ vi.mock('@/lib/api', () => ({
   },
 }));
 
-import ProvidersPage from '@/app/providers/page';
+import ProvidersPage from '@/app/(web)/providers/page';
 
 describe('providers page', () => {
   beforeEach(() => {

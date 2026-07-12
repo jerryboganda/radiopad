@@ -1,7 +1,7 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { render, screen } from '@testing-library/react';
 import * as React from 'react';
-import LoginPage from '@/app/login/page';
+import LoginPage from '@/app/(shared)/login/page';
 
 // A working in-memory `localStorage` is installed centrally in
 // `__tests__/setup.ts` (jsdom here is launched with a broken

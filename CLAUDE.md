@@ -33,6 +33,18 @@ It bumps `desktop/src-tauri/tauri.conf.json` **and** `desktop/src-tauri/Cargo.to
 - Never bump only one version file or hand-edit a build (version mismatch → updater loop). Always use `pnpm release:desktop`.
 - Signing secrets (`TAURI_PRIVATE_KEY`, `TAURI_KEY_PASSWORD`) are already set in GitHub; the public key is embedded in `tauri.conf.json`. macOS is excluded from the matrix until Apple signing is configured.
 
+## ⚠️ MISSION-CRITICAL: three specialised surfaces from one frontend (RADIOPAD_SURFACE)
+
+RadioPad is **desktop-first, surface-specialised**. The single `frontend/` codebase builds into three scoped bundles selected by the `RADIOPAD_SURFACE` build flag:
+
+- **desktop** = the entire reporting product (worklist, editor, dictation, library authoring, personal settings, **companion host**). Clinical roles.
+- **web** = master-admin / platform operations ONLY (`admin/*`, users, billing, SSO, providers, governance, usage). NO reporting. Clinical-only users get a "download the desktop app" interstitial ([WebAdminGate](frontend/components/shell/WebAdminGate.tsx)).
+- **mobile** = a dictation **companion** that pairs to a live desktop session (pairing + voice dictation + remote only). NO standalone reporting.
+
+How it works: routes live in App Router **route groups** `frontend/app/(desktop|web|mobile|shared)/`. [scripts/build-surface.mjs](frontend/scripts/build-surface.mjs) (`pnpm --filter @radiopad/frontend build:{desktop,web,mobile}`) sets the flag, stages non-target groups OUT of `app/` (and swaps the root `/` for a redirect on web/mobile), runs `next build`, and moves `out/` → `out-<surface>`. So each shell **physically** ships only its routes. [lib/surface.ts](frontend/lib/surface.ts) exposes `SURFACE`/`isWebSurface`/`surfaceAllows`; nav is surface-tagged in [nav.config.tsx](frontend/components/shell/nav.config.tsx). Tauri consumes `out-desktop` (`build:desktop`), Capacitor `out-mobile` (`build:mobile`), web deploy serves `out-web`. Plain `next dev` = full desktop app (all groups present).
+
+The **companion** relay is a cloud subsystem (`/ws/companion` + `/api/companion/*`, [lib/companion.ts](frontend/lib/companion.ts), [CompanionHostPanel](frontend/components/companion/CompanionHostPanel.tsx)) — desktop advertises a code, phone pairs and streams dictation into the desktop's focused section via `getLastFocusedSectionEditor().insertAtCursor`.
+
 ## Project mission
 
 AI-assisted radiology reporting platform. Radiologist drafts, validates, and signs; AI never auto-signs. See [PRD.md](PRD.md) and [PROGRESS.md](PROGRESS.md) (Ralph-loop memory).
@@ -52,9 +64,9 @@ No other frameworks. Do not propose Express/Fastify/NestJS/etc. for the backend.
 ## Repo map
 
 - `backend/RadioPad.Api/` — ASP.NET Core solution (Domain, Application, Validation, Infrastructure, Api, tests)
-- `frontend/` — Next.js app
-- `desktop/` — Tauri shell
-- `mobile/` — Capacitor project
+- `frontend/` — Next.js app; routes grouped by surface under `app/(desktop|web|mobile|shared)/`, built per-surface via `build:{desktop,web,mobile}` (see surface-model note above)
+- `desktop/` — Tauri shell (consumes `frontend/out-desktop`)
+- `mobile/` — Capacitor project (companion; consumes `frontend/out-mobile`)
 - `cli/RadioPad.Cli/` — .NET global tool
 - `rulebooks/` — YAML rulebooks
 - `templates/` — JSON report templates

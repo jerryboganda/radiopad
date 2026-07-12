@@ -65,19 +65,23 @@ pnpm android    # opens Android Studio
 pnpm ios        # opens Xcode (macOS only)
 ```
 
-## Dictation (PRD MOB / iter-36)
+## Companion dictation (desktop-first model)
 
-The mobile shell ships three dedicated touch pages (served by the same Next.js
-frontend that the WebView wraps):
+The mobile app is a **dictation companion**, not a standalone reporting client.
+It wraps the `mobile` surface build (`pnpm --filter @radiopad/frontend
+build:mobile` → `frontend/out-mobile`) which ships only the companion:
 
-- `/mobile/dictate/[reportId]` — Web Speech API dictation with a localStorage
-  draft buffer so a network drop never costs spoken notes. Uses
-  [`@capacitor-community/speech-recognition`](https://github.com/capacitor-community/speech-recognition)
-  on native (added to `package.json`); falls back gracefully on browsers that
-  do not expose `window.SpeechRecognition`.
-- `/mobile/reports/[reportId]/edit` — collapsible per-section editor.
-- `/mobile/reports/[reportId]/sign` — acknowledgement-and-export screen.
-  RadioPad never auto-signs; the radiologist still signs in their RIS/EHR.
+- `/companion` — the whole app. Pair to a **live desktop session** by the short
+  code (or QR) the desktop shows (report open → "Pair phone"), then hold the mic
+  to dictate. Spoken text streams over the companion relay (`/ws/companion`) and
+  lands in the report's focused section **on the paired desktop**. Remote
+  buttons move between sections. There is **no editing or signing on the phone**
+  — RadioPad never auto-signs, and the radiologist signs on the desktop.
+
+Dictation uses the Web Speech API where available, with
+[`@capacitor-community/speech-recognition`](https://github.com/capacitor-community/speech-recognition)
+as the native on-device path. The old standalone `/mobile/dictate`,
+`/mobile/reports/edit`, and `/mobile/reports/sign` pages have been removed.
 
 After `pnpm exec cap add ios|android`, configure the platform permissions:
 

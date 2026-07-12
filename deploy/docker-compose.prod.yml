@@ -111,7 +111,8 @@ services:
       - "443:443"
     volumes:
       - ./Caddyfile.prod:/etc/caddy/Caddyfile:ro
-      - ../frontend/out:/srv/frontend:ro
+      # Web surface = master-admin only (build with `pnpm --filter @radiopad/frontend build:web`).
+      - ../frontend/out-web:/srv/frontend:ro
       - radiopad-caddy-data:/data
       - radiopad-caddy-config:/config
     depends_on:

@@ -16,7 +16,7 @@ vi.mock('@/lib/api', () => ({
   },
 }));
 
-import AnalyticsPage from '@/app/analytics/page';
+import AnalyticsPage from '@/app/(desktop)/analytics/page';
 
 const SAMPLE_SUMMARY = {
   window: { from: '2026-01-01', to: '2026-01-31' },

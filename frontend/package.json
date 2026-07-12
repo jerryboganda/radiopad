@@ -5,6 +5,9 @@
   "scripts": {
     "dev": "next dev -p 3000",
     "build": "next build",
+    "build:desktop": "node scripts/build-surface.mjs desktop",
+    "build:web": "node scripts/build-surface.mjs web",
+    "build:mobile": "node scripts/build-surface.mjs mobile",
     "start": "next start",
     "lint": "next lint",
     "typecheck": "tsc -b --noEmit",

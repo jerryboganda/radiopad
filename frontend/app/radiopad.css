@@ -909,6 +909,34 @@
 }
 
 /* ============================================================
+   Companion — phone dictates into a live desktop session.
+   Mobile side reuses .rp-mobile / .rp-mic-btn / .rp-transcript;
+   .rp-companion-remote is the remote-control button row. The
+   desktop host lives inline in the report editor. Locked tokens only.
+   ============================================================ */
+.rp-companion-remote {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin: 12px 0;
+}
+.rp-companion-remote .ghost { flex: 1 1 auto; }
+
+.rp-companion-host {
+  position: relative;
+  margin: 8px 0;
+}
+.rp-companion-host-panel {
+  margin-top: 8px;
+  max-width: 420px;
+}
+.rp-companion-host-panel img {
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: #fff;
+}
+
+/* ============================================================
    Dictation overlay — global floating mic that replaces the old
    full-screen /mobile/dictate navigation. Fixed bottom-right, above
    app chrome. Locked tokens only; the recording state borrows the

@@ -4,6 +4,55 @@
 
 ---
 
+## Desktop-first surface specialisation (web=admin · mobile=companion)
+
+- **Date:** 2026-07-12
+- **Scope:** Operator decision — re-scope the product so the **desktop app is
+  the entire reporting product**, the **web app is master-admin/platform
+  operations only** (no reporting, no clinical login), and the **mobile app is a
+  dictation companion** that pairs to a live desktop session (no standalone
+  reporting). One `frontend/` codebase, three surfaces.
+
+### Delivered (frontend — verified: typecheck + 227 tests + all 3 builds green)
+
+- **Surface flag + build:** `RADIOPAD_SURFACE` (`frontend/lib/surface.ts`,
+  inlined via `next.config.ts` `env`), `build:{desktop,web,mobile}` →
+  `out-<surface>` via `frontend/scripts/build-surface.mjs`, which stages
+  non-target App Router route groups out of `app/` and swaps `/` for a redirect
+  on web/mobile. Routes reorganised into `app/(desktop|web|mobile|shared)/`.
+- **Scoped nav + gates:** `nav.config.tsx` items are surface-tagged and filtered
+  in `Sidebar.tsx`; `WebAdminGate` shows clinical-only users a
+  "download the desktop app" interstitial on web.
+- **Companion:** `/api/companion/*` + `/ws/companion` relay client
+  (`lib/companion.ts`, cloud base via `companionBase()`), desktop
+  `CompanionHostPanel` (QR + code, inserts dictation into the focused section
+  via `sectionEditorRegistry`), mobile `app/(mobile)/companion` (pair → dictate
+  + remote). Standalone `mobile/reports/*` edit/sign removed.
+- **Shells repointed:** Tauri `frontendDist`→`out-desktop` + `build:desktop` +
+  CSP `wss:`; Capacitor `webDir`→`out-mobile` + `build:mobile`.
+
+### Backend companion relay (delivered — build + 799 tests green)
+- `CompanionSession` entity + `AddCompanionSession` migration; `CompanionController`
+  (`/api/companion/*`); raw-WebSocket relay `/ws/companion` (`CompanionRelayEndpoint`
+  + `CompanionRelayRegistry`, in-memory host/companion slots).
+- WS auth mirrors `RadioPadBearerMiddleware` incl. the AuthSession revocation/expiry
+  check; a re-validation watchdog + 12h max-lifetime cap close revoked/expired
+  sockets; TOCTOU re-check avoids orphan peers.
+
+### Adversarial review (13 findings) — all fixed + verified
+- Notable: WebAdminGate was fail-open (a Radiologist holds users.read/billing.read/
+  mcp_tools.invoke) → `WEB_ADMIN_PERMISSIONS` restricted to manage/approve/verify/
+  export perms only; and it wrongly showed the download notice to UNAUTHENTICATED
+  users → now defers to AuthGate. Deploy gap: nginx/Caddy had no `/ws/` proxy → added.
+  `/admin/fhir-import` moved to the (desktop) group (it's a reporting feature).
+
+### Operational follow-up (NOT done — needs operator go-ahead; outward, auto-updates users)
+- Deploy order: commit → deploy backend to prod VPS → `pnpm release:desktop`
+  (DESK-001) → deploy web `out-web` → build/publish mobile `out-mobile`. Backend
+  MUST land first, else the desktop "Pair phone" flow errors against prod.
+
+---
+
 ## Iteration 56 — Remove all Whisper STT models & engines
 
 - **Date:** 2026-06-28

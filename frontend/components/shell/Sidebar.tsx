@@ -8,6 +8,7 @@ import { navGroups, isActive } from './nav.config';
 import { useShell } from './ShellContext';
 import ProfileMenu from './ProfileMenu';
 import { usePermissions, type PermissionKey } from '@/lib/permissions';
+import { surfaceAllows } from '@/lib/surface';
 
 export default function Sidebar() {
   const tNav = useTranslations('nav');
@@ -22,8 +23,16 @@ export default function Sidebar() {
   // The backend still enforces RBAC; this is purely which links we surface.
   const visible = (permission?: PermissionKey) =>
     permsLoading || !permission || can(permission);
+  // Scope items to the surface this bundle was built for (item tag overrides
+  // the group tag; neither → shared). Applied alongside the RBAC filter — the
+  // backend still enforces both.
   const groups = navGroups
-    .map((g) => ({ ...g, items: g.items.filter((it) => visible(it.permission)) }))
+    .map((g) => ({
+      ...g,
+      items: g.items.filter(
+        (it) => visible(it.permission) && surfaceAllows(it.surfaces ?? g.surfaces),
+      ),
+    }))
     .filter((g) => g.items.length > 0);
 
   // Close mobile drawer on route change.

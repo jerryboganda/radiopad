@@ -14,17 +14,9 @@ export function providerOAuthHref(id: string): string {
   return withParam('/admin/providers/oauth', 'id', id);
 }
 
-export function mobileDictateHref(reportId: string): string {
-  return withParam('/mobile/dictate', 'reportId', reportId);
-}
-
-export function mobileReportEditHref(reportId: string): string {
-  return withParam('/mobile/reports/edit', 'reportId', reportId);
-}
-
-export function mobileReportSignHref(reportId: string): string {
-  return withParam('/mobile/reports/sign', 'reportId', reportId);
-}
+// Standalone mobile reporting routes were removed: the mobile app is now a
+// dictation companion only (see app/(mobile)/companion). Report editing/signing
+// happens on the desktop app.
 
 export function rulebookEditorHref(id?: string): string {
   if (id) return withParam('/rulebooks/editor', 'id', id);

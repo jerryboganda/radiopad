@@ -1,6 +1,13 @@
 node_modules/
 dist/
 out/
+# Per-surface static exports (scripts/build-surface.mjs) — desktop|web|mobile.
+out-desktop/
+out-web/
+out-mobile/
+# Transient route-group staging used while building a single surface.
+frontend/.surface-staging/
+.surface-staging/
 .next/
 publish/
 desktop/src-tauri/binaries/

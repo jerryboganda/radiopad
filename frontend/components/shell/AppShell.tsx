@@ -8,6 +8,8 @@ import MobileDrawerBackdrop from './MobileDrawerBackdrop';
 import { ShellProvider, useShell } from './ShellContext';
 import { PageActionsProvider } from './PageActionsSlot';
 import AuthGate from './AuthGate';
+import WebAdminGate from './WebAdminGate';
+import { isWebSurface } from '@/lib/surface';
 import BillingStatusBanner from '@/components/BillingStatusBanner';
 import DesktopStatusBanner from '@/components/DesktopStatusBanner';
 import PageTransition from '@/components/ui/PageTransition';
@@ -49,13 +51,22 @@ export default function AppShell({ children }: { children: ReactNode }) {
     );
   }
 
+  // On the web (master-admin) surface, clinical-only users are shown the
+  // desktop-app notice instead of the shell. `isWebSurface` is an inlined build
+  // constant, so this branch is compiled away entirely on desktop/mobile.
+  const shell = isWebSurface ? (
+    <WebAdminGate>
+      <ShellRoot>{children}</ShellRoot>
+    </WebAdminGate>
+  ) : (
+    <ShellRoot>{children}</ShellRoot>
+  );
+
   return (
     <ToastProvider>
       <ShellProvider>
         <PageActionsProvider>
-          <AuthGate>
-            <ShellRoot>{children}</ShellRoot>
-          </AuthGate>
+          <AuthGate>{shell}</AuthGate>
         </PageActionsProvider>
       </ShellProvider>
     </ToastProvider>

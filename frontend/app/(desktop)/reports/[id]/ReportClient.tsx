@@ -18,6 +18,7 @@ import { getSessionAudio } from '@/lib/dictation/audioBuffer';
 import { isUseUbagEnabled } from '@/lib/dictation/crossCheckPrefs';
 import { anchorCorrections, applyCorrection } from '@/lib/dictation/anchorCorrections';
 import CrossCheckBadge from '@/components/dictation/CrossCheckBadge';
+import CompanionHostPanel from '@/components/companion/CompanionHostPanel';
 import { readQueryParam } from '@/lib/browserParams';
 import { detectCommand, stripCommand, type VoiceCommand, type CommandMatch } from '@/lib/voiceCommands';
 import RewriteStylePanel from './RewriteStylePanel';
@@ -802,6 +803,8 @@ export default function ReportPage() {
         primarySigned={primarySigned}
         onGoToSignoff={() => setInspectorTab('signoff')}
       />
+
+      <CompanionHostPanel />
 
       {error && <div className="banner warn">{error}</div>}
 

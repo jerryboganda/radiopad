@@ -44,7 +44,7 @@ vi.mock('@/lib/api', () => ({
   },
 }));
 
-import AdminModelEvalPage from '@/app/admin/model-eval/page';
+import AdminModelEvalPage from '@/app/(web)/admin/model-eval/page';
 
 // The page gates UI off the backend-authoritative permission set returned by
 // `api.me()` (`user.permissions`), via `can(...)` from @/lib/permissions:

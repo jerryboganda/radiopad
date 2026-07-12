@@ -493,6 +493,16 @@ New locked helpers in `frontend/app/radiopad.css`:
   RFC 8628). The code chip is a mono-font 32 px tile with 0.18em
   letter-spacing — large enough to read across the room, locked so
   no inline-style escape hatch is needed (iter-36).
+- `.rp-companion-remote` — remote-control button row on the mobile
+  dictation companion (`/companion`); a flex-wrap row of `.ghost`
+  buttons (next/prev section, insert, undo, read-back). The mobile
+  companion otherwise reuses `.rp-mobile` / `.rp-mic-btn` /
+  `.rp-transcript`.
+- `.rp-companion-host` / `.rp-companion-host-panel` — the desktop
+  "Pair phone" host affordance inline in the report editor. The panel
+  composes the standard `.rp-panel` surface and reuses the locked
+  `.rp-pair-code-tile` / `.rp-pair-code` for the code and a bordered
+  QR tile; no new tokens.
 
 AI-drafted prose continues to wear `.ai-mark`; validation findings
 continue to use the locked severity classes

@@ -28,7 +28,7 @@ vi.mock('@/lib/api', () => ({
   },
 }));
 
-import TemplatesPage from '@/app/templates/page';
+import TemplatesPage from '@/app/(desktop)/templates/page';
 
 const SAMPLE_TEMPLATES = [
   {

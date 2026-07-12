@@ -60,6 +60,9 @@ public class RadioPadDbContext : DbContext
     /// <summary>PRD §18.2 — drift detection baselines per (tenant, provider, rulebook).</summary>
     public DbSet<DriftBaseline> DriftBaselines => Set<DriftBaseline>();
 
+    /// <summary>Desktop↔phone companion pairing sessions (short-code relay handshake).</summary>
+    public DbSet<CompanionSession> CompanionSessions => Set<CompanionSession>();
+
     protected override void OnModelCreating(ModelBuilder b)
     {
         b.Entity<Tenant>().HasIndex(x => x.Slug).IsUnique();
@@ -121,6 +124,11 @@ public class RadioPadDbContext : DbContext
         // PRD §18.2 — drift baselines are unique per (tenant, provider, rulebook).
         b.Entity<DriftBaseline>()
             .HasIndex(x => new { x.TenantId, x.ProviderId, x.RulebookId }).IsUnique();
+
+        // Companion pairing — the phone joins by PairingCode, so it must be a fast
+        // lookup; unique so an active code resolves to exactly one session.
+        b.Entity<CompanionSession>().HasIndex(x => x.PairingCode).IsUnique();
+        b.Entity<CompanionSession>().HasIndex(x => new { x.TenantId, x.UserId, x.Status });
 
         b.Entity<Report>().OwnsOne(x => x.Study);
         b.Entity<Report>().HasMany(x => x.Versions).WithOne().HasForeignKey(v => v.ReportId);

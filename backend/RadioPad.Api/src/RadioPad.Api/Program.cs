@@ -163,6 +163,11 @@ builder.Services.AddSingleton<RadioPad.Infrastructure.Providers.Ubag.UbagOperato
 // and client disconnects, so it runs detached from the HTTP request. Singleton:
 // poll requests arrive on different scopes than the submit.
 builder.Services.AddSingleton<RadioPad.Api.Services.AiJobRegistry>();
+// Companion relay (desktop↔phone). The registry holds live relay sockets in
+// memory (process-local, single instance); the session service manages the
+// durable pairing record.
+builder.Services.AddSingleton<RadioPad.Api.Services.CompanionRelayRegistry>();
+builder.Services.AddScoped<RadioPad.Api.Services.CompanionSessionService>();
 // Dynamic UBAG provider auto-discovery: keeps each tenant's UBAG provider rows in sync
 // with the gateway's live target catalog + login state, so any web AI the operator logs
 // into via the UBAG Chromium session appears in the picker automatically (no dev needed).
@@ -660,6 +665,15 @@ app.UseMiddleware<RateLimitMiddleware>();
 // app bounces back to the login screen. The web app is same-origin (no preflight)
 // and was unaffected. Default policy allow-lists the tauri/capacitor origins.
 app.UseCors();
+// Desktop↔phone companion relay (raw WebSocket, PRD companion subsystem).
+// UseWebSockets must precede the endpoint that accepts the upgrade. The relay
+// authenticates the RadioPad bearer from the `access_token` query param itself
+// (browsers/webviews cannot set WS headers), so it is mapped here as an isolated
+// terminal branch AHEAD of the /api bearer middlewares — which only guard /api
+// paths — rather than relying on them.
+app.UseWebSockets();
+app.Map("/ws/companion", static branch =>
+    branch.Run(RadioPad.Api.Services.CompanionRelayEndpoint.HandleAsync));
 app.UseMiddleware<OidcBearerMiddleware>();
 app.UseMiddleware<RadioPadBearerMiddleware>();
 // Runs after identity projection so per-tenant allowlists are evaluated

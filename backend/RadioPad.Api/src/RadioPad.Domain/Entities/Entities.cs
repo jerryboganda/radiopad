@@ -1107,3 +1107,32 @@ public class DriftBaseline : Entity
     public string FindingRuleIdsJson { get; set; } = "[]";
     public DateTimeOffset CheckedAt { get; set; }
 }
+
+/// <summary>
+/// Desktop↔phone companion pairing session. A radiologist's desktop app (report
+/// open) advertises a session with a short <see cref="PairingCode"/>; their phone
+/// joins by that code and streams voice dictation + remote commands to the desktop
+/// through the cloud <c>/ws/companion</c> relay (the phone cannot reach the
+/// desktop's loopback sidecar directly). The row is the durable coordination
+/// record; the live dictation stream is relayed in-memory and never persisted.
+/// </summary>
+public class CompanionSession : Entity
+{
+    public Guid TenantId { get; set; }
+    /// <summary>The radiologist who opened the session on the desktop. The phone
+    /// must authenticate as the SAME tenant + user to pair.</summary>
+    public Guid UserId { get; set; }
+    /// <summary>Short human-typeable pairing code (6 uppercase alphanumerics),
+    /// unique among active sessions.</summary>
+    public string PairingCode { get; set; } = "";
+    /// <summary>Advertised name of the desktop that created the session.</summary>
+    public string HostDeviceName { get; set; } = "";
+    /// <summary>Name of the phone that paired; null until <see cref="Status"/> becomes
+    /// <see cref="CompanionSessionStatus.Paired"/>.</summary>
+    public string? CompanionDeviceName { get; set; }
+    public CompanionSessionStatus Status { get; set; } = CompanionSessionStatus.Advertising;
+    /// <summary>The code stops being pairable once this passes (default: 5 minutes).</summary>
+    public DateTimeOffset ExpiresAt { get; set; }
+    /// <summary>When the phone paired; null while still advertising / ended / expired.</summary>
+    public DateTimeOffset? PairedAt { get; set; }
+}

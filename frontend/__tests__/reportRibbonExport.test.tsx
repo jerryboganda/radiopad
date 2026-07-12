@@ -1,8 +1,8 @@
 import { describe, expect, it, vi } from 'vitest';
 import { fireEvent, render, screen } from '@testing-library/react';
-import ReportRibbon, { type ReportRibbonProps } from '@/app/reports/[id]/ReportRibbon';
+import ReportRibbon, { type ReportRibbonProps } from '@/app/(desktop)/reports/[id]/ReportRibbon';
 
-vi.mock('@/app/reports/[id]/CopyToRisButton', () => ({ default: () => null }));
+vi.mock('@/app/(desktop)/reports/[id]/CopyToRisButton', () => ({ default: () => null }));
 
 function props(onExport: ReportRibbonProps['onExport']): ReportRibbonProps {
   const noop = vi.fn();

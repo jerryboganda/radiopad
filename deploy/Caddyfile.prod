@@ -41,6 +41,16 @@
         header_up X-RadioPad-RequestId {http.request.uuid}
     }
 
+    # WebSocket relay for the desktop↔phone dictation companion (/ws/companion).
+    # Caddy upgrades WebSocket connections on reverse_proxy automatically.
+    reverse_proxy /ws/* api:7457 {
+        header_up Host {upstream_hostport}
+        header_up X-Real-IP {remote_host}
+        header_up X-Forwarded-For {remote_host}
+        header_up X-Forwarded-Proto {scheme}
+        header_up X-Forwarded-Host {host}
+    }
+
     # Security headers
     header {
         Strict-Transport-Security "max-age=31536000; includeSubDomains; preload"

@@ -39,6 +39,20 @@ public enum ReportStatus
     Exported = 3,
 }
 
+/// <summary>
+/// Lifecycle of a <see cref="Entities.CompanionSession"/> (desktop↔phone pairing).
+/// A session is created <see cref="Advertising"/>; the phone joining by code moves
+/// it to <see cref="Paired"/>. <see cref="Ended"/> (explicit teardown) and
+/// <see cref="Expired"/> (code TTL elapsed before pairing) are terminal.
+/// </summary>
+public enum CompanionSessionStatus
+{
+    Advertising = 0,
+    Paired = 1,
+    Ended = 2,
+    Expired = 3,
+}
+
 public enum UserRole
 {
     Radiologist = 0,
@@ -224,6 +238,10 @@ public enum AuditAction
     /// <summary>Master-admin user management — a user's enrolled TOTP authenticator
     /// was cleared so they must re-enroll on next sign-in (<c>POST /api/users/{id}/reset-mfa</c>).</summary>
     UserMfaReset = 61,
+    /// <summary>Companion relay — a phone paired to a desktop's advertised companion
+    /// session (<c>POST /api/companion/pair</c>). Details record the session id only;
+    /// never any dictation text or report content (transient relay, no PHI).</summary>
+    CompanionPaired = 62,
 }
 
 /// <summary>

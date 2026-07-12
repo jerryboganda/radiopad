@@ -3,7 +3,9 @@ import type { CapacitorConfig } from '@capacitor/cli';
 const config: CapacitorConfig = {
   appId: 'com.radiopad.mobile',
   appName: 'RadioPad',
-  webDir: '../frontend/out',
+  // The mobile shell wraps the `mobile` surface build (companion: pairing +
+  // dictation only), produced by `pnpm --filter @radiopad/frontend build:mobile`.
+  webDir: '../frontend/out-mobile',
   bundledWebRuntime: false,
   server: {
     androidScheme: 'https',

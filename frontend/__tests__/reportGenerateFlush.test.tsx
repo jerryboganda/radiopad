@@ -56,9 +56,9 @@ vi.mock('@/lib/browserParams', () => ({
 }));
 
 // Sub-components are irrelevant to this flow and pull in extra weight; stub them.
-vi.mock('@/app/reports/[id]/RewriteStylePanel', () => ({ default: () => null }));
-vi.mock('@/app/reports/[id]/PriorComparePanel', () => ({ default: () => null }));
-vi.mock('@/app/reports/[id]/CopyToRisButton', () => ({ default: () => null }));
+vi.mock('@/app/(desktop)/reports/[id]/RewriteStylePanel', () => ({ default: () => null }));
+vi.mock('@/app/(desktop)/reports/[id]/PriorComparePanel', () => ({ default: () => null }));
+vi.mock('@/app/(desktop)/reports/[id]/CopyToRisButton', () => ({ default: () => null }));
 
 vi.mock('@/lib/api', () => {
   const api = {
@@ -110,7 +110,7 @@ vi.mock('@/lib/api', () => {
   return { api };
 });
 
-import ReportPage from '@/app/reports/[id]/ReportClient';
+import ReportPage from '@/app/(desktop)/reports/[id]/ReportClient';
 import { api } from '@/lib/api';
 
 beforeEach(() => {

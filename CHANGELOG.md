@@ -6,6 +6,31 @@ The format is based on [Keep a Changelog 1.1.0](https://keepachangelog.com/en/1.
 
 ## [Unreleased]
 
+### Changed
+- **Desktop-first surface specialisation — one frontend, three scoped apps.**
+  The single Next.js frontend now builds into three surfaces selected by a
+  `RADIOPAD_SURFACE` build flag (`build:{desktop,web,mobile}` →
+  `frontend/out-<surface>`): the **desktop** app is the entire reporting product;
+  the **web** app is master-admin / platform operations only (no reporting, no
+  clinical login — clinical users get a "download the desktop app" interstitial);
+  the **mobile** app is a dictation companion only. Routes are organised into App
+  Router route groups `app/(desktop|web|mobile|shared)/` and the build stages
+  non-target groups out so each shell physically ships only its own routes. Tauri
+  now bundles `out-desktop`, Capacitor `out-mobile`.
+
+### Added
+- **Phone dictation companion.** The mobile app pairs to a live desktop session
+  (short code / QR) and streams voice dictation into the report open on that
+  desktop via a cloud relay (`/api/companion/*`, `/ws/companion`). The desktop
+  shows a "Pair phone" host panel; received dictation is inserted into the
+  focused report section through the same path as local dictation. No editing or
+  signing happens on the phone; RadioPad never auto-signs.
+
+### Removed
+- **Removed the standalone mobile reporting pages** (`/mobile/dictate`,
+  `/mobile/reports/edit`, `/mobile/reports/sign`) — superseded by the pairing
+  companion above.
+
 ### Removed
 - **Removed all Whisper speech-to-text models and engines.** The Whisper
   large-v3-turbo, small.en, and medical large-v3 models, the `WhisperNet` /

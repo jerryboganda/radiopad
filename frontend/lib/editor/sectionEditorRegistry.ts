@@ -42,6 +42,12 @@ export function getSectionEditor(sectionKey: string): SectionEditorHandle | unde
   return registry.get(sectionKey);
 }
 
+/** Mounted section editors in registration order (used by companion remote
+ *  next/prev-section navigation). */
+export function getSectionEditorsInOrder(): SectionEditorHandle[] {
+  return [...registry.values()];
+}
+
 /** Test-only reset of module state. */
 export function _resetSectionEditorRegistry(): void {
   registry.clear();

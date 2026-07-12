@@ -8,9 +8,11 @@ COPY frontend/package.json frontend/package.json
 COPY mobile/package.json mobile/package.json
 RUN pnpm install --frozen-lockfile --filter @radiopad/frontend
 COPY frontend frontend
-RUN pnpm --filter @radiopad/frontend build
+# Web is the master-admin surface only — build the `web` surface bundle
+# (RADIOPAD_SURFACE=web → frontend/out-web), which ships no reporting routes.
+RUN pnpm --filter @radiopad/frontend build:web
 
 FROM nginx:1.27-alpine
 COPY deploy/vps/nginx.conf /etc/nginx/conf.d/default.conf
-COPY --from=build /src/frontend/out /usr/share/nginx/html
+COPY --from=build /src/frontend/out-web /usr/share/nginx/html
 EXPOSE 80

@@ -11,6 +11,7 @@ import {
   Activity, Settings2, Fingerprint, Users, ScanLine, Bone,
 } from 'lucide-react';
 import type { PermissionKey } from '@/lib/permissions';
+import type { Surface } from '@/lib/surface';
 
 export type NavIcon = ComponentType<SVGProps<SVGSVGElement>>;
 
@@ -26,11 +27,19 @@ export interface NavItem {
    * signed-in user. Gating mirrors the backend RBAC (server still enforces).
    */
   permission?: PermissionKey;
+  /**
+   * Surfaces this item belongs on (`desktop` = reporting product, `web` =
+   * master admin, `mobile` = companion). Omitted → inherits the group's
+   * `surfaces`; omitted on both → visible on every surface (shared).
+   */
+  surfaces?: readonly Surface[];
 }
 
 export interface NavGroup {
   /** i18n key under `nav.groups.*` */
   labelKey: string;
+  /** Default surfaces for items in this group; each item may override. */
+  surfaces?: readonly Surface[];
   items: NavItem[];
 }
 
@@ -65,17 +74,24 @@ export const Icons: Record<string, NavIcon> = {
 
 export const navGroups: NavGroup[] = [
   {
+    // Reporting workspace lives on the desktop app; `account/security` is
+    // shared so every surface can reach sign-in-devices / personal security.
     labelKey: 'workspace',
     items: [
-      { href: '/', labelKey: 'reports', icon: Icons.reports, permission: 'reports.read' },
-      { href: '/validation', labelKey: 'validation', icon: Icons.validation, permission: 'validation_packs.read' },
-      { href: '/audit', labelKey: 'audit', icon: Icons.audit, permission: 'audit.read' },
-      { href: '/analytics', labelKey: 'analytics', icon: Icons.analytics, permission: 'reports.read' },
+      { href: '/', labelKey: 'reports', icon: Icons.reports, permission: 'reports.read', surfaces: ['desktop'] },
+      { href: '/validation', labelKey: 'validation', icon: Icons.validation, permission: 'validation_packs.read', surfaces: ['desktop'] },
+      // Audit trail list lives in the (desktop) group only — tag it desktop so
+      // the web sidebar never links to a route staged out of the web bundle.
+      // Admin audit on web is served by /admin/governance + /admin/usage.
+      { href: '/audit', labelKey: 'audit', icon: Icons.audit, permission: 'audit.read', surfaces: ['desktop'] },
+      { href: '/analytics', labelKey: 'analytics', icon: Icons.analytics, permission: 'reports.read', surfaces: ['desktop'] },
       { href: '/account/security', labelKey: 'signInDevices', icon: Icons.signInDevices },
     ],
   },
   {
+    // Clinical content authoring — part of the reporting product (desktop).
     labelKey: 'library',
+    surfaces: ['desktop'],
     items: [
       { href: '/rulebooks', labelKey: 'rulebooks', icon: Icons.rulebooks, permission: 'rulebooks.read' },
       { href: '/templates', labelKey: 'templates', icon: Icons.templates, permission: 'templates.read' },
@@ -89,15 +105,19 @@ export const navGroups: NavGroup[] = [
   {
     labelKey: 'integrations',
     items: [
-      { href: '/providers', labelKey: 'providers', icon: Icons.providers, permission: 'providers.read' },
-      { href: '/admin/ubag', labelKey: 'ubag', icon: Icons.ubag, permission: 'mcp_tools.invoke' },
-      { href: '/admin/pacs', labelKey: 'pacs', icon: Icons.pacs, permission: 'tenant_settings.manage' },
-      { href: '/admin/fhir-import', labelKey: 'fhirImport', icon: Icons.fhir, permission: 'reports.draft' },
-      { href: '/offline', labelKey: 'offline', icon: Icons.offline },
+      // Provider / PACS / MCP wiring is platform administration → web.
+      { href: '/providers', labelKey: 'providers', icon: Icons.providers, permission: 'providers.read', surfaces: ['web'] },
+      { href: '/admin/ubag', labelKey: 'ubag', icon: Icons.ubag, permission: 'mcp_tools.invoke', surfaces: ['web'] },
+      { href: '/admin/pacs', labelKey: 'pacs', icon: Icons.pacs, permission: 'tenant_settings.manage', surfaces: ['web'] },
+      // FHIR import seeds a draft report → part of the reporting flow (desktop).
+      { href: '/admin/fhir-import', labelKey: 'fhirImport', icon: Icons.fhir, permission: 'reports.draft', surfaces: ['desktop'] },
+      { href: '/offline', labelKey: 'offline', icon: Icons.offline, surfaces: ['desktop'] },
     ],
   },
   {
+    // Master-admin / platform operations → web only.
     labelKey: 'admin',
+    surfaces: ['web'],
     items: [
       { href: '/admin/users', labelKey: 'users', icon: Icons.users, permission: 'users.manage' },
       { href: '/admin/governance', labelKey: 'governance', icon: Icons.governance, permission: 'audit.verify' },

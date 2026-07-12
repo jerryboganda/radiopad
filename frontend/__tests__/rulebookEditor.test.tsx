@@ -30,7 +30,7 @@ vi.mock('@/lib/api', () => ({
   },
 }));
 
-import RulebookEditorPage from '@/app/rulebooks/editor/page';
+import RulebookEditorPage from '@/app/(desktop)/rulebooks/editor/page';
 
 describe('rulebook editor', () => {
   beforeEach(() => {
