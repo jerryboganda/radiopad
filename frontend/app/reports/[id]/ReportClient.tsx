@@ -28,6 +28,7 @@ import { SECTIONS, SECTION_FIELD_MAP, normalizeScaffold, statusLabel, statusTone
 import { usePermissions } from '@/lib/permissions';
 import SectionEditor from '@/components/editor/SectionEditor';
 import { useRichEditorEnabled } from '@/lib/editor/richEditorFlag';
+import { saveDownload } from '@/lib/saveDownload';
 
 type RewriteState = {
   mode: RewriteMode;
@@ -650,32 +651,46 @@ export default function ReportPage() {
     if (!report) return;
     const fhir = await api.reports.exportFhir(report.id);
     const blob = new Blob([JSON.stringify(fhir, null, 2)], { type: 'application/fhir+json' });
-    downloadBlob(blob, `${report.study.accessionNumber || report.id}.fhir.json`);
+    await saveDownload(blob, `${report.study.accessionNumber || report.id}.fhir.json`);
   }
 
   async function exportJson() {
     if (!report) return;
     const json = await api.reports.exportJson(report.id);
     const blob = new Blob([JSON.stringify(json, null, 2)], { type: 'application/json' });
-    downloadBlob(blob, `${report.study.accessionNumber || report.id}.json`);
+    await saveDownload(blob, `${report.study.accessionNumber || report.id}.json`);
   }
 
   async function exportText() {
     if (!report) return;
     const text = await api.reports.exportText(report.id);
-    downloadBlob(new Blob([text], { type: 'text/plain' }), `${report.study.accessionNumber || report.id}.txt`);
+    await saveDownload(new Blob([text], { type: 'text/plain' }), `${report.study.accessionNumber || report.id}.txt`);
   }
 
   async function exportPdf() {
     if (!report) return;
     const blob = await api.reports.exportPdf(report.id);
-    downloadBlob(blob, `${report.study.accessionNumber || report.id}.pdf`);
+    await saveDownload(blob, `${report.study.accessionNumber || report.id}.pdf`);
   }
 
   async function exportDocx() {
     if (!report) return;
     const blob = await api.reports.exportDocx(report.id);
-    downloadBlob(blob, `${report.study.accessionNumber || report.id}.docx`);
+    await saveDownload(blob, `${report.study.accessionNumber || report.id}.docx`);
+  }
+
+  async function runExport(fmt: ExportFormat) {
+    setError(null);
+    try {
+      if (fmt === 'text') await exportText();
+      else if (fmt === 'json') await exportJson();
+      else if (fmt === 'fhir') await exportFhir();
+      else if (fmt === 'pdf') await exportPdf();
+      else if (fmt === 'docx') await exportDocx();
+    } catch (e) {
+      const err = e as { body?: { error?: string; detail?: string }; message?: string };
+      setError(err.body?.error || err.body?.detail || err.message || `Could not export ${fmt.toUpperCase()}.`);
+    }
   }
 
   useEffect(() => {
@@ -782,13 +797,7 @@ export default function ReportPage() {
         exportMenuOpen={exportMenuOpen}
         onToggleExportMenu={() => setExportMenuOpen((v) => !v)}
         onCloseExportMenu={() => setExportMenuOpen(false)}
-        onExport={(fmt: ExportFormat) => {
-          if (fmt === 'text') void exportText();
-          else if (fmt === 'json') void exportJson();
-          else if (fmt === 'fhir') void exportFhir();
-          else if (fmt === 'pdf') void exportPdf();
-          else if (fmt === 'docx') void exportDocx();
-        }}
+        onExport={(fmt: ExportFormat) => { void runExport(fmt); }}
         blockers={blockers}
         onAcknowledge={acknowledge}
         primarySigned={primarySigned}
@@ -1039,13 +1048,4 @@ export default function ReportPage() {
       )}
     </div>
   );
-}
-
-function downloadBlob(blob: Blob, name: string) {
-  const url = URL.createObjectURL(blob);
-  const a = document.createElement('a');
-  a.href = url;
-  a.download = name;
-  a.click();
-  URL.revokeObjectURL(url);
 }

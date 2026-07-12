@@ -30,6 +30,7 @@ use std::sync::{Mutex, OnceLock};
 use tauri::Emitter;
 use tauri::Manager;
 use tauri_plugin_clipboard_manager::ClipboardExt;
+use tauri_plugin_dialog::DialogExt;
 use tauri_plugin_global_shortcut::{Code, GlobalShortcutExt, Modifiers, Shortcut, ShortcutState};
 use tauri_plugin_store::StoreExt;
 
@@ -122,6 +123,36 @@ async fn secure_copy(app: tauri::AppHandle, text: String, ttl_ms: u64) -> Result
         }
     });
     Ok(())
+}
+
+/// Save an authenticated report export through the operating system's native
+/// Save As dialog. WebView2 can silently discard temporary blob downloads, so
+/// desktop exports write the already-fetched bytes to the selected destination.
+#[tauri::command]
+async fn save_export_file(
+    app: tauri::AppHandle,
+    file_name: String,
+    bytes: Vec<u8>,
+) -> Result<bool, String> {
+    let safe_name = PathBuf::from(&file_name)
+        .file_name()
+        .and_then(|name| name.to_str())
+        .filter(|name| !name.is_empty())
+        .unwrap_or("radiopad-export")
+        .to_string();
+    let selected = app
+        .dialog()
+        .file()
+        .set_file_name(safe_name)
+        .blocking_save_file();
+    let Some(selected) = selected else {
+        return Ok(false);
+    };
+    let path = selected
+        .into_path()
+        .map_err(|e| format!("invalid export destination: {e}"))?;
+    std::fs::write(&path, bytes).map_err(|e| format!("could not save export: {e}"))?;
+    Ok(true)
 }
 
 /// PRD DESK-009 — verify a plugin or model artifact before the desktop loads
@@ -231,6 +262,7 @@ fn main() {
             get_backend_url,
             get_local_stt_url,
             secure_copy,
+            save_export_file,
             verify_plugin,
             offline_drafts::offline_drafts_list,
             offline_drafts::offline_drafts_save,
