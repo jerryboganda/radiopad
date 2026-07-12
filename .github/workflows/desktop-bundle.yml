@@ -101,9 +101,13 @@ jobs:
         working-directory: frontend
         run: pnpm install --frozen-lockfile
 
-      - name: Build frontend (static export)
+      - name: Build frontend (desktop surface)
         working-directory: frontend
-        run: pnpm build
+        # Desktop ships the full reporting product; build the `desktop` surface so
+        # frontend/out-desktop (tauri.conf frontendDist) exists. `cargo tauri build`
+        # also re-runs this via beforeBuildCommand, but building it here first keeps
+        # the step self-describing and independent of that hook.
+        run: pnpm build:desktop
 
       # --- Windows Authenticode signing (if cert present) -----------------
       - name: Decode Windows certificate

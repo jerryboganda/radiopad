@@ -26,10 +26,12 @@ jobs:
         with: { version: '9' }
       - uses: actions/setup-java@v4
         with: { distribution: 'temurin', java-version: '21' }
-      - name: Build frontend (static export)
+      - name: Build frontend (mobile companion surface)
         run: |
           pnpm install --frozen-lockfile=false
-          cd frontend && pnpm install --frozen-lockfile=false && pnpm build
+          # Mobile ships the `mobile` surface only (companion: pairing + dictation),
+          # which Capacitor consumes from frontend/out-mobile (see capacitor.config.ts).
+          cd frontend && pnpm install --frozen-lockfile=false && pnpm build:mobile
       - name: Capacitor sync
         working-directory: mobile
         run: |
@@ -94,10 +96,12 @@ jobs:
         with: { node-version: '20' }
       - uses: pnpm/action-setup@v4
         with: { version: '9' }
-      - name: Build frontend (static export)
+      - name: Build frontend (mobile companion surface)
         run: |
           pnpm install --frozen-lockfile=false
-          cd frontend && pnpm install --frozen-lockfile=false && pnpm build
+          # Mobile ships the `mobile` surface only (companion: pairing + dictation),
+          # which Capacitor consumes from frontend/out-mobile (see capacitor.config.ts).
+          cd frontend && pnpm install --frozen-lockfile=false && pnpm build:mobile
       - name: Capacitor sync
         working-directory: mobile
         run: |
