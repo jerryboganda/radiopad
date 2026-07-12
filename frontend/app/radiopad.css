@@ -936,6 +936,39 @@
   background: #fff;
 }
 
+/* Real-time (interim) dictation preview rendered at the caret while the phone is
+   speaking. Muted + italic so it reads as "not committed yet"; it is a widget
+   decoration, never part of the saved document (see lib/editor/interimDecoration). */
+.rp-interim-dictation {
+  color: var(--text-muted);
+  font-style: italic;
+  opacity: 0.85;
+}
+
+/* Desktop host "phone is listening" indicator — a small pulsing dot. */
+.rp-mic-live-dot {
+  display: inline-block;
+  width: 8px;
+  height: 8px;
+  margin-right: 6px;
+  border-radius: 50%;
+  background: var(--red);
+  vertical-align: middle;
+  animation: rp-mic-pulse 1.4s var(--ease-out, ease-out) infinite;
+}
+
+/* Mobile mic button, live (recording) state — a soft pulse on top of the red
+   .recording styling so it's obvious the mic is on until tapped again. */
+.rp-mic-btn.is-live { animation: rp-mic-pulse 1.6s var(--ease-out, ease-out) infinite; }
+
+@keyframes rp-mic-pulse {
+  0%, 100% { box-shadow: 0 0 0 0 var(--red-bg); }
+  50% { box-shadow: 0 0 0 6px transparent; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .rp-mic-live-dot, .rp-mic-btn.is-live { animation: none; }
+}
+
 /* ============================================================
    Dictation overlay — global floating mic that replaces the old
    full-screen /mobile/dictate navigation. Fixed bottom-right, above

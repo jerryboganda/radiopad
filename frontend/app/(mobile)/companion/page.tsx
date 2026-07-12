@@ -3,23 +3,21 @@
 /**
  * Mobile companion — the entire mobile app.
  *
- * The phone pairs to a *live desktop session* and then acts as a wireless
- * dictation microphone + remote for the report open on that desktop. Pairing is
- * by **scanning the QR the desktop shows**: that QR carries a short-lived
- * companion bearer, so scanning it BOTH authenticates the phone (as the same
- * radiologist) AND joins the session — there is no separate phone login. (Before
- * this, the phone had no way to authenticate, so every pair attempt 401'd and
- * surfaced as "Pairing failed".) Spoken text is streamed over the companion
- * relay ({@link connectCompanion}) to the desktop, which inserts it into the
- * focused section. There is NO standalone reporting here — no editing, no signing.
+ * The phone pairs to a *live desktop session* by scanning the desktop QR (which
+ * carries a short-lived companion bearer, so scanning authenticates AND joins —
+ * no phone login), then acts as a wireless dictation microphone + remote for the
+ * report open on that desktop. Spoken text streams over the companion relay
+ * ({@link connectCompanion}); PARTIAL results land live at the desktop caret and
+ * finals commit into the focused section. There is NO standalone reporting here.
  *
- * Uses the Web Speech API where available (with the native
- * `@capacitor-community/speech-recognition` plugin as the on-device path). Locked
- * mobile classes: `.rp-mobile`, `.rp-mic-btn`, `.rp-transcript`, `.rp-page-title`,
+ * Dictation uses the native `@capacitor-community/speech-recognition` engine on
+ * the phone (the browser Web Speech API does not work in the Android WebView) via
+ * {@link startDictation}. The mic is a simple ON/OFF toggle. Locked mobile
+ * classes: `.rp-mobile`, `.rp-mic-btn`, `.rp-transcript`, `.rp-page-title`,
  * `.rp-page-sub`, `.banner`, `.primary`, `.ghost`, `.subtle`, `.rp-input`.
  */
 
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { api, setActiveAuthToken, setCompanionBase } from '@/lib/api';
 import { setAuthToken } from '@/lib/secureAuth';
 import {
@@ -29,29 +27,7 @@ import {
 } from '@/lib/companion';
 import { decodeCompanionPairing, type CompanionPairingPayload } from '@/lib/companionPairing';
 import { nativeScanAvailable, webScanAvailable, scanNative, scanWebcam } from '@/lib/companionScan';
-
-type SpeechRecognitionLike = {
-  lang: string;
-  continuous: boolean;
-  interimResults: boolean;
-  onresult:
-    | ((event: { resultIndex: number; results: ArrayLike<ArrayLike<{ transcript: string }> & { isFinal?: boolean }> }) => void)
-    | null;
-  onerror: ((event: { error?: string }) => void) | null;
-  onend: (() => void) | null;
-  start(): void;
-  stop(): void;
-};
-type SpeechRecognitionCtor = new () => SpeechRecognitionLike;
-
-function getSpeechRecognitionCtor(): SpeechRecognitionCtor | null {
-  if (typeof window === 'undefined') return null;
-  const w = window as unknown as {
-    SpeechRecognition?: SpeechRecognitionCtor;
-    webkitSpeechRecognition?: SpeechRecognitionCtor;
-  };
-  return w.SpeechRecognition ?? w.webkitSpeechRecognition ?? null;
-}
+import { startDictation, dictationAvailable, type DictationController } from '@/lib/companionSpeech';
 
 function deviceName(): string {
   if (typeof navigator === 'undefined') return 'RadioPad phone';
@@ -62,18 +38,22 @@ function deviceName(): string {
   return 'RadioPad companion';
 }
 
+// Remote controls a radiologist reaches for while dictating hands-free: navigate
+// between sections, jump straight to the two they live in (Findings / Impression),
+// break a line, and undo. "Generate impression (AI)" is rendered separately as a
+// bigger, distinct action below the grid.
 const REMOTE_COMMANDS: Array<{ command: CompanionCommand; label: string }> = [
-  { command: 'prev_section', label: '‹ Prev section' },
-  { command: 'next_section', label: 'Next section ›' },
-  { command: 'insert', label: 'Insert' },
-  { command: 'undo', label: 'Undo' },
-  { command: 'read_back', label: 'Read back' },
+  { command: 'prev_section', label: '‹ Prev' },
+  { command: 'next_section', label: 'Next ›' },
+  { command: 'jump_findings', label: 'Findings' },
+  { command: 'jump_impression', label: 'Impression' },
+  { command: 'new_line', label: '↵ New line' },
+  { command: 'undo', label: '⤺ Undo' },
 ];
 
 type Phase = 'pair' | 'connecting' | 'live' | 'ended';
 
 export default function MobileCompanionPage() {
-  const Ctor = useMemo(getSpeechRecognitionCtor, []);
   const [phase, setPhase] = useState<Phase>('pair');
   const [pairing, setPairing] = useState(false);
   const [scanning, setScanning] = useState(false);
@@ -86,7 +66,12 @@ export default function MobileCompanionPage() {
   const [transcript, setTranscript] = useState('');
 
   const connRef = useRef<CompanionConnection | null>(null);
-  const recognitionRef = useRef<SpeechRecognitionLike | null>(null);
+  const dictationRef = useRef<DictationController | null>(null);
+  const micBusyRef = useRef(false);
+  // Intent flag: true only while the user wants the mic on. Cleared synchronously
+  // by stopDictation/teardown so a `startDictation` that resolves AFTER the session
+  // ended can immediately shut its engine down instead of leaving a hot mic.
+  const micWantedRef = useRef(false);
   const videoRef = useRef<HTMLVideoElement | null>(null);
   const scanAbortRef = useRef<AbortController | null>(null);
 
@@ -96,14 +81,22 @@ export default function MobileCompanionPage() {
     setScanning(false);
   }, []);
 
+  const stopDictation = useCallback(() => {
+    micWantedRef.current = false;
+    const c = dictationRef.current;
+    dictationRef.current = null;
+    void c?.stop().catch(() => undefined);
+    setRecording(false);
+    setTranscript('');
+  }, []);
+
   const teardown = useCallback(() => {
-    try { recognitionRef.current?.stop(); } catch { /* noop */ }
-    recognitionRef.current = null;
+    stopDictation();
     connRef.current?.close();
     connRef.current = null;
     scanAbortRef.current?.abort();
     scanAbortRef.current = null;
-  }, []);
+  }, [stopDictation]);
 
   useEffect(() => () => teardown(), [teardown]);
 
@@ -125,8 +118,8 @@ export default function MobileCompanionPage() {
       role: 'companion',
       onOpen: () => setPhase('live'),
       // On an INVOLUNTARY end (relay drop or desktop unpair) tear everything down —
-      // critically, stop the running SpeechRecognition so the phone microphone can
-      // never stay live after the UI says the session ended.
+      // critically, stop dictation so the phone mic can never stay live after the
+      // UI says the session ended.
       onClose: () => { teardown(); setPhase('ended'); },
       onMessage: (msg) => {
         if (msg.type === 'section_context') {
@@ -142,10 +135,9 @@ export default function MobileCompanionPage() {
   }, [teardown]);
 
   /**
-   * Adopt a scanned/pasted pairing payload: point at the advertised relay, take
-   * on its short-lived bearer (in memory + secure store so a reload survives),
-   * then join the session by its code. The bearer is what makes the pair call
-   * authenticate — without it the backend 401s (the original bug).
+   * Adopt a scanned/pasted pairing payload: point at the advertised relay, take on
+   * its short-lived bearer (memory + secure store so a reload survives), then join
+   * by code. The bearer is what makes the pair call authenticate.
    */
   const pairFromPayload = useCallback(async (payload: CompanionPairingPayload) => {
     stopScan();
@@ -159,7 +151,6 @@ export default function MobileCompanionPage() {
         localStorage.setItem('radiopad.tenant', payload.tenant);
         localStorage.setItem('radiopad.user', payload.user);
       }
-      // Best-effort persist so the token survives a webview reload within its life.
       void setAuthToken(payload.token).catch(() => undefined);
 
       const res = await api.companion.pair(payload.code, deviceName());
@@ -198,11 +189,9 @@ export default function MobileCompanionPage() {
       setError('This device can’t scan. Use “Paste pairing link” instead.');
       return;
     }
-    // Web/browser: live-preview webcam scan.
     const controller = new AbortController();
     scanAbortRef.current = controller;
     setScanning(true);
-    // Defer so the <video> element is mounted before we attach the stream.
     setTimeout(async () => {
       const video = videoRef.current;
       if (!video) { setScanning(false); return; }
@@ -227,50 +216,74 @@ export default function MobileCompanionPage() {
     await pairFromPayload(payload);
   }, [pasteText, pairFromPayload]);
 
-  const startRecording = useCallback(() => {
-    if (!Ctor || !connRef.current) return;
-    const rec = new Ctor();
-    rec.lang = 'en-US';
-    rec.continuous = true;
-    rec.interimResults = true;
-    rec.onresult = (event) => {
-      let interim = '';
-      for (let i = event.resultIndex; i < event.results.length; i += 1) {
-        const result = event.results[i];
-        const text = result[0]?.transcript ?? '';
-        const isFinal = Boolean((result as { isFinal?: boolean }).isFinal);
-        if (isFinal) {
-          connRef.current?.sendDictation(text, true);
-        } else {
-          interim += text;
-        }
-      }
-      if (interim) {
-        setTranscript(interim);
-        connRef.current?.sendDictation(interim, false);
-      } else {
-        setTranscript('');
-      }
-    };
-    rec.onerror = (ev) => setError(`Microphone error: ${ev.error ?? 'unknown'}`);
-    rec.onend = () => setRecording(false);
-    recognitionRef.current = rec;
+  /**
+   * Toggle the mic. The user tap is authoritative: turning ON streams partials
+   * (real-time) + finals to the desktop and tells it the mic is live; turning OFF
+   * stops the engine. Android's recognizer auto-restarts between utterances
+   * internally (see companionSpeech) — the desktop indicator follows the tap, not
+   * those internal restarts, so it never flickers.
+   */
+  const toggleMic = useCallback(async () => {
+    // Guard against a rapid double-tap racing two engine starts before the first
+    // `await startDictation` resolves (dictationRef is still null in that window).
+    if (micBusyRef.current) return;
+    micBusyRef.current = true;
     try {
-      rec.start();
+      if (dictationRef.current) {
+        connRef.current?.sendCommand('ptt_stop');
+        stopDictation();
+        return;
+      }
+      if (!dictationAvailable()) {
+        setError('Speech recognition isn’t available on this device.');
+        return;
+      }
+      setError(null);
       setRecording(true);
-      connRef.current.sendCommand('ptt_start');
-    } catch {
-      setError('Could not start the microphone.');
+      micWantedRef.current = true;
+      connRef.current?.sendCommand('ptt_start');
+      try {
+        const controller = await startDictation({
+          onPartial: (text) => {
+            setTranscript(text);
+            connRef.current?.sendDictation(text, false);
+          },
+          onFinal: (text) => {
+            setTranscript('');
+            if (text) connRef.current?.sendDictation(text, true);
+          },
+          onState: (listening) => {
+            // Only a TERMINAL stop is surfaced (companionSpeech hides the Android
+            // engine's internal restart cycles). When it fires — user stop, lost
+            // permission, or the engine gave up — make sure neither the phone nor
+            // the desktop is left showing a live mic.
+            if (listening) return;
+            dictationRef.current = null;
+            micWantedRef.current = false;
+            setRecording(false);
+            setTranscript('');
+            connRef.current?.sendCommand('ptt_stop');
+          },
+          onError: (message) => setError(message),
+        });
+        if (!micWantedRef.current) {
+          // The session ended (teardown) while we were starting — never leave the
+          // engine running. Shut the just-started controller down immediately.
+          void controller.stop().catch(() => undefined);
+          setRecording(false);
+        } else {
+          dictationRef.current = controller;
+        }
+      } catch (e) {
+        micWantedRef.current = false;
+        setRecording(false);
+        connRef.current?.sendCommand('ptt_stop');
+        setError(e instanceof Error ? e.message : 'Could not start the microphone.');
+      }
+    } finally {
+      micBusyRef.current = false;
     }
-  }, [Ctor]);
-
-  const stopRecording = useCallback(() => {
-    try { recognitionRef.current?.stop(); } catch { /* noop */ }
-    recognitionRef.current = null;
-    setRecording(false);
-    setTranscript('');
-    connRef.current?.sendCommand('ptt_stop');
-  }, []);
+  }, [stopDictation]);
 
   const sendCommand = useCallback((command: CompanionCommand) => {
     connRef.current?.sendCommand(command);
@@ -351,28 +364,29 @@ export default function MobileCompanionPage() {
   }
 
   // phase === 'live'
+  const canDictate = dictationAvailable();
   return (
     <div className="rp-mobile">
       <h1 className="rp-page-title">Dictating to {hostName || 'desktop'}</h1>
       <p className="rp-page-sub">
-        {section ? <>Active section: <strong>{section}</strong></> : 'Hold the mic and speak — text lands on the desktop.'}
+        {section ? <>Active section: <strong>{section}</strong></> : 'Tap the mic and speak — text lands on the desktop live.'}
       </p>
 
+      {error && <div className="banner warn" role="alert">{error}</div>}
+
       <button
-        className="rp-mic-btn"
+        className={`rp-mic-btn${recording ? ' recording is-live' : ''}`}
         type="button"
         aria-pressed={recording}
-        onPointerDown={startRecording}
-        onPointerUp={stopRecording}
-        onPointerLeave={() => recording && stopRecording()}
-        disabled={!Ctor}
+        onClick={toggleMic}
+        disabled={!canDictate}
       >
-        {recording ? 'Listening… release to send' : 'Hold to dictate'}
+        {recording ? 'Listening — tap to stop' : 'Tap to dictate'}
       </button>
 
-      {!Ctor && (
+      {!canDictate && (
         <div className="banner warn" role="alert">
-          Speech recognition isn’t available on this device’s browser.
+          Speech recognition isn’t available on this device.
         </div>
       )}
 
@@ -385,6 +399,15 @@ export default function MobileCompanionPage() {
           </button>
         ))}
       </div>
+
+      <button
+        className="primary-ghost"
+        type="button"
+        onClick={() => sendCommand('generate_impression')}
+        style={{ width: '100%' }}
+      >
+        ✨ Generate impression (AI)
+      </button>
 
       <button className="subtle" type="button" onClick={() => { teardown(); setPhase('ended'); }}>
         End session

@@ -477,7 +477,10 @@ New locked helpers in `frontend/app/radiopad.css`:
 - `.rp-mic-btn` — large square mic tile used on the dictation page.
   Default state composes `--bg-panel` + `--border` + `--shadow-xs`;
   the `.recording` modifier swaps the surface to the locked red
-  family (`--red-bg`, `--red-border`, `--red`).
+  family (`--red-bg`, `--red-border`, `--red`). On the phone companion
+  it is a click TOGGLE (tap on / tap off); the `.is-live` modifier adds
+  a soft `rp-mic-pulse` box-shadow so an active mic is unmistakable
+  (respects `prefers-reduced-motion`).
 - `.rp-transcript` — transcript surface in the locked serif stack
   (`var(--serif)`, 15 px / 1.55). The `data-empty="true"` attribute
   (set when no transcript yet) softens to `--text-muted` italic so
@@ -495,9 +498,17 @@ New locked helpers in `frontend/app/radiopad.css`:
   no inline-style escape hatch is needed (iter-36).
 - `.rp-companion-remote` — remote-control button row on the mobile
   dictation companion (`/companion`); a flex-wrap row of `.ghost`
-  buttons (next/prev section, insert, undo, read-back). The mobile
-  companion otherwise reuses `.rp-mobile` / `.rp-mic-btn` /
-  `.rp-transcript`.
+  buttons (prev/next section, jump to Findings / Impression, new line,
+  undo), with a full-width `.primary-ghost` "Generate impression (AI)"
+  action below. The mobile companion otherwise reuses `.rp-mobile` /
+  `.rp-mic-btn` / `.rp-transcript`.
+- `.rp-interim-dictation` — the live (interim) dictation preview the
+  desktop shows at the caret while the phone is speaking. Muted
+  `--text-muted` italic so it reads as "not committed yet"; it is a
+  ProseMirror widget decoration, never part of the saved document.
+- `.rp-mic-live-dot` — small pulsing `--red` dot in the desktop host
+  panel while the phone mic is live (paired-session "listening"
+  indicator); shares the `rp-mic-pulse` keyframe.
 - `.rp-companion-host` / `.rp-companion-host-panel` — the desktop
   "Pair phone" host affordance inline in the report editor. The panel
   composes the standard `.rp-panel` surface and reuses the locked

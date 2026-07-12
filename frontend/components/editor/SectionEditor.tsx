@@ -19,6 +19,11 @@ import History from '@tiptap/extension-history';
 import { stringToDoc, docToString, plainOffsetToPmPos } from '@/lib/editor/plainText';
 import { withSmartSpacing } from '@/lib/dictation/insertIntoEditor';
 import {
+  InterimDictation,
+  setInterimText,
+  clearInterimText,
+} from '@/lib/editor/interimDecoration';
+import {
   registerSectionEditor,
   unregisterSectionEditor,
   noteSectionEditorFocus,
@@ -111,7 +116,7 @@ export default function SectionEditor({
 
   const editor = useEditor({
     immediatelyRender: false, // avoid Next SSR hydration mismatch
-    extensions: [Document, Paragraph, Text, History, ClinicalStructure, CorrectionHighlight],
+    extensions: [Document, Paragraph, Text, History, ClinicalStructure, CorrectionHighlight, InterimDictation],
     content: stringToDoc(value),
     editorProps: {
       attributes: {
@@ -157,6 +162,11 @@ export default function SectionEditor({
         const insert = withSmartSpacing(before, text);
         editor.chain().focus().insertContent(insert).run();
       },
+      setInterim: (text: string) => setInterimText(editor, text),
+      clearInterim: () => clearInterimText(editor),
+      // New paragraph = a new line in the plain-text serialization.
+      newLine: () => editor.chain().focus().splitBlock().run(),
+      undo: () => editor.chain().focus().undo().run(),
     };
     registerSectionEditor(handle);
     return () => unregisterSectionEditor(sectionKey);

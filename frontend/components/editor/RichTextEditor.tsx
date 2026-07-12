@@ -25,6 +25,11 @@ import {
 import { docToMarkdown } from '@/lib/editor/docToMarkdown';
 import { withSmartSpacing } from '@/lib/dictation/insertIntoEditor';
 import {
+  InterimDictation,
+  setInterimText,
+  clearInterimText,
+} from '@/lib/editor/interimDecoration';
+import {
   registerSectionEditor,
   unregisterSectionEditor,
   noteSectionEditorFocus,
@@ -53,6 +58,7 @@ export default function RichTextEditor({
       StarterKit.configure({
         heading: { levels: [2, 3] },
       }),
+      InterimDictation,
     ],
     content: '',
     editorProps: {
@@ -85,6 +91,10 @@ export default function RichTextEditor({
         const insert = withSmartSpacing(before, text);
         editor.chain().focus().insertContent(insert).run();
       },
+      setInterim: (text: string) => setInterimText(editor, text),
+      clearInterim: () => clearInterimText(editor),
+      newLine: () => editor.chain().focus().splitBlock().run(),
+      undo: () => editor.chain().focus().undo().run(),
     };
     registerSectionEditor(handle);
     return () => unregisterSectionEditor(sectionKey);

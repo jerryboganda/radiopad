@@ -25,9 +25,13 @@ export type CompanionRole = 'host' | 'companion';
 export type CompanionCommand =
   | 'next_section'
   | 'prev_section'
-  | 'insert'
+  | 'jump_findings'
+  | 'jump_impression'
+  | 'new_line'
   | 'undo'
-  | 'read_back'
+  | 'generate_impression'
+  | 'insert' // legacy — dictation auto-inserts on final; kept for back-compat
+  | 'read_back' // legacy — advisory, no-op on the host today
   | 'ptt_start'
   | 'ptt_stop';
 

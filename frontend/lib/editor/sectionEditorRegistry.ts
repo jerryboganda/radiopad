@@ -14,6 +14,15 @@ export interface SectionEditorHandle {
   insertAtCursor: (text: string) => void;
   /** Move focus into the editor. */
   focus: () => void;
+  /** Show/replace the live (interim) dictation preview at the caret. Optional —
+   *  editors that don't render a real-time preview simply omit it. */
+  setInterim?: (text: string) => void;
+  /** Clear the interim preview (called on a final result / when dictation stops). */
+  clearInterim?: () => void;
+  /** Start a new line/paragraph at the caret (companion "New line" remote). */
+  newLine?: () => void;
+  /** Undo the last change in this editor (companion "Undo" remote). */
+  undo?: () => void;
 }
 
 const registry = new Map<string, SectionEditorHandle>();
