@@ -886,9 +886,10 @@
 }
 .rp-mic-btn:hover:not(:disabled) { background: var(--bg-subtle); }
 .rp-mic-btn.recording {
-  background: var(--red-bg);
-  color: var(--red);
-  border-color: var(--red-border);
+  /* RC-08: active listening is GREEN (red is reserved for errors). */
+  background: var(--green-bg);
+  color: var(--green);
+  border-color: var(--green-border);
 }
 .rp-mic-btn:disabled { opacity: 0.6; cursor: not-allowed; }
 
@@ -979,7 +980,7 @@
 .rp-mic-btn.is-live { animation: rp-mic-pulse 1.6s var(--ease-out, ease-out) infinite; }
 
 @keyframes rp-mic-pulse {
-  0%, 100% { box-shadow: 0 0 0 0 var(--red-bg); }
+  0%, 100% { box-shadow: 0 0 0 0 var(--green-bg); }
   50% { box-shadow: 0 0 0 6px transparent; }
 }
 @media (prefers-reduced-motion: reduce) {
