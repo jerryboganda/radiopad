@@ -1,0 +1,52 @@
+name: attach-android-release
+
+# When a desktop release is published (by desktop-bundle), attach the matching
+# Android companion APK — built by mobile-bundle for the SAME commit — as a
+# stable-named release asset. The phone app's "Check for updates" reads the latest
+# release via the GitHub API and downloads this asset. GitHub Actions artifacts
+# are NOT publicly downloadable, but release assets are, so the APK must live on
+# the release. Runs on `release: published`, i.e. AFTER the release exists, so
+# there is no race with desktop-bundle creating it.
+
+on:
+  release:
+    types: [published]
+
+jobs:
+  attach-apk:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write # upload release assets
+      actions: read # list + download workflow artifacts
+    steps:
+      - name: Attach companion APK to the release
+        env:
+          GH_TOKEN: ${{ github.token }}
+          SHA: ${{ github.sha }}
+          TAG: ${{ github.event.release.tag_name }}
+        run: |
+          set -euo pipefail
+          echo "Release $TAG @ $SHA"
+          # Wait (up to ~12 min) for a successful mobile-bundle run on this commit.
+          # mobile-bundle finishes in a few minutes; desktop-bundle (which creates
+          # the release) takes far longer, so it is normally already done — this is
+          # just a safety net.
+          RUN=""
+          for i in $(seq 1 24); do
+            RUN=$(gh run list --workflow mobile-bundle.yml --commit "$SHA" --status success \
+                    --limit 1 --json databaseId --jq '.[0].databaseId' 2>/dev/null || true)
+            if [ -n "$RUN" ]; then break; fi
+            echo "waiting for a successful mobile-bundle run on $SHA ($i/24)…"
+            sleep 30
+          done
+          if [ -z "$RUN" ]; then
+            echo "::warning::No successful mobile-bundle run for $SHA; APK not attached."
+            exit 0
+          fi
+          echo "Using mobile-bundle run $RUN"
+          gh run download "$RUN" -n radiopad-android-debug -D apk
+          APK=$(ls apk/*.apk | head -1)
+          if [ -z "$APK" ]; then echo "::warning::No APK in artifact."; exit 0; fi
+          cp "$APK" RadioPad-companion-android.apk
+          gh release upload "$TAG" RadioPad-companion-android.apk --clobber
+          echo "Attached RadioPad-companion-android.apk to $TAG"

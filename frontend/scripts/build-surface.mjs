@@ -35,10 +35,22 @@
 
 import { createRequire } from 'node:module';
 import { spawnSync } from 'node:child_process';
-import { rmSync, renameSync, existsSync, mkdirSync, readdirSync, writeFileSync } from 'node:fs';
+import { rmSync, renameSync, existsSync, mkdirSync, readdirSync, writeFileSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
 
 const require = createRequire(import.meta.url);
+
+/** The canonical release version (kept in lock-step by `pnpm release:desktop`).
+ *  Baked into the bundle as NEXT_PUBLIC_APP_VERSION so the mobile companion can
+ *  compare itself against the latest GitHub release in its "Check for updates". */
+function appVersion() {
+  try {
+    const conf = readFileSync(join('..', 'desktop', 'src-tauri', 'tauri.conf.json'), 'utf8');
+    const m = conf.match(/"version":\s*"(\d+\.\d+\.\d+)"/);
+    if (m) return m[1];
+  } catch { /* fall through */ }
+  return '0.0.0';
+}
 
 const SURFACES = new Set(['desktop', 'web', 'mobile']);
 const surface = process.argv[2];
@@ -160,7 +172,12 @@ try {
   const nextBin = require.resolve('next/dist/bin/next');
   const result = spawnSync(process.execPath, [nextBin, 'build'], {
     stdio: 'inherit',
-    env: { ...process.env, RADIOPAD_SURFACE: surface },
+    env: {
+      ...process.env,
+      RADIOPAD_SURFACE: surface,
+      // Don't clobber an explicit override (CI may pin an exact release version).
+      NEXT_PUBLIC_APP_VERSION: process.env.NEXT_PUBLIC_APP_VERSION || appVersion(),
+    },
   });
   status = result.status ?? 1;
 } finally {

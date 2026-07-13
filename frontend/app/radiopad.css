@@ -922,6 +922,20 @@
 }
 .rp-companion-remote .ghost { flex: 1 1 auto; }
 
+/* "Check for updates" footer on the phone companion (mobile surface only). The
+   sideloaded APK can't self-update, so this checks the latest release and offers
+   the new APK to download + install. */
+.rp-mobile-update {
+  margin-top: 24px;
+  padding-top: 16px;
+  border-top: 1px solid var(--border);
+  text-align: center;
+}
+.rp-mobile-update .subtle { width: 100%; }
+.rp-mobile-update.banner { text-align: left; }
+.rp-mobile-update .primary { display: block; margin-top: 8px; text-align: center; }
+.rp-mobile-update-cur { color: var(--text-muted); }
+
 .rp-companion-host {
   position: relative;
   margin: 8px 0;

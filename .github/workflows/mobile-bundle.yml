@@ -38,6 +38,17 @@ jobs:
           pnpm install --frozen-lockfile=false
           npx cap add android || echo 'android already added'
           npx cap sync android
+      # Persist the Android debug keystore across runs so every debug APK is signed
+      # with the SAME key. Without this, Gradle generates a fresh random debug key
+      # per runner and Android refuses to install an update over a differently-signed
+      # build ("App not installed"), breaking the companion's in-app "Check for
+      # updates". A stable key → updates install in place. (Debug keys are not
+      # secret; the cache just avoids re-generating one each build.)
+      - name: Cache Android debug keystore
+        uses: actions/cache@v4
+        with:
+          path: ~/.android/debug.keystore
+          key: android-debug-keystore-v1
       - name: Assemble debug APK
         working-directory: mobile/android
         run: ./gradlew assembleDebug --no-daemon

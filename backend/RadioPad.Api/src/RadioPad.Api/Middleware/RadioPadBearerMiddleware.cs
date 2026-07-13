@@ -127,6 +127,10 @@ public sealed class RadioPadBearerMiddleware
 
     private static bool IsPublicApi(PathString path) =>
         path.StartsWithSegments("/api/health") ||
+        // Mobile companion "Check for updates" — a public version check returning
+        // only public GitHub release metadata; the phone may be unpaired/signed-out
+        // when it checks.
+        path.StartsWithSegments("/api/mobile") ||
         // On-device model manager (download/test/diagnostics). Loopback-only on the
         // desktop sidecar; on a hosted build LocalModelsController gates every action
         // on RADIOPAD_LOCAL_STT_ENABLED and returns inert results, so anonymous

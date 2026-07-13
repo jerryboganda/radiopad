@@ -28,6 +28,7 @@ import {
 import { decodeCompanionPairing, type CompanionPairingPayload } from '@/lib/companionPairing';
 import { nativeScanAvailable, webScanAvailable, scanNative, scanWebcam } from '@/lib/companionScan';
 import { startDictation, dictationAvailable, type DictationController } from '@/lib/companionSpeech';
+import MobileUpdateCheck from '@/components/companion/MobileUpdateCheck';
 
 function deviceName(): string {
   if (typeof navigator === 'undefined') return 'RadioPad phone';
@@ -347,6 +348,8 @@ export default function MobileCompanionPage() {
             )}
           </>
         )}
+
+        {!scanning && <MobileUpdateCheck />}
       </div>
     );
   }
@@ -359,6 +362,7 @@ export default function MobileCompanionPage() {
         <button className="primary" type="button" onClick={() => { setPhase('pair'); setPasteText(''); setError(null); }}>
           Pair again
         </button>
+        <MobileUpdateCheck />
       </div>
     );
   }

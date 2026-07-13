@@ -506,6 +506,11 @@ New locked helpers in `frontend/app/radiopad.css`:
   desktop shows at the caret while the phone is speaking. Muted
   `--text-muted` italic so it reads as "not committed yet"; it is a
   ProseMirror widget decoration, never part of the saved document.
+- `.rp-mobile-update` — "Check for updates" footer on the phone companion
+  (mobile surface only; the desktop self-updates via Tauri). A `--border`
+  top divider over a full-width `.subtle` check button; when an update is
+  found it becomes a `.banner ok` with a `.primary` "Download & install"
+  link (opens the release APK in the system browser).
 - `.rp-mic-live-dot` — small pulsing `--red` dot in the desktop host
   panel while the phone mic is live (paired-session "listening"
   indicator); shares the `rp-mic-pulse` keyframe.
