@@ -27,10 +27,23 @@ internal static class CliProviderRunner
     public const ProviderComplianceClass DefaultComplianceClass = ProviderComplianceClass.Sandbox;
     public const int DefaultTimeoutMs = 60_000;
 
+    // The gemini CLI is a heavyweight Node bundle: even `gemini --version` cold-loads
+    // the whole framework and takes ~15–31 s (measured in prod), so the old 10 s probe
+    // cap always false-negatived it to "Unreachable". Give the health probe its own,
+    // generous default that covers the slow bootstrap; override via
+    // RADIOPAD_CLI_PROBE_TIMEOUT_MS. Generation is unaffected (RADIOPAD_CLI_PROVIDER_TIMEOUT_MS).
+    public const int DefaultProbeTimeoutMs = 45_000;
+
     public static int ResolveTimeoutMs()
     {
         var v = Environment.GetEnvironmentVariable("RADIOPAD_CLI_PROVIDER_TIMEOUT_MS");
         return int.TryParse(v, out var ms) && ms > 0 ? ms : DefaultTimeoutMs;
+    }
+
+    public static int ResolveProbeTimeoutMs()
+    {
+        var v = Environment.GetEnvironmentVariable("RADIOPAD_CLI_PROBE_TIMEOUT_MS");
+        return int.TryParse(v, out var ms) && ms > 0 ? ms : DefaultProbeTimeoutMs;
     }
 
     public static string ResolveBinary(string envVar, string defaultName)
@@ -140,7 +153,7 @@ internal static class CliProviderRunner
                 FileName: fileName,
                 Arguments: arguments,
                 StandardInput: null,
-                TimeoutMs: Math.Min(ResolveTimeoutMs(), 10_000)), ct);
+                TimeoutMs: Math.Min(ResolveTimeoutMs(), ResolveProbeTimeoutMs())), ct);
 
             if (result.ExitCode == 0)
             {

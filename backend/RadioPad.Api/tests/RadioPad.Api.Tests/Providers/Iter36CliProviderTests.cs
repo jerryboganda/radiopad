@@ -103,6 +103,27 @@ public class Iter36CliProviderTests
     }
 
     [Fact]
+    public async Task Gemini_HealthProbe_UsesSkipTrust_AndGenerousTimeout()
+    {
+        // Regression guard (2026-07-13): `gemini --version` cold-loads the whole
+        // Node bundle (~15–31 s in prod), so the old 10 s probe cap always reported
+        // the provider "Unreachable". The probe now runs under the generous probe
+        // timeout and passes --skip-trust so the trusted-folder check can't fail it.
+        var stub = StubLauncher.Ok("0.50.0\n");
+        var sut = new GeminiCliProvider(stub, NullLogger<GeminiCliProvider>.Instance);
+
+        var health = await sut.ProbeAsync(
+            new ProviderConfig { Adapter = GeminiCliProvider.AdapterId }, CancellationToken.None);
+
+        Assert.True(health.Ok);
+        var spec = stub.Captured[0];
+        Assert.Contains("--skip-trust", spec.Arguments);
+        Assert.Contains("--version", spec.Arguments);
+        Assert.True(spec.TimeoutMs > 10_000,
+            $"probe timeout {spec.TimeoutMs}ms must exceed the old 10s cap that false-negatived gemini");
+    }
+
+    [Fact]
     public async Task Gemini_HealthProbe_ReportsMissingBinary()
     {
         var sut = new GeminiCliProvider(StubLauncher.NotFound(), NullLogger<GeminiCliProvider>.Instance);

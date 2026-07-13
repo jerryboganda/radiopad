@@ -45,7 +45,11 @@ public sealed class GeminiCliProvider : IAiProviderAdapter, IAiProviderHealthPro
     public Task<AiProviderHealthResult> ProbeAsync(ProviderConfig provider, CancellationToken cancellationToken)
     {
         var bin = CliProviderRunner.ResolveBinary(BinaryEnvVar, DefaultBinary);
-        return CliProviderRunner.ProbeBinaryAsync(AdapterId, bin, new[] { "--version" }, _launcher, cancellationToken);
+        // --skip-trust so the probe never trips gemini-cli's headless trusted-folder
+        // check (exit 55) in the launcher's scrubbed temp cwd. The probe is slow
+        // regardless — gemini cold-loads its whole bundle for --version — so it runs
+        // under the generous probe timeout (ResolveProbeTimeoutMs), not the 10 s cap.
+        return CliProviderRunner.ProbeBinaryAsync(AdapterId, bin, new[] { "--skip-trust", "--version" }, _launcher, cancellationToken);
     }
 
     public async Task<AiResult> CompleteAsync(AiCompletionRequest request, CancellationToken cancellationToken)

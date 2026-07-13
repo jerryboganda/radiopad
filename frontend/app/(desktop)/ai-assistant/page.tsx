@@ -35,10 +35,10 @@ export default function AiAssistantPage() {
         description="Your AI models, recent AI activity, and dictation preferences — all in one place."
       />
       <ProvidersPanel />
-      <div className="rp-grid-2" style={{ alignItems: 'start' }}>
-        <RecentActivityPanel />
-        <DictationSettingsPanel />
-      </div>
+      {/* Full-width stacked panels — a 50/50 split cramped the activity table and
+          the dictation controls; each panel is a self-spacing .rp-panel. */}
+      <RecentActivityPanel />
+      <DictationSettingsPanel />
       <QuickLinksPanel />
     </Container>
   );
