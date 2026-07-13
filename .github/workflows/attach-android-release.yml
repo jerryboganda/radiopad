@@ -1,27 +1,51 @@
 name: attach-android-release
 
-# Attach the Android companion APK to each desktop release as a stable-named asset
-# so the phone app's "Check for updates" can hand back a real download URL.
+# Attach the Android companion APK to each desktop release as a stable-named
+# asset (RadioPad-companion-android.apk) so the phone app's "Check for updates"
+# (GET /api/mobile/latest) can hand back a real download URL.
 #
-# Triggered by EITHER desktop-bundle (which creates the release) OR mobile-bundle
-# (which builds the APK) completing — because their finish order is not guaranteed
-# (mobile-bundle can be queued behind runners and finish after desktop-bundle).
-# Whichever finishes LAST finds both the release AND the APK ready and does the
-# attach; the earlier one exits quietly. Idempotent, so a re-run/both-fire is safe.
-# `release: published` is NOT usable here — GitHub does not fire it for releases
-# created by the default GITHUB_TOKEN.
+# Release lifecycle this has to fit into:
+#   1. desktop-bundle (tag push v*.*.*) builds installers and creates the GitHub
+#      Release as a DRAFT (deliberately — see its "Attach to release" step: an
+#      installer must not hit /releases/latest before latest.json exists).
+#   2. tauri-updater (workflow_run after desktop-bundle) attaches the signed
+#      latest.json and then PUBLISHES the release (`gh release edit --draft=false`).
+#   3. mobile-bundle (also runs on the tag push) produces the APK artifact.
+#
+# Why this used to silently never attach: a DRAFT release is invisible to
+# `gh release view <tag>` (the tags API 404s on drafts), so an attach that fired
+# on desktop-bundle/mobile-bundle completion saw "no release" and exited — and
+# nothing re-fired after tauri-updater published it minutes later. We can't add
+# `tauri-updater` to the trigger list either: it runs as a workflow_run chain, so
+# its head_branch is 'main', not the tag, which would break TAG/SHA derivation.
+# (And `release: published` never fires for releases edited by GITHUB_TOKEN.)
+#
+# Fix: keep the two triggers that DO carry the tag (desktop-bundle, mobile-bundle),
+# and have the step WAIT — bounded — for the release to become published before
+# attaching. Whichever trigger fires within the publish window bridges the gap;
+# desktop-bundle's completion reliably fires ~2-4 min before tauri-updater
+# publishes, so its run catches it. Idempotent (exit if already attached; upload
+# is --clobber), so both bundles firing is safe. `workflow_dispatch` is provided
+# for manual recovery / verification against an existing tag.
 
 on:
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: 'Release tag to attach the companion APK to (e.g. v0.1.70)'
+        required: true
   workflow_run:
     workflows: ['desktop-bundle', 'mobile-bundle']
     types: [completed]
 
 jobs:
   attach-apk:
-    # Only for successful, tag-triggered runs (head_branch is the vX.Y.Z tag).
+    # Manual dispatch always; auto only for successful, tag-triggered bundle runs
+    # (workflow_run.head_branch is the vX.Y.Z tag for those).
     if: >-
-      ${{ github.event.workflow_run.conclusion == 'success'
-          && startsWith(github.event.workflow_run.head_branch, 'v') }}
+      ${{ github.event_name == 'workflow_dispatch'
+          || (github.event.workflow_run.conclusion == 'success'
+              && startsWith(github.event.workflow_run.head_branch, 'v')) }}
     runs-on: ubuntu-latest
     permissions:
       contents: write # upload release assets
@@ -30,37 +54,72 @@ jobs:
       - name: Attach companion APK to the release
         env:
           GH_TOKEN: ${{ github.token }}
-          SHA: ${{ github.event.workflow_run.head_sha }}
-          TAG: ${{ github.event.workflow_run.head_branch }}
+          EVENT: ${{ github.event_name }}
+          INPUT_TAG: ${{ github.event.inputs.tag }}
+          RUN_TAG: ${{ github.event.workflow_run.head_branch }}
+          RUN_SHA: ${{ github.event.workflow_run.head_sha }}
+          RUN_NAME: ${{ github.event.workflow_run.name }}
         run: |
           set -euo pipefail
-          echo "trigger: ${{ github.event.workflow_run.name }} succeeded for $TAG @ $SHA"
 
-          # Release created yet (by desktop-bundle)?
-          if ! gh release view "$TAG" >/dev/null 2>&1; then
-            echo "release $TAG not published yet — the other workflow's completion will retry."
-            exit 0
+          # Resolve the target tag + its commit for both event types.
+          if [ "$EVENT" = "workflow_dispatch" ]; then
+            TAG="$INPUT_TAG"
+            SHA=$(gh api "repos/${GITHUB_REPOSITORY}/commits/${TAG}" --jq '.sha')
+            echo "manual dispatch for $TAG @ $SHA"
+          else
+            TAG="$RUN_TAG"
+            SHA="$RUN_SHA"
+            echo "trigger: ${RUN_NAME:-workflow} succeeded for $TAG @ $SHA"
           fi
 
-          # Already attached (both workflows may fire)?
+          # Already attached? (Both bundles fire; a prior run may have done it.)
           if gh release view "$TAG" --json assets --jq '.assets[].name' 2>/dev/null \
                | grep -qx 'RadioPad-companion-android.apk'; then
             echo "APK already attached to $TAG — nothing to do."
             exit 0
           fi
 
-          # Successful mobile-bundle for this commit yet?
+          # Is the APK even built yet? (Successful mobile-bundle for this commit.)
+          # Guard BEFORE the publish wait so we never hold a runner waiting for a
+          # release that has nothing to attach; mobile-bundle's own completion
+          # re-fires this workflow when it finishes.
           RUN=$(gh run list --workflow mobile-bundle.yml --commit "$SHA" --status success \
                   --limit 1 --json databaseId --jq '.[0].databaseId' 2>/dev/null || true)
           if [ -z "$RUN" ]; then
-            echo "no successful mobile-bundle for $SHA yet — its completion will retry."
+            echo "no successful mobile-bundle for $SHA yet — its completion re-fires this workflow."
+            exit 0
+          fi
+
+          # Wait — bounded — for the release to be PUBLISHED. It starts as a draft
+          # (invisible to `gh release view <tag>`); tauri-updater flips it live a
+          # couple of minutes after desktop-bundle finishes. Poll isDraft==false.
+          # If it never publishes within the budget (e.g. tauri-updater skipped on
+          # a fork with no signing secrets, or this trigger fired long before the
+          # desktop build finished), exit quietly — a later trigger retries.
+          published=""
+          for _ in $(seq 1 36); do # ~6 min at 10s
+            state=$(gh release view "$TAG" --json isDraft --jq '.isDraft' 2>/dev/null || echo "missing")
+            if [ "$state" = "false" ]; then published=1; break; fi
+            echo "release $TAG not live yet (isDraft=$state) — waiting for tauri-updater to publish…"
+            sleep 10
+          done
+          if [ -z "$published" ]; then
+            echo "release $TAG still not published after the wait — a later run will retry."
+            exit 0
+          fi
+
+          # Re-check: a concurrent run may have attached during our wait.
+          if gh release view "$TAG" --json assets --jq '.assets[].name' 2>/dev/null \
+               | grep -qx 'RadioPad-companion-android.apk'; then
+            echo "APK attached by a concurrent run — nothing to do."
             exit 0
           fi
 
           echo "attaching APK from mobile-bundle run $RUN"
           gh run download "$RUN" -n radiopad-android-debug -D apk
           APK=$(ls apk/*.apk | head -1)
-          if [ -z "$APK" ]; then echo "::warning::No APK in artifact."; exit 0; fi
+          if [ -z "$APK" ]; then echo "::warning::No APK in the mobile-bundle artifact."; exit 0; fi
           cp "$APK" RadioPad-companion-android.apk
           gh release upload "$TAG" RadioPad-companion-android.apk --clobber
           echo "Attached RadioPad-companion-android.apk to $TAG"
