@@ -80,14 +80,17 @@ jobs:
             exit 0
           fi
 
-          # Is the APK even built yet? (Successful mobile-bundle for this commit.)
-          # Guard BEFORE the publish wait so we never hold a runner waiting for a
-          # release that has nothing to attach; mobile-bundle's own completion
-          # re-fires this workflow when it finishes.
-          RUN=$(gh run list --workflow mobile-bundle.yml --commit "$SHA" --status success \
+          # Is the APK even built yet? Find the tag's successful mobile-bundle run.
+          # Match on head_branch (== the tag for tag-pushed runs) rather than
+          # `--commit`: the tag uniquely identifies its run, and `--branch` is a
+          # broadly-supported flag whereas `--commit` filtering proved unreliable
+          # on the runner's gh. Guard BEFORE the publish wait so we never hold a
+          # runner waiting for a release that has nothing to attach; mobile-bundle's
+          # own completion re-fires this workflow when it finishes.
+          RUN=$(gh run list --workflow mobile-bundle.yml --branch "$TAG" --status success \
                   --limit 1 --json databaseId --jq '.[0].databaseId' 2>/dev/null || true)
           if [ -z "$RUN" ]; then
-            echo "no successful mobile-bundle for $SHA yet — its completion re-fires this workflow."
+            echo "no successful mobile-bundle for $TAG ($SHA) yet — its completion re-fires this workflow."
             exit 0
           fi
 
