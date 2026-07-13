@@ -1,23 +1,24 @@
 name: attach-android-release
 
 # Attach the Android companion APK to each desktop release as a stable-named asset
-# so the phone app's "Check for updates" can hand back a real download URL. (GitHub
-# Actions artifacts aren't publicly downloadable; release assets are.)
+# so the phone app's "Check for updates" can hand back a real download URL.
 #
-# Triggered by desktop-bundle COMPLETING — NOT by `release: published`, because the
-# release is created with the default GITHUB_TOKEN and GitHub does not fire release
-# events for token-created releases (a recursion guard). By the time desktop-bundle
-# finishes, the release exists and mobile-bundle (much faster) is already done.
+# Triggered by EITHER desktop-bundle (which creates the release) OR mobile-bundle
+# (which builds the APK) completing — because their finish order is not guaranteed
+# (mobile-bundle can be queued behind runners and finish after desktop-bundle).
+# Whichever finishes LAST finds both the release AND the APK ready and does the
+# attach; the earlier one exits quietly. Idempotent, so a re-run/both-fire is safe.
+# `release: published` is NOT usable here — GitHub does not fire it for releases
+# created by the default GITHUB_TOKEN.
 
 on:
   workflow_run:
-    workflows: ['desktop-bundle']
+    workflows: ['desktop-bundle', 'mobile-bundle']
     types: [completed]
 
 jobs:
   attach-apk:
-    # Only for successful, tag-triggered desktop-bundle runs (head_branch is the
-    # vX.Y.Z tag for a tag push).
+    # Only for successful, tag-triggered runs (head_branch is the vX.Y.Z tag).
     if: >-
       ${{ github.event.workflow_run.conclusion == 'success'
           && startsWith(github.event.workflow_run.head_branch, 'v') }}
@@ -33,28 +34,30 @@ jobs:
           TAG: ${{ github.event.workflow_run.head_branch }}
         run: |
           set -euo pipefail
-          echo "desktop-bundle succeeded for $TAG @ $SHA"
+          echo "trigger: ${{ github.event.workflow_run.name }} succeeded for $TAG @ $SHA"
 
-          # The release is created near the end of desktop-bundle; give it a moment.
-          for i in $(seq 1 10); do
-            if gh release view "$TAG" >/dev/null 2>&1; then break; fi
-            echo "waiting for release $TAG ($i/10)…"; sleep 15
-          done
-
-          # Find the successful mobile-bundle run for this exact commit.
-          RUN=""
-          for i in $(seq 1 20); do
-            RUN=$(gh run list --workflow mobile-bundle.yml --commit "$SHA" --status success \
-                    --limit 1 --json databaseId --jq '.[0].databaseId' 2>/dev/null || true)
-            if [ -n "$RUN" ]; then break; fi
-            echo "waiting for a successful mobile-bundle run on $SHA ($i/20)…"; sleep 30
-          done
-          if [ -z "$RUN" ]; then
-            echo "::warning::No successful mobile-bundle run for $SHA; APK not attached."
+          # Release created yet (by desktop-bundle)?
+          if ! gh release view "$TAG" >/dev/null 2>&1; then
+            echo "release $TAG not published yet — the other workflow's completion will retry."
             exit 0
           fi
 
-          echo "Using mobile-bundle run $RUN"
+          # Already attached (both workflows may fire)?
+          if gh release view "$TAG" --json assets --jq '.assets[].name' 2>/dev/null \
+               | grep -qx 'RadioPad-companion-android.apk'; then
+            echo "APK already attached to $TAG — nothing to do."
+            exit 0
+          fi
+
+          # Successful mobile-bundle for this commit yet?
+          RUN=$(gh run list --workflow mobile-bundle.yml --commit "$SHA" --status success \
+                  --limit 1 --json databaseId --jq '.[0].databaseId' 2>/dev/null || true)
+          if [ -z "$RUN" ]; then
+            echo "no successful mobile-bundle for $SHA yet — its completion will retry."
+            exit 0
+          fi
+
+          echo "attaching APK from mobile-bundle run $RUN"
           gh run download "$RUN" -n radiopad-android-debug -D apk
           APK=$(ls apk/*.apk | head -1)
           if [ -z "$APK" ]; then echo "::warning::No APK in artifact."; exit 0; fi
