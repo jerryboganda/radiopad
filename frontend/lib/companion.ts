@@ -35,6 +35,19 @@ export type CompanionCommand =
   | 'ptt_start'
   | 'ptt_stop';
 
+/**
+ * WebRTC signaling relayed (as plain JSON) between the two peers to establish a
+ * direct, LAN-only data channel over which the phone streams voice audio to the
+ * desktop. Only these tiny control messages touch the cloud relay — the audio
+ * itself flows peer-to-peer and never leaves the local network. See
+ * {@link ./companionRtc}.
+ */
+export type CompanionSignal =
+  | { type: 'rtc_offer'; sdp: string }
+  | { type: 'rtc_answer'; sdp: string }
+  | { type: 'rtc_ice'; candidate: RTCIceCandidateInit | null } // null = end-of-candidates
+  | { type: 'rtc_bye' };
+
 export type CompanionMessage =
   | { type: 'ack'; ok: boolean; message?: string }
   | { type: 'dictation'; text: string; isFinal: boolean }
@@ -42,7 +55,8 @@ export type CompanionMessage =
   | { type: 'section_context'; sectionKey: string; sectionTitle: string }
   | { type: 'peer_joined'; deviceName: string }
   | { type: 'peer_left' }
-  | { type: 'session_ended' };
+  | { type: 'session_ended' }
+  | CompanionSignal;
 
 export type CompanionConnectionState = 'connecting' | 'open' | 'closed';
 
@@ -61,6 +75,8 @@ export interface CompanionConnection {
   sendDictation(text: string, isFinal: boolean): void;
   sendCommand(command: CompanionCommand): void;
   sendSectionContext(sectionKey: string, sectionTitle: string): void;
+  /** Relay a WebRTC signaling message to the peer (offer/answer/ICE). */
+  sendSignal(signal: CompanionSignal): void;
   send(message: Record<string, unknown>): void;
   close(): void;
   state(): CompanionConnectionState;
@@ -133,6 +149,9 @@ export function connectCompanion(opts: CompanionConnectOptions): CompanionConnec
     },
     sendSectionContext(sectionKey, sectionTitle) {
       enqueue({ type: 'section_context', sectionKey, sectionTitle });
+    },
+    sendSignal(signal) {
+      enqueue(signal as unknown as Record<string, unknown>);
     },
     send(message) {
       enqueue(message);

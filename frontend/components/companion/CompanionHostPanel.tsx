@@ -22,6 +22,11 @@ import {
   type CompanionConnection,
   type CompanionCommand,
 } from '@/lib/companion';
+import { createRtcPeer, type RtcPeer } from '@/lib/companionRtc';
+import { createAudioReceiver, type AudioReceiver } from '@/lib/companionAudioReceiver';
+import { blobToWav16kMono } from '@/lib/dictation/wavEncode';
+import { formatDictation } from '@/lib/dictation/medicalFormat';
+import { readQueryParam } from '@/lib/browserParams';
 import {
   getLastFocusedSectionEditor,
   getSectionEditor,
@@ -29,6 +34,8 @@ import {
 } from '@/lib/editor/sectionEditorRegistry';
 
 type Phase = 'idle' | 'advertising' | 'paired' | 'error';
+/** State of the direct phone↔desktop LAN audio link (WebRTC). */
+type LinkState = 'idle' | 'connecting' | 'connected' | 'failed';
 
 function hostDeviceName(): string {
   if (typeof navigator === 'undefined') return 'RadioPad desktop';
@@ -55,9 +62,13 @@ export default function CompanionHostPanel() {
   const [qr, setQr] = useState<string>('');
   const [companionName, setCompanionName] = useState<string>('');
   const [phoneListening, setPhoneListening] = useState(false);
+  const [link, setLink] = useState<LinkState>('idle');
+  const [transcribing, setTranscribing] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const connRef = useRef<CompanionConnection | null>(null);
   const sessionIdRef = useRef<string | null>(null);
+  const rtcRef = useRef<RtcPeer | null>(null);
+  const receiverRef = useRef<AudioReceiver | null>(null);
   // Section key currently showing the live (interim) preview, so we can clear it
   // even after focus has moved on to a different section.
   const interimTargetRef = useRef<string | null>(null);
@@ -75,6 +86,60 @@ export default function CompanionHostPanel() {
     getLastFocusedSectionEditor()?.clearInterim?.();
     interimTargetRef.current = null;
   }, []);
+
+  // Tear down the direct LAN audio link + its transcription queue.
+  const stopRtc = useCallback(() => {
+    rtcRef.current?.close();
+    rtcRef.current = null;
+    receiverRef.current?.reset();
+    receiverRef.current = null;
+    setLink('idle');
+    setTranscribing(false);
+  }, []);
+
+  /**
+   * Bring up the direct phone→desktop LAN audio link. The desktop is the WebRTC
+   * offerer; the phone streams per-phrase audio over the data channel (never the
+   * cloud), and each segment is transcribed on-device by the SAME engine as local
+   * dictation, strictly in capture order, then inserted into the focused section.
+   */
+  const startRtc = useCallback(() => {
+    stopRtc();
+    const receiver = createAudioReceiver({
+      transcribe: async (webm) => {
+        let wav: Blob;
+        try { wav = await blobToWav16kMono(webm); } catch { wav = webm; }
+        const reportId = readQueryParam('id') ?? '';
+        const res = await api.reports.transcribe(reportId, wav);
+        return formatDictation(res.transcript ?? '');
+      },
+      insert: (text) => {
+        if (!text) return;
+        // If the radiologist hasn't clicked into a section yet, don't drop the
+        // dictation — land it in Findings (or the first section) by default.
+        const target = getLastFocusedSectionEditor()
+          ?? getSectionEditor('findings')
+          ?? getSectionEditorsInOrder()[0];
+        target?.insertAtCursor(text);
+      },
+      onBusyChange: setTranscribing,
+      onError: (m) => setError(m),
+    });
+    receiverRef.current = receiver;
+    setLink('connecting');
+    const peer = createRtcPeer({
+      role: 'host',
+      sendSignal: (s) => connRef.current?.sendSignal(s),
+      onSegment: (blob, seq) => receiver.pushSegment(blob, seq),
+      onState: (state) => {
+        if (state === 'connected') setLink('connected');
+        else if (state === 'failed') setLink('failed');
+      },
+      onFailed: () => setLink('failed'),
+    });
+    rtcRef.current = peer;
+    void peer.startAsHost();
+  }, [stopRtc]);
 
   const handleCommand = useCallback((command: CompanionCommand) => {
     // Moving focus off the current section: drop any lingering live preview there
@@ -103,13 +168,14 @@ export default function CompanionHostPanel() {
   }, [sendSectionContext, clearInterimEverywhere]);
 
   const teardown = useCallback(() => {
+    stopRtc();
     connRef.current?.close();
     connRef.current = null;
     clearInterimEverywhere();
     const id = sessionIdRef.current;
     sessionIdRef.current = null;
     if (id) void api.companion.endSession(id).catch(() => undefined);
-  }, [clearInterimEverywhere]);
+  }, [clearInterimEverywhere, stopRtc]);
 
   useEffect(() => () => teardown(), [teardown]);
 
@@ -160,6 +226,9 @@ export default function CompanionHostPanel() {
               target?.setInterim?.(msg.text);
               interimTargetRef.current = targetKey;
             }
+          } else if (msg.type === 'rtc_answer' || msg.type === 'rtc_ice' || msg.type === 'rtc_offer' || msg.type === 'rtc_bye') {
+            // WebRTC signaling for the direct LAN audio link.
+            void rtcRef.current?.handleSignal(msg);
           } else if (msg.type === 'command') {
             // Mic on/off is reflected as a live indicator, not an editor action.
             if (msg.command === 'ptt_start') { setPhoneListening(true); return; }
@@ -173,15 +242,19 @@ export default function CompanionHostPanel() {
             setCompanionName(msg.deviceName || 'phone');
             setPhase('paired');
             sendSectionContext();
+            // Desktop is the offerer — bring up the direct LAN audio link now.
+            startRtc();
           } else if (msg.type === 'peer_left') {
             setPhase('advertising');
             setCompanionName('');
             setPhoneListening(false);
             clearInterimEverywhere();
+            stopRtc();
           } else if (msg.type === 'session_ended') {
             setPhase('idle');
             setPhoneListening(false);
             clearInterimEverywhere();
+            stopRtc();
           }
         },
         onError: () => setError('Companion relay unreachable.'),
@@ -196,7 +269,7 @@ export default function CompanionHostPanel() {
       setError(ex.body?.error ?? ex.message ?? 'Could not start pairing.');
       setPhase('error');
     }
-  }, [handleCommand, sendSectionContext, clearInterimEverywhere]);
+  }, [handleCommand, sendSectionContext, clearInterimEverywhere, startRtc, stopRtc]);
 
   const stop = useCallback(() => {
     teardown();
@@ -246,17 +319,35 @@ export default function CompanionHostPanel() {
               <p className="rp-auth-hint">Waiting for your phone to join…</p>
               <button className="ghost" type="button" onClick={stop}>Cancel</button>
             </>
-          ) : (
+          ) : link === 'failed' ? (
+            <>
+              <div className="banner danger" role="alert">
+                Couldn’t connect to <code>{companionName || 'your phone'}</code> over the local network.
+                Make sure this computer and the phone are on the <strong>same Wi‑Fi</strong>, then retry.
+              </div>
+              <button className="primary" type="button" onClick={startRtc}>Retry connection</button>
+              <button className="ghost" type="button" onClick={stop}>Unpair</button>
+            </>
+          ) : link === 'connected' ? (
             <>
               <div className="banner ok" role="status">
-                Paired with <code>{companionName || 'phone'}</code>. Dictate from your phone — text
-                lands in the focused section in real time.
+                Paired with <code>{companionName || 'phone'}</code> over Wi‑Fi. Dictate from your phone —
+                your voice is transcribed here, on-device.
               </div>
               <p className="rp-auth-hint" aria-live="polite">
-                {phoneListening
-                  ? <><span className="rp-mic-live-dot" aria-hidden /> Listening — speak into your phone…</>
-                  : 'Mic idle — tap the mic on your phone to dictate.'}
+                {transcribing
+                  ? <><span className="rp-mic-live-dot" aria-hidden /> Transcribing…</>
+                  : phoneListening
+                    ? <><span className="rp-mic-live-dot" aria-hidden /> Listening — speak into your phone…</>
+                    : 'Mic idle — tap the mic on your phone to dictate.'}
               </p>
+              <button className="ghost" type="button" onClick={stop}>Unpair</button>
+            </>
+          ) : (
+            <>
+              <div className="banner" role="status">
+                Paired with <code>{companionName || 'phone'}</code>. Connecting to it over Wi‑Fi…
+              </div>
               <button className="ghost" type="button" onClick={stop}>Unpair</button>
             </>
           )}
