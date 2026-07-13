@@ -5,7 +5,7 @@
   "description": "RadioPad mobile shell (Capacitor 6)",
   "scripts": {
     "build:web": "pnpm --filter @radiopad/frontend build:mobile",
-    "sync": "pnpm build:web && cap sync",
+    "sync": "pnpm build:web && cap sync && node scripts/inject-android-permissions.mjs",
     "android": "pnpm sync && cap open android",
     "ios": "pnpm sync && cap open ios"
   },

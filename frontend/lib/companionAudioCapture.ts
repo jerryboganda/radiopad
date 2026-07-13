@@ -45,6 +45,30 @@ export function audioCaptureAvailable(): boolean {
     && typeof MediaRecorder !== 'undefined';
 }
 
+/**
+ * Turn a capture failure into a specific, actionable phone banner. getUserMedia
+ * rejects with a named DOMException; mapping the name tells the radiologist what
+ * to actually do (vs. the old generic "Could not start the microphone.").
+ */
+export function describeCaptureError(e: unknown): string {
+  const name = e && typeof e === 'object' && 'name' in e ? String((e as { name: unknown }).name) : '';
+  switch (name) {
+    case 'NotAllowedError':
+    case 'SecurityError':
+      return 'Microphone access is blocked. Open Android Settings → Apps → RadioPad → Permissions and allow the Microphone, then tap the mic again.';
+    case 'NotFoundError':
+    case 'OverconstrainedError':
+      return 'No microphone was found on this device.';
+    case 'NotReadableError':
+    case 'AbortError':
+      return 'The microphone is busy in another app. Close it, then tap the mic again.';
+    default: {
+      const msg = e && typeof e === 'object' && 'message' in e ? String((e as { message: unknown }).message) : '';
+      return `Could not start the microphone${name ? ` (${name})` : ''}${msg ? `: ${msg}` : '.'}`;
+    }
+  }
+}
+
 function pickMimeType(): string | undefined {
   const candidates = ['audio/webm;codecs=opus', 'audio/webm', 'audio/mp4'];
   for (const m of candidates) {

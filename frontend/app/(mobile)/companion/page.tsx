@@ -24,7 +24,7 @@ import {
 } from '@/lib/companion';
 import { decodeCompanionPairing, type CompanionPairingPayload } from '@/lib/companionPairing';
 import { nativeScanAvailable, webScanAvailable, scanNative, scanWebcam } from '@/lib/companionScan';
-import { startAudioCapture, audioCaptureAvailable, type AudioCaptureController } from '@/lib/companionAudioCapture';
+import { startAudioCapture, audioCaptureAvailable, describeCaptureError, type AudioCaptureController } from '@/lib/companionAudioCapture';
 import { ensureMicPermission } from '@/lib/companionSpeech';
 import { createRtcPeer, type RtcPeer } from '@/lib/companionRtc';
 import MobileUpdateCheck from '@/components/companion/MobileUpdateCheck';
@@ -277,11 +277,11 @@ export default function MobileCompanionPage() {
         } else {
           captureRef.current = controller;
         }
-      } catch {
+      } catch (e) {
         micWantedRef.current = false;
         setRecording(false);
         connRef.current?.sendCommand('ptt_stop');
-        setError('Could not start the microphone.');
+        setError(describeCaptureError(e));
       }
     } finally {
       micBusyRef.current = false;

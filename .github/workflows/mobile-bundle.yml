@@ -38,6 +38,21 @@ jobs:
           pnpm install --frozen-lockfile=false
           npx cap add android || echo 'android already added'
           npx cap sync android
+      # The WebView microphone (getUserMedia audio) needs RECORD_AUDIO +
+      # MODIFY_AUDIO_SETTINGS declared, or Capacitor's onPermissionRequest denies
+      # audio capture and the phone shows "Could not start the microphone."
+      # cap generates the manifest fresh each run, so inject them here, then
+      # assert they landed (fail loudly rather than ship a mute APK).
+      - name: Inject WebView microphone permissions
+        working-directory: mobile
+        run: |
+          node scripts/inject-android-permissions.mjs
+          MANIFEST=android/app/src/main/AndroidManifest.xml
+          for perm in RECORD_AUDIO MODIFY_AUDIO_SETTINGS; do
+            grep -q "android.permission.$perm" "$MANIFEST" \
+              || { echo "::error::$perm missing from $MANIFEST after injection"; exit 1; }
+          done
+          echo "Verified RECORD_AUDIO + MODIFY_AUDIO_SETTINGS in $MANIFEST"
       # Persist the Android debug keystore across runs so every debug APK is signed
       # with the SAME key. Without this, Gradle generates a fresh random debug key
       # per runner and Android refuses to install an update over a differently-signed
