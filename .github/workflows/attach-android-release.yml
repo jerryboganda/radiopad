@@ -54,6 +54,13 @@ jobs:
       - name: Attach companion APK to the release
         env:
           GH_TOKEN: ${{ github.token }}
+          # This job does NOT check out the repo, so gh has no git remote to infer
+          # the repository from. Without GH_REPO, `gh release view/upload` and
+          # `gh run download` all fail (repo unknown) — which silently looked like
+          # "release not published" / "already attached=false" and blocked every
+          # attach. (`gh api` calls below are unaffected: they carry the repo in
+          # the URL via $GITHUB_REPOSITORY.)
+          GH_REPO: ${{ github.repository }}
           EVENT: ${{ github.event_name }}
           INPUT_TAG: ${{ github.event.inputs.tag }}
           RUN_TAG: ${{ github.event.workflow_run.head_branch }}
