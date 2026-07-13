@@ -88,7 +88,7 @@ fn clear_secure_clipboard_if_owned(app: &tauri::AppHandle) -> bool {
 #[tauri::command]
 fn get_backend_url() -> String {
     std::env::var("RADIOPAD_BACKEND")
-        .unwrap_or_else(|_| "https://radiopad.polytronx.com".to_string())
+        .unwrap_or_else(|_| "https://radiopadstudio.com".to_string())
 }
 
 /// Base URL for the bundled on-device STT sidecar (loopback only). The frontend

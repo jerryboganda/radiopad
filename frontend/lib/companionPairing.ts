@@ -19,7 +19,7 @@ export const COMPANION_PAIRING_KIND = 'rp-companion';
 export const COMPANION_PAIRING_VERSION = 1;
 
 export interface CompanionPairingPayload {
-  /** Cloud relay origin the phone addresses (`companionBase()`), e.g. https://radiopad.polytronx.com */
+  /** Cloud relay origin the phone addresses (`companionBase()`), e.g. https://radiopadstudio.com */
   base: string;
   /** Short pairing code (also shown for manual fallback). */
   code: string;

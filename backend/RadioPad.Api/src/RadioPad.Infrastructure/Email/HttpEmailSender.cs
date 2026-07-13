@@ -13,7 +13,7 @@ namespace RadioPad.Infrastructure.Email;
 /// Environment variables:
 ///   RADIOPAD_EMAIL_PROVIDER  = gmail | resend | sendgrid | mailgun
 ///   RADIOPAD_EMAIL_API_KEY   = API key for the chosen provider (not needed for gmail)
-///   RADIOPAD_EMAIL_FROM      = Default From address (e.g. "RadioPad noreply@radiopad.polytronx.com")
+///   RADIOPAD_EMAIL_FROM      = Default From address (e.g. "RadioPad noreply@radiopadstudio.com")
 ///   RADIOPAD_EMAIL_REPLY_TO  = Optional Reply-To address
 ///
 /// For Gmail API, set:
@@ -22,7 +22,7 @@ namespace RadioPad.Infrastructure.Email;
 ///   RADIOPAD_GMAIL_REFRESH_TOKEN = OAuth2 refresh token (generated once via consent flow)
 ///
 /// For Mailgun, also set:
-///   RADIOPAD_MAILGUN_DOMAIN  = Your sending domain (e.g. mg.radiopad.polytronx.com)
+///   RADIOPAD_MAILGUN_DOMAIN  = Your sending domain (e.g. mg.radiopadstudio.com)
 /// </summary>
 public sealed class HttpEmailSender : IEmailSender
 {
@@ -39,7 +39,7 @@ public sealed class HttpEmailSender : IEmailSender
     {
         var provider = Environment.GetEnvironmentVariable("RADIOPAD_EMAIL_PROVIDER")?.Trim().ToLowerInvariant() ?? "gmail";
         var apiKey = Environment.GetEnvironmentVariable("RADIOPAD_EMAIL_API_KEY") ?? "";
-        var defaultFrom = Environment.GetEnvironmentVariable("RADIOPAD_EMAIL_FROM") ?? "RadioPad <noreply@radiopad.polytronx.com>";
+        var defaultFrom = Environment.GetEnvironmentVariable("RADIOPAD_EMAIL_FROM") ?? "RadioPad <noreply@radiopadstudio.com>";
         var defaultReplyTo = Environment.GetEnvironmentVariable("RADIOPAD_EMAIL_REPLY_TO");
 
         var from = message.From ?? defaultFrom;
@@ -242,7 +242,7 @@ public sealed class HttpEmailSender : IEmailSender
     private async Task<bool> SendViaMailgunAsync(string apiKey, string from, string? replyTo, EmailMessage msg, CancellationToken ct)
     {
         // Mailgun API: POST https://api.mailgun.net/v3/{domain}/messages
-        var domain = Environment.GetEnvironmentVariable("RADIOPAD_MAILGUN_DOMAIN") ?? "mg.radiopad.polytronx.com";
+        var domain = Environment.GetEnvironmentVariable("RADIOPAD_MAILGUN_DOMAIN") ?? "mg.radiopadstudio.com";
 
         var formData = new MultipartFormDataContent
         {

@@ -1,0 +1,34 @@
+name: marketing-static
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'marketing/**'
+      - 'package.json'
+      - 'pnpm-lock.yaml'
+      - 'pnpm-workspace.yaml'
+      - '.github/workflows/marketing-static.yml'
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+      - name: Enable pnpm
+        run: corepack enable && corepack prepare pnpm@9.15.9 --activate
+      - name: Install marketing dependencies
+        run: pnpm install --frozen-lockfile --filter @radiopad/marketing
+      - name: Build marketing static site
+        run: pnpm --filter @radiopad/marketing build
+      - name: Upload static site
+        uses: actions/upload-artifact@v4
+        with:
+          name: radiopad-marketing
+          path: marketing/dist
+          retention-days: 7

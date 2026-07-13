@@ -3,7 +3,7 @@
  * `GET /api/tenant/me`. Used by admin surfaces (Settings / Billing /
  * Usage) so they can render a "Sign in required" empty state instead of
  * shouting raw 401/403 banners at signed-out visitors (see screenshots
- * from radiopad.polytronx.com tracked in PROGRESS.md).
+ * from radiopadstudio.com tracked in PROGRESS.md).
  *
  * The hook never throws. Callers branch on `signedOut` (true when /me
  * returns 401, 403, or any auth-derived failure) and on `me` (resolved

@@ -1,4 +1,4 @@
 User-agent: *
 Allow: /
 
-Sitemap: https://radiopad.polytronx.com/sitemap-index.xml
+Sitemap: https://radiopadstudio.com/sitemap-index.xml

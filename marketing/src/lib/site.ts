@@ -5,7 +5,7 @@ export const site = {
   name: "RadioPad",
   description:
     "AI-assisted radiology reporting. RadioPad drafts and validates; the radiologist reviews and signs. The AI never signs.",
-  url: "https://radiopad.polytronx.com",
+  url: "https://radiopadstudio.com",
   email: "hello@radiopad.example",
   tagline:
     "AI-assisted radiology reporting. The radiologist stays the final authority.",

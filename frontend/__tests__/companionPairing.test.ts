@@ -6,7 +6,7 @@ import {
 } from '@/lib/companionPairing';
 
 const sample: CompanionPairingPayload = {
-  base: 'https://radiopad.polytronx.com',
+  base: 'https://radiopadstudio.com',
   code: '3XAXEF',
   token: 'rp_abc123.def456',
   tenant: 'dev',
