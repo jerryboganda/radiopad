@@ -154,7 +154,10 @@ export default function ReportPage() {
     open: false,
     entry: null,
   });
-  const voicePillIdRef = { current: 0 };
+  // Must persist across renders so voice-command pill ids stay unique and
+  // monotonic (a plain object literal would reset to 0 each render, producing
+  // duplicate React keys that remove both pills on one timeout).
+  const voicePillIdRef = useRef(0);
 
   // Latest-value refs. AI actions can fire from the toolbar button (fresh
   // closure), but also from a desktop menu/keyboard event or a voice command

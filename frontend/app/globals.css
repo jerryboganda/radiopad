@@ -35,7 +35,11 @@ body {
 }
 
 /* -------- Buttons --------------------------------------------------- */
-button {
+/* The button-variant classes are also used on <Link>/<a> elements as CTAs
+   (e.g. dashboard "New report"). Anchor variants opt into the same base box
+   so they render as buttons, not inherited-color text. */
+button,
+a.primary, a.primary-ghost, a.ghost, a.subtle {
   font: inherit;
   color: var(--text);
   background: var(--bg-panel);
@@ -46,43 +50,60 @@ button {
   transition: background var(--transition-fast), border-color var(--transition-fast),
     color var(--transition-fast), box-shadow var(--transition-fast), transform var(--transition-fast);
 }
-button:hover:not(:disabled) { background: var(--bg-subtle); border-color: var(--border-strong); }
+a.primary, a.primary-ghost, a.ghost, a.subtle {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  text-decoration: none;
+}
+button:hover:not(:disabled),
+a.primary:hover, a.primary-ghost:hover, a.ghost:hover, a.subtle:hover { background: var(--bg-subtle); border-color: var(--border-strong); }
 button:active:not(:disabled) { transform: scale(0.98); }
-button:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+button:focus-visible,
+a.primary:focus-visible, a.primary-ghost:focus-visible, a.ghost:focus-visible, a.subtle:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
 
-button.primary {
+:is(button, a).primary {
   background: var(--accent);
   border-color: var(--accent);
   color: var(--accent-fg);
   font-weight: 500;
   box-shadow: 0 1px 0 color-mix(in srgb, var(--color-accent) 18%, transparent) inset, var(--shadow-xs);
 }
-button.primary:hover:not(:disabled) {
+:is(button, a).primary:hover:not(:disabled) {
   background: var(--accent-hover);
   border-color: var(--accent-hover);
+  color: var(--accent-fg);
 }
-button.primary-ghost {
+:is(button, a).primary-ghost {
   background: var(--bg-panel);
   border-color: var(--accent);
   color: var(--accent);
   font-weight: 500;
 }
-button.primary-ghost:hover:not(:disabled) { background: var(--accent-tint); }
+:is(button, a).primary-ghost:hover:not(:disabled) { background: var(--accent-tint); }
 
-button.ghost {
+:is(button, a).ghost {
   background: transparent;
   border-color: var(--border);
   color: var(--text);
 }
-button.ghost:hover:not(:disabled) { background: var(--bg-subtle); border-color: var(--border-strong); }
+:is(button, a).ghost:hover:not(:disabled) { background: var(--bg-subtle); border-color: var(--border-strong); }
+/* Selected/toggled ghost control (STT mode, hotkey category filters). */
+:is(button, a).ghost.active {
+  background: var(--accent-soft);
+  border-color: var(--accent);
+  color: var(--accent);
+  font-weight: 500;
+}
 
-button.subtle,
+:is(button, a).subtle,
 select.subtle {
   background: var(--bg-subtle);
   border-color: transparent;
   color: var(--text);
 }
-button.subtle:hover:not(:disabled),
+:is(button, a).subtle:hover:not(:disabled),
 select.subtle:hover:not(:disabled) { background: var(--bg-muted); }
 
 button.icon-btn { padding: 6px 10px; font-size: 13px; }

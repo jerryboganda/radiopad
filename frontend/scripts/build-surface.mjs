@@ -18,7 +18,7 @@
 // The root route `/` is the desktop reporting dashboard (`app/page.tsx`). It
 // is not in a group (so `next dev` — always desktop — renders it directly with
 // no redirect flash). For web/mobile builds this script swaps it for a tiny
-// redirect stub (web → /admin/users, mobile → /pair), so the dashboard code is
+// redirect stub (web → /admin/users, mobile → /companion), so the dashboard code is
 // excluded there too.
 //
 // All staging is crash-safe: a leftover staged folder/file from an interrupted

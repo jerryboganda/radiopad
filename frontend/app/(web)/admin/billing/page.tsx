@@ -306,8 +306,16 @@ export default function BillingDashboardPage() {
                       aria-label={`${labels[k]} used`}
                     >
                       <div
-                        className={`rp-bar-fill badge ${tone}`}
-                        style={{ width: `${pct}%`, height: '100%', borderRadius: 0 }}
+                        className="rp-bar-fill"
+                        style={{
+                          width: `${pct}%`,
+                          height: '100%',
+                          borderRadius: 0,
+                          // Solid tone fill (the .badge tints were near-invisible
+                          // against the track in both themes).
+                          background:
+                            tone === 'danger' ? 'var(--red)' : tone === 'warn' ? 'var(--amber)' : 'var(--green)',
+                        }}
                       />
                     </div>
                     <div className="rp-stat-sub">
