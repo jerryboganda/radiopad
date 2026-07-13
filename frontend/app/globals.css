@@ -3,11 +3,11 @@
 @tailwind utilities;
 
 /* ============================================================
-   RadioPad — Hallmark design system (ported from UBAG).
-   The OKLCH palette, fonts, radii, motion + the RadioPad→Hallmark
-   token aliases now live in app/hallmark.css (imported immediately
-   after this file in app/layout.tsx). Do NOT redefine :root color
-   tokens here — they resolve from hallmark.css.
+   RadioPad — RC design system (PRD v3.0 §20).
+   The RC palette (light + dark), fonts, radii, motion + the
+   RadioPad token aliases now live in app/tokens.css (imported
+   immediately after this file in app/layout.tsx). Do NOT redefine
+   :root color tokens here — they resolve from tokens.css.
    See docs/02-design/design.md.
    ============================================================ */
 

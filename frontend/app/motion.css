@@ -2,12 +2,12 @@
    RadioPad — Motion library (first-class motion layer, Phase 0).
 
    Net-new, token-driven keyframes + entrance/attention utility
-   classes used app-wide. Imported in app/layout.tsx AFTER hallmark.css
+   classes used app-wide. Imported in app/layout.tsx AFTER tokens.css
    (so it can reference --anim-* / --ease-* / --delay-* tokens) and
    BEFORE radiopad.css / shell.css.
 
    Everything here is purely additive and degrades gracefully under the
-   global `prefers-reduced-motion` rule in hallmark.css; the explicit
+   global `prefers-reduced-motion` rule in tokens.css; the explicit
    parity block at the end guarantees entrance animations never leave
    content hidden when motion is reduced.
 
@@ -103,7 +103,7 @@
 .rp-bar-fill { transform-origin: left center; animation: rp-bar-fill var(--anim-slow) var(--ease-out) both; }
 
 /* ---- Reduced-motion parity ---------------------------------------------- */
-/* The global rule in hallmark.css collapses durations; this block additionally
+/* The global rule in tokens.css collapses durations; this block additionally
    guarantees `both`-filled entrance animations never strand content at
    opacity:0 / off-position when the user prefers reduced motion. */
 @media (prefers-reduced-motion: reduce) {

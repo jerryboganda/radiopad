@@ -68,7 +68,7 @@ Headings use the sans family by default; report bodies use serif. Do not introdu
 
 ## Motion
 
-Motion is a **first-class token layer** (defined in `app/hallmark.css`, keyframes +
+Motion is a **first-class token layer** (defined in `app/tokens.css`, keyframes +
 utilities in `app/motion.css`, mirrored as Tailwind utilities in `tailwind.config.ts`).
 RadioPad now uses a **lively, expressive** motion language; the old "calm, no springs"
 rule is retired. All motion stays purposeful and is fully `prefers-reduced-motion`-gated.
@@ -87,7 +87,7 @@ rule is retired. All motion stays purposeful and is fully `prefers-reduced-motio
 - **React primitives:** `<PageTransition>` (route changes), `<Reveal>` (scroll entrance),
   `<AnimatedNumber>` (count-up), `<Banner>` + `<ToastProvider>`/`useToast`.
 - **Reduced motion:** one global `@media (prefers-reduced-motion: reduce)` rule in
-  `hallmark.css` neutralizes motion app-wide; do not re-implement per component.
+  `tokens.css` neutralizes motion app-wide; do not re-implement per component.
 - Verify the full catalog at the dev route **`/design/motion`**.
 
 ## Adding tokens
