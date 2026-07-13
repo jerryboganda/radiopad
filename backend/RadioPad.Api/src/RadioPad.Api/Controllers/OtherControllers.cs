@@ -221,11 +221,23 @@ public class TemplatesController : TenantedController
         try
         {
             using var doc = System.Text.Json.JsonDocument.Parse(string.IsNullOrWhiteSpace(t.SectionsJson) ? "[]" : t.SectionsJson);
-            if (doc.RootElement.ValueKind == System.Text.Json.JsonValueKind.Array)
+            // The editor saves sections either as a bare array or wrapped in an
+            // object (`{ "sections": [...] }`), and each section is keyed by
+            // either `key` or `id`. Accept every shape so preview never comes
+            // back empty for a valid template.
+            var arr = doc.RootElement.ValueKind == System.Text.Json.JsonValueKind.Array
+                ? doc.RootElement
+                : (doc.RootElement.ValueKind == System.Text.Json.JsonValueKind.Object
+                    && doc.RootElement.TryGetProperty("sections", out var wrapped)
+                    && wrapped.ValueKind == System.Text.Json.JsonValueKind.Array
+                    ? wrapped
+                    : (System.Text.Json.JsonElement?)null);
+            if (arr is { } sectionArray)
             {
-                foreach (var el in doc.RootElement.EnumerateArray())
+                foreach (var el in sectionArray.EnumerateArray())
                 {
                     var key = el.TryGetProperty("key", out var k) ? k.GetString() ?? "" : "";
+                    if (string.IsNullOrEmpty(key) && el.TryGetProperty("id", out var idEl)) key = idEl.GetString() ?? "";
                     var label = el.TryGetProperty("label", out var l) ? l.GetString() ?? key : key;
                     var placeholder = el.TryGetProperty("placeholder", out var p) ? p.GetString() ?? "" : "";
                     sections.Add(new

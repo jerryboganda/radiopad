@@ -215,25 +215,30 @@ export default function TemplatesPage() {
       )}
 
       {preview && (
-        <div className="rp-panel rp-anim-fade-in-up">
-          <div className="rp-row between">
-            <div className="rp-panel-title">Preview — {preview.name} <code>{preview.templateId}</code></div>
-            <button className="ghost" onClick={() => setPreview(null)}>Close</button>
-          </div>
-          <p className="rp-page-sub">Variant: {preview.variant} · Status: {preview.status}</p>
-          <div className="rp-section-list">
-            {preview.sections.map((s) => (
-              <div key={s.key} className="rp-field">
-                <span>{s.label}</span>
-                <div style={{ font: '14px/1.6 var(--serif)', color: 'var(--text)' }}>{s.body}</div>
-              </div>
-            ))}
+        <div className="rp-modal-backdrop" onClick={() => setPreview(null)} onKeyDown={(e) => { if (e.key === 'Escape') setPreview(null); }}>
+          <div className="rp-panel rp-modal rp-anim-scale-in" role="dialog" aria-modal="true" aria-label="Template preview" onClick={(e) => e.stopPropagation()} style={{ width: 'min(720px, 100%)' }}>
+            <div className="rp-row between">
+              <div className="rp-panel-title">Preview — {preview.name} <code>{preview.templateId}</code></div>
+              <button className="ghost" onClick={() => setPreview(null)}>Close</button>
+            </div>
+            <p className="rp-page-sub">Variant: {preview.variant} · Status: {preview.status}</p>
+            <div className="rp-section-list">
+              {preview.sections.length === 0 ? (
+                <em style={{ color: 'var(--text-faint)' }}>This template has no sections.</em>
+              ) : preview.sections.map((s) => (
+                <div key={s.key} className="rp-field">
+                  <span>{s.label}</span>
+                  <div style={{ font: '14px/1.6 var(--serif)', color: 'var(--text)' }}>{s.body}</div>
+                </div>
+              ))}
+            </div>
           </div>
         </div>
       )}
 
       {usage && (
-        <div className="rp-panel rp-anim-fade-in-up">
+        <div className="rp-modal-backdrop" onClick={() => setUsage(null)} onKeyDown={(e) => { if (e.key === 'Escape') setUsage(null); }}>
+          <div className="rp-panel rp-modal rp-anim-scale-in" role="dialog" aria-modal="true" aria-label="Template usage" onClick={(e) => e.stopPropagation()} style={{ width: 'min(560px, 100%)' }}>
           <div className="rp-row between">
             <div className="rp-panel-title">Usage — <code>{usage.templateId}</code></div>
             <button className="ghost" onClick={() => setUsage(null)}>Close</button>
@@ -258,6 +263,7 @@ export default function TemplatesPage() {
               : usage.byUser.map((u) => (
                 <span key={u.userId} className="badge" style={{ marginRight: 6 }}><code>{u.userId.slice(0, 8)}</code>: {u.count}</span>
               ))}</div>
+          </div>
           </div>
         </div>
       )}
