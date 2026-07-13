@@ -75,9 +75,12 @@ export function createAudioReceiver(opts: AudioReceiverOptions): AudioReceiver {
           // reset() ran while transcribing — this belongs to a dead session; drop it.
           if (gen !== generation) return;
           if (text && text.trim()) opts.insert(text);
-        } catch {
+        } catch (e) {
           if (gen !== generation) return;
-          opts.onError?.('Could not transcribe a phrase.');
+          // Surface the pipeline's own message (codec/timeout/engine errors are
+          // actionable); fall back to the generic line for unknown throw shapes.
+          const message = e instanceof Error && e.message ? e.message : 'Could not transcribe a phrase.';
+          opts.onError?.(message);
         } finally {
           opts.onBusyChange?.(false);
         }

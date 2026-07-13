@@ -26,6 +26,8 @@ import { createRtcPeer, type RtcPeer } from '@/lib/companionRtc';
 import { createAudioReceiver, type AudioReceiver } from '@/lib/companionAudioReceiver';
 import { blobToWav16kMono } from '@/lib/dictation/wavEncode';
 import { formatDictation } from '@/lib/dictation/medicalFormat';
+import { getSttMode } from '@/lib/dictation/sttMode';
+import { raceTimeout } from '@/lib/asyncTimeout';
 import { readQueryParam } from '@/lib/browserParams';
 import {
   getLastFocusedSectionEditor,
@@ -36,6 +38,16 @@ import {
 type Phase = 'idle' | 'advertising' | 'paired' | 'error';
 /** State of the direct phone↔desktop LAN audio link (WebRTC). */
 type LinkState = 'idle' | 'connecting' | 'connected' | 'failed';
+
+// A hung decode or engine call must become a skippable error, never a frozen
+// "Transcribing…" (the FIFO stalls totally behind one unsettled await). The
+// engine budget is generous because the first phrase after app start can pay
+// the Parakeet cold-load; a phrase that trips it is skipped and the queue
+// moves on (the engine usually finishes warming meanwhile).
+const DECODE_TIMEOUT_MS = 20_000;
+const TRANSCRIBE_TIMEOUT_MS = 60_000;
+/** After this long on one phrase, escalate the status line to "warming up". */
+const SLOW_TRANSCRIBE_HINT_MS = 8_000;
 
 function hostDeviceName(): string {
   if (typeof navigator === 'undefined') return 'RadioPad desktop';
@@ -64,11 +76,19 @@ export default function CompanionHostPanel() {
   const [phoneListening, setPhoneListening] = useState(false);
   const [link, setLink] = useState<LinkState>('idle');
   const [transcribing, setTranscribing] = useState(false);
+  const [slowTranscribe, setSlowTranscribe] = useState(false);
+  // Increments at each phrase start. React batches the busy false→true flip
+  // between consecutive queued phrases, so `transcribing` alone can stay true
+  // across many fast phrases and the "warming up" hint would fire spuriously.
+  const [phraseSeq, setPhraseSeq] = useState(0);
   const [error, setError] = useState<string | null>(null);
   const connRef = useRef<CompanionConnection | null>(null);
   const sessionIdRef = useRef<string | null>(null);
   const rtcRef = useRef<RtcPeer | null>(null);
   const receiverRef = useRef<AudioReceiver | null>(null);
+  // In-flight engine call, so Unpair/teardown can cancel it instead of leaving
+  // a dangling fetch against the loopback sidecar.
+  const transcribeAbortRef = useRef<AbortController | null>(null);
   // Section key currently showing the live (interim) preview, so we can clear it
   // even after focus has moved on to a different section.
   const interimTargetRef = useRef<string | null>(null);
@@ -93,8 +113,49 @@ export default function CompanionHostPanel() {
     rtcRef.current = null;
     receiverRef.current?.reset();
     receiverRef.current = null;
+    transcribeAbortRef.current?.abort();
+    transcribeAbortRef.current = null;
     setLink('idle');
     setTranscribing(false);
+  }, []);
+
+  // "Transcribing…" that runs long is almost always the engine cold-loading —
+  // tell the radiologist that instead of looking frozen. Keyed to phraseSeq so
+  // the 8s window restarts per phrase, not cumulatively across a busy queue.
+  useEffect(() => {
+    setSlowTranscribe(false);
+    if (!transcribing) return undefined;
+    const t = setTimeout(() => setSlowTranscribe(true), SLOW_TRANSCRIBE_HINT_MS);
+    return () => clearTimeout(t);
+  }, [transcribing, phraseSeq]);
+
+  /**
+   * Companion audio can only be transcribed by the sidecar engines (they accept
+   * a WAV blob; the Edge Web Speech card is a live-mic recognizer and can't).
+   * Probe readiness as soon as the phone link comes up so "model never
+   * downloaded" surfaces as an actionable banner immediately — not as a hang
+   * after the first phrase.
+   */
+  const checkEngineReady = useCallback(async () => {
+    try {
+      const peer = rtcRef.current;
+      const res = await api.localModels.list();
+      // Torn down / re-connected while probing — this result belongs to a dead
+      // session; don't paint its banner over the new state.
+      if (rtcRef.current !== peer || !peer) return;
+      if (!res.enabled) return; // web/dev build — hosted transcribe path, nothing to probe
+      const blobCapable = res.models.filter(
+        (m) => m.kind === 'Stt' && !m.placeholder && m.provisioning !== 'BrowserWebSpeech',
+      );
+      if (blobCapable.length > 0 && !blobCapable.some((m) => m.available)) {
+        const downloading = blobCapable.some((m) => m.progress?.state === 'Downloading' || m.progress?.state === 'Verifying' || m.progress?.state === 'Extracting' || m.progress?.state === 'Installing');
+        setError(downloading
+          ? 'The on-device speech model is still downloading — phone phrases will transcribe once it finishes (watch Settings → On-device models). Type mode on the phone works right now.'
+          : 'Phone dictation needs the on-device speech engine. Open Settings → On-device models and download the speech model — or use Type mode on the phone meanwhile.');
+      }
+    } catch {
+      // Sidecar unreachable right now — the per-phrase timeout will surface it.
+    }
   }, []);
 
   /**
@@ -107,11 +168,53 @@ export default function CompanionHostPanel() {
     stopRtc();
     const receiver = createAudioReceiver({
       transcribe: async (webm) => {
+        // Decode phone audio → 16 kHz WAV for the sidecar. If this WebView can't
+        // decode the phone's codec, fall back to the raw container — the sidecar
+        // also accepts audio/webm and decodes it server-side. Deadline so a hung
+        // decode can never freeze the queue.
         let wav: Blob;
-        try { wav = await blobToWav16kMono(webm); } catch { wav = webm; }
+        try {
+          wav = await raceTimeout(blobToWav16kMono(webm), DECODE_TIMEOUT_MS, 'decode timed out');
+        } catch {
+          wav = webm;
+        }
+        // The session may have been torn down / replaced while decoding — bail
+        // before registering an abort controller that would clobber the live
+        // session's (the receiver's generation guard drops the thrown error).
+        if (receiverRef.current !== receiver) throw new Error('Session ended.');
         const reportId = readQueryParam('id') ?? '';
-        const res = await api.reports.transcribe(reportId, wav);
-        return formatDictation(res.transcript ?? '');
+        // Same engine mode as local dictation; abortable + hard deadline so one
+        // hung engine call (cold ONNX load, backlogged sidecar) can never freeze
+        // the queue — that was the frozen "Transcribing…".
+        const ctrl = new AbortController();
+        transcribeAbortRef.current = ctrl;
+        const timer = setTimeout(() => ctrl.abort(), TRANSCRIBE_TIMEOUT_MS);
+        try {
+          const res = await raceTimeout(
+            api.reports.transcribe(reportId, wav, getSttMode(), ctrl.signal),
+            TRANSCRIBE_TIMEOUT_MS + 5_000,
+            'The speech engine timed out.',
+          );
+          return formatDictation(res.transcript ?? '');
+        } catch (e) {
+          if (ctrl.signal.aborted) {
+            throw new Error('The speech engine timed out on a phrase — skipped it. It may still be warming up; keep dictating.');
+          }
+          // Same warm-up mapping as local dictation (DictationOverlay): 503 /
+          // stt_unavailable = engine present but model not ready; TypeError =
+          // sidecar not reachable (still booting).
+          const ex = e as { status?: number; body?: { error?: string; kind?: string }; message?: string };
+          if (ex.status === 503 || ex.body?.kind === 'stt_unavailable') {
+            throw new Error('The on-device speech engine isn’t ready — its model may still be downloading. Check Settings → On-device models, or use Type mode on the phone.');
+          }
+          if (e instanceof TypeError) {
+            throw new Error('The on-device speech engine is still starting up — keep dictating, phrases will resume shortly.');
+          }
+          throw new Error(ex.body?.error ?? ex.message ?? 'Could not transcribe a phrase.');
+        } finally {
+          clearTimeout(timer);
+          if (transcribeAbortRef.current === ctrl) transcribeAbortRef.current = null;
+        }
       },
       insert: (text) => {
         if (!text) return;
@@ -121,8 +224,13 @@ export default function CompanionHostPanel() {
           ?? getSectionEditor('findings')
           ?? getSectionEditorsInOrder()[0];
         target?.insertAtCursor(text);
+        // A phrase landed — any earlier per-phrase error is stale noise now.
+        setError(null);
       },
-      onBusyChange: setTranscribing,
+      onBusyChange: (busy) => {
+        setTranscribing(busy);
+        if (busy) setPhraseSeq((n) => n + 1);
+      },
       onError: (m) => setError(m),
     });
     receiverRef.current = receiver;
@@ -132,14 +240,17 @@ export default function CompanionHostPanel() {
       sendSignal: (s) => connRef.current?.sendSignal(s),
       onSegment: (blob, seq) => receiver.pushSegment(blob, seq),
       onState: (state) => {
-        if (state === 'connected') setLink('connected');
-        else if (state === 'failed') setLink('failed');
+        if (state === 'connected') {
+          setLink('connected');
+          // Surface "speech model not set up" NOW, not after the first phrase.
+          void checkEngineReady();
+        } else if (state === 'failed') setLink('failed');
       },
       onFailed: () => setLink('failed'),
     });
     rtcRef.current = peer;
     void peer.startAsHost();
-  }, [stopRtc]);
+  }, [stopRtc, checkEngineReady]);
 
   const handleCommand = useCallback((command: CompanionCommand) => {
     // Moving focus off the current section: drop any lingering live preview there
@@ -210,20 +321,27 @@ export default function CompanionHostPanel() {
         role: 'host',
         onMessage: (msg) => {
           if (msg.type === 'dictation') {
-            const target = getLastFocusedSectionEditor();
-            const targetKey = target?.sectionKey ?? null;
+            // One resolved target for BOTH branches — same no-focus fallback as
+            // the audio path (Findings → first section), so neither the live
+            // preview nor the committed text is ever silently dropped, and the
+            // interim anchor always matches where the ghost actually renders.
+            const resolved = getLastFocusedSectionEditor()
+              ?? getSectionEditor('findings')
+              ?? getSectionEditorsInOrder()[0]
+              ?? null;
+            const targetKey = resolved?.sectionKey ?? null;
             // If the live preview was anchored in a different section, clear it there
             // first so focus changes never strand a ghost.
             const prevKey = interimTargetRef.current;
             if (prevKey && prevKey !== targetKey) getSectionEditor(prevKey)?.clearInterim?.();
             if (msg.isFinal) {
               // Commit the completed utterance and drop the live preview.
-              if (msg.text) target?.insertAtCursor(msg.text);
-              target?.clearInterim?.();
+              if (msg.text) resolved?.insertAtCursor(msg.text);
+              resolved?.clearInterim?.();
               interimTargetRef.current = null;
             } else {
               // Real-time: show the not-yet-final words live at the caret.
-              target?.setInterim?.(msg.text);
+              resolved?.setInterim?.(msg.text);
               interimTargetRef.current = targetKey;
             }
           } else if (msg.type === 'rtc_answer' || msg.type === 'rtc_ice' || msg.type === 'rtc_offer' || msg.type === 'rtc_bye') {
@@ -277,6 +395,7 @@ export default function CompanionHostPanel() {
     setCode('');
     setQr('');
     setCompanionName('');
+    setError(null); // per-phrase / readiness errors die with the session
   }, [teardown]);
 
   return (
@@ -336,10 +455,12 @@ export default function CompanionHostPanel() {
               </div>
               <p className="rp-auth-hint" aria-live="polite">
                 {transcribing
-                  ? <><span className="rp-mic-live-dot" aria-hidden /> Transcribing…</>
+                  ? slowTranscribe
+                    ? <><span className="rp-mic-live-dot" aria-hidden /> Still transcribing — the speech engine may be loading (the first phrase can take a while)…</>
+                    : <><span className="rp-mic-live-dot" aria-hidden /> Transcribing…</>
                   : phoneListening
                     ? <><span className="rp-mic-live-dot" aria-hidden /> Listening — speak into your phone…</>
-                    : 'Mic idle — tap the mic on your phone to dictate.'}
+                    : 'Mic idle — dictate with the phone mic, or use its Type mode for instant text.'}
               </p>
               <button className="ghost" type="button" onClick={stop}>Unpair</button>
             </>

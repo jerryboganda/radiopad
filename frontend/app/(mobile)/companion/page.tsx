@@ -3,11 +3,15 @@
 /**
  * Mobile companion — the entire mobile app.
  *
- * The phone pairs to a live desktop session by scanning the desktop QR, then acts
- * as a wireless MICROPHONE: it captures voice and streams the raw audio directly
- * to the desktop over the local network (WebRTC data channel — audio never touches
- * the cloud), and the DESKTOP transcribes it with its on-device engine and inserts
- * the text. (The old on-phone Android speech recognizer is gone — its few-second
+ * The phone pairs to a live desktop session by scanning the desktop QR, then
+ * dictates in one of two modes:
+ * - "Wi-Fi mic": pure microphone — voice streams as raw audio directly to the
+ *   desktop over the local network (WebRTC data channel — audio never touches
+ *   the cloud) and the DESKTOP transcribes it with its on-device engine.
+ * - "Keyboard voice": the phone keyboard's own voice typing (Gboard / iOS
+ *   dictation) recognizes speech instantly ON the phone; the text streams live
+ *   over the relay (works on any connection, no LAN link needed).
+ * (The old on-phone Android SpeechRecognizer is gone — its few-second
  * endpointing made dictation choppy.) There is NO standalone reporting here.
  *
  * Locked mobile classes: `.rp-mobile`, `.rp-mic-btn`, `.rp-page-title`,
@@ -27,6 +31,8 @@ import { nativeScanAvailable, webScanAvailable, scanNative, scanWebcam } from '@
 import { startAudioCapture, audioCaptureAvailable, describeCaptureError, type AudioCaptureController } from '@/lib/companionAudioCapture';
 import { ensureMicPermission } from '@/lib/companionSpeech';
 import { createRtcPeer, type RtcPeer } from '@/lib/companionRtc';
+import { createTypeDictationStreamer, type TypeDictationStreamer } from '@/lib/companionTypeDictation';
+import { formatDictation } from '@/lib/dictation/medicalFormat';
 import MobileUpdateCheck from '@/components/companion/MobileUpdateCheck';
 
 function deviceName(): string {
@@ -49,6 +55,16 @@ const REMOTE_COMMANDS: Array<{ command: CompanionCommand; label: string }> = [
 
 type Phase = 'pair' | 'connecting' | 'live' | 'ended';
 type LinkState = 'connecting' | 'connected' | 'failed';
+/**
+ * Two ways to dictate:
+ * - 'voice': the phone is a pure mic — audio streams to the desktop over the
+ *   LAN data channel, the desktop's on-device engine transcribes (private,
+ *   same-Wi-Fi only).
+ * - 'type': the phone KEYBOARD does the recognition (Gboard / iOS voice
+ *   typing — instant + very accurate); text streams live over the relay, so it
+ *   also works when the direct Wi-Fi link can't form.
+ */
+type InputMode = 'voice' | 'type';
 
 export default function MobileCompanionPage() {
   const [phase, setPhase] = useState<Phase>('pair');
@@ -62,10 +78,22 @@ export default function MobileCompanionPage() {
   const [recording, setRecording] = useState(false);
   const [speaking, setSpeaking] = useState(false);
   const [link, setLink] = useState<LinkState>('connecting');
+  const [inputMode, setInputMode] = useState<InputMode>('voice');
+  const [typedText, setTypedText] = useState('');
+  const [lastInserted, setLastInserted] = useState('');
 
   const connRef = useRef<CompanionConnection | null>(null);
   const rtcRef = useRef<RtcPeer | null>(null);
   const captureRef = useRef<AudioCaptureController | null>(null);
+  const typeStreamerRef = useRef<TypeDictationStreamer | null>(null);
+  // Committed-prefix guard: a voice-typed word can land between the idle-commit
+  // and React clearing the textarea; that change event still carries the
+  // committed text as a prefix. Strip it or the phrase inserts twice.
+  const justCommittedRef = useRef<{ raw: string; at: number } | null>(null);
+  // True while the Android/iOS IME has an active composition — the idle-commit
+  // must not clear the textarea mid-composition (value clobbering duplicates or
+  // mangles the phrase on some IMEs).
+  const composingRef = useRef(false);
   const micBusyRef = useRef(false);
   const micWantedRef = useRef(false);
   const videoRef = useRef<HTMLVideoElement | null>(null);
@@ -88,6 +116,16 @@ export default function MobileCompanionPage() {
 
   const teardown = useCallback(() => {
     stopCapture();
+    // Best-effort commit of words typed but not yet inserted (the send rides the
+    // relay if it is still open; buffered/no-op otherwise), then drop the
+    // streamer AND its UI state — stale text must not survive into a re-paired
+    // session, where a fresh streamer would silently commit '' (dead Insert).
+    typeStreamerRef.current?.commit();
+    typeStreamerRef.current?.dispose();
+    typeStreamerRef.current = null;
+    setTypedText('');
+    setLastInserted('');
+    justCommittedRef.current = null;
     rtcRef.current?.close();
     rtcRef.current = null;
     connRef.current?.close();
@@ -272,8 +310,11 @@ export default function MobileCompanionPage() {
           onError: (message) => setError(message),
         });
         if (!micWantedRef.current) {
+          // Aborted mid-start (session ended / mode switched during the prompt):
+          // ptt_start already went out, so close the desktop "Listening" state.
           void controller.stop().catch(() => undefined);
           setRecording(false);
+          connRef.current?.sendCommand('ptt_stop');
         } else {
           captureRef.current = controller;
         }
@@ -291,6 +332,74 @@ export default function MobileCompanionPage() {
   const sendCommand = useCallback((command: CompanionCommand) => {
     connRef.current?.sendCommand(command);
   }, []);
+
+  // ——— Type mode (phone keyboard voice typing → live text over the relay) ———
+
+  const ensureTypeStreamer = useCallback((): TypeDictationStreamer => {
+    if (!typeStreamerRef.current) {
+      typeStreamerRef.current = createTypeDictationStreamer({
+        send: (text, isFinal) => connRef.current?.sendDictation(text, isFinal),
+        format: formatDictation,
+        // Never auto-commit (→ clear the field) while the IME is composing.
+        deferIdleCommit: () => composingRef.current,
+        onCommitted: (formatted, raw) => {
+          justCommittedRef.current = { raw, at: Date.now() };
+          setTypedText('');
+          setLastInserted(formatted);
+        },
+      });
+    }
+    return typeStreamerRef.current;
+  }, []);
+
+  const onTypedChange = useCallback((value: string) => {
+    let next = value;
+    const jc = justCommittedRef.current;
+    if (jc && (Date.now() - jc.at >= 400 || !next.startsWith(jc.raw))) {
+      // Window passed, or the IME state no longer relates to the committed text.
+      justCommittedRef.current = null;
+    } else if (jc) {
+      // Keep the guard alive for the WHOLE window (multiple events can race the
+      // clear) and strip exact matches too — the IME re-finalizing the committed
+      // text with no new word must strip to '', not resurrect the phrase (which
+      // would re-commit and double-insert it into the report).
+      next = next.slice(jc.raw.length);
+    }
+    setTypedText(next);
+    if (next.trim()) setLastInserted('');
+    ensureTypeStreamer().onTextChange(next);
+  }, [ensureTypeStreamer]);
+
+  const insertTypedNow = useCallback(() => {
+    // Re-seed from the live field first: after a session teardown recreated the
+    // streamer, its internal text is empty while the textarea still shows words —
+    // committing without the resync would silently insert nothing.
+    const s = ensureTypeStreamer();
+    s.onTextChange(typedText);
+    s.commit();
+  }, [ensureTypeStreamer, typedText]);
+
+  const switchMode = useCallback((mode: InputMode) => {
+    if (mode === inputMode) return;
+    if (mode === 'type') {
+      // Leaving voice mode: the mic must never stay hot in the background, and
+      // ptt_stop goes unconditionally — ptt_start is sent BEFORE the async
+      // capture start, so gating on captureRef would strand the desktop on
+      // "Listening" if the user switches during the permission prompt.
+      connRef.current?.sendCommand('ptt_stop');
+      stopCapture();
+    } else {
+      // Leaving type mode: don't lose words that were typed but not yet inserted,
+      // and reset the desktop's "Listening" indicator.
+      typeStreamerRef.current?.commit();
+      typeStreamerRef.current?.dispose();
+      typeStreamerRef.current = null;
+      setTypedText('');
+      connRef.current?.sendCommand('ptt_stop');
+    }
+    setError(null);
+    setInputMode(mode);
+  }, [inputMode, stopCapture]);
 
   if (phase === 'pair' || phase === 'connecting') {
     const busy = pairing || phase === 'connecting';
@@ -377,16 +486,35 @@ export default function MobileCompanionPage() {
 
       {error && <div className="banner warn" role="alert">{error}</div>}
 
-      {link !== 'connected' ? (
-        <div className="banner" role="status">
-          {link === 'failed' ? (
-            <>Couldn’t reach your desktop. Make sure this phone and the desktop are on the <strong>same Wi‑Fi network</strong>, then tap <strong>Retry</strong> on the desktop’s pairing panel.</>
-          ) : (
-            <>Connecting to your desktop over Wi‑Fi…</>
-          )}
-        </div>
-      ) : (
-        <>
+      <div className="rp-companion-remote" role="group" aria-label="Dictation mode">
+        <button
+          className={inputMode === 'voice' ? 'primary' : 'ghost'}
+          type="button"
+          aria-pressed={inputMode === 'voice'}
+          onClick={() => switchMode('voice')}
+        >
+          Wi‑Fi mic
+        </button>
+        <button
+          className={inputMode === 'type' ? 'primary' : 'ghost'}
+          type="button"
+          aria-pressed={inputMode === 'type'}
+          onClick={() => switchMode('type')}
+        >
+          Keyboard voice
+        </button>
+      </div>
+
+      {inputMode === 'voice' ? (
+        link !== 'connected' ? (
+          <div className="banner" role="status">
+            {link === 'failed' ? (
+              <>Couldn’t reach your desktop over Wi‑Fi. Make sure both are on the <strong>same network</strong> and tap <strong>Retry</strong> on the desktop — or switch to <strong>Keyboard voice</strong> above, which works on any connection.</>
+            ) : (
+              <>Connecting to your desktop over Wi‑Fi…</>
+            )}
+          </div>
+        ) : (
           <button
             className={`rp-mic-btn${recording ? ' recording is-live' : ''}`}
             type="button"
@@ -395,25 +523,68 @@ export default function MobileCompanionPage() {
           >
             {recording ? (speaking ? 'Listening…' : 'Mic on — tap to stop') : 'Tap to dictate'}
           </button>
-
-          <div className="rp-companion-remote" role="group" aria-label="Remote controls">
-            {REMOTE_COMMANDS.map((c) => (
-              <button key={c.command} className="ghost" type="button" onClick={() => sendCommand(c.command)}>
-                {c.label}
-              </button>
-            ))}
-          </div>
-
+        )
+      ) : (
+        <>
+          <p className="rp-page-sub">
+            Tap the box, then press the <strong>mic key on your keyboard</strong> (Gboard voice
+            typing). Words appear on the desktop as you speak; a short pause inserts them.
+          </p>
+          <textarea
+            className="rp-input"
+            rows={5}
+            placeholder="Tap here, then press the mic on your keyboard…"
+            aria-label="Dictation text"
+            value={typedText}
+            onChange={(e) => onTypedChange(e.target.value)}
+            onFocus={() => sendCommand('ptt_start')}
+            onBlur={() => {
+              // Commit whatever is pending (existing streamer only — blur after a
+              // session ended must not resurrect a fresh streamer) and close the
+              // desktop "Listening" state.
+              composingRef.current = false;
+              typeStreamerRef.current?.commit();
+              sendCommand('ptt_stop');
+            }}
+            onCompositionStart={() => { composingRef.current = true; }}
+            onCompositionEnd={() => { composingRef.current = false; }}
+            autoCapitalize="sentences"
+            autoComplete="off"
+            spellCheck
+            style={{ width: '100%', fontSize: '1.05rem', lineHeight: 1.45 }}
+          />
           <button
-            className="primary-ghost"
+            className="primary"
             type="button"
-            onClick={() => sendCommand('generate_impression')}
-            style={{ width: '100%' }}
+            onClick={insertTypedNow}
+            disabled={!typedText.trim()}
           >
-            ✨ Generate impression (AI)
+            Insert into report now
           </button>
+          {lastInserted && !typedText && (
+            <p className="rp-page-sub" role="status" aria-live="polite">
+              Inserted: “{lastInserted.length > 90 ? `${lastInserted.slice(0, 90)}…` : lastInserted}”
+            </p>
+          )}
         </>
       )}
+
+      <div className="rp-companion-remote" role="group" aria-label="Remote controls">
+        {REMOTE_COMMANDS.map((c) => (
+          <button key={c.command} className="ghost" type="button" onClick={() => sendCommand(c.command)}>
+            {c.label}
+          </button>
+        ))}
+      </div>
+
+      <button
+        className="primary-ghost"
+        type="button"
+        onClick={() => sendCommand('generate_impression')}
+        style={{ width: '100%' }}
+      >
+        ✨ Generate impression (AI)
+      </button>
 
       <button className="subtle" type="button" onClick={() => { teardown(); setPhase('ended'); }}>
         End session

@@ -80,4 +80,41 @@ describe('companion audio receiver — FIFO transcription order', () => {
     await new Promise((r) => setTimeout(r, 30));
     expect(inserted).toEqual(['t0']);
   });
+
+  it('surfaces the transcribe error message, skips the phrase, and keeps draining', async () => {
+    const { blobs, seqOf } = makeSegments(2);
+    const inserted: string[] = [];
+    const errors: string[] = [];
+    const busy: boolean[] = [];
+    const receiver = createAudioReceiver({
+      transcribe: async (b) => {
+        const seq = seqOf.get(b)!;
+        if (seq === 0) throw new Error('The speech engine timed out on a phrase — skipped it.');
+        return `t${seq}`;
+      },
+      insert: (t) => inserted.push(t),
+      onError: (m) => errors.push(m),
+      onBusyChange: (b) => busy.push(b),
+    });
+    receiver.pushSegment(blobs[0], 0);
+    receiver.pushSegment(blobs[1], 1);
+    await vi.waitFor(() => expect(inserted.length).toBe(1), { timeout: 2000 });
+    expect(inserted).toEqual(['t1']); // the failed phrase was skipped, not fatal
+    expect(errors).toEqual(['The speech engine timed out on a phrase — skipped it.']);
+    expect(busy[busy.length - 1]).toBe(false); // never left stuck on "Transcribing…"
+  });
+
+  it('falls back to a generic message for non-Error throw shapes', async () => {
+    const { blobs } = makeSegments(1);
+    const errors: string[] = [];
+    const receiver = createAudioReceiver({
+      // eslint-disable-next-line prefer-promise-reject-errors
+      transcribe: () => Promise.reject('weird'),
+      insert: () => undefined,
+      onError: (m) => errors.push(m),
+    });
+    receiver.pushSegment(blobs[0], 0);
+    await vi.waitFor(() => expect(errors.length).toBe(1), { timeout: 2000 });
+    expect(errors).toEqual(['Could not transcribe a phrase.']);
+  });
 });

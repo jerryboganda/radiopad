@@ -491,7 +491,7 @@ async function requestBlob(path: string): Promise<Blob> {
   return await res.blob();
 }
 
-async function requestForm<T>(path: string, form: FormData): Promise<T> {
+async function requestForm<T>(path: string, form: FormData, signal?: AbortSignal): Promise<T> {
   // Multipart upload: deliberately do NOT set Content-Type — the browser adds
   // the multipart boundary. Tenant + auth headers still apply.
   const headers = new Headers();
@@ -502,6 +502,7 @@ async function requestForm<T>(path: string, form: FormData): Promise<T> {
     method: 'POST',
     body: form,
     credentials: requestCredentials(base),
+    signal,
   }, headers);
   if (!res.ok) {
     throw Object.assign(new Error(`API ${res.status} ${res.statusText}`), { status: res.status, body: await errorBody(res) });
@@ -517,8 +518,8 @@ async function requestForm<T>(path: string, form: FormData): Promise<T> {
  * endpoint is anonymous and loopback-bound, so the production session token is
  * neither needed nor appropriate to send to localhost.
  */
-async function requestFormTo<T>(base: string, path: string, form: FormData): Promise<T> {
-  const res = await fetch(`${base}${path}`, { method: 'POST', body: form, credentials: 'omit' });
+async function requestFormTo<T>(base: string, path: string, form: FormData, signal?: AbortSignal): Promise<T> {
+  const res = await fetch(`${base}${path}`, { method: 'POST', body: form, credentials: 'omit', signal });
   if (!res.ok) {
     throw Object.assign(new Error(`API ${res.status} ${res.statusText}`), { status: res.status, body: await errorBody(res) });
   }
@@ -1217,7 +1218,7 @@ export const api = {
     // resulting de-identified transcript is saved to the production report. On
     // web (no sidecar) it falls back to the report-scoped cloud path, where PHI
     // routing is handled by the provider router exactly like text dictation.
-    transcribe: async (id: string, audio: Blob, mode?: SttMode) => {
+    transcribe: async (id: string, audio: Blob, mode?: SttMode, signal?: AbortSignal) => {
       const form = new FormData();
       // Desktop converts to 16 kHz mono WAV for the on-device engine; web sends
       // the original webm. Name the part by type so the backend content-type
@@ -1239,9 +1240,9 @@ export const api = {
         // report-scoped — the engine needs only the audio. Deliberately NO cloud
         // fallback here: if the on-device engine isn't ready it surfaces an error
         // rather than silently shipping PHI audio off-device.
-        return requestFormTo<TranscribeResult>(local, '/api/stt/transcribe', form);
+        return requestFormTo<TranscribeResult>(local, '/api/stt/transcribe', form, signal);
       }
-      return requestForm<TranscribeResult>(`/api/reports/${id}/dictation/transcribe`, form);
+      return requestForm<TranscribeResult>(`/api/reports/${id}/dictation/transcribe`, form, signal);
     },
     /**
      * Manual "Cross Check": re-run the retained dictation audio through the extra
