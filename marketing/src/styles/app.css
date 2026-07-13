@@ -1,6 +1,6 @@
 /* Marketing site global stylesheet (entry). Imported once in BaseLayout.
-   Order: framework -> fonts -> tokens/alias -> base -> sections -> @theme.
-   Colors are LOCKED (verbatim OKLCH from frontend/app/hallmark.css, see BRAND-LOCK.md). */
+   Order: framework -> fonts -> tokens/alias -> base -> sections -> @theme -> dark scheme.
+   Colors are LOCKED (verbatim RC hex from frontend/app/tokens.css, see BRAND-LOCK.md). */
 
 @import "tailwindcss";
 @import "./fonts.css";
@@ -10,32 +10,78 @@
 @import "./blog.css";
 
 /* Canonical locked tokens -> emitted as :root custom properties AND Tailwind utilities
-   (bg-paper, text-ink, border-rule, etc.). Do not alter these values. */
+   (bg-paper, text-ink, border-rule, etc.). Do not alter these values.
+   Names keep the site's original surface vocabulary (paper/ink/rule) but every value is
+   the RC design system's LIGHT palette (frontend/app/tokens.css):
+     paper=canvas, paper-soft=surface, paper-warm=surface-subtle. */
 @theme {
-  --color-paper: oklch(96.5% 0.012 75);
-  --color-paper-soft: oklch(99% 0.006 75);
-  --color-paper-warm: oklch(93% 0.02 70);
-  --color-ink: oklch(20% 0.022 55);
-  --color-ink-soft: oklch(38% 0.018 55);
-  --color-ink-mute: oklch(50% 0.012 60);
-  --color-rule: oklch(86% 0.014 70);
-  --color-rule-soft: oklch(91% 0.01 70);
-  --color-accent: oklch(58% 0.18 35);
-  --color-accent-deep: oklch(42% 0.2 32);
-  --color-accent-soft: oklch(82% 0.08 45);
-  --color-success: oklch(50% 0.09 150);
-  --color-success-soft: oklch(90% 0.04 145);
-  --color-marine: oklch(34% 0.09 240);
-  --color-marine-soft: oklch(83% 0.045 240);
-  --color-danger: oklch(52% 0.17 25);
-  --color-danger-soft: oklch(89% 0.055 32);
-  --color-saffron: oklch(78% 0.16 78);
-  --color-saffron-soft: oklch(91% 0.07 80);
-  --color-ai: oklch(45% 0.14 300);
-  --color-ai-soft: oklch(90% 0.05 300);
-  --color-focus: oklch(48% 0.2 32);
+  --color-paper: #f5f8fb;        /* RC canvas */
+  --color-paper-soft: #ffffff;   /* RC surface */
+  --color-paper-warm: #eef3f8;   /* RC surface-subtle */
+  --color-ink: #0f1f38;
+  --color-ink-soft: #40536b;
+  --color-ink-mute: #5d7085;
+  --color-rule: #d8e2eb;
+  --color-rule-soft: #e7eef4;
+  --color-accent: #2f88d8;       /* RadioPad blue */
+  --color-accent-deep: #1f6fb8;  /* hover / small accent text & links */
+  --color-accent-soft: #bbdcf6;  /* soft accent fill */
+  --color-accent-tint: #eaf3fc;  /* tinted chip / selected bg */
+  --color-accent-fg: #ffffff;    /* text/icon on accent fills (both schemes) */
+  --color-success: #11845b;
+  --color-success-soft: #dcf2e8;
+  --color-info: #2565ae;
+  --color-info-soft: #dfecfa;
+  --color-danger: #c43d3d;
+  --color-danger-soft: #fae3e3;
+  --color-warning: #a65e00;
+  --color-warning-soft: #fbf1de;
+  --color-ai: #1d63c2;
+  --color-ai-soft: #e8f1fd;
+  --color-focus: #5eaaf0;
+  /* reverse "band" surfaces (ink-navy CTA/demo bands, dark bento cell, code blocks) */
+  --color-band: #0f1f38;
+  --color-band-ink: #f5f8fb;
+  --color-band-accent: #bbdcf6;  /* accent-tinted marks sitting ON the band */
 
   --font-display: "Clash Display", "General Sans", system-ui, sans-serif;
   --font-body: "General Sans", system-ui, -apple-system, sans-serif;
   --font-mono: "JetBrains Mono", ui-monospace, "Cascadia Mono", monospace;
+}
+
+/* Dark scheme — RC first-class deep-navy theme (never pure black), verbatim from
+   frontend/app/tokens.css html[data-theme='dark']. Marketing follows the visitor's
+   OS preference; no toggle. Same custom properties, re-pointed. */
+@media (prefers-color-scheme: dark) {
+  :root {
+    color-scheme: dark;
+
+    --color-paper: #0b1422;        /* RC canvas (dark) */
+    --color-paper-soft: #111d2d;   /* RC surface (dark) */
+    --color-paper-warm: #152235;   /* RC surface-subtle (dark) */
+    --color-ink: #edf6ff;
+    --color-ink-soft: #b9c7d7;
+    --color-ink-mute: #8ca0b5;
+    --color-rule: #2b3d52;
+    --color-rule-soft: #223349;
+    --color-accent: #3b82f6;
+    --color-accent-deep: #619bf8;  /* dark hover/link is LIGHTER, per RC */
+    --color-accent-soft: #1e3a5f;
+    --color-accent-tint: #16283f;
+    --color-accent-fg: #ffffff;
+    --color-success: #2fbf87;
+    --color-success-soft: #0e2b22;
+    --color-info: #6fa8e8;
+    --color-info-soft: #12263c;
+    --color-danger: #e36868;
+    --color-danger-soft: #351619;
+    --color-warning: #e5a43b;
+    --color-warning-soft: #33270f;
+    --color-ai: #7cb8f5;
+    --color-ai-soft: #142943;
+    --color-focus: #83c4ff;
+    --color-band: #16273b;         /* RC elevated navy — band stays a dark panel */
+    --color-band-ink: #edf6ff;
+    --color-band-accent: #7cb8f5;
+  }
 }

@@ -114,37 +114,37 @@ console.log(`Testimonial avatars: ${Object.keys(testimonialAvatars).length} file
 
 // ---------- OG IMAGE (1200x630) ----------
 const og = `<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="630" viewBox="0 0 1200 630">
-  <rect width="1200" height="630" fill="#f8f2eb"/>
-  <rect x="0" y="0" width="1200" height="10" fill="#ce4522"/>
+  <rect width="1200" height="630" fill="#f5f8fb"/>
+  <rect x="0" y="0" width="1200" height="10" fill="#2f88d8"/>
   <!-- left: brand + tagline -->
   <g transform="translate(80,120)">
-    <rect width="84" height="84" rx="21" fill="#ce4522"/>
-    <path d="M19 42h11l8 19 14-44 8 29h16" fill="none" stroke="#fefbf7" stroke-width="8" stroke-linecap="round" stroke-linejoin="round"/>
+    <rect width="84" height="84" rx="21" fill="#2f88d8"/>
+    <path d="M19 42h11l8 19 14-44 8 29h16" fill="none" stroke="#ffffff" stroke-width="8" stroke-linecap="round" stroke-linejoin="round"/>
   </g>
-  <text x="180" y="182" font-family="Arial, Helvetica, sans-serif" font-size="60" font-weight="700" fill="#1e130c">RadioPad</text>
-  <text x="82" y="320" font-family="Arial, Helvetica, sans-serif" font-size="46" font-weight="600" fill="#1e130c">Radiology reports,</text>
-  <text x="82" y="378" font-family="Arial, Helvetica, sans-serif" font-size="46" font-weight="600" fill="#4a4039">drafted in seconds.</text>
-  <text x="82" y="436" font-family="Arial, Helvetica, sans-serif" font-size="46" font-weight="700" fill="#9e0000">Signed by you.</text>
-  <text x="82" y="556" font-family="Arial, Helvetica, sans-serif" font-size="23" fill="#69625d">AI-assisted radiology reporting. The radiologist stays the final authority.</text>
+  <text x="180" y="182" font-family="Arial, Helvetica, sans-serif" font-size="60" font-weight="700" fill="#0f1f38">RadioPad</text>
+  <text x="82" y="320" font-family="Arial, Helvetica, sans-serif" font-size="46" font-weight="600" fill="#0f1f38">Radiology reports,</text>
+  <text x="82" y="378" font-family="Arial, Helvetica, sans-serif" font-size="46" font-weight="600" fill="#40536b">drafted in seconds.</text>
+  <text x="82" y="436" font-family="Arial, Helvetica, sans-serif" font-size="46" font-weight="700" fill="#1f6fb8">Signed by you.</text>
+  <text x="82" y="556" font-family="Arial, Helvetica, sans-serif" font-size="23" fill="#5d7085">AI-assisted radiology reporting. The radiologist stays the final authority.</text>
   <!-- right: product-preview motif (shapes only, font-independent) -->
   <g transform="translate(720,150)">
-    <rect width="400" height="300" rx="20" fill="#fefbf7" stroke="#d7d0c7" stroke-width="1.5"/>
-    <rect width="400" height="46" rx="20" fill="#f8f2eb"/>
-    <rect y="30" width="400" height="16" fill="#f8f2eb"/>
-    <circle cx="26" cy="23" r="6" fill="#b63132"/>
-    <circle cx="46" cy="23" r="6" fill="#efa810"/>
-    <circle cx="66" cy="23" r="6" fill="#397247"/>
-    <line x1="0" y1="46" x2="400" y2="46" stroke="#e6e0da" stroke-width="1.5"/>
-    <rect x="28" y="78" width="300" height="11" rx="5.5" fill="#e6e0da"/>
-    <rect x="28" y="104" width="240" height="11" rx="5.5" fill="#e6e0da"/>
-    <rect x="28" y="130" width="180" height="11" rx="5.5" fill="#f1b499"/>
-    <rect x="28" y="156" width="270" height="11" rx="5.5" fill="#e6e0da"/>
-    <circle cx="34" cy="205" r="5" fill="#b63132"/>
-    <rect x="50" y="200" width="150" height="9" rx="4.5" fill="#e6e0da"/>
-    <circle cx="34" cy="228" r="5" fill="#efa810"/>
-    <rect x="50" y="223" width="120" height="9" rx="4.5" fill="#e6e0da"/>
-    <line x1="0" y1="256" x2="400" y2="256" stroke="#e6e0da" stroke-width="1.5"/>
-    <rect x="28" y="272" width="126" height="20" rx="10" fill="#cee6ce"/>
+    <rect width="400" height="300" rx="20" fill="#ffffff" stroke="#d8e2eb" stroke-width="1.5"/>
+    <rect width="400" height="46" rx="20" fill="#f5f8fb"/>
+    <rect y="30" width="400" height="16" fill="#f5f8fb"/>
+    <circle cx="26" cy="23" r="6" fill="#c43d3d"/>
+    <circle cx="46" cy="23" r="6" fill="#a65e00"/>
+    <circle cx="66" cy="23" r="6" fill="#11845b"/>
+    <line x1="0" y1="46" x2="400" y2="46" stroke="#e7eef4" stroke-width="1.5"/>
+    <rect x="28" y="78" width="300" height="11" rx="5.5" fill="#e7eef4"/>
+    <rect x="28" y="104" width="240" height="11" rx="5.5" fill="#e7eef4"/>
+    <rect x="28" y="130" width="180" height="11" rx="5.5" fill="#bbdcf6"/>
+    <rect x="28" y="156" width="270" height="11" rx="5.5" fill="#e7eef4"/>
+    <circle cx="34" cy="205" r="5" fill="#c43d3d"/>
+    <rect x="50" y="200" width="150" height="9" rx="4.5" fill="#e7eef4"/>
+    <circle cx="34" cy="228" r="5" fill="#a65e00"/>
+    <rect x="50" y="223" width="120" height="9" rx="4.5" fill="#e7eef4"/>
+    <line x1="0" y1="256" x2="400" y2="256" stroke="#e7eef4" stroke-width="1.5"/>
+    <rect x="28" y="272" width="126" height="20" rx="10" fill="#dcf2e8"/>
   </g>
 </svg>`;
 await sharp(Buffer.from(og)).png().toFile("public/og-default.png");

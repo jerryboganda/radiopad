@@ -1,6 +1,6 @@
 /* Blog index + post template (ported from the approved Phase 3 mockups). */
 
-.tag { display: inline-flex; align-items: center; font-family: var(--font-mono); font-size: .72rem; letter-spacing: .06em; text-transform: uppercase; color: var(--accent-deep); background: var(--accent-soft); padding: .28rem .6rem; border-radius: var(--radius-pill); font-weight: 500; }
+.tag { display: inline-flex; align-items: center; font-family: var(--font-mono); font-size: .72rem; letter-spacing: .06em; text-transform: uppercase; color: var(--accent-deep); background: var(--accent-tint); padding: .28rem .6rem; border-radius: var(--radius-pill); font-weight: 500; }
 .post-meta { display: flex; align-items: center; gap: .6rem; font-size: .82rem; color: var(--ink-mute); font-family: var(--font-mono); flex-wrap: wrap; }
 
 /* index header */
@@ -91,7 +91,7 @@
 .prose figure { margin: 2.4rem 0; }
 .prose figure img { border-radius: var(--radius); border: 1px solid var(--rule); }
 .prose figcaption { margin-top: .6rem; font-size: .82rem; color: var(--ink-mute); }
-.prose pre { background: var(--ink); color: var(--paper); border-radius: var(--radius); padding: 1.25rem 1.4rem; overflow-x: auto; font-family: var(--font-mono); font-size: .85rem; line-height: 1.6; }
+.prose pre { background: var(--band); color: var(--band-ink); border-radius: var(--radius); padding: 1.25rem 1.4rem; overflow-x: auto; font-family: var(--font-mono); font-size: .85rem; line-height: 1.6; }
 .prose code { font-family: var(--font-mono); font-size: .9em; background: var(--paper-warm); padding: .1em .35em; border-radius: 5px; }
 .prose pre code { background: none; padding: 0; }
 .callout { display: flex; gap: .85rem; padding: 1.2rem 1.35rem; border-radius: var(--radius); background: var(--ai-soft); border: 1px solid color-mix(in oklch, var(--ai), transparent 70%); }

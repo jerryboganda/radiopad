@@ -1,137 +1,154 @@
-# BRAND-LOCK — RadioPad Marketing Site
+# BRAND-LOCK — RadioPad Marketing Site (RC design system)
 
-> **This palette is LOCKED.** Every color below is extracted verbatim from the RadioPad
-> product's canonical token source, [`frontend/app/hallmark.css`](../frontend/app/hallmark.css).
-> The marketing site reuses these values **exactly** — no new brand hues, no shifted
-> scheme, no re-tinting. Fonts, spacing, type scale, layout, and motion are free to change
-> (see "Design direction" at the bottom).
+> **This palette is LOCKED.** Every color below is taken verbatim from the RadioPad
+> product's canonical token source, [`frontend/app/tokens.css`](../frontend/app/tokens.css)
+> (the **RC design system**, PRD v3.0 §20; reference mockups RC-01…RC-10 at
+> `UI UX SCREENS/Authentication/`). The marketing site reuses these values **exactly** —
+> no new brand hues, no shifted scheme, no re-tinting. Fonts, spacing, type scale,
+> layout, and motion remain free (see "Design direction" at the bottom).
 >
-> OKLCH is the source of truth (copy it directly into CSS). Hex is a computed sRGB
-> equivalent (Björn Ottosson OKLCH→sRGB, D65) for tooling that can't read OKLCH — treat
-> hex as the fallback, OKLCH as canonical.
+> **Locked on 2026-07-13. This lock SUPERSEDES the previous Hallmark lock**
+> (warm-paper / terracotta, sourced from the retired `frontend/app/hallmark.css`).
+> No Hallmark value may appear anywhere on the site.
+>
+> Hex is canonical here (the product ships hex). The marketing token names keep the
+> site's original surface vocabulary (`paper` / `ink` / `rule` / `accent`) but every
+> value is an RC primitive: `paper`=canvas, `paper-soft`=surface, `paper-warm`=surface-subtle.
 
 ---
 
-## 1. Locked palette
+## 1. Locked palette — LIGHT (default) and DARK (first-class)
 
-### Surfaces (warm "paper")
-| Token | OKLCH (canonical) | Hex (computed) | Role | Source |
+Both schemes are mandatory. The site follows the visitor's OS preference via
+`@media (prefers-color-scheme: dark)` — no toggle on marketing. Dark is the RC
+deep-navy theme, **never pure black**.
+
+### Surfaces (clinical white / deep navy)
+| Token | Light | Dark | Role | RC source name |
 |---|---|---|---|---|
-| `--color-paper` | `oklch(96.5% 0.012 75)` | `#f8f2eb` | Page background | hallmark.css:22 |
-| `--color-paper-soft` | `oklch(99% 0.006 75)` | `#fefbf7` | Elevated surface / card / button text on accent | hallmark.css:23 |
-| `--color-paper-warm` | `oklch(93% 0.02 70)` | `#f1e6da` | Subtle section bg / hover fill | hallmark.css:24 |
+| `--color-paper` | `#f5f8fb` | `#0b1422` | Page background | `--color-canvas` |
+| `--color-paper-soft` | `#ffffff` | `#111d2d` | Card / panel / elevated surface | `--color-surface` |
+| `--color-paper-warm` | `#eef3f8` | `#152235` | Subtle section bg / hover fill | `--color-surface-subtle` |
 
 ### Ink (text)
-| Token | OKLCH (canonical) | Hex (computed) | Role | Source |
-|---|---|---|---|---|
-| `--color-ink` | `oklch(20% 0.022 55)` | `#1e130c` | Primary text / headlines | hallmark.css:25 |
-| `--color-ink-soft` | `oklch(38% 0.018 55)` | `#4a4039` | Secondary / body text | hallmark.css:26 |
-| `--color-ink-mute` | `oklch(50% 0.012 60)` | `#69625d` | Faint / caption / disabled text | hallmark.css:27 |
+| Token | Light | Dark | Role |
+|---|---|---|---|
+| `--color-ink` | `#0f1f38` | `#edf6ff` | Primary text / headlines |
+| `--color-ink-soft` | `#40536b` | `#b9c7d7` | Secondary / body text |
+| `--color-ink-mute` | `#5d7085` | `#8ca0b5` | Faint / caption text |
 
 ### Rules (borders)
-| Token | OKLCH (canonical) | Hex (computed) | Role | Source |
-|---|---|---|---|---|
-| `--color-rule` | `oklch(86% 0.014 70)` | `#d7d0c7` | Primary border / hairline | hallmark.css:28 |
-| `--color-rule-soft` | `oklch(91% 0.01 70)` | `#e6e0da` | Soft divider | hallmark.css:29 |
+| Token | Light | Dark | Role |
+|---|---|---|---|
+| `--color-rule` | `#d8e2eb` | `#2b3d52` | Primary border / hairline |
+| `--color-rule-soft` | `#e7eef4` | `#223349` | Soft divider |
 
-### Brand accent (terracotta) — the single accent, used site-wide
-| Token | OKLCH (canonical) | Hex (computed) | Role | Source |
-|---|---|---|---|---|
-| `--color-accent` | `oklch(58% 0.18 35)` | `#ce4522` | Primary CTA fill, brand mark | hallmark.css:32 |
-| `--color-accent-deep` | `oklch(42% 0.2 32)` | `#9e0000` | CTA hover/active, **accent-colored small text & links** | hallmark.css:33 |
-| `--color-accent-soft` | `oklch(82% 0.08 45)` | `#f1b499` | Accent tint background | hallmark.css:34 |
+### Brand accent (RadioPad blue) — the single accent, used site-wide
+| Token | Light | Dark | Role |
+|---|---|---|---|
+| `--color-accent` | `#2f88d8` | `#3b82f6` | Primary CTA fill, brand mark |
+| `--color-accent-deep` | `#1f6fb8` | `#619bf8` | CTA hover; **accent-colored small text & links** (dark hover/link is deliberately LIGHTER, per RC) |
+| `--color-accent-soft` | `#bbdcf6` | `#1e3a5f` | Soft accent fill / tint block |
+| `--color-accent-tint` | `#eaf3fc` | `#16283f` | Tinted chip / selected background |
+| `--color-accent-fg` | `#ffffff` | `#ffffff` | Text/icon ON accent fills (both schemes) |
 
-### Semantic states (used sparingly on marketing — mostly for iconography / validation storytelling)
-| Token | OKLCH (canonical) | Hex (computed) | Role | Source |
-|---|---|---|---|---|
-| `--color-success` | `oklch(50% 0.09 150)` | `#397247` | Success / "validated" green | hallmark.css:41 |
-| `--color-success-soft` | `oklch(90% 0.04 145)` | `#cee6ce` | Success tint | hallmark.css:42 |
-| `--color-marine` | `oklch(34% 0.09 240)` | `#003c61` | Info blue | hallmark.css:39 |
-| `--color-marine-soft` | `oklch(83% 0.045 240)` | `#aecce2` | Info tint | hallmark.css:40 |
-| `--color-danger` | `oklch(52% 0.17 25)` | `#b63132` | Error / "blocker" red | hallmark.css:43 |
-| `--color-danger-soft` | `oklch(89% 0.055 32)` | `#fdcec4` | Error tint | hallmark.css:44 |
-| `--color-saffron` | `oklch(78% 0.16 78)` | `#efa810` | Warning amber | hallmark.css:37 |
-| `--color-saffron-soft` | `oklch(91% 0.07 80)` | `#faddad` | Warning tint | hallmark.css:38 |
+### Semantic states (only where they carry meaning — validation storytelling)
+| Token | Light | Dark | Role |
+|---|---|---|---|
+| `--color-success` | `#11845b` | `#2fbf87` | Success / "validated" |
+| `--color-success-soft` | `#dcf2e8` | `#0e2b22` | Success tint |
+| `--color-warning` | `#a65e00` | `#e5a43b` | Warning amber |
+| `--color-warning-soft` | `#fbf1de` | `#33270f` | Warning tint |
+| `--color-danger` | `#c43d3d` | `#e36868` | Error / "blocker" |
+| `--color-danger-soft` | `#fae3e3` | `#351619` | Error tint |
+| `--color-info` | `#2565ae` | `#6fa8e8` | Info blue |
+| `--color-info-soft` | `#dfecfa` | `#12263c` | Info tint |
 
-### Clinical-safety marker (purple) — carry it for brand fidelity even if lightly used
-| Token | OKLCH (canonical) | Hex (computed) | Role | Source |
-|---|---|---|---|---|
-| `--color-ai` | `oklch(45% 0.14 300)` | `#623e96` | "AI-generated" disclosure purple — must stay visually distinct from info-blue | hallmark.css:49 |
-| `--color-ai-soft` | `oklch(90% 0.05 300)` | `#e3d7fb` | AI tint | hallmark.css:50 |
+### Clinical-safety marker (AI blue — distinct from accent and info)
+| Token | Light | Dark | Role |
+|---|---|---|---|
+| `--color-ai` | `#1d63c2` | `#7cb8f5` | "AI-generated" disclosure |
+| `--color-ai-soft` | `#e8f1fd` | `#142943` | AI tint |
 
 ### Focus
-| Token | OKLCH (canonical) | Hex (computed) | Role | Source |
-|---|---|---|---|---|
-| `--color-focus-ring` | `oklch(48% 0.2 32)` | `#b30000` | Keyboard focus outline (2px) | hallmark.css:45 |
+| Token | Light | Dark | Role |
+|---|---|---|---|
+| `--color-focus` | `#5eaaf0` | `#83c4ff` | Keyboard focus outline (2px) |
 
-**Theme:** Light-only. No dark-mode token set exists in the product, and the brief
-explicitly requires "BRIGHT / LIGHT (never dark)." The whole site locks to one light
-theme (taste-skill §4.11 Page Theme Lock).
+### Reverse "band" surfaces (marketing-only composite tokens)
+The site's high-contrast reverse sections (final CTA band, demo band, dark bento cell,
+code blocks) do **not** use raw `--ink` as a background — ink flips light in dark mode.
+They use dedicated band tokens built from RC values:
+
+| Token | Light | Dark | Role |
+|---|---|---|---|
+| `--color-band` | `#0f1f38` (ink navy) | `#16273b` (RC elevated) | Reverse band background |
+| `--color-band-ink` | `#f5f8fb` | `#edf6ff` | Text on the band |
+| `--color-band-accent` | `#bbdcf6` | `#7cb8f5` | Accent marks ON the band |
+
+Shadows tint to a fixed navy shade (`--shadow-ink`: light `#0f1f38`, dark `#020812`),
+never `var(--ink)` and never pure black.
 
 ---
 
 ## 2. Usage notes & guardrails
 
-- **One accent, locked** (taste-skill §4.2 Color Consistency Lock): terracotta
-  `--color-accent` is the *only* accent across the entire site. No blue/teal/rose CTAs
-  sneaking into later sections. Semantic colors (green/blue/red/amber/purple) appear
-  **only** where they carry real meaning (e.g. illustrating the validation engine:
-  blocker=red, warning=amber, info=blue, validated=green; the AI-disclosure purple).
+- **One accent, locked:** RadioPad blue `--color-accent` is the *only* accent across the
+  entire site. No terracotta, teal, or rose anywhere. Semantic colors (green/amber/red/
+  info-blue/AI-blue) appear **only** where they carry real meaning (validation engine:
+  blocker=red, warning=amber, info=blue, validated=green; the AI-disclosure treatment).
   They are never decorative accents.
 
-- **⚠ Accent contrast rule (WCAG, verified):**
-  - `--color-accent` `#ce4522` on `--color-paper` = **4.20:1** → passes AA for **large
-    text only** (≥24px / ≥18.66px bold). **Fails** AA for normal-size text/links.
-  - Therefore: accent-colored **small text, inline links, and small labels use
-    `--color-accent-deep` `#9e0000`** (7.70:1 on paper — AA ✓). Reserve bright
-    `--color-accent` for large display words, icon fills, and button *fills* (where the
-    label sits on the accent, not the accent on paper).
-  - `--color-paper-soft` `#fefbf7` on `--color-accent` fill = **4.52:1** → AA ✓ for
-    button label text. Good.
+- **Accent contrast rule (matches the product):**
+  - Small accent-colored text and inline links use `--color-accent-deep`
+    (light `#1f6fb8` = 4.9:1 on canvas, AA ✓; dark `#619bf8` = 6.6:1 on canvas, AA ✓).
+  - Bright `--color-accent` is reserved for button *fills*, icon fills, and large display
+    accents. Labels on accent fills always use `--color-accent-fg` (white) — never a
+    surface token, which would go dark in the dark scheme.
+  - Tinted chips (e.g. blog tags) pair `--color-accent-deep` text on
+    `--color-accent-tint` backgrounds (AA ✓ in both schemes); `--color-accent-soft` is
+    too strong a background for small text.
 
-- **Verified contrast (text on `--color-paper` `#f8f2eb`):**
-  | Pair | Ratio | Verdict |
-  |---|---|---|
-  | ink `#1e130c` | 16.38 | AA ✓ (AAA) |
-  | ink-soft `#4a4039` | 9.07 | AA ✓ (AAA) |
-  | ink-mute `#69625d` | 5.39 | AA ✓ (body) |
-  | accent-deep `#9e0000` | 7.70 | AA ✓ |
-  | accent `#ce4522` | 4.20 | large text only |
-  | marine `#003c61` | 10.39 | AA ✓ |
-  | success `#397247` | 5.14 | AA ✓ |
-  | danger `#b63132` | 5.44 | AA ✓ |
+- **Both schemes are mandatory.** Every new section/component must be checked in light
+  AND dark before it ships. Never hardcode a hex in `.astro`/`.svelte`/section CSS —
+  always `var(--*)` aliases (or the mapped Tailwind utility), so both schemes resolve.
 
-- **Shadows** tint to the paper hue, never pure black (taste-skill §4.4). Use warm,
-  low-opacity ink shadows, e.g. `0 18px 60px color-mix(in oklch, var(--color-ink), transparent 90%)`.
+- **Backgrounds:** alternate only within the RC surface family — `--color-paper` ↔
+  `--color-paper-soft` ↔ `--color-paper-warm`, plus occasional `--color-accent-soft` /
+  `--color-accent-tint`, or a deliberate `--color-band` reverse band. Never flip to a
+  warm hue or a different color family mid-page.
 
-- **Backgrounds:** alternate only *within* the warm family — `--color-paper` ↔
-  `--color-paper-soft` ↔ `--color-paper-warm`, plus occasional `--color-accent-soft`
-  or a full `--color-ink` "reverse" band for one deliberate high-contrast section.
-  Never flip to a cool-gray or a different hue family mid-page.
+- **Brand mark:** blue rounded square (`--color-accent`) with the white waveform stroke
+  (`#ffffff` = `--color-accent-fg`). Works unchanged on both schemes.
 
 ---
 
-## 3. Reference-only (NOT locked — free to replace on the marketing site)
+## 3. Reference-only (NOT locked — marketing's own system, unchanged by this re-lock)
 
-Captured from the product for reference; the marketing site replaces these with its own
-system (see Design Direction). Product source: `frontend/app/hallmark.css`.
-
-- **Fonts (product):** display `Aptos Display`, body `Aptos`, mono `Cascadia Mono`,
-  serif `Source Serif Pro`. These are Microsoft/Adobe system fonts, **not freely
-  web-embeddable**, so the marketing site uses a new self-hosted pairing.
-- **Spacing (product):** 11-step 4px grid, `--space-1`…`--space-11` (4→192px).
-- **Type scale (product):** 8-step, `--text-xs` 12px … `--text-display` 56px.
-- **Motion tokens (product):** durations 120/180/260ms; easings include
-  `--ease-out cubic-bezier(0.16,1,0.3,1)`, `--ease-spring cubic-bezier(0.175,0.885,0.32,1.275)`,
-  `--ease-pop`, `--ease-overshoot`. **We will reuse `--ease-out` (0.16,1,0.3,1) as the
-  primary marketing easing** — it's the product's signature curve and a free way to keep
-  motion feeling on-brand while everything else upgrades.
+- **Fonts (marketing):** display **Clash Display**, body **General Sans**, mono
+  **JetBrains Mono** — self-hosted woff2. Marketing typography was always free and is
+  deliberately NOT switched to the product's Inter. (Product fonts for reference:
+  Inter Variable everywhere, Cascadia Mono for IDs.)
+- **Spacing / type scale / radii:** marketing's fluid scale in `src/styles/tokens.css`
+  stays as-is.
+- **Motion:** primary easing stays `cubic-bezier(0.16, 1, 0.3, 1)` — the product's
+  signature `--ease-out` curve (still shipped in `frontend/app/tokens.css`).
 
 ---
 
-## 4. How these tokens ship into the Astro site (Phase 4)
+## 4. How these tokens ship into the Astro site
 
-Mirror the product's pattern: a `:root` block of `--color-*` custom properties (verbatim
-OKLCH from §1) + a matching Tailwind v4 `@theme` mapping, so both CSS-variable and
-utility (`bg-paper`, `text-ink`, `bg-accent`) authoring resolve to the identical locked
-values. No hardcoded hex in components — always `var(--color-*)` or the mapped utility.
+Mirrors the product's pattern:
+
+1. **Canonical values** live in the Tailwind v4 `@theme` block in
+   [`src/styles/app.css`](src/styles/app.css) (light values), emitted as `:root`
+   custom properties AND utilities (`bg-paper`, `text-ink`, `bg-accent`, …).
+2. **Dark scheme** overrides the same `--color-*` custom properties in a
+   `@media (prefers-color-scheme: dark)` block directly below `@theme`.
+3. **Alias layer** in [`src/styles/tokens.css`](src/styles/tokens.css) re-points the
+   short names (`--paper`, `--accent`, `--band`, …) used by all section CSS.
+4. No hardcoded hex in components — always `var(--color-*)` / aliases / utilities.
+
+Asset debt from the re-brand (generated art, tracked separately): `public/og-default.png`
+still renders the old terracotta OG card — regenerate via `scripts/gen-assets.mjs`
+(template already re-pointed to RC in this lock).

@@ -1,11 +1,14 @@
 /* Alias layer + non-color design tokens.
-   The canonical --color-* tokens live in the Tailwind @theme block (app.css) and are
-   emitted as :root custom properties there. This file mirrors hallmark.css's pattern:
+   The canonical --color-* tokens live in the Tailwind @theme block (app.css) — RC palette,
+   light values, with the dark-scheme override right below it — and are emitted as :root
+   custom properties there. This file mirrors the product tokens.css pattern:
    short brand-friendly aliases point at the locked --color-* values, so component CSS
    can use var(--paper) / var(--accent) while Tailwind utilities (bg-paper, text-ink)
    resolve to the exact same locked values. */
 
 :root {
+  color-scheme: light;
+
   /* color aliases -> locked --color-* (defined in @theme) */
   --paper: var(--color-paper);
   --paper-soft: var(--color-paper-soft);
@@ -18,17 +21,22 @@
   --accent: var(--color-accent);
   --accent-deep: var(--color-accent-deep);
   --accent-soft: var(--color-accent-soft);
+  --accent-tint: var(--color-accent-tint);
+  --accent-fg: var(--color-accent-fg);
   --success: var(--color-success);
   --success-soft: var(--color-success-soft);
-  --marine: var(--color-marine);
-  --marine-soft: var(--color-marine-soft);
+  --info: var(--color-info);
+  --info-soft: var(--color-info-soft);
   --danger: var(--color-danger);
   --danger-soft: var(--color-danger-soft);
-  --saffron: var(--color-saffron);
-  --saffron-soft: var(--color-saffron-soft);
+  --warning: var(--color-warning);
+  --warning-soft: var(--color-warning-soft);
   --ai: var(--color-ai);
   --ai-soft: var(--color-ai-soft);
   --focus: var(--color-focus);
+  --band: var(--color-band);
+  --band-ink: var(--color-band-ink);
+  --band-accent: var(--color-band-accent);
 
   /* fluid type scale (pushed larger for the production build).
      --t-display is capped so the 8-word hero headline keeps 3 clean lines and the
@@ -51,10 +59,23 @@
   --radius-lg: 22px;
   --radius-pill: 999px;
 
-  /* motion — house easing reused from the product (hallmark.css --ease-out) */
+  /* motion — house easing reused from the product (frontend/app/tokens.css --ease-out) */
   --ease: cubic-bezier(0.16, 1, 0.3, 1);
-  --shadow: 0 1px 2px color-mix(in oklch, var(--ink), transparent 92%),
-            0 18px 50px color-mix(in oklch, var(--ink), transparent 90%);
-  --shadow-sm: 0 1px 2px color-mix(in oklch, var(--ink), transparent 90%),
-               0 8px 24px color-mix(in oklch, var(--ink), transparent 93%);
+  /* shadows tint to a fixed navy shade (RC shadow hue), NOT var(--ink) — ink flips
+     light in the dark scheme and would produce white glows. */
+  --shadow-ink: #0f1f38;
+  --shadow: 0 1px 2px color-mix(in oklch, var(--shadow-ink), transparent 92%),
+            0 18px 50px color-mix(in oklch, var(--shadow-ink), transparent 90%);
+  --shadow-sm: 0 1px 2px color-mix(in oklch, var(--shadow-ink), transparent 90%),
+               0 8px 24px color-mix(in oklch, var(--shadow-ink), transparent 93%);
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --shadow-ink: #020812; /* matches RC dark scrim hue */
+    --shadow: 0 1px 2px color-mix(in oklch, var(--shadow-ink), transparent 75%),
+              0 18px 50px color-mix(in oklch, var(--shadow-ink), transparent 60%);
+    --shadow-sm: 0 1px 2px color-mix(in oklch, var(--shadow-ink), transparent 70%),
+                 0 8px 24px color-mix(in oklch, var(--shadow-ink), transparent 70%);
+  }
 }
