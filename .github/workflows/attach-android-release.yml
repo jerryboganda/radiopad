@@ -1,19 +1,26 @@
 name: attach-android-release
 
-# When a desktop release is published (by desktop-bundle), attach the matching
-# Android companion APK — built by mobile-bundle for the SAME commit — as a
-# stable-named release asset. The phone app's "Check for updates" reads the latest
-# release via the GitHub API and downloads this asset. GitHub Actions artifacts
-# are NOT publicly downloadable, but release assets are, so the APK must live on
-# the release. Runs on `release: published`, i.e. AFTER the release exists, so
-# there is no race with desktop-bundle creating it.
+# Attach the Android companion APK to each desktop release as a stable-named asset
+# so the phone app's "Check for updates" can hand back a real download URL. (GitHub
+# Actions artifacts aren't publicly downloadable; release assets are.)
+#
+# Triggered by desktop-bundle COMPLETING — NOT by `release: published`, because the
+# release is created with the default GITHUB_TOKEN and GitHub does not fire release
+# events for token-created releases (a recursion guard). By the time desktop-bundle
+# finishes, the release exists and mobile-bundle (much faster) is already done.
 
 on:
-  release:
-    types: [published]
+  workflow_run:
+    workflows: ['desktop-bundle']
+    types: [completed]
 
 jobs:
   attach-apk:
+    # Only for successful, tag-triggered desktop-bundle runs (head_branch is the
+    # vX.Y.Z tag for a tag push).
+    if: >-
+      ${{ github.event.workflow_run.conclusion == 'success'
+          && startsWith(github.event.workflow_run.head_branch, 'v') }}
     runs-on: ubuntu-latest
     permissions:
       contents: write # upload release assets
@@ -22,27 +29,31 @@ jobs:
       - name: Attach companion APK to the release
         env:
           GH_TOKEN: ${{ github.token }}
-          SHA: ${{ github.sha }}
-          TAG: ${{ github.event.release.tag_name }}
+          SHA: ${{ github.event.workflow_run.head_sha }}
+          TAG: ${{ github.event.workflow_run.head_branch }}
         run: |
           set -euo pipefail
-          echo "Release $TAG @ $SHA"
-          # Wait (up to ~12 min) for a successful mobile-bundle run on this commit.
-          # mobile-bundle finishes in a few minutes; desktop-bundle (which creates
-          # the release) takes far longer, so it is normally already done — this is
-          # just a safety net.
+          echo "desktop-bundle succeeded for $TAG @ $SHA"
+
+          # The release is created near the end of desktop-bundle; give it a moment.
+          for i in $(seq 1 10); do
+            if gh release view "$TAG" >/dev/null 2>&1; then break; fi
+            echo "waiting for release $TAG ($i/10)…"; sleep 15
+          done
+
+          # Find the successful mobile-bundle run for this exact commit.
           RUN=""
-          for i in $(seq 1 24); do
+          for i in $(seq 1 20); do
             RUN=$(gh run list --workflow mobile-bundle.yml --commit "$SHA" --status success \
                     --limit 1 --json databaseId --jq '.[0].databaseId' 2>/dev/null || true)
             if [ -n "$RUN" ]; then break; fi
-            echo "waiting for a successful mobile-bundle run on $SHA ($i/24)…"
-            sleep 30
+            echo "waiting for a successful mobile-bundle run on $SHA ($i/20)…"; sleep 30
           done
           if [ -z "$RUN" ]; then
             echo "::warning::No successful mobile-bundle run for $SHA; APK not attached."
             exit 0
           fi
+
           echo "Using mobile-bundle run $RUN"
           gh run download "$RUN" -n radiopad-android-debug -D apk
           APK=$(ls apk/*.apk | head -1)
