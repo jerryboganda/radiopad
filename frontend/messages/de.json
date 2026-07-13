@@ -96,6 +96,19 @@
       "installing": "Wird installiert…",
       "upToDate": "Aktuell",
       "failed": "Update fehlgeschlagen — erneut versuchen"
+    },
+    "search": "Suchen",
+    "hipaa": "HIPAA-konform",
+    "hipaaTitle": "PHI-Schutz aktiv — Audit-Log, Mandantentrennung, Provider-Richtlinien",
+    "collapse": "Einklappen",
+    "palette": {
+      "title": "Befehlspalette",
+      "placeholder": "Module und Berichte durchsuchen…",
+      "noResults": "Keine Treffer"
+    },
+    "notifications": {
+      "label": "Benachrichtigungen",
+      "empty": "Alles erledigt."
     }
   },
   "profile": {

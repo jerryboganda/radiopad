@@ -121,24 +121,27 @@
   color: var(--text);
 }
 
-/* -------- AI draft highlight (purple family) ---------------------- */
+/* -------- AI draft highlight (blue "generated" treatment, RC-02/03) ----
+   Clinical-safety marking: tinted field + ✨ generated label; cleared when
+   the radiologist accepts/edits. Label + border carry the meaning (never
+   hue-only). Uses the --ai family — purple is reserved for provenance. */
 .ai-mark {
   position: relative;
-  background: var(--purple-bg);
-  border: 1px solid var(--purple-border);
-  border-left: 3px solid var(--purple);
+  background: var(--ai-bg);
+  border: 1px solid var(--ai-border);
+  border-left: 3px solid var(--ai);
   border-radius: var(--radius-sm);
   padding: 10px 12px;
   animation: rp-pop-in var(--anim-base) var(--ease-pop) both;
 }
 .ai-mark::before {
-  content: 'AI draft — review required';
+  content: '✨ generated — review required';
   display: block;
   font-family: var(--sans);
   font-size: 10.5px;
   letter-spacing: 0.06em;
   text-transform: uppercase;
-  color: var(--purple);
+  color: var(--ai);
   font-weight: 600;
   margin-bottom: 6px;
 }
@@ -322,7 +325,7 @@
 }
 .badge.ok     { background: var(--green-bg);  border-color: var(--green-border);  color: var(--green); }
 .badge.info   { background: var(--blue-bg);   border-color: var(--blue-border);   color: var(--blue); }
-.badge.ai     { background: var(--purple-bg); border-color: var(--purple-border); color: var(--purple); }
+.badge.ai     { background: var(--ai-bg); border-color: var(--ai-border); color: var(--ai); }
 .badge.warn   { background: var(--amber-bg);                                       color: var(--amber); }
 .badge.danger { background: var(--red-bg);    border-color: var(--red-border);    color: var(--red); }
 
@@ -343,7 +346,7 @@
 }
 .banner.warn { background: var(--amber-bg); color: var(--amber); border-color: color-mix(in srgb, var(--amber) 25%, transparent); }
 .banner.info { background: var(--blue-bg); border-color: var(--blue-border); color: var(--blue); }
-.banner.ai   { background: var(--purple-bg); border-color: var(--purple-border); color: var(--purple); }
+.banner.ai   { background: var(--ai-bg); border-color: var(--ai-border); color: var(--ai); }
 .banner.danger { background: var(--red-bg); border-color: var(--red-border); color: var(--red); }
 .rp-desktop-status {
   border-left: 0;
@@ -405,7 +408,7 @@
   background: var(--bg-subtle);
   color: var(--text);
 }
-.rp-banner.warn   { background: var(--amber-bg); color: var(--amber); border-color: rgba(178, 98, 0, 0.25); }
+.rp-banner.warn   { background: var(--amber-bg); color: var(--amber); border-color: var(--amber-border); }
 .rp-banner.info   { background: var(--blue-bg);  border-color: var(--blue-border);  color: var(--blue); }
 .rp-banner.danger { background: var(--red-bg);   border-color: var(--red-border);   color: var(--red); }
 
@@ -437,7 +440,7 @@
 /* ----------- Modal (provider editor, etc.) -- locked tokens only --------- */
 .rp-modal-backdrop {
   position: fixed; inset: 0; z-index: 50;
-  background: rgba(26, 25, 22, 0.32);
+  background: var(--scrim);
   display: flex; align-items: center; justify-content: center;
   padding: 24px;
 }
@@ -448,7 +451,7 @@
   background: var(--bg);
   border: 1px solid var(--border);
   border-radius: 12px;
-  box-shadow: 0 16px 48px rgba(26, 25, 22, 0.18);
+  box-shadow: var(--shadow-lg);
   padding: 20px 22px;
 }
 .rp-field { display: flex; flex-direction: column; gap: 4px; margin-bottom: 12px; }
@@ -532,7 +535,7 @@
   background: var(--bg);
   border: 1px solid var(--border);
   border-radius: var(--radius);
-  box-shadow: 0 8px 32px rgba(26, 25, 22, 0.14);
+  box-shadow: var(--shadow-md);
   padding: 12px;
 }
 .rp-rewrite-option { padding: 0; margin: 0; }
@@ -764,7 +767,7 @@
   background: var(--bg);
   border: 1px solid var(--border);
   border-radius: var(--radius);
-  box-shadow: 0 8px 32px rgba(26, 25, 22, 0.14);
+  box-shadow: var(--shadow-md);
   padding: 6px;
   display: flex;
   flex-direction: column;
@@ -947,7 +950,7 @@
 .rp-companion-host-panel img {
   border: 1px solid var(--border);
   border-radius: var(--radius);
-  background: #fff;
+  background: #fff; /* theme-neutral: QR codes need a white quiet zone to scan */
 }
 
 /* Real-time (interim) dictation preview rendered at the caret while the phone is
@@ -1316,7 +1319,7 @@
   color: var(--text-muted);
 }
 .rp-context-spacer { flex: 1; }
-.rp-chip-dirty { background: var(--amber-bg); color: var(--amber); border-color: rgba(178, 98, 0, 0.25); }
+.rp-chip-dirty { background: var(--amber-bg); color: var(--amber); border-color: var(--amber-border); }
 
 /* Count pill on a panel title (e.g. "Prompt blocks 4"). */
 .rp-panel-count {
@@ -1556,7 +1559,7 @@
   .rp-auth-feature::before { transition: transform 0.22s cubic-bezier(0.16, 1, 0.3, 1), opacity 0.2s ease; }
   .rp-auth-feature:hover { transform: translateY(-2px); border-color: var(--accent-soft); box-shadow: var(--shadow-sm); }
   .rp-auth-feature:hover::before { transform: scaleY(1); opacity: 1; }
-  .rp-auth-feature:hover .rp-auth-feature-icon { color: #fff; background: linear-gradient(150deg, var(--accent), var(--accent-strong)); border-color: var(--accent-strong); }
+  .rp-auth-feature:hover .rp-auth-feature-icon { color: var(--accent-fg); background: linear-gradient(150deg, var(--accent), var(--accent-strong)); border-color: var(--accent-strong); }
 }
 .rp-auth-feature-icon {
   width: 38px;
@@ -1742,7 +1745,7 @@
   font: 600 12px/1 var(--sans);
 }
 .rp-pair-step-label { font: 500 11.5px/1.3 var(--sans); color: var(--text-soft); }
-.rp-pair-step.active .rp-pair-step-dot { background: var(--accent); border-color: var(--accent); color: #fff; }
+.rp-pair-step.active .rp-pair-step-dot { background: var(--accent); border-color: var(--accent); color: var(--accent-fg); }
 .rp-pair-step.active .rp-pair-step-label { color: var(--text); }
 .rp-pair-step.done .rp-pair-step-dot { background: var(--accent-tint); border-color: var(--accent-soft); color: var(--accent); }
 .rp-auth-card .rp-pair-code-tile {
@@ -1787,7 +1790,7 @@
 /* ---- Forced first-login TOTP enrolment -------------------------- */
 .rp-totp-enroll { display: flex; gap: 16px; align-items: center; flex-wrap: wrap; margin-bottom: 18px; }
 .rp-qr {
-  background: #fff;
+  background: #fff; /* theme-neutral: QR codes need a white quiet zone to scan */
   border: 1px solid var(--border);
   border-radius: var(--radius);
   padding: 10px;
@@ -1985,8 +1988,8 @@
   color: var(--text);
   font: 600 12.5px/1 var(--sans);
 }
-.rp-wizard-step.current .rp-wizard-step-num { background: var(--accent); color: var(--accent-fg, #fff); }
-.rp-wizard-step.done .rp-wizard-step-num { background: var(--green, #2e7d32); color: #fff; }
+.rp-wizard-step.current .rp-wizard-step-num { background: var(--accent); color: var(--accent-fg); }
+.rp-wizard-step.done .rp-wizard-step-num { background: var(--green); color: var(--accent-fg); }
 .rp-wizard-step-label { font-size: 13.5px; font-weight: 500; }
 
 /* Panel + layout */
@@ -2144,8 +2147,8 @@
   opacity: 0.9;
   animation: rp-genoverlay-pulse 1.6s var(--ease-in-out, ease-in-out) infinite;
 }
-.rp-genoverlay-orb.done .rp-genoverlay-orb-ring { animation: none; border-top-color: var(--green, #2e7d32); border-color: color-mix(in oklch, var(--green, #2e7d32), transparent 70%); }
-.rp-genoverlay-orb.done .rp-genoverlay-orb-core { background: var(--green, #2e7d32); animation: none; }
+.rp-genoverlay-orb.done .rp-genoverlay-orb-ring { animation: none; border-top-color: var(--green); border-color: color-mix(in oklch, var(--green), transparent 70%); }
+.rp-genoverlay-orb.done .rp-genoverlay-orb-core { background: var(--green); animation: none; }
 
 /* Step checklist */
 .rp-genoverlay-steps { list-style: none; margin: 0 0 16px; padding: 0; text-align: left; }
@@ -2160,7 +2163,7 @@
 }
 .rp-genoverlay-step.active { color: var(--text-strong, var(--text)); font-weight: 600; }
 .rp-genoverlay-step.done { color: var(--text); }
-.rp-genoverlay-step-mark { flex: 0 0 auto; width: 18px; height: 18px; display: grid; place-items: center; color: var(--green, #2e7d32); }
+.rp-genoverlay-step-mark { flex: 0 0 auto; width: 18px; height: 18px; display: grid; place-items: center; color: var(--green); }
 .rp-genoverlay-step.active .rp-genoverlay-step-mark { color: var(--accent); }
 .rp-genoverlay-step-dot { width: 7px; height: 7px; border-radius: 999px; background: var(--border-strong, var(--border)); }
 .rp-genoverlay-step-spin {
@@ -2179,7 +2182,7 @@
   background: linear-gradient(90deg, var(--accent), color-mix(in oklch, var(--accent), transparent 35%));
   transition: width 0.6s var(--ease-out, ease);
 }
-.rp-genoverlay-bar-fill.done { background: var(--green, #2e7d32); }
+.rp-genoverlay-bar-fill.done { background: var(--green); }
 .rp-genoverlay-meta { display: flex; justify-content: flex-end; margin-top: 8px; }
 .rp-genoverlay-timer { font: 500 12.5px/1 var(--mono, monospace); color: var(--text-dim, var(--text)); }
 

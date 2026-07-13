@@ -10,9 +10,17 @@ import { useSttMode } from '@/lib/dictation/sttMode';
 import { useCrossCheckEnabled, useUseUbag } from '@/lib/dictation/crossCheckPrefs';
 import LocalePicker from '../LocalePicker';
 
-type Me = { tenant: { displayName: string }; user: { email: string } } | null;
+type Me = {
+  tenant: { displayName: string };
+  user: { email: string; roleName?: string };
+} | null;
 
-export default function ProfileMenu() {
+/**
+ * variant="topbar" (RC chrome): avatar + name/role trigger on the topbar's
+ * right edge, popover drops down. variant="sidebar" keeps the legacy
+ * sidebar-footer placement (popover opens upward).
+ */
+export default function ProfileMenu({ variant = 'sidebar' }: { variant?: 'sidebar' | 'topbar' }) {
   const router = useRouter();
   const tBar = useTranslations('topbar');
   const tNav = useTranslations('nav');
@@ -50,6 +58,9 @@ export default function ProfileMenu() {
   const initials = me?.user?.email?.slice(0, 1).toUpperCase() ?? '?';
   const email = me?.user?.email ?? tProfile('signedOut');
   const tenant = me?.tenant?.displayName ?? tBar('tagline');
+  const role = me?.user?.roleName;
+  // Topbar trigger shows identity + role (RC chrome); sidebar shows tenant.
+  const secondary = variant === 'topbar' ? role ?? tenant : tenant;
 
   async function signOut() {
     setOpen(false);
@@ -66,7 +77,7 @@ export default function ProfileMenu() {
   }
 
   return (
-    <div className="rp-profile-menu" ref={ref}>
+    <div className={`rp-profile-menu${variant === 'topbar' ? ' rp-profile-menu--topbar' : ''}`} ref={ref}>
       <button
         type="button"
         className="rp-profile-trigger"
@@ -77,7 +88,7 @@ export default function ProfileMenu() {
         <span className="rp-avatar" aria-hidden>{initials}</span>
         <span className="rp-profile-text">
           <span className="rp-profile-name">{email}</span>
-          <span className="rp-profile-tenant">{tenant}</span>
+          <span className="rp-profile-tenant">{secondary}</span>
         </span>
       </button>
 

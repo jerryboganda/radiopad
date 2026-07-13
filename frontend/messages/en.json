@@ -96,6 +96,19 @@
       "installing": "Installing…",
       "upToDate": "Up to date",
       "failed": "Update failed — retry"
+    },
+    "search": "Search",
+    "hipaa": "HIPAA Compliant",
+    "hipaaTitle": "PHI safeguards active — audit log, tenant isolation, provider policy gates",
+    "collapse": "Collapse",
+    "palette": {
+      "title": "Command palette",
+      "placeholder": "Search modules and reports…",
+      "noResults": "No results"
+    },
+    "notifications": {
+      "label": "Notifications",
+      "empty": "You're all caught up."
     }
   },
   "profile": {

@@ -96,6 +96,19 @@
       "installing": "Instalando…",
       "upToDate": "Actualizado",
       "failed": "Error al actualizar — reintentar"
+    },
+    "search": "Buscar",
+    "hipaa": "Conforme a HIPAA",
+    "hipaaTitle": "Protección de PHI activa — registro de auditoría, aislamiento de inquilinos, políticas de proveedores",
+    "collapse": "Contraer",
+    "palette": {
+      "title": "Paleta de comandos",
+      "placeholder": "Buscar módulos e informes…",
+      "noResults": "Sin resultados"
+    },
+    "notifications": {
+      "label": "Notificaciones",
+      "empty": "Estás al día."
     }
   },
   "profile": {

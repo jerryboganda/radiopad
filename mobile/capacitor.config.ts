@@ -16,7 +16,8 @@ const config: CapacitorConfig = {
   plugins: {
     SplashScreen: {
       launchShowDuration: 600,
-      backgroundColor: '#faf9f7',
+      // RC canvas (light) — see frontend/app/tokens.css.
+      backgroundColor: '#f5f8fb',
     },
     PushNotifications: {
       // PRD MOB-007 — request `alert` + `badge` + `sound` on first launch.

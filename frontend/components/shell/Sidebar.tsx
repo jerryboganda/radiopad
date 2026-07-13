@@ -6,9 +6,9 @@ import { useTranslations } from 'next-intl';
 import { useEffect } from 'react';
 import { navGroups, isActive } from './nav.config';
 import { useShell } from './ShellContext';
-import ProfileMenu from './ProfileMenu';
 import { usePermissions, type PermissionKey } from '@/lib/permissions';
 import { surfaceAllows } from '@/lib/surface';
+import { ChevronLeft, ChevronRight } from 'lucide-react';
 
 export default function Sidebar() {
   const tNav = useTranslations('nav');
@@ -47,26 +47,6 @@ export default function Sidebar() {
       aria-label={tBar('primaryNav')}
       data-collapsed={collapsed ? 'true' : 'false'}
     >
-      <Link href="/" className="rp-sidebar-brand">
-        <span className="brand-mark" aria-hidden>
-          <span className="brand-mark-letter">R</span>
-        </span>
-        <span className="rp-sidebar-brand-text">
-          <span className="rp-sidebar-brand-title">{tBar('title')}</span>
-          <span className="rp-sidebar-brand-meta">{tBar('tagline')}</span>
-        </span>
-      </Link>
-
-      <button
-        type="button"
-        className="rp-sidebar-collapse-btn"
-        aria-label={collapsed ? tBar('expandSidebar') : tBar('collapseSidebar')}
-        aria-expanded={!collapsed}
-        onClick={toggleCollapsed}
-      >
-        <span aria-hidden>{collapsed ? '›' : '‹'}</span>
-      </button>
-
       <nav className="rp-sidebar-nav">
         {groups.map((group) => (
           <div key={group.labelKey} className="rp-sidebar-group">
@@ -94,7 +74,19 @@ export default function Sidebar() {
       </nav>
 
       <div className="rp-sidebar-footer">
-        <ProfileMenu />
+        {/* RC sidebar: labeled Collapse control pinned to the footer. */}
+        <button
+          type="button"
+          className="rp-sidebar-collapse"
+          aria-label={collapsed ? tBar('expandSidebar') : tBar('collapseSidebar')}
+          aria-expanded={!collapsed}
+          onClick={toggleCollapsed}
+        >
+          <span className="rp-sidebar-icon" aria-hidden>
+            {collapsed ? <ChevronRight /> : <ChevronLeft />}
+          </span>
+          <span className="rp-sidebar-label">{tBar('collapse')}</span>
+        </button>
       </div>
     </aside>
   );

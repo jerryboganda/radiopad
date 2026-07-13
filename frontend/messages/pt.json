@@ -96,6 +96,19 @@
       "installing": "Instalando…",
       "upToDate": "Atualizado",
       "failed": "Falha na atualização — tentar novamente"
+    },
+    "search": "Pesquisar",
+    "hipaa": "Conforme HIPAA",
+    "hipaaTitle": "Proteções de PHI ativas — log de auditoria, isolamento de tenants, políticas de provedores",
+    "collapse": "Recolher",
+    "palette": {
+      "title": "Paleta de comandos",
+      "placeholder": "Pesquisar módulos e laudos…",
+      "noResults": "Sem resultados"
+    },
+    "notifications": {
+      "label": "Notificações",
+      "empty": "Você está em dia."
     }
   },
   "profile": {
