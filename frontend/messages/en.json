@@ -30,8 +30,19 @@
       "workspace": "Workspace",
       "library": "Library",
       "integrations": "Connections",
-      "admin": "Workspace admin"
-    }
+      "admin": "Workspace admin",
+      "insights": "Insights",
+      "account": "Account"
+    },
+    "dashboard": "Dashboard",
+    "worklist": "Worklist",
+    "composer": "Report Composer",
+    "protocols": "Protocols",
+    "aiAssistant": "AI Assistant",
+    "findingsLibrary": "Findings Library",
+    "quality": "Quality & Peer Review",
+    "settingsHub": "Settings",
+    "hotkeys": "Hotkeys"
   },
   "buttons": {
     "primary": {

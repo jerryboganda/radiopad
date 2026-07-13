@@ -1,21 +1,29 @@
 'use client';
 
-// Tabbed right-hand inspector for the report editor. Folds the former three
-// stacked right-pane panels (study context, validation, sign & addendum) into
-// one persistent panel with Context / Checks / Sign-off tabs so they never sit
-// at uneven heights. Purely presentational — state + handlers come from props.
-import type { Report, ValidationFinding, ReportTemplate, ReportSignature, CatalogItem, Rulebook } from '@/lib/api';
-import SearchableSelect from '@/components/ui/SearchableSelect';
+// RC right rail for the report composer — tabbed panel with Checklist /
+// Details / Validation (RC-04) / AI activity (RC-06) / Export (RC-09) /
+// Sign-off. Purely presentational: state + handlers arrive from ReportClient.
+// The old Context tab moved to the left StudyContextPanel (RC-01).
+import type { ReactNode } from 'react';
+import type { Report, ValidationFinding, ReportTemplate, ReportSignature, Rulebook, Provider } from '@/lib/api';
 import {
-  contrastLabel,
   groupBySeverity,
   normalizeRole,
   roleBadge,
   fmtDateTime,
+  statusLabel,
+  statusTone,
   UnsupportedClaimFinding,
 } from './reportShared';
+import ChecklistPanel from '@/components/reports/ChecklistPanel';
+import AiActivityPanel, { type AiActivityEntry } from '@/components/reports/AiActivityPanel';
+import ExportPanel, { type ExportFormat } from '@/components/reports/ExportPanel';
+import ErrorState from '@/components/ui/ErrorState';
+import EmptyState from '@/components/ui/EmptyState';
+import Skeleton from '@/components/ui/Skeleton';
+import { ShieldCheck, CornerDownRight, RefreshCw } from 'lucide-react';
 
-export type InspectorTab = 'context' | 'checks' | 'signoff';
+export type InspectorTab = 'checklist' | 'details' | 'validation' | 'activity' | 'export' | 'signoff';
 
 export interface ReportInspectorProps {
   tab: InspectorTab;
@@ -23,28 +31,39 @@ export interface ReportInspectorProps {
 
   report: Report;
 
-  // Context
-  templates: ReportTemplate[];
-  // Iter-36 — admin-managed catalogs drive the modality/body-part dropdowns;
-  // rulebooks are used to label the auto-matched rulebook (prompts).
-  modalities: CatalogItem[];
-  bodyParts: CatalogItem[];
-  rulebooks: Rulebook[];
-  onStudyChange: (patch: { modality?: string; bodyPart?: string; contrast?: string; age?: number | null; gender?: string }) => void;
-  // Manual binding overrides — selecting pins the binding (survives later
-  // study-context changes); reset clears the pin and re-resolves automatically.
-  onTemplateChange: (templateId: string) => void;
-  onTemplateReset: () => void;
-  onRulebookChange: (rulebookId: string) => void;
-  onRulebookReset: () => void;
-  canEdit: boolean;
+  // Checklist
+  hasAiText: boolean;
+  onAcknowledge: () => void;
 
-  // Checks
+  // Details
+  templates: ReportTemplate[];
+  rulebooks: Rulebook[];
+
+  // Validation (RC-04)
   findings: ValidationFinding[];
   qualityScore: number | null;
   blockers: number;
+  validationState: 'idle' | 'running' | 'done' | 'error';
+  validationError: string | null;
+  lastValidatedAt: Date | null;
   canValidate: boolean;
   onValidate: () => void;
+  onJumpToSection: (section: string) => void;
+
+  // AI activity (RC-06)
+  aiActivity: AiActivityEntry[];
+  provider: Provider | null;
+  onShowProvenance: (entry: AiActivityEntry) => void;
+
+  // Export (RC-09)
+  canExport: boolean;
+  exportAllowed: boolean;
+  exportTitle?: string;
+  onExport: (fmt: ExportFormat) => Promise<void>;
+  risSlot?: ReactNode;
+
+  // Permissions
+  canEdit: boolean;
 
   // Sign-off
   canSign: boolean;
@@ -64,301 +83,234 @@ export interface ReportInspectorProps {
 
 export default function ReportInspector(p: ReportInspectorProps) {
   const tabs: Array<{ id: InspectorTab; label: string }> = [
-    { id: 'context', label: 'Context' },
-    { id: 'checks', label: 'Checks' },
+    { id: 'checklist', label: 'Checklist' },
+    { id: 'details', label: 'Details' },
+    { id: 'validation', label: 'Validation' },
+    { id: 'activity', label: 'AI activity' },
+    { id: 'export', label: 'Export' },
   ];
   if (p.canSign) tabs.push({ id: 'signoff', label: 'Sign-off' });
 
   return (
-    <aside className="rp-inspector">
-      <div className="rp-inspector-tabbar" role="tablist" aria-label="Report inspector">
+    <aside className="rp-inspector rp-rail">
+      <div className="rp-rail-tabbar" role="tablist" aria-label="Report inspector">
         {tabs.map((t) => (
           <button
             key={t.id}
             type="button"
             role="tab"
             aria-selected={p.tab === t.id}
-            className={`rp-inspector-tab${p.tab === t.id ? ' is-active' : ''}`}
+            className={`rp-rail-tab${p.tab === t.id ? ' is-active' : ''}`}
             onClick={() => p.onTabChange(t.id)}
           >
             {t.label}
+            {t.id === 'validation' && p.blockers > 0 && (
+              <span className="rp-rail-tab-count" aria-label={`${p.blockers} blockers`}>{p.blockers}</span>
+            )}
           </button>
         ))}
       </div>
 
       <div className="rp-inspector-body" role="tabpanel">
-        {p.tab === 'context' && <ContextPanel {...p} />}
-        {p.tab === 'checks' && <ChecksPanel {...p} />}
+        {p.tab === 'checklist' && (
+          <ChecklistPanel
+            report={p.report}
+            hasAiText={p.hasAiText}
+            validated={p.validationState === 'done'}
+            blockers={p.blockers}
+            primarySigned={p.primarySigned}
+            canEdit={p.canEdit}
+            onAcknowledge={p.onAcknowledge}
+          />
+        )}
+        {p.tab === 'details' && <DetailsPanel {...p} />}
+        {p.tab === 'validation' && <ValidationPanel {...p} />}
+        {p.tab === 'activity' && (
+          <AiActivityPanel entries={p.aiActivity} provider={p.provider} onShowProvenance={p.onShowProvenance} />
+        )}
+        {p.tab === 'export' && (
+          <ExportPanel
+            canExport={p.canExport}
+            exportAllowed={p.exportAllowed}
+            exportBlockedReason={p.exportTitle}
+            validated={p.validationState === 'done'}
+            blockers={p.blockers}
+            warnings={groupBySeverity(p.findings).warning.length}
+            onOpenValidation={() => {
+              p.onTabChange('validation');
+              if (p.validationState === 'idle' && p.canValidate) p.onValidate();
+            }}
+            onExport={p.onExport}
+            risSlot={p.risSlot}
+          />
+        )}
         {p.tab === 'signoff' && p.canSign && <SignoffPanel {...p} />}
       </div>
     </aside>
   );
 }
 
-function ContextPanel(p: ReportInspectorProps) {
-  const study = p.report.study;
-  // Modality + body part + contrast are the selection key. They are admin-managed
-  // dropdowns; changing any re-binds the matching template (scaffolding) and
-  // rulebook (prompts) server-side — unless the radiologist manually pinned a
-  // binding via the override dropdowns below.
-  const matchedTemplate = p.templates.find((t) => t.id === p.report.templateId);
-  const matchedRulebook = p.rulebooks.find((r) => r.id === p.report.rulebookId);
-
-  // One flat, searchable list per binding (same pattern as the ribbon's AI
-  // provider picker): click → search box + every option. Options matching the
-  // current study context sort first so the likely picks lead, but nothing is
-  // hidden behind a toggle — an off-context pick (e.g. swapping the trauma
-  // head-CT rulebook for delayed milestones) is just a search away.
-  const eq = (a: string, b: string) => a.trim().toLowerCase() === b.trim().toLowerCase();
-  const csvHas = (csv: string, value: string) =>
-    csv.split(',').some((part) => eq(part, value));
-
-  const templateMatchesStudy = (t: ReportTemplate) =>
-    eq(t.modality, study.modality) && eq(t.bodyPart, study.bodyPart);
-  const templateOptions = p.templates
-    .filter((t) => t.status === undefined || t.status === 1) // Approved only
-    .sort((a, b) => {
-      const am = templateMatchesStudy(a) ? 0 : 1;
-      const bm = templateMatchesStudy(b) ? 0 : 1;
-      return am !== bm ? am - bm : a.name.localeCompare(b.name);
-    });
-  // Keep a bound-but-off-list template selectable (mirrors the catalog trick).
-  if (matchedTemplate && !templateOptions.some((t) => t.id === matchedTemplate.id)) {
-    templateOptions.unshift(matchedTemplate);
-  }
-
-  const rulebookMatchesStudy = (r: Rulebook) =>
-    csvHas(r.appliesToModalities, study.modality) && csvHas(r.appliesToBodyParts, study.bodyPart);
-  const rulebookOptions = [...p.rulebooks].sort((a, b) => {
-    const am = rulebookMatchesStudy(a) ? 0 : 1;
-    const bm = rulebookMatchesStudy(b) ? 0 : 1;
-    return am !== bm ? am - bm : a.name.localeCompare(b.name);
-  });
-  if (matchedRulebook && !rulebookOptions.some((r) => r.id === matchedRulebook.id)) {
-    rulebookOptions.unshift(matchedRulebook);
-  }
-
-  // Contrast-tier hint — surfaces which resolution tier the bound template came
-  // from (exact / agnostic / closest-available fallback).
-  const tplContrast = matchedTemplate?.contrast ?? '';
-  const studyContrast = study.contrast || '';
-  const contrastHint = !matchedTemplate ? null
-    : !tplContrast
-      ? { text: 'Contrast-agnostic template', warn: false }
-      : eq(tplContrast, studyContrast)
-        ? { text: `Exact contrast match — ${contrastLabel(tplContrast)}`, warn: false }
-        : {
-            text: `Closest available — template is “${contrastLabel(tplContrast)}”, study is ${studyContrast ? `“${contrastLabel(studyContrast)}”` : 'unspecified'}`,
-            warn: true,
-          };
-
-  const bindingsLocked = p.primarySigned || !p.canEdit;
-
-  // Keep a PACS/legacy value selectable even if it's no longer in the catalog.
-  const modalityOptions = study.modality && !p.modalities.some((m) => m.code === study.modality)
-    ? [{ id: `_${study.modality}`, code: study.modality, name: study.modality, active: true, sortOrder: -1 } as CatalogItem, ...p.modalities]
-    : p.modalities;
-  const bodyPartOptions = study.bodyPart && !p.bodyParts.some((b) => b.code === study.bodyPart)
-    ? [{ id: `_${study.bodyPart}`, code: study.bodyPart, name: study.bodyPart, active: true, sortOrder: -1 } as CatalogItem, ...p.bodyParts]
-    : p.bodyParts;
-
+function DetailsPanel(p: ReportInspectorProps) {
+  const template = p.templates.find((t) => t.id === p.report.templateId);
+  const rulebook = p.rulebooks.find((r) => r.id === p.report.rulebookId);
+  const primary = p.signatures.find((s) => normalizeRole(s.role) === 'Primary');
   return (
     <div className="rp-panel">
-      <div className="rp-panel-title">Study context</div>
-      <div className="section-block">
-        <label>Modality</label>
-        <select
-          className="rp-input"
-          aria-label="Modality"
-          value={study.modality}
-          onChange={(e) => p.onStudyChange({ modality: e.target.value })}
-        >
-          <option value="">— select —</option>
-          {modalityOptions.map((m) => (
-            <option key={m.id} value={m.code}>{m.name || m.code}</option>
-          ))}
-        </select>
-      </div>
-      <div className="section-block">
-        <label>Body part</label>
-        <select
-          className="rp-input"
-          aria-label="Body part"
-          value={study.bodyPart}
-          onChange={(e) => p.onStudyChange({ bodyPart: e.target.value })}
-        >
-          <option value="">— select —</option>
-          {bodyPartOptions.map((b) => (
-            <option key={b.id} value={b.code}>{b.name || b.code}</option>
-          ))}
-        </select>
-      </div>
-      <div className="section-block">
-        <label>Contrast</label>
-        <select
-          className="rp-input"
-          aria-label="Contrast"
-          value={study.contrast || ''}
-          onChange={(e) => p.onStudyChange({ contrast: e.target.value })}
-        >
-          <option value="">— select —</option>
-          <option value="None">Without contrast</option>
-          <option value="With">With contrast</option>
-          <option value="WithAndWithout">With and without contrast</option>
-        </select>
-      </div>
-      <div className="rp-row rp-gap-sm">
-        <div className="section-block" style={{ flex: 1 }}>
-          <label>Age</label>
-          <input
-            className="rp-input"
-            type="number"
-            min={0}
-            max={150}
-            aria-label="Patient age"
-            value={study.age ?? ''}
-            onChange={(e) => {
-              const v = e.target.value;
-              p.onStudyChange({ age: v === '' ? null : Number(v) });
-            }}
-          />
-        </div>
-        <div className="section-block" style={{ flex: 1 }}>
-          <label>Gender</label>
-          <select
-            className="rp-input"
-            aria-label="Patient gender"
-            value={study.gender || ''}
-            onChange={(e) => p.onStudyChange({ gender: e.target.value })}
-          >
-            <option value="">— select —</option>
-            <option value="Male">Male</option>
-            <option value="Female">Female</option>
-            <option value="Other">Other</option>
-            <option value="Unknown">Unknown</option>
-          </select>
-        </div>
-      </div>
-      <div className="section-block">
-        <div className="rp-row between">
-          <label htmlFor="rp-ctx-template">Matched template</label>
-          <span className={`badge ${p.report.templatePinned ? 'info' : ''}`}>
-            {p.report.templatePinned ? 'Manual' : 'Auto'}
-          </span>
-        </div>
-        <SearchableSelect
-          id="rp-ctx-template"
-          ariaLabel="Matched template"
-          value={p.report.templateId}
-          disabled={bindingsLocked}
-          placeholder="— none —"
-          searchPlaceholder="Search templates…"
-          options={[
-            ...(p.report.templateId && !matchedTemplate
-              ? [{ value: p.report.templateId, label: '(unavailable template)' }]
-              : []),
-            ...templateOptions.map((t) => ({
-              value: t.id,
-              label: t.name,
-              searchText: `${t.modality} ${t.bodyPart} ${contrastLabel(t.contrast ?? '')} ${t.subspecialty}`,
-            })),
-          ]}
-          onChange={(v) => { if (v) p.onTemplateChange(v); }}
-        />
-        {contrastHint && (
-          <p className="rp-page-sub" style={{ marginTop: 4 }}>
-            {contrastHint.warn && <span className="badge warn">Closest</span>} {contrastHint.text}
-          </p>
+      <div className="rp-panel-title">Details</div>
+      <dl className="rp-rail-facts">
+        {primary && (
+          <div><dt>Report author</dt><dd><code>{primary.radiologistEmail}</code></dd></div>
         )}
-        {p.report.templatePinned && !bindingsLocked && (
-          <button className="ghost" type="button" style={{ marginTop: 4 }} onClick={p.onTemplateReset}>
-            Reset to auto
-          </button>
-        )}
-      </div>
-      <div className="section-block">
-        <div className="rp-row between">
-          <label htmlFor="rp-ctx-rulebook">Matched rulebook (prompts)</label>
-          <span className={`badge ${p.report.rulebookPinned ? 'info' : ''}`}>
-            {p.report.rulebookPinned ? 'Manual' : 'Auto'}
-          </span>
+        <div>
+          <dt>Status</dt>
+          <dd><span className={`rp-status ${statusTone(p.report.status)}`}>{statusLabel(p.report.status)}</span></dd>
         </div>
-        <SearchableSelect
-          id="rp-ctx-rulebook"
-          ariaLabel="Matched rulebook"
-          value={p.report.rulebookId}
-          disabled={bindingsLocked}
-          placeholder="— none —"
-          searchPlaceholder="Search rulebooks…"
-          options={[
-            ...(p.report.rulebookId && !matchedRulebook
-              ? [{ value: p.report.rulebookId, label: '(unavailable rulebook)' }]
-              : []),
-            ...rulebookOptions.map((r) => ({
-              value: r.id,
-              label: `${r.name} · v${r.version}`,
-              searchText: `${r.appliesToModalities} ${r.appliesToBodyParts}`,
-            })),
-          ]}
-          onChange={(v) => { if (v) p.onRulebookChange(v); }}
-        />
-        {p.report.rulebookPinned && !bindingsLocked && (
-          <button className="ghost" type="button" style={{ marginTop: 4 }} onClick={p.onRulebookReset}>
-            Reset to auto
-          </button>
+        <div><dt>Last edited</dt><dd>{fmtDateTime(p.report.updatedAt)}</dd></div>
+        <div><dt>Report ID</dt><dd><code>{p.report.id.slice(0, 8)}</code></dd></div>
+        {p.report.study.accessionNumber && (
+          <div><dt>Accession</dt><dd><code>{p.report.study.accessionNumber}</code></dd></div>
         )}
-      </div>
+        <div><dt>Template</dt><dd>{template ? template.name : '—'}</dd></div>
+        <div><dt>Rulebook</dt><dd>{rulebook ? `${rulebook.name} · v${rulebook.version}` : '—'}</dd></div>
+      </dl>
     </div>
   );
 }
 
-function ChecksPanel(p: ReportInspectorProps) {
+/** RC-04 — severity stat tiles, grouped issue cards with jump links, and the
+ * all-clear / running / engine-offline states. Accept/override per finding is
+ * not part of the current validation flow, so no such controls are faked. */
+function ValidationPanel(p: ReportInspectorProps) {
+  if (p.validationState === 'running') {
+    return (
+      <div className="rp-valpanel" role="status" aria-busy="true">
+        <div className="banner info">Validating report… your current draft is preserved.</div>
+        <Skeleton variant="row" />
+        <Skeleton variant="row" />
+        <Skeleton variant="row" />
+        <span className="rp-sr-only">Validation running…</span>
+      </div>
+    );
+  }
+
+  if (p.validationState === 'error') {
+    return (
+      <div className="rp-valpanel">
+        <ErrorState
+          title="Validation engine unavailable"
+          message={
+            <>
+              {p.validationError || 'The validation service could not be reached.'}
+              <br />
+              Your draft is safe — no data was lost.
+            </>
+          }
+          onRetry={p.canValidate ? p.onValidate : undefined}
+          retryLabel="Retry validation"
+        />
+      </div>
+    );
+  }
+
+  if (p.validationState === 'idle') {
+    return (
+      <div className="rp-valpanel">
+        <EmptyState
+          icon={<ShieldCheck size={18} aria-hidden />}
+          title="Not validated yet"
+          description="Run rulebook checks to see blockers, warnings and style notes here."
+          action={
+            p.canValidate ? (
+              <button className="primary-ghost" type="button" onClick={p.onValidate}>Validate now</button>
+            ) : undefined
+          }
+        />
+      </div>
+    );
+  }
+
+  const groups = groupBySeverity(p.findings);
+  const total = p.findings.length;
+
   return (
-    <div className="rp-panel">
-      <div className="rp-panel-title">
-        Validation
-        {p.qualityScore !== null && (
+    <div className="rp-valpanel">
+      <div className="rp-valpanel-head">
+        <span className="rp-panel-title">Validation summary</span>
+        {p.canValidate && (
+          <button className="ghost rp-valpanel-rerun" type="button" onClick={p.onValidate}>
+            <RefreshCw size={12} aria-hidden /> Re-run
+          </button>
+        )}
+      </div>
+
+      <div className="rp-valpanel-tiles">
+        <div className="rp-valpanel-tile is-blocker">
+          <span className="rp-valpanel-tile-value">{groups.blocker.length}</span>
+          <span className="rp-valpanel-tile-label">Blockers</span>
+        </div>
+        <div className="rp-valpanel-tile is-warning">
+          <span className="rp-valpanel-tile-value">{groups.warning.length}</span>
+          <span className="rp-valpanel-tile-label">Warnings</span>
+        </div>
+        <div className="rp-valpanel-tile is-style">
+          <span className="rp-valpanel-tile-value">{groups.info.length}</span>
+          <span className="rp-valpanel-tile-label">Style</span>
+        </div>
+        <div className="rp-valpanel-tile">
+          <span className="rp-valpanel-tile-value">{total}</span>
+          <span className="rp-valpanel-tile-label">Total</span>
+        </div>
+      </div>
+
+      {p.qualityScore !== null && (
+        <div className="rp-valpanel-quality">
           <span className={`badge ${p.qualityScore >= 80 ? 'ok' : p.qualityScore >= 50 ? 'warn' : 'danger'}`}>
             Quality: {p.qualityScore}/100
           </span>
-        )}
-      </div>
-      {p.findings.length === 0 && (
-        <>
-          <p style={{ color: 'var(--text-muted)' }}>Run rulebook checks to see findings here.</p>
-          {p.canValidate && (
-            <button className="primary-ghost rp-mt-sm" type="button" onClick={p.onValidate}>Validate now</button>
-          )}
-        </>
+        </div>
       )}
-      {p.findings.length > 0 && (() => {
-        const groups = groupBySeverity(p.findings);
-        return (
-          <>
-            <div className="rp-row" style={{ gap: 6, marginBottom: 8, flexWrap: 'wrap' }}>
-              {groups.blocker.length > 0 && <span className="badge danger">{groups.blocker.length} blocker{groups.blocker.length === 1 ? '' : 's'}</span>}
-              {groups.warning.length > 0 && <span className="badge warn">{groups.warning.length} warning{groups.warning.length === 1 ? '' : 's'}</span>}
-              {groups.info.length > 0 && <span className="badge info">{groups.info.length} info</span>}
-              {p.blockers === 0 && <span className="badge ok">No blockers</span>}
-            </div>
-            {(['blocker', 'warning', 'info'] as const).map((sev) => groups[sev].length > 0 && (
-              <div key={sev} style={{ marginTop: 8 }}>
-                <div className="rp-severity-label">{sev}</div>
-                {groups[sev].map((f, i) =>
-                  f.ruleId === 'ai:unsupported_claim' ? (
-                    <UnsupportedClaimFinding key={`${sev}-${i}`} finding={f} />
-                  ) : (
-                    <div key={`${sev}-${i}`} className={`finding ${sev}`}>
-                      <div>{f.message}</div>
-                      <div className="rule"><code>{f.ruleId}</code>{f.section ? ` · ${f.section}` : ''}</div>
-                    </div>
-                  ),
-                )}
+
+      {total === 0 ? (
+        <div className="banner ok rp-valpanel-clear">
+          <ShieldCheck size={14} aria-hidden />
+          <span>
+            <strong>All checks passed.</strong> 0 issues found — this report is ready for review.
+          </span>
+        </div>
+      ) : (
+        (['blocker', 'warning', 'info'] as const).map((sev) =>
+          groups[sev].length > 0 ? (
+            <div key={sev} className="rp-valpanel-group">
+              <div className="rp-severity-label">
+                {sev === 'info' ? 'style' : sev} ({groups[sev].length})
               </div>
-            ))}
-          </>
-        );
-      })()}
+              {groups[sev].map((f, i) =>
+                f.ruleId === 'ai:unsupported_claim' ? (
+                  <UnsupportedClaimFinding key={`${sev}-${i}`} finding={f} />
+                ) : (
+                  <div key={`${sev}-${i}`} className={`finding ${sev}`}>
+                    <div>{f.message}</div>
+                    <div className="rule"><code>{f.ruleId}</code></div>
+                    {f.section && (
+                      <button
+                        type="button"
+                        className="rp-valpanel-jump"
+                        onClick={() => p.onJumpToSection(f.section as string)}
+                      >
+                        <CornerDownRight size={11} aria-hidden /> Jump to {f.section}
+                      </button>
+                    )}
+                  </div>
+                ),
+              )}
+            </div>
+          ) : null,
+        )
+      )}
+
+      {p.lastValidatedAt && (
+        <p className="rp-valpanel-when">Last validated {p.lastValidatedAt.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</p>
+      )}
     </div>
   );
 }

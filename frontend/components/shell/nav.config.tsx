@@ -9,6 +9,7 @@ import {
   MessageSquareText, Store, BookText, Server, Network, HardDrive,
   FileInput, WifiOff, Scale, FlaskConical, ShieldCheck, Flag, CreditCard,
   Activity, Settings2, Fingerprint, Users, ScanLine, Bone,
+  LayoutDashboard, ListTodo, PenLine, Layers, Sparkles, Library, BadgeCheck,
 } from 'lucide-react';
 import type { PermissionKey } from '@/lib/permissions';
 import type { Surface } from '@/lib/surface';
@@ -43,8 +44,15 @@ export interface NavGroup {
   items: NavItem[];
 }
 
-// Hallmark icon set — lucide-react, matching UBAG's icon vocabulary.
+// RC icon set — lucide-react.
 export const Icons: Record<string, NavIcon> = {
+  dashboard: LayoutDashboard,
+  worklist: ListTodo,
+  composer: PenLine,
+  protocols: Layers,
+  aiAssistant: Sparkles,
+  findingsLibrary: Library,
+  quality: BadgeCheck,
   reports: FileText,
   validation: ClipboardCheck,
   audit: ScrollText,
@@ -74,18 +82,29 @@ export const Icons: Record<string, NavIcon> = {
 
 export const navGroups: NavGroup[] = [
   {
-    // Reporting workspace lives on the desktop app; `account/security` is
-    // shared so every surface can reach sign-in-devices / personal security.
+    // RC primary group (mockup order): the clinical reporting flow.
     labelKey: 'workspace',
+    surfaces: ['desktop'],
     items: [
-      { href: '/', labelKey: 'reports', icon: Icons.reports, permission: 'reports.read', surfaces: ['desktop'] },
-      { href: '/validation', labelKey: 'validation', icon: Icons.validation, permission: 'validation_packs.read', surfaces: ['desktop'] },
-      // Audit trail list lives in the (desktop) group only — tag it desktop so
-      // the web sidebar never links to a route staged out of the web bundle.
-      // Admin audit on web is served by /admin/governance + /admin/usage.
-      { href: '/audit', labelKey: 'audit', icon: Icons.audit, permission: 'audit.read', surfaces: ['desktop'] },
-      { href: '/analytics', labelKey: 'analytics', icon: Icons.analytics, permission: 'reports.read', surfaces: ['desktop'] },
-      { href: '/account/security', labelKey: 'signInDevices', icon: Icons.signInDevices },
+      { href: '/dashboard', labelKey: 'dashboard', icon: Icons.dashboard, permission: 'reports.read' },
+      { href: '/worklist', labelKey: 'worklist', icon: Icons.worklist, permission: 'reports.read' },
+      { href: '/reports/compose', labelKey: 'composer', icon: Icons.composer, permission: 'reports.draft', matchPrefix: '/reports/view' },
+      { href: '/templates', labelKey: 'templates', icon: Icons.templates, permission: 'templates.read' },
+      { href: '/protocols', labelKey: 'protocols', icon: Icons.protocols },
+      { href: '/ai-assistant', labelKey: 'aiAssistant', icon: Icons.aiAssistant },
+      { href: '/findings-library', labelKey: 'findingsLibrary', icon: Icons.findingsLibrary, permission: 'templates.read' },
+    ],
+  },
+  {
+    // RC second group: records & insight.
+    labelKey: 'insights',
+    surfaces: ['desktop'],
+    items: [
+      { href: '/reports', labelKey: 'reports', icon: Icons.reports, permission: 'reports.read' },
+      { href: '/analytics', labelKey: 'analytics', icon: Icons.analytics, permission: 'reports.read' },
+      { href: '/quality', labelKey: 'quality', icon: Icons.quality, permission: 'reports.read' },
+      { href: '/validation', labelKey: 'validation', icon: Icons.validation, permission: 'validation_packs.read' },
+      { href: '/audit', labelKey: 'audit', icon: Icons.audit, permission: 'audit.read' },
     ],
   },
   {
@@ -94,7 +113,6 @@ export const navGroups: NavGroup[] = [
     surfaces: ['desktop'],
     items: [
       { href: '/rulebooks', labelKey: 'rulebooks', icon: Icons.rulebooks, permission: 'rulebooks.read' },
-      { href: '/templates', labelKey: 'templates', icon: Icons.templates, permission: 'templates.read' },
       { href: '/modalities', labelKey: 'modalities', icon: Icons.modalities, permission: 'modalities.read' },
       { href: '/body-parts', labelKey: 'bodyParts', icon: Icons.bodyParts, permission: 'body_parts.read' },
       { href: '/prompts', labelKey: 'prompts', icon: Icons.prompts, permission: 'prompt_overrides.manage' },
@@ -115,7 +133,8 @@ export const navGroups: NavGroup[] = [
     ],
   },
   {
-    // Master-admin / platform operations → web only.
+    // Master-admin / platform operations → web only ("Users & Teams" +
+    // "System Settings" of the RC mockups live here on the admin surface).
     labelKey: 'admin',
     surfaces: ['web'],
     items: [
@@ -129,9 +148,24 @@ export const navGroups: NavGroup[] = [
       { href: '/admin/settings', labelKey: 'settings', icon: Icons.settings, permission: 'tenant_settings.manage' },
     ],
   },
+  {
+    // Personal account — desktop settings hub + shared sign-in devices.
+    labelKey: 'account',
+    items: [
+      { href: '/settings', labelKey: 'settingsHub', icon: Icons.settings, surfaces: ['desktop'] },
+      { href: '/account/security', labelKey: 'signInDevices', icon: Icons.signInDevices },
+    ],
+  },
 ];
 
 export function isActive(pathname: string, item: NavItem): boolean {
-  if (item.href === '/') return pathname === '/' || pathname.startsWith('/reports');
+  if (item.matchPrefix && pathname.startsWith(item.matchPrefix)) return true;
+  if (item.href === '/') return pathname === '/';
+  // Keep "Reports" from claiming composer routes owned by the composer item.
+  if (item.href === '/reports') {
+    return pathname === '/reports' || pathname.startsWith('/reports/')
+      ? !pathname.startsWith('/reports/view') && !pathname.startsWith('/reports/compose')
+      : false;
+  }
   return pathname === item.href || pathname.startsWith(item.href + '/');
 }

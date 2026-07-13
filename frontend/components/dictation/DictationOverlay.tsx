@@ -108,12 +108,56 @@ export default function DictationOverlay() {
   const fixDismissRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const fixBusy = fixStatus?.status === 'busy';
 
+  // Live input level (0..1) for the RC-08 meter — real AnalyserNode data on
+  // the HQ recording path (the only path that owns the MediaStream).
+  const [level, setLevel] = useState(0);
+  const meterRafRef = useRef<number | null>(null);
+  const meterCtxRef = useRef<AudioContext | null>(null);
+
+  const stopMeter = useCallback(() => {
+    if (meterRafRef.current !== null) cancelAnimationFrame(meterRafRef.current);
+    meterRafRef.current = null;
+    void meterCtxRef.current?.close().catch(() => undefined);
+    meterCtxRef.current = null;
+    setLevel(0);
+  }, []);
+
+  const startMeter = useCallback((stream: MediaStream) => {
+    try {
+      const Ctx = window.AudioContext ?? (window as unknown as { webkitAudioContext?: typeof AudioContext }).webkitAudioContext;
+      if (!Ctx) return;
+      const ctx = new Ctx();
+      meterCtxRef.current = ctx;
+      const source = ctx.createMediaStreamSource(stream);
+      const analyser = ctx.createAnalyser();
+      analyser.fftSize = 512;
+      source.connect(analyser);
+      const buf = new Uint8Array(analyser.fftSize);
+      const tick = () => {
+        analyser.getByteTimeDomainData(buf);
+        let sum = 0;
+        for (let i = 0; i < buf.length; i++) {
+          const v = (buf[i] - 128) / 128;
+          sum += v * v;
+        }
+        // RMS → perceptual-ish scale; clamp for a stable meter.
+        setLevel(Math.min(1, Math.sqrt(sum / buf.length) * 3));
+        meterRafRef.current = requestAnimationFrame(tick);
+      };
+      meterRafRef.current = requestAnimationFrame(tick);
+    } catch {
+      /* meter is progressive enhancement — recording continues without it */
+    }
+  }, []);
+
   useEffect(() => {
     setSupported(getSpeechRecognitionCtor() !== null);
     const stopTracking = startFocusTracking();
     return () => {
       stopTracking();
       recognizerRef.current?.stop();
+      if (meterRafRef.current !== null) cancelAnimationFrame(meterRafRef.current);
+      void meterCtxRef.current?.close().catch(() => undefined);
     };
   }, []);
 
@@ -244,6 +288,7 @@ export default function DictationOverlay() {
       const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
       audioStreamRef.current = stream;
       audioChunksRef.current = [];
+      startMeter(stream);
       const rec = new MediaRecorder(stream, { mimeType: 'audio/webm' });
       rec.ondataavailable = (ev) => {
         if (ev.data && ev.data.size > 0) audioChunksRef.current.push(ev.data);
@@ -252,6 +297,7 @@ export default function DictationOverlay() {
         const blob = new Blob(audioChunksRef.current, { type: 'audio/webm' });
         audioStreamRef.current?.getTracks().forEach((t) => t.stop());
         audioStreamRef.current = null;
+        stopMeter();
         void transcribeAudio(blob);
       };
       mediaRecorderRef.current = rec;
@@ -259,6 +305,7 @@ export default function DictationOverlay() {
       setAudioRecording(true);
     } catch (e) {
       setAudioRecording(false);
+      stopMeter();
       // A denied/absent microphone must not look like a button that does
       // nothing — say what blocked the HQ recording.
       const name = (e as { name?: string })?.name;
@@ -270,7 +317,7 @@ export default function DictationOverlay() {
             : 'Could not start the HQ recording. Check the microphone and try again.',
       );
     }
-  }, [transcribeAudio]);
+  }, [transcribeAudio, startMeter, stopMeter]);
 
   const stopAudioCapture = useCallback(() => {
     const rec = mediaRecorderRef.current;
@@ -321,8 +368,47 @@ export default function DictationOverlay() {
       ? 'Stop dictation'
       : 'Start dictation';
 
+  // RC-08 state machine → color-coded bar states (labels + icons carry the
+  // meaning alongside color; never hue-only).
+  const barState = !supported
+      && (typeof navigator === 'undefined' || !navigator.mediaDevices?.getUserMedia)
+    ? 'disconnected'
+    : sttError
+      ? 'error'
+      : transcribing
+        ? 'processing'
+        : audioRecording
+          ? 'listening'
+          : listening
+            ? 'listening'
+            : 'idle';
+  const statusLine =
+    barState === 'processing'
+      ? 'Processing your dictation…'
+      : audioRecording
+        ? 'Recording (HQ)… press Stop to transcribe'
+        : listening
+          ? 'Listening… Speak now'
+          : barState === 'disconnected'
+            ? 'No dictation engine available on this build'
+            : barState === 'error'
+              ? 'Dictation needs attention'
+              : 'Ready to dictate';
+
   return (
-    <div className="rp-dictation" data-testid="dictation-overlay">
+    <div
+      className="rp-dictation"
+      data-testid="dictation-overlay"
+      data-state={barState}
+      onKeyDown={(e) => {
+        // RC-08: Escape stops dictation — scoped to the bar itself so typing
+        // elsewhere is never hijacked (buttons keep native Space/Enter).
+        if (e.key === 'Escape') {
+          if (listeningRef.current) stop();
+          if (audioRecording) stopAudioCapture();
+        }
+      }}
+    >
       {listening && interim && (
         <div className="rp-dictation-interim" data-testid="dictation-interim">
           {interim}
@@ -398,6 +484,18 @@ export default function DictationOverlay() {
           <span className="rp-dictation-dot" aria-hidden="true" />
           <span className="rp-dictation-label">{listening ? 'Listening…' : 'Dictate'}</span>
         </button>
+        {/* RC-08: live input meter (real AnalyserNode level while the HQ path
+            owns the mic; decorative pulse while the live engine listens). */}
+        <span className={`rp-dictation-meter${listening || audioRecording ? ' active' : ''}`} aria-hidden="true">
+          {Array.from({ length: 8 }, (_, i) => (
+            <span
+              key={i}
+              className="rp-dictation-meter-bar"
+              data-on={audioRecording ? level * 8 > i : undefined}
+            />
+          ))}
+        </span>
+        <span className="rp-dictation-statusline" role="status">{statusLine}</span>
         <button
           type="button"
           data-testid="dictation-hq"

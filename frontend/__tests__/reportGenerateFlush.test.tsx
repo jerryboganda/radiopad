@@ -81,6 +81,10 @@ vi.mock('@/lib/api', () => {
         };
       }),
       signatures: vi.fn(async () => []),
+      // RC composer additions — priors lookup (context bar / study panel) and
+      // the case-queue list beside the study context.
+      prior: vi.fn(async () => ({ current: { id: 'r1', bodyPart: 'Chest' }, prior: null })),
+      list: vi.fn(async () => []),
     },
     providers: {
       list: vi.fn(async () => [
@@ -107,7 +111,11 @@ vi.mock('@/lib/api', () => {
       },
     })),
   };
-  return { api };
+  // AiActionsBar renders the provider PHI-policy pill off this map.
+  const COMPLIANCE_LABELS: Record<number, string> = {
+    0: 'Blocked', 1: 'Sandbox', 2: 'De-identified only', 3: 'PHI-approved', 4: 'Local only',
+  };
+  return { api, COMPLIANCE_LABELS };
 });
 
 import ReportPage from '@/app/(desktop)/reports/[id]/ReportClient';
@@ -125,7 +133,7 @@ describe('Generate impression — flush before AI (HANDOFF gotcha #3)', () => {
   it('sends the on-screen findings to the AI even when typed right before clicking (no blur)', async () => {
     const { container } = render(<ReportPage />);
 
-    const genBtn = await screen.findByRole('button', { name: 'Generate impression' });
+    const genBtn = await screen.findByRole('button', { name: 'Generate Impression' });
     // Wait for providers.list() so the button leaves its disabled state.
     await waitFor(() => expect((genBtn as HTMLButtonElement).disabled).toBe(false));
 

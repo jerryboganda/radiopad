@@ -30,8 +30,19 @@
       "workspace": "Espace de travail",
       "library": "Bibliothèque",
       "integrations": "Intégrations",
-      "admin": "Administration"
-    }
+      "admin": "Administration",
+      "insights": "Analyses",
+      "account": "Compte"
+    },
+    "dashboard": "Tableau de bord",
+    "worklist": "Liste de travail",
+    "composer": "Éditeur de comptes rendus",
+    "protocols": "Protocoles",
+    "aiAssistant": "Assistant IA",
+    "findingsLibrary": "Bibliothèque de constatations",
+    "quality": "Qualité et relecture",
+    "settingsHub": "Paramètres",
+    "hotkeys": "Raccourcis"
   },
   "buttons": {
     "primary": {

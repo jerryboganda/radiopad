@@ -30,8 +30,19 @@
       "workspace": "Arbeitsbereich",
       "library": "Bibliothek",
       "integrations": "Integrationen",
-      "admin": "Verwaltung"
-    }
+      "admin": "Verwaltung",
+      "insights": "Auswertung",
+      "account": "Konto"
+    },
+    "dashboard": "Dashboard",
+    "worklist": "Arbeitsliste",
+    "composer": "Befund-Editor",
+    "protocols": "Protokolle",
+    "aiAssistant": "KI-Assistent",
+    "findingsLibrary": "Befund-Bibliothek",
+    "quality": "Qualität & Peer-Review",
+    "settingsHub": "Einstellungen",
+    "hotkeys": "Tastenkürzel"
   },
   "buttons": {
     "primary": {

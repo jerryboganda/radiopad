@@ -37,7 +37,9 @@ export function getThemePreference(): ThemePreference {
 
 export function resolveTheme(pref: ThemePreference = getThemePreference()): ResolvedTheme {
   if (pref === 'system') {
-    if (isBrowser() && window.matchMedia('(prefers-color-scheme: dark)').matches) return 'dark';
+    // matchMedia is absent in some test environments (jsdom) — treat as light.
+    if (isBrowser() && typeof window.matchMedia === 'function'
+      && window.matchMedia('(prefers-color-scheme: dark)').matches) return 'dark';
     return 'light';
   }
   return pref;
@@ -73,7 +75,7 @@ export function setThemePreference(pref: ThemePreference): ResolvedTheme {
  * is 'system'. Returns an unsubscribe function.
  */
 export function watchSystemTheme(): () => void {
-  if (!isBrowser()) return () => {};
+  if (!isBrowser() || typeof window.matchMedia !== 'function') return () => {};
   const mql = window.matchMedia('(prefers-color-scheme: dark)');
   const onChange = () => {
     if (getThemePreference() === 'system') applyTheme('system');

@@ -30,8 +30,19 @@
       "workspace": "कार्यक्षेत्र",
       "library": "पुस्तकालय",
       "integrations": "एकीकरण",
-      "admin": "व्यवस्थापन"
-    }
+      "admin": "व्यवस्थापन",
+      "insights": "विश्लेषण",
+      "account": "खाता"
+    },
+    "dashboard": "डैशबोर्ड",
+    "worklist": "कार्य सूची",
+    "composer": "रिपोर्ट संपादक",
+    "protocols": "प्रोटोकॉल",
+    "aiAssistant": "AI सहायक",
+    "findingsLibrary": "निष्कर्ष पुस्तकालय",
+    "quality": "गुणवत्ता और समीक्षा",
+    "settingsHub": "सेटिंग्स",
+    "hotkeys": "शॉर्टकट"
   },
   "buttons": {
     "primary": {

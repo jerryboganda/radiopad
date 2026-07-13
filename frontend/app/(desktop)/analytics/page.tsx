@@ -73,7 +73,7 @@ export default function AnalyticsPage() {
     <Container>
       <PageHeader
         title="Analytics Dashboard"
-        description="PRD §18 — Product & Governance KPIs. Tenant-scoped."
+        description="Productivity, quality, and governance metrics for your workspace."
         secondaryActions={
           <a
             href="/analytics/quality"

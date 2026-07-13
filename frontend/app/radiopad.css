@@ -1611,6 +1611,9 @@
   top: 18px;
   right: 18px;
   z-index: 2;
+  display: flex;
+  align-items: center;
+  gap: 8px;
 }
 .rp-auth-card {
   width: 100%;
@@ -2197,3 +2200,928 @@
   50% { transform: scale(0.78); opacity: 0.6; }
 }
 @keyframes rp-genoverlay-fade { from { opacity: 0; } to { opacity: 1; } }
+
+/* ============================================================
+   RC report composer (PRD §20.9, RC-01…RC-09).
+   Patient context bar · study context panel + case queue ·
+   section cards · AI actions bar · right rail tabs · checklist ·
+   validation tiles · export panel · provenance modal · priors
+   comparison. Tokens only — correct in both themes by construction.
+   ============================================================ */
+
+/* ---- Composer layout ---- */
+.rp-composer { padding-top: 0; }
+.rp-composer-grid {
+  display: grid;
+  grid-template-columns: minmax(280px, 320px) minmax(0, 1fr) minmax(280px, 340px);
+  gap: 16px;
+  align-items: start;
+  margin-top: 16px;
+  /* Reserve space below the last field so the fixed-bottom DictationOverlay
+     (.rp-dictation, z-index:70) never sits on top of the rail's last fields
+     or the last section card on short viewports. */
+  padding-bottom: 140px;
+}
+.rp-composer-grid.left-collapsed {
+  grid-template-columns: 44px minmax(0, 1fr) minmax(280px, 340px);
+}
+@media (max-width: 1100px) {
+  .rp-composer-grid,
+  .rp-composer-grid.left-collapsed { grid-template-columns: minmax(0, 1fr) minmax(260px, 320px); }
+  .rp-studyctx { grid-column: 1 / -1; position: static; }
+}
+@media (max-width: 960px) {
+  .rp-composer-grid,
+  .rp-composer-grid.left-collapsed { grid-template-columns: 1fr; }
+  .rp-rail { position: static; }
+}
+.rp-composer-main { min-width: 0; display: flex; flex-direction: column; gap: 12px; }
+.rp-composer-syncbanner { margin-top: 12px; }
+
+/* Composer header — title, status, toolbar (RC-02) */
+.rp-composer-head {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+.rp-composer-title {
+  font: 600 17px/1.2 var(--sans);
+  letter-spacing: -0.01em;
+  color: var(--text-strong);
+  margin: 0;
+}
+.rp-composer-tools {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-wrap: wrap;
+  margin-left: auto;
+}
+.rp-composer-tools > button {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+/* ---- Patient context bar (RC-01, sticky under the topbar) ---- */
+.rp-patientbar {
+  position: sticky;
+  top: var(--rp-topbar-h);
+  z-index: 30;
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  padding: 10px 14px;
+  margin: 0 -2px;
+  background: var(--bg-panel);
+  border: 1px solid var(--border);
+  border-radius: 0 0 var(--radius) var(--radius);
+  border-top: 0;
+  box-shadow: var(--shadow-sm);
+  overflow-x: auto;
+}
+.rp-patientbar-back { flex: none; }
+.rp-patientbar-identity { display: flex; align-items: center; gap: 10px; flex: none; }
+.rp-patientbar-avatar {
+  display: grid;
+  place-items: center;
+  width: 32px;
+  height: 32px;
+  border-radius: var(--radius-pill);
+  background: var(--accent-tint);
+  color: var(--accent-strong);
+  flex: none;
+}
+.rp-patientbar-idtext { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+.rp-patientbar-title {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font: 600 13.5px/1.2 var(--sans);
+  color: var(--text-strong);
+  white-space: nowrap;
+}
+.rp-patientbar-meta {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font: 500 11.5px/1.2 var(--sans);
+  color: var(--text-muted);
+  white-space: nowrap;
+}
+.rp-patientbar-accession {
+  font: 500 11px/1 var(--mono);
+  color: var(--text-muted);
+  background: var(--bg-subtle);
+  border: 1px solid var(--border-soft);
+  border-radius: var(--radius-sm);
+  padding: 2px 6px;
+}
+.rp-patientbar-seg {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding-left: 14px;
+  border-left: 1px solid var(--border-soft);
+  min-width: 0;
+  flex: none;
+  max-width: 260px;
+}
+.rp-patientbar-seg-label {
+  font: 600 9.5px/1 var(--sans);
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--text-faint);
+}
+.rp-patientbar-seg-value {
+  font: 500 12px/1.35 var(--sans);
+  color: var(--text);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.rp-patientbar-seg-link {
+  appearance: none;
+  background: none;
+  border: 0;
+  padding: 0;
+  font: 600 12px/1.35 var(--sans);
+  color: var(--link);
+  cursor: pointer;
+  text-align: left;
+  white-space: nowrap;
+}
+.rp-patientbar-seg-link:hover { text-decoration: underline; }
+.rp-patientbar-spacer { flex: 1; min-width: 8px; }
+.rp-patientbar-review { display: inline-flex; align-items: center; gap: 4px; flex: none; }
+.rp-patientbar-save {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  font: 500 12px/1.2 var(--sans);
+  white-space: nowrap;
+  flex: none;
+}
+.rp-patientbar-save.is-saved { color: var(--green); }
+.rp-patientbar-save.is-saving { color: var(--blue); }
+.rp-patientbar-save.is-error { color: var(--amber); }
+.rp-patientbar-retry {
+  appearance: none;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  background: var(--amber-bg);
+  border: 1px solid var(--amber-border);
+  border-radius: var(--radius-pill);
+  padding: 2px 8px;
+  font: 600 11px/1.2 var(--sans);
+  color: var(--amber);
+  cursor: pointer;
+}
+.rp-patientbar-export {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  flex: none;
+}
+
+/* ---- Study context panel (RC-01, left, collapsible) ---- */
+.rp-studyctx {
+  position: sticky;
+  top: calc(var(--rp-topbar-h) + 68px);
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  min-width: 0;
+  max-height: calc(100vh - var(--rp-topbar-h) - 84px);
+  overflow-y: auto;
+  /* visible popovers (SearchableSelect) must not be clipped */
+  overflow-x: visible;
+}
+.rp-studyctx.is-collapsed {
+  align-items: center;
+  gap: 8px;
+  background: var(--bg-panel);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  box-shadow: var(--shadow-xs);
+  padding: 8px 4px;
+  overflow: hidden;
+}
+.rp-studyctx-vertical {
+  writing-mode: vertical-rl;
+  font: 600 10.5px/1 var(--sans);
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--text-faint);
+  margin-top: 6px;
+}
+.rp-studyctx-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+.rp-studyctx-title {
+  font: 600 13px/1.2 var(--sans);
+  color: var(--text-strong);
+}
+.rp-studyctx-card {
+  background: var(--bg-panel);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  box-shadow: var(--shadow-xs);
+  padding: 14px;
+}
+.rp-studyctx-card-title {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font: 600 12px/1.2 var(--sans);
+  color: var(--text-strong);
+  margin-bottom: 10px;
+}
+.rp-studyctx-row {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 10px;
+  padding: 5px 0;
+}
+.rp-studyctx-row-label {
+  font: 500 11.5px/1.4 var(--sans);
+  color: var(--text-soft);
+  flex: none;
+}
+.rp-studyctx-row-value {
+  font: 500 12px/1.4 var(--sans);
+  color: var(--text);
+  text-align: right;
+  min-width: 0;
+}
+.rp-studyctx-row-code {
+  font: 500 11px/1 var(--mono);
+  color: var(--text-muted);
+  background: var(--bg-subtle);
+  border: 1px solid var(--border-soft);
+  border-radius: var(--radius-sm);
+  padding: 2px 6px;
+}
+.rp-studyctx-link {
+  appearance: none;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  background: none;
+  border: 0;
+  padding: 0;
+  font: 600 12px/1.4 var(--sans);
+  color: var(--link);
+  cursor: pointer;
+}
+.rp-studyctx-link:hover { text-decoration: underline; }
+.rp-studyctx-divider { height: 1px; background: var(--border-soft); margin: 10px 0; }
+
+/* ---- Case queue (RC-01) ---- */
+.rp-queue {
+  background: var(--bg-panel);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  box-shadow: var(--shadow-xs);
+  padding: 12px 14px;
+}
+.rp-queue-head { display: flex; align-items: center; justify-content: space-between; margin-bottom: 8px; }
+.rp-queue-title {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font: 600 12px/1.2 var(--sans);
+  color: var(--text-strong);
+}
+.rp-queue-table { width: 100%; border-collapse: collapse; }
+.rp-queue-table th {
+  font: 600 9.5px/1.2 var(--sans);
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--text-faint);
+  text-align: left;
+  padding: 4px 6px;
+  border-bottom: 1px solid var(--border-soft);
+}
+.rp-queue-table td {
+  padding: 6px;
+  border-bottom: 1px solid var(--border-soft);
+  font: 500 11.5px/1.3 var(--sans);
+  color: var(--text);
+  vertical-align: middle;
+}
+.rp-queue-table tbody tr { cursor: pointer; }
+.rp-queue-table tbody tr:hover td { background: var(--bg-subtle); }
+.rp-queue-table tbody tr.is-current { cursor: default; }
+.rp-queue-table tbody tr.is-current td {
+  background: var(--bg-selected);
+  box-shadow: inset 2px 0 0 var(--accent);
+}
+.rp-queue-table tbody tr:focus-visible { outline: 2px solid var(--accent); outline-offset: -2px; }
+.rp-queue-id { font: 500 10.5px/1 var(--mono); color: var(--text-muted); }
+.rp-queue-proc { max-width: 120px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.rp-queue-wait { color: var(--text-muted); white-space: nowrap; }
+.rp-queue-more {
+  display: inline-block;
+  margin-top: 8px;
+  font: 600 11.5px/1.2 var(--sans);
+  color: var(--link);
+  text-decoration: none;
+}
+.rp-queue-more:hover { text-decoration: underline; }
+
+/* ---- AI actions bar (RC-06) ---- */
+.rp-aibar {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  background: var(--bg-panel);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  box-shadow: var(--shadow-xs);
+  padding: 10px 12px;
+}
+.rp-aibar-actions { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; }
+.rp-aibar-actions > button { display: inline-flex; align-items: center; gap: 6px; }
+.rp-aibar-generate { flex: none; }
+.rp-aibar-meta {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+.rp-aibar-scope {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 3px 10px;
+  border-radius: var(--radius-pill);
+  background: var(--bg-subtle);
+  border: 1px solid var(--border-soft);
+  font: 600 11px/1.3 var(--sans);
+  color: var(--text-muted);
+}
+.rp-aibar-route { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+.rp-aibar-provider { min-width: 200px; }
+.rp-aibar-policy {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 3px 10px;
+  border-radius: var(--radius-pill);
+  background: var(--blue-bg);
+  border: 1px solid var(--blue-border);
+  font: 600 11px/1.3 var(--sans);
+  color: var(--blue);
+  white-space: nowrap;
+}
+.rp-aibar-policy-dot {
+  width: 6px;
+  height: 6px;
+  border-radius: var(--radius-pill);
+  background: var(--green);
+}
+
+/* ---- Section cards (RC-02/03) ---- */
+.rp-sectioncard {
+  background: var(--bg-panel);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  box-shadow: var(--shadow-xs);
+  min-width: 0;
+  scroll-margin-top: calc(var(--rp-topbar-h) + 76px);
+}
+.rp-sectioncard-head {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 14px;
+  border-bottom: 1px solid var(--border-soft);
+}
+.rp-sectioncard-icon {
+  display: grid;
+  place-items: center;
+  color: var(--text-soft);
+  flex: none;
+}
+.rp-sectioncard-title {
+  font: 600 13px/1.2 var(--sans);
+  color: var(--text-strong);
+  margin: 0;
+}
+.rp-sectioncard-chips {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-wrap: wrap;
+  margin-left: auto;
+}
+.rp-sectioncard-chips .badge { display: inline-flex; align-items: center; gap: 4px; }
+.rp-sectioncard-menu-btn { flex: none; }
+.rp-sectioncard-body { padding: 12px 14px; }
+.rp-sectioncard-body .section-block { margin-bottom: 0; }
+.rp-sectioncard-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 14px 12px;
+}
+.rp-sectioncard-hint {
+  font: 400 11.5px/1.4 var(--sans);
+  color: var(--text-soft);
+}
+/* RC-03 — impression paragraphs render as a numbered list in the rich editor. */
+.rp-sectioncard-impression .ProseMirror { counter-reset: rp-impression; }
+.rp-sectioncard-impression .ProseMirror > p { position: relative; padding-left: 26px; }
+.rp-sectioncard-impression .ProseMirror > p::before {
+  counter-increment: rp-impression;
+  content: counter(rp-impression) '.';
+  position: absolute;
+  left: 4px;
+  font: 600 12.5px/1.6 var(--sans);
+  color: var(--text-soft);
+}
+
+/* ---- Right rail (rework of the inspector) ---- */
+.rp-rail .rp-inspector-body { padding: 14px; }
+.rp-rail-tabbar {
+  display: flex;
+  flex-wrap: wrap;
+  border-bottom: 1px solid var(--border-soft);
+}
+.rp-rail-tab {
+  appearance: none;
+  background: transparent;
+  border: 0;
+  border-bottom: 2px solid transparent;
+  padding: 9px 8px;
+  font: 500 11.5px/1.2 var(--sans);
+  color: var(--text-muted);
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+.rp-rail-tab:hover { color: var(--text-strong); background: var(--bg-subtle); }
+.rp-rail-tab:focus-visible { outline: 2px solid var(--accent); outline-offset: -2px; }
+.rp-rail-tab.is-active { color: var(--accent-strong); border-bottom-color: var(--accent); font-weight: 600; }
+.rp-rail-tab-count {
+  display: inline-grid;
+  place-items: center;
+  min-width: 15px;
+  height: 15px;
+  padding: 0 4px;
+  border-radius: var(--radius-pill);
+  background: var(--red);
+  color: var(--accent-fg);
+  font: 700 9.5px/1 var(--sans);
+}
+.rp-rail-facts { display: flex; flex-direction: column; margin: 0; }
+.rp-rail-facts > div {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 10px;
+  padding: 6px 0;
+  border-bottom: 1px solid var(--border-soft);
+}
+.rp-rail-facts > div:last-child { border-bottom: 0; }
+.rp-rail-facts dt { font: 500 11.5px/1.4 var(--sans); color: var(--text-soft); margin: 0; }
+.rp-rail-facts dd { font: 500 12px/1.4 var(--sans); color: var(--text); margin: 0; text-align: right; min-width: 0; overflow-wrap: anywhere; }
+
+/* ---- Review checklist (RC-01/02) ---- */
+.rp-checklist { display: flex; flex-direction: column; gap: 12px; }
+.rp-checklist-summary { display: flex; align-items: center; gap: 12px; }
+.rp-checklist-ring-track { stroke: var(--bg-muted); }
+.rp-checklist-ring-fill {
+  stroke: var(--accent);
+  transition: stroke-dashoffset var(--dur-slow) var(--ease-out);
+}
+.rp-checklist-ring-text {
+  font: 700 10.5px var(--sans);
+  fill: var(--text-strong);
+}
+.rp-checklist-summary-text { display: flex; flex-direction: column; gap: 2px; }
+.rp-checklist-pct { font: 600 13px/1.2 var(--sans); color: var(--text-strong); }
+.rp-checklist-pending { font: 600 11.5px/1.3 var(--sans); color: var(--amber); }
+.rp-checklist-items { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; }
+.rp-checklist-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 0;
+  border-bottom: 1px solid var(--border-soft);
+  font: 500 12px/1.4 var(--sans);
+  color: var(--text);
+}
+.rp-checklist-item:last-child { border-bottom: 0; }
+.rp-checklist-mark { display: grid; place-items: center; flex: none; }
+.rp-checklist-item.is-done .rp-checklist-mark { color: var(--green); }
+.rp-checklist-item.is-pending .rp-checklist-mark { color: var(--amber); }
+.rp-checklist-item.is-pending .rp-checklist-label { color: var(--amber); font-weight: 600; }
+.rp-checklist-item.is-todo .rp-checklist-mark { color: var(--text-faint); }
+.rp-checklist-item.is-todo .rp-checklist-label { color: var(--text-muted); }
+.rp-checklist-ack { align-self: flex-start; }
+
+/* ---- Validation panel (RC-04) ---- */
+.rp-valpanel { display: flex; flex-direction: column; gap: 10px; }
+.rp-valpanel-head { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+.rp-valpanel-head .rp-panel-title { margin-bottom: 0; }
+.rp-valpanel-rerun { display: inline-flex; align-items: center; gap: 5px; }
+.rp-valpanel-tiles {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 6px;
+}
+.rp-valpanel-tile {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: 8px 6px;
+  background: var(--bg-subtle);
+  border: 1px solid var(--border-soft);
+  border-radius: var(--radius-sm);
+  text-align: center;
+  align-items: center;
+}
+.rp-valpanel-tile-value { font: 700 16px/1.1 var(--sans); color: var(--text-strong); }
+.rp-valpanel-tile-label {
+  font: 600 9.5px/1.2 var(--sans);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--text-soft);
+}
+.rp-valpanel-tile.is-blocker { background: var(--red-bg); border-color: var(--red-border); }
+.rp-valpanel-tile.is-blocker .rp-valpanel-tile-value,
+.rp-valpanel-tile.is-blocker .rp-valpanel-tile-label { color: var(--red); }
+.rp-valpanel-tile.is-warning { background: var(--amber-bg); border-color: var(--amber-border); }
+.rp-valpanel-tile.is-warning .rp-valpanel-tile-value,
+.rp-valpanel-tile.is-warning .rp-valpanel-tile-label { color: var(--amber); }
+.rp-valpanel-tile.is-style { background: var(--blue-bg); border-color: var(--blue-border); }
+.rp-valpanel-tile.is-style .rp-valpanel-tile-value,
+.rp-valpanel-tile.is-style .rp-valpanel-tile-label { color: var(--blue); }
+.rp-valpanel-quality { display: flex; }
+.rp-valpanel-clear { display: flex; align-items: flex-start; gap: 8px; }
+.rp-valpanel-group { display: flex; flex-direction: column; gap: 6px; }
+.rp-valpanel-jump {
+  appearance: none;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  background: none;
+  border: 0;
+  padding: 0;
+  margin-top: 4px;
+  font: 600 11.5px/1.3 var(--sans);
+  color: var(--link);
+  cursor: pointer;
+  text-transform: capitalize;
+}
+.rp-valpanel-jump:hover { text-decoration: underline; }
+.rp-valpanel-when { margin: 0; font: 400 11px/1.4 var(--sans); color: var(--text-faint); }
+
+/* ---- AI activity rail (RC-06) ---- */
+.rp-aiactivity { display: flex; flex-direction: column; gap: 12px; }
+.rp-aiactivity-list { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; }
+.rp-aiactivity-item {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  padding: 7px 0;
+  border-bottom: 1px solid var(--border-soft);
+}
+.rp-aiactivity-item:last-child { border-bottom: 0; }
+.rp-aiactivity-time {
+  font: 500 10.5px/1.6 var(--mono);
+  color: var(--text-faint);
+  flex: none;
+}
+.rp-aiactivity-main { display: flex; flex-direction: column; gap: 1px; min-width: 0; flex: 1; }
+.rp-aiactivity-action { font: 600 12px/1.4 var(--sans); color: var(--text); }
+.rp-aiactivity-route { font: 400 11px/1.4 var(--sans); color: var(--text-soft); overflow-wrap: anywhere; }
+.rp-aiactivity-error { font: 400 11px/1.4 var(--sans); color: var(--red); }
+.rp-aiactivity-provenance {
+  appearance: none;
+  border: 1px solid var(--green-border);
+  background: var(--green-bg);
+  color: var(--green);
+  border-radius: var(--radius-pill);
+  padding: 2px 8px;
+  font: 600 10.5px/1.4 var(--sans);
+  cursor: pointer;
+  flex: none;
+}
+.rp-aiactivity-provenance:hover { border-color: var(--green); }
+.rp-aiactivity-facts { display: flex; flex-direction: column; margin: 0; }
+.rp-aiactivity-facts > div {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 10px;
+  padding: 4px 0;
+}
+.rp-aiactivity-facts dt { font: 500 11.5px/1.4 var(--sans); color: var(--text-soft); margin: 0; }
+.rp-aiactivity-facts dd { font: 500 12px/1.4 var(--sans); color: var(--text); margin: 0; text-align: right; }
+.rp-aiactivity-last,
+.rp-aiactivity-route-card {
+  border-top: 1px solid var(--border-soft);
+  padding-top: 10px;
+}
+.rp-aiactivity-audit { margin: 6px 0 0; font: 400 11px/1.4 var(--sans); color: var(--text-faint); }
+
+/* ---- Export panel (RC-09) ---- */
+.rp-exportpanel { display: flex; flex-direction: column; gap: 10px; }
+.rp-exportpanel-dests { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 6px; }
+.rp-exportpanel-dest {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 8px 10px;
+  background: var(--bg-subtle);
+  border: 1px solid var(--border-soft);
+  border-radius: var(--radius-sm);
+}
+.rp-exportpanel-dest-icon { display: grid; place-items: center; color: var(--text-soft); flex: none; }
+.rp-exportpanel-dest-main { display: flex; flex-direction: column; gap: 1px; min-width: 0; flex: 1; }
+.rp-exportpanel-dest-name { font: 600 12px/1.3 var(--sans); color: var(--text); }
+.rp-exportpanel-dest-sub { font: 400 11px/1.3 var(--sans); color: var(--text-soft); }
+.rp-exportpanel-formats { display: flex; flex-wrap: wrap; gap: 6px; }
+.rp-exportpanel-format {
+  appearance: none;
+  padding: 5px 10px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  background: var(--bg-panel);
+  font: 600 11.5px/1.2 var(--sans);
+  color: var(--text-muted);
+  cursor: pointer;
+}
+.rp-exportpanel-format:hover { border-color: var(--border-strong); color: var(--text); }
+.rp-exportpanel-format.is-active {
+  border-color: var(--accent);
+  background: var(--accent-tint);
+  color: var(--accent-strong);
+}
+.rp-exportpanel-gate { display: flex; align-items: flex-start; gap: 8px; }
+.rp-exportpanel-boundary {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  padding: 8px 10px;
+  background: var(--amber-bg);
+  border: 1px solid var(--amber-border);
+  border-radius: var(--radius-sm);
+  font: 400 11.5px/1.5 var(--sans);
+  color: var(--amber);
+}
+.rp-exportpanel-status {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 10px;
+  border-radius: var(--radius-sm);
+  font: 600 12px/1.4 var(--sans);
+}
+.rp-exportpanel-status.is-sending { background: var(--blue-bg); border: 1px solid var(--blue-border); color: var(--blue); }
+.rp-exportpanel-status.is-delivered { background: var(--green-bg); border: 1px solid var(--green-border); color: var(--green); }
+.rp-exportpanel-status.is-failed { background: var(--red-bg); border: 1px solid var(--red-border); color: var(--red); }
+.rp-exportpanel-run { width: 100%; justify-content: center; display: inline-flex; }
+.rp-exportpanel-ris {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+  border-top: 1px solid var(--border-soft);
+  padding-top: 10px;
+}
+
+/* ---- Provenance modal (RC-07) ---- */
+.rp-provenance-scrim {
+  position: fixed;
+  inset: 0;
+  z-index: 90;
+  background: var(--scrim);
+  display: grid;
+  place-items: center;
+  padding: 24px;
+}
+.rp-provenance {
+  width: min(560px, 100%);
+  max-height: min(80vh, 640px);
+  display: flex;
+  flex-direction: column;
+  background: var(--bg-elevated);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-lg);
+  overflow: hidden;
+}
+.rp-provenance-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  padding: 12px 16px;
+  border-bottom: 1px solid var(--border-soft);
+}
+.rp-provenance-title { font: 600 13.5px/1.2 var(--sans); color: var(--text-strong); }
+.rp-provenance-body { padding: 14px 16px; overflow-y: auto; display: flex; flex-direction: column; gap: 12px; }
+.rp-provenance-claim { display: flex; flex-direction: column; gap: 4px; }
+.rp-provenance-claim-label {
+  font: 600 9.5px/1 var(--sans);
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--text-faint);
+}
+.rp-provenance-claim-value {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font: 600 13px/1.4 var(--sans);
+  color: var(--text-strong);
+  flex-wrap: wrap;
+}
+.rp-provenance-claim-scope { font: 400 11.5px/1.4 var(--sans); color: var(--text-soft); }
+.rp-provenance-unavailable { display: flex; align-items: flex-start; gap: 8px; }
+.rp-provenance-chain { display: flex; flex-direction: column; gap: 6px; }
+.rp-provenance-row {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  padding: 8px 10px;
+  background: var(--bg-subtle);
+  border: 1px solid var(--border-soft);
+  border-radius: var(--radius-sm);
+}
+.rp-provenance-row-icon {
+  display: grid;
+  place-items: center;
+  width: 24px;
+  height: 24px;
+  border-radius: var(--radius-sm);
+  background: var(--accent-tint);
+  color: var(--accent-strong);
+  flex: none;
+}
+.rp-provenance-row-main { display: flex; flex-direction: column; gap: 1px; min-width: 0; }
+.rp-provenance-row-label { font: 600 11px/1.3 var(--sans); color: var(--text-soft); }
+.rp-provenance-row-value { font: 600 12.5px/1.4 var(--sans); color: var(--text); overflow-wrap: anywhere; }
+.rp-provenance-row-missing { font: 500 12px/1.4 var(--sans); color: var(--text-faint); font-style: italic; }
+.rp-provenance-row-hint { font: 400 11px/1.4 var(--sans); color: var(--text-faint); }
+.rp-provenance-what {
+  background: var(--bg-subtle);
+  border: 1px solid var(--border-soft);
+  border-radius: var(--radius-sm);
+  padding: 10px 12px;
+}
+.rp-provenance-what-title {
+  font: 600 10px/1 var(--sans);
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--text-faint);
+  margin-bottom: 4px;
+}
+.rp-provenance-what p { margin: 0; font: 400 12px/1.6 var(--sans); color: var(--text-muted); }
+.rp-provenance-foot {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+  padding: 10px 16px;
+  border-top: 1px solid var(--border-soft);
+}
+
+/* ---- Priors comparison (RC-05) ---- */
+.rp-priorcmp-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  flex-wrap: wrap;
+  margin-bottom: 4px;
+}
+.rp-priorcmp-sync { display: inline-flex; align-items: center; gap: 5px; }
+.rp-priorcmp-sync.is-on {
+  border-color: var(--accent);
+  color: var(--accent-strong);
+  background: var(--accent-tint);
+}
+.rp-priorcmp-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+}
+@media (max-width: 720px) {
+  .rp-priorcmp-grid { grid-template-columns: 1fr; }
+}
+.rp-priorcmp-col { min-width: 0; display: flex; flex-direction: column; gap: 6px; }
+.rp-priorcmp-col-head {
+  font: 600 11px/1.3 var(--sans);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--text-soft);
+  padding-bottom: 4px;
+  border-bottom: 1px solid var(--border-soft);
+}
+.rp-priorcmp-scroll {
+  max-height: 440px;
+  overflow-y: auto;
+  padding-right: 4px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.rp-priorcmp-chip { margin-left: 8px; display: inline-flex; align-items: center; gap: 3px; }
+.rp-priorcmp-changed {
+  background: var(--blue-bg);
+  border-color: var(--blue-border);
+}
+.rp-priorcmp-different {
+  background: var(--amber-bg);
+  border-color: var(--amber-border);
+}
+
+/* ============================================================
+   RC-08 — Dictation bar states (idle blue / listening green /
+   processing blue / error+disconnected red). Labels + icons carry
+   meaning alongside color; the bar outline reflects the state.
+   ============================================================ */
+.rp-dictation-controls {
+  padding: 8px 10px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  background: var(--bg-panel);
+  box-shadow: var(--shadow-md);
+}
+.rp-dictation[data-state='idle'] .rp-dictation-controls { border-color: var(--blue-border); }
+.rp-dictation[data-state='listening'] .rp-dictation-controls { border-color: var(--green-border); }
+.rp-dictation[data-state='processing'] .rp-dictation-controls { border-color: var(--blue-border); }
+.rp-dictation[data-state='error'] .rp-dictation-controls,
+.rp-dictation[data-state='disconnected'] .rp-dictation-controls { border-color: var(--red-border); }
+
+/* Listening is GREEN in the RC system (red is reserved for errors). */
+.rp-dictation-fab.recording {
+  background: var(--green-bg);
+  color: var(--green);
+  border-color: var(--green-border);
+  animation: rp-rec-glow-green 1.8s var(--ease-in-out) infinite;
+}
+.rp-dictation-fab.recording .rp-dictation-dot {
+  background: var(--green);
+  animation: rp-rec-pulse-green 1.2s var(--ease-in-out) infinite;
+}
+@keyframes rp-rec-glow-green {
+  0%, 100% { box-shadow: var(--shadow-xs), 0 0 0 0 color-mix(in oklch, var(--green), transparent 72%); }
+  50% { box-shadow: var(--shadow-xs), 0 0 0 4px color-mix(in oklch, var(--green), transparent 100%); }
+}
+@keyframes rp-rec-pulse-green {
+  0%, 100% { transform: scale(1); box-shadow: 0 0 0 0 color-mix(in oklch, var(--green), transparent 45%); }
+  50% { transform: scale(1.25); box-shadow: 0 0 0 5px color-mix(in oklch, var(--green), transparent 100%); }
+}
+
+/* Input level meter — real AnalyserNode bars on the HQ path; a gentle
+   equal-height pulse while the live engine listens (no stream access). */
+.rp-dictation-meter {
+  display: inline-flex;
+  align-items: flex-end;
+  gap: 2px;
+  height: 18px;
+  padding: 0 2px;
+}
+.rp-dictation-meter-bar {
+  width: 3px;
+  height: 30%;
+  border-radius: 2px;
+  background: var(--border-strong);
+  transition: height 90ms var(--ease-snap), background 90ms var(--ease-snap);
+}
+.rp-dictation-meter-bar:nth-child(2n) { height: 55%; }
+.rp-dictation-meter-bar:nth-child(3n) { height: 40%; }
+.rp-dictation-meter-bar[data-on='true'] { background: var(--green); height: 100%; }
+.rp-dictation-meter.active .rp-dictation-meter-bar:not([data-on]) {
+  animation: rp-meter-idle 1.1s var(--ease-in-out) infinite;
+  background: color-mix(in oklch, var(--green), var(--border-strong) 35%);
+}
+@keyframes rp-meter-idle {
+  0%, 100% { transform: scaleY(0.7); }
+  50% { transform: scaleY(1.15); }
+}
+
+.rp-dictation-statusline {
+  font: 500 11.5px/1.2 var(--sans);
+  color: var(--text-soft);
+  max-width: 200px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.rp-dictation[data-state='listening'] .rp-dictation-statusline { color: var(--green); }
+.rp-dictation[data-state='processing'] .rp-dictation-statusline { color: var(--blue); }
+.rp-dictation[data-state='error'] .rp-dictation-statusline,
+.rp-dictation[data-state='disconnected'] .rp-dictation-statusline { color: var(--red); }

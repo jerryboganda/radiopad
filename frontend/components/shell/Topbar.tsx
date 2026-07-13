@@ -17,6 +17,7 @@ import CommandPalette from './CommandPalette';
 import NotificationsBell from './NotificationsBell';
 import ProfileMenu from './ProfileMenu';
 import ThemeToggle from '@/components/ui/ThemeToggle';
+import { bindingFromKeyboardEvent, getBinding, normalizeBinding } from '@/lib/hotkeys';
 
 export default function Topbar() {
   const tBar = useTranslations('topbar');
@@ -26,8 +27,13 @@ export default function Topbar() {
 
   useEffect(() => {
     setIsMac(/mac/i.test(navigator.platform));
+    // Binding is user-customizable via /settings/hotkeys (RC-10). Cmd on mac
+    // is accepted wherever the stored binding says Ctrl.
     const onKey = (e: KeyboardEvent) => {
-      if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === 'k') {
+      const pressed = bindingFromKeyboardEvent(e);
+      if (!pressed) return;
+      const bound = normalizeBinding(getBinding('command-palette'));
+      if (pressed === bound || pressed.replace(/^Meta\+/, 'Ctrl+') === bound) {
         e.preventDefault();
         setPaletteOpen((o) => !o);
       }

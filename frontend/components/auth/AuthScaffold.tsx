@@ -2,6 +2,7 @@
 
 import type { ReactNode } from 'react';
 import CheckUpdatesButton from '@/components/shell/CheckUpdatesButton';
+import ThemeToggle from '@/components/ui/ThemeToggle';
 
 /**
  * Split-screen scaffold for the public auth entrance (sign-in / register /
@@ -123,9 +124,11 @@ export default function AuthScaffold({
       </aside>
 
       <main className="rp-auth-main">
-        {/* Desktop self-update, reachable before sign-in. Renders only inside the
-            Tauri shell (CheckUpdatesButton self-hides on web/mobile). */}
+        {/* Pre-sign-in chrome: theme toggle (THEME-002 — visible on the sign-in
+            screen) + desktop self-update (CheckUpdatesButton self-hides on
+            web/mobile). */}
         <div className="rp-auth-update">
+          <ThemeToggle />
           <CheckUpdatesButton />
         </div>
         <div className="rp-auth-card">
