@@ -2,9 +2,9 @@
 
 **Status:** Current  ·  **Owner:** Engineering + Product  ·  **Last Updated:** 2026-05-04
 
-The single jumping-off point for every documentation surface in this repository. The legacy short index is preserved at [INDEX.legacy.md](INDEX.legacy.md).
+The single jumping-off point for every documentation surface in this repository.
 
-> ⚠️ The UI/UX is **locked** to the Open Design (Claude.ai-inspired) visual language. See [02-design/design.md](02-design/design.md) before touching any UI.
+> ⚠️ The UI/UX is **locked** to the **RC design system** (light + first-class deep-navy dark; canonical tokens in `frontend/app/tokens.css`, build-time Tailwind 3). See [02-design/design.md](02-design/design.md) and the authoritative [CLAUDE.md](../CLAUDE.md) before touching any UI.
 
 ## Start here
 

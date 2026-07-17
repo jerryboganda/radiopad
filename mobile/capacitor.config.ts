@@ -9,9 +9,11 @@ const config: CapacitorConfig = {
   bundledWebRuntime: false,
   server: {
     androidScheme: 'https',
-    // In dev, point to a desktop running the API + Next.js. In prod the
-    // backend will be reached over the institution's VPN/HTTPS endpoint.
-    cleartext: true,
+    // PHI transport MUST be encrypted (HIPAA). Cleartext HTTP/WS is OFF by
+    // default so production APKs cannot downgrade. Developers pointing the
+    // companion at a desktop over plain http on the LAN can opt in for a
+    // local build only via RADIOPAD_MOBILE_CLEARTEXT=1; never set it in CI.
+    cleartext: process.env.RADIOPAD_MOBILE_CLEARTEXT === '1',
   },
   plugins: {
     SplashScreen: {

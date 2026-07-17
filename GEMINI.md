@@ -1,14 +1,14 @@
 # GEMINI.md — RadioPad project context for Gemini CLI
 
-> Read this file before any task. It mirrors [AGENTS.md](AGENTS.md) and [CLAUDE.md](CLAUDE.md) for Gemini agents.
+> Read this file before any task. **[CLAUDE.md](CLAUDE.md) is the authoritative source of truth** — this file is a thin pointer to it for Gemini agents; if they ever disagree, CLAUDE.md wins.
 
 ## Project summary
 
 RadioPad is an AI-assisted radiology reporting platform. A radiologist drafts a structured report, AI suggests phrasing, a rulebook validates findings, and the radiologist signs/exports — RadioPad never auto-signs.
 
-## ⚠️ UI/UX is LOCKED
+## ⚠️ UI/UX is LOCKED — the "RC" design system
 
-The frontend uses the Open Design (Claude.ai-inspired) warm-paper visual language. Spec lives in [docs/02-design/design.md](docs/02-design/design.md); canonical stylesheet is [frontend/app/globals.css](frontend/app/globals.css). Use only the documented tokens and component classes. **Do not** introduce Tailwind utilities, MUI/Ant/Chakra/Bootstrap, dark mode, emoji icons, or alternate accents.
+The frontend uses the **RC design system**: a light-first white/blue clinical-SaaS palette with a **first-class deep-navy dark theme — both themes are mandatory**. The canonical token source is [frontend/app/tokens.css](frontend/app/tokens.css) (RC primitives + alias layer) with `var()`-based scales in [frontend/tailwind.config.ts](frontend/tailwind.config.ts); build-time **Tailwind 3 IS part of the stack**. Full contract: [CLAUDE.md](CLAUDE.md) + [docs/02-design/design.md](docs/02-design/design.md). Use only the documented alias tokens and `.rp-*` component classes. **Do not** hardcode colours, add accent colours, introduce MUI/Ant/Chakra/Bootstrap, use emoji-as-icons, or use any primary navigation other than the left-sidebar shell. (The retired "Open Design warm-paper / no-dark-mode / no-Tailwind" rule no longer applies.)
 
 ## Strict tech stack
 

@@ -20,15 +20,6 @@ obj/
 *.log
 .vite
 
-# Local runtime data — auto-created by the daemon on first start.
-# Holds app.sqlite (project metadata), projects/<id>/ (per-project artifacts,
-# the agent's CWD), and artifacts/ (one-off renders). Never commit.
-.od
-
-# Legacy folder name from before the rename; keep ignored so existing
-# clones don't accidentally stage stale runtime data.
-.ocd
-
 tsconfig.tsbuildinfo
 
 .claude-sessions/*
@@ -42,13 +33,28 @@ tsconfig.tsbuildinfo
 # Commander task scratchpad; keep local task notes out of git by default.
 .task/
 
-# Secret keys � never commit private signing material
+# Local CodeGraph index — large local DB, never commit.
+.codegraph/
+
+# Secrets & env files — NEVER commit (this is a PHI app). `.env.example` is the
+# only env file that may be tracked.
+.env
+.env.*
+!.env.example
+.secrets.env
+*.secret
+*.key
+*.pem
+*.pfx
+*.p12
+*.sec
+# Private signing material (also matched by *.sec above; kept explicit).
 mcp-connectors/_signing/release.sec
 
+# Generated gap-analysis / audit scratch artifacts.
+.gap_*
+
 # Test output logs
-iter32_test.tail.txt
-iter36_test.full.txt
-iter36_test.tail.txt
 tsc_output.txt
 
 # Dev databases

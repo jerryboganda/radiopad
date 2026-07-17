@@ -39,7 +39,7 @@ if ($command) {
 if ($match) {
     Write-HookResult ([ordered]@{
         continue = $true
-        systemMessage = "Open Design safety hook flagged $(if ($toolName) { $toolName } else { 'a tool' }): $($match.Reason)."
+        systemMessage = "RadioPad safety guard flagged $(if ($toolName) { $toolName } else { 'a tool' }): $($match.Reason)."
         hookSpecificOutput = [ordered]@{
             hookEventName = 'PreToolUse'
             permissionDecision = 'ask'

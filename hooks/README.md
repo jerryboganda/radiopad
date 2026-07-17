@@ -1,47 +1,33 @@
-# Hooks Layer
+# RadioPad agent guardrail
 
-Hooks are deterministic lifecycle automation for agent sessions. They enforce simple project policy and inject short runtime context without relying on model obedience.
+A single defensive hook for local AI-agent sessions: a **PreToolUse guard** that
+asks for confirmation before potentially destructive shell commands — recursive
+force-deletes outside a clearly scoped path, `git reset --hard`, `git clean -fdx`,
+`Remove-Item -Recurse -Force`, Windows `del /s`, and `curl … | sh` remote-exec.
+It only ever asks for confirmation; it never mutates files.
 
-The tracked workspace manifest is `.github/hooks/open-design-agent-kit.json`. It points at Node scripts for general runtimes and PowerShell `windows` overrides for Windows runtimes where `node` may not be on PATH. Shell wrappers are included for agents that expect the Claude-style names shown in the five-layer diagrams.
+## Files
 
-## Registered Events
+- `pretooluse.mjs` / `pretooluse.ps1` — the guard (Node + PowerShell mirrors).
+- `lib.mjs` / `lib.ps1` — hook payload read/write helpers.
 
-| Event | Script | Purpose |
-|---|---|---|
-| `SessionStart` | `session-start.mjs` | Inject concise project architecture and safety context. |
-| `PreToolUse` | `pretooluse.mjs` | Ask for confirmation before potentially destructive shell commands. |
-| `PostToolUse` | `posttooluse.mjs` | Remind agents to validate when source or test files were touched. |
-| `SubagentStop` | `subagent-stop.mjs` | Ask parent agents to summarize subagent results instead of pasting logs. |
-| `Stop` | `stop.mjs` | Remind agents to report changed files, checks, and limitations. |
+## Input / output contract
 
-## Input And Output Contract
+Hooks receive JSON on stdin and emit JSON on stdout. `PreToolUse` returns
+`hookSpecificOutput.permissionDecision`: `allow` for normal commands, `ask` for
+destructive operations. Exit code `0` means success; the guard prefers `ask` so a
+human approves genuinely intended dangerous work.
 
-Hooks receive JSON on stdin and emit JSON on stdout. The scripts are permissive about input shape because different agent runtimes name fields differently.
+## Activating it in Claude Code
 
-`PreToolUse` returns `hookSpecificOutput.permissionDecision`:
+Claude Code reads hooks from `.claude/settings.json`. In this repo `.claude/` is
+**gitignored**, so the wiring is local per machine (a ready-to-use
+`.claude/settings.json` is provided locally). Run `claude` from the repo root so
+the relative `node hooks/pretooluse.mjs` path resolves. To share the guard with
+the whole team, track a `settings.json` under a committed path instead.
 
-- `allow` for normal commands
-- `ask` for destructive operations such as recursive deletes, hard resets, forced cleans, or piped remote execution
+## Safety rules
 
-Exit code `0` means success. These hooks do not intentionally use exit code `2`; they prefer `ask` so a human can approve truly intended dangerous work.
-
-## Local Runtime Notes
-
-Do not commit `.claude/settings.json`, `.claude/settings.local.json`, `.opencode/`, `.codex/`, or `.agents/`. If an agent runtime needs a local hook manifest, copy or mirror `.github/hooks/open-design-agent-kit.json` into that runtime's expected ignored location.
-
-## Safety Rules
-
-- Hooks must stay short and auditable.
-- Hooks must not read secrets or print environment variables.
-- Hooks must not perform long network calls.
-- Hooks must not mutate source files unless a future feature explicitly documents that behavior.
-
-## Review Checklist
-
-Before changing a hook script or manifest:
-
-1. Confirm commands are relative repo paths, not absolute paths or remote shell snippets.
-2. Confirm both Node and PowerShell variants stay behaviorally aligned.
-3. Confirm scripts only read stdin and write JSON to stdout unless a future feature documents another side effect.
-4. Confirm destructive commands return `permissionDecision: ask` or a stricter decision.
-5. Run `pnpm test -- --run tests/agent-kit-docs.test.ts` when Node and pnpm are available.
+- Keep the guard short and auditable; do not read secrets or print env vars.
+- No long network calls; never mutate source files.
+- Keep the Node and PowerShell variants behaviourally aligned.

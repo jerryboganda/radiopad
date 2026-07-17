@@ -100,5 +100,9 @@ plugin on native; the web fallback uses the browser's standard
 ## Design lock
 
 The mobile shell renders the same Next.js frontend as web/desktop — colours,
-typography, and component classes are governed by `frontend/app/globals.css`
-and `frontend/app/radiopad.css`. Use the splash background `#faf9f7` to match.
+typography, and component classes are governed by the **RC design system**
+(canonical tokens in `frontend/app/tokens.css`, imported via
+`frontend/app/globals.css`; domain patterns in `frontend/app/radiopad.css`).
+Both light and dark themes are mandatory. The splash background is the RC light
+canvas `#f5f8fb` — it matches `SplashScreen.backgroundColor` in
+`capacitor.config.ts`. See [CLAUDE.md](../CLAUDE.md) + `docs/02-design/design.md`.

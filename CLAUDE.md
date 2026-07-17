@@ -1,6 +1,6 @@
 # CLAUDE.md — RadioPad project memory for Claude Code
 
-# CLAUDE.md — RadioPad project memory for Claude Code
+> **This file is the authoritative project instruction file.** [AGENTS.md](AGENTS.md) and [GEMINI.md](GEMINI.md) are thin pointers to it; if they ever disagree, this file wins.
 
 ## ⚠️ MISSION-CRITICAL: RC design system (dual-theme tokens), build-time Tailwind, sidebar shell
 
@@ -72,8 +72,8 @@ No other frameworks. Do not propose Express/Fastify/NestJS/etc. for the backend.
 - `rulebooks/` — YAML rulebooks
 - `templates/` — JSON report templates
 - `docs/` — full documentation hierarchy
-- `src/`, `daemon/` — LEGACY Open Design reference (read-only)
-- `*.legacy.*` — archived original Open Design root files
+- `subagents/` — portable AI subagent roles (explorer, code-reviewer, test-runner, feature-dev)
+- `mcp-connectors/` — signed clinical data connectors (DICOM/FHIR/PACS) — a **product** feature, not developer MCP
 
 ## Commands
 
@@ -104,3 +104,7 @@ dotnet run --project cli/RadioPad.Cli -- rulebook validate ../../rulebooks/chest
 - See [/memories/repo/radiopad-design-lock.md](/memories/repo/radiopad-design-lock.md) for the design-lock note.
 - Update `PROGRESS.md` after completing a checklist item.
 - Update `docs/` when changing behaviour.
+
+## Code navigation
+
+Prefer semantic tools over grepping or reading whole files: Serena's symbol tools (`find_symbol`, `find_referencing_symbols`, `get_symbols_overview`, `search_for_pattern`) for navigation/edits, and CodeGraph queries (`codegraph_explore` or `codegraph explore "<question>"`) for dependency/impact questions. Fall back to Grep/Read only when the semantic tools can't answer.

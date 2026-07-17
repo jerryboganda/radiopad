@@ -10,6 +10,6 @@ applyTo: "**"
 - Tenant isolation: every query touching tenant-scoped data must include `r.TenantId == tenant.Id` (or equivalent). Add an integration test for any new tenant-scoped endpoint.
 - Backend binds `127.0.0.1` by default. Remote exposure requires the operator to set `RADIOPAD_BIND` *and* a TLS reverse proxy.
 - Logs and JSON responses must never contain PHI, secrets, or full report bodies. Use the `X-Request-Id` correlation header for support, not patient identifiers.
-- Authentication is intentionally simple in v0.1 (header-based dev tenant). Any change toward SSO/OIDC requires an ADR and human review of `auth-architecture.md`.
-- Dependencies: pin minor versions; review SCA reports weekly; security patches go to the next minor (`0.x.y`) regardless of feature release cadence.
+- Authentication is real and multi-modal: WebAuthn / passkeys (with server-side user verification), SAML and OIDC SSO, SCIM user provisioning, and bearer tokens with lockout. Header-based tenant/user resolution exists for **local dev only**, gated by `RADIOPAD_DEV_HEADERS` (and `RADIOPAD_REQUIRE_AUTH`). Changes to the auth stack require an ADR and human review of `auth-architecture.md` and the WebAuthn/Saml/Scim/Auth controllers.
+- Dependencies: pin minor versions; apply security patches promptly to the next minor (`0.x.y`) regardless of feature cadence. (Automated SCA / dependency scanning is **not** currently wired into CI — do not represent it as running; add it deliberately if adopted.)
 - Disclosure: contributors must follow [SECURITY.md](../../SECURITY.md). Never discuss unpatched vulnerabilities in public issues.

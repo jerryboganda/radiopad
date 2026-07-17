@@ -4,24 +4,28 @@ This file is the entry point for every AI coding agent (Claude Code, Codex, Curs
 
 ---
 
-## 0. MISSION-CRITICAL UI/UX RULE (read first)
+## 0. Source of truth & precedence (read first)
 
-> **RadioPad's visual identity is the Hallmark "paper & ink" system (OKLCH, ported from UBAG). The token NAMES (palette, typography, accent, semantic families, `.ai-mark`, radii, shadows) are the stable contract; the APP SHELL is the canonical left-sidebar SaaS layout.** You MUST NOT introduce a different design system, colour palette, or dark-mode variant, or a component/theme library (MUI / Ant / Chakra / Bootstrap). Build-time **Tailwind 3** IS part of the stack and allowed.
+> **[CLAUDE.md](CLAUDE.md) is the authoritative project instruction file.** When anything here disagrees with CLAUDE.md, CLAUDE.md wins. This file and [GEMINI.md](GEMINI.md) are deliberately thin, platform-neutral pointers so every agent (Codex, Cursor, Copilot, Gemini, …) reads the same rules. Do not restate the full contract here — read CLAUDE.md.
 
-The full spec lives in [docs/02-design/design.md](docs/02-design/design.md). The canonical token source is [frontend/app/hallmark.css](frontend/app/hallmark.css) (OKLCH Hallmark tokens + the alias layer) plus [frontend/tailwind.config.ts](frontend/tailwind.config.ts); [frontend/app/globals.css](frontend/app/globals.css) carries the `@tailwind` directives, and [frontend/app/shell.css](frontend/app/shell.css) is the sidebar shell + page chrome. When in doubt, read the design doc and copy the existing pattern.
+## 0.1. MISSION-CRITICAL UI/UX RULE
+
+> **RadioPad's visual identity is the "RC" design system: a light-first white/blue clinical-SaaS palette with a first-class deep-navy dark theme. BOTH themes are mandatory** (light is the first-run default; dark is first-class, never pure black). The APP SHELL is the canonical left-sidebar SaaS layout. You MUST NOT introduce a different design system, colour palette, or component/theme library (MUI / Ant / Chakra / Bootstrap). Build-time **Tailwind 3** IS part of the stack and allowed.
+
+The full contract lives in [CLAUDE.md](CLAUDE.md) (§"RC design system") and [docs/02-design/design.md](docs/02-design/design.md). The **canonical token source** is [frontend/app/tokens.css](frontend/app/tokens.css) (RC `--color-*` primitives — light in `:root`, dark under `html[data-theme="dark"]` — plus the alias layer that re-points RadioPad's original token names) with `var()`-based scales in [frontend/tailwind.config.ts](frontend/tailwind.config.ts) (`darkMode: ['selector', '[data-theme="dark"]']`); [frontend/app/globals.css](frontend/app/globals.css) carries the `@tailwind` directives and imports the token layers, and [frontend/app/shell.css](frontend/app/shell.css) is the sidebar shell + page chrome. When in doubt, read the design doc and copy the existing pattern.
 
 Concretely:
 
-- Write against the documented token names (`--bg`, `--accent`, `--text`, semantic families). They are the **stable alias contract** and resolve to Hallmark OKLCH via `hallmark.css`. **Do not reintroduce the old hex values or invent new tokens.**
+- Write against the documented alias tokens (`--bg`, `--accent`, `--accent-fg`, `--scrim`, semantic families green/blue/red/amber/ai/purple/navy). They resolve to the RC primitives via `tokens.css`. **Do not hardcode colours (no hex/rgb in feature CSS/TSX), do not invent inline tokens, and do not write new code against the retired Hallmark paper/saffron/marine alias names.**
+- **Both themes are mandatory** and every UI change must be checked in both before it ships. Print/exports always render the light document theme.
 - Render every page inside `<AppShell>` (`frontend/components/shell/AppShell.tsx`). Use `<Container>` + `<PageHeader>` for the top of every page; do not re-implement chrome.
-- Use the documented component classes (`.rp-shell`, `.rp-sidebar`, `.rp-topbar`, `.rp-page-header`, `.rp-panel`, `.section-block`, `.composer`, `.primary`, `.ghost`, `.subtle`, etc.). The legacy `.app` / `.topbar` classes survive only as in-page editor chrome inside `.split` two-pane surfaces — they must not be used as the application root.
-- Reports / AI prose render in the serif stack (`var(--serif)`); chrome in sans; codes in mono.
-- Validation severities map to the semantic families: blocker → red, warning → amber, info → blue.
-- AI-generated text **must** be wrapped in `.ai-mark` (purple family) until reviewed.
+- Use the documented `.rp-*` component classes (`.rp-shell`, `.rp-sidebar`, `.rp-topbar`, `.rp-page-header`, `.rp-panel`, `.section-block`, `.composer`, button variants `.primary` / `.primary-ghost` / `.ghost` / `.subtle`, etc.). The legacy `.app` / `.topbar` classes survive only as in-page editor chrome inside `.split` two-pane surfaces — they must not be used as the application root.
+- Validation severities map to the semantic families: Blocker → red, Warning → amber, Info/Style → blue.
+- AI-generated text **must** be wrapped in `.ai-mark` (blue "✨ generated" treatment, paired with an amber "Requires review" flag) until reviewed.
 - Data-driven pages render `<Skeleton />` while loading, `<EmptyState />` for zero rows, and `<ErrorState onRetry />` on fetch failure.
-- **Forbidden:** Material UI / Ant / Chakra / Bootstrap, dark-mode variants, emoji-as-icons, generic dark-grey "developer-tool" palettes, additional accent colours, primary navigation patterns other than the canonical left-sidebar shell. (Build-time **Tailwind 3** is allowed — it compiles to static CSS for `output: 'export'`; utilities and named Hallmark/RadioPad classes may be mixed.)
+- **Forbidden:** Material UI / Ant / Chakra / Bootstrap, emoji-as-icons, additional accent colours, hardcoded colours, primary navigation patterns other than the canonical left-sidebar shell. (The old "light-only / no dark mode" rule is **revoked** — dark mode is now required. Build-time **Tailwind 3** is allowed — it compiles to static CSS for `output: 'export'`; utilities and named RC/RadioPad classes may be mixed.)
 
-If a UI requirement cannot be met with the existing tokens/components, stop and add the new token to the Hallmark block in `hallmark.css` (mirror it in `tailwind.config.ts`), or the new class to `shell.css`, + `docs/02-design/design.md` in the same PR — never ship a one-off style.
+If a UI requirement cannot be met with the existing tokens/components, stop and extend the RC primitives in `tokens.css` (light **and** dark values, mirrored in `tailwind.config.ts`), or add the new class to `shell.css`, + `docs/02-design/design.md` in the same PR — never ship a one-off style.
 
 ---
 
@@ -88,19 +92,18 @@ Adding any other backend framework, ORM, or UI framework requires explicit human
 
 ```
 backend/RadioPad.Api/   ASP.NET Core solution (Domain, Application, Validation, Infrastructure, Api, tests)
-frontend/               Next.js app (App Router) — UI/UX uses the Hallmark design system (OKLCH) + build-time Tailwind
-desktop/                Tauri shell
-mobile/                 Capacitor project
-cli/RadioPad.Cli/       .NET global tool
+frontend/               Next.js app (App Router) — UI/UX uses the RC design system (light + first-class dark) + build-time Tailwind 3
+desktop/                Tauri 2 shell (consumes frontend/out-desktop)
+mobile/                 Capacitor 6 companion (consumes frontend/out-mobile)
+cli/RadioPad.Cli/       .NET 8 global tool
 rulebooks/              YAML rulebooks (chest_ct_v1, brain_mri_v1, …)
 templates/              JSON report templates
+subagents/              Portable AI subagent roles (explorer, code-reviewer, test-runner, feature-dev)
+mcp-connectors/         Signed clinical data connectors (DICOM/FHIR/PACS) — a PRODUCT feature, not developer MCP
 docs/                   Documentation (00-product, 02-design, 03-architecture, 04-security, …)
-src/                    LEGACY Open Design web app — kept for reference only
-daemon/                 LEGACY Open Design Node daemon — kept for reference only
-*.legacy.*              Archived original Open Design root files
 ```
 
-You may freely edit anything under `frontend/`, `backend/`, `desktop/`, `mobile/`, `cli/`, `docs/`, `rulebooks/`, `templates/`. **Do not modify** `src/` or `daemon/` — those are the legacy reference. Treat `*.legacy.*` files as read-only history.
+You may freely edit anything under `frontend/`, `backend/`, `desktop/`, `mobile/`, `cli/`, `docs/`, `rulebooks/`, `templates/`. (The former Open Design legacy tree — `src/`, `daemon/`, `app/`, `design-systems/`, and the `*.legacy.*` files — has been removed from the repo.)
 
 ---
 
@@ -207,5 +210,5 @@ These are non-negotiable. Violations must be reverted in review.
 ## 8. When you're stuck
 
 - Search `docs/` first.
-- Read the matching legacy file in `src/` or `daemon/` (Open Design reference) for UX patterns — but do not copy implementation logic; reimplement on the strict stack.
+- Check the reference mockups under `UI UX SCREENS/` and `docs/02-design/design.md` for UX patterns; reimplement on the strict stack.
 - Open an explicit "open question" in `PROGRESS.md` rather than guessing.

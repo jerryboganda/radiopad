@@ -107,8 +107,8 @@ jobs:
       - name: pnpm install
         run: pnpm install --frozen-lockfile
 
-      - name: Build frontend (static export)
-        run: pnpm --filter @radiopad/frontend build
+      - name: Build frontend (desktop surface static export)
+        run: pnpm --filter @radiopad/frontend build:desktop
 
       - name: Install tauri-cli
         run: cargo install tauri-cli --version "^2" --locked

@@ -35,7 +35,7 @@ const match = command ? riskyCommands.find(({ pattern }) => pattern.test(command
 if (match) {
   writeHookResult({
     continue: true,
-    systemMessage: `Open Design safety hook flagged ${toolName || 'a tool'}: ${match.reason}.`,
+    systemMessage: `RadioPad safety guard flagged ${toolName || 'a tool'}: ${match.reason}.`,
     hookSpecificOutput: {
       hookEventName: 'PreToolUse',
       permissionDecision: 'ask',
