@@ -240,11 +240,17 @@ public class TemplatesController : TenantedController
                     if (string.IsNullOrEmpty(key) && el.TryGetProperty("id", out var idEl)) key = idEl.GetString() ?? "";
                     var label = el.TryGetProperty("label", out var l) ? l.GetString() ?? key : key;
                     var placeholder = el.TryGetProperty("placeholder", out var p) ? p.GetString() ?? "" : "";
+                    // F2 — the section's "normal" (default body) is what a new report is actually
+                    // seeded with, so it is the preferred preview fallback; the greyed placeholder
+                    // is only used when no normal is defined. Report content (when merging a report)
+                    // still wins over both.
+                    var normal = el.TryGetProperty("normal", out var nv) ? nv.GetString() ?? "" : "";
+                    var fallback = string.IsNullOrEmpty(normal) ? placeholder : normal;
                     sections.Add(new
                     {
                         key,
                         label,
-                        body = ResolveSectionBody(report, key, placeholder),
+                        body = ResolveSectionBody(report, key, fallback),
                     });
                 }
             }
