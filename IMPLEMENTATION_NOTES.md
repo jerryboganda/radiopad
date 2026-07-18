@@ -22,7 +22,8 @@ The safety engine and the buildable competitive features are shipped, all TDD + 
 - **F2** template "normal" values — author per-section defaults, **Use** seeds a report from them,
   Preview shows the normal body.
 - **F3** device-local snippets with tab-through `${field}` selection math + manager UI + textarea
-  insertion primitive. (In-editor ProseMirror trigger-on-type auto-expansion is the noted follow-up.)
+  insertion primitive **and in-editor auto-expansion** (Tiptap `SnippetExpansion`: Tab expands the
+  trigger before the caret + tab-cycles fields). Complete.
 - **F4** measurement-sanity + findings/impression consistency (deterministic).
 - **F5** auto-comparison statement (deterministic; inserts into Comparison).
 - **F7a/F7b** org + per-user correction dictionaries (backend + management UI).
@@ -44,7 +45,6 @@ The safety engine and the buildable competitive features are shipped, all TDD + 
   **llama-server binary bundled in CI**.
 - **P0.3 remainder** — Rust system-wide global-shortcut rebind (needs a Tauri build I can't
   compile-verify) + true streaming/chunked on-device decode.
-- **F3 in-editor auto-expansion** — ProseMirror/Tiptap trigger-on-type + in-editor tab-through.
 
 ---
 

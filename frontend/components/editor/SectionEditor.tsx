@@ -31,6 +31,7 @@ import {
 } from '@/lib/editor/sectionEditorRegistry';
 import type { EditorCorrection } from '@/lib/editor/corrections';
 import { clinicalLineRole } from '@/lib/editor/clinicalStructure';
+import { SnippetExpansion } from '@/lib/editor/snippetExpansion';
 
 const correctionPluginKey = new PluginKey<DecorationSet>('rpCorrections');
 
@@ -116,7 +117,7 @@ export default function SectionEditor({
 
   const editor = useEditor({
     immediatelyRender: false, // avoid Next SSR hydration mismatch
-    extensions: [Document, Paragraph, Text, History, ClinicalStructure, CorrectionHighlight, InterimDictation],
+    extensions: [Document, Paragraph, Text, History, ClinicalStructure, CorrectionHighlight, InterimDictation, SnippetExpansion],
     content: stringToDoc(value),
     editorProps: {
       attributes: {

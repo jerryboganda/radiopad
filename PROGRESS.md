@@ -59,9 +59,12 @@
   to next, wrapping) — and `lib/snippetInsert.ts` applies it to a real `<textarea>`/`<input>`
   (React-safe native-setter + input event; `insertSnippet` + `snippetTab`). Managed at
   **Settings → Snippets** (add/edit/delete, live field-count). 17 tests (11 core + 3 insert + 3
-  page). NOTE: trigger-on-type auto-expansion inside the ProseMirror section editor (true in-editor
-  tab-through) is the remaining editor-integration step — deliberately deferred to a focused
-  ProseMirror pass rather than risk the rich editor's selection state.
+  page). **In-editor auto-expansion now shipped** — `lib/editor/snippetExpansion.ts` is a Tiptap
+  extension: **Tab** expands the trigger word before the caret into the snippet body and selects the
+  first `${field}`; a further **Tab** advances through the fields (wrapping); with no snippet context
+  Tab falls through to its default. All position math runs in plain-text space mapped via
+  `plainOffsetToPmPos`, so it is robust to multi-line bodies. +6 tests (incl. a live-editor Tab
+  integration test); existing `SectionEditor` suite unregressed. F3 is complete.
 - **Phase 3 regulated-feature gating (OFF by default)** — the assist-only capabilities
   (auto-impression, critical-finding flagging, follow-up standardisation, interval/RECIST tracking)
   are now gated behind an explicit, fail-safe opt-in. Backend `RegulatedFeatures`
