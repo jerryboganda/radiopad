@@ -52,6 +52,12 @@
   `TenantLexicon` (rows with a replacement, longest-first) into `CorrectionRule[]` applied by the
   §5.2 pass-through BEFORE the LLM; wired through `DictationDraftService` + the `/dictation/draft`
   endpoint.
+- **F1 "scratch that" voice undo** — `lib/dictation/voiceEditCommands.ts` recognises a
+  whole-utterance editing command ("scratch that" / "strike that" / "undo that" / "delete that")
+  and the `DictationOverlay` live path routes it to the focused rich editor's existing `undo()`
+  instead of typing it. Anchored full-chunk matching so dictation content that merely contains a
+  keyword ("delete the prior comparison") never triggers it; if the target can't undo the command
+  is swallowed, never typed. 17 tests (15 parser + 2 overlay wiring).
 - **F1 spoken-measurement formatting (live path)** — `lib/dictation/spokenNumbers.ts`, a faithful
   TS port of the backend §5.2 `NormalizeSpokenNumbers` (cardinals incl. hundreds + "and" bridging,
   "point" decimals, `by`→`x` axis joins, mm/cm unit abbreviation). Folded into `formatDictation`

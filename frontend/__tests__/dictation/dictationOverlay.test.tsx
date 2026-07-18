@@ -3,6 +3,11 @@ import { render, fireEvent, act, screen } from '@testing-library/react';
 import * as React from 'react';
 import DictationOverlay from '@/components/dictation/DictationOverlay';
 import { _resetFocusTracker } from '@/lib/dictation/focusTracker';
+import {
+  registerSectionEditor,
+  noteSectionEditorFocus,
+  _resetSectionEditorRegistry,
+} from '@/lib/editor/sectionEditorRegistry';
 
 // Minimal Web-Speech stand-in the tests can drive.
 class FakeRecognition {
@@ -24,6 +29,7 @@ let rec: FakeRecognition;
 
 beforeEach(() => {
   _resetFocusTracker();
+  _resetSectionEditorRegistry();
   document.body.innerHTML = '';
   rec = new FakeRecognition();
   w.SpeechRecognition = function () {
@@ -94,6 +100,34 @@ describe('DictationOverlay', () => {
     fireEvent.click(screen.getByTestId('dictation-fab'));
     act(() => rec.emit('no acute findings full stop', true));
     expect(field.value).toBe('No acute findings.');
+  });
+
+  it('undoes the focused section editor when "scratch that" is dictated (F1)', () => {
+    const undo = vi.fn();
+    const insertAtCursor = vi.fn();
+    registerSectionEditor({ sectionKey: 'findings', insertAtCursor, focus: vi.fn(), undo });
+    noteSectionEditorFocus('findings');
+
+    render(<DictationOverlay />);
+    fireEvent.click(screen.getByTestId('dictation-fab'));
+    act(() => rec.emit('scratch that', true));
+
+    expect(undo).toHaveBeenCalledTimes(1);
+    expect(insertAtCursor).not.toHaveBeenCalled(); // the command is never typed into the report
+  });
+
+  it('inserts ordinary prose into the focused section editor (not treated as a command)', () => {
+    const undo = vi.fn();
+    const insertAtCursor = vi.fn();
+    registerSectionEditor({ sectionKey: 'findings', insertAtCursor, focus: vi.fn(), undo });
+    noteSectionEditorFocus('findings');
+
+    render(<DictationOverlay />);
+    fireEvent.click(screen.getByTestId('dictation-fab'));
+    act(() => rec.emit('delete the prior comparison', true));
+
+    expect(undo).not.toHaveBeenCalled();
+    expect(insertAtCursor).toHaveBeenCalledWith('Delete the prior comparison');
   });
 
   it('asks the host page to clean the dictation when Fix is pressed', () => {

@@ -23,6 +23,7 @@ import { getLastFocusedSectionEditor } from '@/lib/editor/sectionEditorRegistry'
 import { setSessionAudio } from '@/lib/dictation/audioBuffer';
 import { useCrossCheckEnabled, useUseUbag } from '@/lib/dictation/crossCheckPrefs';
 import { formatDictation } from '@/lib/dictation/medicalFormat';
+import { parseVoiceEditCommand } from '@/lib/dictation/voiceEditCommands';
 import { blobToWav16kMono } from '@/lib/dictation/wavEncode';
 import {
   getSpeechRecognitionCtor,
@@ -179,7 +180,15 @@ export default function DictationOverlay() {
       const { finalText, interimText } = parseSpeechResults(event);
       setInterim(interimText);
       if (finalText) {
-        insertDictation(formatDictation(finalText));
+        // F1 — a whole-utterance editing command ("scratch that") undoes the last dictation in
+        // the focused rich editor instead of being typed into the report. Anything else is
+        // ordinary prose and is inserted. If the focused target can't undo, the command is simply
+        // swallowed — never typed, so "scratch that" can't end up in the report.
+        if (parseVoiceEditCommand(finalText)?.kind === 'undo') {
+          getLastFocusedSectionEditor()?.undo?.();
+        } else {
+          insertDictation(formatDictation(finalText));
+        }
         setInterim('');
       }
     };
