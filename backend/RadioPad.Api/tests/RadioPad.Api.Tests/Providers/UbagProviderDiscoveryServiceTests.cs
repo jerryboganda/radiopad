@@ -100,6 +100,73 @@ public class UbagProviderDiscoveryServiceTests
     }
 
     [Fact]
+    public async Task Pinned_primary_stays_enabled_when_gateway_gives_no_login_signal()
+    {
+        // Regression (2026-07-18, prod): the vps-local executor runs jobs against live
+        // browser profiles WITHOUT ever registering /v1/browser/contexts rows — the real
+        // /v1/targets shape carries no readiness either (Ready=null). The old code read
+        // that absence as logged-out and disabled a perfectly working curated primary.
+        // No signal must leave the operator's Enabled choice untouched.
+        using var db = CreateDb();
+        db.Providers.Add(new ProviderConfig
+        {
+            TenantId = Tenant,
+            Name = "UBAG Gemini Web",
+            Adapter = "ubag",
+            Model = "gemini_web",
+            Compliance = ProviderComplianceClass.PhiApproved,
+            Enabled = true,
+        });
+        await db.SaveChangesAsync();
+
+        var noSignal = new FakeClient(
+            targets: new[] { new UbagTarget("gemini_web", "Gemini Web", "listed", null, null) },
+            contexts: Array.Empty<UbagBrowserContext>());
+
+        Assert.Equal(0, await Service(db, noSignal).SyncAsync(Tenant, default));
+        Assert.True((await db.Providers.SingleAsync(p => p.Model == "gemini_web")).Enabled);
+    }
+
+    [Fact]
+    public async Task Pinned_primary_stays_disabled_when_gateway_gives_no_login_signal()
+    {
+        // Symmetric to the enabled case: an operator-disabled row must not be silently
+        // re-enabled just because the gateway is silent about login state.
+        using var db = CreateDb();
+        db.Providers.Add(new ProviderConfig
+        {
+            TenantId = Tenant,
+            Name = "UBAG DeepSeek Web",
+            Adapter = "ubag",
+            Model = "deepseek_web",
+            Compliance = ProviderComplianceClass.PhiApproved,
+            Enabled = false,
+        });
+        await db.SaveChangesAsync();
+
+        var noSignal = new FakeClient(
+            targets: new[] { new UbagTarget("deepseek_web", "DeepSeek Web", "listed", null, null) },
+            contexts: Array.Empty<UbagBrowserContext>());
+
+        Assert.Equal(0, await Service(db, noSignal).SyncAsync(Tenant, default));
+        Assert.False((await db.Providers.SingleAsync(p => p.Model == "deepseek_web")).Enabled);
+    }
+
+    [Fact]
+    public async Task No_signal_non_pinned_target_is_not_materialised()
+    {
+        // Materialisation still requires an EXPLICIT authenticated signal — silence
+        // neither creates picker rows nor flips existing ones.
+        using var db = CreateDb();
+        var client = new FakeClient(
+            targets: new[] { new UbagTarget("chatgpt_web", "ChatGPT Web", "listed", null, null) },
+            contexts: Array.Empty<UbagBrowserContext>());
+
+        Assert.Equal(0, await Service(db, client).SyncAsync(Tenant, default));
+        Assert.False(await db.Providers.AnyAsync(p => p.Model == "chatgpt_web"));
+    }
+
+    [Fact]
     public async Task Pinned_primary_row_is_never_created_by_discovery()
     {
         using var db = CreateDb();

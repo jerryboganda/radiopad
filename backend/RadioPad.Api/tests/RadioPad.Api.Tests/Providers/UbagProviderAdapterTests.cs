@@ -218,16 +218,38 @@ public class UbagProviderAdapterTests
     }
 
     [Fact]
-    public void MergeTargetReadiness_NoMatchingContext_PreservesOriginalStatus()
+    public void MergeTargetReadiness_NoMatchingContext_PreservesOriginalStatusAndReady()
     {
-        var targets = new[] { new UbagTarget("deepseek_web", "DeepSeek", "listed", false, null) };
+        // Absent context row = NO login signal — Ready must pass through untouched
+        // (null here, matching the real 2026-05-22 /v1/targets shape). The vps-local
+        // executor runs jobs without ever registering contexts, so "no context" must
+        // never read as logged-out (2026-07-18).
+        var targets = new[] { new UbagTarget("deepseek_web", "DeepSeek", "listed", null, null) };
         var contexts = Array.Empty<UbagBrowserContext>();
 
         var result = UbagProviderAdapter.MergeTargetReadiness(targets, contexts);
 
         Assert.Single(result);
-        Assert.False(result[0].Ready);
+        Assert.Null(result[0].Ready);
         Assert.Equal("listed", result[0].Status);
+    }
+
+    [Fact]
+    public void MergeTargetReadiness_NoMatchingContext_PreservesExplicitLegacyReady()
+    {
+        // A legacy gateway that reported readiness on /v1/targets itself keeps that
+        // explicit signal when the contexts endpoint has no matching row.
+        var targets = new[]
+        {
+            new UbagTarget("legacy_up", "Legacy Up", "ready", true, null),
+            new UbagTarget("legacy_down", "Legacy Down", "offline", false, null),
+        };
+        var contexts = Array.Empty<UbagBrowserContext>();
+
+        var result = UbagProviderAdapter.MergeTargetReadiness(targets, contexts);
+
+        Assert.True(result[0].Ready);
+        Assert.False(result[1].Ready);
     }
 
     // ── helpers ───────────────────────────────────────────────────────────────

@@ -83,15 +83,18 @@ public class UbagClientParsingTests
     }
 
     [Fact]
-    public async Task ListTargetsAsync_RealShape_ReadyIsFalse_ForAllTargets()
+    public async Task ListTargetsAsync_RealShape_ReadyIsNull_ForAllTargets()
     {
-        // The real /v1/targets shape carries no readiness field and no ok-status value —
-        // every target comes back Ready=false. True readiness is derived separately by
+        // The real /v1/targets shape carries no readiness field and no status/state —
+        // every target comes back Ready=null ("no signal"), NOT false: treating the
+        // missing field as logged-out made discovery disable working providers on
+        // gateways whose executors never register browser contexts (2026-07-18).
+        // True readiness, when the gateway does report it, is derived separately by
         // cross-referencing /v1/browser/contexts via MergeTargetReadiness.
         var sut = BuildClient(StubHandler.Json(HttpStatusCode.OK, RealTargetsJson));
         var targets = await sut.ListTargetsAsync(CancellationToken.None);
 
-        Assert.All(targets, t => Assert.False(t.Ready));
+        Assert.All(targets, t => Assert.Null(t.Ready));
     }
 
     // ── /v1/targets — legacy shapes (backward-compat) ─────────────────────────

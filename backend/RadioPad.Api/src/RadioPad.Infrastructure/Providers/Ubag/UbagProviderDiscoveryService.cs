@@ -110,13 +110,21 @@ public sealed class UbagProviderDiscoveryService
                 // here), but their Enabled flag now mirrors live login state too
                 // (2026-07-11): a logged-out Gemini must stop receiving traffic
                 // instead of failing every routed request until a human notices.
-                if (row is not null && row.Enabled != t.Ready)
+                // Ready is tri-state (2026-07-18): only an EXPLICIT gateway signal
+                // may flip Enabled — null means the gateway never reported login
+                // state (e.g. vps-local executors register no browser contexts even
+                // while jobs succeed), so the operator's Enabled choice stands and
+                // real outages surface via the failure-based alert path instead.
+                if (t.Ready is bool pinnedReady)
                 {
-                    row.Enabled = t.Ready;
-                    changes++;
-                    if (!t.Ready) loginLost.Add(t.Id);
+                    if (row is not null && row.Enabled != pinnedReady)
+                    {
+                        row.Enabled = pinnedReady;
+                        changes++;
+                        if (!pinnedReady) loginLost.Add(t.Id);
+                    }
+                    if (pinnedReady) _alerts?.RecordTargetAuthenticated(t.Id);
                 }
-                if (t.Ready) _alerts?.RecordTargetAuthenticated(t.Id);
                 continue;
             }
 
@@ -124,8 +132,8 @@ public sealed class UbagProviderDiscoveryService
             {
                 // Only materialise a row once the operator has actually logged in, so
                 // the picker isn't cluttered with every theoretical web AI the gateway
-                // could drive.
-                if (!t.Ready) continue;
+                // could drive. (An explicit TRUE is required — "no signal" stays hidden.)
+                if (t.Ready != true) continue;
                 _db.Providers.Add(new ProviderConfig
                 {
                     TenantId = tenantId,
@@ -141,14 +149,15 @@ public sealed class UbagProviderDiscoveryService
                 });
                 changes++;
             }
-            else if (row.Enabled != t.Ready)
+            else if (t.Ready is bool discoveredReady && row.Enabled != discoveredReady)
             {
-                // Mirror live login state: logging out hides it, logging back in restores it.
-                row.Enabled = t.Ready;
+                // Mirror live login state: logging out hides it, logging back in restores
+                // it. Null (no signal) leaves the row exactly as the operator set it.
+                row.Enabled = discoveredReady;
                 changes++;
-                if (!t.Ready) loginLost.Add(t.Id);
+                if (!discoveredReady) loginLost.Add(t.Id);
             }
-            if (t.Ready) _alerts?.RecordTargetAuthenticated(t.Id);
+            if (t.Ready == true) _alerts?.RecordTargetAuthenticated(t.Id);
         }
 
         if (changes > 0)

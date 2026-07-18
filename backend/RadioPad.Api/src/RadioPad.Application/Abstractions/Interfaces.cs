@@ -133,11 +133,20 @@ public sealed record UbagBrowserSummary(
     string? Status,
     string? RawStatus);
 
+/// <summary>
+/// A web-AI target the UBAG gateway can drive. <see cref="Ready"/> is tri-state:
+/// <c>true</c>/<c>false</c> only when the gateway gave an EXPLICIT login signal
+/// (a legacy <c>ready</c>/status field on <c>/v1/targets</c>, or a
+/// <c>/v1/browser/contexts</c> row); <c>null</c> means "no signal" — the real
+/// 2026-05-22 shape carries no readiness field, and some executor modes (e.g.
+/// vps-local) never register browser contexts even while jobs succeed, so the
+/// absence of a context row must NOT be read as logged-out.
+/// </summary>
 public sealed record UbagTarget(
     string Id,
     string Name,
     string Status,
-    bool Ready,
+    bool? Ready,
     string? Url);
 
 /// <summary>

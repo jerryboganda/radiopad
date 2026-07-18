@@ -106,13 +106,15 @@ public sealed class UbagClient : IUbagClient
             // Real gateway has no readiness field on /v1/targets — readiness comes from
             // /v1/browser/contexts. If a status/state field is present (legacy) use it;
             // otherwise record "listed" so callers know the target exists but isn't probed.
-            var status = ReadString(item, "status") ?? ReadString(item, "state") ?? "listed";
+            var explicitStatus = ReadString(item, "status") ?? ReadString(item, "state");
+            var status = explicitStatus ?? "listed";
 
-            // "ready" bool wins if present (legacy); otherwise derive from status string.
-            // IsOkStatus("listed") is already false, so no need to guard against it separately.
-            // Note: the real /v1/targets shape has no readiness field — readiness is derived
-            // from /v1/browser/contexts via MergeTargetReadiness.
-            var ready = ReadBool(item, "ready") ?? IsOkStatus(status);
+            // "ready" bool wins if present (legacy); else an explicit legacy status/state
+            // string decides. The real 2026-05-22 shape carries NEITHER — that is a genuine
+            // "no readiness signal" (null), NOT logged-out: login state may only ever appear
+            // via /v1/browser/contexts, and some executor modes (e.g. vps-local) never
+            // register contexts at all even while jobs succeed (verified 2026-07-18).
+            var ready = ReadBool(item, "ready") ?? (explicitStatus is null ? (bool?)null : IsOkStatus(explicitStatus));
 
             rows.Add(new UbagTarget(
                 Id: id,

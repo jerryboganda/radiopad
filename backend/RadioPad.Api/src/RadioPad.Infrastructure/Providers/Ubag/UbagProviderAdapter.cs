@@ -98,8 +98,11 @@ public sealed class UbagProviderAdapter : IAiProviderAdapter, IAiProviderHealthP
     /// Merges browser-context readiness into a target list in a single pass (no double-scan).
     /// For each target, finds the matching context by id (case-insensitive) once, then sets
     /// <c>Ready</c> from <c>ctx.Authenticated</c> and <c>Status</c> from <c>ctx.LoginState</c>.
-    /// When no context matches the target's original <c>Status</c> is preserved and
-    /// <c>Ready</c> is <c>false</c>.
+    /// When no context matches, the target's original <c>Status</c> AND <c>Ready</c> are
+    /// preserved — an absent context row is NOT a logged-out signal. The vps-local executor
+    /// runs jobs against live browser profiles without ever registering contexts (verified
+    /// 2026-07-18: gemini_web/deepseek_web jobs completed while /v1/browser/contexts was
+    /// empty), so only an explicit context row may flip readiness here.
     /// Pure function — safe to unit-test without HTTP.
     /// </summary>
     public static IReadOnlyList<UbagTarget> MergeTargetReadiness(
@@ -112,7 +115,7 @@ public sealed class UbagProviderAdapter : IAiProviderAdapter, IAiProviderHealthP
             var ctx = contexts.FirstOrDefault(c => string.Equals(c.TargetId, t.Id, StringComparison.OrdinalIgnoreCase));
             result.Add(t with
             {
-                Ready = ctx?.Authenticated == true,
+                Ready = ctx is not null ? ctx.Authenticated : t.Ready,
                 Status = ctx is not null ? ctx.LoginState : t.Status,
             });
         }
