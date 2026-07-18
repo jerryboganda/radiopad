@@ -328,7 +328,9 @@ public class ReportsController : TenantedController
         string? Modality, string? BodyPart, int? Age, string? Gender, string? Contrast,
         // Manual binding overrides — an explicit id pins the binding; sending
         // TemplatePinned/RulebookPinned = false clears the pin (reset-to-auto).
-        Guid? TemplateId = null, bool? TemplatePinned = null, bool? RulebookPinned = null);
+        Guid? TemplateId = null, bool? TemplatePinned = null, bool? RulebookPinned = null,
+        // F8 — RIS/worklist priority (Routine | Urgent | Stat).
+        string? Priority = null);
 
     [HttpPatch("{id:guid}")]
     public async Task<IActionResult> Patch(Guid id, [FromBody] PatchReportDto dto, CancellationToken ct)
@@ -365,6 +367,9 @@ public class ReportsController : TenantedController
         if (dto.Impression is not null) report.Impression = dto.Impression;
         if (dto.Recommendations is not null) report.Recommendations = dto.Recommendations;
         if (dto.AiHighlightsJson is not null) report.AiHighlightsJson = dto.AiHighlightsJson;
+        if (dto.Priority is not null
+            && Enum.TryParse<RadioPad.Domain.Enums.ReportPriority>(dto.Priority, ignoreCase: true, out var prio))
+            report.Priority = prio;
 
         // Manual binding overrides. An explicit id is a deliberate user choice:
         // validate it, apply it, and pin it so later selection-key changes don't

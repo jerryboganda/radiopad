@@ -357,6 +357,10 @@ public class Report : Entity
 
     public ReportStatus Status { get; set; } = ReportStatus.Draft;
 
+    /// <summary>F8 — RIS/worklist priority (default Routine). Settable via ingest or PATCH; drives
+    /// the worklist queue ordering (STAT first) instead of a client-side heuristic.</summary>
+    public ReportPriority Priority { get; set; } = ReportPriority.Routine;
+
     public StudyContext Study { get; set; } = new();
 
     public string Indication { get; set; } = "";

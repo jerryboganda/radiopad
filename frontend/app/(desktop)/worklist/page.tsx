@@ -37,11 +37,19 @@ function statusName(s: Report['status']): string {
   return ['Draft', 'Validated', 'Acknowledged', 'Exported'][s] ?? String(s);
 }
 
-/** No explicit priority field exists on Report, so we read the clinical
- * indication honestly: a whole-word "stat" means STAT, urgent/emergency
- * language means Urgent, everything else is Routine. Word boundaries keep
- * "status", "prostate" or "metastatic" from triggering STAT. */
+/** Prefer the authoritative backend priority (RIS-fed or PATCH-set) when it is a real
+ * escalation; a default Routine falls back to reading the clinical indication honestly:
+ * a whole-word "stat" means STAT, urgent/emergency language means Urgent. Word boundaries
+ * keep "status", "prostate" or "metastatic" from triggering STAT. */
 function derivePriority(r: Report): Priority {
+  const p = (r as { priority?: number | string }).priority;
+  const name =
+    p === undefined || p === null ? null
+    : typeof p === 'string' ? p
+    : (['Routine', 'Urgent', 'Stat'][p] ?? null);
+  if (name === 'Stat') return 'STAT';
+  if (name === 'Urgent') return 'Urgent';
+
   const text = r.indication || '';
   if (/\bstat\b/i.test(text)) return 'STAT';
   if (/\b(urgent(ly)?|emergen\w*|immediate\w*|asap)\b/i.test(text)) return 'Urgent';

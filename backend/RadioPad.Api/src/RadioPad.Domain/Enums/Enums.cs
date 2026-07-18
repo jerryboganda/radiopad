@@ -39,6 +39,14 @@ public enum ReportStatus
     Exported = 3,
 }
 
+/// <summary>F8 — RIS-driven report priority that drives worklist queue ordering (STAT first).</summary>
+public enum ReportPriority
+{
+    Routine = 0,
+    Urgent = 1,
+    Stat = 2,
+}
+
 /// <summary>
 /// Lifecycle of a <see cref="Entities.CompanionSession"/> (desktop↔phone pairing).
 /// A session is created <see cref="Advertising"/>; the phone joining by code moves
