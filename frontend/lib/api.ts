@@ -836,7 +836,10 @@ export type RewriteMode =
   | 'formal'
   | 'patient_friendly'
   | 'referring_summary'
-  | 'in_my_style';
+  | 'in_my_style'
+  | 'custom';
+
+export type RewriteViolation = { reason: string; detail: string };
 
 export type RewriteResult = {
   text: string;
@@ -847,6 +850,8 @@ export type RewriteResult = {
   promptVersion?: string;
   latencyMs?: number;
   styleFingerprint?: string;
+  /** F12 — §5.3 fabrication findings on a custom rewrite (empty/undefined when clean). */
+  violations?: RewriteViolation[];
 };
 
 export type ComparePriorSection = {
@@ -1251,7 +1256,14 @@ export const api = {
     },
     rewrite: (
       id: string,
-      body: { mode: RewriteMode; sections?: string[] | null; providerId?: string; samples?: string[] },
+      body: {
+        mode: RewriteMode;
+        sections?: string[] | null;
+        providerId?: string;
+        samples?: string[];
+        /** F12 — required for mode: 'custom' — the radiologist's free-text edit instruction. */
+        instruction?: string;
+      },
     ) =>
       request<RewriteResult>(`/api/reports/${id}/rewrite`, {
         method: 'POST',

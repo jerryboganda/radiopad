@@ -75,6 +75,8 @@ type RewriteState = {
   original: string;
   proposed: string;
   diff: boolean;
+  /** F12 — §5.3 fabrication findings on a custom rewrite (flagged before accept). */
+  violations?: import('@/lib/api').RewriteViolation[];
 };
 
 // RC display titles for the section cards (data keys are unchanged).
@@ -355,7 +357,7 @@ export default function ReportPage() {
     }
   }
 
-  async function runRewrite(mode: RewriteMode, sectionOverride?: keyof Report) {
+  async function runRewrite(mode: RewriteMode, sectionOverride?: keyof Report, instruction?: string) {
     if (!report) return;
     const section = sectionOverride ?? rewriteSection;
     if (sectionOverride) setRewriteSection(sectionOverride);
@@ -378,8 +380,16 @@ export default function ReportPage() {
         mode,
         sections: [section as string],
         providerId: providerId || undefined,
+        instruction,
       });
-      setRewriteDraft({ mode, section, original, proposed: result.text, diff: false });
+      setRewriteDraft({
+        mode,
+        section,
+        original,
+        proposed: result.text,
+        diff: false,
+        violations: result.violations ?? [],
+      });
       patchActivity(actId, { status: 'completed', provider: providerName });
     } catch (e) {
       const err = e as { body?: { error?: string }; message: string };
@@ -1174,7 +1184,7 @@ export default function ReportPage() {
             }))}
             rewriteSection={rewriteSection as string}
             onRewriteSectionChange={(k) => setRewriteSection(k as keyof Report)}
-            onRewrite={(mode) => { void runRewrite(mode); }}
+            onRewrite={(mode, instruction) => { void runRewrite(mode, undefined, instruction); }}
             rewriteBusy={rewriteBusy}
             rewriteOpen={rewriteOpen}
             onRewriteOpenChange={setRewriteOpen}
@@ -1281,6 +1291,16 @@ export default function ReportPage() {
               ) : (
                 <div className="ai-mark">
                   <pre className="rp-rewrite-pre">{rewriteDraft.proposed}</pre>
+                </div>
+              )}
+              {rewriteDraft.violations && rewriteDraft.violations.length > 0 && (
+                <div role="alert" className="text-warning" style={{ marginTop: 8, fontSize: 13 }}>
+                  <strong>Requires review — this edit added values not in the original text:</strong>
+                  <ul style={{ margin: '4px 0 0', paddingLeft: 18 }}>
+                    {rewriteDraft.violations.map((v, i) => (
+                      <li key={i}>{v.detail}</li>
+                    ))}
+                  </ul>
                 </div>
               )}
               <div className="rp-toolbar rp-mt-sm">

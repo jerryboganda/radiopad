@@ -12,7 +12,7 @@ import type { Provider, RewriteMode } from '@/lib/api';
 import { COMPLIANCE_LABELS } from '@/lib/api';
 import { Sparkles, Wand2, PenLine, ChevronDown } from 'lucide-react';
 import SearchableSelect from '@/components/ui/SearchableSelect';
-import { useEffect, useRef } from 'react';
+import { useEffect, useRef, useState } from 'react';
 
 export type AiBarAction =
   | 'draft'
@@ -34,7 +34,8 @@ export interface AiActionsBarProps {
   sections: Array<{ key: string; label: string }>;
   rewriteSection: string;
   onRewriteSectionChange: (key: string) => void;
-  onRewrite: (mode: RewriteMode) => void;
+  /** F12 — `instruction` is supplied only for mode: 'custom' (free-text NL edit). */
+  onRewrite: (mode: RewriteMode, instruction?: string) => void;
   rewriteBusy: boolean;
   /** Controlled popover state — the global `radiopad:rewrite` event opens it. */
   rewriteOpen: boolean;
@@ -52,6 +53,7 @@ export default function AiActionsBar(p: AiActionsBarProps) {
   const rewriteOpen = p.rewriteOpen;
   const setRewriteOpen = p.onRewriteOpenChange;
   const rewriteRef = useRef<HTMLDivElement | null>(null);
+  const [customInstruction, setCustomInstruction] = useState('');
 
   useEffect(() => {
     if (!rewriteOpen) return;
@@ -147,6 +149,35 @@ export default function AiActionsBar(p: AiActionsBarProps) {
                   </li>
                 ))}
               </ul>
+
+              {/* F12 — free-text natural-language edit. The backend hard-guards this with the §5.3
+                  fabrication check, so it can rephrase but can't invent a measurement/number/date. */}
+              <div className="section-block" style={{ marginTop: 8 }}>
+                <label htmlFor="rp-custom-rewrite">Custom edit</label>
+                <textarea
+                  id="rp-custom-rewrite"
+                  className="rp-input"
+                  rows={2}
+                  placeholder="e.g. make the impression more concise and add a 6-month follow-up recommendation"
+                  value={customInstruction}
+                  onChange={(e) => setCustomInstruction(e.target.value)}
+                  style={{ width: '100%', resize: 'vertical' }}
+                />
+                <button
+                  type="button"
+                  className="primary"
+                  disabled={p.rewriteBusy || customInstruction.trim().length === 0}
+                  style={{ marginTop: 6 }}
+                  onClick={() => {
+                    const instruction = customInstruction.trim();
+                    if (!instruction) return;
+                    setRewriteOpen(false);
+                    p.onRewrite('custom', instruction);
+                  }}
+                >
+                  Apply custom edit
+                </button>
+              </div>
             </div>
           )}
         </div>

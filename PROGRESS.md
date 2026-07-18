@@ -52,6 +52,15 @@
   `TenantLexicon` (rows with a replacement, longest-first) into `CorrectionRule[]` applied by the
   §5.2 pass-through BEFORE the LLM; wired through `DictationDraftService` + the `/dictation/draft`
   endpoint.
+- **F12 free-text NL editing (custom rewrite)** — the radiologist types an instruction ("make the
+  impression concise and add a 6-month follow-up") and the model edits the report. Backend
+  `ReportRewriteMode.Custom` with a tightly-bounded prompt (treats the untrusted instruction as an
+  edit request only, never content to add) **hard-guarded** by the existing §5.3
+  `DictationValidationService` (`ReportRewriteService.CheckNoFabrication`): any measurement/number/
+  date not in the source is returned as a violation, so the model physically cannot slip in an
+  un-dictated clinical value. Endpoint returns `violations[]`; the AI actions bar gains a "Custom
+  edit" box and `ReportClient` flags any violations with an amber "Requires review" notice before
+  Accept. 7 tests (5 backend guard + 2 AiActionsBar); report suite unregressed.
 - **F5 auto-comparison statement** — `lib/comparisonStatement.ts` (`buildComparisonStatement`)
   composes a conventional "Compared to the prior <body part> study dated <date>." sentence from the
   most-recent prior (`/compare-prior`), with deterministic UTC date formatting. Surfaced in the
