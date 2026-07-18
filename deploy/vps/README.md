@@ -159,38 +159,40 @@ docker compose -f deploy/vps/docker-compose.yml --env-file ../.secrets.env up -d
 docker compose -f deploy/vps/docker-compose.yml --env-file ../.secrets.env ps
 ```
 
-## UBAG AI-orchestrator wiring (2026-07-11)
+## UBAG AI-orchestrator wiring (updated 2026-07-18)
 
-RadioPad consumes the UBAG gateway (compose project `ubag-small` at
-`/opt/ubag`) as its browser-driving AI provider layer. The wiring is codified
-in the compose files so a re-up can never silently sever it:
+RadioPad consumes the UBAG gateway (compose project at `/opt/docker/ubag`,
+gateway container `ubag-vps-gateway-1`) as its browser-driving AI provider
+layer. RadioPad reaches it **internally** over the shared external docker
+network `platform` — never via the public `ubag.polytronx.com` host, which
+sits behind operator Basic-auth.
 
-1. Add to `/opt/radiopad/.secrets.env`:
+1. Add to `/opt/docker/radiopad/.secrets.env` (chmod 600):
 
    ```bash
-   RADIOPAD_UBAG_BASE_URL=http://ubag-small-gateway-1:8080
-   RADIOPAD_UBAG_AUTH_SECRET=<UBAG_APP_SECRET from /opt/ubag/deploy/small/env.local>
-   RADIOPAD_UBAG_ALLOWED_TARGETS=gemini_web,deepseek_web,mock
-   RADIOPAD_UBAG_ORDERED_TARGETS=gemini_web,deepseek_web
+   # Preferred: secret-ref indirection — only the env NAME is ever stored elsewhere.
+   RADIOPAD_UBAG_TOKEN=<UBAG_APP_SECRET from the ubag gateway's env>
+   ```
+
+   and in the compose `environment:` block (non-secret values):
+
+   ```yaml
+   RADIOPAD_UBAG_BASE_URL: http://ubag-vps-gateway-1:8080
+   RADIOPAD_UBAG_AUTH_SECRET_REF: env:RADIOPAD_UBAG_TOKEN
+   RADIOPAD_UBAG_ALLOWED_TARGETS: gemini_web,deepseek_web,chatgpt_web,mock
    # Operator inbox for login-lost / gateway-down alert emails (throttled 1/provider/day):
-   RADIOPAD_OPERATOR_ALERT_EMAIL=ops@example.com
+   RADIOPAD_OPERATOR_ALERT_EMAIL: ops@example.com
    ```
 
-2. Bring the stack up WITH the UBAG overlay so `radiopad-api` joins UBAG's
-   private network (external network `ubag-small_ubag-private`):
+2. Give `radiopad-api` the `platform` network (external) in addition to
+   `radiopad_network`, then `docker compose up -d`. On hosts without UBAG,
+   omit the network + env — RadioPad logs a startup ERROR in Production when
+   the base URL/secret are missing and fails over to its non-UBAG providers.
 
-   ```bash
-   cd /opt/radiopad/src
-   docker compose -f deploy/vps/docker-compose.yml \
-                  -f deploy/vps/docker-compose.ubag.yml \
-                  --env-file ../.secrets.env up -d
-   ```
-
-   On hosts without UBAG, omit the overlay — the UBAG env vars are harmless
-   when empty and RadioPad fails over to its non-UBAG providers.
-
-3. Verify: `curl -s http://127.0.0.1:8093/api/ubag/status` (authenticated)
-   shows `health.ok: true`, per-target login state, and any operator alerts
+3. Verify: `GET https://<domain>/api/ubag/status` (authenticated, admin role)
+   shows `health.ok: true`, per-target readiness (tri-state — `ready: null`
+   means the gateway reports no login signal, which is normal for vps-local
+   executors and does NOT disable providers), and any operator alerts
    (`alerts[]`, `gatewayUnreachableSince`).
 
 ## NPM Proxy Host

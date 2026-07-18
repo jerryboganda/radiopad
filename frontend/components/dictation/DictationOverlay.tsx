@@ -44,7 +44,7 @@ type FixStatus = { status: 'busy' | 'success' | 'no-changes' | 'empty' | 'error'
 
 function fixStatusLabel(s: FixStatus): string {
   if (s.message) return s.message;
-  if (s.status === 'busy') return 'Cleaning dictation via UBAG…';
+  if (s.status === 'busy') return 'Cleaning dictation…';
   if (s.status === 'success') return 'Done.';
   return '';
 }
@@ -362,6 +362,19 @@ export default function DictationOverlay() {
     };
   }, []);
 
+  // Truthful HQ tooltip: the desktop shell (same `__TAURI__` signal the
+  // transcribe path keys on) transcribes fully on-device via the bundled STT
+  // sidecar — audio never leaves the machine; only the web surface uses the
+  // report-scoped cloud transcription path. Resolved in an effect so the
+  // prerendered HTML stays hydration-safe.
+  const [onDeviceStt, setOnDeviceStt] = useState(false);
+  useEffect(() => {
+    setOnDeviceStt(typeof window !== 'undefined' && '__TAURI__' in window);
+  }, []);
+  const hqTitle = onDeviceStt
+    ? 'Record and transcribe with high accuracy (on-device — audio never leaves this machine)'
+    : 'Record and transcribe with high accuracy (cloud transcription)';
+
   const title = !supported
     ? 'Dictation needs the audio engine — unavailable in this build'
     : listening
@@ -501,7 +514,7 @@ export default function DictationOverlay() {
           data-testid="dictation-hq"
           className={`rp-dictation-fix subtle${audioRecording ? ' recording' : ''}`}
           aria-pressed={audioRecording}
-          title="Record and transcribe with high accuracy (UBAG audio)"
+          title={hqTitle}
           disabled={transcribing}
           onMouseDown={(e) => e.preventDefault()}
           onClick={toggleAudio}

@@ -721,18 +721,25 @@ export default function ReportPage() {
       });
       const changed = Object.keys(patch).length;
       if (changed === 0) {
-        emitCleanupResult('no-changes', 'UBAG returned no changes for this dictation.');
+        emitCleanupResult('no-changes', `${res.provider || 'AI provider'} returned no changes for this dictation.`);
         patchActivity(actId, { status: 'completed', provider: res.provider });
         return;
       }
       setAiUndo((prev) => ({ ...prev, ...undo }));
       setAiHighlights(nextHighlights);
       await update({ ...patch, aiHighlightsJson: JSON.stringify(nextHighlights) } as Partial<Report>);
-      emitCleanupResult('success', `Cleaned ${changed} section${changed === 1 ? '' : 's'} via ${res.provider || 'UBAG'}.`);
+      emitCleanupResult('success', `Cleaned ${changed} section${changed === 1 ? '' : 's'} via ${res.provider || 'AI provider'}.`);
       patchActivity(actId, { status: 'completed', provider: res.provider });
     } catch (e) {
-      const err = e as { body?: { error?: string; detail?: string; title?: string }; message: string };
-      const msg = err.body?.error || err.body?.detail || err.body?.title || err.message || 'Fix failed.';
+      const err = e as { kind?: string; body?: { error?: string; detail?: string; title?: string; kind?: string }; message: string };
+      // Branch on the backend's error `kind` discriminator for actionable text.
+      const kind = err.kind ?? err.body?.kind;
+      let msg = err.body?.error || err.body?.detail || err.body?.title || err.message || 'Fix failed.';
+      if (kind === 'target_not_allowed') {
+        msg = "This AI target isn't in the allowed list (RADIOPAD_UBAG_ALLOWED_TARGETS).";
+      } else if (kind === 'provider' || kind === 'transport') {
+        msg = `${msg} Check Admin → UBAG Hub status.`;
+      }
       setError(msg);
       emitCleanupResult('error', msg);
       patchActivity(actId, { status: 'failed', error: msg });

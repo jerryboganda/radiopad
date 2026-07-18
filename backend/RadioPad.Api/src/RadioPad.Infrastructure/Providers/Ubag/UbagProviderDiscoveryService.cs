@@ -91,6 +91,26 @@ public sealed class UbagProviderDiscoveryService
             .Where(p => p.TenantId == tenantId && p.Adapter == UbagProviderAdapter.AdapterId)
             .ToListAsync(ct);
 
+        // Heal-on-empty (audit fix 2026-07-18): an org whose creation-time seeding
+        // failed has ZERO ubag rows and used to be invisible to this sweep forever
+        // (and POST /api/ubag/refresh-targets couldn't create the pinned primaries).
+        // Ensure the curated primaries for such tenants so both paths fully heal.
+        // Tenants with ANY ubag row are left alone — deliberate single-row deletions
+        // still stick for the process lifetime.
+        if (existing.Count == 0)
+        {
+            var healed = await UbagPrimarySeed.EnsureCuratedPrimariesAsync(_db, tenantId, ct);
+            if (healed > 0)
+            {
+                _logger.LogInformation(
+                    "UBAG discovery healed {Count} curated primary row(s) for tenant {TenantId}",
+                    healed, tenantId);
+                existing = await _db.Providers
+                    .Where(p => p.TenantId == tenantId && p.Adapter == UbagProviderAdapter.AdapterId)
+                    .ToListAsync(ct);
+            }
+        }
+
         var changes = 0;
         var loginLost = new List<string>();
         foreach (var t in merged)
@@ -289,78 +309,138 @@ public sealed class UbagProviderDiscoveryHostedService : BackgroundService
         try { await Task.Delay(StartupDelay, stoppingToken); }
         catch (OperationCanceledException) { return; }
 
-        // One-time backfill: ensure EVERY existing tenant has the curated UBAG primaries
-        // (Gemini Web + DeepSeek Web). Orgs created before per-controller seeding shipped —
-        // e.g. production orgs bootstrapped earlier — would otherwise never get them, because
-        // the periodic discovery below only runs for tenants that ALREADY have a UBAG row, and
-        // those primaries were historically seeded only for the DevSeed "dev" tenant. This is
-        // idempotent + ensure-on-absence and runs ONCE at startup (not every sweep), so an
-        // operator who deletes a primary keeps it deleted until the next restart.
+        // One-time startup backfill for pre-existing tenants (curated UBAG primaries,
+        // admin catalogs, Gemini CLI provider + its compliance/name migrations). All
+        // stages are idempotent + ensure-on-absence. Each stage — and each tenant
+        // within a stage — runs in its OWN try/catch (audit fix 2026-07-18): a single
+        // transient failure (e.g. a SQLite lock on tenant #1) used to abort every
+        // remaining tenant and stage until the next restart. Zero-row UBAG tenants are
+        // additionally healed by every discovery sweep (see SyncAsync), so this pass is
+        // belt-and-suspenders for the non-UBAG stages.
         try
         {
             using var scope = _scopes.CreateScope();
             var db = scope.ServiceProvider.GetRequiredService<RadioPadDbContext>();
             var allTenantIds = await db.Tenants.Select(t => t.Id).ToListAsync(stoppingToken);
-            var seeded = 0;
-            foreach (var tid in allTenantIds)
-                seeded += await UbagPrimarySeed.EnsureCuratedPrimariesAsync(db, tid, stoppingToken);
+
+            // Per-tenant stage runner: one tenant's failure skips only that tenant.
+            async Task<int> PerTenant(string stage, Func<Guid, Task<int>> run)
+            {
+                var total = 0;
+                foreach (var tid in allTenantIds)
+                {
+                    stoppingToken.ThrowIfCancellationRequested();
+                    try { total += await run(tid); }
+                    catch (OperationCanceledException) { throw; }
+                    catch (Exception ex)
+                    {
+                        _logger.LogWarning(ex, "{Stage} backfill failed for tenant {TenantId}", stage, tid);
+                    }
+                }
+                return total;
+            }
+
+            // Whole-DB stage runner: one stage's failure skips only that stage.
+            async Task<int> Stage(string stage, Func<Task<int>> run)
+            {
+                try { return await run(); }
+                catch (OperationCanceledException) { throw; }
+                catch (Exception ex)
+                {
+                    _logger.LogWarning(ex, "{Stage} backfill stage failed", stage);
+                    return 0;
+                }
+            }
+
+            var seeded = await PerTenant("UBAG primaries",
+                tid => UbagPrimarySeed.EnsureCuratedPrimariesAsync(db, tid, stoppingToken));
             if (seeded > 0)
                 _logger.LogInformation(
                     "UBAG primary backfill: seeded {Count} curated row(s) across {Tenants} tenant(s)",
                     seeded, allTenantIds.Count);
 
-            // Iter-36 — same one-time, all-tenant backfill for the admin Modality +
-            // BodyPart catalogs, so pre-existing (production) orgs get the defaults
-            // that were formerly hardcoded in the frontend. Idempotent on absence.
-            var catalogRows = 0;
-            foreach (var tid in allTenantIds)
-                catalogRows += await Seeding.CatalogSeed.EnsureCatalogAsync(db, tid, stoppingToken);
+            // Iter-36 — admin Modality + BodyPart catalog defaults for pre-existing orgs.
+            var catalogRows = await PerTenant("Catalog",
+                tid => Seeding.CatalogSeed.EnsureCatalogAsync(db, tid, stoppingToken));
             if (catalogRows > 0)
                 _logger.LogInformation(
                     "Catalog backfill: seeded {Count} modality/body-part row(s) across {Tenants} tenant(s)",
                     catalogRows, allTenantIds.Count);
 
-            // Same one-time, all-tenant backfill for the Gemini CLI (OAuth) provider so
-            // pre-existing orgs get it in the report intake's provider dropdown. Idempotent
-            // on absence; an operator who deletes it keeps it deleted until next restart.
-            var cliSeeded = 0;
-            foreach (var tid in allTenantIds)
-                cliSeeded += await Seeding.CliProviderSeed.EnsureGeminiCliAsync(db, tid, stoppingToken);
+            // Gemini CLI provider row for the report intake's provider dropdown.
+            var cliSeeded = await PerTenant("Gemini CLI",
+                tid => Seeding.CliProviderSeed.EnsureGeminiCliAsync(db, tid, stoppingToken));
             if (cliSeeded > 0)
                 _logger.LogInformation(
                     "Gemini CLI backfill: seeded {Count} provider row(s) across {Tenants} tenant(s)",
                     cliSeeded, allTenantIds.Count);
 
-            // Operator promotion (2026-07-12): Gemini CLI is PhiApproved (it runs
-            // under the operator's own Google OAuth login; the workflow routes
-            // de-identified text). Promote rows seeded as Sandbox before this
-            // change. Idempotent — only non-PhiApproved rows.
-            var cliPromoted = await Seeding.CliProviderSeed.EnsureGeminiCliComplianceAsync(db, stoppingToken);
+            // Operator promotion (2026-07-12): Gemini CLI is PhiApproved.
+            var cliPromoted = await Stage("Gemini CLI compliance",
+                () => Seeding.CliProviderSeed.EnsureGeminiCliComplianceAsync(db, stoppingToken));
             if (cliPromoted > 0)
                 _logger.LogInformation(
                     "Gemini CLI compliance backfill: promoted {Count} row(s) to PhiApproved", cliPromoted);
 
-            // Rename backfill (2026-07-13): the provider authenticates with an API
-            // key now, not OAuth, so the legacy "Gemini CLI (OAuth)" name is
-            // misleading. Rename rows that still carry the exact legacy default.
-            var cliRenamed = await Seeding.CliProviderSeed.EnsureGeminiCliNameAsync(db, stoppingToken);
+            // Rename backfill (2026-07-13): API-key auth, not OAuth.
+            var cliRenamed = await Stage("Gemini CLI name",
+                () => Seeding.CliProviderSeed.EnsureGeminiCliNameAsync(db, stoppingToken));
             if (cliRenamed > 0)
                 _logger.LogInformation(
                     "Gemini CLI name backfill: renamed {Count} row(s) to '{Name}'",
                     cliRenamed, Seeding.CliProviderSeed.ProviderName);
 
-            // Policy change (2026-06-27): UBAG is PHI-approved. Promote any rows
-            // that were seeded as Sandbox before this change so existing orgs'
-            // AI features (cleanup/impression/rewrite/cross-check) stop being
-            // blocked by the PHI gates. Idempotent — only non-PhiApproved rows.
-            var promoted = await UbagPrimarySeed.EnsureCuratedComplianceAsync(db, stoppingToken);
+            // Policy change (2026-06-27): UBAG is PHI-approved.
+            var promoted = await Stage("UBAG compliance",
+                () => UbagPrimarySeed.EnsureCuratedComplianceAsync(db, stoppingToken));
             if (promoted > 0)
                 _logger.LogInformation(
                     "UBAG compliance backfill: promoted {Count} row(s) to PhiApproved", promoted);
+
+            // Rehydrate operator-alert state from the audit trail (audit fix
+            // 2026-07-18): banner "since" timestamps and the 1/day email throttle
+            // were process-memory only, so every restart re-armed the throttle and
+            // blanked the Hub banners mid-outage. Seed from the last 7 days of
+            // ubag_login_lost SystemAlert rows; live sweeps overwrite as needed.
+            _ = await Stage("UBAG alert rehydrate", async () =>
+            {
+                var alerts = scope.ServiceProvider.GetService<UbagOperatorAlertService>();
+                if (alerts is null) return 0;
+                var cutoff = DateTimeOffset.UtcNow.AddDays(-7);
+                var rows = await db.AuditEvents
+                    .Where(a => a.Action == Domain.Enums.AuditAction.SystemAlert
+                        && a.CreatedAt >= cutoff
+                        && a.DetailsJson.Contains("ubag_login_lost"))
+                    .Select(a => new { a.DetailsJson, a.CreatedAt })
+                    .ToListAsync(stoppingToken);
+                var rehydrated = 0;
+                foreach (var group in rows
+                    .Select(r => new
+                    {
+                        Target = System.Text.Json.JsonDocument.Parse(r.DetailsJson)
+                            .RootElement.TryGetProperty("target", out var t) ? t.GetString() : null,
+                        r.CreatedAt,
+                    })
+                    .Where(r => !string.IsNullOrWhiteSpace(r.Target))
+                    .GroupBy(r => r.Target!, StringComparer.OrdinalIgnoreCase))
+                {
+                    alerts.RehydrateLoginLost(
+                        group.Key,
+                        since: group.Min(r => r.CreatedAt),
+                        lastAlertAt: group.Max(r => r.CreatedAt));
+                    rehydrated++;
+                }
+                if (rehydrated > 0)
+                    _logger.LogInformation(
+                        "UBAG alert rehydrate: restored login-lost state for {Count} target(s) from the audit trail",
+                        rehydrated);
+                return rehydrated;
+            });
         }
         catch (OperationCanceledException) { return; }
         catch (Exception ex)
         {
+            // Only scope/tenant-list construction can land here now; stages self-isolate.
             _logger.LogWarning(ex, "UBAG primary backfill failed");
         }
 
@@ -371,12 +451,12 @@ public sealed class UbagProviderDiscoveryHostedService : BackgroundService
                 using var scope = _scopes.CreateScope();
                 var db = scope.ServiceProvider.GetRequiredService<RadioPadDbContext>();
                 var disco = scope.ServiceProvider.GetRequiredService<UbagProviderDiscoveryService>();
-                // Only tenants that already use UBAG (DevSeed / prod-seed gave them the
-                // curated primaries) opt in to discovery of additional web targets.
-                var tenantIds = await db.Providers
-                    .Where(p => p.Adapter == UbagProviderAdapter.AdapterId)
-                    .Select(p => p.TenantId)
-                    .Distinct()
+                // Sweep EVERY tenant (audit fix 2026-07-18): selecting only tenants that
+                // already had a ubag row made an org whose creation-time seeding failed
+                // invisible to discovery forever. SyncAsync heals zero-row tenants by
+                // ensuring the curated primaries, so all tenants must be visited.
+                var tenantIds = await db.Tenants
+                    .Select(t => t.Id)
                     .ToListAsync(stoppingToken);
                 foreach (var tid in tenantIds)
                 {

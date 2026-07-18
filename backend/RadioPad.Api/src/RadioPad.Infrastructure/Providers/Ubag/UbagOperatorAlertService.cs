@@ -89,6 +89,21 @@ public sealed class UbagOperatorAlertService
     /// per target. The audit event is appended by the caller — it owns the
     /// tenant scope; this service owns the global banner + email state.
     /// </summary>
+    /// <summary>
+    /// Rehydrates login-lost state from the tenant audit trail after a restart
+    /// (audit fix 2026-07-18: this state was process-memory only, so restarts
+    /// cleared Hub banners, lost "since" timestamps, and re-armed the 1/day email
+    /// throttle — duplicating operator emails during multi-day outages). Seeds
+    /// both maps only when absent; live sweep signals always win, and
+    /// <see cref="RecordTargetAuthenticated"/> clears a stale entry on the first
+    /// sweep that sees the target authenticated again.
+    /// </summary>
+    public void RehydrateLoginLost(string targetId, DateTimeOffset since, DateTimeOffset lastAlertAt)
+    {
+        _loggedOutSince.TryAdd(targetId, since);
+        _lastEmailByTarget.TryAdd(targetId, lastAlertAt);
+    }
+
     public Task NotifyTargetLoggedOutAsync(string targetId, CancellationToken ct)
     {
         var since = _loggedOutSince.GetOrAdd(targetId, DateTimeOffset.UtcNow);

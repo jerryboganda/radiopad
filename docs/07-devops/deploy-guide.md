@@ -65,11 +65,13 @@ All knobs are environment variables:
 | `RADIOPAD_CLI_PROVIDER_ENV_ALLOWLIST` | optional | Extra env vars passed to CLI subprocesses beyond OS basics. Keep minimal and provider-specific. |
 | `RADIOPAD_CODEX_CLI_ENABLED` | optional | Defaults `0`; must be `1` before `codex-cli` executes. |
 | `RADIOPAD_OPENAI_COMPATIBLE_ALLOW_PHI` | optional | Defaults `0`; set only after reviewed approval for a remote OpenAI-compatible PHI endpoint. |
-| `RADIOPAD_UBAG_BASE_URL` | optional | Defaults to production UBAG `https://ubag.polytronx.com`. RadioPad backend only; never expose this as a frontend public env var. |
+| `RADIOPAD_UBAG_BASE_URL` | optional | UBAG gateway base URL. Production uses the internal docker-network address `http://ubag-vps-gateway-1:8080` (see "UBAG production wiring" below); the public `https://ubag.polytronx.com` is behind operator Basic-auth and must not be used by RadioPad. Backend only; never expose this as a frontend public env var. |
 | `RADIOPAD_UBAG_API_VERSION` | optional | Defaults `2026-05-22`; sent in UBAG job/workflow envelopes. |
 | `RADIOPAD_UBAG_TIMEOUT_MS` | optional | Defaults `120000`; HTTP timeout and adapter polling budget. |
-| `RADIOPAD_UBAG_ALLOWED_TARGETS` | optional | Defaults `chatgpt_web,gemini_web,deepseek_web,mock`; comma-separated allowlist for UBAG provider jobs. |
-| `RADIOPAD_UBAG_AUTH_SECRET_REF` | optional | Preferred UBAG auth reference, e.g. `env:RADIOPAD_UBAG_TOKEN`; resolved server-side only. |
+| `RADIOPAD_UBAG_ALLOWED_TARGETS` | optional | Default-deny allowlist for UBAG provider jobs. Unset means the conservative default list `chatgpt_web,gemini_web,deepseek_web,mock` (everything else is denied); set explicitly to override. Production pins `gemini_web,deepseek_web,chatgpt_web,mock`. |
+| `RADIOPAD_UBAG_ORDERED_TARGETS` | optional | Comma-separated chain for the ordered web-chain workflow. Code default `gemini_web,deepseek_web` (`chatgpt_web` not included by default). |
+| `RADIOPAD_OPERATOR_ALERT_EMAIL` | optional | When set, login-lost / gateway-unreachable alerts email the operator via the configured email provider, throttled 1/day/target; unset = Hub banners only. |
+| `RADIOPAD_UBAG_AUTH_SECRET_REF` | optional | Preferred UBAG auth reference, e.g. `env:RADIOPAD_UBAG_TOKEN`; resolved server-side only and sent as `Authorization: Bearer`. When no secret resolves, the client sends **no** auth header (silently unauthenticated) — production must always set it. |
 | `RADIOPAD_UBAG_AUTH_SECRET` | optional | Direct server-side UBAG auth fallback when no secret ref is used. Do not commit it or return it in JSON. |
 | `RADIOPAD_UBAG_AUTH_SCHEME` / `RADIOPAD_UBAG_AUTH_HEADER` | optional | Defaults `Bearer` / `Authorization`; use only when UBAG production auth requires a different scheme/header. |
 
@@ -87,6 +89,37 @@ features (cleanup/impression/rewrite/cross-check) route through it. Secret-shape
 prompts are still refused. ChatGPT, Gemini, and DeepSeek provider logins remain
 manual through UBAG Browser Sessions; RadioPad must not automate login, CAPTCHA,
 2FA, consent, cookie extraction, or credential collection.
+
+### UBAG production wiring
+
+Verified in production 2026-07-18. RadioPad reaches UBAG **internally** over the
+shared external docker network `platform`; the public host is not used:
+
+```bash
+# .secrets.env on the server (never commit real values)
+RADIOPAD_UBAG_BASE_URL=http://ubag-vps-gateway-1:8080
+RADIOPAD_UBAG_AUTH_SECRET_REF=env:RADIOPAD_UBAG_TOKEN
+RADIOPAD_UBAG_TOKEN=<UBAG_APP_SECRET from the UBAG deployment>
+RADIOPAD_UBAG_ALLOWED_TARGETS=gemini_web,deepseek_web,chatgpt_web,mock
+RADIOPAD_UBAG_ORDERED_TARGETS=gemini_web,deepseek_web
+RADIOPAD_OPERATOR_ALERT_EMAIL=ops@example.com
+```
+
+- The public `https://ubag.polytronx.com` sits behind operator Basic-auth and
+  must **not** be used by RadioPad.
+- The token is UBAG's `UBAG_APP_SECRET`; UbagClient sends it as
+  `Authorization: Bearer`. With no resolvable secret the client sends no auth
+  header at all — production must always set it.
+- `UbagProviderDiscoveryService` sweeps targets every 5 minutes (8 s after
+  startup); `POST /api/ubag/refresh-targets` forces a sync. Login state is
+  tri-state: a gateway registering no browser context is "no signal" and never
+  disables a provider — only an explicit `login_state` context row flips
+  `Enabled`. After a login-lost alert, re-log the provider in via the UBAG
+  browser viewer (noVNC) / UBAG dashboard; explicit-signal deployments
+  re-enable automatically on the next sweep.
+- Compose commands and overlay details live in `deploy/vps/README.md`
+  ("UBAG AI-orchestrator wiring") — note that section predates the 2026-07-18
+  wiring; the env values above are the current production ground truth.
 
 ## 4. Database
 

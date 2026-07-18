@@ -167,8 +167,12 @@ public class UbagProviderDiscoveryServiceTests
     }
 
     [Fact]
-    public async Task Pinned_primary_row_is_never_created_by_discovery()
+    public async Task Zero_row_tenant_is_healed_with_curated_primaries()
     {
+        // Heal-on-empty (2026-07-18): a tenant with NO ubag rows (creation-time
+        // seeding failed) gets the curated primaries from the sweep/refresh path
+        // instead of being invisible to discovery forever. The healed rows come
+        // from UbagPrimarySeed (not the reconcile branch), so `changed` stays 0.
         using var db = CreateDb();
         var client = new FakeClient(
             targets: new[] { new UbagTarget("gemini_web", "Gemini Web", "listed", false, null) },
@@ -177,7 +181,18 @@ public class UbagProviderDiscoveryServiceTests
         var changed = await Service(db, client).SyncAsync(Tenant, default);
 
         Assert.Equal(0, changed);
-        Assert.False(await db.Providers.AnyAsync());
+        var rows = await db.Providers.Where(p => p.Adapter == "ubag").OrderBy(p => p.Priority).ToListAsync();
+        Assert.Equal(2, rows.Count);
+        // Pin the router-preference numbers (audit fix 2026-07-18: previously unpinned):
+        // Gemini P1/Q0.90 outranks DeepSeek P2/Q0.85 in the quality-weighted router.
+        Assert.Equal("gemini_web", rows[0].Model);
+        Assert.Equal(1, rows[0].Priority);
+        Assert.Equal(0.9m, rows[0].Quality);
+        Assert.Equal("deepseek_web", rows[1].Model);
+        Assert.Equal(2, rows[1].Priority);
+        Assert.Equal(0.85m, rows[1].Quality);
+        Assert.All(rows, r => Assert.True(r.Enabled));
+        Assert.All(rows, r => Assert.Equal(ProviderComplianceClass.PhiApproved, r.Compliance));
     }
 
     [Fact]
@@ -335,8 +350,17 @@ public class UbagProviderDiscoveryServiceTests
 
         var changed = await Service(db, client).SyncAsync(Tenant, default);
 
+        // The zero-row tenant is first healed with the two curated primaries
+        // (2026-07-18); the reconcile branch itself must still create nothing for
+        // pinned targets and never materialise placeholder targets (mock /
+        // generic_chat are Excluded) — so exactly the two healed rows exist.
         Assert.Equal(0, changed);
-        Assert.False(await db.Providers.AnyAsync());
+        var models = await db.Providers.Where(p => p.Adapter == "ubag").Select(p => p.Model).ToListAsync();
+        Assert.Equal(2, models.Count);
+        Assert.Contains("gemini_web", models);
+        Assert.Contains("deepseek_web", models);
+        Assert.DoesNotContain("mock", models);
+        Assert.DoesNotContain("generic_chat", models);
     }
 
     [Fact]

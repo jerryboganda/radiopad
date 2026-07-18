@@ -143,42 +143,32 @@ public sealed class UbagProviderAdapter : IAiProviderAdapter, IAiProviderHealthP
         return target;
     }
 
-    // Full set of UBAG web targets the gateway can drive today. Used only as the
-    // display fallback when no explicit operator cap is configured; the live source of
-    // truth for what is *selectable* is the per-tenant ProviderConfig rows that
-    // UbagProviderDiscoveryService keeps in sync with the gateway login state.
-    private static readonly string[] KnownCatalog =
+    /// <summary>
+    /// The documented default allow-list applied when <c>RADIOPAD_UBAG_ALLOWED_TARGETS</c>
+    /// is unset. Default-DENY (audit fix 2026-07-18): unset used to mean "no cap", silently
+    /// permitting every target the gateway could drive; production docs always promised
+    /// this conservative set, so the code now matches them. Operators widen it explicitly.
+    /// </summary>
+    private static readonly string[] DefaultAllowedTargets =
     {
-        "gemini_web", "deepseek_web", "chatgpt_web", "claude_web",
-        "mistral_lechat", "perplexity_web", "mock",
+        "chatgpt_web", "gemini_web", "deepseek_web", "mock",
     };
 
     /// <summary>
-    /// The explicit operator allow-list from <c>RADIOPAD_UBAG_ALLOWED_TARGETS</c>, or
-    /// <c>null</c> when unset/blank — meaning "no cap": any live UBAG catalog target is
-    /// permitted, so a provider the operator logs into works with zero configuration.
+    /// The operator allow-list from <c>RADIOPAD_UBAG_ALLOWED_TARGETS</c>, falling back to
+    /// <see cref="DefaultAllowedTargets"/> when unset/blank. Never "no cap" — a target
+    /// outside this list is rejected at request time and never materialised by discovery.
     /// </summary>
-    public static IReadOnlyList<string>? ResolveAllowedTargetCap()
+    public static IReadOnlyList<string> ResolveAllowedTargetCap()
     {
         var raw = Environment.GetEnvironmentVariable("RADIOPAD_UBAG_ALLOWED_TARGETS");
-        if (string.IsNullOrWhiteSpace(raw)) return null;
+        if (string.IsNullOrWhiteSpace(raw)) return DefaultAllowedTargets;
         return raw.Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
     }
 
-    /// <summary>True when no cap is configured, or the cap explicitly lists the target.</summary>
+    /// <summary>True when the effective allow-list (env or documented default) lists the target.</summary>
     public static bool IsTargetAllowed(string target)
-    {
-        var cap = ResolveAllowedTargetCap();
-        return cap is null || cap.Contains(target, StringComparer.OrdinalIgnoreCase);
-    }
-
-    /// <summary>
-    /// Back-compat concrete list for callers that need one. When no operator cap is
-    /// configured this returns the full known catalog rather than a hardcoded subset,
-    /// so newly logged-in providers are never gated out.
-    /// </summary>
-    public static IReadOnlyList<string> ResolveAllowedTargets()
-        => ResolveAllowedTargetCap() ?? KnownCatalog;
+        => ResolveAllowedTargetCap().Contains(target, StringComparer.OrdinalIgnoreCase);
 
     private async Task<UbagJob> WaitForJobAsync(UbagJob initial, CancellationToken ct)
     {
@@ -257,6 +247,4 @@ public sealed class UbagProviderAdapter : IAiProviderAdapter, IAiProviderHealthP
     private static int EstimateTokens(string value)
         => Math.Max(1, (int)Math.Ceiling((value ?? string.Empty).Length / 4.0));
 
-    private static string Hash(string value)
-        => Convert.ToHexString(System.Security.Cryptography.SHA256.HashData(System.Text.Encoding.UTF8.GetBytes(value ?? ""))).ToLowerInvariant();
 }

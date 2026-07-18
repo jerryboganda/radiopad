@@ -42,6 +42,21 @@ export function canViewModelEval(role: number | undefined | null): boolean {
   return role === UserRole.MedicalDirector || role === UserRole.ComplianceReviewer;
 }
 
+/**
+ * UBAG Hub — mirrors the backend `/api/ubag` RBAC: ItAdmin / ReportingAdmin /
+ * MedicalDirector (submit) + ComplianceReviewer (read-only).
+ */
+export const UBAG_HUB_ROLES: readonly number[] = [
+  UserRole.ItAdmin,
+  UserRole.ReportingAdmin,
+  UserRole.MedicalDirector,
+  UserRole.ComplianceReviewer,
+];
+
+export function canUseUbagHub(role: number | undefined | null): boolean {
+  return role != null && UBAG_HUB_ROLES.includes(role);
+}
+
 /** Promote-to-production action — Medical Director only. */
 export function canPromoteRulebook(role: number | undefined | null): boolean {
   return role === UserRole.MedicalDirector;

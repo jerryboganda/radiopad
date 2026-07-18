@@ -157,6 +157,17 @@ These are non-negotiable. Violations must be reverted in review.
 
 ---
 
+## 4.5. UBAG integration
+
+- Adapter id `ubag` routes report AI work through the UBAG browser-automation gateway. The adapter is `PhiApproved` (operator decision 2026-06-27): only de-identified report text is routed, gated by AiGateway's compliance class; the Hub endpoints (`/api/ubag/*`) still apply PHI/secret heuristics to raw operator prompts.
+- The env contract (base URL, auth secret-ref, allowed/ordered targets, alert email) is documented in [docs/03-architecture/provider-catalog.md](docs/03-architecture/provider-catalog.md) and [docs/07-devops/deploy-guide.md](docs/07-devops/deploy-guide.md).
+- Login signal is **tri-state**: a gateway that registers no browser context is "no signal" — never treat missing contexts as logged-out or disable a provider on it; only an explicit `login_state` context row flips `Enabled`.
+- UBAG failures must throw `ProviderTransportException` so gateway failover works.
+- Provider logins (ChatGPT/Gemini/DeepSeek) remain manual through UBAG Browser Sessions; RadioPad never automates login, CAPTCHA, 2FA, consent, cookies, or credentials.
+- As everywhere, [CLAUDE.md](CLAUDE.md) remains authoritative if anything here disagrees.
+
+---
+
 ## 5. Files requiring human review before merge
 
 - `backend/RadioPad.Api/src/RadioPad.Application/Services/AiGateway.cs` (PHI policy)

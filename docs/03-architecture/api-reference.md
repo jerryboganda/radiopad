@@ -209,21 +209,26 @@ Configuration:
 
 | Variable | Default | Notes |
 | --- | --- | --- |
-| `RADIOPAD_UBAG_BASE_URL` | `https://ubag.polytronx.com` | Production UBAG base URL. |
+| `RADIOPAD_UBAG_BASE_URL` | — | UBAG base URL. Production uses the internal address on the shared `platform` docker network (`http://ubag-vps-gateway-1:8080`); the public `https://ubag.polytronx.com` is behind operator Basic-auth and must not be used by RadioPad. |
 | `RADIOPAD_UBAG_API_VERSION` | `2026-05-22` | Sent in UBAG job/workflow envelopes. |
 | `RADIOPAD_UBAG_TIMEOUT_MS` | `120000` | HTTP timeout and adapter polling budget. |
-| `RADIOPAD_UBAG_ALLOWED_TARGETS` | `chatgpt_web,gemini_web,deepseek_web,mock` | Comma-separated allowlist for single jobs/provider adapter use. |
-| `RADIOPAD_UBAG_AUTH_SECRET_REF` / `RADIOPAD_UBAG_AUTH_SECRET` | empty | Optional server-only auth. Prefer `env:NAME` in `RADIOPAD_UBAG_AUTH_SECRET_REF`. |
+| `RADIOPAD_UBAG_ALLOWED_TARGETS` | `chatgpt_web,gemini_web,deepseek_web,mock` | Comma-separated allowlist for single jobs/provider adapter use. Default-deny: unset means the conservative default list above (everything else denied); set the var to override explicitly. Production pins `gemini_web,deepseek_web,chatgpt_web,mock`. |
+| `RADIOPAD_UBAG_ORDERED_TARGETS` | `gemini_web,deepseek_web` | Comma-separated chain for `POST /api/ubag/workflows/ordered-web-chain`. `chatgpt_web` is not included by default. |
+| `RADIOPAD_UBAG_AUTH_SECRET_REF` / `RADIOPAD_UBAG_AUTH_SECRET` | empty | Server-only auth. Prefer `env:NAME` in `RADIOPAD_UBAG_AUTH_SECRET_REF` (production: `env:RADIOPAD_UBAG_TOKEN`, the token being UBAG's `UBAG_APP_SECRET`); sent as `Authorization: Bearer`. When no secret resolves the client sends **no** auth header (silently unauthenticated) — production must always set it. |
+| `RADIOPAD_OPERATOR_ALERT_EMAIL` | empty | When set, login-lost / gateway-unreachable alerts are emailed to the operator via the configured email provider, throttled to 1/day/target. Unset = Hub banners only. |
 | `RADIOPAD_UBAG_AUTH_SCHEME` | `Bearer` | `Bearer`, `Basic`, or `Raw`. |
 | `RADIOPAD_UBAG_AUTH_HEADER` | `Authorization` | Optional custom header name. |
 
 | Method | Path | Description |
 | --- | --- | --- |
-| GET | `/api/ubag/status` | Health, browser summary, target readiness, allowed targets, and ordered-chain targets. Roles: ItAdmin / ReportingAdmin / MedicalDirector / ComplianceReviewer. |
+| GET | `/api/ubag/status` | Returns `{ health, browser, targets[] (tri-state ready), allowedTargets, orderedTargets, alerts[], gatewayUnreachableSince }`. Each `alerts[]` entry is `{ kind: login_lost \| failing, target, since, remedy }`. Roles: ItAdmin / ReportingAdmin / MedicalDirector / ComplianceReviewer. |
+| POST | `/api/ubag/refresh-targets` | Force an immediate provider-discovery sync (normally `UbagProviderDiscoveryService` sweeps every 5 minutes, first sweep 8 s after startup). Roles: ItAdmin / ReportingAdmin / MedicalDirector. |
 | POST | `/api/ubag/jobs` | Submit one non-PHI job. Body `{ target, prompt }`. Roles: ItAdmin / ReportingAdmin / MedicalDirector. Audits `AiResponse` metadata with hashes only. |
 | GET | `/api/ubag/jobs/{id}` | Poll a UBAG job. |
-| POST | `/api/ubag/workflows/ordered-web-chain` | Create and run the fixed `chatgpt_web -> gemini_web -> deepseek_web` workflow. Body `{ prompt, name? }`. |
+| POST | `/api/ubag/workflows/ordered-web-chain` | Create and run the ordered web-chain workflow. The chain is configurable via `RADIOPAD_UBAG_ORDERED_TARGETS` (default `gemini_web,deepseek_web`). Body `{ prompt, name? }`. |
 | GET | `/api/ubag/workflows/runs/{id}` | Poll a UBAG workflow run. |
+
+Target readiness is tri-state: a gateway that registers **no** browser context for a target is "no signal" and never disables a provider; only an explicit context row (`login_state`) flips `Enabled`. Some UBAG executor modes (`vps-local`) never register contexts even while jobs succeed. Login-lost recovery: the operator re-logs the provider in via the UBAG browser viewer (noVNC) / UBAG dashboard; on explicit-signal deployments the provider re-enables automatically on the next 5-minute discovery sweep (or after `POST /api/ubag/refresh-targets`), while on no-signal deployments rows simply stay as the operator set them.
 
 ## AI routing preview
 

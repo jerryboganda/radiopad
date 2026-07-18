@@ -34,18 +34,18 @@ Production CLI providers require `RADIOPAD_CLI_PROVIDER_ALLOWED_PATHS`; empty/un
 - Local providers probe their metadata endpoints (`/api/tags`, `/v1/models`, or `/health`).
 - `openai-compatible` probes `GET /v1/models` without bearer auth and blocks unsafe endpoint targets before the request.
 - CLI providers verify the configured binary without passing a prompt.
-- `ubag` checks UBAG `/v1/health` plus target readiness without sending a prompt.
+- `ubag` prefers UBAG `GET /v1/ready` (full readiness: job store, executor, artifact store, webhook outbox) plus target readiness without sending a prompt; it falls back to `/v1/health` only when the gateway answers 404/405 (older gateways).
 
 ## UBAG Guardrails
 
 UBAG is for governed browser AI automation only. RadioPad's backend is the only
 component that may call UBAG; the frontend never stores UBAG auth material.
 
-- Default `RADIOPAD_UBAG_BASE_URL`: `https://ubag.polytronx.com`.
+- `RADIOPAD_UBAG_BASE_URL`: in production, the internal address on the shared `platform` docker network (`http://ubag-vps-gateway-1:8080`). The public `https://ubag.polytronx.com` sits behind operator Basic-auth and must **not** be used by RadioPad.
 - Default API version: `2026-05-22`.
-- Default allowed targets: `chatgpt_web,gemini_web,deepseek_web,mock`.
-- The fixed ordered workflow is `chatgpt_web -> gemini_web -> deepseek_web`.
-- UBAG adapter calls and Hub submissions reject PHI and secret-shaped prompts.
+- `RADIOPAD_UBAG_ALLOWED_TARGETS`: default-deny allowlist. Unset means the conservative default list `chatgpt_web,gemini_web,deepseek_web,mock` (everything else is denied); set the env var to override explicitly. Production pins `gemini_web,deepseek_web,chatgpt_web,mock`.
+- The ordered workflow is configurable via `RADIOPAD_UBAG_ORDERED_TARGETS`; the code default is `gemini_web,deepseek_web` (`chatgpt_web` is not included by default).
+- The UBAG adapter (report-text path) is `PhiApproved` (operator decision 2026-06-27): the AiGateway compliance class gates it and only de-identified report text is routed, so the adapter itself no longer rejects PHI. Only the Hub endpoints (`POST /api/ubag/jobs` etc.) apply PHI/secret heuristics to raw operator prompts; secret-shaped prompts are rejected everywhere.
 - Operator login, CAPTCHA, 2FA, consent, cookie, and credential handling remain manual inside UBAG Browser Sessions.
 
 ## Adding A Provider

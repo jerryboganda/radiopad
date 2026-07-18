@@ -4,9 +4,9 @@ import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { useTranslations } from 'next-intl';
 import { useEffect } from 'react';
-import { navGroups, isActive } from './nav.config';
+import { navGroups, isActive, type NavItem } from './nav.config';
 import { useShell } from './ShellContext';
-import { usePermissions, type PermissionKey } from '@/lib/permissions';
+import { usePermissions } from '@/lib/permissions';
 import { surfaceAllows } from '@/lib/surface';
 import { ChevronLeft, ChevronRight } from 'lucide-react';
 
@@ -16,13 +16,16 @@ export default function Sidebar() {
   const tBar = useTranslations('topbar');
   const pathname = usePathname() ?? '/';
   const { collapsed, toggleCollapsed, drawerOpen, closeDrawer } = useShell();
-  const { can, loading: permsLoading } = usePermissions();
+  const { can, role, loading: permsLoading } = usePermissions();
 
   // Show every item until the permission set resolves (avoids a flash of an
-  // empty sidebar), then hide items whose required permission the user lacks.
+  // empty sidebar), then hide items whose required permission (or role, for
+  // role-gated items like UBAG Hub) the user lacks.
   // The backend still enforces RBAC; this is purely which links we surface.
-  const visible = (permission?: PermissionKey) =>
-    permsLoading || !permission || can(permission);
+  const visible = (it: NavItem) =>
+    permsLoading ||
+    ((!it.permission || can(it.permission)) &&
+      (!it.roles || (role !== null && it.roles.includes(role))));
   // Scope items to the surface this bundle was built for (item tag overrides
   // the group tag; neither → shared). Applied alongside the RBAC filter — the
   // backend still enforces both.
@@ -30,7 +33,7 @@ export default function Sidebar() {
     .map((g) => ({
       ...g,
       items: g.items.filter(
-        (it) => visible(it.permission) && surfaceAllows(it.surfaces ?? g.surfaces),
+        (it) => visible(it) && surfaceAllows(it.surfaces ?? g.surfaces),
       ),
     }))
     .filter((g) => g.items.length > 0);

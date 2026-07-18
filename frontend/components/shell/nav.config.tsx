@@ -12,6 +12,7 @@ import {
   LayoutDashboard, ListTodo, PenLine, Layers, Sparkles, Library, BadgeCheck,
 } from 'lucide-react';
 import type { PermissionKey } from '@/lib/permissions';
+import { UBAG_HUB_ROLES } from '@/lib/roles';
 import type { Surface } from '@/lib/surface';
 
 export type NavIcon = ComponentType<SVGProps<SVGSVGElement>>;
@@ -28,6 +29,12 @@ export interface NavItem {
    * signed-in user. Gating mirrors the backend RBAC (server still enforces).
    */
   permission?: PermissionKey;
+  /**
+   * Role ordinals (lib/roles `UserRole`) allowed to SEE this item. Used where
+   * the backend gates by role rather than a permission key (e.g. UBAG Hub).
+   * Omitted → no role restriction. The server still enforces.
+   */
+  roles?: readonly number[];
   /**
    * Surfaces this item belongs on (`desktop` = reporting product, `web` =
    * master admin, `mobile` = companion). Omitted → inherits the group's
@@ -125,7 +132,9 @@ export const navGroups: NavGroup[] = [
     items: [
       // Provider / PACS / MCP wiring is platform administration → web.
       { href: '/providers', labelKey: 'providers', icon: Icons.providers, permission: 'providers.read', surfaces: ['web'] },
-      { href: '/admin/ubag', labelKey: 'ubag', icon: Icons.ubag, permission: 'mcp_tools.invoke', surfaces: ['web'] },
+      // Backend /api/ubag gates by ROLE (ItAdmin / ReportingAdmin / MedicalDirector
+      // / ComplianceReviewer), not a permission key — mirror that here.
+      { href: '/admin/ubag', labelKey: 'ubag', icon: Icons.ubag, roles: UBAG_HUB_ROLES, surfaces: ['web'] },
       { href: '/admin/pacs', labelKey: 'pacs', icon: Icons.pacs, permission: 'tenant_settings.manage', surfaces: ['web'] },
       // FHIR import seeds a draft report → part of the reporting flow (desktop).
       { href: '/admin/fhir-import', labelKey: 'fhirImport', icon: Icons.fhir, permission: 'reports.draft', surfaces: ['desktop'] },

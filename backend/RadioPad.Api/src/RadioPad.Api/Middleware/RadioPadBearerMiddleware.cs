@@ -137,9 +137,6 @@ public sealed class RadioPadBearerMiddleware
         // reachability exposes no tenant data, secrets, or PHI. Whitelisted here so
         // it returns those inert results instead of a 401.
         path.StartsWithSegments("/api/local-models") ||
-        // Desktop UBAG passthrough — self-authenticated via RADIOPAD_DESKTOP_PROXY_TOKEN
-        // in the controller, so it must bypass the Production bearer/OIDC requirement.
-        path.StartsWithSegments("/api/ubag-gw") ||
         path.StartsWithSegments("/api/auth/logout") ||
         path.StartsWithSegments("/api/auth/oidc/authorize-url") ||
         path.StartsWithSegments("/api/auth/magic-link/request") ||

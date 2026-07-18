@@ -338,10 +338,9 @@ public sealed class UbagClient : IUbagClient
         var client = _http.CreateClient(HttpClientName);
         // Build an absolute URL that preserves any base-URL PATH segment. A
         // leading-slash relative path ("/v1/health") against a BaseAddress that
-        // itself has a path (e.g. the desktop web-server proxy at
-        // https://host/api/ubag-gw) would resolve to the host root and silently
+        // itself carries a path segment would resolve to the host root and silently
         // drop the prefix. Combining base + path explicitly keeps both the direct
-        // internal gateway (no base path) and the proxy working.
+        // internal gateway (no base path) and any path-prefixed base URL working.
         var requestUri = client.BaseAddress is { } baseAddr
             ? new Uri($"{baseAddr.ToString().TrimEnd('/')}/{path.TrimStart('/')}")
             : new Uri(path, UriKind.RelativeOrAbsolute);
@@ -406,8 +405,7 @@ public sealed class UbagClient : IUbagClient
     {
         var client = _http.CreateClient(HttpClientName);
         // Reuse the SAME absolute-URL builder as SendAsync so a base-URL PATH
-        // segment (e.g. the desktop proxy at https://host/api/ubag-gw) is
-        // preserved for binary uploads exactly as it is for JSON calls.
+        // segment is preserved for binary uploads exactly as it is for JSON calls.
         var requestUri = client.BaseAddress is { } baseAddr
             ? new Uri($"{baseAddr.ToString().TrimEnd('/')}/{path.TrimStart('/')}")
             : new Uri(path, UriKind.RelativeOrAbsolute);

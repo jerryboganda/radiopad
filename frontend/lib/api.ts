@@ -364,6 +364,21 @@ async function errorBody(res: Response): Promise<unknown> {
   }
 }
 
+/**
+ * Build the error thrown for a non-OK response. Backend error payloads carry a
+ * `kind` discriminator (e.g. `ubag_unconfigured`, `target_not_allowed`, and the
+ * GlobalExceptionMiddleware 502 kinds `provider` / `transport`); surface it as
+ * a top-level `kind` so callers can branch without digging into `body`.
+ */
+async function apiError(res: Response): Promise<Error> {
+  const body = await errorBody(res);
+  const kind =
+    body && typeof body === 'object' && typeof (body as { kind?: unknown }).kind === 'string'
+      ? (body as { kind: string }).kind
+      : undefined;
+  return Object.assign(new Error(`API ${res.status} ${res.statusText}`), { status: res.status, body, kind });
+}
+
 async function request<T>(path: string, init?: RequestInit): Promise<T> {
   const headers = new Headers(init?.headers || {});
   if (!headers.has('Content-Type')) headers.set('Content-Type', 'application/json');
@@ -376,7 +391,7 @@ async function request<T>(path: string, init?: RequestInit): Promise<T> {
     credentials: requestCredentials(base, init?.credentials),
   }, headers);
   if (!res.ok) {
-    throw Object.assign(new Error(`API ${res.status} ${res.statusText}`), { status: res.status, body: await errorBody(res) });
+    throw await apiError(res);
   }
   if (res.status === 204) return undefined as unknown as T;
   const ct = res.headers.get('content-type') || '';
@@ -444,6 +459,7 @@ async function runReportAiJob<T>(reportId: string, submitPath: string, body: unk
     if (s.status === 'error') {
       throw Object.assign(new Error(s.error || 'AI generation failed.'), {
         status: 502,
+        kind: s.errorKind || 'ai_job_failed',
         body: { error: s.error || 'AI generation failed.', kind: s.errorKind || 'ai_job_failed' },
       });
     }
@@ -486,7 +502,7 @@ async function requestBlob(path: string): Promise<Blob> {
     credentials: requestCredentials(base),
   }, headers);
   if (!res.ok) {
-    throw Object.assign(new Error(`API ${res.status} ${res.statusText}`), { status: res.status, body: await errorBody(res) });
+    throw await apiError(res);
   }
   return await res.blob();
 }
@@ -505,7 +521,7 @@ async function requestForm<T>(path: string, form: FormData, signal?: AbortSignal
     signal,
   }, headers);
   if (!res.ok) {
-    throw Object.assign(new Error(`API ${res.status} ${res.statusText}`), { status: res.status, body: await errorBody(res) });
+    throw await apiError(res);
   }
   const ct = res.headers.get('content-type') || '';
   if (ct.includes('application/json')) return (await res.json()) as T;
@@ -521,7 +537,7 @@ async function requestForm<T>(path: string, form: FormData, signal?: AbortSignal
 async function requestFormTo<T>(base: string, path: string, form: FormData, signal?: AbortSignal): Promise<T> {
   const res = await fetch(`${base}${path}`, { method: 'POST', body: form, credentials: 'omit', signal });
   if (!res.ok) {
-    throw Object.assign(new Error(`API ${res.status} ${res.statusText}`), { status: res.status, body: await errorBody(res) });
+    throw await apiError(res);
   }
   const ct = res.headers.get('content-type') || '';
   if (ct.includes('application/json')) return (await res.json()) as T;
@@ -539,7 +555,7 @@ async function requestTo<T>(base: string, path: string, init?: RequestInit): Pro
   if (init?.body && !headers.has('Content-Type')) headers.set('Content-Type', 'application/json');
   const res = await fetch(`${base}${path}`, { ...init, headers, credentials: 'omit' });
   if (!res.ok) {
-    throw Object.assign(new Error(`API ${res.status} ${res.statusText}`), { status: res.status, body: await errorBody(res) });
+    throw await apiError(res);
   }
   if (res.status === 204) return undefined as unknown as T;
   const ct = res.headers.get('content-type') || '';
@@ -564,7 +580,7 @@ async function requestCompanion<T>(path: string, init?: RequestInit): Promise<T>
     credentials: base ? 'include' : 'same-origin',
   });
   if (!res.ok) {
-    throw Object.assign(new Error(`API ${res.status} ${res.statusText}`), { status: res.status, body: await errorBody(res) });
+    throw await apiError(res);
   }
   if (res.status === 204) return undefined as unknown as T;
   const ct = res.headers.get('content-type') || '';
@@ -583,6 +599,20 @@ async function requestCompanion<T>(path: string, init?: RequestInit): Promise<T>
 async function requestLocal<T>(path: string, init?: RequestInit): Promise<T> {
   const base = await localSttBase();
   return base ? requestTo<T>(base, path, init) : request<T>(path, init);
+}
+
+/**
+ * The on-device STT sidecar is not reachable. Cross Check deliberately has NO
+ * cloud fallback — dictation audio is PHI and stays on-device — so callers get
+ * the same "engine warming up / unavailable" shape the transcribe path uses
+ * (503 + `stt_unavailable`) instead of a confusing 404 from a nonexistent
+ * hosted endpoint.
+ */
+function sttUnavailableError(): Error {
+  return Object.assign(
+    new Error('On-device cross-check engine is unavailable — it runs only in the desktop app, and dictation audio never leaves this machine. Give the engine a moment and try again.'),
+    { status: 503, kind: 'stt_unavailable', body: { kind: 'stt_unavailable' } },
+  );
 }
 
 export type Report = {
@@ -1248,10 +1278,13 @@ export const api = {
      * Manual "Cross Check": re-run the retained dictation audio through the extra
      * on-device engines, reconcile against the live draft, and (later) an LLM
      * medical pass. Async — returns a job id to poll via `crossCheckStatus`.
-     * Desktop hits the loopback sidecar (PHI-local); web hits the hosted path.
+     * Only the loopback sidecar handles the audio: there is deliberately NO
+     * cloud fallback — dictation audio is PHI and never leaves the machine. If
+     * the sidecar isn't available (web surface, or engine still warming up) the
+     * caller surfaces the engine-unavailable state.
      */
     crossCheck: async (
-      id: string,
+      _id: string,
       audio: Blob,
       opts: { liveTranscript: string; sectionKey?: string; useUbag?: boolean },
     ): Promise<{ jobId: string }> => {
@@ -1262,13 +1295,13 @@ export const api = {
       if (opts.sectionKey) form.append('sectionKey', opts.sectionKey);
       if (opts.useUbag) form.append('useUbag', 'true');
       const local = await localSttBase();
-      if (local) return requestFormTo<{ jobId: string }>(local, '/api/stt/crosscheck', form);
-      return requestForm<{ jobId: string }>(`/api/reports/${id}/crosscheck`, form);
+      if (!local) throw sttUnavailableError();
+      return requestFormTo<{ jobId: string }>(local, '/api/stt/crosscheck', form);
     },
-    crossCheckStatus: async (id: string, jobId: string): Promise<CrossCheckStatus> => {
+    crossCheckStatus: async (_id: string, jobId: string): Promise<CrossCheckStatus> => {
       const local = await localSttBase();
-      if (local) return requestTo<CrossCheckStatus>(local, `/api/stt/crosscheck/${jobId}`);
-      return request<CrossCheckStatus>(`/api/reports/${id}/crosscheck/${jobId}`);
+      if (!local) throw sttUnavailableError();
+      return requestTo<CrossCheckStatus>(local, `/api/stt/crosscheck/${jobId}`);
     },
     /**
      * LLM medical-accuracy review of already-transcribed text. Always hosted (it
@@ -1696,7 +1729,7 @@ export const api = {
         credentials: requestCredentials(base),
       });
       if (!res.ok) {
-        throw Object.assign(new Error(`API ${res.status} ${res.statusText}`), { status: res.status, body: await errorBody(res) });
+        throw await apiError(res);
       }
       return (await res.json()) as { upserts: number; removed: number };
     },

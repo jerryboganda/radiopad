@@ -198,7 +198,10 @@ describe('providers page', () => {
       expect(modelEl.tagName).toBe('SELECT');
     });
 
-    expect((screen.getByLabelText('Model') as HTMLSelectElement).value).toBe('gemini_web');
+    // First entry of the shared FALLBACK_UBAG_TARGETS (lib/ubagTargets.ts) —
+    // the old page-local list started at gemini_web, which was the divergence
+    // this fixture previously encoded.
+    expect((screen.getByLabelText('Model') as HTMLSelectElement).value).toBe('chatgpt_web');
   });
 
   it('shows provider health status returned by the API', async () => {

@@ -12,7 +12,7 @@ import { useRouter } from 'next/navigation';
 import { useTranslations } from 'next-intl';
 import { Search, FileText, CornerDownLeft } from 'lucide-react';
 import { navGroups, type NavItem } from './nav.config';
-import { usePermissions, type PermissionKey } from '@/lib/permissions';
+import { usePermissions } from '@/lib/permissions';
 import { surfaceAllows } from '@/lib/surface';
 import { api, type Report } from '@/lib/api';
 
@@ -35,7 +35,7 @@ export default function CommandPalette({
   const router = useRouter();
   const tNav = useTranslations('nav');
   const tPalette = useTranslations('topbar.palette');
-  const { can, loading: permsLoading } = usePermissions();
+  const { can, role, loading: permsLoading } = usePermissions();
   const [query, setQuery] = useState('');
   const [cursor, setCursor] = useState(0);
   const [reports, setReports] = useState<Report[]>([]);
@@ -43,8 +43,11 @@ export default function CommandPalette({
   const listRef = useRef<HTMLDivElement | null>(null);
 
   const visible = useCallback(
-    (permission?: PermissionKey) => permsLoading || !permission || can(permission),
-    [permsLoading, can],
+    (it: NavItem) =>
+      permsLoading ||
+      ((!it.permission || can(it.permission)) &&
+        (!it.roles || (role !== null && it.roles.includes(role)))),
+    [permsLoading, can, role],
   );
 
   // Lazy-load recent reports the first time the palette opens.
@@ -65,7 +68,7 @@ export default function CommandPalette({
     const navEntries: PaletteEntry[] = navGroups
       .flatMap((g) =>
         g.items.filter(
-          (it) => visible(it.permission) && surfaceAllows(it.surfaces ?? g.surfaces),
+          (it) => visible(it) && surfaceAllows(it.surfaces ?? g.surfaces),
         ),
       )
       .map((it) => ({

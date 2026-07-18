@@ -101,9 +101,8 @@ public static class DevSeed
             // curated primaries now live in UbagPrimarySeed — the single source of
             // truth shared by org bootstrap/registration and the startup backfill, so
             // EVERY org gets them (not just this dev tenant) and the definitions never
-            // drift across call sites. The desktop reaches the gateway via the
-            // web-server passthrough (RADIOPAD_UBAG_BASE_URL -> /api/ubag-gw);
-            // EndpointUrl/ApiKeySecretRef stay empty — UbagClient gets the base URL +
+            // drift across call sites. The desktop is a thin client over the hosted
+            // API — all UBAG traffic is server-side; EndpointUrl/ApiKeySecretRef stay empty — UbagClient gets the base URL +
             // bearer from the RADIOPAD_UBAG_* environment. Gemini is the unattended
             // PRIMARY (higher Quality); DeepSeek is the enabled secondary.
             db.Providers.AddRange(UbagPrimarySeed.CuratedPrimaries(tenant.Id));

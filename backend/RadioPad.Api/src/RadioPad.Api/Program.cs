@@ -575,6 +575,30 @@ if (app.Environment.IsProduction() &&
     throw new InvalidOperationException("Production OIDC requires RADIOPAD_OIDC_AUDIENCE when RADIOPAD_OIDC_AUTHORITY is configured.");
 }
 
+// UBAG misconfiguration surfaced loudly (audit fix 2026-07-18): with the base URL
+// unset the client silently targets the hardcoded public host, and with no auth
+// secret it silently sends UNAUTHENTICATED requests — both previously discoverable
+// only as opaque provider failures. Log ERROR (not throw): UBAG is one provider
+// among several and must not take the whole API down.
+if (app.Environment.IsProduction())
+{
+    var startupLog = app.Services.GetRequiredService<ILoggerFactory>().CreateLogger("RadioPad.Startup");
+    if (string.IsNullOrWhiteSpace(Environment.GetEnvironmentVariable("RADIOPAD_UBAG_BASE_URL")))
+        startupLog.LogError(
+            "RADIOPAD_UBAG_BASE_URL is not set — the UBAG client will target the public default host. " +
+            "Production must point at the internal gateway (see deploy-guide 'UBAG production wiring').");
+    var ubagSecretRef = Environment.GetEnvironmentVariable("RADIOPAD_UBAG_AUTH_SECRET_REF");
+    var ubagSecretResolved =
+        (ubagSecretRef?.StartsWith("env:", StringComparison.OrdinalIgnoreCase) == true
+            ? Environment.GetEnvironmentVariable(ubagSecretRef[4..])
+            : ubagSecretRef)
+        ?? Environment.GetEnvironmentVariable("RADIOPAD_UBAG_AUTH_SECRET");
+    if (string.IsNullOrWhiteSpace(ubagSecretResolved))
+        startupLog.LogError(
+            "No UBAG auth secret resolves (RADIOPAD_UBAG_AUTH_SECRET_REF / RADIOPAD_UBAG_AUTH_SECRET) — " +
+            "gateway calls will be sent UNAUTHENTICATED and rejected. Set the secret ref to the gateway app secret.");
+}
+
 // Resolve the encryptor before EF builds its model for migrations/seeding.
 // This makes the production KMS contract fail closed during startup rather
 // than silently letting EF converters initialize the non-production fallback.

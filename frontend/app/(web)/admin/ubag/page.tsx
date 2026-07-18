@@ -1,8 +1,11 @@
 'use client';
 
-import PermissionGate from '@/components/ui/PermissionGate';
+import SignInRequired from '@/components/ui/SignInRequired';
 
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
+import { usePermissions } from '@/lib/permissions';
+import { canUseUbagHub } from '@/lib/roles';
+import { FALLBACK_UBAG_TARGETS } from '@/lib/ubagTargets';
 import Container from '@/components/shell/Container';
 import PageHeader from '@/components/shell/PageHeader';
 import EmptyState from '@/components/ui/EmptyState';
@@ -10,8 +13,6 @@ import ErrorState from '@/components/ui/ErrorState';
 import Banner from '@/components/ui/Banner';
 import { TableSkeleton } from '@/components/ui/Skeleton';
 import { api, type UbagJob, type UbagStatus, type UbagWorkflowRun } from '@/lib/api';
-
-const DEFAULT_TARGETS = ['chatgpt_web', 'gemini_web', 'deepseek_web', 'mock'];
 
 function statusBadge(ok: boolean): string {
   return ok ? 'ok' : 'warn';
@@ -29,12 +30,36 @@ function isBlockedPrompt(prompt: string): string | null {
 }
 
 export default function UbagHubPage() {
-  return (
-    <PermissionGate permission="mcp_tools.invoke" title="UBAG Hub">
-      <UbagHubPageInner />
-    </PermissionGate>
-  );
+  // Role gate mirroring the backend `/api/ubag` RBAC (ItAdmin / ReportingAdmin /
+  // MedicalDirector submit + ComplianceReviewer read) — no /api/ubag endpoint
+  // checks a permission key, so gating follows the role like the governance /
+  // model-eval dashboards. The backend still enforces.
+  const { loading, signedOut, role } = usePermissions();
+  if (loading) return null;
+  if (signedOut) {
+    return (
+      <div className="rp-container">
+        <h1 className="rp-page-title">UBAG Hub</h1>
+        <SignInRequired />
+      </div>
+    );
+  }
+  if (!canUseUbagHub(role)) {
+    return (
+      <div className="rp-container">
+        <h1 className="rp-page-title">UBAG Hub</h1>
+        <SignInRequired
+          surface="You don't have permission to view this page in this workspace."
+          detail="UBAG Hub is limited to the IT Admin, Reporting Admin, Medical Director, and Compliance Reviewer roles."
+        />
+      </div>
+    );
+  }
+  return <UbagHubPageInner />;
 }
+
+/** Statuses (lowercased) that end a job/workflow run — stop auto-polling. */
+const TERMINAL_STATUSES = new Set(['completed', 'succeeded', 'failed', 'error', 'cancelled']);
 
 function UbagHubPageInner() {
   const [status, setStatus] = useState<UbagStatus | null>(null);
@@ -48,7 +73,7 @@ function UbagHubPageInner() {
   const [run, setRun] = useState<UbagWorkflowRun | null>(null);
 
   const allowedTargets = useMemo(
-    () => status?.allowedTargets?.length ? status.allowedTargets : DEFAULT_TARGETS,
+    () => status?.allowedTargets?.length ? status.allowedTargets : FALLBACK_UBAG_TARGETS,
     [status],
   );
   const promptBlock = isBlockedPrompt(prompt);
@@ -131,6 +156,25 @@ function UbagHubPageInner() {
       setBusy(false);
     }
   }
+
+  // Browser-driven jobs/workflows take minutes — auto-poll the tracked one
+  // every 5s while it is non-terminal, skipping a tick if the previous poll is
+  // still in flight. Cleared on unmount and once the status turns terminal.
+  const pollInFlight = useRef(false);
+  useEffect(() => {
+    const jobActive = !!job?.id && !job.terminal && !TERMINAL_STATUSES.has((job.status || '').toLowerCase());
+    const runActive = !!run?.id && !run.terminal && !TERMINAL_STATUSES.has((run.status || '').toLowerCase());
+    if (!jobActive && !runActive) return;
+    const timer = setInterval(() => {
+      if (pollInFlight.current) return;
+      pollInFlight.current = true;
+      void (jobActive ? pollJob() : pollRun()).finally(() => {
+        pollInFlight.current = false;
+      });
+    }, 5000);
+    return () => clearInterval(timer);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [job, run]);
 
   return (
     <Container>

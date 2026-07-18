@@ -78,14 +78,14 @@ public class UbagController : TenantedController
             browser = new UbagBrowserSummary(0, 0, 0, "unreachable", "{}");
             mergedTargets = Array.Empty<UbagTarget>();
         }
-        // AllowedTargets reflects the LIVE catalog (capped only if the operator set an
-        // explicit RADIOPAD_UBAG_ALLOWED_TARGETS), so the Hub dropdown and the provider
-        // admin page automatically list every web AI the gateway can drive — including
-        // ones the operator just logged into.
+        // AllowedTargets = the LIVE catalog intersected with the effective allow-list
+        // (RADIOPAD_UBAG_ALLOWED_TARGETS, or the documented conservative default when
+        // unset — default-deny since 2026-07-18). The Hub dropdown and the provider
+        // admin page therefore only offer targets the operator has actually permitted.
         var cap = UbagProviderAdapter.ResolveAllowedTargetCap();
-        var allowedTargets = (cap is null
-                ? mergedTargets.Select(t => t.Id)
-                : mergedTargets.Where(t => cap.Contains(t.Id, StringComparer.OrdinalIgnoreCase)).Select(t => t.Id))
+        var allowedTargets = mergedTargets
+            .Where(t => cap.Contains(t.Id, StringComparer.OrdinalIgnoreCase))
+            .Select(t => t.Id)
             .ToList();
         var alerts = (_alerts?.LoggedOutTargets ?? new Dictionary<string, DateTimeOffset>())
             .Select(kv => new UbagAlertDto(
@@ -118,6 +118,7 @@ public class UbagController : TenantedController
     /// the background discovery sweep.
     /// </summary>
     [HttpPost("refresh-targets")]
+    [Microsoft.AspNetCore.RateLimiting.EnableRateLimiting("ai")]
     public async Task<IActionResult> RefreshTargets(CancellationToken ct)
     {
         var (tenant, user) = await ResolveContextAsync(_db, ct);
@@ -143,7 +144,10 @@ public class UbagController : TenantedController
         var validation = ValidatePrompt(dto.Prompt, dto.Target);
         if (validation is not null) return validation;
 
-        var key = $"radiopad-ubag-job-{tenant.Id:N}-{Hash(dto.Target + "|" + dto.Prompt)[..16]}";
+        // Per-invocation nonce (2026-07-18): the old deterministic tenant+prompt hash
+        // made the gateway replay a cancelled/timed-out job on retry — the same bug
+        // the adapter fixed on 2026-07-11. A user retry must create a fresh job.
+        var key = $"radiopad-ubag-job-{Guid.NewGuid():N}";
         var sw = System.Diagnostics.Stopwatch.StartNew();
         var job = await _ubag.CreateJobAsync(new UbagJobRequest(dto.Target.Trim(), dto.Prompt.Trim(), ClientRequestId: key), key, ct);
         sw.Stop();

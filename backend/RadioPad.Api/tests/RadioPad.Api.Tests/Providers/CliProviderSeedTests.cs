@@ -47,6 +47,26 @@ public class CliProviderSeedTests
     }
 
     [Fact]
+    public async Task Compliance_backfill_promotes_legacy_sandbox_rows_to_phi_approved()
+    {
+        // Operator promotion 2026-07-12 (audit fix 2026-07-18: previously untested).
+        using var db = CreateDb();
+        db.Providers.AddRange(
+            new ProviderConfig { TenantId = Tenant, Name = CliProviderSeed.ProviderName, Adapter = GeminiCliProvider.AdapterId, Compliance = ProviderComplianceClass.Sandbox, Enabled = true },
+            new ProviderConfig { TenantId = Tenant, Name = "custom row", Adapter = GeminiCliProvider.AdapterId, Compliance = ProviderComplianceClass.PhiApproved, Enabled = true });
+        await db.SaveChangesAsync();
+
+        var promoted = await CliProviderSeed.EnsureGeminiCliComplianceAsync(db, default);
+
+        Assert.Equal(1, promoted); // only the Sandbox row needed promotion
+        Assert.All(
+            await db.Providers.Where(p => p.Adapter == GeminiCliProvider.AdapterId).ToListAsync(),
+            p => Assert.Equal(ProviderComplianceClass.PhiApproved, p.Compliance));
+        // Idempotent: a second run touches nothing.
+        Assert.Equal(0, await CliProviderSeed.EnsureGeminiCliComplianceAsync(db, default));
+    }
+
+    [Fact]
     public async Task Seed_is_idempotent()
     {
         using var db = CreateDb();

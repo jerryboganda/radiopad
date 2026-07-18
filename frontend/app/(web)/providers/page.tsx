@@ -9,8 +9,7 @@ import ErrorState from '@/components/ui/ErrorState';
 import Banner from '@/components/ui/Banner';
 import { TableSkeleton } from '@/components/ui/Skeleton';
 import OnDeviceModels from './OnDeviceModels';
-
-const UBAG_FALLBACK_TARGETS = ['gemini_web', 'deepseek_web', 'mock'];
+import { FALLBACK_UBAG_TARGETS } from '@/lib/ubagTargets';
 
 const SANDBOX_COMPLIANCE = 1;
 const SANDBOX_MODES = ['impression', 'draft', 'concise', 'formal', 'patient_friendly', 'referring_summary'] as const;
@@ -83,7 +82,7 @@ export default function ProvidersPage() {
   const [loading, setLoading] = useState(true);
   const [draft, setDraft] = useState<Editable | null>(null);
   const [saving, setSaving] = useState(false);
-  const [ubagTargets, setUbagTargets] = useState<string[]>(UBAG_FALLBACK_TARGETS);
+  const [ubagTargets, setUbagTargets] = useState<string[]>(FALLBACK_UBAG_TARGETS);
 
   // Deep-link the active tab via ?tab=on-device without pulling in next/navigation
   // (keeps this page out of a Suspense boundary). Default 'cloud'; sync after mount.
@@ -108,7 +107,7 @@ export default function ProvidersPage() {
     setDraft((prev) => (prev && !prev.model ? { ...prev, model: ubagTargets[0] } : prev));
     api.ubag.status().then((s) => {
       if (cancelled) return;
-      const list = s.allowedTargets?.length ? s.allowedTargets : UBAG_FALLBACK_TARGETS;
+      const list = s.allowedTargets?.length ? s.allowedTargets : FALLBACK_UBAG_TARGETS;
       setUbagTargets(list);
       setDraft((prev) => (prev && !prev.model ? { ...prev, model: list[0] } : prev));
     }).catch(() => { /* swallow — use fallback list */ });

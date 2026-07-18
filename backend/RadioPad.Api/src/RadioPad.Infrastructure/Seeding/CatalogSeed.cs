@@ -12,8 +12,10 @@ namespace RadioPad.Infrastructure.Seeding;
 ///
 /// Seeding every org through this helper — at registration/bootstrap and via a
 /// one-time startup backfill for pre-existing orgs — mirrors <see cref="UbagPrimarySeed"/>
-/// so the defaults never drift across call sites. Idempotent + ensure-on-absence:
-/// an operator who deletes a catalog row keeps it deleted.
+/// so the defaults never drift across call sites. Note: the seed re-runs at every
+/// process start, so a hard-deleted default modality/body-part row is resurrected
+/// on the next restart. To hide a default row permanently, clear its Active flag
+/// instead of deleting it.
 /// </summary>
 public static class CatalogSeed
 {
