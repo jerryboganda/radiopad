@@ -7,7 +7,9 @@ namespace RadioPad.Application.Dictation;
 /// <summary>Produces a safety-wrapped, editable dictation draft for one report (brief §4.2).</summary>
 public interface IDictationDraftService
 {
-    Task<DictationDraft> BuildDraftAsync(Tenant tenant, User user, Report report, string rawDictation, CancellationToken ct);
+    Task<DictationDraft> BuildDraftAsync(
+        Tenant tenant, User user, Report report, string rawDictation,
+        IReadOnlyList<CorrectionRule> corrections, CancellationToken ct);
 }
 
 /// <summary>
@@ -30,7 +32,9 @@ public sealed class DictationDraftService : IDictationDraftService
         _audit = audit;
     }
 
-    public async Task<DictationDraft> BuildDraftAsync(Tenant tenant, User user, Report report, string rawDictation, CancellationToken ct)
+    public async Task<DictationDraft> BuildDraftAsync(
+        Tenant tenant, User user, Report report, string rawDictation,
+        IReadOnlyList<CorrectionRule> corrections, CancellationToken ct)
     {
         var context = new DictationFormatContext(
             Modality: report.Study?.Modality ?? string.Empty,
@@ -39,9 +43,6 @@ public sealed class DictationDraftService : IDictationDraftService
             SectionKeys: DictationGrammar.DefaultSections,
             // GBNF is applied on the local MedGemma path once the desktop sidecar is wired (P0.4).
             Grammar: null);
-
-        // Phase 1 (F7/§6) will populate the per-user correction dictionary + org-lexicon layering.
-        IReadOnlyList<CorrectionRule> corrections = Array.Empty<CorrectionRule>();
 
         var formatter = new CleanupServiceFormatter(_cleanup, tenant, user, report);
 

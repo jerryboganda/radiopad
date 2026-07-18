@@ -48,6 +48,10 @@
   construction, `.ai-mark` on drafted sections. Surfaces the §5.3 fail-safe fallback + violations
   (danger/red), the §5.6 sentinel warnings (warn/amber), and an Apply action. Frontend suite
   278 green (+3 rendering tests); desktop surface build (`out-desktop`) green.
+- **§6/F7 org correction dictionary** (`Dictation/CorrectionDictionary.cs`): resolves the tenant
+  `TenantLexicon` (rows with a replacement, longest-first) into `CorrectionRule[]` applied by the
+  §5.2 pass-through BEFORE the LLM; wired through `DictationDraftService` + the `/dictation/draft`
+  endpoint. Per-user personal-override layer is the remaining F7 piece (needs its own store).
 
 ### Remaining Phase 0 (needs model binaries / Rust / hardware — see IMPLEMENTATION_NOTES.md)
 
