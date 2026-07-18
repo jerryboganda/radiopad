@@ -6,6 +6,7 @@ import { startAutoSync } from '@/lib/offlineDrafts';
 import { getAuthToken } from '@/lib/secureAuth';
 import { setActiveAuthToken } from '@/lib/api';
 import { isBiometricLockEnabled, unlockWithBiometric } from '@/lib/biometric';
+import { installDictationHotkey } from '@/lib/dictationHotkey';
 
 type TauriUnlisten = () => void;
 type TauriListenHandle = TauriUnlisten | { unlisten?: TauriUnlisten } | null | undefined;
@@ -81,6 +82,12 @@ export default function ShellBridge() {
         /* not running under Tauri — no-op */
       }
     })();
+    // P0.3 — in-app rebindable dictation hotkey. Works on every surface (including web, which has
+    // no Rust global shortcut) and honours the user's configured chord. The desktop Rust global
+    // shortcut still covers the system-wide (unfocused) case; a chord the OS has claimed as a
+    // global shortcut never reaches this listener, so there is no double-fire.
+    const uninstallDictationHotkey = installDictationHotkey();
+
     // Mobile/desktop offline-draft auto sync.
     startAutoSync().catch(() => { /* best effort */ });
     // Hydrate the bearer from native secure storage (Tauri keyring on desktop,
@@ -101,6 +108,7 @@ export default function ShellBridge() {
     })();
     return () => {
       cancelled = true;
+      uninstallDictationHotkey();
       for (const u of unsub) {
         try { u(); } catch { /* ignore */ }
       }
