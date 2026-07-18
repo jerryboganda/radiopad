@@ -52,6 +52,12 @@
   `TenantLexicon` (rows with a replacement, longest-first) into `CorrectionRule[]` applied by the
   §5.2 pass-through BEFORE the LLM; wired through `DictationDraftService` + the `/dictation/draft`
   endpoint.
+- **F1 spoken-measurement formatting (live path)** — `lib/dictation/spokenNumbers.ts`, a faithful
+  TS port of the backend §5.2 `NormalizeSpokenNumbers` (cardinals incl. hundreds + "and" bridging,
+  "point" decimals, `by`→`x` axis joins, mm/cm unit abbreviation). Folded into `formatDictation`
+  so dictation shows "3.5 cm" the instant it lands in the editor; idempotent under the backend
+  pass (digit text is untouched, so the draft endpoint's re-normalisation is a no-op). 16 tests
+  (13 unit + 3 integration); existing `medicalFormat` suite unchanged.
 - **§6/F7b per-user correction dictionary** — the personal-override layer: `UserCorrection` entity
   + `AddUserCorrections` migration, `UserCorrectionsController` (GET/POST-upsert/DELETE,
   `ReportsEdit`), and `CorrectionDictionary.Resolve(org, user)` where the user's entry wins for the

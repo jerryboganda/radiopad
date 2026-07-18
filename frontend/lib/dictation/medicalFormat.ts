@@ -1,10 +1,13 @@
-// Dictation auto-formatting. Turns spoken punctuation words into real
+// Dictation auto-formatting. Turns spoken number words into digits + abbreviated
+// units (F1 spoken-measurement formatting), turns spoken punctuation words into real
 // punctuation, normalises whitespace, and capitalises sentence starts so a
 // radiologist can dictate prose hands-free. Pure + deterministic — every rule
 // is unit-tested in `__tests__/dictation/medicalFormat.test.ts`.
 //
 // Scope is intentionally small (the high-value spoken tokens). Anything not
 // recognised is passed through verbatim, so dictation never loses words.
+
+import { normalizeSpokenNumbers } from './spokenNumbers';
 
 const SPOKEN_PUNCTUATION: ReadonlyArray<readonly [RegExp, string]> = [
   [/\bnew paragraph\b/gi, '\n\n'],
@@ -26,7 +29,9 @@ function capitaliseSentences(text: string): string {
 }
 
 export function formatDictation(input: string): string {
-  let s = input;
+  // Digitise spoken measurements FIRST, while "point"/"by" are still plain words and before we
+  // start inserting real punctuation — keeps the result in step with the backend §5.2 pass.
+  let s = normalizeSpokenNumbers(input);
   for (const [pattern, replacement] of SPOKEN_PUNCTUATION) {
     s = s.replace(pattern, replacement);
   }

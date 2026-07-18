@@ -48,3 +48,21 @@ describe('formatDictation — capitalisation & whitespace', () => {
     expect(formatDictation('lesion is 2.5 cm')).toBe('Lesion is 2.5 cm');
   });
 });
+
+describe('formatDictation — spoken measurements (F1)', () => {
+  it('digitises a spoken decimal measurement and abbreviates the unit', () => {
+    expect(formatDictation('the mass measures three point five centimeters full stop')).toBe(
+      'The mass measures 3.5 cm.',
+    );
+  });
+
+  it('joins spoken axes with x when no intermediate unit is given', () => {
+    expect(formatDictation('nodule is two by three millimeters full stop')).toBe(
+      'Nodule is 2 x 3 mm.',
+    );
+  });
+
+  it('still passes already-typed digit measurements through unchanged', () => {
+    expect(formatDictation('measures 2 millimeters')).toBe('Measures 2 millimeters');
+  });
+});
