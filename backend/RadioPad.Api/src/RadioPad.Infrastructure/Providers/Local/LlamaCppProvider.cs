@@ -46,12 +46,17 @@ public sealed class LlamaCppProvider : IAiProviderAdapter
         var url = $"{baseUrl}/completion";
         var prompt = $"SYSTEM: {request.SystemPrompt}\n\nUSER: {request.UserPrompt}\n\nASSISTANT:";
 
-        var body = new
+        // Brief §5.4 — forward the clamped temperature (callers set ≈0 for MedGemma report
+        // formatting) and, when supplied, the GBNF grammar so decoding is structurally constrained.
+        var body = new Dictionary<string, object?>
         {
-            prompt,
-            n_predict = 1024,
-            stream = false,
+            ["prompt"] = prompt,
+            ["n_predict"] = 1024,
+            ["stream"] = false,
+            ["temperature"] = request.Temperature,
         };
+        if (!string.IsNullOrWhiteSpace(request.Grammar))
+            body["grammar"] = request.Grammar;
 
         var client = _http.CreateClient("ai");
         var sw = Stopwatch.StartNew();

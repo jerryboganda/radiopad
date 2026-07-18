@@ -4,6 +4,44 @@
 
 ---
 
+## On-Device Dictation & Reporting Engine — Phase 0 (part 1: deterministic safety pipeline)
+
+- **Date:** 2026-07-18
+- **Scope:** Implement `RadioPad_Dictation_Engine_ClaudeCode_Brief.md` (MedASR STT + MedGemma
+  formatter, brief §5 guardrails). Operator decisions this session (see `IMPLEMENTATION_NOTES.md`):
+  cloud AI stays primary (local MedGemma is an OPTIONAL offline formatter, iter-55 NOT reversed);
+  MedASR = default primary STT with Parakeet user-promotable; streaming push-to-talk from Phase 0;
+  all phases with per-phase commits; Phase 3 regulated features OFF by default.
+
+### Delivered (backend — verified: 856 passed / 5 skipped / 0 failed; +35 new TDD tests)
+
+- **§5.2 deterministic pass-through** (`Application/Dictation/DeterministicPassThrough.cs`):
+  correction-dictionary find-replace + spoken-number/measurement normalization
+  ("three point two centimetres"→"3.2 cm", "three by four cm"→"3 x 4 cm") + token locking of
+  numbers/measurements/dates/laterality/negation. Runs BEFORE the formatter; the corrected
+  transcript is also the §5.3 fallback. Deterministic (never via the LLM).
+- **§5.3 validation-diff** (`DictationValidationService.cs`): set-membership diff of formatter
+  output vs the protected transcript; rejects fabricated numbers/measurements/dates (incl. unit
+  flips cm→mm) and dropped required sections; fail-safe fallback to the corrected transcript.
+- **§5.6 laterality/negation/gender sentinel** (`LateralityNegationSentinel.cs`): warns (never
+  silently rejects) on L/R flips, dropped/added negation, and sex-specific anatomy in the wrong-sex
+  study.
+- **§5.4 GBNF grammar** (`DictationGrammar.cs`): section-JSON grammar + per-template builder;
+  wired into `LlamaCppProvider` via a new `AiCompletionRequest.Grammar` field, and temperature≈0
+  now forwarded on the local llama.cpp path.
+- **§4.2 pipeline orchestration** (`DictationEngineService.cs` + `IDictationFormatter`): wires
+  §5.2 → formatter (cloud or local MedGemma) → §5.3 → §5.6 into one editable `DictationDraft`;
+  never signs (feeds the existing §5.5 sign-off gate); `.ai-mark` "Requires review" always set.
+
+### Remaining Phase 0 (integration — needs model binaries / Rust / frontend, tracked in tasks)
+
+- MedASR ONNX engine (ONNX-export prototype is build-time) + catalog descriptor; MedGemma GGUF
+  provisioner + bundled llama-server sidecar; streaming decode + hold-to-talk PTT + rebindable
+  hotkey; local encrypted audit store (§5.7); model load/unload memory manager (§4.4); the
+  `formatDictation` endpoint + `lib/api.ts` routing; desktop release (DESK-001).
+
+---
+
 ## Desktop-first surface specialisation (web=admin · mobile=companion)
 
 - **Date:** 2026-07-12

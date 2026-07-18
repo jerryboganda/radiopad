@@ -81,6 +81,15 @@ public sealed record AiCompletionRequest(
     /// adapters request structured output via <c>response_format</c>. Null = free text.
     /// </summary>
     public string? OutputSchema { get; init; }
+
+    /// <summary>
+    /// Phase 0 (brief §5.4) — optional GBNF grammar (llama.cpp format) that constrains the model's
+    /// decoding so it is structurally unable to emit malformed output. When set, local llama.cpp
+    /// adapters forward it as the <c>grammar</c> field on <c>/completion</c>. Null = unconstrained.
+    /// Preferred over <see cref="OutputSchema"/> for small local models (e.g. MedGemma 1.5 4B), where
+    /// prose-instructed JSON is fragile; tolerant JSON parsing remains the secondary net.
+    /// </summary>
+    public string? Grammar { get; init; }
 }
 
 public interface IUbagClient
