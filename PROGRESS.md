@@ -43,14 +43,19 @@
   `POST /api/reports/{id}/dictation/draft` in `ReportsController` + DI in `Program.cs`): the safety
   pipeline reuses the existing PHI-gated cloud formatter (`IDictationCleanupService`) today and
   writes the §5.7 audit. Reachable end-to-end; app-boot integration tests green.
+- **Frontend draft UI + routing** (`lib/api.ts` `reports.dictationDraft` + `DictationDraftPanel.tsx`
+  mounted in `ReportClient` behind a "Format draft" toggle): RC design system, dual-theme by
+  construction, `.ai-mark` on drafted sections. Surfaces the §5.3 fail-safe fallback + violations
+  (danger/red), the §5.6 sentinel warnings (warn/amber), and an Apply action. Frontend suite
+  278 green (+3 rendering tests); desktop surface build (`out-desktop`) green.
 
-### Remaining Phase 0 (needs model binaries / Rust / frontend — see IMPLEMENTATION_NOTES.md)
+### Remaining Phase 0 (needs model binaries / Rust / hardware — see IMPLEMENTATION_NOTES.md)
 
 - MedASR ONNX engine (ONNX-export prototype is build-time) + catalog descriptor (needs HAI-DEF
   terms + verified artifact); MedGemma GGUF provisioner + bundled llama-server sidecar (needs
   verified GGUF SHA); streaming decode + hold-to-talk PTT + rebindable hotkey (Rust/frontend);
-  thread the local FileDictationAuditStore + key management + patientSex on desktop; `lib/api.ts`
-  routing + settings toggle + draft UI; desktop release (DESK-001).
+  thread the local FileDictationAuditStore + key management + patientSex on desktop; offline-
+  formatter settings toggle that routes the draft to the local sidecar.
 
 ---
 

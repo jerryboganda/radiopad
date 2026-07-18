@@ -32,6 +32,28 @@ export type CrossCheckCorrection = {
   severity: 'safety' | 'warning' | 'info';
 };
 
+/** Report section keys a dictation draft can populate. */
+export type DictationSectionKey =
+  | 'indication' | 'technique' | 'findings' | 'impression' | 'recommendations';
+
+/**
+ * Result of the SAFETY-CHECKED dictation→report draft (dictation-engine brief §4.2):
+ * §5.2 deterministic pass-through → formatter → §5.3 validation-diff → §5.6 sentinel.
+ * `usedFallback` means the formatter output was REJECTED (§5.3) and `sections` holds the
+ * dictionary-corrected transcript instead. `sentinelWarnings` require eye-confirmation (§5.6).
+ */
+export type DictationDraftResult = {
+  sections: Partial<Record<DictationSectionKey, string>>;
+  accepted: boolean;
+  usedFallback: boolean;
+  requiresReview: boolean;
+  violations: { reason: string; detail: string }[];
+  sentinelWarnings: { kind: string; detail: string }[];
+  provider: string;
+  model: string;
+  latencyMs: number;
+};
+
 /** Desktop-created companion session (returned to the desktop host). */
 export type CompanionSessionInit = {
   sessionId: string;
@@ -1239,6 +1261,19 @@ export const api = {
           recommendations: string;
         };
       }>(`/api/reports/${id}/dictation/cleanup`, {
+        method: 'POST',
+        body: JSON.stringify({ rawDictation }),
+      }),
+    /**
+     * Dictation-engine brief §4.2 — the SAFETY-CHECKED dictation→report draft:
+     * deterministic pass-through (§5.2) → formatter (PHI-gated AiGateway) →
+     * validation-diff (§5.3, fail-safe fallback to the corrected transcript) →
+     * laterality/negation/gender sentinel (§5.6) → local audit (§5.7). Report-scoped
+     * cloud path today (like cleanupDictation); the optional local MedGemma formatter
+     * is selected on the desktop once the on-device sidecar is wired.
+     */
+    dictationDraft: (id: string, rawDictation: string) =>
+      request<DictationDraftResult>(`/api/reports/${id}/dictation/draft`, {
         method: 'POST',
         body: JSON.stringify({ rawDictation }),
       }),

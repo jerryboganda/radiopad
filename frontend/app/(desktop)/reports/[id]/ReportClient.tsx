@@ -29,6 +29,7 @@ import { readQueryParam } from '@/lib/browserParams';
 import { detectCommand, stripCommand, type VoiceCommand, type CommandMatch } from '@/lib/voiceCommands';
 import RewriteStylePanel from './RewriteStylePanel';
 import PriorComparePanel from './PriorComparePanel';
+import DictationDraftPanel from './DictationDraftPanel';
 import CopyToRisButton from './CopyToRisButton';
 import ReportInspector, { type InspectorTab } from './ReportInspector';
 import {
@@ -135,6 +136,7 @@ export default function ReportPage() {
   const [styleSection, setStyleSection] =
     useState<'findings' | 'impression' | 'recommendations'>('impression');
   const [showPrior, setShowPrior] = useState(false);
+  const [showDictationDraft, setShowDictationDraft] = useState(false);
   const [voiceCommandMode, setVoiceCommandMode] = useState(false);
   const [dictating, setDictating] = useState(false);
   const [voiceCommandPills, setVoiceCommandPills] = useState<Array<{ id: number; command: VoiceCommand }>>([]);
@@ -1124,6 +1126,9 @@ export default function ReportPage() {
                 <GitCompareArrows size={13} aria-hidden />
                 {showPrior ? 'Hide compare' : 'Compare'}
               </button>
+              <button className="ghost" type="button" onClick={() => setShowDictationDraft((v) => !v)} aria-expanded={showDictationDraft}>
+                {showDictationDraft ? 'Hide draft' : 'Format draft'}
+              </button>
               {canEdit && (
                 <button
                   className="ghost"
@@ -1219,6 +1224,30 @@ export default function ReportPage() {
           )}
 
           {showPrior && <PriorComparePanel reportId={report.id} />}
+
+          {showDictationDraft && (
+            <DictationDraftPanel
+              reportId={report.id}
+              initialText={String((report as Record<string, unknown>).findings ?? '')}
+              onApply={async (sections) => {
+                const patch: Partial<Report> = {};
+                const nextHighlights = { ...aiHighlightsRef.current };
+                const undo: Record<string, string> = {};
+                (['indication', 'technique', 'findings', 'impression', 'recommendations'] as const).forEach((k) => {
+                  const v = sections[k];
+                  if (v && v.trim()) {
+                    undo[k] = String((reportRef.current as Record<string, unknown> | null)?.[k] ?? '');
+                    (patch as Record<string, unknown>)[k] = v;
+                    nextHighlights[k] = true;
+                  }
+                });
+                if (Object.keys(patch).length === 0) return;
+                setAiUndo((prev) => ({ ...prev, ...undo }));
+                setAiHighlights(nextHighlights);
+                await update({ ...patch, aiHighlightsJson: JSON.stringify(nextHighlights) } as Partial<Report>);
+              }}
+            />
+          )}
 
           {rewriteDraft && (
             <div className="rp-panel">
