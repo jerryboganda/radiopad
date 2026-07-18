@@ -206,6 +206,11 @@ export default function AnalyticsPage() {
                 value={formatDuration(s.product.turnaroundTimeImpact)}
                 severity="info"
               />
+              <Kpi
+                label="Reports / hour"
+                value={s.product.reportsPerHour.toFixed(1)}
+                severity="info"
+              />
               {s.product.avgQualityScore != null && (
                 <Kpi
                   label="Avg quality score"

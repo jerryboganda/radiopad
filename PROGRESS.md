@@ -52,6 +52,11 @@
   `TenantLexicon` (rows with a replacement, longest-first) into `CorrectionRule[]` applied by the
   §5.2 pass-through BEFORE the LLM; wired through `DictationDraftService` + the `/dictation/draft`
   endpoint.
+- **F10 reports/hour throughput KPI** — `AnalyticsService.ComputeAsync` now emits
+  `ProductKpis.ReportsPerHour` (completed reports ÷ window wall-clock hours, zero-window guarded),
+  reusing the already-fetched `CompletedReports` (no controller/data-fetch change). Surfaced in the
+  analytics dashboard as a "Reports / hour" KPI card and the `api.ts` summary type. Adds the
+  service's first unit tests (3, xUnit) + updated the analytics-page mock.
 - **F1 "scratch that" voice undo** — `lib/dictation/voiceEditCommands.ts` recognises a
   whole-utterance editing command ("scratch that" / "strike that" / "undo that" / "delete that")
   and the `DictationOverlay` live path routes it to the focused rich editor's existing `undo()`

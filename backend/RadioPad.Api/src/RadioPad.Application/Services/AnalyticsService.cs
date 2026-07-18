@@ -77,6 +77,13 @@ public sealed class AnalyticsService
             ? (double?)null
             : raw.QualityScoreSum / raw.QualityScoreCount;
 
+        // 12. Reports per hour (F10 throughput) — completed reports over the window's wall-clock
+        // hours. Zero-length (or inverted) windows report 0 rather than dividing by zero.
+        var windowHours = (to - from).TotalHours;
+        var reportsPerHour = windowHours <= 0
+            ? 0.0
+            : raw.CompletedReports / windowHours;
+
         // ── Governance KPIs (§18.2) ─────────────────────────────────────
 
         var governanceKpis = new GovernanceKpis(
@@ -99,7 +106,8 @@ public sealed class AnalyticsService
             RulebookAdoption: rulebookAdoption,
             ProviderCostPerReport: providerCostPerReport,
             TurnaroundTimeImpact: turnaroundTimeImpact,
-            AvgQualityScore: avgQualityScore);
+            AvgQualityScore: avgQualityScore,
+            ReportsPerHour: reportsPerHour);
 
         return new AnalyticsSummary(
             Window: new AnalyticsWindow(from, to),
@@ -143,7 +151,9 @@ public sealed record ProductKpis(
     /// <summary>Median seconds to acknowledge (recent period vs baseline).</summary>
     double TurnaroundTimeImpact,
     /// <summary>Average quality score from validation results (null if none).</summary>
-    double? AvgQualityScore);
+    double? AvgQualityScore,
+    /// <summary>Completed reports per wall-clock hour over the window (F10 throughput).</summary>
+    double ReportsPerHour);
 
 /// <summary>PRD §18.2 — governance KPIs.</summary>
 public sealed record GovernanceKpis(

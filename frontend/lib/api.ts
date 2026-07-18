@@ -2359,6 +2359,7 @@ export const api = {
           providerCostPerReport: number;
           turnaroundTimeImpact: number;
           avgQualityScore: number | null;
+          reportsPerHour: number;
         };
         governance: {
           unapprovedPromptUsage: number;

@@ -32,6 +32,7 @@ const SAMPLE_SUMMARY = {
     providerCostPerReport: 0.0234,
     turnaroundTimeImpact: 45,
     avgQualityScore: 82,
+    reportsPerHour: 6.2,
   },
   governance: {
     unapprovedPromptUsage: 0,
