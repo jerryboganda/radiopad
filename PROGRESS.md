@@ -52,6 +52,16 @@
   `TenantLexicon` (rows with a replacement, longest-first) into `CorrectionRule[]` applied by the
   §5.2 pass-through BEFORE the LLM; wired through `DictationDraftService` + the `/dictation/draft`
   endpoint.
+- **Phase 3 regulated-feature gating (OFF by default)** — the assist-only capabilities
+  (auto-impression, critical-finding flagging, follow-up standardisation, interval/RECIST tracking)
+  are now gated behind an explicit, fail-safe opt-in. Backend `RegulatedFeatures`
+  (Application/Governance): enum + catalog + `IsEnabled(featureFlagsJson, feature)` / `Describe(...)`,
+  flags under the `regulated.` prefix in `Tenant.FeatureFlagsJson`, absent/false/malformed → OFF
+  (6 xUnit tests). Frontend `lib/regulatedFeatures.ts` mirrors the catalog (parse/toggle helpers,
+  6 tests) and the tenant **Settings** admin page gains a "Regulated AI features" panel — a
+  prominent "Regulatory review required" note, per-feature toggles (off by default), persisted via
+  the existing settings Save. Nothing here auto-signs. Runtime gating of each capability's behaviour
+  builds on this enforcement point.
 - **F12 free-text NL editing (custom rewrite)** — the radiologist types an instruction ("make the
   impression concise and add a 6-month follow-up") and the model edits the report. Backend
   `ReportRewriteMode.Custom` with a tightly-bounded prompt (treats the untrusted instruction as an

@@ -142,18 +142,25 @@ public class UbagProviderAdapterTests
     }
 
     [Fact]
-    public async Task ProbeAsync_No_Context_ReturnsContextNotFound()
+    public async Task ProbeAsync_No_Context_TreatedAsListed_ReturnsOkTrue()
     {
+        // Regression (operator report 2026-07-19): an absent browser context is NOT a
+        // failure. The vps-local executor drives working targets without ever
+        // registering /v1/browser/contexts, and /v1/targets carries no readiness, so
+        // "no context row" means "no explicit login signal" — the probe must report the
+        // listed target as ready (same doctrine as MergeTargetReadiness), NOT surface a
+        // bogus context_not_found that shows "Unavailable" for a working primary.
         using var env = EnvVarScope.Set("RADIOPAD_UBAG_ALLOWED_TARGETS", "gemini_web");
         var fake = new FakeUbagClient(
-            targets: new[] { new UbagTarget("gemini_web", "Gemini", "listed", false, null) },
+            targets: new[] { new UbagTarget("gemini_web", "Gemini", "listed", null, null) },
             contexts: Array.Empty<UbagBrowserContext>());
         var adapter = new UbagProviderAdapter(fake);
 
         var result = await adapter.ProbeAsync(Provider("gemini_web"), default);
 
-        Assert.False(result.Ok);
-        Assert.Contains("context_not_found:gemini_web", result.Error);
+        Assert.True(result.Ok);
+        Assert.Null(result.Error);
+        Assert.Equal("gemini_web", result.Runtime);
     }
 
     [Fact]

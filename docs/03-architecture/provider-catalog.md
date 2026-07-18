@@ -34,7 +34,7 @@ Production CLI providers require `RADIOPAD_CLI_PROVIDER_ALLOWED_PATHS`; empty/un
 - Local providers probe their metadata endpoints (`/api/tags`, `/v1/models`, or `/health`).
 - `openai-compatible` probes `GET /v1/models` without bearer auth and blocks unsafe endpoint targets before the request.
 - CLI providers verify the configured binary without passing a prompt.
-- `ubag` prefers UBAG `GET /v1/ready` (full readiness: job store, executor, artifact store, webhook outbox) plus target readiness without sending a prompt; it falls back to `/v1/health` only when the gateway answers 404/405 (older gateways).
+- `ubag` prefers UBAG `GET /v1/ready` (full readiness: job store, executor, artifact store, webhook outbox) plus target readiness without sending a prompt; it falls back to `/v1/health` only when the gateway answers 404/405 (older gateways). An **absent** `/v1/browser/contexts` row is treated as "ready, no explicit login signal" — NOT a failure: the vps-local executor drives working targets without registering contexts, so the probe reports the listed target ready and only an explicit context row can downgrade it to `login_required` (fix 2026-07-19; previously surfaced a bogus `context_not_found` that showed working primaries as "Unavailable").
 
 ## UBAG Guardrails
 
@@ -47,6 +47,7 @@ component that may call UBAG; the frontend never stores UBAG auth material.
 - The ordered workflow is configurable via `RADIOPAD_UBAG_ORDERED_TARGETS`; the code default is `gemini_web,deepseek_web` (`chatgpt_web` is not included by default).
 - The UBAG adapter (report-text path) is `PhiApproved` (operator decision 2026-06-27): the AiGateway compliance class gates it and only de-identified report text is routed, so the adapter itself no longer rejects PHI. Only the Hub endpoints (`POST /api/ubag/jobs` etc.) apply PHI/secret heuristics to raw operator prompts; secret-shaped prompts are rejected everywhere.
 - Operator login, CAPTCHA, 2FA, consent, cookie, and credential handling remain manual inside UBAG Browser Sessions.
+- **Auto-discovery / sync:** `UbagProviderDiscoveryService` materialises a provider row for **every allowed catalog target** the gateway lists (bounded by `RADIOPAD_UBAG_ALLOWED_TARGETS`), regardless of whether a login signal is available — so all UBAG web models (e.g. `chatgpt_web`) appear in the picker automatically without operator config. A freshly discovered row defaults `Enabled=ON` and relies on failure-based alerting; only an **explicit** logged-out signal from `/v1/browser/contexts` starts it disabled (fix 2026-07-19; the old code required an explicit `authenticated` signal that vps-local gateways never emit, so non-pinned targets like ChatGPT never surfaced). Curated primaries `gemini_web`/`deepseek_web` remain DevSeed-owned.
 
 ## Adding A Provider
 

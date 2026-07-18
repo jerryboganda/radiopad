@@ -153,17 +153,39 @@ public class UbagProviderDiscoveryServiceTests
     }
 
     [Fact]
-    public async Task No_signal_non_pinned_target_is_not_materialised()
+    public async Task No_signal_allowed_target_is_materialised_enabled()
     {
-        // Materialisation still requires an EXPLICIT authenticated signal — silence
-        // neither creates picker rows nor flips existing ones.
+        // Operator report 2026-07-19: chatgpt_web is an ALLOWED catalog target but the
+        // vps-local gateway reports no readiness (Ready=null) and no browser context, so
+        // it never surfaced in the picker. Auto-sync must materialise every allowed
+        // target the gateway lists even with no login signal, defaulting Enabled=ON
+        // (the failure-based alert path covers a dead session), so all UBAG web models
+        // appear automatically.
         using var db = CreateDb();
         var client = new FakeClient(
             targets: new[] { new UbagTarget("chatgpt_web", "ChatGPT Web", "listed", null, null) },
             contexts: Array.Empty<UbagBrowserContext>());
 
-        Assert.Equal(0, await Service(db, client).SyncAsync(Tenant, default));
-        Assert.False(await db.Providers.AnyAsync(p => p.Model == "chatgpt_web"));
+        Assert.Equal(1, await Service(db, client).SyncAsync(Tenant, default));
+        var row = await db.Providers.SingleAsync(p => p.Model == "chatgpt_web");
+        Assert.Equal("UBAG (ChatGPT Web)", row.Name);
+        Assert.True(row.Enabled);
+    }
+
+    [Fact]
+    public async Task Explicitly_logged_out_allowed_target_is_materialised_disabled()
+    {
+        // The one case that still starts a freshly discovered row OFF: the gateway gave
+        // an EXPLICIT logged-out signal. The model is still visible (so the operator
+        // knows it exists) but not selectable until they log in.
+        using var db = CreateDb();
+        var client = new FakeClient(
+            targets: new[] { new UbagTarget("chatgpt_web", "ChatGPT Web", "listed", false, null) },
+            contexts: new[] { new UbagBrowserContext("chatgpt_web", "login_required") });
+
+        Assert.Equal(1, await Service(db, client).SyncAsync(Tenant, default));
+        var row = await db.Providers.SingleAsync(p => p.Model == "chatgpt_web");
+        Assert.False(row.Enabled);
     }
 
     [Fact]

@@ -82,8 +82,18 @@ public sealed class UbagProviderAdapter : IAiProviderAdapter, IAiProviderHealthP
 
             var contexts = await _client.ListBrowserContextsAsync(cancellationToken);
             var ctx = contexts.FirstOrDefault(c => string.Equals(c.TargetId, target, StringComparison.OrdinalIgnoreCase));
+            // An ABSENT browser context is NOT a failure — same doctrine as
+            // MergeTargetReadiness. The vps-local executor drives live browser
+            // profiles without ever registering a /v1/browser/contexts row, and the
+            // 2026-05-22 /v1/targets shape carries no readiness field, so "no context"
+            // means "no explicit login signal", not "logged out". Reporting
+            // context_not_found here made every WORKING primary (gemini_web,
+            // deepseek_web, …) show "Unavailable: context_not_found:…" in the picker's
+            // connection test even while jobs succeeded (operator report, 2026-07-19).
+            // The target is listed and health is OK, so report ready; only an EXPLICIT
+            // context row may downgrade that to login_required.
             if (ctx is null)
-                return new AiProviderHealthResult(false, $"context_not_found:{target}", Runtime: target);
+                return new AiProviderHealthResult(true, null, Note: match.Status, Runtime: target);
             if (ctx.Authenticated)
                 return new AiProviderHealthResult(true, null, Note: ctx.LoginState, Runtime: target);
             return new AiProviderHealthResult(false, $"login_required:{target}", Note: ctx.LoginState, Runtime: target);

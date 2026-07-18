@@ -1,6 +1,11 @@
 'use client';
 
 import { useEffect, useState } from 'react';
+import {
+  REGULATED_FEATURES,
+  isRegulatedEnabled,
+  setRegulatedFlag,
+} from '@/lib/regulatedFeatures';
 import { api, PLAN_LABELS, publicEnv } from '@/lib/api';
 import { isAuthError, useAuthSession } from '@/lib/useAuthSession';
 import SignInRequired from '@/components/ui/SignInRequired';
@@ -424,6 +429,51 @@ export default function SettingsPage() {
               </span>
             </div>
           </details>
+
+          {/* ---------- Regulated AI features (Phase 3) ---------- */}
+          <div className="rp-panel rp-anim-fade-in-up">
+            <div className="rp-panel-title">Regulated AI features</div>
+            <div role="note" className="text-warning" style={{ fontSize: 13, marginBottom: 12 }}>
+              <strong>Regulatory review required.</strong> These are assist-only, suggestion-based
+              capabilities built on developer models that are <em>not</em> cleared medical devices.
+              They ship <strong>off</strong> and stay off until your organisation has completed the
+              appropriate UKCA / MHRA / CE / FDA review. Nothing here ever auto-signs a report.
+            </div>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+              {REGULATED_FEATURES.map((f) => {
+                const on = isRegulatedEnabled(s.featureFlagsJson, f.key);
+                return (
+                  <label
+                    key={f.key}
+                    className="rp-card"
+                    style={{ display: 'flex', alignItems: 'flex-start', gap: 12, padding: '12px 14px', cursor: 'pointer' }}
+                  >
+                    <input
+                      type="checkbox"
+                      checked={on}
+                      onChange={(e) =>
+                        setS({ ...s, featureFlagsJson: setRegulatedFlag(s.featureFlagsJson, f.key, e.target.checked) })
+                      }
+                      style={{ marginTop: 3 }}
+                      aria-label={f.title}
+                    />
+                    <span style={{ flex: 1 }}>
+                      <span style={{ display: 'block', fontWeight: 600 }}>
+                        {f.title}
+                        <span className="badge" style={{ marginLeft: 8 }}>
+                          {on ? 'Enabled' : 'Off — review required'}
+                        </span>
+                      </span>
+                      <span className="rp-page-sub">{f.description}</span>
+                    </span>
+                  </label>
+                );
+              })}
+            </div>
+            <p className="rp-page-sub" style={{ marginTop: 10 }}>
+              Changes take effect after <strong>Save changes</strong> below.
+            </p>
+          </div>
 
           {/* ---------- Developer features (very advanced) ---------- */}
           <details className="rp-panel rp-anim-fade-in-up">

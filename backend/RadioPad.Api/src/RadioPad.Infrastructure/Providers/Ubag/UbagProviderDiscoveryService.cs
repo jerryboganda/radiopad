@@ -18,11 +18,14 @@ namespace RadioPad.Infrastructure.Providers.Ubag;
 /// change, no manual provider config, no developer involvement.
 ///
 /// Curated primaries (<see cref="Pinned"/> = gemini_web, deepseek_web) are owned by
-/// <c>DevSeed</c> and never touched here. Every OTHER catalog target is auto-managed:
-/// a row is materialised the first time the target is authenticated, and its
-/// <see cref="ProviderConfig.Enabled"/> flag then mirrors the live login state
-/// (logged in → selectable; logged out → hidden), so the picker always reflects what
-/// the operator can actually use right now.
+/// <c>DevSeed</c> and never touched here. Every OTHER allowed catalog target is
+/// auto-managed: a row is materialised as soon as the gateway lists the target (bounded
+/// by the operator allow-list), regardless of whether a login signal is available — the
+/// vps-local executor drives working targets without ever registering a browser context,
+/// so requiring an explicit "authenticated" signal used to hide real models (e.g.
+/// chatgpt_web) from the picker forever. Its <see cref="ProviderConfig.Enabled"/> flag
+/// then mirrors the live login state WHEN the gateway reports one (logged out → disabled;
+/// logged back in → re-enabled); with no signal the row stays as the operator left it.
 /// </summary>
 public sealed class UbagProviderDiscoveryService
 {
@@ -150,10 +153,18 @@ public sealed class UbagProviderDiscoveryService
 
             if (row is null)
             {
-                // Only materialise a row once the operator has actually logged in, so
-                // the picker isn't cluttered with every theoretical web AI the gateway
-                // could drive. (An explicit TRUE is required — "no signal" stays hidden.)
-                if (t.Ready != true) continue;
+                // Materialise a row for EVERY allowed catalog target so the operator
+                // sees all their UBAG web models automatically — not just ones the
+                // gateway happens to report a login signal for. The 2026-05-22 gateway
+                // carries no readiness on /v1/targets and vps-local executors register
+                // no browser contexts (Ready=null), so the old "require Ready==true"
+                // gate hid real, working targets — e.g. chatgpt_web — from the picker
+                // forever (operator report, 2026-07-19). The operator allow-list
+                // (RADIOPAD_UBAG_ALLOWED_TARGETS, checked above) already bounds WHICH
+                // targets may appear, so this never floods the picker. Enabled mirrors
+                // the login signal WHEN there is one; "no signal" (null) defaults ON and
+                // relies on the failure-based alert path, exactly like the curated
+                // primaries. Only an EXPLICIT logged-out signal starts the row disabled.
                 _db.Providers.Add(new ProviderConfig
                 {
                     TenantId = tenantId,
@@ -161,7 +172,7 @@ public sealed class UbagProviderDiscoveryService
                     Adapter = UbagProviderAdapter.AdapterId,
                     Model = t.Id,
                     Compliance = UbagProviderAdapter.DefaultComplianceClass,
-                    Enabled = true,
+                    Enabled = t.Ready != false,
                     // Conservative default quality so a freshly discovered provider does
                     // not outrank the curated primaries until a human grades it.
                     Quality = 0.5m,
