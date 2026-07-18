@@ -413,6 +413,18 @@ public sealed class UbagProviderDiscoveryHostedService : BackgroundService
                         && a.DetailsJson.Contains("ubag_login_lost"))
                     .Select(a => new { a.DetailsJson, a.CreatedAt })
                     .ToListAsync(stoppingToken);
+                // Only rehydrate targets whose provider rows are actually DISABLED —
+                // the row is the durable outage signal. Audit rows written by the
+                // pre-tri-state code (false logged-out events) or from an outage the
+                // operator has since resolved must not resurrect stale Hub banners
+                // over providers that are enabled and serving.
+                var stillDisabled = new HashSet<string>(
+                    await db.Providers
+                        .Where(p => p.Adapter == UbagProviderAdapter.AdapterId && !p.Enabled && p.Model != null)
+                        .Select(p => p.Model!)
+                        .Distinct()
+                        .ToListAsync(stoppingToken),
+                    StringComparer.OrdinalIgnoreCase);
                 var rehydrated = 0;
                 foreach (var group in rows
                     .Select(r => new
@@ -421,7 +433,7 @@ public sealed class UbagProviderDiscoveryHostedService : BackgroundService
                             .RootElement.TryGetProperty("target", out var t) ? t.GetString() : null,
                         r.CreatedAt,
                     })
-                    .Where(r => !string.IsNullOrWhiteSpace(r.Target))
+                    .Where(r => !string.IsNullOrWhiteSpace(r.Target) && stillDisabled.Contains(r.Target!))
                     .GroupBy(r => r.Target!, StringComparer.OrdinalIgnoreCase))
                 {
                     alerts.RehydrateLoginLost(
