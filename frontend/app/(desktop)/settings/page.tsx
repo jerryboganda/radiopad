@@ -16,6 +16,7 @@ import {
   ArrowRight,
   Sparkles,
   SpellCheck,
+  Type,
 } from 'lucide-react';
 import Container from '@/components/shell/Container';
 import PageHeader from '@/components/shell/PageHeader';
@@ -192,6 +193,19 @@ export default function SettingsPage() {
           <span style={{ flex: 1 }}>
             <span style={{ display: 'block', fontWeight: 600 }}>Dictation corrections</span>
             <span className="rp-page-sub">Your personal spoken-word fixes, applied before formatting.</span>
+          </span>
+          <ArrowRight size={15} strokeWidth={1.8} aria-hidden className="text-ink-soft" />
+        </Link>
+
+        <Link
+          href="/settings/snippets"
+          className="rp-card"
+          style={{ display: 'flex', alignItems: 'center', gap: 12, textDecoration: 'none' }}
+        >
+          <Type size={18} strokeWidth={1.8} aria-hidden className="text-accent" />
+          <span style={{ flex: 1 }}>
+            <span style={{ display: 'block', fontWeight: 600 }}>Snippets</span>
+            <span className="rp-page-sub">Autotext shortcuts with tab-through fill-in fields.</span>
           </span>
           <ArrowRight size={15} strokeWidth={1.8} aria-hidden className="text-ink-soft" />
         </Link>
