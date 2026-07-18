@@ -3,8 +3,10 @@ namespace RadioPad.Infrastructure.Providers.Local;
 /// <summary>The class of local model — drives grouping in the manager UI.</summary>
 public enum ModelKind { Stt, Tts, Orchestrator }
 
-/// <summary>How a model is packaged on its download URL.</summary>
-public enum ModelArchiveKind { TarBz2, RawFile }
+/// <summary>How a model is packaged on its download URL. <see cref="MedAsrCtc"/> is the two-raw-file
+/// sherpa-onnx CTC bundle (model.int8.onnx + tokens.txt) provisioned via
+/// <c>SttModelProvisioner.EnsureMedAsrAsync</c>.</summary>
+public enum ModelArchiveKind { TarBz2, RawFile, MedAsrCtc }
 
 /// <summary>
 /// How an entry is provisioned + run. Distinguishes the hosted-file engines
@@ -92,9 +94,28 @@ public sealed class LocalModelCatalog : ILocalModelCatalog
         var parakeet = LocalSttModels.Parakeet;
         return new List<LocalModelDescriptor>
         {
+            // MedASR (Google Conformer-CTC, radiology-tuned ~4.6% WER) — the DEFAULT primary
+            // on-device engine (D2), via the public/ungated sherpa-onnx CTC bundle (two raw files:
+            // model.int8.onnx + tokens.txt). Auto-provisioned on first run; runs on the same
+            // sherpa-onnx CPU runtime as Parakeet. Pinned in LocalSttModels (verified, HF gated:false).
+            new(
+                Id: LocalSttModels.MedAsrModelName,
+                DisplayName: "MedASR (radiology) — primary speech-to-text",
+                Kind: ModelKind.Stt,
+                Engine: SherpaMedAsrSttClient.EngineName, // "medasr"
+                DownloadUrl: LocalSttModels.MedAsrModel.Url,
+                Sha256: LocalSttModels.MedAsrModel.Sha256,
+                SizeBytes: LocalSttModels.MedAsrModel.SizeBytes,
+                License: "HAI-DEF",
+                ArchiveKind: ModelArchiveKind.MedAsrCtc,
+                FileName: LocalSttModels.MedAsrModel.FileName,
+                Placeholder: false,
+                Provisioning: ModelProvisioning.HostedFile,
+                Note: "Radiology-tuned on-device speech-to-text (~160 MB). Runs fully on-device — audio never leaves the workstation."),
+
             new(
                 Id: parakeet.Name,
-                DisplayName: "Parakeet TDT 0.6B v3 — primary speech-to-text",
+                DisplayName: "Parakeet TDT 0.6B v3 — speech-to-text (alternative)",
                 Kind: ModelKind.Stt,
                 Engine: SherpaParakeetSttClient.EngineName, // "parakeet"
                 DownloadUrl: parakeet.Url,

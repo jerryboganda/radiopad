@@ -75,6 +75,7 @@ public sealed class SttModelProvisioner
                     desc.Id,
                     desc.FileName ?? throw new InvalidOperationException("raw-file model requires a file name"),
                     desc.DownloadUrl, desc.SizeBytes, desc.Sha256), ct),
+            ModelArchiveKind.MedAsrCtc => EnsureMedAsrAsync(ct),
             _ => Task.FromResult(false),
         };
     }

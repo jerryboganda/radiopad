@@ -28,11 +28,26 @@ public class LocalModelCatalogTests
     }
 
     [Fact]
-    public void Catalog_Surfaces_Future_Kinds_As_Placeholders()
+    public void Catalog_Surfaces_Tts_As_Placeholder_And_MedGemma_As_A_Real_Orchestrator()
     {
         var cat = new LocalModelCatalog();
+        // TTS is still a roadmap placeholder.
         Assert.Contains(cat.All, m => m.Kind == ModelKind.Tts && m.Placeholder);
-        Assert.Contains(cat.All, m => m.Kind == ModelKind.Orchestrator && m.Placeholder);
+        // The orchestrator kind is now a REAL model (MedGemma), not a placeholder.
+        Assert.Contains(cat.All, m => m.Kind == ModelKind.Orchestrator && !m.Placeholder);
+    }
+
+    [Fact]
+    public void Catalog_Lists_MedAsr_As_The_Primary_Stt_Engine()
+    {
+        var cat = new LocalModelCatalog();
+        var medasr = cat.ById(LocalSttModels.MedAsrModelName);
+        Assert.NotNull(medasr);
+        Assert.Equal(ModelKind.Stt, medasr!.Kind);
+        Assert.Equal(SherpaMedAsrSttClient.EngineName, medasr.Engine);
+        Assert.Equal(ModelArchiveKind.MedAsrCtc, medasr.ArchiveKind);
+        Assert.False(medasr.Placeholder);
+        Assert.Equal(LocalSttModels.MedAsrModel.Sha256, medasr.Sha256);
     }
 
     [Fact]
