@@ -51,7 +51,13 @@
 - **§6/F7 org correction dictionary** (`Dictation/CorrectionDictionary.cs`): resolves the tenant
   `TenantLexicon` (rows with a replacement, longest-first) into `CorrectionRule[]` applied by the
   §5.2 pass-through BEFORE the LLM; wired through `DictationDraftService` + the `/dictation/draft`
-  endpoint. Per-user personal-override layer is the remaining F7 piece (needs its own store).
+  endpoint.
+- **§6/F7b per-user correction dictionary** — the personal-override layer: `UserCorrection` entity
+  + `AddUserCorrections` migration, `UserCorrectionsController` (GET/POST-upsert/DELETE,
+  `ReportsEdit`), and `CorrectionDictionary.Resolve(org, user)` where the user's entry wins for the
+  same term (longest-first). Now surfaced end-to-end: **Settings → Dictation corrections**
+  (`app/(desktop)/settings/corrections`) with the `userCorrections` api client and the pure
+  `lib/userCorrections.ts` validators (13 tests: 9 helper + 4 page).
 
 - **§2.2 optional local MedGemma formatter path** — MedGemma Q4_K_M GGUF **pinned + verified** in
   `LocalModelCatalog` (`unsloth/medgemma-1.5-4b-it-Q4_K_M.gguf`, real URL/SHA-256/size,
@@ -71,8 +77,7 @@
 - **MedASR** STT engine + catalog descriptor — blocked: `google/medasr` is gated (HAI-DEF token
   needed for download) and PyTorch (needs an ONNX/CT2 export prototype at build time).
 - Streaming decode + hold-to-talk PTT + rebindable hotkey (Rust/frontend); thread the encrypted
-  `FileDictationAuditStore` + key management + `patientSex` on the desktop; per-user correction layer
-  (F7b, needs a migration).
+  `FileDictationAuditStore` + key management + `patientSex` on the desktop.
 
 ---
 

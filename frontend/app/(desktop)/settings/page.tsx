@@ -15,6 +15,7 @@ import {
   ShieldCheck,
   ArrowRight,
   Sparkles,
+  SpellCheck,
 } from 'lucide-react';
 import Container from '@/components/shell/Container';
 import PageHeader from '@/components/shell/PageHeader';
@@ -182,6 +183,19 @@ export default function SettingsPage() {
 
       {/* ── More settings ──────────────────────────────────────────── */}
       <div className="rp-grid-2 rp-anim-fade-in-up">
+        <Link
+          href="/settings/corrections"
+          className="rp-card"
+          style={{ display: 'flex', alignItems: 'center', gap: 12, textDecoration: 'none' }}
+        >
+          <SpellCheck size={18} strokeWidth={1.8} aria-hidden className="text-accent" />
+          <span style={{ flex: 1 }}>
+            <span style={{ display: 'block', fontWeight: 600 }}>Dictation corrections</span>
+            <span className="rp-page-sub">Your personal spoken-word fixes, applied before formatting.</span>
+          </span>
+          <ArrowRight size={15} strokeWidth={1.8} aria-hidden className="text-ink-soft" />
+        </Link>
+
         <Link
           href="/settings/hotkeys"
           className="rp-card"

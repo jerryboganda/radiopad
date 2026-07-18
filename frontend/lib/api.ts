@@ -1813,6 +1813,22 @@ export const api = {
       return (await res.json()) as { upserts: number; removed: number };
     },
   },
+  /**
+   * F7 (dictation brief §6) — the signed-in radiologist's personal correction dictionary.
+   * Deterministic find→replace applied BEFORE the LLM and layered over the org lexicon (the
+   * user's entry wins for the same term). Backend: `UserCorrectionsController`, upserts on `from`.
+   */
+  userCorrections: {
+    list: () => request<{ id: string; from: string; to: string }[]>('/api/user-corrections'),
+    /** Add or update a personal correction (idempotent on the source term). */
+    save: (body: { from: string; to: string }) =>
+      request<{ id: string; from: string; to: string }>('/api/user-corrections', {
+        method: 'POST',
+        body: JSON.stringify(body),
+      }),
+    delete: (id: string) =>
+      request<void>(`/api/user-corrections/${id}`, { method: 'DELETE' }),
+  },
   tenant: {
     settings: {
       get: () =>
