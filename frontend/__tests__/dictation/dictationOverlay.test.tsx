@@ -130,6 +130,52 @@ describe('DictationOverlay', () => {
     expect(insertAtCursor).toHaveBeenCalledWith('Delete the prior comparison');
   });
 
+  it('press-and-hold the mic dictates only while held (P0.3 push-to-talk)', () => {
+    const nowSpy = vi.spyOn(Date, 'now');
+    let t = 1000;
+    nowSpy.mockImplementation(() => t);
+    try {
+      render(<DictationOverlay />);
+      const fab = screen.getByTestId('dictation-fab');
+
+      fireEvent.pointerDown(fab, { pointerId: 1 });
+      expect(rec.start).toHaveBeenCalledTimes(1); // capture begins on press
+      expect(fab).toHaveAttribute('aria-pressed', 'true');
+
+      t = 1600; // held well past the tap/hold threshold
+      fireEvent.pointerUp(fab, { pointerId: 1 });
+      expect(rec.stop).toHaveBeenCalledTimes(1); // release ends it
+      expect(fab).toHaveAttribute('aria-pressed', 'false');
+    } finally {
+      nowSpy.mockRestore();
+    }
+  });
+
+  it('a quick pointer tap toggles listening on, then off (P0.3)', () => {
+    const nowSpy = vi.spyOn(Date, 'now');
+    let t = 1000;
+    nowSpy.mockImplementation(() => t);
+    try {
+      render(<DictationOverlay />);
+      const fab = screen.getByTestId('dictation-fab');
+
+      // Tap on.
+      fireEvent.pointerDown(fab, { pointerId: 1 });
+      fireEvent.pointerUp(fab, { pointerId: 1 }); // same instant → a tap
+      expect(rec.start).toHaveBeenCalledTimes(1);
+      expect(fab).toHaveAttribute('aria-pressed', 'true');
+
+      // Tap off.
+      t = 1100;
+      fireEvent.pointerDown(fab, { pointerId: 1 });
+      fireEvent.pointerUp(fab, { pointerId: 1 });
+      expect(rec.stop).toHaveBeenCalledTimes(1);
+      expect(fab).toHaveAttribute('aria-pressed', 'false');
+    } finally {
+      nowSpy.mockRestore();
+    }
+  });
+
   it('asks the host page to clean the dictation when Fix is pressed', () => {
     render(<DictationOverlay />);
     const onCleanup = vi.fn();

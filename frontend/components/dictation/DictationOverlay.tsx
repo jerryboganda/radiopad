@@ -16,7 +16,7 @@
 // (Windows Speech / Parakeet). The "Fix" button asks the host page to
 // clean the dictation into medical phrasing via UBAG.
 
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { startFocusTracking, getLastFocusedEditable } from '@/lib/dictation/focusTracker';
 import { insertAtCursor } from '@/lib/dictation/insertText';
 import { getLastFocusedSectionEditor } from '@/lib/editor/sectionEditorRegistry';
@@ -24,6 +24,7 @@ import { setSessionAudio } from '@/lib/dictation/audioBuffer';
 import { useCrossCheckEnabled, useUseUbag } from '@/lib/dictation/crossCheckPrefs';
 import { formatDictation } from '@/lib/dictation/medicalFormat';
 import { parseVoiceEditCommand } from '@/lib/dictation/voiceEditCommands';
+import { createPushToTalk } from '@/lib/dictation/pushToTalk';
 import { blobToWav16kMono } from '@/lib/dictation/wavEncode';
 import {
   getSpeechRecognitionCtor,
@@ -222,6 +223,13 @@ export default function DictationOverlay() {
     if (listeningRef.current) stop();
     else start();
   }, [start, stop]);
+
+  // P0.3 — hold-to-talk push-to-talk, coexisting with tap-to-toggle. A quick tap toggles
+  // hands-free listening; pressing and holding the mic dictates only while held.
+  const ptt = useMemo(
+    () => createPushToTalk({ isActive: () => listeningRef.current, start, stop }),
+    [start, stop],
+  );
 
   const transcribeAudio = useCallback(async (blob: Blob) => {
     const reportId = readQueryParam('id');
@@ -501,7 +509,22 @@ export default function DictationOverlay() {
           title={title}
           disabled={!supported}
           onMouseDown={(e) => e.preventDefault()}
-          onClick={toggle}
+          onPointerDown={(e) => {
+            e.preventDefault();
+            // Capture the pointer so a release that drifts off the button still ends push-to-talk.
+            try {
+              e.currentTarget.setPointerCapture(e.pointerId);
+            } catch {
+              /* jsdom / unsupported — release is handled by onPointerUp on the button */
+            }
+            ptt.pointerDown();
+          }}
+          onPointerUp={() => ptt.pointerUp()}
+          onPointerCancel={() => ptt.pointerUp()}
+          // Pointer taps are handled above; onClick only toggles for keyboard (Enter/Space).
+          onClick={() => {
+            if (!ptt.claimClick()) toggle();
+          }}
         >
           <span className="rp-dictation-dot" aria-hidden="true" />
           <span className="rp-dictation-label">{listening ? 'Listening…' : 'Dictate'}</span>
