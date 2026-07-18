@@ -52,6 +52,13 @@
   `TenantLexicon` (rows with a replacement, longest-first) into `CorrectionRule[]` applied by the
   §5.2 pass-through BEFORE the LLM; wired through `DictationDraftService` + the `/dictation/draft`
   endpoint.
+- **F5 auto-comparison statement** — `lib/comparisonStatement.ts` (`buildComparisonStatement`)
+  composes a conventional "Compared to the prior <body part> study dated <date>." sentence from the
+  most-recent prior (`/compare-prior`), with deterministic UTC date formatting. Surfaced in the
+  `PriorComparePanel` as an insertable suggestion: **Insert into Comparison** drops it into the
+  Comparison section editor (`getSectionEditor('comparison').insertAtCursor`), clipboard fallback
+  otherwise. Deterministic + safety-guarded: it references the study + date only and invents no
+  interval change. 9 tests (7 helper + 2 panel).
 - **F2 template normal-values ("start from normal")** — each template section gains an optional
   `normal` (default body), authored in the template editor (a per-section textarea). A new **Use**
   action on the templates page creates a report that pins the template (feeds template-usage

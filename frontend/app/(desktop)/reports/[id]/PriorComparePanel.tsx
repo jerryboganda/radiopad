@@ -16,7 +16,9 @@ import Banner from '@/components/ui/Banner';
 import StatusBadge from '@/components/ui/StatusBadge';
 import Skeleton from '@/components/ui/Skeleton';
 import EmptyState from '@/components/ui/EmptyState';
-import { GitCompareArrows, Link as LinkIcon } from 'lucide-react';
+import { GitCompareArrows, Link as LinkIcon, Plus, Check } from 'lucide-react';
+import { getSectionEditor } from '@/lib/editor/sectionEditorRegistry';
+import { buildComparisonStatement } from '@/lib/comparisonStatement';
 
 type Props = {
   reportId: string;
@@ -43,6 +45,7 @@ export default function PriorComparePanel({ reportId }: Props) {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [syncScroll, setSyncScroll] = useState(true);
+  const [cmpState, setCmpState] = useState<'idle' | 'inserted' | 'copied'>('idle');
 
   const leftRef = useRef<HTMLDivElement | null>(null);
   const rightRef = useRef<HTMLDivElement | null>(null);
@@ -110,6 +113,22 @@ export default function PriorComparePanel({ reportId }: Props) {
 
   const changedCount = data.sections.filter((s) => s.changed).length;
 
+  // F5 — a conventional "Compared to …" sentence built from the prior's body part + date. It is
+  // deterministic (no invented interval change); the radiologist inserts it into Comparison and
+  // writes the actual comparison of findings themselves.
+  const comparison = buildComparisonStatement(data.prior);
+  function insertComparison() {
+    const editor = getSectionEditor('comparison');
+    if (editor) {
+      editor.focus();
+      editor.insertAtCursor(comparison);
+      setCmpState('inserted');
+    } else if (typeof navigator !== 'undefined' && navigator.clipboard?.writeText) {
+      void navigator.clipboard.writeText(comparison).then(() => setCmpState('copied')).catch(() => undefined);
+    }
+    window.setTimeout(() => setCmpState('idle'), 2500);
+  }
+
   return (
     <div className="rp-panel rp-priorcmp rp-anim-scale-in">
       <div className="rp-priorcmp-head">
@@ -134,6 +153,30 @@ export default function PriorComparePanel({ reportId }: Props) {
         Compared against report <code>{data.prior.id.slice(0, 8)}</code> from{' '}
         <code>{fmtDate(data.prior.createdAt)}</code>.
       </p>
+
+      {comparison && (
+        <div
+          className="rp-card"
+          style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '10px 14px', marginBottom: 12 }}
+        >
+          <span style={{ flex: 1 }}>
+            <span className="rp-page-sub" style={{ display: 'block' }}>Comparison statement</span>
+            <span style={{ fontWeight: 500 }}>{comparison}</span>
+          </span>
+          <button
+            type="button"
+            className="primary-ghost"
+            onClick={insertComparison}
+            style={{ display: 'inline-flex', alignItems: 'center', gap: 6, whiteSpace: 'nowrap' }}
+          >
+            {cmpState === 'idle' ? (
+              <><Plus size={14} strokeWidth={2} aria-hidden /> Insert into Comparison</>
+            ) : (
+              <><Check size={14} strokeWidth={2} aria-hidden /> {cmpState === 'copied' ? 'Copied' : 'Inserted'}</>
+            )}
+          </button>
+        </div>
+      )}
 
       <div className="rp-priorcmp-grid">
         <div className="rp-priorcmp-col">
