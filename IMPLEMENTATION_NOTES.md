@@ -4,7 +4,47 @@
 > §0.5/§10. Records pinned model versions, the MedASR deployment decision, safety-policy
 > changes, and open questions. Updated every phase.
 
-**Started:** 2026-07-18 · **Owner:** dictation-engine build · **Status:** Phase 0 in progress
+**Started:** 2026-07-18 · **Owner:** dictation-engine build · **Status:** Phases 0–3 substantially
+delivered; remaining work is externally blocked (model artifacts, Rust build) or a noted follow-up.
+Last desktop release: **v0.1.78** (auto-updater).
+
+---
+
+## 0. Delivered (running summary)
+
+The safety engine and the buildable competitive features are shipped, all TDD + committed per slice:
+
+- **§5 dictation safety engine** — §5.2 deterministic pass-through, §5.3 validation-diff (fail-safe
+  fallback), §5.4 GBNF grammar, §5.6 laterality/negation/gender sentinel, §5.7 encrypted on-device
+  audit; orchestrated by `DictationEngineService`; §4.4 memory manager; §4.2 draft endpoint + UI.
+- **F1** spoken-measurement formatting (TS port of §5.2, idempotent) · "scratch that" voice undo ·
+  spoken percent/slash punctuation.
+- **F2** template "normal" values — author per-section defaults, **Use** seeds a report from them,
+  Preview shows the normal body.
+- **F3** device-local snippets with tab-through `${field}` selection math + manager UI + textarea
+  insertion primitive. (In-editor ProseMirror trigger-on-type auto-expansion is the noted follow-up.)
+- **F4** measurement-sanity + findings/impression consistency (deterministic).
+- **F5** auto-comparison statement (deterministic; inserts into Comparison).
+- **F7a/F7b** org + per-user correction dictionaries (backend + management UI).
+- **F8** one-command Sign & Send · RIS-driven report priority.
+- **F9** patient-friendly summary (pre-existing, verified).
+- **F10** reports/hour KPI (+ AnalyticsService's first tests); template-usage pre-existing.
+- **F12** free-text custom rewrite, **hard-guarded by §5.3** so it cannot introduce an un-dictated
+  measurement/number/date; violations surfaced as an amber "Requires review" flag before Accept.
+- **P0.3 (partial)** hold-to-talk PTT (alongside tap-toggle) + in-app rebindable dictation hotkey
+  (all surfaces). System-wide/unfocused Rust rebind + streaming on-device decode still pending.
+- **Phase 3 gating** — `RegulatedFeatures` gate (OFF by default, fail-safe) + admin
+  "Regulated AI features" surface. See §5 below (now implemented, not just planned).
+
+### Still blocked / deferred (need artifacts, a Rust build, or a focused pass)
+- **P0.2 MedASR** — gated Conformer, no published sherpa bundle → needs a build-time ONNX-export
+  artifact + HAI-DEF license + HF token before a real (URL, SHA-256) descriptor can exist. Not
+  fabricated. Cloud STT stays primary (D1/D2).
+- **Local MedGemma runtime** — pin is verified (§2), but actually running it needs the
+  **llama-server binary bundled in CI**.
+- **P0.3 remainder** — Rust system-wide global-shortcut rebind (needs a Tauri build I can't
+  compile-verify) + true streaming/chunked on-device decode.
+- **F3 in-editor auto-expansion** — ProseMirror/Tiptap trigger-on-type + in-editor tab-through.
 
 ---
 
@@ -83,13 +123,16 @@ stubbed false). No GPU/VRAM assumed.
   MedGemma path is the no-PHI-to-cloud option); append-only audit via `IAuditLog.AppendAsync`;
   backend binds `127.0.0.1`; tenant isolation via `TenantedController.ResolveContextAsync`.
 
-## 5. ⚠️ Regulatory review required (Phase 3 — ships OFF by default)
+## 5. ⚠️ Regulatory review required (Phase 3 — ships OFF by default) — **GATE IMPLEMENTED**
 
 MedASR and MedGemma are Google **"developer models requiring validation," NOT cleared medical
 devices.** The following may constitute clinical decision support / a medical-device function
 (UKCA/MHRA, CE, FDA depending on market) and **require a regulatory/clinical-validation pathway
-before any clinical use.** Each ships behind an explicit OFF-by-default feature flag, fully audited,
-UI-labelled as assistive, and requiring explicit radiologist confirmation:
+before any clinical use.** The **gate is now built**: `RadioPad.Application.Governance.RegulatedFeatures`
+(enum + catalog + `IsEnabled`/`Describe`) reads `Tenant.FeatureFlagsJson` under the `regulated.`
+prefix — absent/false/malformed → **OFF** (fail safe) — and the tenant **Settings → Regulated AI
+features** admin panel surfaces the "Regulatory review required" note + per-feature toggles. Each
+capability ships OFF by default, and its runtime behaviour must consult `IsEnabled` before acting:
 
 - Auto-impression draft from dictated findings.
 - Actionable/critical-finding flagging (e.g. "?PE", "new mass") + communication workflow.
@@ -105,11 +148,19 @@ UI-labelled as assistive, and requiring explicit radiologist confirmation:
 
 ## 7. Open questions / to resolve at build time
 
-1. Exact `transformers` minimum release for MedASR (and whether a pinned GitHub commit is needed).
-2. MedASR ONNX/CT2 export fidelity vs the Python-sidecar fallback (D3) — prototype outcome.
-3. Exact MedGemma Q4_K_M GGUF artifact (URL + SHA-256 + size) to pin.
-4. CPU-only latency on the 2-core target for MedASR streaming + MedGemma formatting (benchmark).
+1. Exact `transformers` minimum release for MedASR (and whether a pinned GitHub commit is needed). **OPEN.**
+2. MedASR ONNX/CT2 export fidelity vs the Python-sidecar fallback (D3) — prototype outcome. **OPEN** (blocks P0.2).
+3. ~~Exact MedGemma Q4_K_M GGUF artifact (URL + SHA-256 + size) to pin.~~ **RESOLVED** — pinned in §2.
+4. CPU-only latency on the 2-core target for MedASR streaming + MedGemma formatting (benchmark). **OPEN.**
+5. **llama-server binary bundling in CI** — required for the local MedGemma path to actually run. **OPEN.**
 
 ## 8. Change log
 
 - **2026-07-18** — File created. Phase 0 started. Decisions D1–D6 locked; model specs verified.
+- **2026-07-18/19** — Delivered the §5 safety engine + orchestration + memory manager + encrypted
+  audit + draft UI; F1/F2/F3/F4/F5/F7a/F7b/F8/F9/F10/F12; Phase 3 gate + admin surface; P0.3
+  hold-to-talk PTT + in-app rebindable hotkey. See §0 for the full list and what remains blocked.
+  MedGemma GGUF pin resolved (§2). Desktop releases: **v0.1.76** (mid-session) → v0.1.77 (**failed**:
+  root `pnpm-lock.yaml` was out of sync with the ESLint devDeps added to `frontend/package.json`;
+  desktop-bundle installs `--frozen-lockfile` — no `latest.json` published, so nothing broken
+  reached users) → **v0.1.78** (lockfile regenerated + committed, re-cut).
