@@ -47,7 +47,11 @@ services:
       RADIOPAD_RATE_LIMIT_IP_PER_MIN: "600"
       RADIOPAD_RATE_LIMIT_TENANT_PER_MIN: "5000"
       RADIOPAD_CLI_PROVIDER_TIMEOUT_MS: ${RADIOPAD_CLI_PROVIDER_TIMEOUT_MS:-60000}
-      RADIOPAD_CLI_PROVIDER_ALLOWED_PATHS: ${RADIOPAD_CLI_PROVIDER_ALLOWED_PATHS:-}
+      # Gemini CLI provider binary is baked into the api image at /usr/local/bin/gemini
+      # (see api.Dockerfile). Default the pin + allowlist so production's default-deny
+      # CLI binary check permits it out of the box; override both via .secrets.env.
+      RADIOPAD_GEMINI_BIN: ${RADIOPAD_GEMINI_BIN:-/usr/local/bin/gemini}
+      RADIOPAD_CLI_PROVIDER_ALLOWED_PATHS: ${RADIOPAD_CLI_PROVIDER_ALLOWED_PATHS:-/usr/local/bin/gemini}
       RADIOPAD_CLI_PROVIDER_ENV_ALLOWLIST: ${RADIOPAD_CLI_PROVIDER_ENV_ALLOWLIST:-}
       RADIOPAD_CODEX_CLI_ENABLED: ${RADIOPAD_CODEX_CLI_ENABLED:-0}
       RADIOPAD_OPENAI_COMPATIBLE_ALLOW_PHI: ${RADIOPAD_OPENAI_COMPATIBLE_ALLOW_PHI:-0}

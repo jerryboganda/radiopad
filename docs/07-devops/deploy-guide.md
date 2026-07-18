@@ -61,7 +61,7 @@ All knobs are environment variables:
 | `OPENAI_COMPATIBLE_API_KEY` | optional | Example env var for `openai-compatible` providers. Tenants may choose any `env:NAME` reference. |
 | `RADIOPAD_GEMINI_BIN` / `RADIOPAD_CODEX_BIN` | optional | Override local CLI binaries for sandbox CLI providers. |
 | `RADIOPAD_CLI_PROVIDER_TIMEOUT_MS` | optional | Per-process timeout for CLI providers. Default `60000`. |
-| `RADIOPAD_CLI_PROVIDER_ALLOWED_PATHS` | required for production CLI providers | Semicolon-separated allowlist for CLI binaries. Missing production allowlists and unlisted binaries are blocked. |
+| `RADIOPAD_CLI_PROVIDER_ALLOWED_PATHS` | required for production CLI providers | Semicolon-separated allowlist for CLI binaries; must list the EXACT resolved binary path (matched against `RADIOPAD_GEMINI_BIN`). Missing production allowlists and unlisted binaries are blocked. The VPS compose defaults both this and `RADIOPAD_GEMINI_BIN` to `/usr/local/bin/gemini` (the gemini binary baked into the api image) so gemini-cli works out of the box. |
 | `RADIOPAD_CLI_PROVIDER_ENV_ALLOWLIST` | optional | Extra env vars passed to CLI subprocesses beyond OS basics. Keep minimal and provider-specific. |
 | `RADIOPAD_CODEX_CLI_ENABLED` | optional | Defaults `0`; must be `1` before `codex-cli` executes. |
 | `RADIOPAD_OPENAI_COMPATIBLE_ALLOW_PHI` | optional | Defaults `0`; set only after reviewed approval for a remote OpenAI-compatible PHI endpoint. |
