@@ -27,8 +27,21 @@ tsconfig.tsbuildinfo
 .cursor/
 .agents/
 .opencode/
-.claude/
 .codex/
+
+# Claude Code: track the SHARED team config so hooks/agents/commands/skills reach the
+# whole team (.claude/settings.json, .claude/agents/, .claude/commands/, .claude/skills/,
+# plus root-level hooks/ and .mcp.json). Keep only per-developer local overrides out of git.
+.claude/settings.local.json
+.claude/*.local.json
+
+# Most .claude/skills/ entries are per-developer symlinks into a local .agents/ library
+# (which is itself gitignored) and resolve only on the author's machine — never commit them.
+# Track only the repo-specific skills that live here as real files.
+.claude/skills/*
+!.claude/skills/ef-migration-helper/
+!.claude/skills/scaffold-radiopad-page/
+!.claude/skills/verify-both-themes/
 
 # Commander task scratchpad; keep local task notes out of git by default.
 .task/

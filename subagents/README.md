@@ -2,7 +2,10 @@
 
 Subagents are focused helper roles with their own context window. Use them to keep research, review, test execution, and implementation work scoped instead of filling the main session with every intermediate detail.
 
-This folder contains portable role definitions.
+This folder contains **portable** role definitions (the source of truth, runtime-agnostic).
+They are promoted into runnable Claude Code subagents at `.claude/agents/*.md` (committed), where
+each gets a real `tools:` allowlist and a `model:`. Edit a role here, then mirror the change into
+`.claude/agents/` so both stay in sync.
 
 ## Available Subagents
 
@@ -23,4 +26,7 @@ This folder contains portable role definitions.
 
 ## Runtime Notes
 
-If another agent runtime expects subagents in an ignored local directory, copy or symlink these definitions into that runtime locally. Do not commit `.claude/`, `.agents/`, `.opencode/`, or `.codex/` mirrors.
+These four roles are promoted to committed Claude Code subagents in `.claude/agents/`
+(`explorer`, `code-reviewer`, `test-runner`, `feature-dev`) — dispatch them with `@explorer`,
+`@code-reviewer`, etc., or let Claude auto-delegate. For other runtimes (`.agents/`, `.opencode/`,
+`.codex/` — still gitignored) copy or symlink these definitions in locally.

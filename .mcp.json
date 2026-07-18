@@ -1,0 +1,16 @@
+{
+  "$comment": "Project-scoped MCP servers for RadioPad, checked in so the whole team gets them. context7 needs no secret. github expands ${GITHUB_PAT} from your environment (fine-grained PAT for jerryboganda/radiopad: Actions:read, Contents:read, Pull requests+Issues:write) — export it in your shell; it is never committed. See AGENTS.md for the Serena + CodeGraph launch commands (they depend on your local install, so add them per-machine).",
+  "mcpServers": {
+    "context7": {
+      "type": "http",
+      "url": "https://mcp.context7.com/mcp"
+    },
+    "github": {
+      "type": "http",
+      "url": "https://api.githubcopilot.com/mcp/",
+      "headers": {
+        "Authorization": "Bearer ${GITHUB_PAT}"
+      }
+    }
+  }
+}
