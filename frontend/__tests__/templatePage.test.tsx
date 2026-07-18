@@ -13,6 +13,8 @@ const templatesSubmitMock = vi.fn();
 const templatesDeprecateMock = vi.fn();
 const templatesPreviewMock = vi.fn();
 const templatesUsageMock = vi.fn();
+const reportsCreateMock = vi.fn();
+const reportsPatchMock = vi.fn();
 
 vi.mock('@/lib/api', () => ({
   api: {
@@ -25,7 +27,16 @@ vi.mock('@/lib/api', () => ({
       preview: (...args: unknown[]) => templatesPreviewMock(...args),
       usage: (...args: unknown[]) => templatesUsageMock(...args),
     },
+    reports: {
+      create: (...args: unknown[]) => reportsCreateMock(...args),
+      patch: (...args: unknown[]) => reportsPatchMock(...args),
+    },
   },
+}));
+
+const routerPushMock = vi.fn();
+vi.mock('next/navigation', () => ({
+  useRouter: () => ({ push: (...args: unknown[]) => routerPushMock(...args) }),
 }));
 
 import TemplatesPage from '@/app/(desktop)/templates/page';
@@ -86,6 +97,48 @@ const SAMPLE_TEMPLATES = [
 describe('templates page', () => {
   beforeEach(() => {
     templatesListMock.mockReset();
+    reportsCreateMock.mockReset();
+    reportsPatchMock.mockReset();
+    routerPushMock.mockReset();
+  });
+
+  it('"Use" starts a report from the template, seeding normal section values (F2)', async () => {
+    templatesListMock.mockResolvedValue([
+      {
+        id: 'tpl-9',
+        templateId: 'ct_head_normal',
+        name: 'CT Head (normal)',
+        modality: 'CT',
+        bodyPart: 'Head',
+        subspecialty: 'Neuro',
+        sectionsJson: JSON.stringify({
+          sections: [
+            { id: 'technique', label: 'Technique', normal: 'Axial CT of the head without contrast.' },
+            { id: 'findings', label: 'Findings', normal: 'No acute intracranial abnormality.' },
+            { id: 'impression', label: 'Impression', normal: '' }, // empty → not seeded
+          ],
+        }),
+        updatedAt: '2026-01-01T00:00:00Z',
+        status: 1,
+      },
+    ]);
+    reportsCreateMock.mockResolvedValue({ id: 'rep-1' });
+    reportsPatchMock.mockResolvedValue({ id: 'rep-1' });
+
+    const { fireEvent } = await import('@testing-library/react');
+    render(<TemplatesPage />);
+    await waitFor(() => expect(screen.getByText('CT Head (normal)')).toBeInTheDocument());
+
+    fireEvent.click(screen.getByRole('button', { name: /^Use$/ }));
+
+    await waitFor(() =>
+      expect(reportsCreateMock).toHaveBeenCalledWith({ modality: 'CT', bodyPart: 'Head', templateId: 'tpl-9' }),
+    );
+    expect(reportsPatchMock).toHaveBeenCalledWith('rep-1', {
+      technique: 'Axial CT of the head without contrast.',
+      findings: 'No acute intracranial abnormality.',
+    });
+    await waitFor(() => expect(routerPushMock).toHaveBeenCalledWith('/reports/rep-1'));
   });
 
   it('template list renders with modality and body part', async () => {

@@ -52,6 +52,14 @@
   `TenantLexicon` (rows with a replacement, longest-first) into `CorrectionRule[]` applied by the
   §5.2 pass-through BEFORE the LLM; wired through `DictationDraftService` + the `/dictation/draft`
   endpoint.
+- **F2 template normal-values ("start from normal")** — each template section gains an optional
+  `normal` (default body), authored in the template editor (a per-section textarea). A new **Use**
+  action on the templates page creates a report that pins the template (feeds template-usage
+  analytics) and seeds the six canonical sections from their normals via
+  `lib/templateSeed.ts` (`sectionsToReportSeed` / `parseTemplateSections`, canonical-id mapping,
+  empty normals never blank a field), then opens the editor — the radiologist edits only the
+  exceptions. Nothing is auto-signed; seeded text is ordinary editable content. 11 tests
+  (6 helper + 5 page incl. the Use flow).
 - **P0.3 push-to-talk + rebindable hotkey (frontend)** — hold-to-talk added alongside
   tap-to-toggle on the mic (`lib/dictation/pushToTalk.ts`, deterministic tap/hold discriminator;
   keyboard still toggles via `claimClick`), and a rebindable in-app dictation hotkey

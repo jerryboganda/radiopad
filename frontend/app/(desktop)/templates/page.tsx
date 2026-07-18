@@ -1,7 +1,9 @@
 'use client';
 
 import { useCallback, useEffect, useState } from 'react';
+import { useRouter } from 'next/navigation';
 import { api, type ReportTemplate } from '@/lib/api';
+import { sectionsToReportSeed, parseTemplateSections } from '@/lib/templateSeed';
 import Container from '@/components/shell/Container';
 import PageHeader from '@/components/shell/PageHeader';
 import { TableSkeleton } from '@/components/ui/Skeleton';
@@ -9,7 +11,10 @@ import EmptyState from '@/components/ui/EmptyState';
 import ErrorState from '@/components/ui/ErrorState';
 import Banner from '@/components/ui/Banner';
 
-type Section = { id: string; label: string; placeholder?: string; required?: boolean };
+// F2 — `normal` is the section's default/"normal" body: canned prose the new-report wizard seeds
+// into the report so the radiologist edits only the exceptions. Distinct from `placeholder`, which
+// is only greyed hint text shown in preview.
+type Section = { id: string; label: string; placeholder?: string; normal?: string; required?: boolean };
 
 type ExtTemplate = ReportTemplate & {
   status?: number | string;
@@ -63,6 +68,31 @@ export default function TemplatesPage() {
   const [saving, setSaving] = useState(false);
   const [preview, setPreview] = useState<PreviewState>(null);
   const [usage, setUsage] = useState<UsageState>(null);
+  const [usingId, setUsingId] = useState<string | null>(null);
+  const router = useRouter();
+
+  // F2 — start a new report from this template: pin the template (for usage analytics), seed the
+  // study context + each section's "normal" body, then open the editor. The radiologist edits only
+  // the exceptions. Nothing is auto-signed; the seeded text is ordinary editable report content.
+  async function useTemplate(t: ExtTemplate) {
+    setError(null);
+    setUsingId(t.id);
+    try {
+      const created = await api.reports.create({
+        modality: t.modality,
+        bodyPart: t.bodyPart,
+        templateId: t.id,
+      });
+      const seed = sectionsToReportSeed(parseTemplateSections(t.sectionsJson));
+      if (Object.keys(seed).length > 0) {
+        await api.reports.patch(created.id, seed);
+      }
+      router.push(`/reports/${created.id}`);
+    } catch (e) {
+      setError((e as Error).message);
+      setUsingId(null);
+    }
+  }
 
   async function refresh() {
     setItems((await api.templates.list()) as ExtTemplate[]);
@@ -193,6 +223,16 @@ export default function TemplatesPage() {
                     <td>{t.bodyPart}</td>
                     <td><span className={`badge ${templateStatusClass(t.status)}`}>{status}</span></td>
                     <td>
+                      <button
+                        className="primary"
+                        onClick={() => useTemplate(t)}
+                        disabled={usingId === t.id}
+                        aria-busy={usingId === t.id}
+                        title="Start a new report from this template"
+                      >
+                        {usingId === t.id && <span className="rp-spinner sm" aria-hidden />}
+                        {usingId === t.id ? 'Starting…' : 'Use'}
+                      </button>
                       <button className="subtle" onClick={() => editTemplate(t)}>Edit</button>
                       <button className="subtle" onClick={() => showPreview(t)}>Preview</button>
                       <button className="subtle" onClick={() => showUsage(t)}>Usage</button>
@@ -318,42 +358,53 @@ export default function TemplatesPage() {
             <div className="rp-panel-title" style={{ marginTop: 12 }}>Sections</div>
             <div className="rp-section-list">
               {draft.sections.map((s, i) => (
-                <div key={i} className="rp-row" style={{ gap: 8, marginBottom: 6, alignItems: 'center' }}>
-                  <input
-                    className="rp-input"
-                    placeholder="id"
-                    value={s.id}
-                    onChange={(e) => mutate(setDraft, draft, i, { id: e.target.value })}
-                    style={{ width: 140 }}
-                  />
-                  <input
-                    className="rp-input"
-                    placeholder="label"
-                    value={s.label}
-                    onChange={(e) => mutate(setDraft, draft, i, { label: e.target.value })}
-                    style={{ width: 180 }}
-                  />
-                  <input
-                    className="rp-input"
-                    placeholder="placeholder"
-                    value={s.placeholder ?? ''}
-                    onChange={(e) => mutate(setDraft, draft, i, { placeholder: e.target.value })}
-                    style={{ flex: 1 }}
-                  />
-                  <label className="rp-row" style={{ gap: 4, alignItems: 'center' }}>
+                <div key={i} style={{ marginBottom: 10 }}>
+                  <div className="rp-row" style={{ gap: 8, alignItems: 'center' }}>
                     <input
-                      type="checkbox"
-                      checked={!!s.required}
-                      onChange={(e) => mutate(setDraft, draft, i, { required: e.target.checked })}
+                      className="rp-input"
+                      placeholder="id"
+                      value={s.id}
+                      onChange={(e) => mutate(setDraft, draft, i, { id: e.target.value })}
+                      style={{ width: 140 }}
                     />
-                    <span style={{ font: '500 12px var(--sans)', color: 'var(--text-muted)' }}>req</span>
-                  </label>
-                  <button
-                    className="subtle"
-                    onClick={() =>
-                      setDraft({ ...draft, sections: draft.sections.filter((_, j) => j !== i) })
-                    }
-                  >×</button>
+                    <input
+                      className="rp-input"
+                      placeholder="label"
+                      value={s.label}
+                      onChange={(e) => mutate(setDraft, draft, i, { label: e.target.value })}
+                      style={{ width: 180 }}
+                    />
+                    <input
+                      className="rp-input"
+                      placeholder="placeholder"
+                      value={s.placeholder ?? ''}
+                      onChange={(e) => mutate(setDraft, draft, i, { placeholder: e.target.value })}
+                      style={{ flex: 1 }}
+                    />
+                    <label className="rp-row" style={{ gap: 4, alignItems: 'center' }}>
+                      <input
+                        type="checkbox"
+                        checked={!!s.required}
+                        onChange={(e) => mutate(setDraft, draft, i, { required: e.target.checked })}
+                      />
+                      <span style={{ font: '500 12px var(--sans)', color: 'var(--text-muted)' }}>req</span>
+                    </label>
+                    <button
+                      className="subtle"
+                      onClick={() =>
+                        setDraft({ ...draft, sections: draft.sections.filter((_, j) => j !== i) })
+                      }
+                    >×</button>
+                  </div>
+                  <textarea
+                    className="rp-input"
+                    placeholder={`Normal / default value for “${s.label || s.id}” — seeded into new reports`}
+                    aria-label={`Normal value for ${s.label || s.id}`}
+                    value={s.normal ?? ''}
+                    onChange={(e) => mutate(setDraft, draft, i, { normal: e.target.value })}
+                    rows={2}
+                    style={{ width: '100%', marginTop: 4, resize: 'vertical' }}
+                  />
                 </div>
               ))}
               <button
