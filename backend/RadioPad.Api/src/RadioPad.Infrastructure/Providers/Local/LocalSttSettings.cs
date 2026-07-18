@@ -42,16 +42,17 @@ public sealed class LocalSttSettings : ILocalSttSettings
     /// <summary>
     /// The out-of-box primary on a fresh install: Windows on-device speech (SAPI)
     /// when a Windows recognizer is actually installed — it is PHI-safe and needs no
-    /// download — else the downloadable Parakeet model. The recognizer check matters
-    /// on Windows 11, where the legacy speech recognizer is often absent; defaulting
-    /// to SAPI only when present keeps the "Primary" badge honest. Either way the
-    /// ensemble's primary-pick falls back to the first available engine, so this is
-    /// always safe.
+    /// download — else the downloadable **MedASR** model (decision D2: MedASR is the
+    /// default primary sherpa engine; Parakeet is the user-promotable fallback). The
+    /// recognizer check matters on Windows 11, where the legacy speech recognizer is
+    /// often absent; defaulting to SAPI only when present keeps the "Primary" badge
+    /// honest. Either way the ensemble's primary-pick falls back to the first available
+    /// engine, so this is always safe (e.g. while MedASR is still downloading).
     /// </summary>
     internal static string DefaultPrimaryModelId =>
         LocalSttModels.IsEnabled() && WindowsSapiSttClient.IsRecognizerInstalled()
             ? LocalModelCatalog.WindowsSapiId
-            : LocalSttModels.DefaultModelName;
+            : LocalSttModels.MedAsrModelName;
 
     private static string? Load(string? path)
     {
@@ -83,6 +84,7 @@ public sealed class LocalSttSettings : ILocalSttSettings
         // recognizer (SAPI), so it maps to the SAPI engine rather than a separate one.
         LocalModelCatalog.WindowsWinRtId => LocalModelCatalog.WindowsSapiEngine,
         LocalModelCatalog.EdgeWebSpeechId => LocalModelCatalog.EdgeWebSpeechEngine,
+        LocalSttModels.MedAsrModelName => SherpaMedAsrSttClient.EngineName,
         _ => SherpaParakeetSttClient.EngineName,
     };
 

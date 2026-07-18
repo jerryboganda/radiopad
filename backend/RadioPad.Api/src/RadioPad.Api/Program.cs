@@ -254,6 +254,12 @@ builder.Services.AddSingleton<RadioPad.Application.Abstractions.ILocalSttClient,
 // Engines register as ILocalSttEngine for the orchestrator to consume.
 builder.Services.AddSingleton<RadioPad.Application.Abstractions.ILocalSttEngine>(
     sp => sp.GetRequiredService<RadioPad.Infrastructure.Providers.Local.SherpaParakeetSttClient>());
+// MedASR (Google Conformer-CTC, radiology-tuned) — the DEFAULT primary on-device engine (D2), via
+// the public/ungated sherpa-onnx CTC bundle. Same sherpa-onnx CPU runtime as Parakeet; Available is
+// false until the bundle is provisioned, so it degrades gracefully to Parakeet / the cloud path.
+builder.Services.AddSingleton<RadioPad.Infrastructure.Providers.Local.SherpaMedAsrSttClient>();
+builder.Services.AddSingleton<RadioPad.Application.Abstractions.ILocalSttEngine>(
+    sp => sp.GetRequiredService<RadioPad.Infrastructure.Providers.Local.SherpaMedAsrSttClient>());
 // Windows on-device speech (System.Speech / SAPI) — the classic Windows Speech
 // Recognition engine, fully on-device (PHI-safe) and built into Windows. Registered
 // always; Available is false off Windows / when no recognizer is installed (the
