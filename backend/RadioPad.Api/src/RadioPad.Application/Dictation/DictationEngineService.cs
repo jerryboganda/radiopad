@@ -92,6 +92,13 @@ public sealed class DictationEngineService
             ? formatted.Sections
             : new Dictionary<string, string> { ["findings"] = pass.CorrectedTranscript };
 
+        // 6) F4 — deterministic measurement sanity + findings/impression consistency, merged into the
+        // same review-warning channel as the §5.6 sentinel (all are eye-confirm warnings, not rejects).
+        var sanity = MeasurementSanityChecker.Check(draftSections);
+        IReadOnlyList<SentinelWarning> warnings = sanity.Count == 0
+            ? sentinel.Warnings
+            : sentinel.Warnings.Concat(sanity).ToList();
+
         return new DictationDraft(
             RawTranscript: pass.RawTranscript,
             CorrectedTranscript: pass.CorrectedTranscript,
@@ -99,7 +106,7 @@ public sealed class DictationEngineService
             Accepted: validation.Accepted,
             UsedFallback: !validation.Accepted,
             Violations: validation.Violations,
-            SentinelWarnings: sentinel.Warnings,
+            SentinelWarnings: warnings,
             Provider: formatted.Provider,
             Model: formatted.Model,
             LatencyMs: formatted.LatencyMs);

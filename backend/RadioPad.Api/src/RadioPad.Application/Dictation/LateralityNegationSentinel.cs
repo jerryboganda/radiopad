@@ -2,12 +2,15 @@ using System.Text.RegularExpressions;
 
 namespace RadioPad.Application.Dictation;
 
-/// <summary>Category of a §5.6 sentinel warning.</summary>
+/// <summary>Category of a sentinel/consistency warning surfaced for radiologist review.</summary>
 public enum SentinelKind
 {
     Laterality,
     Negation,
     Gender,
+    // F4 — deterministic consistency checks (surfaced through the same warning channel).
+    Consistency,
+    MeasurementSanity,
 }
 
 /// <summary>A single §5.6 sentinel warning surfaced to the radiologist for eye-confirmation.</summary>
