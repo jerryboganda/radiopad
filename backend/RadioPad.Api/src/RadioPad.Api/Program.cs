@@ -202,6 +202,22 @@ builder.Services.AddScoped<RadioPad.Application.Services.ITerminologyAdapter, Ra
 builder.Services.AddScoped<IPromptOverrideStore, EfPromptOverrideStore>();
 builder.Services.AddScoped<RadioPad.Application.Abstractions.IDictationCleanupService,
     RadioPad.Application.Services.DictationCleanupService>();
+// Dictation-engine brief §4.2/§5 — deterministic on-device safety pipeline. Stateless singletons
+// that wrap whichever formatter runs (cloud default / local MedGemma optional).
+builder.Services.AddSingleton<RadioPad.Application.Dictation.DeterministicPassThrough>();
+builder.Services.AddSingleton<RadioPad.Application.Dictation.DictationValidationService>();
+builder.Services.AddSingleton<RadioPad.Application.Dictation.LateralityNegationSentinel>();
+builder.Services.AddSingleton<RadioPad.Application.Dictation.DictationEngineService>();
+// §4.4 — model load/unload memory manager (≤5 GB combined resident, CPU-only).
+builder.Services.AddSingleton<RadioPad.Application.Runtime.ModelMemoryManager>();
+// §5.7 — local dictation audit store. In-memory default (DI-safe on web/server); the desktop wires
+// the encrypted on-disk FileDictationAuditStore (see IMPLEMENTATION_NOTES.md — key management).
+builder.Services.AddSingleton<RadioPad.Application.Dictation.IDictationAuditStore,
+    RadioPad.Application.Dictation.InMemoryDictationAuditStore>();
+// §4.2 — safety-wrapped dictation draft pipeline (pass-through → formatter → validation → sentinel
+// → audit). Scoped: wraps the scoped IDictationCleanupService.
+builder.Services.AddScoped<RadioPad.Application.Dictation.IDictationDraftService,
+    RadioPad.Application.Dictation.DictationDraftService>();
 // Cross-check LLM medical-accuracy review (hosted-side; routes via IAiGateway so
 // PHI policy + audit apply). Opt-in UBAG is honored by a forced provider.
 builder.Services.AddScoped<RadioPad.Application.Abstractions.ICrossCheckReviewService,

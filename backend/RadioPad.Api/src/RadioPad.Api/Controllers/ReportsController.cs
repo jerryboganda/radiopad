@@ -1380,6 +1380,61 @@ public class ReportsController : TenantedController
         }
     }
 
+    public record DictationDraftDto(string RawDictation);
+
+    /// <summary>
+    /// Dictation-engine brief §4.2 — the safety-wrapped dictation→report pipeline: §5.2 deterministic
+    /// pass-through → formatter (PHI-gated AiGateway) → §5.3 validation-diff (fail-safe fallback) →
+    /// §5.6 laterality/negation/gender sentinel → §5.7 local audit. Returns an editable draft that
+    /// still requires the §5.5 sign-off gate. RBAC: <see cref="UserRole.Radiologist"/> /
+    /// <see cref="UserRole.MedicalDirector"/>.
+    /// </summary>
+    [HttpPost("{id:guid}/dictation/draft")]
+    [Microsoft.AspNetCore.RateLimiting.EnableRateLimiting("ai")]
+    public async Task<IActionResult> DictationDraft(
+        Guid id,
+        [FromBody] DictationDraftDto dto,
+        [FromServices] RadioPad.Application.Dictation.IDictationDraftService service,
+        CancellationToken ct)
+    {
+        var (tenant, user) = await ResolveContextAsync(_db, ct);
+        var deny = RequireRole(user, UserRole.Radiologist, UserRole.MedicalDirector);
+        if (deny is not null) return deny;
+        var report = await _db.Reports.FirstOrDefaultAsync(r => r.Id == id && r.TenantId == tenant.Id, ct);
+        if (report is null) return NotFound();
+        if (string.IsNullOrWhiteSpace(dto.RawDictation))
+            return BadRequest(new { error = "rawDictation is required.", kind = "validation" });
+
+        try
+        {
+            var draft = await service.BuildDraftAsync(tenant, user, report, dto.RawDictation, ct);
+            return Ok(new
+            {
+                sections = draft.DraftSections,
+                accepted = draft.Accepted,
+                usedFallback = draft.UsedFallback,
+                requiresReview = draft.RequiresReview,
+                violations = draft.Violations.Select(v => new { reason = v.Reason.ToString(), detail = v.Detail }),
+                sentinelWarnings = draft.SentinelWarnings.Select(w => new { kind = w.Kind.ToString(), detail = w.Detail }),
+                provider = draft.Provider,
+                model = draft.Model,
+                latencyMs = draft.LatencyMs,
+            });
+        }
+        catch (Application.Services.ProviderPolicyException pex)
+        {
+            return StatusCode(StatusCodes.Status403Forbidden, new { error = pex.Message, kind = "provider_policy" });
+        }
+        catch (Application.Services.ProviderTransportException tex)
+        {
+            return StatusCode(StatusCodes.Status502BadGateway, new
+            {
+                error = $"The AI provider could not complete the draft: {tex.Message}",
+                kind = "provider_transport",
+            });
+        }
+    }
+
     public record CrossCheckReviewDto(string Text, string? SectionKey, bool UseUbag);
 
     /// <summary>

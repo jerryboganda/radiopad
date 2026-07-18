@@ -32,13 +32,25 @@
 - **§4.2 pipeline orchestration** (`DictationEngineService.cs` + `IDictationFormatter`): wires
   §5.2 → formatter (cloud or local MedGemma) → §5.3 → §5.6 into one editable `DictationDraft`;
   never signs (feeds the existing §5.5 sign-off gate); `.ai-mark` "Requires review" always set.
+- **§4.4 memory manager** (`Runtime/ModelMemoryManager.cs`): enforces the ≤5 GB combined-resident
+  ceiling, evicts STT first, low-memory mode unloads STT during formatting, exposes a snapshot for
+  the status panel. CPU-only stays enforced.
+- **§5.7 local encrypted audit** (`Dictation/DictationAudit.cs` + `Infrastructure/Audit/
+  FileDictationAuditStore.cs`): append-only SHA-256 hash chain (ADR-0003 design) + AES-256-GCM at
+  rest, persisting raw transcript + corrected transcript + final report + diff + model versions;
+  in-memory default is DI-safe on web/server.
+- **§4.2 production wiring** (`Dictation/DictationDraftService.cs` +
+  `POST /api/reports/{id}/dictation/draft` in `ReportsController` + DI in `Program.cs`): the safety
+  pipeline reuses the existing PHI-gated cloud formatter (`IDictationCleanupService`) today and
+  writes the §5.7 audit. Reachable end-to-end; app-boot integration tests green.
 
-### Remaining Phase 0 (integration — needs model binaries / Rust / frontend, tracked in tasks)
+### Remaining Phase 0 (needs model binaries / Rust / frontend — see IMPLEMENTATION_NOTES.md)
 
-- MedASR ONNX engine (ONNX-export prototype is build-time) + catalog descriptor; MedGemma GGUF
-  provisioner + bundled llama-server sidecar; streaming decode + hold-to-talk PTT + rebindable
-  hotkey; local encrypted audit store (§5.7); model load/unload memory manager (§4.4); the
-  `formatDictation` endpoint + `lib/api.ts` routing; desktop release (DESK-001).
+- MedASR ONNX engine (ONNX-export prototype is build-time) + catalog descriptor (needs HAI-DEF
+  terms + verified artifact); MedGemma GGUF provisioner + bundled llama-server sidecar (needs
+  verified GGUF SHA); streaming decode + hold-to-talk PTT + rebindable hotkey (Rust/frontend);
+  thread the local FileDictationAuditStore + key management + patientSex on desktop; `lib/api.ts`
+  routing + settings toggle + draft UI; desktop release (DESK-001).
 
 ---
 
