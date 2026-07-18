@@ -1229,6 +1229,26 @@ export const api = {
     exportPdf: (id: string) => requestBlob(`/api/reports/${id}/export/pdf`),
     exportDocx: (id: string) => requestBlob(`/api/reports/${id}/export/docx`),
     exportHl7: (id: string) => requestBlob(`/api/reports/${id}/export/hl7`),
+    /**
+     * F8 — one-command "Sign & Send": Primary sign-off → acknowledge (blocker-gated on the server)
+     * → export, chaining the EXISTING gated endpoints in order. If sign or acknowledge fails (e.g.
+     * validation blockers), it STOPS before export — the sign-off gate is never bypassed and nothing
+     * is auto-signed (the radiologist explicitly triggers this one action).
+     */
+    signAndSend: async (
+      id: string,
+      opts: { note?: string; format?: 'fhir' | 'hl7' | 'json' | 'text' } = {},
+    ) => {
+      const signature = await api.reports.sign(id, { role: 'Primary', note: opts.note });
+      const report = await api.reports.acknowledge(id);
+      const format = opts.format ?? 'text';
+      const exported =
+        format === 'fhir' ? await api.reports.exportFhir(id)
+        : format === 'json' ? await api.reports.exportJson(id)
+        : format === 'hl7' ? await api.reports.exportHl7(id)
+        : await api.reports.exportText(id);
+      return { signature, report, exported, format };
+    },
     rewrite: (
       id: string,
       body: { mode: RewriteMode; sections?: string[] | null; providerId?: string; samples?: string[] },

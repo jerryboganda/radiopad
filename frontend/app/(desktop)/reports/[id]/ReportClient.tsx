@@ -30,6 +30,7 @@ import { detectCommand, stripCommand, type VoiceCommand, type CommandMatch } fro
 import RewriteStylePanel from './RewriteStylePanel';
 import PriorComparePanel from './PriorComparePanel';
 import DictationDraftPanel from './DictationDraftPanel';
+import SignAndSendButton from './SignAndSendButton';
 import CopyToRisButton from './CopyToRisButton';
 import ReportInspector, { type InspectorTab } from './ReportInspector';
 import {
@@ -137,6 +138,7 @@ export default function ReportPage() {
     useState<'findings' | 'impression' | 'recommendations'>('impression');
   const [showPrior, setShowPrior] = useState(false);
   const [showDictationDraft, setShowDictationDraft] = useState(false);
+  const [showSignSend, setShowSignSend] = useState(false);
   const [voiceCommandMode, setVoiceCommandMode] = useState(false);
   const [dictating, setDictating] = useState(false);
   const [voiceCommandPills, setVoiceCommandPills] = useState<Array<{ id: number; command: VoiceCommand }>>([]);
@@ -1129,6 +1131,9 @@ export default function ReportPage() {
               <button className="ghost" type="button" onClick={() => setShowDictationDraft((v) => !v)} aria-expanded={showDictationDraft}>
                 {showDictationDraft ? 'Hide draft' : 'Format draft'}
               </button>
+              <button className="ghost" type="button" onClick={() => setShowSignSend((v) => !v)} aria-expanded={showSignSend}>
+                {showSignSend ? 'Hide sign & send' : 'Sign & send'}
+              </button>
               {canEdit && (
                 <button
                   className="ghost"
@@ -1224,6 +1229,8 @@ export default function ReportPage() {
           )}
 
           {showPrior && <PriorComparePanel reportId={report.id} />}
+
+          {showSignSend && <SignAndSendButton reportId={report.id} />}
 
           {showDictationDraft && (
             <DictationDraftPanel
