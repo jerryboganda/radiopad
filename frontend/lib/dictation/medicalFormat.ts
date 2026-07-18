@@ -21,6 +21,10 @@ const SPOKEN_PUNCTUATION: ReadonlyArray<readonly [RegExp, string]> = [
   [/\b(?:open paren|open parenthesis)\b/gi, '('],
   [/\b(?:close paren|close parenthesis)\b/gi, ')'],
   [/\b(?:hyphen|dash)\b/gi, '-'],
+  // "%" attaches to the preceding number ("fifty percent" → "50%"); consume the leading space.
+  [/\s*\bpercent\b/gi, '%'],
+  // "/" joins the tokens either side ("T2 slash FLAIR" → "T2/FLAIR"); consume the surrounding spaces.
+  [/\s*\b(?:forward slash|slash)\b\s*/gi, '/'],
 ];
 
 /** Capitalise the first letter at the start, after sentence enders, and after newlines. */

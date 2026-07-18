@@ -65,4 +65,12 @@ describe('formatDictation — spoken measurements (F1)', () => {
   it('still passes already-typed digit measurements through unchanged', () => {
     expect(formatDictation('measures 2 millimeters')).toBe('Measures 2 millimeters');
   });
+
+  it('attaches a spoken percent to the preceding number', () => {
+    expect(formatDictation('stenosis of fifty percent full stop')).toBe('Stenosis of 50%.');
+  });
+
+  it('joins tokens spoken with slash', () => {
+    expect(formatDictation('T2 slash FLAIR hyperintensity')).toBe('T2/FLAIR hyperintensity');
+  });
 });
