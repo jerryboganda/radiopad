@@ -33,7 +33,7 @@ public class ReportsLifecycleController : TenantedController
         _rewrite = rewrite;
     }
 
-    public record RewriteDto(string Mode, string[]? Sections, Guid? ProviderId);
+    public record RewriteDto(string Mode, string[]? Sections, Guid? ProviderId, string? Instruction = null);
 
     /// <summary>RPT-007 — multi-mode rewrite. Returns the rewritten text;
     /// frontend handles accept/reject. PHI policy is enforced inside the
@@ -53,7 +53,17 @@ public class ReportsLifecycleController : TenantedController
         {
             return BadRequest(new
             {
-                error = $"Unsupported rewrite mode '{dto.Mode}'. Supported: concise, formal, patient_friendly, referring_summary.",
+                error = $"Unsupported rewrite mode '{dto.Mode}'. Supported: concise, formal, patient_friendly, referring_summary, custom.",
+                kind = "validation",
+            });
+        }
+
+        // F12 — the free-text Custom mode requires an instruction to act on.
+        if (mode == ReportRewriteMode.Custom && string.IsNullOrWhiteSpace(dto.Instruction))
+        {
+            return BadRequest(new
+            {
+                error = "A custom rewrite needs an instruction describing the edit.",
                 kind = "validation",
             });
         }
@@ -91,7 +101,7 @@ public class ReportsLifecycleController : TenantedController
 
         try
         {
-            var result = await _rewrite.RewriteAsync(tenant, report, provider, mode, dto.Sections, ct);
+            var result = await _rewrite.RewriteAsync(tenant, report, provider, mode, dto.Sections, dto.Instruction, ct);
             return Ok(new
             {
                 text = result.Text,
@@ -100,6 +110,9 @@ public class ReportsLifecycleController : TenantedController
                 latencyMs = result.LatencyMs,
                 promptVersion = result.PromptVersion,
                 mode = mode.ToString(),
+                // F12 — §5.3 fabrication findings (empty unless a custom rewrite invented a
+                // measurement/number/date). The frontend flags these for review.
+                violations = result.Violations.Select(v => new { reason = v.Reason.ToString(), detail = v.Detail }),
             });
         }
         catch (ProviderPolicyException pex)
@@ -365,6 +378,7 @@ public class ReportsLifecycleController : TenantedController
             case "patient-friendly": mode = ReportRewriteMode.PatientFriendly; return true;
             case "referring_summary":
             case "referring-summary": mode = ReportRewriteMode.ReferringSummary; return true;
+            case "custom": mode = ReportRewriteMode.Custom; return true;
             default: mode = default; return false;
         }
     }
