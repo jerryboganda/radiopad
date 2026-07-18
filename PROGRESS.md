@@ -52,6 +52,19 @@
   `TenantLexicon` (rows with a replacement, longest-first) into `CorrectionRule[]` applied by the
   §5.2 pass-through BEFORE the LLM; wired through `DictationDraftService` + the `/dictation/draft`
   endpoint.
+- **P0.3 push-to-talk + rebindable hotkey (frontend)** — hold-to-talk added alongside
+  tap-to-toggle on the mic (`lib/dictation/pushToTalk.ts`, deterministic tap/hold discriminator;
+  keyboard still toggles via `claimClick`), and a rebindable in-app dictation hotkey
+  (`lib/dictationHotkey.ts` wired in `ShellBridge`) that works on every surface incl. web and
+  honours the configured chord live. 22 tests. **Still blocked (desktop-only, needs a Tauri
+  build):** making the Rust *system-wide/unfocused* global shortcut follow a rebind needs a
+  handler refactor + a re-register command — not committed because it can't be compile-verified
+  here and a broken `.rs` would fail the release build.
+- **P0.2 MedASR STT — genuinely blocked (external):** the STT stack is sherpa-onnx transducer
+  bundles (encoder/decoder/joiner/tokens ONNX). `google/medasr` is a gated Conformer with no
+  published sherpa bundle, so it needs a build-time ONNX-export artifact + HAI-DEF license
+  acceptance + an HF token before a real (URL, SHA-256) descriptor can exist. Not fabricating a
+  placeholder descriptor with a fake digest. Cloud STT stays primary per the operator decision.
 - **F10 reports/hour throughput KPI** — `AnalyticsService.ComputeAsync` now emits
   `ProductKpis.ReportsPerHour` (completed reports ÷ window wall-clock hours, zero-window guarded),
   reusing the already-fetched `CompletedReports` (no controller/data-fetch change). Surfaced in the
