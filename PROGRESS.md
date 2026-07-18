@@ -52,6 +52,16 @@
   `TenantLexicon` (rows with a replacement, longest-first) into `CorrectionRule[]` applied by the
   §5.2 pass-through BEFORE the LLM; wired through `DictationDraftService` + the `/dictation/draft`
   endpoint.
+- **F3 smart-text snippets (autotext + tab-through fields)** — device-local per-user snippets
+  (`lib/snippets.ts`, localStorage like hotkeys; never PHI): a trigger expands to canned prose that
+  may carry `${field}` fill-in placeholders. The cursor-jump core is pure + fully tested —
+  `findFields` / `expandSnippet` (insert body, select the first field) / `nextFieldSelection` (Tab
+  to next, wrapping) — and `lib/snippetInsert.ts` applies it to a real `<textarea>`/`<input>`
+  (React-safe native-setter + input event; `insertSnippet` + `snippetTab`). Managed at
+  **Settings → Snippets** (add/edit/delete, live field-count). 17 tests (11 core + 3 insert + 3
+  page). NOTE: trigger-on-type auto-expansion inside the ProseMirror section editor (true in-editor
+  tab-through) is the remaining editor-integration step — deliberately deferred to a focused
+  ProseMirror pass rather than risk the rich editor's selection state.
 - **Phase 3 regulated-feature gating (OFF by default)** — the assist-only capabilities
   (auto-impression, critical-finding flagging, follow-up standardisation, interval/RECIST tracking)
   are now gated behind an explicit, fail-safe opt-in. Backend `RegulatedFeatures`
