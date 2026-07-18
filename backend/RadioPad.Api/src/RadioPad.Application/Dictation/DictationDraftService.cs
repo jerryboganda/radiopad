@@ -24,12 +24,18 @@ public sealed class DictationDraftService : IDictationDraftService
     private readonly IDictationCleanupService _cleanup;
     private readonly DictationEngineService _engine;
     private readonly IDictationAuditStore _audit;
+    private readonly ILocalReportFormatter _localFormatter;
 
-    public DictationDraftService(IDictationCleanupService cleanup, DictationEngineService engine, IDictationAuditStore audit)
+    public DictationDraftService(
+        IDictationCleanupService cleanup,
+        DictationEngineService engine,
+        IDictationAuditStore audit,
+        ILocalReportFormatter localFormatter)
     {
         _cleanup = cleanup;
         _engine = engine;
         _audit = audit;
+        _localFormatter = localFormatter;
     }
 
     public async Task<DictationDraft> BuildDraftAsync(
@@ -41,10 +47,14 @@ public sealed class DictationDraftService : IDictationDraftService
             BodyPart: report.Study?.BodyPart ?? string.Empty,
             Indication: report.Indication ?? string.Empty,
             SectionKeys: DictationGrammar.DefaultSections,
-            // GBNF is applied on the local MedGemma path once the desktop sidecar is wired (P0.4).
-            Grammar: null);
+            // §5.4 — used by the local MedGemma formatter; the cloud formatter ignores it.
+            Grammar: DictationGrammar.ReportSectionsGbnf);
 
-        var formatter = new CleanupServiceFormatter(_cleanup, tenant, user, report);
+        // Optional offline formatter (MedGemma, on-device) when enabled + reachable; else the cloud
+        // formatter (default). The deterministic safety layers wrap whichever one runs.
+        IDictationFormatter formatter = _localFormatter.Available
+            ? _localFormatter
+            : new CleanupServiceFormatter(_cleanup, tenant, user, report);
 
         // patientSex is threaded through once the Study sex field is confirmed (P0.4 wiring); the
         // §5.6 gender sentinel is exercised by unit tests meanwhile.

@@ -53,13 +53,26 @@
   §5.2 pass-through BEFORE the LLM; wired through `DictationDraftService` + the `/dictation/draft`
   endpoint. Per-user personal-override layer is the remaining F7 piece (needs its own store).
 
-### Remaining Phase 0 (needs model binaries / Rust / hardware — see IMPLEMENTATION_NOTES.md)
+- **§2.2 optional local MedGemma formatter path** — MedGemma Q4_K_M GGUF **pinned + verified** in
+  `LocalModelCatalog` (`unsloth/medgemma-1.5-4b-it-Q4_K_M.gguf`, real URL/SHA-256/size,
+  download-on-demand via the existing provisioner); `LocalMedGemmaFormatter` (LocalOnly,
+  loopback-**enforced**, GBNF + temp 0) selected by `DictationDraftService` when
+  `RADIOPAD_LOCAL_FORMATTER_ENABLED`; stateless on-device endpoint
+  `POST /api/dictation/draft-local` (anonymous/loopback, mirrors `SttController` — runs the full
+  §5.2→§5.3→§5.6 pipeline + §5.7 audit, no DB, so the STT-only sidecar can serve it);
+  `lib/api.ts` `reports.dictationDraftLocal`. Cloud formatting stays the default (+2 catalog tests).
 
-- MedASR ONNX engine (ONNX-export prototype is build-time) + catalog descriptor (needs HAI-DEF
-  terms + verified artifact); MedGemma GGUF provisioner + bundled llama-server sidecar (needs
-  verified GGUF SHA); streaming decode + hold-to-talk PTT + rebindable hotkey (Rust/frontend);
-  thread the local FileDictationAuditStore + key management + patientSex on desktop; offline-
-  formatter settings toggle that routes the draft to the local sidecar.
+### Remaining Phase 0 (needs binaries / Rust / hardware — see IMPLEMENTATION_NOTES.md)
+
+- **Make the local formatter live** (packaging): bundle a `llama-server` binary as a Tauri
+  externalBin + spawn it in `sidecar_manager.rs` pointing at the provisioned GGUF (set
+  `RADIOPAD_LOCAL_FORMATTER_ENABLED` + `RADIOPAD_LOCAL_LLAMA_URL`), and have `DictationDraftPanel`
+  try local-first. Not editable/verifiable here (needs the binary + Rust build on CI).
+- **MedASR** STT engine + catalog descriptor — blocked: `google/medasr` is gated (HAI-DEF token
+  needed for download) and PyTorch (needs an ONNX/CT2 export prototype at build time).
+- Streaming decode + hold-to-talk PTT + rebindable hotkey (Rust/frontend); thread the encrypted
+  `FileDictationAuditStore` + key management + `patientSex` on the desktop; per-user correction layer
+  (F7b, needs a migration).
 
 ---
 

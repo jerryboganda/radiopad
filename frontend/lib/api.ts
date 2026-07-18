@@ -1277,6 +1277,30 @@ export const api = {
         method: 'POST',
         body: JSON.stringify({ rawDictation }),
       }),
+    /**
+     * Optional OFFLINE draft path (desktop only): runs the whole safety pipeline on the loopback
+     * sidecar with the local MedGemma formatter — the transcript (PHI) never leaves the machine.
+     * Stateless (report context is passed in the body, not resolved from the DB). Returns 503 until
+     * the on-device formatter + bundled llama-server are provisioned; callers fall back to
+     * `dictationDraft` (cloud) on failure.
+     */
+    dictationDraftLocal: async (
+      raw: string,
+      ctx: {
+        modality?: string; bodyPart?: string; indication?: string; patientSex?: string;
+        corrections?: { from: string; to: string }[];
+      } = {},
+    ): Promise<DictationDraftResult> => {
+      const local = await localSttBase();
+      if (!local) throw new Error('On-device formatter is not available on this surface.');
+      const res = await fetch(`${local}/api/dictation/draft-local`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ rawDictation: raw, ...ctx }),
+      });
+      if (!res.ok) throw new Error(`On-device formatting failed (HTTP ${res.status}).`);
+      return (await res.json()) as DictationDraftResult;
+    },
     // Dictation transcription. On the desktop the recorded audio is transcribed
     // FULLY ON-DEVICE by the bundled STT sidecar (Parakeet, CPU) — the
     // PHI-bearing audio never leaves the machine; only the

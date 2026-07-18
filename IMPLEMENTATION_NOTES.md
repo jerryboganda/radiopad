@@ -39,11 +39,18 @@
 
 ### MedGemma 1.5 4B — optional local report formatter
 - **Source:** Google MedGemma 1.5, 4B multimodal (built on Gemma 3, 128K ctx), updated **2026-01-13**.
-- **Runtime:** bundled **llama-server** sidecar (llama.cpp) with a **Q4_K_M GGUF** (~2.5–2.8 GB),
-  driven by the existing `LlamaCppProvider` (`/completion`) adapter. Community Q4_K_M GGUFs exist on
-  HF (`unsloth/medgemma-1.5-4b-it-GGUF`, `mradermacher/...`) and Ollama.
-- **⏳ OPEN:** confirm the exact GGUF artifact (URL + SHA-256 + size) to pin in `LocalModelCatalog`
-  before shipping. Record here.
+- **Runtime:** bundled **llama-server** sidecar (llama.cpp) with a **Q4_K_M GGUF** (~2.5 GB),
+  driven by the existing `LlamaCppProvider` (`/completion`) adapter.
+- **✅ PINNED (verified via HF public API 2026-07-18 — repo is `gated:false`, anonymously
+  downloadable by the provisioner):**
+  - Repo/file: `unsloth/medgemma-1.5-4b-it-GGUF` → `medgemma-1.5-4b-it-Q4_K_M.gguf`
+  - URL: `https://huggingface.co/unsloth/medgemma-1.5-4b-it-GGUF/resolve/main/medgemma-1.5-4b-it-Q4_K_M.gguf`
+  - Size: `2489894976` bytes · SHA-256 (HF LFS oid): `b31becdf4f39561800505514cce67681604fe449d04dd35c8c92fd7848c6d7bd`
+  - Registered in `LocalModelCatalog` as an `Orchestrator`-kind `RawFile` descriptor
+    (`medgemma-1.5-4b-q4`), download-on-demand (NOT auto-downloaded on first run).
+  - Ungated mirror fallback: `mradermacher/medgemma-1.5-4b-it-GGUF` →
+    `medgemma-1.5-4b-it.Q4_K_M.gguf` (size `2489894624`, sha256
+    `ee5121f1b6ffda000f65bcf14b86a653f1beae2438663381f61980e3cf639454`).
 - **Inference:** **temperature ≈ 0** (deterministic formatting). **No native tool/function-calling**
   → structured output enforced via **GBNF grammar** (§5.4), tolerant JSON parse as secondary net.
 - **License:** HAI-DEF / Gemma terms (commercial use permitted subject to the acceptable-use policy).

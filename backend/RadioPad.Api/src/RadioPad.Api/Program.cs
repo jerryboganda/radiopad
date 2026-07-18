@@ -218,6 +218,11 @@ builder.Services.AddSingleton<RadioPad.Application.Dictation.IDictationAuditStor
 // → audit). Scoped: wraps the scoped IDictationCleanupService.
 builder.Services.AddScoped<RadioPad.Application.Dictation.IDictationDraftService,
     RadioPad.Application.Dictation.DictationDraftService>();
+// §2.2 — optional on-device MedGemma report formatter (LocalOnly, loopback-enforced). Inert unless
+// RADIOPAD_LOCAL_FORMATTER_ENABLED is set (the desktop sidecar with the bundled llama-server); the
+// cloud formatter stays the default everywhere else.
+builder.Services.AddSingleton<RadioPad.Application.Dictation.ILocalReportFormatter,
+    RadioPad.Infrastructure.Providers.Local.LocalMedGemmaFormatter>();
 // Cross-check LLM medical-accuracy review (hosted-side; routes via IAiGateway so
 // PHI policy + audit apply). Opt-in UBAG is honored by a forced provider.
 builder.Services.AddScoped<RadioPad.Application.Abstractions.ICrossCheckReviewService,

@@ -76,6 +76,12 @@ public sealed class LocalModelCatalog : ILocalModelCatalog
     public const string EdgeWebSpeechEngine = "edge_webspeech";
     public const string EdgeWebSpeechId = "edge-webspeech";
 
+    // ── Optional on-device MedGemma report formatter (dictation brief §2.2) ────
+    /// <summary>Catalog id == the models/&lt;id&gt; folder the GGUF is provisioned into.</summary>
+    public const string MedGemmaId = "medgemma-1.5-4b-q4";
+    /// <summary>Pinned MedGemma Q4_K_M GGUF file name (see IMPLEMENTATION_NOTES.md for the SHA-256).</summary>
+    public const string MedGemmaFileName = "medgemma-1.5-4b-it-Q4_K_M.gguf";
+
     public IReadOnlyList<LocalModelDescriptor> All { get; } = Build();
 
     public LocalModelDescriptor? ById(string id) =>
@@ -174,18 +180,26 @@ public sealed class LocalModelCatalog : ILocalModelCatalog
                 ArchiveKind: ModelArchiveKind.RawFile,
                 FileName: null,
                 Placeholder: true),
+            // MedGemma 1.5 4B (Q4_K_M) — the OPTIONAL on-device report formatter (dictation brief
+            // §2.2). Downloaded on demand from the model manager (NOT auto-provisioned on first run;
+            // only Parakeet is). Run by the bundled llama-server sidecar via the LlamaCppProvider
+            // LocalOnly adapter. Pin verified against the HF public API (repo gated:false, so the
+            // provisioner's anonymous SHA-256-verified download works). Cloud formatting stays the
+            // default — this is the fully-offline, no-PHI-to-cloud alternative.
             new(
-                Id: "orchestrator-coming-soon",
-                DisplayName: "On-device orchestrator brain",
+                Id: MedGemmaId,
+                DisplayName: "MedGemma 1.5 4B (Q4_K_M) — on-device report formatter",
                 Kind: ModelKind.Orchestrator,
-                Engine: "orchestrator",
-                DownloadUrl: "",
-                Sha256: "",
-                SizeBytes: 0,
-                License: "",
+                Engine: LlamaCppProvider.AdapterId, // "llama-cpp"
+                DownloadUrl: "https://huggingface.co/unsloth/medgemma-1.5-4b-it-GGUF/resolve/main/medgemma-1.5-4b-it-Q4_K_M.gguf",
+                Sha256: "b31becdf4f39561800505514cce67681604fe449d04dd35c8c92fd7848c6d7bd",
+                SizeBytes: 2489894976L,
+                License: "HAI-DEF / Gemma",
                 ArchiveKind: ModelArchiveKind.RawFile,
-                FileName: null,
-                Placeholder: true),
+                FileName: MedGemmaFileName,
+                Placeholder: false,
+                Provisioning: ModelProvisioning.HostedFile,
+                Note: "Optional offline report formatter (~2.5 GB). Formats dictated findings only — never invents findings, never reads images. Cloud formatting remains the default."),
         };
     }
 }
