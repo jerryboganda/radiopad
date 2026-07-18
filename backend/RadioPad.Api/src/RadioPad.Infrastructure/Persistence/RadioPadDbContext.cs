@@ -32,6 +32,7 @@ public class RadioPadDbContext : DbContext
     public DbSet<AiRequest> AiRequests => Set<AiRequest>();
     public DbSet<AuditEvent> AuditEvents => Set<AuditEvent>();
     public DbSet<TenantLexicon> Lexicons => Set<TenantLexicon>();
+    public DbSet<UserCorrection> UserCorrections => Set<UserCorrection>();
     public DbSet<TenantSettings> TenantSettings => Set<TenantSettings>();
     public DbSet<MagicLinkToken> MagicLinks => Set<MagicLinkToken>();
     public DbSet<DeviceAuthRequest> DeviceAuth => Set<DeviceAuthRequest>();
@@ -85,6 +86,7 @@ public class RadioPadDbContext : DbContext
         b.Entity<BodyPart>().HasIndex(x => new { x.TenantId, x.Code }).IsUnique();
         b.Entity<ProviderConfig>().HasIndex(x => new { x.TenantId, x.Name }).IsUnique();
         b.Entity<TenantLexicon>().HasIndex(x => new { x.TenantId, x.Term }).IsUnique();
+        b.Entity<UserCorrection>().HasIndex(x => new { x.TenantId, x.UserId, x.From }).IsUnique();
         b.Entity<TenantSettings>().HasIndex(x => x.TenantId).IsUnique();
         b.Entity<MagicLinkToken>().HasIndex(x => x.TokenHash).IsUnique();
         b.Entity<DeviceAuthRequest>().HasIndex(x => x.DeviceCodeHash).IsUnique();

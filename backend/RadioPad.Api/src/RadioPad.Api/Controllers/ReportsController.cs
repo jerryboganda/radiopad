@@ -1405,9 +1405,12 @@ public class ReportsController : TenantedController
         if (string.IsNullOrWhiteSpace(dto.RawDictation))
             return BadRequest(new { error = "rawDictation is required.", kind = "validation" });
 
-        // §6/F7 — apply the tenant's correction dictionary deterministically before the LLM.
+        // §6/F7 — apply the org lexicon + the user's personal corrections deterministically before
+        // the LLM (the user's entry wins for the same term).
         var lexicon = await _db.Lexicons.Where(l => l.TenantId == tenant.Id).ToListAsync(ct);
-        var corrections = RadioPad.Application.Dictation.CorrectionDictionary.FromLexicon(lexicon);
+        var userCorrections = await _db.UserCorrections
+            .Where(c => c.TenantId == tenant.Id && c.UserId == user.Id).ToListAsync(ct);
+        var corrections = RadioPad.Application.Dictation.CorrectionDictionary.Resolve(lexicon, userCorrections);
 
         try
         {

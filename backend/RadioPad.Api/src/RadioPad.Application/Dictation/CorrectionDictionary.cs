@@ -21,4 +21,31 @@ public static class CorrectionDictionary
             .Select(l => new CorrectionRule(l.Term.Trim(), l.Replacement.Trim()))
             .ToList();
     }
+
+    /// <summary>
+    /// Resolves the effective correction rules for a user: the org lexicon layered UNDER the user's
+    /// personal corrections — for the same source term the user's entry wins. Longest phrases first
+    /// so they are not pre-empted by a shorter rule.
+    /// </summary>
+    public static IReadOnlyList<CorrectionRule> Resolve(
+        IEnumerable<TenantLexicon>? orgLexicon,
+        IEnumerable<UserCorrection>? userCorrections)
+    {
+        var byFrom = new Dictionary<string, CorrectionRule>(StringComparer.OrdinalIgnoreCase);
+
+        foreach (var rule in FromLexicon(orgLexicon))
+            byFrom[rule.From] = rule;
+
+        if (userCorrections is not null)
+        {
+            foreach (var u in userCorrections)
+            {
+                if (string.IsNullOrWhiteSpace(u.From) || string.IsNullOrWhiteSpace(u.To))
+                    continue;
+                byFrom[u.From.Trim()] = new CorrectionRule(u.From.Trim(), u.To.Trim()); // user overrides org
+            }
+        }
+
+        return byFrom.Values.OrderByDescending(r => r.From.Length).ToList();
+    }
 }

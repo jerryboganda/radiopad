@@ -65,4 +65,29 @@ public class CorrectionDictionaryTests
 
         Assert.Contains("hypodense", result.CorrectedTranscript);
     }
+
+    // ── per-user layer (F7b) ─────────────────────────────────────────────
+
+    [Fact]
+    public void Resolve_Merges_Org_And_User_With_User_Winning_For_Same_Term()
+    {
+        var org = new[]
+        {
+            new TenantLexicon { Term = "US", Replacement = "ultrasound" },
+            new TenantLexicon { Term = "hypo dense", Replacement = "hypodense" },
+        };
+        var user = new[] { new UserCorrection { From = "US", To = "US scan" } };
+
+        var rules = CorrectionDictionary.Resolve(org, user);
+
+        Assert.Contains(rules, r => r.From == "US" && r.To == "US scan");          // user overrides org
+        Assert.Contains(rules, r => r.From == "hypo dense" && r.To == "hypodense"); // org entry kept
+        Assert.Single(rules, r => string.Equals(r.From, "US", System.StringComparison.OrdinalIgnoreCase));
+    }
+
+    [Fact]
+    public void Resolve_Null_Inputs_Yield_Empty()
+    {
+        Assert.Empty(CorrectionDictionary.Resolve(null, null));
+    }
 }

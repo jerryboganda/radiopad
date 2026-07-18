@@ -557,6 +557,21 @@ public class TenantLexicon : Entity
 }
 
 /// <summary>
+/// F7 — a per-user correction-dictionary entry, applied deterministically BEFORE the LLM (dictation
+/// brief §6). Layered over the org <see cref="TenantLexicon"/>: for the same source term the user's
+/// entry wins. "Fix a term once, applied to all future transcripts."
+/// </summary>
+public class UserCorrection : Entity
+{
+    public Guid TenantId { get; set; }
+    public Guid UserId { get; set; }
+    /// <summary>The spoken/mis-transcribed form to replace (e.g. "hypo dense").</summary>
+    public string From { get; set; } = "";
+    /// <summary>The canonical replacement (e.g. "hypodense").</summary>
+    public string To { get; set; } = "";
+}
+
+/// <summary>
 /// Per-tenant settings (singleton row keyed by <see cref="TenantId"/>):
 /// AI safety toggles (PRD AI-007), billing plan + feature flags
 /// (PRD BILL-001/006), and Stripe customer linkage.
