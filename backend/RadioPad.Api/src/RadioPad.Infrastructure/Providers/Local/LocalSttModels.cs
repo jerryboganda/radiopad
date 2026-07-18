@@ -21,10 +21,57 @@ public static class LocalSttModels
         SizeBytes: 487170055L,
         Sha256: "5793d0fd397c5778d2cf2126994d58e9d56b1be7c04d13c7a15bb1b4eafb16bf");
 
+    // ── MedASR (default primary STT, brief §2.1 / decision D2) ─────────────
+    public const string MedAsrModelName = "medasr-ctc-en-int8";
+
+    /// <summary>
+    /// Google MedASR (Conformer-CTC, ~105M) as a **sherpa-onnx-native CTC bundle** exported by the
+    /// sherpa-onnx maintainer (csukuangfj). Two raw files — no archive. The repo is <b>public and
+    /// ungated</b> (HF API <c>gated:false</c>), so the anonymous provisioner downloads it directly;
+    /// no HF token or license-click is needed. Runs via <see cref="SherpaMedAsrSttClient"/> on the
+    /// existing sherpa-onnx (<c>OfflineModelConfig.MedAsr</c>) CPU path — the same runtime as
+    /// Parakeet. Verified against the HF blob API 2026-07-19.
+    /// </summary>
+    public static readonly FileSpec MedAsrModel = new(
+        Name: MedAsrModelName,
+        FileName: "model.int8.onnx",
+        Url: "https://huggingface.co/csukuangfj/sherpa-onnx-medasr-ctc-en-int8-2025-12-25/resolve/main/model.int8.onnx",
+        SizeBytes: 154106419L,
+        Sha256: "2c20f03265ee6144c566fd18b0f7bbb4f0d005d11ce9440dd641920210f4c33a");
+
+    /// <summary>MedASR token table. A tiny non-LFS vocab file (~4.7 KB); an empty
+    /// <see cref="FileSpec.Sha256"/> tells the provisioner to skip content verification for it.</summary>
+    public static readonly FileSpec MedAsrTokens = new(
+        Name: MedAsrModelName,
+        FileName: "tokens.txt",
+        Url: "https://huggingface.co/csukuangfj/sherpa-onnx-medasr-ctc-en-int8-2025-12-25/resolve/main/tokens.txt",
+        SizeBytes: 4712L,
+        Sha256: "");
+
     public sealed record ModelSpec(string Name, string Url, long SizeBytes, string Sha256);
 
     /// <summary>A single downloadable model file (no archive extraction).</summary>
     public sealed record FileSpec(string Name, string FileName, string Url, long SizeBytes, string Sha256);
+
+    /// <summary>Resolve the MedASR CTC model + tokens under <paramref name="dir"/> (null when absent).</summary>
+    public static (string? model, string? tokens) ResolveMedAsrFiles(string? dir)
+    {
+        if (string.IsNullOrEmpty(dir) || !Directory.Exists(dir))
+            return (null, null);
+        string? Pick(string fileName)
+        {
+            var f = Directory.GetFiles(dir, fileName, SearchOption.AllDirectories).FirstOrDefault();
+            return f;
+        }
+        return (Pick(MedAsrModel.FileName), Pick(MedAsrTokens.FileName));
+    }
+
+    /// <summary>True when the MedASR CTC model + tokens are both present under <paramref name="dir"/>.</summary>
+    public static bool IsMedAsrComplete(string? dir)
+    {
+        var (m, t) = ResolveMedAsrFiles(dir);
+        return m is not null && t is not null;
+    }
 
     // ── Tuning knobs (env-overridable; safe defaults) ──────────────────────
     // All default to the *optimized* setting so a stock desktop build benefits

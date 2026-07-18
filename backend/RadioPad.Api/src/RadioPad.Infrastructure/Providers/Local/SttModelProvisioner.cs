@@ -35,6 +35,29 @@ public sealed class SttModelProvisioner
     public Task<bool> EnsureAsync(CancellationToken ct) => EnsureAsync(LocalSttModels.Parakeet, ct);
 
     /// <summary>
+    /// Ensure the MedASR CTC bundle (the default primary STT, D2) is installed — its two raw files
+    /// (model.int8.onnx + tokens.txt) into the MedASR model dir. Idempotent; a fast no-op once both
+    /// are present. The repo is public/ungated, so this needs no credentials.
+    /// </summary>
+    public async Task<bool> EnsureMedAsrAsync(CancellationToken ct)
+    {
+        var dir = LocalSttModels.ResolveModelDir(LocalSttModels.MedAsrModelName);
+        if (dir is null)
+        {
+            _log.LogWarning("No local-app-data dir resolvable; cannot provision MedASR.");
+            return false;
+        }
+        if (LocalSttModels.IsMedAsrComplete(dir))
+        {
+            _status.SetState(LocalSttModels.MedAsrModelName, ProvisionState.Ready);
+            return true;
+        }
+        var okModel = await EnsureFileInDirAsync(LocalSttModels.MedAsrModel, dir, ct);
+        var okTokens = await EnsureFileInDirAsync(LocalSttModels.MedAsrTokens, dir, ct);
+        return okModel && okTokens && LocalSttModels.IsMedAsrComplete(dir);
+    }
+
+    /// <summary>
     /// Ensure the model described by <paramref name="desc"/> is installed,
     /// dispatching by archive kind. Used by the manual download endpoint so any
     /// catalog model (STT today; future kinds) provisions through one entry point.
@@ -195,7 +218,10 @@ public sealed class SttModelProvisioner
                 _status.SetState(spec.Name, ProvisionState.Downloading);
                 await DownloadAsync(spec.Name, spec.Url, tmp, ct);
                 _status.SetState(spec.Name, ProvisionState.Verifying);
-                await VerifySha256Async(tmp, spec.Sha256, ct);
+                // Tiny non-LFS config files (e.g. tokens.txt) carry no pinned digest — an empty
+                // Sha256 skips content verification. Real model weights always pin a digest.
+                if (!string.IsNullOrWhiteSpace(spec.Sha256))
+                    await VerifySha256Async(tmp, spec.Sha256, ct);
                 _status.SetState(spec.Name, ProvisionState.Installing);
                 if (File.Exists(dest)) File.Delete(dest);
                 File.Move(tmp, dest);

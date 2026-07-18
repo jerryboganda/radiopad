@@ -37,10 +37,17 @@ The safety engine and the buildable competitive features are shipped, all TDD + 
 - **Phase 3 gating** — `RegulatedFeatures` gate (OFF by default, fail-safe) + admin
   "Regulated AI features" surface. See §5 below (now implemented, not just planned).
 
+### MedASR — UNBLOCKED (browser research, 2026-07-19)
+The "no sherpa bundle exists" blocker was **wrong**. A public, **ungated** sherpa-onnx-native CTC
+export exists from the sherpa-onnx maintainer: `csukuangfj/sherpa-onnx-medasr-ctc-en-int8-2025-12-25`
+(model.int8.onnx + tokens.txt, ~160 MB, HF API `gated:false`). And sherpa-onnx v1.13.3 (already
+pinned) has first-class MedASR support (`OfflineModelConfig.MedAsr.Model`). So MedASR now runs on the
+existing on-device engine — **no HF token, no license-click, no ONNX-export step**. Engine wired +
+compile-verified: `SherpaMedAsrSttClient` + the verified `LocalSttModels.MedAsr*` descriptor +
+`SttModelProvisioner.EnsureMedAsrAsync`. Remaining finish: DI registration + routing/ensemble +
+`LocalSttSettings` primary selection + on-desktop runtime verification of transcription.
+
 ### Still blocked / deferred (need artifacts, a Rust build, or a focused pass)
-- **P0.2 MedASR** — gated Conformer, no published sherpa bundle → needs a build-time ONNX-export
-  artifact + HAI-DEF license + HF token before a real (URL, SHA-256) descriptor can exist. Not
-  fabricated. Cloud STT stays primary (D1/D2).
 - **Local MedGemma runtime** — pin is verified (§2), but actually running it needs the
   **llama-server binary bundled in CI**.
 - **P0.3 remainder** — Rust system-wide global-shortcut rebind (needs a Tauri build I can't
