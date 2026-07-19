@@ -248,3 +248,14 @@ capability ships OFF by default, and its runtime behaviour must consult `IsEnabl
   safety layers refused a bad formatter rather than putting its output in a draft — the behaviour
   they exist for, observed rather than asserted. §5.2 was visible in the same run: "three point two
   centimeter" → "3.2 cm".
+- **2026-07-19 — P0.3 complete (incremental decode).** Named honestly: both engines are sherpa-onnx
+  **offline** recognizers (MedASR Conformer-CTC, Parakeet TDT) and neither exposes sherpa's
+  streaming `OnlineRecognizer`, so frame-level streaming ASR is not available with the pinned
+  models. What ships is chunked incremental decode — `SpeechSegmenter` cuts audio at natural pauses
+  (700 ms hold, chosen to ride through the ~200-400 ms gap inside "three point two" rather than cut
+  it) and each completed segment is decoded for a live preview.
+  **Safety line, enforced by design and stated at both call sites: preview text is DISPLAY-ONLY.**
+  A segment boundary can split a spoken measurement and decode to a number nobody said, so the
+  authoritative transcript remains the whole-buffer decode taken on push-to-talk release. Desktop
+  only — on-device segments are free, whereas on the web each would be a billed cloud transcription
+  of audio being uploaded in full anyway.
