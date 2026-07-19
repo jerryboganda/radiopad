@@ -364,6 +364,9 @@ public sealed class LocalModelsController : ControllerBase
                 return d.ArchiveKind switch
                 {
                     ModelArchiveKind.TarBz2 => LocalSttModels.IsComplete(dir),
+                    // The MedASR CTC bundle is two raw files, so neither the Parakeet transducer
+                    // check nor the single-FileName check answers "is it installed".
+                    ModelArchiveKind.MedAsrCtc => LocalSttModels.IsMedAsrComplete(dir),
                     ModelArchiveKind.RawFile => d.FileName is not null && System.IO.File.Exists(Path.Combine(dir, d.FileName)),
                     _ => false,
                 };

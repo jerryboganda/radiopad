@@ -97,8 +97,42 @@ public sealed class LocalSttEnsemble : ILocalSttClient
             sw.ElapsedMilliseconds, reconciled.Spans);
     }
 
+    /// <summary>
+    /// Deliberate fallback order when the configured primary has no backend engine to run.
+    ///
+    /// <para>This is not hypothetical: the Edge Web Speech engine is frontend-only, so whenever it
+    /// is the user's primary, EVERY sidecar transcription falls back. Before this order existed the
+    /// fallback was <c>engines[0]</c> — i.e. whichever engine DI happened to register first — which
+    /// silently routed dictation to Parakeet even with MedASR installed and available, defeating
+    /// decision D2. Registration order is an implementation detail and must never decide which
+    /// engine transcribes a radiologist's dictation.</para>
+    /// </summary>
+    private static readonly string[] FallbackEngineOrder =
+    {
+        SherpaMedAsrSttClient.EngineName,      // D2: the radiology-tuned default primary
+        SherpaParakeetSttClient.EngineName,    // general-purpose alternative
+        LocalModelCatalog.WindowsSapiEngine,   // always-present Windows recognizer
+    };
+
     private ILocalSttEngine PickPrimary(IReadOnlyList<ILocalSttEngine> engines)
-        => engines.FirstOrDefault(e => e.EngineId == _settings.PrimaryEngineId) ?? engines[0];
+    {
+        var configured = engines.FirstOrDefault(e => e.EngineId == _settings.PrimaryEngineId);
+        if (configured is not null) return configured;
+
+        foreach (var engineId in FallbackEngineOrder)
+        {
+            var match = engines.FirstOrDefault(e => e.EngineId == engineId);
+            if (match is not null)
+            {
+                _log.LogInformation(
+                    "Configured primary STT engine {Configured} has no on-device implementation; " +
+                    "falling back to {Fallback}.", _settings.PrimaryEngineId, match.EngineId);
+                return match;
+            }
+        }
+
+        return engines[0];
+    }
 
     private async Task<EngineTranscript?> RunSafe(ILocalSttEngine engine, byte[] bytes, CancellationToken ct)
     {
