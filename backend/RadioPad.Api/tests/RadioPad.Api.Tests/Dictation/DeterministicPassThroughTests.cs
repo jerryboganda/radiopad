@@ -70,6 +70,28 @@ public class DeterministicPassThroughTests
         Assert.Equal("the lesion is hypodense", DeterministicPassThrough.ApplyCorrections("the lesion is Hypo Dense", rules));
     }
 
+    /// <summary>
+    /// Parity anchor for the frontend port (<c>frontend/lib/dictation/resolveCorrections.ts</c>),
+    /// which the microphone path now applies client-side — the mic used to insert its transcript
+    /// without any correction dictionary at all.
+    ///
+    /// The two implementations must agree, including where they are LIMITED: a source phrase ending
+    /// in punctuation never matches, because both wrap it in <c>\b…\b</c> and a word boundary cannot
+    /// anchor after a trailing '.'. Pinned on both sides so neither can drift into correcting more
+    /// than the other; if this is ever relaxed, relax it in the same change.
+    /// </summary>
+    [Fact]
+    public void Corrections_Do_Not_Match_A_Source_Phrase_Ending_In_Punctuation()
+    {
+        var rules = new[] { new CorrectionRule("c.t.", "CT") };
+        Assert.Equal("c.t. of the chest", DeterministicPassThrough.ApplyCorrections("c.t. of the chest", rules));
+
+        // The escaping itself is sound: the '.' is literal, so it does not match an arbitrary char.
+        var interior = new[] { new CorrectionRule("c.t", "CT") };
+        Assert.Equal("CT of the chest", DeterministicPassThrough.ApplyCorrections("c.t of the chest", interior));
+        Assert.Equal("cot of the chest", DeterministicPassThrough.ApplyCorrections("cot of the chest", interior));
+    }
+
     [Fact]
     public void Corrections_Are_Applied_In_Order()
     {

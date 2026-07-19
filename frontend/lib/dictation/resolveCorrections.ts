@@ -65,3 +65,31 @@ export function resolveCorrections(
 
   return [...byFrom.values()].sort((a, b) => b.from.length - a.from.length);
 }
+
+/**
+ * Apply resolved rules to text, as ordered, whitespace-tolerant, case-insensitive whole-phrase
+ * replacements. The canonical `to` form wins.
+ *
+ * A faithful port of `DeterministicPassThrough.ApplyCorrections`, needed because the primary mic
+ * path inserts its transcript straight into the editor without ever reaching a backend that could
+ * apply the dictionary: `DictationOverlay` ran only `formatDictation` (spoken numbers and
+ * punctuation), so every correction a radiologist had configured applied when they used the
+ * dictation-draft panel and silently did nothing when they used the microphone. Same feature, same
+ * settings screen, opposite behaviour depending on which control they reached for.
+ */
+export function applyCorrections(text: string, rules: readonly CorrectionRule[] | null | undefined): string {
+  if (!text || !rules || rules.length === 0) return text ?? '';
+
+  let out = text;
+  for (const rule of rules) {
+    if (!rule?.from || rule.from.trim().length === 0) continue;
+    // Whitespace inside the source phrase matches any run of whitespace, so a phrase dictated
+    // across a line break still matches.
+    const parts = rule.from.trim().split(/\s+/).map((p) => p.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'));
+    const pattern = new RegExp(`\\b${parts.join('\\s+')}\\b`, 'gi');
+    // '$' in the replacement is literal, matching the backend's Replace("$", "$$").
+    const replacement = (rule.to ?? '').replace(/\$/g, '$$$$');
+    out = out.replace(pattern, replacement);
+  }
+  return out;
+}

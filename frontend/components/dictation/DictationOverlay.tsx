@@ -23,6 +23,7 @@ import { getLastFocusedSectionEditor } from '@/lib/editor/sectionEditorRegistry'
 import { setSessionAudio } from '@/lib/dictation/audioBuffer';
 import { useCrossCheckEnabled, useUseUbag } from '@/lib/dictation/crossCheckPrefs';
 import { formatDictation } from '@/lib/dictation/medicalFormat';
+import { resolveCorrections, applyCorrections, type CorrectionRule } from '@/lib/dictation/resolveCorrections';
 import { parseVoiceEditCommand } from '@/lib/dictation/voiceEditCommands';
 import { createPushToTalk } from '@/lib/dictation/pushToTalk';
 import { startInterimDecode } from '@/lib/dictation/interimDecode';
@@ -75,6 +76,35 @@ export default function DictationOverlay() {
   const [interim, setInterim] = useState('');
   const recognizerRef = useRef<SpeechRecognitionLike | null>(null);
   const listeningRef = useRef(false);
+
+  // F7 — the effective correction dictionary (org lexicon under the user's personal corrections).
+  //
+  // The mic path inserts its transcript straight into the editor, so nothing downstream ever
+  // applies these: dictating through the microphone silently ignored every correction the
+  // radiologist had configured, while the dictation-draft panel honoured them. Held in a ref
+  // because the Web Speech `onresult` handler inserts synchronously, and refreshed whenever
+  // dictation starts so edits made in Settings take effect on the next utterance.
+  const correctionsRef = useRef<CorrectionRule[]>([]);
+  const refreshCorrections = useCallback(async () => {
+    try {
+      const [lexicon, userCorrections] = await Promise.all([
+        api.lexicon.list().catch(() => []),
+        api.userCorrections.list().catch(() => []),
+      ]);
+      correctionsRef.current = resolveCorrections(lexicon, userCorrections);
+    } catch {
+      // Never block dictation on the dictionary — uncorrected text beats no text.
+    }
+  }, []);
+  useEffect(() => {
+    void refreshCorrections();
+  }, [refreshCorrections]);
+
+  /** Correct, then format — the same order as the backend's deterministic pass-through. */
+  const prepareDictated = useCallback(
+    (text: string) => formatDictation(applyCorrections(text, correctionsRef.current)),
+    [],
+  );
   listeningRef.current = listening;
 
   // Broadcast so other controls (the ribbon's own Dictate button) can mirror
@@ -174,6 +204,8 @@ export default function DictationOverlay() {
   }, []);
 
   const start = useCallback(() => {
+    // Pick up corrections edited in Settings since this overlay mounted.
+    void refreshCorrections();
     const Ctor = getSpeechRecognitionCtor();
     if (!Ctor) return;
     const rec = new Ctor();
@@ -191,7 +223,7 @@ export default function DictationOverlay() {
         if (parseVoiceEditCommand(finalText)?.kind === 'undo') {
           getLastFocusedSectionEditor()?.undo?.();
         } else {
-          insertDictation(formatDictation(finalText));
+          insertDictation(prepareDictated(finalText));
         }
         setInterim('');
       }
@@ -220,7 +252,7 @@ export default function DictationOverlay() {
     } catch {
       setListening(false);
     }
-  }, []);
+  }, [prepareDictated, refreshCorrections]);
 
   const toggle = useCallback(() => {
     if (listeningRef.current) stop();
@@ -269,7 +301,7 @@ export default function DictationOverlay() {
       }
       const res = await api.reports.transcribe(reportId, payload, mode);
       if (res.transcript) {
-        const formatted = formatDictation(res.transcript);
+        const formatted = prepareDictated(res.transcript);
         insertDictation(formatted);
         // Retain the audio + its transcript (and which section it went into) so the
         // manual Cross Check can re-run the same audio through the extra engines.
