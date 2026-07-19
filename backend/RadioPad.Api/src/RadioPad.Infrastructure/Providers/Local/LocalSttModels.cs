@@ -48,6 +48,20 @@ public static class LocalSttModels
         SizeBytes: 4712L,
         Sha256: "");
 
+    /// <summary>
+    /// A real radiology dictation sample from the bundle's own <c>test_wavs/</c> (16 kHz mono,
+    /// ~1.4 MB). Provisioned alongside the model so the model-manager "Test" action transcribes
+    /// actual speech: <see cref="SelfTestAudio"/> otherwise falls back to a synthesized 440 Hz tone,
+    /// which MedASR correctly transcribes as nothing — indistinguishable from a broken engine.
+    /// The Parakeet bundle ships test_wavs inside its archive; this restores parity.
+    /// </summary>
+    public static readonly FileSpec MedAsrSampleWav = new(
+        Name: MedAsrModelName,
+        FileName: "test_wavs/0.wav",
+        Url: "https://huggingface.co/csukuangfj/sherpa-onnx-medasr-ctc-en-int8-2025-12-25/resolve/main/test_wavs/0.wav",
+        SizeBytes: 1401678L,
+        Sha256: "f762591b44f3672e4b5b464d89912d43e12510082a8471c5fb85ec03dcb9d794");
+
     public sealed record ModelSpec(string Name, string Url, long SizeBytes, string Sha256);
 
     /// <summary>A single downloadable model file (no archive extraction).</summary>

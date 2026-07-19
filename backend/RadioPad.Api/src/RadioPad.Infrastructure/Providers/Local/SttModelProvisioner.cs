@@ -54,7 +54,24 @@ public sealed class SttModelProvisioner
         }
         var okModel = await EnsureFileInDirAsync(LocalSttModels.MedAsrModel, dir, ct);
         var okTokens = await EnsureFileInDirAsync(LocalSttModels.MedAsrTokens, dir, ct);
-        return okModel && okTokens && LocalSttModels.IsMedAsrComplete(dir);
+
+        // Best-effort: the self-test sample makes the manager's "Test" action transcribe real
+        // speech, but the engine is fully functional without it, so a failure here must not fail
+        // provisioning. Deliberately excluded from IsMedAsrComplete for the same reason.
+        try { await EnsureFileInDirAsync(LocalSttModels.MedAsrSampleWav, dir, ct); }
+        catch (Exception ex) when (ex is not OperationCanceledException)
+        {
+            _log.LogWarning(ex, "MedASR self-test sample could not be provisioned; engine is unaffected.");
+        }
+
+        var complete = okModel && okTokens && LocalSttModels.IsMedAsrComplete(dir);
+
+        // The three specs share one status key, so a failed *sample* download would otherwise leave
+        // MedASR reading "Failed" in the manager while the engine is perfectly usable. Re-assert the
+        // truth from the files actually on disk.
+        if (complete) _status.SetState(LocalSttModels.MedAsrModelName, ProvisionState.Ready);
+
+        return complete;
     }
 
     /// <summary>
@@ -209,7 +226,9 @@ public sealed class SttModelProvisioner
                 return true; // another caller finished while we waited
             }
 
-            Directory.CreateDirectory(dir);
+            // Create the DESTINATION's parent, not just dir: a FileSpec may carry a nested path
+            // (e.g. "test_wavs/0.wav"), and File.Move would otherwise fail on the missing subdir.
+            Directory.CreateDirectory(Path.GetDirectoryName(dest) ?? dir);
             var tmp = dest + $".download-{Guid.NewGuid():N}";
             try
             {

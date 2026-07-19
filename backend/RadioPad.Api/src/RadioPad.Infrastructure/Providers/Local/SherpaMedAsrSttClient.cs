@@ -123,7 +123,10 @@ public sealed class SherpaMedAsrSttClient : ILocalSttClient, ILocalSttEngine, ID
                 using var stream = recognizer.CreateStream();
                 stream.AcceptWaveform(SampleRate, samples);
                 recognizer.Decode(stream);
-                return (stream.Result.Text ?? string.Empty).Trim();
+                // MedASR emits its own markup ({period} markers, [FINDINGS] tags) rather than plain
+                // punctuation — translate it here, at the engine boundary, so every consumer (§5.2,
+                // the formatter, the ROVER ensemble, the raw-transcript fallback) sees plain prose.
+                return MedAsrTranscriptNormalizer.Normalize(stream.Result.Text);
             }
         }
         catch (Exception ex) when (ex is not OperationCanceledException)
