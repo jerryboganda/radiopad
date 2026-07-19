@@ -3,6 +3,7 @@
 import Link from 'next/link';
 import { useEffect, useState } from 'react';
 import { api, type BillingStatus } from '@/lib/api';
+import { isWebSurface } from '@/lib/surface';
 
 const REFRESH_MS = 5 * 60 * 1000;
 
@@ -43,8 +44,7 @@ export default function BillingStatusBanner() {
       <div className="banner danger" role="alert">
         Billing suspended on{' '}
         <code>{new Date(status.suspendedAt).toLocaleDateString()}</code>. Some
-        features are disabled.{' '}
-        <Link href="/admin/billing">Resolve in billing →</Link>
+        features are disabled. <BillingAction label="Resolve in billing" />
       </div>
     );
   }
@@ -53,9 +53,21 @@ export default function BillingStatusBanner() {
     return (
       <div className="banner warn" role="status">
         Payment overdue — grace period ends in {days} day{days === 1 ? '' : 's'}.{' '}
-        <Link href="/admin/billing">Update billing →</Link>
+        <BillingAction label="Update billing" />
       </div>
     );
   }
   return null;
+}
+
+/**
+ * Billing lives on the web admin console only — `/admin/billing` is a `(web)` route and
+ * build-surface.mjs stages that group out of the desktop and mobile bundles. This banner renders
+ * on every surface, so linking there unconditionally sent radiologists to "Page not found" at
+ * exactly the moment they were told something needed resolving. Off web, name the action instead
+ * of offering a link that goes nowhere: a clinical user cannot settle the tenant's invoice anyway.
+ */
+function BillingAction({ label }: { label: string }) {
+  if (!isWebSurface) return <>Contact your administrator to resolve this.</>;
+  return <Link href="/admin/billing">{label} →</Link>;
 }

@@ -7,6 +7,7 @@ import AuthScaffold from '@/components/auth/AuthScaffold';
 import { api, publicEnv, setActiveAuthToken } from '@/lib/api';
 import { setAuthToken, isAuthTokenSecure } from '@/lib/secureAuth';
 import { signInWithPasskey, registerPasskey, isPlatformAuthenticatorAvailable } from '@/lib/webauthn';
+import { isDesktopSurface } from '@/lib/surface';
 
 const LS_TENANT = 'radiopad.tenant';
 const LS_USER = 'radiopad.user';
@@ -383,9 +384,13 @@ function LoginContent() {
                 {busy === 'sso' ? 'Starting SSO…' : 'Continue with SSO'}
               </button>
             )}
-            <button className="ghost" type="button" onClick={() => router.push('/pair')} disabled={busy !== null}>
-              Pair a device
-            </button>
+            {/* /pair is a (desktop) route. Login is (shared) and ships everywhere, so on the web
+                console and the mobile companion this button led straight to "Page not found". */}
+            {isDesktopSurface && (
+              <button className="ghost" type="button" onClick={() => router.push('/pair')} disabled={busy !== null}>
+                Pair a device
+              </button>
+            )}
           </div>
 
           {devLoginEnabled && (

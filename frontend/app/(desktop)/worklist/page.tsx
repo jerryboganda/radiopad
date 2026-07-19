@@ -133,6 +133,9 @@ function WorklistInner() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [refreshError, setRefreshError] = useState<string | null>(null);
+  // Non-null when the queue is showing fewer reports than the tenant holds. Priority is ranked
+  // client-side, so an incomplete list can hide an urgent case — never let that pass unannounced.
+  const [truncated, setTruncated] = useState<{ shown: number; total: number } | null>(null);
   const [lastRefreshed, setLastRefreshed] = useState<Date | null>(null);
   const [now, setNow] = useState(() => Date.now());
 
@@ -147,11 +150,15 @@ function WorklistInner() {
       setLoading(true);
       setError(null);
     }
+    // listAll, not list(): the bare endpoint returns the 100 most recently updated reports, and
+    // priority is ranked here on the client — so a STAT study that had been waiting while newer
+    // routine work moved never arrived to be ranked at all.
     return api.reports
-      .list()
-      .then((rows) => {
+      .listAll()
+      .then(({ items: rows, total, truncated }) => {
         hasDataRef.current = true;
         setReports(rows);
+        setTruncated(truncated ? { shown: rows.length, total } : null);
         setError(null);
         setRefreshError(null);
         setLastRefreshed(new Date());
@@ -263,6 +270,14 @@ function WorklistInner() {
       {refreshError && (
         <Banner tone="warn" title="Couldn't refresh the queue">
           Showing the last loaded list. {refreshError}
+        </Banner>
+      )}
+
+      {truncated && (
+        <Banner tone="warn" title="This queue is incomplete">
+          Showing {truncated.shown} of {truncated.total} reports. Priority is ranked across the
+          loaded list only, so an urgent case outside it would not appear here. Narrow the queue
+          with the filters below.
         </Banner>
       )}
 

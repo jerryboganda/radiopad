@@ -315,10 +315,13 @@ export default function AdminGovernancePage() {
             )}
           </tbody>
         </table>
-        <div className="rp-row rp-gap-sm rp-mt-sm">
-          <Link href="/rulebooks" className="rp-subtle-link">Open Rulebooks →</Link>
-          <Link href="/prompts" className="rp-subtle-link">Open Prompt Studio →</Link>
-        </div>
+        {/* Rulebooks and Prompt Studio are (desktop) routes; this page is (web), and
+            build-surface.mjs stages the desktop group out of the web bundle — so these were dead
+            links for the only users who can reach this screen. The governance table above already
+            summarises both; authoring happens in the desktop app. */}
+        <p className="rp-page-sub rp-mt-sm">
+          Rulebooks and prompt overrides are authored in the RadioPad desktop app.
+        </p>
       </div>
 
       {/* 3 — AI usage ------------------------------------------------------- */}
@@ -481,7 +484,8 @@ export default function AdminGovernancePage() {
             })}
           </ul>
         )}
-        <Link href="/audit" className="rp-subtle-link">Open audit log →</Link>
+        {/* /audit is a (desktop) route and does not ship in the web bundle — see the note above. */}
+        <p className="rp-page-sub">The full append-only audit log is available in the desktop app.</p>
       </div>
     </div>
   );

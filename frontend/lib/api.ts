@@ -1137,6 +1137,32 @@ export const api = {
       const qs = sp.toString();
       return requestPaged<Report>(`/api/reports${qs ? '?' + qs : ''}`);
     },
+    /**
+     * Every matching report, paged until the server's total is satisfied.
+     *
+     * `list()` hits the bare route, which the backend serves with take=100 ordered by UpdatedAt.
+     * Any caller that ranks rows itself — the worklist sorts by derived priority — therefore ranked
+     * only the 100 most recently touched reports, and a STAT study that had been waiting while
+     * newer routine work moved was simply not in the response. Callers that must not miss a row
+     * use this instead. `truncated` is true when the page ceiling was reached before the total,
+     * so the caller can say so rather than quietly showing a partial queue.
+     */
+    listAll: async (
+      params: { modality?: string; status?: number; q?: string } = {},
+      opts: { pageSize?: number; maxPages?: number } = {},
+    ): Promise<{ items: Report[]; total: number; truncated: boolean }> => {
+      const pageSize = opts.pageSize ?? 500; // the backend clamps take to 500
+      const maxPages = opts.maxPages ?? 20; // 10k rows, then say so
+      const items: Report[] = [];
+      let total = 0;
+      for (let page = 0; page < maxPages; page++) {
+        const res = await api.reports.listPaged({ ...params, skip: page * pageSize, take: pageSize });
+        total = res.total;
+        items.push(...res.items);
+        if (res.items.length === 0 || items.length >= total) break;
+      }
+      return { items, total, truncated: items.length < total };
+    },
     get: (id: string) => request<Report>(`/api/reports/${id}`),
     create: (
       body: Partial<Report['study']> & {

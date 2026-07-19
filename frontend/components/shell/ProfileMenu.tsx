@@ -8,7 +8,7 @@ import { api, setActiveAuthToken } from '@/lib/api';
 import { clearAuthToken } from '@/lib/secureAuth';
 import { useSttMode } from '@/lib/dictation/sttMode';
 import { useCrossCheckEnabled, useUseUbag } from '@/lib/dictation/crossCheckPrefs';
-import { isDesktopSurface } from '@/lib/surface';
+import { isDesktopSurface, isWebSurface } from '@/lib/surface';
 import LocalePicker from '../LocalePicker';
 
 type Me = {
@@ -96,12 +96,24 @@ export default function ProfileMenu({ variant = 'sidebar' }: { variant?: 'sideba
       {open && (
         <div className="rp-profile-popover" role="menu">
           <div className="rp-profile-popover-meta">{tProfile('account')}</div>
-          <Link className="rp-profile-popover-item" role="menuitem" href="/admin/settings" onClick={() => setOpen(false)}>
+          {/* Both of these pointed unconditionally at `(web)` routes, which build-surface.mjs
+              stages out of the desktop and mobile bundles — so on every screen that renders the
+              topbar (i.e. nearly all of them) they landed a radiologist on "Page not found" and
+              lost their place. Settings exists on both surfaces at different paths; billing is a
+              master-admin concern that only the web console ships. */}
+          <Link
+            className="rp-profile-popover-item"
+            role="menuitem"
+            href={isWebSurface ? '/admin/settings' : '/settings'}
+            onClick={() => setOpen(false)}
+          >
             {tNav('settings')}
           </Link>
-          <Link className="rp-profile-popover-item" role="menuitem" href="/admin/billing" onClick={() => setOpen(false)}>
-            {tNav('billing')}
-          </Link>
+          {isWebSurface && (
+            <Link className="rp-profile-popover-item" role="menuitem" href="/admin/billing" onClick={() => setOpen(false)}>
+              {tNav('billing')}
+            </Link>
+          )}
           {/* Dictation preferences drive the desktop-only on-device engines +
               cross-check flow — dead UI on the web admin surface, so gate them
               to the desktop bundle (same build-time flag the shell uses). */}
