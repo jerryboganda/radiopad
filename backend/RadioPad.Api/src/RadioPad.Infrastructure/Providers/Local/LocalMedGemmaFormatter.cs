@@ -3,16 +3,24 @@ using RadioPad.Application.Dictation;
 using RadioPad.Application.Services;
 using RadioPad.Domain.Entities;
 using RadioPad.Domain.Enums;
+using RadioPad.Domain.ValueObjects;
 
 namespace RadioPad.Infrastructure.Providers.Local;
 
 /// <summary>
 /// Dictation brief §2.2 — the OPTIONAL on-device report formatter. Runs the deterministically
-/// protected transcript through the bundled MedGemma 1.5 4B (Q4_K_M) llama-server via the
+/// protected transcript through MedGemma 1.5 4B (Q4_K_M) on a llama-server via the
 /// <see cref="LlamaCppProvider"/> (LocalOnly), constrained by the §5.4 GBNF grammar at temperature 0.
 /// PHI never leaves the device: the endpoint is enforced to be loopback. Enabled per-workstation by
 /// <c>RADIOPAD_LOCAL_FORMATTER_ENABLED</c> (set by the desktop sidecar); inert everywhere else, so
 /// the cloud formatter stays the default.
+///
+/// <para><b>The llama-server is NOT bundled yet.</b> This adapter speaks HTTP to one that is already
+/// listening on loopback — today the operator runs it themselves (llama.cpp's <c>llama-server</c>
+/// pointed at the provisioned GGUF). Shipping that binary is tracked in IMPLEMENTATION_NOTES.md.
+/// Until then a transport failure is surfaced as an actionable message rather than a bare
+/// "connection refused": the model download alone is ~2.5 GB, and someone who paid that deserves to
+/// be told what is actually missing.</para>
 /// </summary>
 public sealed class LocalMedGemmaFormatter : ILocalReportFormatter
 {
@@ -64,7 +72,23 @@ public sealed class LocalMedGemmaFormatter : ILocalReportFormatter
             Grammar = context.Grammar ?? DictationGrammar.ReportSectionsGbnf, // §5.4 structural constraint
         };
 
-        var result = await _llama.CompleteAsync(request, ct);
+        AiResult result;
+        try
+        {
+            result = await _llama.CompleteAsync(request, ct);
+        }
+        catch (ProviderTransportException ex)
+        {
+            // Nothing is listening on loopback — almost always "the llama-server isn't running",
+            // not a bug. Say so, because the raw transport error ("connection refused") gives the
+            // radiologist no idea that a separate process is required.
+            throw new ProviderTransportException(
+                $"The on-device MedGemma formatter could not reach a llama-server at {endpoint}. " +
+                "Start llama.cpp's llama-server pointed at the downloaded MedGemma GGUF, or turn the " +
+                "offline formatter off to use the cloud formatter (the default). " +
+                $"Underlying error: {ex.Message}",
+                inner: ex);
+        }
         var sections = ReportSectionJson.Parse(result.Text);
 
         var dict = new Dictionary<string, string>

@@ -16,6 +16,9 @@ namespace RadioPad.Api.Tests;
 /// <c>RADIOPAD_STT_SMOKE_REQUIRE=1</c> turns a missing dir into a hard failure so a mis-wired
 /// smoke job can't silently "pass" — see <see cref="SttSmokeGate"/>.
 /// </summary>
+// Enables the on-device engine via a process-global environment variable, so it must not run in
+// parallel with tests that assert the engine is disabled. See EnvironmentVariableCollection.
+[Collection(RadioPad.Api.Tests.Infrastructure.EnvironmentVariableCollection.Name)]
 public class MedAsrEngineSmokeTests
 {
     private readonly Xunit.Abstractions.ITestOutputHelper _out;
@@ -38,8 +41,10 @@ public class MedAsrEngineSmokeTests
         if (modelDir is null)
             return; // not configured (normal CI) — skip; fails loudly if REQUIRE=1
 
-        Environment.SetEnvironmentVariable("RADIOPAD_LOCAL_STT_ENABLED", "1");
-        Environment.SetEnvironmentVariable("RADIOPAD_STT_MODEL_DIR", modelDir);
+        // Scoped so the on-device engine is not left enabled for the rest of the assembly.
+        using var env = new SttSmokeGate.EnvScope()
+            .Set("RADIOPAD_LOCAL_STT_ENABLED", "1")
+            .Set("RADIOPAD_STT_MODEL_DIR", modelDir);
 
         var client = new SherpaMedAsrSttClient(
             new WavAudioDecoder(),
@@ -83,8 +88,10 @@ public class MedAsrEngineSmokeTests
         if (modelDir is null)
             return;
 
-        Environment.SetEnvironmentVariable("RADIOPAD_LOCAL_STT_ENABLED", "1");
-        Environment.SetEnvironmentVariable("RADIOPAD_STT_MODEL_DIR", modelDir);
+        // Scoped so the on-device engine is not left enabled for the rest of the assembly.
+        using var env = new SttSmokeGate.EnvScope()
+            .Set("RADIOPAD_LOCAL_STT_ENABLED", "1")
+            .Set("RADIOPAD_STT_MODEL_DIR", modelDir);
 
         var client = new SherpaMedAsrSttClient(
             new WavAudioDecoder(),

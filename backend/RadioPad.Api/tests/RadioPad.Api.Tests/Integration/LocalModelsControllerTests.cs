@@ -12,6 +12,10 @@ namespace RadioPad.Api.Tests.Integration;
 /// behaviour. The endpoints are anonymous and not report-scoped, so an
 /// unauthenticated client reaches them (no download is ever triggered here).
 /// </summary>
+// These assert on the engine being DISABLED, which is read from a process-global environment
+// variable — so they cannot run in parallel with the STT smoke tests, which enable it. Sharing the
+// non-parallel environment-variable collection serialises them.
+[Collection(RadioPad.Api.Tests.Infrastructure.EnvironmentVariableCollection.Name)]
 public class LocalModelsControllerTests : IClassFixture<RadioPadAppFactory>
 {
     private readonly RadioPadAppFactory _factory;
