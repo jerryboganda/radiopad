@@ -434,10 +434,11 @@ export default function SettingsPage() {
           <div className="rp-panel rp-anim-fade-in-up">
             <div className="rp-panel-title">Regulated AI features</div>
             <div role="note" className="text-warning" style={{ fontSize: 13, marginBottom: 12 }}>
-              <strong>Regulatory review required.</strong> These are assist-only, suggestion-based
-              capabilities built on developer models that are <em>not</em> cleared medical devices.
-              They ship <strong>off</strong> and stay off until your organisation has completed the
-              appropriate UKCA / MHRA / CE / FDA review. Nothing here ever auto-signs a report.
+              <strong>Assist-only capabilities.</strong> These suggest clinical content for the
+              radiologist to confirm or edit; nothing here is auto-applied, and nothing here ever
+              auto-signs a report. They are <strong>enabled</strong>, on the basis that your
+              organisation holds the applicable UKCA / MHRA / CE / FDA clearances. Switch any of them
+              off below if you need to withdraw it.
             </div>
             <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
               {REGULATED_FEATURES.map((f) => {

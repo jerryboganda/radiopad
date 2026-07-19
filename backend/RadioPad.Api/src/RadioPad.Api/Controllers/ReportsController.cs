@@ -5,6 +5,7 @@ using RadioPad.Application.Abstractions;
 using RadioPad.Application.Security;
 using RadioPad.Application.Services;
 using RadioPad.Domain.Entities;
+using RadioPad.Application.Governance;
 using RadioPad.Domain.Enums;
 using RadioPad.Infrastructure.Persistence;
 
@@ -550,6 +551,33 @@ public class ReportsController : TenantedController
 
     public record AiActionDto(string Mode, Guid? ProviderId);
 
+    /// <summary>
+    /// Phase 3 — deny a regulated capability the tenant has explicitly switched off, else null.
+    ///
+    /// <para>Enabled by DEFAULT (the deploying organisation holds the applicable UKCA/MHRA/CE/FDA
+    /// clearances), so this only refuses when an administrator has actively turned the feature off.
+    /// Shared rather than inlined because the same capability is reachable from several endpoints —
+    /// auto-impression from both the synchronous <c>/ai</c> route and the queued <c>/ai/jobs</c>
+    /// route — and gating one entry point while leaving another open is the failure mode that made
+    /// this gate worthless in the first place.</para>
+    /// </summary>
+    private async Task<IActionResult?> DenyIfRegulatedFeatureDisabledAsync(
+        Tenant tenant, RegulatedFeature feature, string label, CancellationToken ct)
+    {
+        // Flags live on TenantSettings, not Tenant. (The gate's own doc comment named the wrong
+        // entity — undetected because nothing ever called it.) Absent settings ⇒ no explicit
+        // override ⇒ enabled.
+        var settings = await _db.TenantSettings.AsNoTracking()
+            .FirstOrDefaultAsync(s => s.TenantId == tenant.Id, ct);
+        if (RegulatedFeatures.IsEnabled(settings?.FeatureFlagsJson, feature)) return null;
+        return StatusCode(StatusCodes.Status403Forbidden, new
+        {
+            error = $"{label} is switched off for this organisation.",
+            kind = "regulated_feature_disabled",
+            feature = RegulatedFeatures.KeyFor(feature),
+        });
+    }
+
     [HttpPost("{id:guid}/ai")]
     [Microsoft.AspNetCore.RateLimiting.EnableRateLimiting("ai")]
     public async Task<IActionResult> RunAi(Guid id, [FromBody] AiActionDto dto, CancellationToken ct)
@@ -561,6 +589,16 @@ public class ReportsController : TenantedController
         if (report is null) return NotFound();
 
         var mode = string.IsNullOrWhiteSpace(dto.Mode) ? "impression" : dto.Mode.Trim().ToLowerInvariant();
+
+        // Phase 3 — auto-impression is a regulated capability; honour the tenant switch. Applied
+        // at BOTH the sync /ai and queued /ai/jobs routes: gating one and leaving the other open
+        // is exactly how a gate becomes decorative.
+        if (string.Equals(mode, "impression", StringComparison.OrdinalIgnoreCase))
+        {
+            var regulatedDeny = await DenyIfRegulatedFeatureDisabledAsync(
+                tenant, RegulatedFeature.AutoImpression, "Automatic impression drafting", ct);
+            if (regulatedDeny is not null) return regulatedDeny;
+        }
         if (!ReportingService.SupportedModes.Contains(mode, StringComparer.OrdinalIgnoreCase))
         {
             return BadRequest(new
@@ -749,6 +787,16 @@ public class ReportsController : TenantedController
         if (report is null) return NotFound();
 
         var mode = string.IsNullOrWhiteSpace(dto.Mode) ? "impression" : dto.Mode.Trim().ToLowerInvariant();
+
+        // Phase 3 — auto-impression is a regulated capability; honour the tenant switch. Applied
+        // at BOTH the sync /ai and queued /ai/jobs routes: gating one and leaving the other open
+        // is exactly how a gate becomes decorative.
+        if (string.Equals(mode, "impression", StringComparison.OrdinalIgnoreCase))
+        {
+            var regulatedDeny = await DenyIfRegulatedFeatureDisabledAsync(
+                tenant, RegulatedFeature.AutoImpression, "Automatic impression drafting", ct);
+            if (regulatedDeny is not null) return regulatedDeny;
+        }
         if (!ReportingService.SupportedModes.Contains(mode, StringComparer.OrdinalIgnoreCase))
         {
             return BadRequest(new
@@ -1592,6 +1640,13 @@ public class ReportsController : TenantedController
         var (tenant, user) = await ResolveContextAsync(_db, ct);
         var deny = RequirePermission(user, RbacPermission.ReportsRead);
         if (deny is not null) return deny;
+
+        // Phase 3 — follow-up standardisation (Fleischner / LI-RADS / TI-RADS / Bosniak) is a
+        // regulated capability; honour the tenant switch.
+        var regulatedDeny = await DenyIfRegulatedFeatureDisabledAsync(
+            tenant, RegulatedFeature.FollowUpStandardisation, "Follow-up standardisation", ct);
+        if (regulatedDeny is not null) return regulatedDeny;
+
         var report = await _db.Reports.FirstOrDefaultAsync(r => r.Id == id && r.TenantId == tenant.Id, ct);
         if (report is null) return NotFound();
         try
