@@ -536,18 +536,59 @@ public class ReportsController : TenantedController
                 && r.CreatedAt < report.CreatedAt)
             .OrderByDescending(r => r.CreatedAt)
             .FirstOrDefaultAsync(ct);
-        if (prior is null) return Ok(new { hasPrior = false });
+        // Shape MUST match ComparePriorResult in frontend/lib/api.ts. It previously returned
+        // hasPrior/priorId/currentReport/priorReport while the client read current/prior/sections —
+        // nothing lined up, so `data.current` was undefined and the priors panel threw on EVERY
+        // load, with or without a prior. The client's shape is the useful one (a per-section diff
+        // the panel renders with change flags), so the server computes it rather than dumping two
+        // report bodies for the UI to re-derive.
+        var current = new { id = report.Id, bodyPart = report.Study.BodyPart ?? string.Empty };
+
+        if (prior is null)
+            return Ok(new { current, prior = (object?)null, sections = Array.Empty<object>() });
+
+        var sections = new[]
+        {
+            SectionDiff("Indication", report.Indication, prior.Indication),
+            SectionDiff("Technique", report.Technique, prior.Technique),
+            SectionDiff("Comparison", report.Comparison, prior.Comparison),
+            SectionDiff("Findings", report.Findings, prior.Findings),
+            SectionDiff("Impression", report.Impression, prior.Impression),
+            SectionDiff("Recommendations", report.Recommendations, prior.Recommendations),
+        };
 
         return Ok(new
         {
-            hasPrior = true,
-            priorId = prior.Id,
-            priorAccession = prior.Study.AccessionNumber,
-            priorCreatedAt = prior.CreatedAt,
-            currentReport = new { report.Indication, report.Technique, report.Comparison, report.Findings, report.Impression, report.Recommendations },
-            priorReport = new { prior.Indication, prior.Technique, prior.Comparison, prior.Findings, prior.Impression, prior.Recommendations },
+            current,
+            prior = new
+            {
+                id = prior.Id,
+                bodyPart = prior.Study.BodyPart ?? string.Empty,
+                createdAt = prior.CreatedAt,
+            },
+            sections,
         });
     }
+
+    /// <summary>
+    /// One section's current-vs-prior comparison. <c>changed</c> is whitespace-insensitive so
+    /// reformatting alone is not reported as a clinical change — the flag drives the panel's
+    /// "N sections changed" count, and inflating it with cosmetic diffs would train the
+    /// radiologist to ignore it.
+    /// </summary>
+    private static object SectionDiff(string section, string? current, string? prior) => new
+    {
+        section,
+        current = current ?? string.Empty,
+        prior = prior ?? string.Empty,
+        changed = !string.Equals(
+            Normalize(current), Normalize(prior), StringComparison.OrdinalIgnoreCase),
+    };
+
+    private static string Normalize(string? s) =>
+        string.IsNullOrWhiteSpace(s)
+            ? string.Empty
+            : System.Text.RegularExpressions.Regex.Replace(s.Trim(), @"\s+", " ");
 
     public record AiActionDto(string Mode, Guid? ProviderId);
 

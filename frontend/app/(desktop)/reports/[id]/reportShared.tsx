@@ -7,6 +7,11 @@ import { getSectionEditor } from '@/lib/editor/sectionEditorRegistry';
 export const SECTIONS: Array<{ key: keyof Report; label: string; cls?: string }> = [
   { key: 'indication', label: 'Indication' },
   { key: 'technique', label: 'Technique' },
+  // Comparison was missing here while being a real field on Report that IS serialized into the
+  // HL7 ORU and FHIR exports — so it reached the RIS without the radiologist ever being able to
+  // see or edit it. It also made F5's "Insert into Comparison" a dead action: getSectionEditor
+  // ('comparison') could never resolve, and the button silently degraded to a clipboard copy.
+  { key: 'comparison', label: 'Comparison' },
   { key: 'findings', label: 'Findings', cls: 'findings' },
   { key: 'impression', label: 'Impression', cls: 'impression' },
   { key: 'recommendations', label: 'Recommendations' },
