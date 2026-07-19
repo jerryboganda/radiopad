@@ -25,6 +25,7 @@ import { useCrossCheckEnabled, useUseUbag } from '@/lib/dictation/crossCheckPref
 import { formatDictation } from '@/lib/dictation/medicalFormat';
 import { parseVoiceEditCommand } from '@/lib/dictation/voiceEditCommands';
 import { createPushToTalk } from '@/lib/dictation/pushToTalk';
+import { startInterimDecode } from '@/lib/dictation/interimDecode';
 import { blobToWav16kMono } from '@/lib/dictation/wavEncode';
 import {
   getSpeechRecognitionCtor,
@@ -115,6 +116,8 @@ export default function DictationOverlay() {
   const [level, setLevel] = useState(0);
   const meterRafRef = useRef<number | null>(null);
   const meterCtxRef = useRef<AudioContext | null>(null);
+  /** Disposer for the live interim-preview tap (P0.3); null when not previewing. */
+  const stopInterimPreviewRef = useRef<(() => void) | null>(null);
 
   const stopMeter = useCallback(() => {
     if (meterRafRef.current !== null) cancelAnimationFrame(meterRafRef.current);
@@ -299,6 +302,33 @@ export default function DictationOverlay() {
     }
   }, [mode]);
 
+  // P0.3 — live preview while dictating. DISPLAY ONLY: it feeds `setInterim` and nothing else.
+  // The transcript that reaches the editor, the formatter and the audit is always the whole-buffer
+  // decode in `rec.onstop`, because a segment boundary can split a spoken measurement.
+  //
+  // Desktop only: segments are decoded by the on-device engine at no marginal cost, whereas on the
+  // web each one would be a billed cloud transcription of audio we are about to send in full anyway.
+  const startInterimPreview = useCallback((stream: MediaStream) => {
+    if (typeof window === 'undefined' || !('__TAURI__' in window)) return;
+    const reportId = readQueryParam('id');
+    if (!reportId) return;
+
+    stopInterimPreviewRef.current?.();
+    stopInterimPreviewRef.current = startInterimDecode(stream, {
+      transcribeSegment: async (wav) => (await api.reports.transcribe(reportId, wav, mode)).transcript ?? '',
+      onPreview: setInterim,
+      // A failed preview must never disrupt the recording in progress; the authoritative decode
+      // still happens on release.
+      onError: () => {},
+    });
+  }, [mode]);
+
+  const stopInterimPreview = useCallback(() => {
+    stopInterimPreviewRef.current?.();
+    stopInterimPreviewRef.current = null;
+    setInterim('');
+  }, []);
+
   const startAudioCapture = useCallback(async () => {
     if (typeof navigator === 'undefined' || !navigator.mediaDevices?.getUserMedia) return;
     try {
@@ -306,6 +336,7 @@ export default function DictationOverlay() {
       audioStreamRef.current = stream;
       audioChunksRef.current = [];
       startMeter(stream);
+      startInterimPreview(stream);
       const rec = new MediaRecorder(stream, { mimeType: 'audio/webm' });
       rec.ondataavailable = (ev) => {
         if (ev.data && ev.data.size > 0) audioChunksRef.current.push(ev.data);
@@ -315,6 +346,9 @@ export default function DictationOverlay() {
         audioStreamRef.current?.getTracks().forEach((t) => t.stop());
         audioStreamRef.current = null;
         stopMeter();
+        stopInterimPreview();
+        // The AUTHORITATIVE transcript: the whole buffer, decoded once. The live preview above is
+        // never used for this — a segment boundary can fall inside a spoken measurement.
         void transcribeAudio(blob);
       };
       mediaRecorderRef.current = rec;
@@ -323,6 +357,7 @@ export default function DictationOverlay() {
     } catch (e) {
       setAudioRecording(false);
       stopMeter();
+      stopInterimPreview();
       // A denied/absent microphone must not look like a button that does
       // nothing — say what blocked the HQ recording.
       const name = (e as { name?: string })?.name;
@@ -334,14 +369,18 @@ export default function DictationOverlay() {
             : 'Could not start the HQ recording. Check the microphone and try again.',
       );
     }
-  }, [transcribeAudio, startMeter, stopMeter]);
+  }, [transcribeAudio, startMeter, stopMeter, startInterimPreview, stopInterimPreview]);
 
   const stopAudioCapture = useCallback(() => {
     const rec = mediaRecorderRef.current;
     if (rec && rec.state !== 'inactive') rec.stop();
     mediaRecorderRef.current = null;
+    // Defensive: `rec.onstop` normally tears the preview down, but it never fires if the recorder
+    // failed to start or was already inactive — and an orphaned tap would hold the AudioContext
+    // and the microphone open.
+    stopInterimPreview();
     setAudioRecording(false);
-  }, []);
+  }, [stopInterimPreview]);
 
   const toggleAudio = useCallback(() => {
     if (audioRecording) stopAudioCapture();
