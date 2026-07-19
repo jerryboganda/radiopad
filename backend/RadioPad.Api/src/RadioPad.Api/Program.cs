@@ -219,8 +219,11 @@ builder.Services.AddSingleton<RadioPad.Application.Dictation.IDictationAuditStor
 builder.Services.AddScoped<RadioPad.Application.Dictation.IDictationDraftService,
     RadioPad.Application.Dictation.DictationDraftService>();
 // §2.2 — optional on-device MedGemma report formatter (LocalOnly, loopback-enforced). Inert unless
-// RADIOPAD_LOCAL_FORMATTER_ENABLED is set (the desktop sidecar with the bundled llama-server); the
-// cloud formatter stays the default everywhere else.
+// RADIOPAD_LOCAL_FORMATTER_ENABLED is set; the cloud formatter stays the default everywhere else.
+// The llama-server runtime is provisioned ON DEMAND (not bundled in the installer) and started
+// lazily by LlamaServerProcess — singleton so one process is shared and disposed with the host,
+// never leaving an orphan holding gigabytes of model.
+builder.Services.AddSingleton<RadioPad.Infrastructure.Providers.Local.LlamaServerProcess>();
 builder.Services.AddSingleton<RadioPad.Application.Dictation.ILocalReportFormatter,
     RadioPad.Infrastructure.Providers.Local.LocalMedGemmaFormatter>();
 // Cross-check LLM medical-accuracy review (hosted-side; routes via IAiGateway so

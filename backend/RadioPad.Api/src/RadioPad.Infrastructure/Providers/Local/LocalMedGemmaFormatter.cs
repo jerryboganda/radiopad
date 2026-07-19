@@ -37,18 +37,60 @@ public sealed class LocalMedGemmaFormatter : ILocalReportFormatter
         "Do not interpret or describe any image. Output the report JSON object only.";
 
     private readonly IAiProviderAdapter _llama;
+    private readonly LlamaServerProcess? _server;
+    private readonly IHttpClientFactory? _http;
 
-    public LocalMedGemmaFormatter(IEnumerable<IAiProviderAdapter> adapters)
+    public LocalMedGemmaFormatter(
+        IEnumerable<IAiProviderAdapter> adapters,
+        LlamaServerProcess? server = null,
+        IHttpClientFactory? http = null)
     {
         _llama = adapters.First(a => a.Id == LlamaCppProvider.AdapterId);
+        _server = server;
+        _http = http;
+    }
+
+    /// <summary>Absolute path of the provisioned MedGemma GGUF, or null when it is not downloaded.</summary>
+    private static string? ResolveModelPath()
+    {
+        var dir = LocalSttModels.ResolveModelDir(LocalModelCatalog.MedGemmaId);
+        if (dir is null) return null;
+        var path = Path.Combine(dir, LocalModelCatalog.MedGemmaFileName);
+        return File.Exists(path) ? path : null;
+    }
+
+    /// <summary>
+    /// Resolve the endpoint to format against, starting the managed llama-server if needed.
+    ///
+    /// <para>An explicit <c>RADIOPAD_LOCAL_LLAMA_URL</c> always wins and is used verbatim: an
+    /// operator running their own server (different port, different model, a shared box) must not
+    /// have a second one started underneath them. Only when no URL is configured do we take
+    /// responsibility for the process.</para>
+    /// </summary>
+    private async Task<string> ResolveEndpointAsync(CancellationToken ct)
+    {
+        var configured = Environment.GetEnvironmentVariable(UrlEnv);
+        if (!string.IsNullOrWhiteSpace(configured)) return configured.Trim();
+
+        if (_server is null || _http is null) return DefaultUrl;
+
+        var modelPath = ResolveModelPath();
+        if (modelPath is null) return DefaultUrl; // not downloaded — fall through to the actionable error
+
+        var baseUrl = await _server.EnsureRunningAsync(modelPath, ct);
+        if (baseUrl is null) return DefaultUrl;
+
+        // Loading a multi-GB GGUF on CPU legitimately takes tens of seconds on a cold start; the
+        // first refused connection is not a failure.
+        await _server.WaitUntilHealthyAsync(_http.CreateClient("ai"), TimeSpan.FromMinutes(3), ct);
+        return baseUrl;
     }
 
     public bool Available => !string.IsNullOrWhiteSpace(Environment.GetEnvironmentVariable(EnabledEnv));
 
     public async Task<FormatterOutput> FormatAsync(string protectedTranscript, DictationFormatContext context, CancellationToken ct)
     {
-        var endpoint = Environment.GetEnvironmentVariable(UrlEnv);
-        endpoint = string.IsNullOrWhiteSpace(endpoint) ? DefaultUrl : endpoint.Trim();
+        var endpoint = await ResolveEndpointAsync(ct);
         EnsureLoopback(endpoint); // PHI must never leave the device
 
         var provider = new ProviderConfig

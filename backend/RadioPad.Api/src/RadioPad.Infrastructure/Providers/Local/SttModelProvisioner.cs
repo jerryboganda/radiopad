@@ -1,5 +1,6 @@
 using System.Collections.Concurrent;
 using System.Security.Cryptography;
+using System.IO.Compression; // ZipFile + the ZipFileExtensions.ExtractToFile extension method
 using ICSharpCode.SharpZipLib.BZip2;
 using ICSharpCode.SharpZipLib.Tar;
 using Microsoft.Extensions.Logging;
@@ -72,6 +73,107 @@ public sealed class SttModelProvisioner
         if (complete) _status.SetState(LocalSttModels.MedAsrModelName, ProvisionState.Ready);
 
         return complete;
+    }
+
+    /// <summary>
+    /// Ensure the pinned llama-server runtime is installed (dictation brief §2.2 — the optional
+    /// offline MedGemma formatter needs an actual server process to talk to).
+    ///
+    /// <para>Downloads the archive, verifies its SHA-256, and extracts the WHOLE thing into the
+    /// runtime dir: on Windows <c>llama-server.exe</c> is a ~9 KB launcher stub whose real code is
+    /// in <c>llama-server-impl.dll</c>, with ~14 <c>ggml-cpu-*.dll</c> backends dlopened at
+    /// runtime, so a cherry-picked executable simply cannot start.</para>
+    ///
+    /// <para>Extraction goes to a temp dir that is only moved into place once a runnable
+    /// executable is confirmed present, so an interrupted download can never leave a half-installed
+    /// runtime that the formatter would then try to launch.</para>
+    /// </summary>
+    public async Task<bool> EnsureLlamaServerAsync(CancellationToken ct)
+    {
+        var spec = LocalRuntimes.LlamaServerArchive();
+        if (spec is null)
+        {
+            _log.LogWarning("No pinned llama-server build for this platform/architecture.");
+            return false;
+        }
+
+        var dir = LocalRuntimes.ResolveRuntimeDir(LocalRuntimes.LlamaServerId);
+        if (dir is null)
+        {
+            _log.LogWarning("No local-app-data dir resolvable; cannot provision llama-server.");
+            return false;
+        }
+        if (LocalRuntimes.IsLlamaServerInstalled(dir))
+        {
+            _status.SetState(LocalRuntimes.LlamaServerId, ProvisionState.Ready);
+            return true;
+        }
+
+        var gate = LockFor(LocalRuntimes.LlamaServerId);
+        await gate.WaitAsync(ct);
+        try
+        {
+            if (LocalRuntimes.IsLlamaServerInstalled(dir))
+            {
+                _status.SetState(LocalRuntimes.LlamaServerId, ProvisionState.Ready);
+                return true;
+            }
+
+            var tmpArchive = Path.Combine(Path.GetTempPath(), $"rp-llama-{Guid.NewGuid():N}");
+            var tmpExtract = dir + $".extract-{Guid.NewGuid():N}";
+            try
+            {
+                _log.LogInformation(
+                    "Downloading llama-server runtime {Tag} (~{SizeMB} MB).",
+                    LocalRuntimes.LlamaServerTag, spec.SizeBytes / (1024 * 1024));
+                _status.SetState(LocalRuntimes.LlamaServerId, ProvisionState.Downloading);
+                _status.SetTotal(LocalRuntimes.LlamaServerId, spec.SizeBytes);
+                await DownloadAsync(LocalRuntimes.LlamaServerId, spec.Url, tmpArchive, ct);
+
+                _status.SetState(LocalRuntimes.LlamaServerId, ProvisionState.Verifying);
+                await VerifySha256Async(tmpArchive, spec.Sha256, ct);
+
+                _status.SetState(LocalRuntimes.LlamaServerId, ProvisionState.Extracting);
+                Directory.CreateDirectory(tmpExtract);
+                if (spec.FileName.EndsWith(".zip", StringComparison.OrdinalIgnoreCase))
+                    ExtractZip(tmpArchive, tmpExtract);
+                else
+                    ExtractTarGz(tmpArchive, tmpExtract);
+
+                if (!LocalRuntimes.IsLlamaServerInstalled(tmpExtract))
+                    throw new InvalidOperationException(
+                        $"the llama-server archive did not contain {LocalRuntimes.LlamaServerExecutableName}");
+
+                _status.SetState(LocalRuntimes.LlamaServerId, ProvisionState.Installing);
+                if (Directory.Exists(dir)) TryDeleteDir(dir);
+                Directory.CreateDirectory(Path.GetDirectoryName(dir)!);
+                Directory.Move(tmpExtract, dir);
+
+                _status.SetState(LocalRuntimes.LlamaServerId, ProvisionState.Ready);
+                _log.LogInformation("llama-server runtime installed at {Dir}", dir);
+                return true;
+            }
+            catch (OperationCanceledException)
+            {
+                _status.SetState(LocalRuntimes.LlamaServerId, ProvisionState.NotStarted);
+                throw;
+            }
+            catch (Exception ex)
+            {
+                _status.SetState(LocalRuntimes.LlamaServerId, ProvisionState.Failed, ex.Message);
+                _log.LogError(ex, "Failed to provision the llama-server runtime");
+                return false;
+            }
+            finally
+            {
+                TryDelete(tmpArchive);
+                TryDeleteDir(tmpExtract);
+            }
+        }
+        finally
+        {
+            gate.Release();
+        }
     }
 
     /// <summary>
@@ -320,6 +422,53 @@ public sealed class SttModelProvisioner
         using var bz = new BZip2InputStream(fileIn);
         using var tar = TarArchive.CreateInputTarArchive(bz, System.Text.Encoding.UTF8);
         tar.ExtractContents(targetDir);
+    }
+
+    /// <summary>
+    /// Extract a .tar.gz runtime archive (the Linux llama.cpp build). Unlike the flat Windows zip
+    /// this nests everything under a top-level directory, which is why the executable lookup
+    /// searches recursively rather than assuming a layout.
+    /// </summary>
+    private static void ExtractTarGz(string archivePath, string targetDir)
+    {
+        using var fileIn = File.OpenRead(archivePath);
+        using var gz = new System.IO.Compression.GZipStream(
+            fileIn, System.IO.Compression.CompressionMode.Decompress);
+        using var tar = TarArchive.CreateInputTarArchive(gz, System.Text.Encoding.UTF8);
+        tar.ExtractContents(targetDir);
+    }
+
+    /// <summary>
+    /// Extract a .zip runtime archive, refusing any entry that would escape
+    /// <paramref name="targetDir"/>.
+    ///
+    /// <para>The SHA-256 check upstream already establishes that the bytes are the ones we pinned,
+    /// so this is defence in depth rather than the primary control — but an archive extractor that
+    /// honours <c>../</c> paths is a classic remote-write primitive, and this one runs on a
+    /// clinical workstation, so it is worth the few lines.</para>
+    /// </summary>
+    private static void ExtractZip(string archivePath, string targetDir)
+    {
+        var root = Path.GetFullPath(targetDir + Path.DirectorySeparatorChar);
+        using var zip = System.IO.Compression.ZipFile.OpenRead(archivePath);
+
+        foreach (var entry in zip.Entries)
+        {
+            // Directory entries have an empty name; create them and move on.
+            if (string.IsNullOrEmpty(entry.Name))
+            {
+                Directory.CreateDirectory(Path.GetFullPath(Path.Combine(targetDir, entry.FullName)));
+                continue;
+            }
+
+            var dest = Path.GetFullPath(Path.Combine(targetDir, entry.FullName));
+            if (!dest.StartsWith(root, StringComparison.Ordinal))
+                throw new InvalidOperationException(
+                    $"archive entry '{entry.FullName}' would extract outside the target directory");
+
+            Directory.CreateDirectory(Path.GetDirectoryName(dest)!);
+            entry.ExtractToFile(dest, overwrite: true);
+        }
     }
 
     private static void TryDelete(string path)
