@@ -4,6 +4,121 @@
 
 ---
 
+## Adversarial audit remediation — every confirmed finding closed (2026-07-19/20)
+
+- **Date:** 2026-07-19 → 2026-07-20
+- **Trigger:** Operator asked for a worst-first audit of everything after the dictation-engine
+  build. 31 findings were raised; this entry covers the ~21 that were still open, each independently
+  re-verified against HEAD and then **adversarially re-checked by a second reviewer instructed to
+  refute it**. Releases: **v0.1.80 → v0.1.85** (all published with full assets + signed
+  `latest.json`).
+- **The dominant defect shape was wiring, not logic.** Almost every finding was a correct component
+  that nothing reached, with green unit tests over the pieces. Recorded because it should change how
+  the next change is reviewed: ask *who calls this, on which surface* before asking *is it correct*.
+
+### Fixed — reachability / wiring
+
+- **On-device model manager shipped only to `(web)`.** `build-surface.mjs` stages non-target route
+  groups out of `app/`, so the desktop bundle — the only surface where MedASR/MedGemma actually run
+  — contained no model manager at all. Everything verified over HTTP that day was behind a screen
+  the product could not open. Moved to `components/models/`, added
+  `app/(desktop)/settings/models/page.tsx` + nav entry + 6 locale labels.
+- **Four dead cross-surface links.** ProfileMenu's Settings/Billing (rendered in the topbar on
+  virtually every screen), BillingStatusBanner's call-to-action, the web governance dashboard's
+  "Open Rulebooks / Prompt Studio / audit log", and login's "Pair a device" — all pointing at route
+  groups absent from the bundle holding the link, i.e. a hard "Page not found", not a soft one.
+  New `__tests__/crossSurfaceLinks.test.ts` reads the real route tree and resolves each component's
+  surfaces through the **reverse-import graph** (a component's surface is decided by its renderers,
+  not its folder), so this class fails CI now instead of shipping. Verified it fails when a fix is
+  reverted.
+- **`/compare-prior` shape mismatch** — server returned `hasPrior/priorId/currentReport`, client read
+  `current/prior/sections`; nothing matched, so the priors tray threw on **every** load, with or
+  without a prior. F5 was entirely non-functional. Server now computes the per-section diff the
+  panel renders; `ComparePriorShapeTests` pins the contract by **keys**, since a typed client cannot
+  defend against a server answering with different field names.
+- **`comparison` reached the RIS unreviewable** — a real `Report` field serialized into HL7 ORU and
+  FHIR exports but missing from `SECTIONS`, so no editor ever rendered it, and F5's "Insert into
+  Comparison" silently degraded to a clipboard copy.
+- **The microphone ignored the correction dictionary.** `DictationOverlay` (the primary path, both
+  the Web Speech and HQ-transcribe branches) inserts straight into the editor and so never reached a
+  backend that could apply it: corrections worked in the draft panel and silently did nothing on the
+  mic. Added `applyCorrections` (faithful port of `DeterministicPassThrough.ApplyCorrections`),
+  resolved on mount and on each dictation start. **The two implementations are now pinned together
+  including where they are limited** — a source phrase ending in punctuation (`c.t.`) matches in
+  neither, because both wrap it in `\b…\b`. My first test asserted the opposite; the code was right
+  and the test was wrong.
+- **`lib/snippetInsert.ts` had zero callers** while its header claimed to cover "every plain-textarea
+  surface". Report sections render a plain `<textarea>` whenever the rich editor is switched off, so
+  that surface simply had no snippets. Added `snippetKeyDown` and wired it into ReportClient.
+
+### Fixed — safety, correctness, permissions
+
+- **A STAT study could be invisible (worst finding).** The worklist called the bare
+  `api.reports.list()` — backend default `take=100` ordered by `UpdatedAt` — and then ranked priority
+  **client-side**. An urgent case that had waited while newer routine work moved was not ranked last;
+  it never arrived. Added `api.reports.listAll()` (pages until `X-Total-Count` is satisfied, reports
+  `truncated` at its own ceiling) and a banner naming any shortfall. **No silent caps.**
+- **`Report.Priority` was never written by any ingest** despite being documented as "RIS-driven" —
+  the JSON order webhook and both FHIR imports built a `Report` without it, so every report in every
+  deployment carried the `Routine` default and the worklist's indication-text regex was the only
+  signal that ever ran. Added `ReportPriorityParser` (FHIR request-priority + HL7 ORC-7 codes), wired
+  into the order webhook and ServiceRequest import. Unrecognised/absent stays Routine — an unreadable
+  priority must never silently escalate a case, and a queue where everything is STAT ranks nothing.
+- **Tab trapped keyboard focus** (accessibility). Snippet tab-through **wrapped** to the first
+  `${field}` when none remained ahead, so any section holding one leftover `${...}` swallowed Tab
+  forever — a radiologist could not move focus forward out of the editor. A unit test **asserted the
+  wrap**, so this was a deliberate choice that was never weighed against keyboard access; that test
+  now asserts the opposite, with the reason. Fixed on both the Tiptap and textarea paths.
+- **Sign & Send skipped the permission gate** its sibling buttons honour — the only control in its
+  row rendered unconditionally, offering a user without `reports.sign` an action that cannot succeed.
+  Also **signed before validating** and was unretryable; now validate-first with a retryable sign.
+- **§5.3 discarded good reports for not fabricating** an undictated section, while never checking for
+  *dropped* content at all. `MissingRequiredSection` is now non-blocking; added `DroppedMeasurement`
+  / `DroppedDate` blocking reasons.
+- **Measurement consistency compared raw strings**, so a lesion restated in the other unit (mm in
+  Findings, cm in Impression — routine dictation) was reported as an inconsistency that did not
+  exist. Now compared on a unit-normalised key. This matters beyond noise: these warnings share a
+  channel with the laterality and fabrication sentinels, so crying wolf trains radiologists to
+  dismiss the banner that also carries the real ones.
+- **That banner mislabelled its own cause** — a draft flagged only for a measurement problem told the
+  radiologist to check for a "possible laterality / negation / sex mismatch". Titled from the kinds
+  actually present.
+- **Case-only correction duplicates collapsed silently** — both rows saved (case-sensitive index) and
+  both listed, but resolution keys case-insensitively, so one was permanently inert while looking
+  active. Warned at entry; the misleading "a case-only difference is a legitimate correction" comment
+  corrected.
+
+### Fixed — dead controls
+
+- **Template "Use" dropped the contrast phase** (93 of the 151 bundled templates carry one), so the
+  Study Context panel flagged the report's own bound template as a mismatch.
+- **The template editor's per-section "req" checkbox was read by nothing** — a section marked
+  required could pass sign-off empty with no warning anywhere. Surfaced in the editor as a review
+  prompt, deliberately **not** a hard block: the authoritative blocking validation is the rulebook
+  engine, and a client-only gate the backend does not enforce would be its own inconsistency.
+- Duplicate-trigger snippet warning was dead code that also **silently destroyed** the snippet stored
+  under the re-used trigger; whitespace triggers saved but could never match; the intake wizard's
+  rich editors never registered snippet expansion at all.
+
+### Refuted — verified NOT defects, deliberately untouched
+
+- **F2 scaffold proxy-guard** — the claimed silent data loss does not hold; PATCH history and the
+  audit chain mean an overwrite is recoverable and traceable.
+- **Worklist priority regex (#17)** — an intentional, documented two-tier fallback. The real defect
+  was that nothing populated `Report.Priority`, fixed above; the regex is now the second tier it was
+  always meant to be.
+- **`RADIOPAD_STT_MODEL_DIR` split-brain** — one resolver (`LocalSttModels.ResolveModelDir`) serves
+  every path; Delete refuses under an override **by design**, with an explicit message.
+
+### Verification
+
+- Backend **972 passed / 5 skipped**; frontend **464 passed / 80 files**; typecheck clean; CI green.
+- **Honest caveat:** one backend test failed once (1 of 977) in the first full run and did **not**
+  reproduce across three subsequent clean runs. I could not name it — the output was consumed before
+  I captured it. Recorded as a known flake, not as resolved.
+
+---
+
 ## On-Device Dictation & Reporting Engine — Phase 0 (part 1: deterministic safety pipeline)
 
 - **Date:** 2026-07-18
@@ -56,8 +171,12 @@
   (`lib/snippets.ts`, localStorage like hotkeys; never PHI): a trigger expands to canned prose that
   may carry `${field}` fill-in placeholders. The cursor-jump core is pure + fully tested —
   `findFields` / `expandSnippet` (insert body, select the first field) / `nextFieldSelection` (Tab
-  to next, wrapping) — and `lib/snippetInsert.ts` applies it to a real `<textarea>`/`<input>`
-  (React-safe native-setter + input event; `insertSnippet` + `snippetTab`). Managed at
+  to next, wrapping — **superseded 2026-07-20: wrapping removed, it was a keyboard trap**) — and
+  `lib/snippetInsert.ts` applies it to a real `<textarea>`/`<input>`
+  (React-safe native-setter + input event; `insertSnippet` + `snippetTab`). **Correction
+  (2026-07-20): this primitive had no production callers until the audit wired `snippetKeyDown`
+  into ReportClient's fallback textarea — the plain-textarea surface had no snippets at all.**
+  Managed at
   **Settings → Snippets** (add/edit/delete, live field-count). 17 tests (11 core + 3 insert + 3
   page). **In-editor auto-expansion now shipped** — `lib/editor/snippetExpansion.ts` is a Tiptap
   extension: **Tab** expands the trigger word before the caret into the snippet body and selects the
@@ -65,7 +184,17 @@
   Tab falls through to its default. All position math runs in plain-text space mapped via
   `plainOffsetToPmPos`, so it is robust to multi-line bodies. +6 tests (incl. a live-editor Tab
   integration test); existing `SectionEditor` suite unregressed. F3 is complete.
-- **Phase 3 regulated-feature gating (OFF by default)** — the assist-only capabilities
+  **Superseded 2026-07-20 (audit):** the wrap made Tab unreleasable in any section holding a
+  leftover `${...}` — a keyboard trap — and is gone; position math now reads the ProseMirror doc
+  directly (the plain-text projection only walks doc/paragraph/text, so every offset inside a list
+  item was wrong on the wizard's schema); and the wizard's `RichTextEditor` had never registered the
+  extension, so snippets did nothing on the screen with the most free prose. "F3 is complete" was
+  premature.
+- **Phase 3 regulated-feature gating (OFF by default)** — **superseded 2026-07-19/20: the flags now
+  default ENABLED** on explicit operator instruction (UKCA/MHRA/CE/FDA licensing stated as acquired),
+  and the gate had **zero call sites** and read the wrong entity (`TenantSettings.FeatureFlagsJson`,
+  not `Tenant`) until the audit wired it into all three `ReportsController` entry points — so the
+  admin panel's regulatory claim was false in both directions. Original entry: — the assist-only capabilities
   (auto-impression, critical-finding flagging, follow-up standardisation, interval/RECIST tracking)
   are now gated behind an explicit, fail-safe opt-in. Backend `RegulatedFeatures`
   (Application/Governance): enum + catalog + `IsEnabled(featureFlagsJson, feature)` / `Describe(...)`,
@@ -103,11 +232,18 @@
   tap-to-toggle on the mic (`lib/dictation/pushToTalk.ts`, deterministic tap/hold discriminator;
   keyboard still toggles via `claimClick`), and a rebindable in-app dictation hotkey
   (`lib/dictationHotkey.ts` wired in `ShellBridge`) that works on every surface incl. web and
-  honours the configured chord live. 22 tests. **Still blocked (desktop-only, needs a Tauri
+  honours the configured chord live. 22 tests. ~~**Still blocked (desktop-only, needs a Tauri
   build):** making the Rust *system-wide/unfocused* global shortcut follow a rebind needs a
   handler refactor + a re-register command — not committed because it can't be compile-verified
-  here and a broken `.rs` would fail the release build.
-- **P0.2 MedASR STT — genuinely blocked (external):** the STT stack is sherpa-onnx transducer
+  here and a broken `.rs` would fail the release build.~~ **Resolved 2026-07-19 — the blocker was
+  wrong.** Rust is available locally; the only obstacle was the build script wanting a sidecar
+  binary CI produces, which a gitignored placeholder satisfies for `cargo check`.
+  `desktop/src-tauri/src/hotkeys.rs` shipped.
+- **P0.2 MedASR STT — genuinely blocked (external):** **WRONG, superseded 2026-07-19.** A public,
+  ungated sherpa-onnx-native CTC export exists (`csukuangfj/sherpa-onnx-medasr-ctc-en-int8-2025-12-25`)
+  and the pinned sherpa-onnx v1.13.3 already has first-class MedASR support — no HF token, no
+  license click, no ONNX-export step. MedASR shipped and is runtime-verified; see
+  IMPLEMENTATION_NOTES.md §0. The original (incorrect) reasoning follows: the STT stack is sherpa-onnx transducer
   bundles (encoder/decoder/joiner/tokens ONNX). `google/medasr` is a gated Conformer with no
   published sherpa bundle, so it needs a build-time ONNX-export artifact + HAI-DEF license
   acceptance + an HF token before a real (URL, SHA-256) descriptor can exist. Not fabricating a

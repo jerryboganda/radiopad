@@ -1,0 +1,15 @@
+{
+  "version": "0.1.85",
+  "notes": "RadioPad v0.1.85",
+  "pub_date": "2026-07-19T23:49:15Z",
+  "platforms": {
+    "linux-x86_64": {
+      "signature": "dW50cnVzdGVkIGNvbW1lbnQ6IHNpZ25hdHVyZSBmcm9tIHRhdXJpIHNlY3JldCBrZXkKUlVUL01nS09DY210ZDV1aG5GV2JtaWtmS0JmbVdueVBMY29ZSHkvQlRldS91UFVyU3AzeFlBbWpiSDFLbmg0Q1llMEE0VjVPVXoyd1ZUQy9aZDBnZTN0c00vRk1hNDR5MGdjPQp0cnVzdGVkIGNvbW1lbnQ6IHRpbWVzdGFtcDoxNzg0NTA0OTU2CWZpbGU6UmFkaW9QYWRfMC4xLjg1X2FtZDY0LkFwcEltYWdlCnNwNTRLVEZBdDBSai9KT1ZING1XcmZBKy9HR2ZKRVRnNnFURElIOGp2RUd6R0Fka1k1c29rZEh3NDR0VjlZMmVNaU8wWmxHMUo3T3RYUHk4TkVKZUFBPT0K",
+      "url": "https://github.com/jerryboganda/radiopad/releases/download/v0.1.85/RadioPad_0.1.85_amd64.AppImage"
+    },
+    "windows-x86_64": {
+      "signature": "dW50cnVzdGVkIGNvbW1lbnQ6IHNpZ25hdHVyZSBmcm9tIHRhdXJpIHNlY3JldCBrZXkKUlVUL01nS09DY210ZHdXcTRxQmJKeCtncGpSTm5ySFFqaE9MWGoxN2M5MDN1dlVwYnByK3VDSXhDZ1J2cWczYW5RSVViZS8rMWtjL0xSY2dwQktuWTZDTzUvZDNNQTlpZFFRPQp0cnVzdGVkIGNvbW1lbnQ6IHRpbWVzdGFtcDoxNzg0NTA0OTU3CWZpbGU6UmFkaW9QYWRfMC4xLjg1X3g2NF9lbi1VUy5tc2kKcVVTRTNUM3FvVVpzVVdhVmR2eGdLRk1hVVArY29hMGxuZCsrVUxETFh2c3pBZ2ZNMHEwNnREcm9hSmREbGduWFdaVUNJTDIrR01ZTWhzZ25tR0cvREE9PQo=",
+      "url": "https://github.com/jerryboganda/radiopad/releases/download/v0.1.85/RadioPad_0.1.85_x64_en-US.msi"
+    }
+  }
+}

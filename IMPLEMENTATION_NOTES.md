@@ -4,9 +4,10 @@
 > §0.5/§10. Records pinned model versions, the MedASR deployment decision, safety-policy
 > changes, and open questions. Updated every phase.
 
-**Started:** 2026-07-18 · **Owner:** dictation-engine build · **Status:** Phases 0–3 substantially
-delivered; remaining work is externally blocked (model artifacts, Rust build) or a noted follow-up.
-Last desktop release: **v0.1.78** (auto-updater).
+**Started:** 2026-07-18 · **Owner:** dictation-engine build · **Status:** Phases 0–3 delivered and
+runtime-verified (MedASR + MedGemma both exercised end-to-end against the real sidecar); the
+adversarial audit that followed is closed — every confirmed finding fixed, four refuted.
+Last desktop release: **v0.1.85** (auto-updater; published with all assets + signed `latest.json`).
 
 ---
 
@@ -23,19 +24,25 @@ The safety engine and the buildable competitive features are shipped, all TDD + 
   Preview shows the normal body.
 - **F3** device-local snippets with tab-through `${field}` selection math + manager UI + textarea
   insertion primitive **and in-editor auto-expansion** (Tiptap `SnippetExpansion`: Tab expands the
-  trigger before the caret + tab-cycles fields). Complete.
+  trigger before the caret + tab-cycles fields). Complete **after the 2026-07-20 audit** — it was
+  called complete earlier while the textarea primitive had no callers, the wizard's editors never
+  registered the extension, and tab-through wrapped into a keyboard trap (see §9).
 - **F4** measurement-sanity + findings/impression consistency (deterministic).
 - **F5** auto-comparison statement (deterministic; inserts into Comparison).
 - **F7a/F7b** org + per-user correction dictionaries (backend + management UI).
-- **F8** one-command Sign & Send · RIS-driven report priority.
+- **F8** one-command Sign & Send · RIS-driven report priority. *(Both were overstated until
+  2026-07-20: Sign & Send signed before validating, was unretryable, and skipped the permission
+  gate; "RIS-driven" priority was written by no ingest path at all. Fixed — see §9.)*
 - **F9** patient-friendly summary (pre-existing, verified).
 - **F10** reports/hour KPI (+ AnalyticsService's first tests); template-usage pre-existing.
 - **F12** free-text custom rewrite, **hard-guarded by §5.3** so it cannot introduce an un-dictated
   measurement/number/date; violations surfaced as an amber "Requires review" flag before Accept.
 - **P0.3 (partial)** hold-to-talk PTT (alongside tap-toggle) + in-app rebindable dictation hotkey
   (all surfaces). System-wide/unfocused Rust rebind + streaming on-device decode still pending.
-- **Phase 3 gating** — `RegulatedFeatures` gate (OFF by default, fail-safe) + admin
-  "Regulated AI features" surface. See §5 below (now implemented, not just planned).
+- **Phase 3 gating** — `RegulatedFeatures` gate + admin "Regulated AI features" surface. **Default
+  flipped to ENABLED on 2026-07-19** by explicit operator instruction (UKCA/MHRA/CE/FDA licensing
+  stated as acquired). Until 2026-07-20 the gate had **no call sites** and read the wrong entity, so
+  neither the old OFF default nor the panel's regulatory claim was actually in force. See §5.
 
 ### MedASR — UNBLOCKED (browser research, 2026-07-19)
 The "no sherpa bundle exists" blocker was **wrong**. A public, **ungated** sherpa-onnx-native CTC
@@ -84,10 +91,17 @@ from `IsMedAsrComplete`): without it `SelfTestAudio` falls back to a synthesized
 MedASR correctly transcribes as nothing — indistinguishable from a broken engine in the manager's
 "Test" action.
 
-### Still blocked / deferred
-- **Local MedGemma runtime** — pin is verified (§2), but actually running it needs the
-  **llama-server binary bundled in CI**.
-- **True streaming/chunked on-device decode** (P0.3 remainder) — the PTT/hotkey half is done.
+### Still blocked / deferred — **all cleared as of 2026-07-20**
+- ~~**Local MedGemma runtime** — needs the llama-server binary bundled in CI.~~ **Resolved:**
+  provisioned on demand (operator's choice over bundling), pinned to llama.cpp `b10068`, started
+  lazily by `LlamaServerProcess`; verified end-to-end against the real sidecar.
+- ~~**True streaming/chunked on-device decode** (P0.3 remainder).~~ **Resolved and named honestly:**
+  neither pinned engine exposes sherpa's streaming `OnlineRecognizer`, so what ships is chunked
+  incremental decode with **display-only** previews; the authoritative transcript stays the
+  whole-buffer decode. See the 2026-07-19 P0.3 entry in §8.
+
+Nothing in this build is now externally blocked. Remaining items are benchmarks (§7) and the
+commercial-model decision (§6), neither of which is engineering work.
 
 > **Correction to an earlier note in this file:** "needs a Tauri build I can't compile-verify" was
 > wrong. Rust *is* available locally; the only obstacle was the build script requiring a sidecar
@@ -104,7 +118,7 @@ MedASR correctly transcribes as nothing — indistinguishable from a broken engi
 | D2 | **MedASR = default primary STT; Parakeet = optional** | User can promote Parakeet to primary via `LocalSttSettings`. Windows SAPI unchanged. Both stay in the ROVER ensemble. |
 | D3 | **MedASR deployment: ONNX-export-first, Python-sidecar fallback** | Prototype ONNX/CTranslate2 export → run on the existing ONNX Runtime path (mirrors `SherpaParakeetSttClient`). Fall back to a bundled Python/transformers sidecar only if export loses accuracy/coverage. Both live behind `ILocalSttClient`. |
 | D4 | **Streaming push-to-talk from Phase 0** | New streaming/chunked decode path + hold-to-talk PTT + rebindable global hotkey. |
-| D5 | **All phases 0→3, commit per phase, minimal pausing** | Phase 3 regulated features ship **OFF by default**. |
+| D5 | **All phases 0→3, commit per phase, minimal pausing** | Phase 3 regulated features ship **OFF by default**. ⚠️ **Superseded 2026-07-19** by a later operator instruction — the default is now **ENABLED** (licensing stated as acquired); per-tenant opt-out remains. See §5. |
 | D6 | **§5.7 raw transcript persisted locally + encrypted** | Reverses the current SHA-256-only privacy design, but stays **on-device + encrypted** (never leaves the machine). Additive to the existing server hash-chain. |
 
 ## 2. Pinned model specifications (verified against live sources 2026-07-18)
@@ -171,16 +185,27 @@ stubbed false). No GPU/VRAM assumed.
   MedGemma path is the no-PHI-to-cloud option); append-only audit via `IAuditLog.AppendAsync`;
   backend binds `127.0.0.1`; tenant isolation via `TenantedController.ResolveContextAsync`.
 
-## 5. ⚠️ Regulatory review required (Phase 3 — ships OFF by default) — **GATE IMPLEMENTED**
+## 5. ⚠️ Regulated features (Phase 3) — **gate enforced; default ENABLED by operator instruction**
 
 MedASR and MedGemma are Google **"developer models requiring validation," NOT cleared medical
-devices.** The following may constitute clinical decision support / a medical-device function
-(UKCA/MHRA, CE, FDA depending on market) and **require a regulatory/clinical-validation pathway
-before any clinical use.** The **gate is now built**: `RadioPad.Application.Governance.RegulatedFeatures`
-(enum + catalog + `IsEnabled`/`Describe`) reads `Tenant.FeatureFlagsJson` under the `regulated.`
-prefix — absent/false/malformed → **OFF** (fail safe) — and the tenant **Settings → Regulated AI
-features** admin panel surfaces the "Regulatory review required" note + per-feature toggles. Each
-capability ships OFF by default, and its runtime behaviour must consult `IsEnabled` before acting:
+devices.** The capabilities below may constitute clinical decision support / a medical-device
+function (UKCA/MHRA, CE, FDA depending on market).
+
+**Current state (2026-07-19/20).** `RadioPad.Application.Governance.RegulatedFeatures`
+(enum + catalog + `IsEnabled`/`Describe`) reads **`TenantSettings.FeatureFlagsJson`** under the
+`regulated.` prefix. The default is **ENABLED** — flipped on explicit operator instruction that
+UKCA/MHRA/CE/FDA licensing has been acquired. An operator can still switch any capability off per
+tenant from **Settings → Regulated AI features**.
+
+Two corrections worth keeping, because the doc previously described a control that was not in force:
+
+- The gate had **zero call sites** until 2026-07-20. It is now enforced at all three
+  `ReportsController` entry points (`/ai`, `/ai/jobs`, `/followup-suggestions`), returning
+  `403 kind=regulated_feature_disabled`.
+- It named **`Tenant.FeatureFlagsJson`**, which does not exist; the flags live on `TenantSettings`.
+  Nothing caught it because nothing called it.
+
+Capabilities under the gate:
 
 - Auto-impression draft from dictated findings.
 - Actionable/critical-finding flagging (e.g. "?PE", "new mass") + communication workflow.
@@ -196,11 +221,18 @@ capability ships OFF by default, and its runtime behaviour must consult `IsEnabl
 
 ## 7. Open questions / to resolve at build time
 
-1. Exact `transformers` minimum release for MedASR (and whether a pinned GitHub commit is needed). **OPEN.**
-2. MedASR ONNX/CT2 export fidelity vs the Python-sidecar fallback (D3) — prototype outcome. **OPEN** (blocks P0.2).
+1. ~~Exact `transformers` minimum release for MedASR.~~ **MOOT** — no PyTorch/`transformers` runtime
+   is used. MedASR runs on the already-pinned sherpa-onnx v1.13.3 via a public ONNX CTC bundle.
+2. ~~MedASR ONNX/CT2 export fidelity vs the Python-sidecar fallback (D3) — blocks P0.2.~~ **MOOT** —
+   no export step exists: the maintainer publishes a sherpa-onnx-native export. D3's fallback branch
+   was never needed.
 3. ~~Exact MedGemma Q4_K_M GGUF artifact (URL + SHA-256 + size) to pin.~~ **RESOLVED** — pinned in §2.
-4. CPU-only latency on the 2-core target for MedASR streaming + MedGemma formatting (benchmark). **OPEN.**
-5. **llama-server binary bundling in CI** — required for the local MedGemma path to actually run. **OPEN.**
+4. CPU-only latency on the 2-core target for MedASR + MedGemma formatting (benchmark). **OPEN** —
+   the only measurement so far is the dev workstation (MedASR 14.7 s for a full report; the weak-model
+   MedGemma run was a safety probe, not a benchmark). Per operator standing instruction this belongs
+   in a CI job, not on the laptop.
+5. ~~**llama-server binary bundling in CI.**~~ **RESOLVED** — provisioned on demand instead of
+   bundled, pinned to `b10068`; `offline-formatter-smoke.yml` exercises the full §4.2 pipeline.
 
 ## 8. Change log
 
@@ -259,3 +291,42 @@ capability ships OFF by default, and its runtime behaviour must consult `IsEnabl
   authoritative transcript remains the whole-buffer decode taken on push-to-talk release. Desktop
   only — on-device segments are free, whereas on the web each would be a billed cloud transcription
   of audio being uploaded in full anyway.
+- **2026-07-19/20 — adversarial audit closed.** 31 findings raised, ~21 still open at the start of
+  the pass; every one independently re-verified against HEAD and then re-checked by a second
+  reviewer instructed to **refute** it. All confirmed findings fixed; four refuted and deliberately
+  untouched. Releases v0.1.80 → **v0.1.85**. Full detail in `PROGRESS.md`; the durable lesson is §9.
+  Backend 972 passed / 5 skipped, frontend 464 passed. One backend test failed once in the first
+  full run and did not reproduce across three subsequent clean runs — recorded as a known flake,
+  **not** as resolved, because I could not identify it.
+
+---
+
+## 9. The pattern this build kept producing (read before the next change)
+
+Almost every real defect found in this build was **not a wrong function — it was a correct function
+nothing reached**, with green unit tests over the pieces. A partial list from one audit:
+
+- the on-device model manager shipped only to the `(web)` bundle, so the desktop — the only surface
+  where MedASR and MedGemma run — had no way to download or select a model;
+- `dictationDraftLocal` and `lib/snippetInsert.ts` each had **zero production callers**;
+- the Phase 3 gate had zero call sites and named a field on the wrong entity (§5);
+- `/compare-prior` answered with field names no client read, so F5 threw on every load;
+- `comparison` was serialized into HL7/FHIR exports with no editor ever rendering it;
+- the microphone path never applied the correction dictionary the draft panel applied;
+- `Report.Priority` — documented "RIS-driven" — was written by no ingest path.
+
+**Why it hides:** unit tests assert the unit. Nothing asserts *"a user can get here."*
+
+**What to do about it.** Before asking whether a change is correct, ask **who calls this and on which
+surface**. Concretely: grep for callers of anything added or fixed; check the route group
+(`app/(desktop|web|mobile|shared)/`) against the surface that actually uses the feature, because
+`scripts/build-surface.mjs` **physically stages the other groups out of `app/`** — a cross-group link
+is a hard 404, not a soft one; and verify both sides of a client/server contract by **keys**, since a
+typed client cannot defend against a server that answers with different field names.
+`frontend/__tests__/crossSurfaceLinks.test.ts` now pins the link case automatically.
+
+**Two process notes earned the hard way.** (1) After writing a test for a bug, **revert the fix and
+confirm the test fails** — one audit finding turned out to be a false positive whose test passed
+either way. (2) When a port and its original disagree, check which one is wrong before "fixing" the
+code: the `applyCorrections` punctuation limitation was correct behaviour and my test was wrong, and
+making the frontend correct *more* than the backend would have been the worse outcome.
