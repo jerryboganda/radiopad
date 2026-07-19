@@ -44,14 +44,55 @@ export exists from the sherpa-onnx maintainer: `csukuangfj/sherpa-onnx-medasr-ct
 pinned) has first-class MedASR support (`OfflineModelConfig.MedAsr.Model`). So MedASR now runs on the
 existing on-device engine — **no HF token, no license-click, no ONNX-export step**. Engine wired +
 compile-verified: `SherpaMedAsrSttClient` + the verified `LocalSttModels.MedAsr*` descriptor +
-`SttModelProvisioner.EnsureMedAsrAsync`. Remaining finish: DI registration + routing/ensemble +
-`LocalSttSettings` primary selection + on-desktop runtime verification of transcription.
+`SttModelProvisioner.EnsureMedAsrAsync`. DI registration, routing/ensemble, and `LocalSttSettings`
+primary selection all landed.
 
-### Still blocked / deferred (need artifacts, a Rust build, or a focused pass)
+### MedASR — RUNTIME-VERIFIED on-device (2026-07-19)
+Downloaded the real bundle (SHA-256 re-verified against the pin: `2c20f03…f4c33a`, 154,106,419 B)
+and transcribed its own `test_wavs` through the actual engine. `OfflineModelConfig.MedAsr` is
+correct at runtime, not merely at compile time. Covered by `MedAsrEngineSmokeTests`, gated on
+`RADIOPAD_MEDASR_SMOKE_MODEL_DIR` (see `SttSmokeGate` — `RADIOPAD_STT_SMOKE_REQUIRE=1` turns a
+missing model into a hard failure so the smoke job cannot false-green).
+
+**This is what compile-checking could never have caught.** MedASR does not emit spoken punctuation
+as words (Parakeet/SAPI style) nor always as punctuation — it emits **its own markup**:
+
+```
+[EXAM TYPE] CT chest PE protocol {period} [FINDINGS] {colon} ... right lower lobe {comma} ...
+```
+
+- Punctuation markers: `{period}` `{comma}` `{colon}` `{new paragraph}`
+- Section tags: `[EXAM TYPE]` `[INDICATION]` `[TECHNIQUE]` `[FINDINGS]` `[IMPRESSION]` `[DIAGNOSES]`
+- It **already normalizes numbers** ("54-year-old", "37.2 degrees", "98%"), so §5.2's spoken-number
+  pass is largely redundant on this engine — harmless, since it is idempotent.
+
+Untranslated these reach a signed report verbatim; worse, the frontend's spoken-punctuation pass
+matches the word *inside* the braces, degrading `{period}` to `{.}`. `MedAsrTranscriptNormalizer`
+translates the markup **at the engine boundary**, so §5.2, the formatter, the ROVER ensemble's token
+alignment, and the raw-transcript fallback all see plain prose. It is punctuation-only and
+content-preserving, hence safe ahead of the §5.2 token lock. Two deliberate choices:
+
+- An **unrecognised marker is left verbatim**, never guessed — a visible `{foo}` is a fail-visible
+  anomaly the radiologist catches; a guess would be a silent fabrication.
+- **Section tags are rendered as heading lines, not treated as authoritative structure.**
+  `test_wavs/5.wav` showed a tag emitted mid-sentence ("The `[DIAGNOSES]` Includes …"), so a hard
+  boundary would mangle the sentence. As a heading, legitimate cases read correctly, a spurious one
+  is obvious, and no words are lost either way.
+
+The bundle's own radiology sample WAV is now provisioned alongside the model (best-effort, excluded
+from `IsMedAsrComplete`): without it `SelfTestAudio` falls back to a synthesized 440 Hz tone, which
+MedASR correctly transcribes as nothing — indistinguishable from a broken engine in the manager's
+"Test" action.
+
+### Still blocked / deferred
 - **Local MedGemma runtime** — pin is verified (§2), but actually running it needs the
   **llama-server binary bundled in CI**.
-- **P0.3 remainder** — Rust system-wide global-shortcut rebind (needs a Tauri build I can't
-  compile-verify) + true streaming/chunked on-device decode.
+- **True streaming/chunked on-device decode** (P0.3 remainder) — the PTT/hotkey half is done.
+
+> **Correction to an earlier note in this file:** "needs a Tauri build I can't compile-verify" was
+> wrong. Rust *is* available locally; the only obstacle was the build script requiring a sidecar
+> binary that CI produces, which a gitignored placeholder under `desktop/src-tauri/binaries/`
+> satisfies for a local `cargo check`/`cargo test`.
 
 ---
 
@@ -171,3 +212,13 @@ capability ships OFF by default, and its runtime behaviour must consult `IsEnabl
   root `pnpm-lock.yaml` was out of sync with the ESLint devDeps added to `frontend/package.json`;
   desktop-bundle installs `--frozen-lockfile` — no `latest.json` published, so nothing broken
   reached users) → **v0.1.78** (lockfile regenerated + committed, re-cut).
+- **2026-07-19** — MedASR **runtime-verified on-device** (not just compiled): pinned SHA-256
+  re-confirmed against a real download, and the bundle's own `test_wavs` transcribed through the
+  live engine. That run exposed MedASR's `{period}`/`[FINDINGS]` output markup — a bug no
+  compile-time check could reach, since it only manifests as literal markers (and `{.}`) in a signed
+  report. Fixed by `MedAsrTranscriptNormalizer` at the engine boundary; see §0 for the marker
+  vocabulary and the two safety choices behind it. P0.3's rebindable **system-wide** hotkey landed
+  (`desktop/src-tauri/src/hotkeys.rs` + `frontend/lib/desktopHotkeys.ts`): overrides previously
+  reached only in-page listeners, so a rebound chord kept firing the old accelerator while the
+  window was unfocused. Also fixed the cause of a long-standing drift — `pnpm release:desktop` never
+  bumped `Cargo.lock`, whose own version entry had read 0.1.29 since that release.
