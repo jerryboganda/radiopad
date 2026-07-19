@@ -11,6 +11,8 @@ import DictationDraftPanel from '@/app/(desktop)/reports/[id]/DictationDraftPane
 
 const dictationDraft = vi.fn();
 const dictationDraftLocal = vi.fn();
+const lexiconList = vi.fn();
+const userCorrectionsList = vi.fn();
 
 vi.mock('@/lib/api', () => ({
   api: {
@@ -18,6 +20,10 @@ vi.mock('@/lib/api', () => ({
       dictationDraft: (...args: unknown[]) => dictationDraft(...args),
       dictationDraftLocal: (...args: unknown[]) => dictationDraftLocal(...args),
     },
+    // The on-device path resolves the correction dictionary client-side before calling, because
+    // that endpoint is stateless and cannot look it up server-side.
+    lexicon: { list: () => lexiconList() },
+    userCorrections: { list: () => userCorrectionsList() },
   },
 }));
 
@@ -48,6 +54,8 @@ async function renderPanel() {
 beforeEach(() => {
   dictationDraft.mockResolvedValue(result('cloud'));
   dictationDraftLocal.mockResolvedValue(result('local-medgemma'));
+  lexiconList.mockResolvedValue([{ term: 'c-spine', replacement: 'cervical spine' }]);
+  userCorrectionsList.mockResolvedValue([{ id: '1', from: 'mri', to: 'MRI' }]);
 });
 
 afterEach(() => {
@@ -76,6 +84,41 @@ describe('on-device formatting route', () => {
 
   it('routes to the on-device formatter when enabled', async () => {
     setDesktop(true);
+    await renderPanel();
+
+    fireEvent.click(await screen.findByTestId('dictation-on-device-toggle'));
+    fireEvent.click(screen.getByRole('button', { name: /format/i }));
+
+    await waitFor(() => expect(dictationDraftLocal).toHaveBeenCalled());
+    expect(dictationDraft).not.toHaveBeenCalled();
+  });
+
+  it('applies the correction dictionary on the on-device path', async () => {
+    // The cloud endpoint resolves org lexicon + personal corrections server-side; the on-device
+    // endpoint is stateless and cannot. Without passing them, switching to on-device would silently
+    // drop every correction the radiologist configured — the same dictation producing different
+    // text depending only on WHERE it was formatted.
+    setDesktop(true);
+    await renderPanel();
+
+    fireEvent.click(await screen.findByTestId('dictation-on-device-toggle'));
+    fireEvent.click(screen.getByRole('button', { name: /format/i }));
+
+    await waitFor(() => expect(dictationDraftLocal).toHaveBeenCalled());
+    const ctx = dictationDraftLocal.mock.calls.at(-1)?.[1] as { corrections?: unknown[] };
+    expect(ctx?.corrections).toEqual(
+      expect.arrayContaining([
+        { from: 'c-spine', to: 'cervical spine' },
+        { from: 'mri', to: 'MRI' },
+      ]),
+    );
+  });
+
+  it('still formats when the correction lookup fails', async () => {
+    // A dictionary that cannot be fetched must degrade to "no corrections", never block dictation.
+    setDesktop(true);
+    lexiconList.mockRejectedValue(new Error('offline'));
+    userCorrectionsList.mockRejectedValue(new Error('offline'));
     await renderPanel();
 
     fireEvent.click(await screen.findByTestId('dictation-on-device-toggle'));

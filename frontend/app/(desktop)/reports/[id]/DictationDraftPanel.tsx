@@ -14,6 +14,7 @@
 
 import { useEffect, useState } from 'react';
 import { api, type DictationDraftResult, type DictationSectionKey } from '@/lib/api';
+import { resolveCorrections } from '@/lib/dictation/resolveCorrections';
 import Banner from '@/components/ui/Banner';
 import StatusBadge from '@/components/ui/StatusBadge';
 
@@ -67,7 +68,20 @@ export default function DictationDraftPanel({ reportId, initialText, onApply }: 
     try {
       if (onDevice && canRunOnDevice) {
         try {
-          setResult(await api.reports.dictationDraftLocal(text));
+          // The on-device endpoint is stateless (PHI never reaches the server), so it cannot look
+          // the correction dictionary up the way the report-scoped cloud path does. Resolve it here
+          // and pass it in — otherwise switching to on-device would silently drop every correction
+          // the radiologist has configured, and the same dictation would produce different text
+          // depending only on WHERE it was formatted.
+          const [lexicon, userCorrections] = await Promise.all([
+            api.lexicon.list().catch(() => []),
+            api.userCorrections.list().catch(() => []),
+          ]);
+          setResult(
+            await api.reports.dictationDraftLocal(text, {
+              corrections: resolveCorrections(lexicon, userCorrections),
+            }),
+          );
           return;
         } catch {
           // The on-device path 503s until the model + llama-server are provisioned. Falling back to
