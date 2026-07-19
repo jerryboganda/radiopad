@@ -1,10 +1,12 @@
 'use client';
 
 /**
- * F8 — one-command "Sign & Send". Applies the radiologist's Primary sign-off, acknowledges the
- * report (the server blocks this if validation blockers remain), then exports — chaining the
- * existing gated endpoints via `api.reports.signAndSend`. Nothing is auto-signed: the two-click
- * confirm IS the explicit verification action, and if sign/acknowledge fails nothing is exported.
+ * F8 — one-command "Sign & Send". Validates FIRST, then applies the radiologist's Primary sign-off,
+ * acknowledges, then exports — chaining the existing gated endpoints via `api.reports.signAndSend`.
+ * Nothing is auto-signed: the two-click confirm IS the explicit verification action.
+ *
+ * The validate-first ordering matters: `sign` performs no blocker check (only `acknowledge` does),
+ * so signing first left blocker-laden reports permanently signed after a failed acknowledge.
  */
 
 import { useState } from 'react';
@@ -39,9 +41,9 @@ export default function SignAndSendButton({ reportId }: { reportId: string }) {
     <div className="rp-panel rp-anim-scale-in">
       <div className="rp-panel-title">Sign &amp; Send</div>
       <p className="rp-page-sub">
-        One action: apply your <strong>Primary sign-off</strong>, acknowledge (the server rejects this
-        if validation blockers remain), then export. Nothing is auto-signed — confirming below is your
-        explicit verification.
+        One action: check for validation blockers, apply your <strong>Primary sign-off</strong>,
+        acknowledge, then export. If any blockers remain, nothing is signed. Nothing is auto-signed —
+        confirming below is your explicit verification.
       </p>
 
       {error && <Banner tone="danger" onDismiss={() => setError(null)}>{error}</Banner>}

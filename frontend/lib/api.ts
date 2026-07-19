@@ -1235,16 +1235,53 @@ export const api = {
     exportDocx: (id: string) => requestBlob(`/api/reports/${id}/export/docx`),
     exportHl7: (id: string) => requestBlob(`/api/reports/${id}/export/hl7`),
     /**
-     * F8 — one-command "Sign & Send": Primary sign-off → acknowledge (blocker-gated on the server)
-     * → export, chaining the EXISTING gated endpoints in order. If sign or acknowledge fails (e.g.
-     * validation blockers), it STOPS before export — the sign-off gate is never bypassed and nothing
-     * is auto-signed (the radiologist explicitly triggers this one action).
+     * F8 — one-command "Sign & Send": validate → Primary sign-off → acknowledge → export, chaining
+     * the EXISTING gated endpoints. Nothing is auto-signed; the radiologist explicitly triggers it.
+     *
+     * VALIDATION RUNS FIRST, and that ordering is the whole point. The `sign` endpoint performs NO
+     * blocker check — only `acknowledge` does. Signing first therefore left a report with
+     * unresolved blockers PERMANENTLY SIGNED, with acknowledge then failing and export skipped. The
+     * radiologist saw "Sign & Send failed" while their Primary signature sat on a blocker-laden
+     * report, and could not retry because a second `sign` 409s on the existing Primary signature.
+     * A signature is an attestation; it must not be applied on the way to a check that can reject.
+     *
+     * The pre-check is belt-and-braces, not a replacement for the server gate: `acknowledge` still
+     * enforces blockers server-side, and a direct `sign` call is unaffected.
      */
     signAndSend: async (
       id: string,
       opts: { note?: string; format?: 'fhir' | 'hl7' | 'json' | 'text' } = {},
     ) => {
-      const signature = await api.reports.sign(id, { role: 'Primary', note: opts.note });
+      const validation = await api.reports.validate(id);
+      if (validation.blockerPresent) {
+        const blockers = validation.findings.filter((f) => f.severity === 'Blocker');
+        throw Object.assign(
+          new Error('Resolve the validation blockers before signing.'),
+          {
+            body: {
+              error: `Cannot sign: ${blockers.length} validation blocker${blockers.length === 1 ? '' : 's'} must be resolved first.`,
+              kind: 'validation_blocker',
+            },
+            validation,
+          },
+        );
+      }
+
+      // Tolerate an already-applied Primary signature so a partial failure is RETRYABLE. If a
+      // previous attempt signed and then failed at acknowledge or export, a second `sign` 409s and
+      // the whole action became permanently unrepeatable — the report stuck signed, unacknowledged
+      // and unexportable with no way forward from the UI. Re-signing is not attempted or needed;
+      // the existing signature is exactly what this step wanted.
+      let signature: ReportSignature | null = null;
+      try {
+        signature = await api.reports.sign(id, { role: 'Primary', note: opts.note });
+      } catch (e) {
+        const status = (e as { status?: number }).status;
+        const kind = (e as { body?: { kind?: string } }).body?.kind;
+        const alreadySigned = status === 409 || kind === 'conflict';
+        if (!alreadySigned) throw e;
+      }
+
       const report = await api.reports.acknowledge(id);
       const format = opts.format ?? 'text';
       const exported =
