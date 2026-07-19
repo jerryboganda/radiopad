@@ -42,7 +42,8 @@
     "findingsLibrary": "Biblioteca de hallazgos",
     "quality": "Calidad y revisión",
     "settingsHub": "Configuración",
-    "hotkeys": "Atajos"
+    "hotkeys": "Atajos",
+    "onDeviceModels": "Modelos en el dispositivo"
   },
   "buttons": {
     "primary": {

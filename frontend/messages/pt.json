@@ -42,7 +42,8 @@
     "findingsLibrary": "Biblioteca de achados",
     "quality": "Qualidade e revisão",
     "settingsHub": "Configurações",
-    "hotkeys": "Atalhos"
+    "hotkeys": "Atalhos",
+    "onDeviceModels": "Modelos no dispositivo"
   },
   "buttons": {
     "primary": {

@@ -8,7 +8,7 @@ import {
   FileText, ClipboardCheck, ScrollText, BarChart3, BookOpen, LayoutTemplate,
   MessageSquareText, Store, BookText, Server, Network, HardDrive,
   FileInput, WifiOff, Scale, FlaskConical, ShieldCheck, Flag, CreditCard,
-  Activity, Settings2, Fingerprint, Users, ScanLine, Bone,
+  Activity, Settings2, Fingerprint, Users, ScanLine, Bone, Cpu,
   LayoutDashboard, ListTodo, PenLine, Layers, Sparkles, Library, BadgeCheck,
 } from 'lucide-react';
 import type { PermissionKey } from '@/lib/permissions';
@@ -74,6 +74,7 @@ export const Icons: Record<string, NavIcon> = {
   providers: Server,
   ubag: Network,
   pacs: HardDrive,
+  onDeviceModels: Cpu,
   fhir: FileInput,
   offline: WifiOff,
   governance: Scale,
@@ -162,6 +163,9 @@ export const navGroups: NavGroup[] = [
     labelKey: 'account',
     items: [
       { href: '/settings', labelKey: 'settingsHub', icon: Icons.settings, surfaces: ['desktop'] },
+      // Desktop-only: the on-device engines run HERE, so the manager must ship here. It lived
+      // only under (web) and was staged out of the desktop bundle entirely.
+      { href: '/settings/models', labelKey: 'onDeviceModels', icon: Icons.onDeviceModels, surfaces: ['desktop'] },
       { href: '/account/security', labelKey: 'signInDevices', icon: Icons.signInDevices },
     ],
   },

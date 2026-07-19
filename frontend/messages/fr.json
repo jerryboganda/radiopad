@@ -42,7 +42,8 @@
     "findingsLibrary": "Bibliothèque de constatations",
     "quality": "Qualité et relecture",
     "settingsHub": "Paramètres",
-    "hotkeys": "Raccourcis"
+    "hotkeys": "Raccourcis",
+    "onDeviceModels": "Modèles sur l’appareil"
   },
   "buttons": {
     "primary": {

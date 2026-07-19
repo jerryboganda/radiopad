@@ -13,7 +13,7 @@ vi.mock('@/lib/api', () => ({
   api: { localModels: { list: (...a: unknown[]) => listMock(...a) } },
 }));
 
-import OnDeviceModels from '@/app/(web)/providers/OnDeviceModels';
+import OnDeviceModels from '@/components/models/OnDeviceModels';
 
 function model(partial: Partial<LocalModel>): LocalModel {
   return {

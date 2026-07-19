@@ -42,7 +42,8 @@
     "findingsLibrary": "Befund-Bibliothek",
     "quality": "Qualität & Peer-Review",
     "settingsHub": "Einstellungen",
-    "hotkeys": "Tastenkürzel"
+    "hotkeys": "Tastenkürzel",
+    "onDeviceModels": "Lokale Modelle"
   },
   "buttons": {
     "primary": {

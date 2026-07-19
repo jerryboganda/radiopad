@@ -8,7 +8,7 @@ import EmptyState from '@/components/ui/EmptyState';
 import ErrorState from '@/components/ui/ErrorState';
 import Banner from '@/components/ui/Banner';
 import { TableSkeleton } from '@/components/ui/Skeleton';
-import OnDeviceModels from './OnDeviceModels';
+import OnDeviceModels from '@/components/models/OnDeviceModels';
 import { FALLBACK_UBAG_TARGETS } from '@/lib/ubagTargets';
 
 const SANDBOX_COMPLIANCE = 1;

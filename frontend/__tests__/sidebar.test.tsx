@@ -19,7 +19,10 @@ const LOCKED_GROUPS: ReadonlyArray<{ key: string; hrefs: string[] }> = [
   { key: 'library', hrefs: ['/rulebooks', '/modalities', '/body-parts', '/prompts', '/marketplace', '/terminology'] },
   { key: 'integrations', hrefs: ['/providers', '/admin/ubag', '/admin/pacs', '/admin/fhir-import', '/offline'] },
   { key: 'admin', hrefs: ['/admin/users', '/admin/governance', '/admin/model-eval', '/admin/security', '/admin/feature-flags', '/admin/billing', '/admin/usage', '/admin/settings'] },
-  { key: 'account', hrefs: ['/settings', '/account/security'] },
+  // '/settings/models' is DESKTOP-only: the on-device engines run there, and the manager
+  // previously shipped only in the (web) bundle — reachable by platform operators but not by the
+  // radiologist who actually has to download the model.
+  { key: 'account', hrefs: ['/settings', '/settings/models', '/account/security'] },
 ];
 
 describe('sidebar nav config', () => {

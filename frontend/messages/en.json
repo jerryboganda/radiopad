@@ -42,7 +42,8 @@
     "findingsLibrary": "Findings Library",
     "quality": "Quality & Peer Review",
     "settingsHub": "Settings",
-    "hotkeys": "Hotkeys"
+    "hotkeys": "Hotkeys",
+    "onDeviceModels": "On-device models"
   },
   "buttons": {
     "primary": {
