@@ -9,7 +9,7 @@
 // is thin.
 
 import { Extension, type Editor } from '@tiptap/core';
-import { docToString, plainOffsetToPmPos } from '@/lib/editor/plainText';
+import { docToString, plainOffsetToPmPos, stringToDoc } from '@/lib/editor/plainText';
 import { findSnippetByTrigger, findFields, type Snippet } from '@/lib/snippets';
 
 /** The whitespace-delimited word immediately before the caret (the candidate trigger). */
@@ -57,7 +57,17 @@ export const SnippetExpansion = Extension.create({
             editor
               .chain()
               .focus()
-              .insertContentAt({ from: wordStartPos, to: sel.from }, match.snippet.body)
+              // Build the paragraphs explicitly rather than handing Tiptap a raw string.
+              //
+              // NOT a bug fix: passing the string directly was verified to preserve newlines here.
+              // But that relies on Tiptap's string parsing incidentally doing the right thing,
+              // which a version bump could change — and plainText.ts documents the opposite as the
+              // default ("Tiptap's default string handling parses HTML and collapses newlines").
+              // Every other insertion path in the editor already goes through stringToDoc; this was
+              // the only one that did not. Making it explicit costs nothing and removes the
+              // dependency on incidental behaviour. See the multi-line test in
+              // __tests__/editor/snippetExpansion.test.tsx, which pins the guarantee either way.
+              .insertContentAt({ from: wordStartPos, to: sel.from }, stringToDoc(match.snippet.body).content)
               .run();
             selectFieldAtOrAfter(editor, bodyStartOffset);
             return true;
