@@ -1313,8 +1313,13 @@ export const api = {
      * Optional OFFLINE draft path (desktop only): runs the whole safety pipeline on the loopback
      * sidecar with the local MedGemma formatter — the transcript (PHI) never leaves the machine.
      * Stateless (report context is passed in the body, not resolved from the DB). Returns 503 until
-     * the on-device formatter + bundled llama-server are provisioned; callers fall back to
-     * `dictationDraft` (cloud) on failure.
+     * the on-device formatter is enabled and the MedGemma model + llama-server runtime are
+     * provisioned (the runtime is fetched ON DEMAND alongside the model — it is not bundled in the
+     * installer); callers fall back to `dictationDraft` (cloud) on failure.
+     *
+     * NOTE: because this path is stateless, corrections are NOT resolved server-side the way the
+     * report-scoped cloud path resolves them — a caller that wants the correction dictionary
+     * applied must pass it in `ctx.corrections`.
      */
     dictationDraftLocal: async (
       raw: string,
@@ -1334,7 +1339,8 @@ export const api = {
       return (await res.json()) as DictationDraftResult;
     },
     // Dictation transcription. On the desktop the recorded audio is transcribed
-    // FULLY ON-DEVICE by the bundled STT sidecar (Parakeet, CPU) — the
+    // FULLY ON-DEVICE by the bundled STT sidecar (MedASR by default per decision
+    // D2, with Parakeet and Windows Speech selectable; all CPU-only) — the
     // PHI-bearing audio never leaves the machine; only the
     // resulting de-identified transcript is saved to the production report. On
     // web (no sidecar) it falls back to the report-scoped cloud path, where PHI

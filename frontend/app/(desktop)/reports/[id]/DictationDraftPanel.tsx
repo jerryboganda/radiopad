@@ -12,7 +12,7 @@
  * gated by the §5.5 sign-off flow — RadioPad never auto-signs.
  */
 
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { api, type DictationDraftResult, type DictationSectionKey } from '@/lib/api';
 import Banner from '@/components/ui/Banner';
 import StatusBadge from '@/components/ui/StatusBadge';
@@ -43,6 +43,16 @@ export default function DictationDraftPanel({ reportId, initialText, onApply }: 
   const [error, setError] = useState<string | null>(null);
   const [result, setResult] = useState<DictationDraftResult | null>(null);
   const [applied, setApplied] = useState(false);
+  // Offline formatting is DESKTOP-only and OPT-IN: decision D1 keeps the cloud formatter the
+  // default. Until this existed, `api.reports.dictationDraftLocal` had no caller at all — the whole
+  // on-device MedGemma path was unreachable from the UI no matter how it was provisioned.
+  const [onDevice, setOnDevice] = useState(false);
+  const [canRunOnDevice, setCanRunOnDevice] = useState(false);
+  const [fellBack, setFellBack] = useState(false);
+
+  useEffect(() => {
+    setCanRunOnDevice(typeof window !== 'undefined' && '__TAURI__' in window);
+  }, []);
 
   async function run() {
     const text = raw.trim();
@@ -53,7 +63,20 @@ export default function DictationDraftPanel({ reportId, initialText, onApply }: 
     setBusy(true);
     setError(null);
     setApplied(false);
+    setFellBack(false);
     try {
+      if (onDevice && canRunOnDevice) {
+        try {
+          setResult(await api.reports.dictationDraftLocal(text));
+          return;
+        } catch {
+          // The on-device path 503s until the model + llama-server are provisioned. Falling back to
+          // the cloud formatter keeps the radiologist working, but it must be VISIBLE — silently
+          // sending PHI to the cloud after the user asked for on-device would be a privacy
+          // surprise, not a convenience.
+          setFellBack(true);
+        }
+      }
       setResult(await api.reports.dictationDraft(reportId, text));
     } catch (e) {
       const err = e as { body?: { error?: string; detail?: string }; message: string };
@@ -88,6 +111,38 @@ export default function DictationDraftPanel({ reportId, initialText, onApply }: 
       </p>
 
       {error && <Banner tone="warn" onDismiss={() => setError(null)}>{error}</Banner>}
+
+      {fellBack && (
+        <Banner tone="warn" onDismiss={() => setFellBack(false)}>
+          On-device formatting was unavailable, so this draft was formatted in the cloud. Download
+          the MedGemma model in Settings → On-device models to keep dictation on this machine.
+        </Banner>
+      )}
+
+      {canRunOnDevice && (
+        <div className="section-block">
+          <label
+            htmlFor="rp-dictation-on-device"
+            className="rp-row"
+            style={{ gap: 8, alignItems: 'flex-start', cursor: 'pointer' }}
+          >
+            <input
+              id="rp-dictation-on-device"
+              type="checkbox"
+              checked={onDevice}
+              onChange={(e) => setOnDevice(e.target.checked)}
+              data-testid="dictation-on-device-toggle"
+            />
+            <span>
+              Format on this device (offline)
+              <span className="rp-page-sub" style={{ display: 'block' }}>
+                Keeps the dictation on this machine instead of sending it to the cloud formatter.
+                Requires the MedGemma model; falls back to the cloud if it is not installed.
+              </span>
+            </span>
+          </label>
+        </div>
+      )}
 
       <div className="section-block">
         <label htmlFor="rp-dictation-raw">Dictation</label>
