@@ -115,16 +115,52 @@ public class DictationValidationServiceTests
     }
 
     [Fact]
-    public void Rejects_When_Required_Section_Missing()
+    /// <summary>
+    /// A missing required section is REPORTED but no longer discards the report.
+    ///
+    /// <para>This test previously asserted rejection. The rule it encoded — the brief's "reject on
+    /// a dropped required section" — is really about the formatter LOSING dictated content, and an
+    /// empty section was a crude proxy for that. In practice the proxy fired hardest on correct
+    /// behaviour: MedGemma, run end-to-end, produced a clean report and was discarded because the
+    /// radiologist had not dictated any recommendations. Since most dictations omit at least one
+    /// required section, the offline formatter fell back on nearly every real input.</para>
+    ///
+    /// <para>The underlying safety property is now measured directly instead of by proxy — see
+    /// <c>Rejects_When_A_Dictated_Measurement_Is_Dropped</c> — which is strictly stronger: before,
+    /// a formatter could silently delete a dictated measurement and nothing caught it.</para>
+    /// </summary>
+    public void Reports_But_Does_Not_Reject_When_A_Required_Section_Is_Missing()
     {
         var svc = new DictationValidationService();
         var source = Source("right upper lobe nodule");
-        var output = Sections(findings: "Right upper lobe nodule.", impression: "");  // impression dropped
+        var output = Sections(findings: "Right upper lobe nodule.", impression: "");
 
         var result = svc.Validate(source, output, Required);
 
+        Assert.True(result.Accepted, "an undictated section must not discard an otherwise sound report");
+        Assert.Contains(result.Violations,
+            v => v.Reason == ValidationRejectReason.MissingRequiredSection
+                 && v.Detail.Contains("impression")
+                 && !v.IsBlocking);
+    }
+
+    /// <summary>
+    /// The real property the section check was standing in for: content the radiologist dictated
+    /// must survive into the report. Losing a measurement is as dangerous as inventing one, and
+    /// before this the pass only ever looked for additions.
+    /// </summary>
+    [Fact]
+    public void Rejects_When_A_Dictated_Measurement_Is_Dropped()
+    {
+        var svc = new DictationValidationService();
+        var source = Source("There is a 3.2 cm nodule in the right upper lobe.");
+        var output = Sections(findings: "There is a nodule in the right upper lobe.", impression: "Nodule.");
+
+        var result = svc.Validate(source, output, Array.Empty<string>());
+
         Assert.False(result.Accepted);
         Assert.Contains(result.Violations,
-            v => v.Reason == ValidationRejectReason.MissingRequiredSection && v.Detail.Contains("impression"));
+            v => v.Reason == ValidationRejectReason.DroppedMeasurement && v.IsBlocking);
+        Assert.Equal(source.CorrectedTranscript, result.FallbackText);
     }
 }
