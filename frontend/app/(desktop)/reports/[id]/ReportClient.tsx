@@ -56,6 +56,7 @@ import { type AiActivityEntry } from '@/components/reports/AiActivityPanel';
 import { type ExportFormat } from '@/components/reports/ExportPanel';
 import { timeAgo } from '@/components/reports/CaseQueue';
 import Skeleton from '@/components/ui/Skeleton';
+import { sectionScaffoldText, sectionScaffoldVariants } from '@/lib/templateSeed';
 import {
   ClipboardList,
   Settings2,
@@ -473,7 +474,9 @@ export default function ReportPage() {
   // dismissible notice instead, so stale "chest technique under a brain study"
   // text can no longer survive a context change while real prose always does.
   const parseTemplateSections = useCallback((t: ReportTemplate) => {
-    let sections: Array<{ id: string; placeholder?: string }> = [];
+    // `normal` MUST be in this type. It was omitted, which is precisely how the scaffold engine
+    // came to ignore normal-value templates: the field was invisible to every line below.
+    let sections: Array<{ id: string; placeholder?: string; normal?: string }> = [];
     try {
       const parsed = JSON.parse(t.sectionsJson) as { sections?: typeof sections } | typeof sections;
       sections = Array.isArray(parsed) ? parsed : parsed.sections ?? [];
@@ -493,11 +496,17 @@ export default function ReportPage() {
       for (const s of sections) {
         const key = SECTION_FIELD_MAP[s.id];
         if (!key) continue;
-        const ph = normalizeScaffold(s.placeholder ?? '');
-        if (!ph) continue;
-        let set = idx.get(key as string);
-        if (!set) { set = new Set(); idx.set(key as string, set); }
-        set.add(ph);
+        // BOTH the placeholder and the normal body count as untouched scaffold. Indexing only
+        // placeholders meant normal-seeded prose was treated as radiologist-authored and survived a
+        // rebind verbatim — stale chest technique under a brain study, the exact failure this
+        // engine exists to prevent.
+        for (const variant of sectionScaffoldVariants(s)) {
+          const ph = normalizeScaffold(variant);
+          if (!ph) continue;
+          let set = idx.get(key as string);
+          if (!set) { set = new Set(); idx.set(key as string, set); }
+          set.add(ph);
+        }
       }
     }
     return idx;
@@ -514,10 +523,14 @@ export default function ReportPage() {
     if (!t) return;
     const sections = parseTemplateSections(t);
     if (!sections) return;
-    const nextPlaceholders = new Map<string, string>();
+    // Seed with the section's NORMAL body when it has one, falling back to the placeholder — the
+    // same precedence the backend's template preview uses. Reading `placeholder` alone meant a
+    // template authored with only `normal` seeded '' here, so on a rebind the old scaffold was
+    // actively PATCHED to empty rather than replaced with the normal prose.
+    const nextScaffold = new Map<string, string>();
     for (const s of sections) {
       const key = SECTION_FIELD_MAP[s.id];
-      if (key) nextPlaceholders.set(key as string, s.placeholder ?? '');
+      if (key) nextScaffold.set(key as string, sectionScaffoldText(s));
     }
 
     const patch: Partial<Report> = {};
@@ -527,7 +540,7 @@ export default function ReportPage() {
       const curNorm = normalizeScaffold(cur);
       const isScaffold = curNorm.length === 0 || (placeholderIndex.get(key as string)?.has(curNorm) ?? false);
       // New template may not carry this section — clear stale scaffold to "".
-      const next = nextPlaceholders.get(key as string) ?? '';
+      const next = nextScaffold.get(key as string) ?? '';
       if (isScaffold) {
         if (normalizeScaffold(next) !== curNorm) {
           (patch as Record<string, unknown>)[key as string] = next;
