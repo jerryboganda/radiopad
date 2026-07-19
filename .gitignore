@@ -74,3 +74,6 @@ tsc_output.txt
 *.dev.db
 *.dev.db-shm
 *.dev.db-wal
+
+# dotnet test --logger trx output
+TestResults/
