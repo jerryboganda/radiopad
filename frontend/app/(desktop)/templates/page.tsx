@@ -81,6 +81,12 @@ export default function TemplatesPage() {
       const created = await api.reports.create({
         modality: t.modality,
         bodyPart: t.bodyPart,
+        // The template's contrast phase was dropped here, so a template authored for a specific
+        // phase (93 of the 151 bundled templates carry one) seeded a report with Study.Contrast
+        // empty. The Study Context panel then flagged its own bound template as a mismatch, and
+        // the patient-context header silently omitted the "with and without contrast" qualifier.
+        // sectionsToReportSeed cannot backfill it — it only maps the six narrative sections.
+        contrast: t.contrast,
         templateId: t.id,
       });
       const seed = sectionsToReportSeed(parseTemplateSections(t.sectionsJson));

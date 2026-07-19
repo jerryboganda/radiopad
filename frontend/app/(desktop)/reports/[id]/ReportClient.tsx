@@ -475,9 +475,11 @@ export default function ReportPage() {
   // dismissible notice instead, so stale "chest technique under a brain study"
   // text can no longer survive a context change while real prose always does.
   const parseTemplateSections = useCallback((t: ReportTemplate) => {
-    // `normal` MUST be in this type. It was omitted, which is precisely how the scaffold engine
-    // came to ignore normal-value templates: the field was invisible to every line below.
-    let sections: Array<{ id: string; placeholder?: string; normal?: string }> = [];
+    // `normal` and `required` MUST both be here. Omitting a field is exactly how it becomes
+    // invisible to every line below: `normal` was missing once and the scaffold engine silently
+    // ignored normal-value templates, and `required` was written by the template editor's "req"
+    // checkbox and then read by nothing at all.
+    let sections: Array<{ id: string; placeholder?: string; normal?: string; required?: boolean }> = [];
     try {
       const parsed = JSON.parse(t.sectionsJson) as { sections?: typeof sections } | typeof sections;
       sections = Array.isArray(parsed) ? parsed : parsed.sections ?? [];
@@ -1061,6 +1063,23 @@ export default function ReportPage() {
   const matchedRulebook = rulebooks.find((r) => r.id === report.rulebookId);
   const matchedTemplate = templates.find((t) => t.id === report.templateId);
 
+  // The template editor's per-section "req" checkbox was persisted into sectionsJson and then read
+  // by nothing — a template author could mark Findings required and a report could be signed with
+  // it empty, no warning anywhere. Surfaced here as a review prompt rather than a hard block: the
+  // authoritative blocking validation is the rulebook engine, and inventing a second client-only
+  // gate that the backend does not enforce would be its own inconsistency.
+  const unmetRequiredSections = (() => {
+    if (!matchedTemplate) return [] as string[];
+    const sections = parseTemplateSections(matchedTemplate);
+    if (!sections) return [] as string[];
+    return sections
+      .filter((s) => s.required)
+      .map((s) => ({ key: SECTION_FIELD_MAP[s.id], id: s.id }))
+      .filter((s): s is { key: keyof Report; id: string } => !!s.key)
+      .filter((s) => !String((report as Record<string, unknown>)[s.key] ?? '').trim())
+      .map((s) => SECTION_TITLES[s.key as string] ?? s.id);
+  })();
+
   return (
     <div className="rp-container rp-composer">
       <PatientContextBar
@@ -1155,9 +1174,15 @@ export default function ReportPage() {
               <button className="ghost" type="button" onClick={() => setShowDictationDraft((v) => !v)} aria-expanded={showDictationDraft}>
                 {showDictationDraft ? 'Hide draft' : 'Format draft'}
               </button>
-              <button className="ghost" type="button" onClick={() => setShowSignSend((v) => !v)} aria-expanded={showSignSend}>
-                {showSignSend ? 'Hide sign & send' : 'Sign & send'}
-              </button>
+              {/* Sign & send validates, signs and exports in one action, so it needs the same
+                  permissions as the individual buttons beside it — it was the only one of the row
+                  rendered unconditionally, offering a user without reports.sign an action that
+                  cannot succeed while the plain "Review & sign" button correctly stayed hidden. */}
+              {canSign && canExport && (
+                <button className="ghost" type="button" onClick={() => setShowSignSend((v) => !v)} aria-expanded={showSignSend}>
+                  {showSignSend ? 'Hide sign & send' : 'Sign & send'}
+                </button>
+              )}
               {canEdit && (
                 <button
                   className="ghost"
@@ -1254,7 +1279,7 @@ export default function ReportPage() {
 
           {showPrior && <PriorComparePanel reportId={report.id} />}
 
-          {showSignSend && <SignAndSendButton reportId={report.id} />}
+          {showSignSend && canSign && canExport && <SignAndSendButton reportId={report.id} />}
 
           {showDictationDraft && (
             <DictationDraftPanel
@@ -1375,6 +1400,13 @@ export default function ReportPage() {
           {hasAiText && (
             <div className="banner ai">
               AI-generated text is highlighted below — review every section before acknowledging.
+            </div>
+          )}
+
+          {unmetRequiredSections.length > 0 && (
+            <div className="banner warn" data-testid="required-sections-notice">
+              This template marks {unmetRequiredSections.length === 1 ? 'a section' : 'sections'} as
+              required, still empty: <strong>{unmetRequiredSections.join(', ')}</strong>.
             </div>
           )}
 

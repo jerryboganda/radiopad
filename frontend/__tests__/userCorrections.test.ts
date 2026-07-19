@@ -39,10 +39,16 @@ describe('validateCorrection', () => {
     expect(r.warning).toMatch(/overwrite/i);
   });
 
-  it('treats a different-case term as new (backend matches exactly)', () => {
+  // The store and the resolver disagreed about what counts as "the same term". The backend's
+  // unique index is case-SENSITIVE, so both rows save and both appear in the list — but
+  // CorrectionDictionary.Resolve (and its frontend port) key case-INSENSITIVELY, so only one of
+  // them can ever apply. The other is stored, listed, editable, and permanently inert, with
+  // nothing to say so. Saving is still allowed; it must not be silent.
+  it('warns that a case-only variant collapses onto the existing term', () => {
     const r = validateCorrection('APENDIX', 'appendix', rows);
     expect(r.ok).toBe(true);
-    expect(r.warning).toBeUndefined();
+    expect(r.warning).toMatch(/case/i);
+    expect(r.warning).toContain('apendix');
   });
 
   it('does not flag a clash against the row being edited', () => {

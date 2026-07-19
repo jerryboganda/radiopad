@@ -38,6 +38,27 @@ const SECTION_LABELS: Record<DictationSectionKey, string> = {
   recommendations: 'Recommendations',
 };
 
+/**
+ * Title the warning banner after what actually fired.
+ *
+ * DictationEngineService merges the F4 deterministic checks (measurement sanity, findings-vs-
+ * impression consistency) into the same `sentinelWarnings` channel as the §5.6 laterality /
+ * negation / sex sentinel. The banner hardcoded the §5.6 wording, so a report flagged only for an
+ * implausible measurement told the radiologist to check for a "possible laterality / negation / sex
+ * mismatch" — sending them looking for a side error that had not occurred, and teaching them that
+ * the most safety-critical banner in the product is often about something else.
+ */
+function sentinelBannerTitle(warnings: { kind: string }[]): string {
+  const kinds = new Set(warnings.map((w) => w.kind));
+  const safety = ['Laterality', 'Negation', 'Gender'].some((k) => kinds.has(k));
+  const consistency = ['Consistency', 'MeasurementSanity'].some((k) => kinds.has(k));
+
+  if (safety && consistency) return 'Requires review — safety and consistency checks flagged this draft';
+  if (safety) return 'Requires review — possible laterality / negation / sex mismatch';
+  if (consistency) return 'Requires review — measurement or findings/impression inconsistency';
+  return 'Requires review — a deterministic safety check flagged this draft';
+}
+
 export default function DictationDraftPanel({ reportId, initialText, onApply }: Props) {
   const [raw, setRaw] = useState(initialText ?? '');
   const [busy, setBusy] = useState(false);
@@ -199,7 +220,7 @@ export default function DictationDraftPanel({ reportId, initialText, onApply }: 
           )}
 
           {result.sentinelWarnings.length > 0 && (
-            <Banner tone="warn" title="Requires review — possible laterality / negation / sex mismatch">
+            <Banner tone="warn" title={sentinelBannerTitle(result.sentinelWarnings)}>
               <ul className="rp-list">
                 {result.sentinelWarnings.map((w, i) => (
                   <li key={i}>

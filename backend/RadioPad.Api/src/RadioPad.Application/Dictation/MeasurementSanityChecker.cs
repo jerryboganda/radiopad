@@ -37,11 +37,14 @@ public static class MeasurementSanityChecker
             }
         }
 
-        // 2) consistency — a measurement in the Impression must also appear in the Findings
+        // 2) consistency — a measurement in the Impression must also appear in the Findings.
+        //    Compared on a unit-normalized key, not the raw text: restating a lesion in the other
+        //    unit ("8 mm" in Findings, "0.8 cm" in the Impression) is ordinary dictation, and
+        //    flagging it produced a safety warning for something that had not gone wrong.
         var findings = Set(sections, "findings");
         foreach (var m in Measurements(Get(sections, "impression")))
         {
-            if (!findings.Contains(m))
+            if (!findings.Contains(CanonicalKey(m)))
                 warnings.Add(new SentinelWarning(SentinelKind.Consistency,
                     $"impression cites measurement '{m}' not present in findings"));
         }
@@ -58,7 +61,35 @@ public static class MeasurementSanityChecker
             .Select(t => t.Text);
 
     private static HashSet<string> Set(IReadOnlyDictionary<string, string> s, string key)
-        => Measurements(Get(s, key)).ToHashSet(StringComparer.OrdinalIgnoreCase);
+        => Measurements(Get(s, key)).Select(CanonicalKey).ToHashSet(StringComparer.Ordinal);
+
+    /// <summary>
+    /// Comparison key for a measurement, with every dimension converted to millimetres, so "8 mm",
+    /// "0.8 cm", "8mm" and "30 x 40 mm" / "3 x 4 cm" are recognised as the same measurement.
+    ///
+    /// Only the equality comparison is normalized — warning text still quotes what the radiologist
+    /// actually dictated. A measurement carrying no recognisable unit falls back to its trimmed,
+    /// lower-cased text so it can still match itself.
+    /// </summary>
+    private static string CanonicalKey(string measurement)
+    {
+        var unit = UnitPattern.Match(measurement);
+        if (!unit.Success)
+            return measurement.Trim().ToLowerInvariant();
+
+        var toMillimetres = unit.Value.ToLowerInvariant() == "cm" ? 10.0 : 1.0;
+        var dimensions = new List<string>();
+        foreach (Match n in NumberPattern.Matches(measurement))
+        {
+            if (double.TryParse(n.Value, NumberStyles.Float, CultureInfo.InvariantCulture, out var v))
+                // Rounded so 0.8 cm and 8 mm agree exactly rather than differing in the last bit.
+                dimensions.Add(Math.Round(v * toMillimetres, 3).ToString(CultureInfo.InvariantCulture));
+        }
+
+        return dimensions.Count == 0
+            ? measurement.Trim().ToLowerInvariant()
+            : string.Join("x", dimensions) + "mm";
+    }
 
     private static bool IsImplausible(string measurement)
     {

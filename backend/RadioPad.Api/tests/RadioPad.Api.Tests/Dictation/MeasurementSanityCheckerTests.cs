@@ -43,6 +43,34 @@ public class MeasurementSanityCheckerTests
         Assert.DoesNotContain(w, x => x.Kind == SentinelKind.Consistency);
     }
 
+    /// <summary>
+    /// The consistency check compared measurement strings for equality, so the same lesion restated
+    /// in the other unit — a routine dictation habit, millimetres in Findings and centimetres in the
+    /// Impression — was reported as an inconsistency that did not exist. A safety warning that cries
+    /// wolf on ordinary reporting is worse than no warning: radiologists learn to dismiss the banner,
+    /// and the real laterality and fabrication warnings ride in the same channel.
+    /// </summary>
+    [Theory]
+    [InlineData("8 mm nodule in the right lower lobe.", "0.8 cm nodule, unchanged.")]
+    [InlineData("0.8 cm nodule in the right lower lobe.", "8 mm nodule, unchanged.")]
+    [InlineData("3.2 cm nodule.", "3.2cm nodule.")] // spacing only
+    [InlineData("A 30 x 40 mm mass.", "A 3 x 4 cm mass.")]
+    public void Does_Not_Flag_The_Same_Measurement_Expressed_In_Another_Unit(string findings, string impression)
+    {
+        var w = MeasurementSanityChecker.Check(Sections(findings: findings, impression: impression));
+        Assert.DoesNotContain(w, x => x.Kind == SentinelKind.Consistency);
+    }
+
+    /// <summary>Normalizing units must not blunt the check: a genuinely different size still flags.</summary>
+    [Theory]
+    [InlineData("8 mm nodule.", "9 mm nodule.")]
+    [InlineData("8 mm nodule.", "8 cm nodule.")]
+    public void Still_Flags_A_Genuinely_Different_Measurement(string findings, string impression)
+    {
+        var w = MeasurementSanityChecker.Check(Sections(findings: findings, impression: impression));
+        Assert.Contains(w, x => x.Kind == SentinelKind.Consistency);
+    }
+
     [Fact]
     public void Empty_Sections_Yield_No_Warnings()
     {

@@ -4,6 +4,7 @@ using System.Text.Json;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using RadioPad.Application.Abstractions;
+using RadioPad.Application.Services;
 using RadioPad.Domain.Entities;
 using RadioPad.Domain.Enums;
 using RadioPad.Infrastructure.Persistence;
@@ -45,7 +46,10 @@ public class IngestController : ControllerBase
         string? Indication,
         string? Comparison,
         string? PatientRef,
-        string? RulebookId);
+        string? RulebookId,
+        // F8 — the RIS's order priority. Accepts FHIR request-priority or HL7 ORC-7 codes; see
+        // ReportPriorityParser. Optional and trailing so existing senders are unaffected.
+        string? Priority = null);
 
     [HttpPost("order")]
     public async Task<IActionResult> Order([FromBody] IngestOrderDto dto, CancellationToken ct)
@@ -95,6 +99,8 @@ public class IngestController : ControllerBase
             Status = ReportStatus.Draft,
             Indication = dto.Indication ?? "",
             Comparison = dto.Comparison ?? "",
+            // Without this the worklist could only guess urgency from the indication text.
+            Priority = ReportPriorityParser.Parse(dto.Priority),
             RulebookId = Guid.TryParse(dto.RulebookId, out var rbId) ? rbId : null,
             Study = new StudyContext
             {
@@ -194,6 +200,7 @@ public class IngestController : ControllerBase
             Status = ReportStatus.Draft,
             Indication = parsed.Indication,
             Comparison = "",
+            Priority = ReportPriorityParser.Parse(parsed.Priority),
             ServiceRequestRef = srRef,
             Study = new StudyContext
             {
@@ -399,7 +406,7 @@ public class IngestController : ControllerBase
         return new ParsedDr(accession.Trim(), modality.Trim(), bodyPart.Trim(), findings.Trim(), impression.Trim(), basedOnRef);
     }
 
-    private record ParsedSr(string AccessionNumber, string Modality, string BodyPart, string Indication);
+    private record ParsedSr(string AccessionNumber, string Modality, string BodyPart, string Indication, string Priority);
 
     private static JsonElement? ResolveServiceRequest(JsonElement root)
     {
@@ -465,7 +472,13 @@ public class IngestController : ControllerBase
             if (notes[0].TryGetProperty("text", out var t)) indication = t.GetString() ?? "";
         }
 
-        return new ParsedSr(accession.Trim(), modality.Trim(), bodyPart.Trim(), indication.Trim());
+        // FHIR request-priority: routine | urgent | asap | stat. Previously ignored, which is why
+        // a STAT ServiceRequest landed in the worklist as ordinary routine work.
+        var priority = "";
+        if (sr.TryGetProperty("priority", out var pr) && pr.ValueKind == JsonValueKind.String)
+            priority = pr.GetString() ?? "";
+
+        return new ParsedSr(accession.Trim(), modality.Trim(), bodyPart.Trim(), indication.Trim(), priority.Trim());
     }
 
     private static bool FixedTimeEquals(string a, string b)
