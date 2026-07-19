@@ -222,3 +222,29 @@ capability ships OFF by default, and its runtime behaviour must consult `IsEnabl
   reached only in-page listeners, so a rebound chord kept firing the old accelerator while the
   window was unfocused. Also fixed the cause of a long-standing drift — `pnpm release:desktop` never
   bumped `Cargo.lock`, whose own version entry had read 0.1.29 since that release.
+- **2026-07-19 (end-to-end run against the real sidecar)** — Published the .NET sidecar exactly as
+  the MSI does and drove the endpoints the desktop calls. This caught two wiring bugs that every
+  unit test missed, because each component was correct in isolation and only the wiring was wrong:
+  (a) `LocalModelsController.IsDownloaded` had no `MedAsrCtc` case, so MedASR reported
+  `downloaded=false` while reporting `available=true` — the manager offered to re-download a
+  154 MB bundle already on disk and "Make primary" 409'd, meaning MedASR could never become
+  primary (all of D2); (b) `LocalSttEnsemble.PickPrimary` fell back to `engines[0]` — DI
+  registration order — whenever the configured primary had no backend engine, which is the normal
+  case for the frontend-only Edge engine. Result: dictation ran on Parakeet (41.6 s, empty
+  transcript) with MedASR installed and idle. After the fix: `model=medasr`, 14.7 s, full clean
+  report. Regression tests guard the invariants (every ArchiveKind needs a completeness check; the
+  fallback order is explicit) rather than the instances.
+- **llama-server is now provisioned on demand** (operator's choice over bundling; cloud stays
+  default per D1) and started lazily by `LlamaServerProcess`. Pinned to llama.cpp `b10068` —
+  deliberately a version we bump, never "latest", since llama.cpp releases per merged commit and
+  every workstation would otherwise run a different unreviewed build against PHI. Verified by real
+  download + hash, and `llama-server.exe` turns out to be a 9 KB launcher stub whose implementation
+  is `llama-server-impl.dll` with ~14 dlopened `ggml-cpu-*.dll` backends — so the whole archive is
+  extracted. Downloading MedGemma now fetches the runtime too, so one user action yields a working
+  feature instead of an inert 2.5 GB file.
+- **Unplanned adversarial validation of §5.3/§5.6.** Driving the offline formatter with a
+  deliberately weak model (SmolLM2-135M) produced degenerate looping output; §5.3 rejected it and
+  fell back to the dictionary-corrected transcript, and §5.6 flagged the added negation cues. The
+  safety layers refused a bad formatter rather than putting its output in a draft — the behaviour
+  they exist for, observed rather than asserted. §5.2 was visible in the same run: "three point two
+  centimeter" → "3.2 cm".

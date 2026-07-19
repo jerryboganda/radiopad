@@ -76,6 +76,32 @@ public sealed class SttModelProvisioner
     }
 
     /// <summary>
+    /// Provision the MedGemma GGUF together with the llama-server runtime it needs to run.
+    ///
+    /// <para>The runtime goes first: it is ~17 MB against the model's 2.5 GB, so if the platform has
+    /// no pinned build or the download fails, the user learns in seconds instead of after a
+    /// multi-gigabyte transfer. A runtime failure is NOT fatal to the model download — the GGUF is
+    /// still worth keeping, and the formatter reports an actionable message about the missing
+    /// server — but the pair is what makes the feature real.</para>
+    /// </summary>
+    private async Task<bool> EnsureMedGemmaWithRuntimeAsync(LocalModelDescriptor desc, CancellationToken ct)
+    {
+        var runtimeOk = await EnsureLlamaServerAsync(ct);
+        if (!runtimeOk)
+            _log.LogWarning(
+                "llama-server runtime could not be provisioned; the MedGemma model will download but " +
+                "offline formatting will stay unavailable until a server is present.");
+
+        var modelOk = await EnsureFileAsync(
+            new LocalSttModels.FileSpec(
+                desc.Id,
+                desc.FileName ?? throw new InvalidOperationException("MedGemma requires a file name"),
+                desc.DownloadUrl, desc.SizeBytes, desc.Sha256), ct);
+
+        return modelOk && runtimeOk;
+    }
+
+    /// <summary>
     /// Ensure the pinned llama-server runtime is installed (dictation brief §2.2 — the optional
     /// offline MedGemma formatter needs an actual server process to talk to).
     ///
@@ -185,6 +211,14 @@ public sealed class SttModelProvisioner
     {
         if (desc.Placeholder)
             return Task.FromResult(false);
+
+        // Downloading MedGemma must yield something that actually WORKS. The GGUF alone is inert —
+        // it needs a llama-server to run in — so the ~17 MB runtime is fetched alongside the 2.5 GB
+        // model rather than hidden behind a second action the user has to discover. Ordered
+        // runtime-first because it is tiny and its failure is the cheap one to surface.
+        if (string.Equals(desc.Id, LocalModelCatalog.MedGemmaId, StringComparison.Ordinal))
+            return EnsureMedGemmaWithRuntimeAsync(desc, ct);
+
         return desc.ArchiveKind switch
         {
             ModelArchiveKind.TarBz2 => EnsureAsync(
