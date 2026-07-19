@@ -63,15 +63,17 @@ export function expandSnippet(value: string, selStart: number, selEnd: number, b
 }
 
 /**
- * The next ${field} placeholder at/after `fromCaret`, wrapping to the first when none remain ahead.
- * Returns null when there are no fields left (all filled). Drives Tab-to-next-field.
+ * The next ${field} placeholder at/after `fromCaret`, or null when none remain ahead.
+ *
+ * Deliberately does NOT wrap to the first field. Wrapping meant the Tab handler always had
+ * somewhere to go, so it reported "handled" for any text containing a single leftover ${...} and
+ * swallowed Tab forever — keyboard focus could never leave the field going forward. Forward Tab
+ * advances while there is somewhere ahead to go and then releases the key to the browser;
+ * Shift+Tab remains the way back.
  */
 export function nextFieldSelection(value: string, fromCaret: number): { start: number; end: number } | null {
-  const fields = findFields(value);
-  if (fields.length === 0) return null;
-  const ahead = fields.find((f) => f.start >= fromCaret);
-  const f = ahead ?? fields[0];
-  return { start: f.start, end: f.end };
+  const f = findFields(value).find((x) => x.start >= fromCaret);
+  return f ? { start: f.start, end: f.end } : null;
 }
 
 // ── Storage (device-local; mirrors lib/hotkeys.ts) ──────────────────────────

@@ -45,6 +45,7 @@ import {
 } from './reportShared';
 import { usePermissions } from '@/lib/permissions';
 import SectionEditor from '@/components/editor/SectionEditor';
+import { snippetKeyDown } from '@/lib/snippetInsert';
 import { useRichEditorEnabled } from '@/lib/editor/richEditorFlag';
 import { saveDownload } from '@/lib/saveDownload';
 import PatientContextBar from '@/components/shell/PatientContextBar';
@@ -1478,6 +1479,13 @@ export default function ReportPage() {
                     <textarea
                       className={cls}
                       value={(report as Record<string, unknown>)[keyStr] as string}
+                      // Snippets are a per-user feature, not a per-editor one: turning the rich
+                      // editor off used to remove them silently. snippetKeyDown returns false when
+                      // there is no trigger or field to act on, so Tab still moves focus.
+                      onKeyDown={(e) => {
+                        if (e.key !== 'Tab' || e.shiftKey) return;
+                        if (snippetKeyDown(e.currentTarget)) e.preventDefault();
+                      }}
                       onChange={(e) => {
                         const next = { ...aiHighlights };
                         if (next[keyStr]) delete next[keyStr];

@@ -53,10 +53,13 @@ describe('nextFieldSelection', () => {
     expect(value.slice(sel!.start, sel!.end)).toBe('${two}');
   });
 
-  it('wraps to the first field when none remain ahead', () => {
+  // Deliberate behaviour change. This used to assert that Tab-through wraps back to the first
+  // field, which is what made the Tab handler swallow the key forever in any text still holding a
+  // ${...} — keyboard focus could not move forward out of the field. Returning null hands Tab back
+  // to the browser once there is nothing ahead. Shift+Tab is the way back.
+  it('returns null rather than wrapping when none remain ahead', () => {
     const value = 'a ${one} b ${two}';
-    const sel = nextFieldSelection(value, value.length);
-    expect(value.slice(sel!.start, sel!.end)).toBe('${one}');
+    expect(nextFieldSelection(value, value.length)).toBeNull();
   });
 
   it('returns null when all fields are filled', () => {
