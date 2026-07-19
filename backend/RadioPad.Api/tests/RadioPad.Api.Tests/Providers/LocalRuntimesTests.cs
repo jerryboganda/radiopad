@@ -24,12 +24,17 @@ public class LocalRuntimesTests
         if (spec is null) return; // unsupported platform/arch — the card stays unavailable
 
         Assert.Contains(LocalRuntimes.LlamaServerTag, spec.Url, StringComparison.Ordinal);
-        Assert.Contains("cpu", spec.FileName, StringComparison.OrdinalIgnoreCase);
 
-        // A GPU build would blow the CPU-only budget (§1) and be wrong on most clinical
-        // workstations, so guard against someone "upgrading" the pin to an accelerated variant.
+        // The real invariant, and the one that holds on every platform: never an accelerated build.
+        // A GPU variant would blow the CPU-only budget (§1) and be wrong on most clinical
+        // workstations, so guard against someone "upgrading" the pin to one.
         foreach (var accel in new[] { "cuda", "hip", "sycl", "vulkan", "openvino", "adreno" })
             Assert.DoesNotContain(accel, spec.FileName, StringComparison.OrdinalIgnoreCase);
+
+        // Only Windows spells the CPU build out ("win-cpu-x64"); upstream names the Linux CPU
+        // build plainly "ubuntu-x64", so asserting "cpu" everywhere fails on a Linux runner.
+        if (RuntimeInformation.IsOSPlatform(OSPlatform.Windows))
+            Assert.Contains("cpu", spec.FileName, StringComparison.OrdinalIgnoreCase);
     }
 
     [Fact]
