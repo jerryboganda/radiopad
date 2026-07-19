@@ -36,15 +36,17 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
+      - name: Free disk space
+        # The runner ships several GB of toolchains we do not need; the GGUF alone is 2.5 GB.
+        # Runs BEFORE setup-dotnet and never touches /usr/share/dotnet — removing it after the SDK
+        # is installed deletes the very toolchain this job needs (`dotnet: command not found`).
+        run: |
+          sudo rm -rf /usr/local/lib/android /opt/ghc /usr/local/.ghcup /opt/hostedtoolcache/CodeQL
+          df -h /
+
       - uses: actions/setup-dotnet@v4
         with:
           dotnet-version: '8.0.x'
-
-      - name: Free disk space
-        # The runner ships several GB of toolchains we do not need; the GGUF alone is 2.5 GB.
-        run: |
-          sudo rm -rf /usr/share/dotnet /usr/local/lib/android /opt/ghc
-          df -h /
 
       - name: Cache llama-server runtime
         id: runtime
