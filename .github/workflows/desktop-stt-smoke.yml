@@ -87,3 +87,54 @@ jobs:
           RADIOPAD_STT_SMOKE_MODEL_DIR: ${{ github.workspace }}\stt-model
         run: |
           dotnet test --filter "FullyQualifiedName~SttEngineSmokeTests" -c Release
+
+  medasr:
+    # MedASR is the DEFAULT primary engine (decision D2), so it needs the same real-engine proof as
+    # Parakeet. Its own job so the two models cache independently and run in parallel.
+    #
+    # This job exists because a local runtime check caught what compile-checking could not: MedASR
+    # emits `{period}` / `[FINDINGS]` markup rather than plain punctuation, which would otherwise
+    # have reached signed reports verbatim. The smoke test asserts on clinical content, so a future
+    # bundle that changes that markup fails here instead of in a radiologist's report.
+    name: on-device MedASR engine smoke (windows)
+    runs-on: windows-latest
+    env:
+      RADIOPAD_STT_SMOKE_REQUIRE: '1'
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '8.0.x'
+
+      - name: Cache MedASR bundle
+        id: medasr-model
+        uses: actions/cache@v4
+        with:
+          path: medasr-model
+          key: stt-medasr-ctc-en-int8-2c20f032
+
+      - name: Download + verify the MedASR CTC bundle
+        if: steps.medasr-model.outputs.cache-hit != 'true'
+        shell: bash
+        run: |
+          set -euo pipefail
+          base="https://huggingface.co/csukuangfj/sherpa-onnx-medasr-ctc-en-int8-2025-12-25/resolve/main"
+          mkdir -p medasr-model/test_wavs
+          # Public + ungated (HF API gated:false) — an anonymous download, no token needed.
+          curl -fL "$base/model.int8.onnx" -o medasr-model/model.int8.onnx
+          curl -fL "$base/tokens.txt"      -o medasr-model/tokens.txt
+          # The bundle's own radiology dictation sample, so the assertions are about real speech.
+          curl -fL "$base/test_wavs/0.wav" -o medasr-model/test_wavs/0.wav
+          # Pins must match LocalSttModels.MedAsr* exactly — a drifted upstream file fails here
+          # rather than silently shipping an unverified model to the provisioner.
+          echo "2c20f03265ee6144c566fd18b0f7bbb4f0d005d11ce9440dd641920210f4c33a  medasr-model/model.int8.onnx" | sha256sum -c -
+          echo "f762591b44f3672e4b5b464d89912d43e12510082a8471c5fb85ec03dcb9d794  medasr-model/test_wavs/0.wav" | sha256sum -c -
+
+      - name: Run MedASR engine smoke (real native lib + model)
+        shell: bash
+        working-directory: backend/RadioPad.Api
+        env:
+          RADIOPAD_MEDASR_SMOKE_MODEL_DIR: ${{ github.workspace }}\medasr-model
+        run: |
+          dotnet test --filter "FullyQualifiedName~MedAsrEngineSmokeTests" -c Release
