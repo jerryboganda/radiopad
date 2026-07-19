@@ -1,0 +1,118 @@
+name: offline-formatter-smoke
+
+# End-to-end proof that the OPTIONAL offline formatter really works: the pinned llama-server
+# runtime, the real ~2.5 GB MedGemma GGUF, and the full §4.2 pipeline (§5.2 pass-through →
+# formatter → §5.3 validation-diff → §5.6 sentinel).
+#
+# Deliberately NOT on every push: this downloads ~2.5 GB and runs CPU inference. It is manual
+# (workflow_dispatch) plus a weekly run, and it exists so this verification NEVER has to happen on
+# a developer laptop — the model download and inference are far too heavy for one.
+#
+# The first manual run of this path found two real bugs that every unit test missed, which is why
+# it is worth the runner minutes: a faithful report was discarded for NOT fabricating an
+# undictated section, and a dictated measurement could be silently dropped with nothing to catch it.
+
+on:
+  workflow_dispatch:
+  schedule:
+    # Weekly, Sunday 04:00 UTC — catches upstream drift (a re-tagged model, a llama.cpp behaviour
+    # change) without paying the cost on every push.
+    - cron: '0 4 * * 0'
+
+permissions:
+  contents: read
+
+jobs:
+  offline-formatter:
+    name: MedGemma offline formatter (ubuntu)
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    env:
+      # A mis-wired job must FAIL rather than silently skip as a no-op. See SttSmokeGate.
+      RADIOPAD_STT_SMOKE_REQUIRE: '1'
+      LLAMA_TAG: b10068
+      LLAMA_SHA: 6bf3d20de562e4df230f1a7c54fb7a06a80c7ff40f5311c953e8255744be4eb2
+      MEDGEMMA_SHA: b31becdf4f39561800505514cce67681604fe449d04dd35c8c92fd7848c6d7bd
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '8.0.x'
+
+      - name: Free disk space
+        # The runner ships several GB of toolchains we do not need; the GGUF alone is 2.5 GB.
+        run: |
+          sudo rm -rf /usr/share/dotnet /usr/local/lib/android /opt/ghc
+          df -h /
+
+      - name: Cache llama-server runtime
+        id: runtime
+        uses: actions/cache@v4
+        with:
+          path: llama-runtime
+          key: llama-server-${{ env.LLAMA_TAG }}-ubuntu-x64
+
+      - name: Download + verify llama-server
+        if: steps.runtime.outputs.cache-hit != 'true'
+        run: |
+          set -euo pipefail
+          url="https://github.com/ggml-org/llama.cpp/releases/download/${LLAMA_TAG}/llama-${LLAMA_TAG}-bin-ubuntu-x64.tar.gz"
+          curl -fL "$url" -o llama.tar.gz
+          # Pin must match LocalRuntimes.LlamaServerArchive() — a drifted upstream asset fails here
+          # rather than being executed unverified on a clinical workstation.
+          echo "${LLAMA_SHA}  llama.tar.gz" | sha256sum -c -
+          mkdir -p llama-runtime
+          # The Linux tarball nests under a top-level dir, unlike the flat Windows zip.
+          tar -xzf llama.tar.gz -C llama-runtime --strip-components=1
+          rm llama.tar.gz
+
+      - name: Cache MedGemma GGUF
+        id: model
+        uses: actions/cache@v4
+        with:
+          path: medgemma
+          key: medgemma-1.5-4b-q4-${{ env.MEDGEMMA_SHA }}
+
+      - name: Download + verify MedGemma
+        if: steps.model.outputs.cache-hit != 'true'
+        run: |
+          set -euo pipefail
+          mkdir -p medgemma
+          # --retry: a truncated 2.5 GB download is a real failure mode (it happened during the
+          # manual run and was caught only by the hash), so retry and then verify.
+          curl -fL --retry 5 --retry-all-errors -C - \
+            "https://huggingface.co/unsloth/medgemma-1.5-4b-it-GGUF/resolve/main/medgemma-1.5-4b-it-Q4_K_M.gguf" \
+            -o medgemma/medgemma-1.5-4b-it-Q4_K_M.gguf
+          echo "${MEDGEMMA_SHA}  medgemma/medgemma-1.5-4b-it-Q4_K_M.gguf" | sha256sum -c -
+
+      - name: Start llama-server
+        run: |
+          set -euo pipefail
+          chmod +x llama-runtime/llama-server
+          # Loopback only: PHI reaches this process in production, and the test must exercise the
+          # same binding the product uses.
+          LD_LIBRARY_PATH="$PWD/llama-runtime" ./llama-runtime/llama-server \
+            --model medgemma/medgemma-1.5-4b-it-Q4_K_M.gguf \
+            --host 127.0.0.1 --port 8080 \
+            --ctx-size 4096 --threads "$(nproc)" > llama-server.log 2>&1 &
+          echo "waiting for llama-server to load the model..."
+          for i in $(seq 1 90); do
+            if curl -fsS http://127.0.0.1:8080/health >/dev/null 2>&1; then
+              echo "healthy after ${i}0s"; exit 0
+            fi
+            sleep 10
+          done
+          echo "llama-server never became healthy"; tail -50 llama-server.log; exit 1
+
+      - name: Run the offline formatter smoke through the full §4.2 pipeline
+        working-directory: backend/RadioPad.Api
+        env:
+          RADIOPAD_MEDGEMMA_SMOKE_URL: http://127.0.0.1:8080
+        run: |
+          dotnet test --filter "FullyQualifiedName~MedGemmaFormatterSmokeTests" -c Release \
+            --logger "console;verbosity=detailed"
+
+      - name: llama-server log on failure
+        if: failure()
+        run: tail -100 llama-server.log
