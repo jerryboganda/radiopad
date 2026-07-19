@@ -3,6 +3,7 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest';
 import { render, screen, fireEvent, act, waitFor } from '@testing-library/react';
 import SectionEditor from '@/components/editor/SectionEditor';
+import RichTextEditor from '@/components/editor/RichTextEditor';
 import {
   triggerWordBefore,
   computeTriggerExpansion,
@@ -103,5 +104,88 @@ describe('SectionEditor — Tab expands a snippet trigger', () => {
     // Each authored line must remain its own line, not be joined by spaces.
     expect(final).toContain('Lungs: Clear.\nHeart: Normal size.');
     expect(final).not.toContain('Clear. Heart:');
+  });
+});
+
+// ── Keyboard trap (accessibility) ───────────────────────────────────────────
+//
+// Tab-through used to WRAP: when no ${field} remained ahead of the caret it selected the FIRST
+// field in the document again. That made the handler return true unconditionally for any section
+// whose text contained even one leftover ${...}, so Tab was swallowed forever and keyboard focus
+// could never leave the editor going forward. A radiologist who expands a snippet and doesn't fill
+// every blank — or who reopens a saved report still holding a ${...} — was trapped.
+//
+// Forward Tab must therefore be strictly forward: advance while fields remain ahead, then fall
+// through to the browser's focus move. (Wrapping backwards is what Shift+Tab is for.)
+describe('SectionEditor — Tab must never trap keyboard focus', () => {
+  /** fireEvent returns false when the handler called preventDefault (i.e. Tab was swallowed). */
+  function pressTab(el: Element): boolean {
+    return fireEvent.keyDown(el, { key: 'Tab' });
+  }
+
+  it('falls through when a leftover ${field} sits BEHIND the caret', async () => {
+    const onChange = vi.fn();
+    render(<SectionEditor sectionKey="findings" value={'The ${finding} is present.'} onChange={onChange} />);
+    await screen.findByRole('textbox');
+
+    // Put the caret at the very end — past the only field in the document.
+    act(() => {
+      noteSectionEditorFocus('findings');
+      getLastFocusedSectionEditor()?.insertAtCursor('No other abnormality.');
+    });
+
+    // Nothing ahead to jump to → Tab belongs to the browser, not to us.
+    expect(pressTab(screen.getByRole('textbox'))).toBe(true);
+  });
+
+  it('advances through the fields ahead, then releases Tab', async () => {
+    const onChange = vi.fn();
+    render(<SectionEditor sectionKey="findings" value={'A ${size} nodule in the ${lobe}.'} onChange={onChange} />);
+    const box = await screen.findByRole('textbox');
+
+    // Caret starts at the top of the document, so both fields are ahead.
+    expect(pressTab(box)).toBe(false); // → ${size}
+    expect(pressTab(box)).toBe(false); // → ${lobe}
+    expect(pressTab(box)).toBe(true); // nothing left ahead → release
+  });
+});
+
+// ── The wizard's rich editors ───────────────────────────────────────────────
+//
+// RichTextEditor (the intake wizard's "clinical history" / "positive findings" fields) registered
+// InterimDictation but not SnippetExpansion, so snippets silently did nothing on the one screen
+// where a radiologist types the most free prose. Same feature, same keystroke, different editor.
+describe('RichTextEditor — snippets work in the intake wizard too', () => {
+  it('expands a trigger on Tab', async () => {
+    saveSnippet({ trigger: 'nlchest', body: 'The lungs are clear.' });
+    const onChange = vi.fn();
+    render(<RichTextEditor sectionKey="intake-findings" onChange={onChange} />);
+    await screen.findByRole('textbox');
+
+    act(() => {
+      noteSectionEditorFocus('intake-findings');
+      getLastFocusedSectionEditor()?.insertAtCursor('nlchest');
+    });
+
+    fireEvent.keyDown(screen.getByRole('textbox'), { key: 'Tab' });
+
+    await waitFor(() => {
+      const last = onChange.mock.calls.at(-1)?.[0] as string | undefined;
+      expect(last ?? '').toContain('The lungs are clear.');
+    });
+  });
+
+  it('leaves Tab alone when there is no snippet context', async () => {
+    const onChange = vi.fn();
+    render(<RichTextEditor sectionKey="intake-history" onChange={onChange} />);
+    const box = await screen.findByRole('textbox');
+
+    act(() => {
+      noteSectionEditorFocus('intake-history');
+      getLastFocusedSectionEditor()?.insertAtCursor('Cough for three weeks.');
+    });
+
+    // No trigger, no fields — the wizard's Tab-to-next-control must still work.
+    expect(fireEvent.keyDown(box, { key: 'Tab' })).toBe(true);
   });
 });

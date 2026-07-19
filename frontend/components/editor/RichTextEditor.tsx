@@ -35,6 +35,7 @@ import {
   noteSectionEditorFocus,
   type SectionEditorHandle,
 } from '@/lib/editor/sectionEditorRegistry';
+import { SnippetExpansion } from '@/lib/editor/snippetExpansion';
 
 export interface RichTextEditorProps {
   /** Unique key for dictation focus tracking (e.g. "intake-findings"). */
@@ -59,6 +60,12 @@ export default function RichTextEditor({
         heading: { levels: [2, 3] },
       }),
       InterimDictation,
+      // Snippets are a per-user F3 feature, not a per-editor one: the wizard's free-prose fields
+      // are exactly where canned blocks earn their keep, and this editor was silently the one
+      // place they did nothing. SnippetExpansion outranks StarterKit's list-indent Tab binding but
+      // yields whenever there is no trigger or field to act on, so Tab still indents inside lists
+      // and still moves focus everywhere else.
+      SnippetExpansion,
     ],
     content: '',
     editorProps: {

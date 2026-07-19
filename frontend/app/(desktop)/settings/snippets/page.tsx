@@ -50,10 +50,20 @@ export default function SnippetsPage() {
       setFormError('Enter both a trigger and the text it expands to.');
       return;
     }
-    // Adding a new trigger that already exists (and isn't the one being edited) would overwrite it.
+    // Expansion matches the single whitespace-delimited word before the caret, so a trigger with a
+    // space in it can never be typed into existence. Refuse it here rather than storing a snippet
+    // that looks saved and silently never fires.
+    if (/\s/.test(t)) {
+      setFormError('A trigger must be a single word — it is matched against the word you just typed.');
+      return;
+    }
+    // Adding a trigger that already exists would overwrite the snippet stored under it. This used
+    // to set the message and then save anyway, and resetForm() cleared the message on the way out —
+    // so the body was replaced with no warning shown at all. Stop instead.
     const clash = rows.find((s) => s.id !== editingId && s.trigger.toLowerCase() === t.toLowerCase());
     if (clash && !editingId) {
-      setFormError(`A snippet for “${clash.trigger}” already exists — editing it instead.`);
+      setFormError(`A snippet for “${clash.trigger}” already exists. Edit that one, or pick another trigger.`);
+      return;
     }
     saveSnippet({ id: editingId ?? undefined, trigger: t, body });
     resetForm();
