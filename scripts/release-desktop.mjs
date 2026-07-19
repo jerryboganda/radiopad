@@ -23,7 +23,7 @@
 //   node scripts/release-desktop.mjs 0.5.0        # set an explicit version
 //   pnpm release:desktop                          # same, via the package script
 
-import { readFileSync, writeFileSync } from 'node:fs';
+import { existsSync, readFileSync, writeFileSync } from 'node:fs';
 import { execSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
 import { dirname, join } from 'node:path';
@@ -65,7 +65,13 @@ const dirty = run('git status --porcelain')
   .split('\n')
   .filter(Boolean)
   .map((l) => l.slice(3))
-  .filter((p) => p && !p.endsWith('tauri.conf.json') && !p.endsWith('src-tauri/Cargo.toml'));
+  .filter(
+    (p) =>
+      p &&
+      !p.endsWith('tauri.conf.json') &&
+      !p.endsWith('src-tauri/Cargo.toml') &&
+      !p.endsWith('src-tauri/Cargo.lock'),
+  );
 if (dirty.length) {
   die(
     `Working tree has uncommitted changes:\n  ${dirty.join('\n  ')}\n` +
@@ -78,10 +84,31 @@ writeFileSync(confPath, conf.replace(/"version":\s*"\d+\.\d+\.\d+"/, `"version":
 const cargo = readFileSync(cargoPath, 'utf8');
 if (!/^version = "\d+\.\d+\.\d+"/m.test(cargo)) die(`Could not find package version in ${cargoPath}`);
 writeFileSync(cargoPath, cargo.replace(/^version = "\d+\.\d+\.\d+"/m, `version = "${next}"`));
-console.log('✓ bumped tauri.conf.json + Cargo.toml');
+
+// Cargo.lock records the crate's OWN version too. Bumping only Cargo.toml leaves the lockfile
+// stale (it read 0.1.29 through the v0.1.79 release before this was fixed) — harmless while the
+// bundle job does not build with --locked, but it would break the build the moment it does. Edited
+// as text on purpose: cargo is not installed on every machine that cuts a release, and the build
+// script needs a sidecar binary that only CI produces, so shelling out to cargo is not an option.
+const lockPath = join(repoRoot, 'desktop', 'src-tauri', 'Cargo.lock');
+const lockFiles = [];
+if (existsSync(lockPath)) {
+  const lock = readFileSync(lockPath, 'utf8');
+  const pkgRe = /(\[\[package\]\]\s*\r?\nname = "radiopad-desktop"\s*\r?\nversion = )"\d+\.\d+\.\d+"/;
+  if (pkgRe.test(lock)) {
+    writeFileSync(lockPath, lock.replace(pkgRe, `$1"${next}"`));
+    lockFiles.push(lockPath);
+  } else {
+    // Non-fatal: a lockfile we cannot parse must not block a release, but say so loudly rather
+    // than silently shipping the drift this block exists to prevent.
+    console.warn('! could not find the radiopad-desktop package entry in Cargo.lock — left as is');
+  }
+}
+console.log(`✓ bumped tauri.conf.json + Cargo.toml${lockFiles.length ? ' + Cargo.lock' : ''}`);
 
 // --- commit, tag, push -------------------------------------------------------
-run(`git commit -m "chore(desktop): release ${tag}" -- "${confPath}" "${cargoPath}"`);
+const versionFiles = [confPath, cargoPath, ...lockFiles].map((p) => `"${p}"`).join(' ');
+run(`git commit -m "chore(desktop): release ${tag}" -- ${versionFiles}`);
 run(`git tag -a "${tag}" -m "RadioPad ${tag}"`);
 run(`git push origin "${branch}"`);
 run(`git push origin "${tag}"`);

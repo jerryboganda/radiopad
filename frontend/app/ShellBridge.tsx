@@ -7,6 +7,7 @@ import { getAuthToken } from '@/lib/secureAuth';
 import { setActiveAuthToken } from '@/lib/api';
 import { isBiometricLockEnabled, unlockWithBiometric } from '@/lib/biometric';
 import { installDictationHotkey } from '@/lib/dictationHotkey';
+import { installDesktopHotkeySync } from '@/lib/desktopHotkeys';
 
 type TauriUnlisten = () => void;
 type TauriListenHandle = TauriUnlisten | { unlisten?: TauriUnlisten } | null | undefined;
@@ -87,6 +88,8 @@ export default function ShellBridge() {
     // shortcut still covers the system-wide (unfocused) case; a chord the OS has claimed as a
     // global shortcut never reaches this listener, so there is no double-fire.
     const uninstallDictationHotkey = installDictationHotkey();
+    // Keep the OS-level global shortcuts in step with the user's rebindings (desktop only).
+    const uninstallDesktopHotkeySync = installDesktopHotkeySync();
 
     // Mobile/desktop offline-draft auto sync.
     startAutoSync().catch(() => { /* best effort */ });
@@ -109,6 +112,7 @@ export default function ShellBridge() {
     return () => {
       cancelled = true;
       uninstallDictationHotkey();
+      uninstallDesktopHotkeySync();
       for (const u of unsub) {
         try { u(); } catch { /* ignore */ }
       }

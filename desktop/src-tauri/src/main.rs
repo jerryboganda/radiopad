@@ -17,6 +17,7 @@
 mod crypto_keyring;
 mod backend_health;
 mod device_pairing;
+mod hotkeys;
 mod local_cache;
 mod log_redactor;
 mod offline_drafts;
@@ -31,7 +32,7 @@ use tauri::Emitter;
 use tauri::Manager;
 use tauri_plugin_clipboard_manager::ClipboardExt;
 use tauri_plugin_dialog::DialogExt;
-use tauri_plugin_global_shortcut::{Code, GlobalShortcutExt, Modifiers, Shortcut, ShortcutState};
+use tauri_plugin_global_shortcut::ShortcutState;
 use tauri_plugin_store::StoreExt;
 
 const SETTINGS_FILE: &str = "radiopad-settings.json";
@@ -212,52 +213,20 @@ fn main() {
         .plugin(tauri_plugin_store::Builder::new().build())
         .plugin(
             tauri_plugin_global_shortcut::Builder::new()
+                // Dispatch through the rebindable table in `hotkeys` rather than matching fixed
+                // key codes: the chord for an action is whatever the user bound it to, so the
+                // shortcut→action mapping cannot live in a `match` here. See hotkeys.rs.
                 .with_handler(|app, shortcut, event| {
                     if event.state != ShortcutState::Pressed {
                         return;
                     }
-                    let mods = shortcut.mods;
-                    let primary = mods.contains(Modifiers::SHIFT)
-                        && (mods.contains(Modifiers::CONTROL)
-                            || mods.contains(Modifiers::SUPER));
-                    if !primary {
-                        return;
-                    }
-                    match shortcut.key {
-                        // Ctrl/Cmd+Shift+R — focus / restore window.
-                        Code::KeyR => {
-                            if let Some(win) = app.get_webview_window("main") {
-                                let _ = win.show();
-                                let _ = win.set_focus();
-                            }
-                        }
-                        // Ctrl/Cmd+Shift+N — start a new report.
-                        Code::KeyN => {
-                            let _ = app.emit("radiopad://new-report", ());
-                        }
-                        // Ctrl/Cmd+Shift+I — generate impression.
-                        Code::KeyI => {
-                            let _ = app.emit("radiopad://generate-impression", ());
-                        }
-                        // Ctrl/Cmd+Shift+W — open rewrite-mode picker.
-                        Code::KeyW => {
-                            let _ = app.emit("radiopad://rewrite", ());
-                        }
-                        // Ctrl/Cmd+Shift+D — start dictation.
-                        Code::KeyD => {
-                            let _ = app.emit("radiopad://dictate", ());
-                        }
-                        // Ctrl/Cmd+Shift+C — secure-copy the focused section.
-                        // The frontend resolves the section text, then calls
-                        // `secure_copy` with an appropriate TTL.
-                        Code::KeyC => {
-                            let _ = app.emit("radiopad://secure-copy-section", ());
-                        }
-                        _ => {}
-                    }
+                    hotkeys::dispatch(app, shortcut);
                 })
                 .build(),
         )
+        // Live shortcut→action table backing the rebindable global hotkeys. Must be managed before
+        // `setup` runs, since registering the defaults writes into it.
+        .manage(hotkeys::HotkeyState::default())
         .invoke_handler(tauri::generate_handler![
             get_backend_url,
             get_local_stt_url,
@@ -278,27 +247,14 @@ fn main() {
             pacs_plugins::pacs_plugins_list,
             pacs_plugins::pacs_plugins_verify,
             pacs_plugins::pacs_plugins_set_enabled,
+            hotkeys::hotkeys_apply,
+            hotkeys::hotkeys_supported_actions,
         ])
         .setup(|app| {
-            let shortcuts = [
-                Shortcut::new(Some(Modifiers::CONTROL | Modifiers::SHIFT), Code::KeyR),
-                Shortcut::new(Some(Modifiers::CONTROL | Modifiers::SHIFT), Code::KeyN),
-                Shortcut::new(Some(Modifiers::CONTROL | Modifiers::SHIFT), Code::KeyI),
-                Shortcut::new(Some(Modifiers::CONTROL | Modifiers::SHIFT), Code::KeyW),
-                Shortcut::new(Some(Modifiers::CONTROL | Modifiers::SHIFT), Code::KeyD),
-                Shortcut::new(Some(Modifiers::CONTROL | Modifiers::SHIFT), Code::KeyC),
-                Shortcut::new(Some(Modifiers::SUPER | Modifiers::SHIFT), Code::KeyR),
-                Shortcut::new(Some(Modifiers::SUPER | Modifiers::SHIFT), Code::KeyN),
-                Shortcut::new(Some(Modifiers::SUPER | Modifiers::SHIFT), Code::KeyI),
-                Shortcut::new(Some(Modifiers::SUPER | Modifiers::SHIFT), Code::KeyW),
-                Shortcut::new(Some(Modifiers::SUPER | Modifiers::SHIFT), Code::KeyD),
-                Shortcut::new(Some(Modifiers::SUPER | Modifiers::SHIFT), Code::KeyC),
-            ];
-            for sc in shortcuts {
-                if let Err(e) = app.global_shortcut().register(sc) {
-                    tracing::warn!("global shortcut registration failed: {e}");
-                }
-            }
+            // Register the built-in defaults now so the shortcuts work before the webview has
+            // loaded; the frontend then pushes the user's effective bindings via `hotkeys_apply`,
+            // which unregisters this set and replaces it.
+            hotkeys::register_defaults(app.handle());
 
             // PRD DESK-004 — clear the clipboard on focus loss when the
             // tenant has opted in via `secureClipboard.clearOnBlur`.
