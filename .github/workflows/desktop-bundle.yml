@@ -187,8 +187,57 @@ jobs:
               Write-Error "Desktop shell PANICKED on launch"; exit 1
             }
             Write-Host "Exited without a panic (likely headless webview on the runner); not failing."
+            # Say so loudly rather than let a green tick imply cover this run did not provide.
+            Write-Host "::warning::shell exited before the sidecar could be probed - ON-DEVICE ENGINES NOT VERIFIED in this run"
           } else {
             Write-Host "Desktop shell stayed alive 12s with no panic - launch OK."
+
+            # The packaged app is running, so the sidecar it supervises must be serving. Everything
+            # before this point tested the sidecar we started OURSELVES; this is the only check that
+            # proves Tauri spawns it, with the right environment, from the real installed binary.
+            # That distinction is not academic: MedGemma was provisioned, pinned and CI-smoke-tested
+            # while unreachable in every shipped build, because nothing ever asked the app itself.
+            $ready = $false
+            for ($i = 0; $i -lt 60; $i++) {
+              try {
+                $r = Invoke-WebRequest -Uri 'http://127.0.0.1:7457/api/health/ready' -UseBasicParsing -TimeoutSec 3
+                if ($r.StatusCode -eq 200) { $ready = $true; break }
+              } catch { Start-Sleep -Seconds 2 }
+            }
+            if (-not $ready) {
+              Stop-Process -Id $p.Id -Force -ErrorAction SilentlyContinue
+              Write-Error "the desktop shell never brought up its sidecar on 127.0.0.1:7457 - on-device dictation is dead in this build"
+              exit 1
+            }
+            Write-Host "sidecar is ready (spawned by the packaged app)"
+
+            # MedASR must be offered by the model manager the app talks to.
+            $models = (Invoke-WebRequest -Uri 'http://127.0.0.1:7457/api/local-models' -UseBasicParsing -TimeoutSec 10).Content
+            if ($models -notmatch 'medasr') {
+              Stop-Process -Id $p.Id -Force -ErrorAction SilentlyContinue
+              Write-Error "the app's sidecar does not offer MedASR - the default on-device engine is unreachable"
+              exit 1
+            }
+            Write-Host "MedASR offered by the app's own sidecar"
+
+            # MedGemma: 503 means the capability flag never reached the backend. A 502 (no model on
+            # this runner) proves the request got past the gate and into the pipeline, which is the
+            # property under test here - inference itself is covered by the model-bearing smokes.
+            $code = 0
+            try {
+              $resp = Invoke-WebRequest -Uri 'http://127.0.0.1:7457/api/dictation/draft-local' `
+                -Method POST -ContentType 'application/json' -UseBasicParsing -TimeoutSec 30 `
+                -Body '{"rawDictation":"CT chest. No pneumothorax.","modality":"CT","bodyPart":"Chest"}'
+              $code = $resp.StatusCode
+            } catch { $code = $_.Exception.Response.StatusCode.value__ }
+            Write-Host "draft-local -> HTTP $code"
+            if ($code -eq 503) {
+              Stop-Process -Id $p.Id -Force -ErrorAction SilentlyContinue
+              Write-Error "503 formatter_unavailable from the PACKAGED app - MedGemma is unreachable to end users"
+              exit 1
+            }
+            Write-Host "MedGemma on-device formatting is reachable from the packaged app (HTTP $code)"
+
             Stop-Process -Id $p.Id -Force -ErrorAction SilentlyContinue
           }
 

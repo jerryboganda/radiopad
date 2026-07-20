@@ -1,0 +1,94 @@
+# How slow is on-device dictation on a modest CPU?
+#
+# IMPLEMENTATION_NOTES §7 open question 4 has been open since the build started: the only timings
+# ever recorded came from the dev workstation (MedASR ~14.7 s for a full report), which says nothing
+# about the 2-core CPU-only target in the brief §1. An unmeasured latency budget is not a small gap
+# for a dictation product — a radiologist will abandon a 60 s round trip regardless of how accurate
+# it is, and we would not have known.
+#
+# So: measure it, publish the numbers, and fail only on an absurd regression rather than pretending
+# a single runner sample is a clinical guarantee. The runner is CPU-only and modest, which is the
+# point — it is a pessimistic stand-in for the target, not a match for it.
+name: on-device-latency
+
+on:
+  workflow_dispatch:
+  schedule:
+    # Weekly. This downloads a 154 MB model (and optionally 2.5 GB of MedGemma), so it is not
+    # something to run per-push.
+    - cron: '0 5 * * 1'
+
+jobs:
+  medasr-latency:
+    name: MedASR decode latency (CPU-only)
+    runs-on: ubuntu-latest
+    env:
+      RADIOPAD_STT_SMOKE_REQUIRE: '1'
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '8.0.x'
+
+      - name: Record the runner's actual capability
+        shell: bash
+        run: |
+          echo "cores: $(nproc)"
+          echo "model: $(grep -m1 'model name' /proc/cpuinfo | cut -d: -f2- | xargs)"
+          echo "memory: $(free -g | awk '/^Mem:/{print $2}') GB"
+          {
+            echo "### Runner"
+            echo ""
+            echo "| | |"
+            echo "|---|---|"
+            echo "| cores | $(nproc) |"
+            echo "| cpu | $(grep -m1 'model name' /proc/cpuinfo | cut -d: -f2- | xargs) |"
+            echo "| memory | $(free -g | awk '/^Mem:/{print $2}') GB |"
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Cache MedASR bundle
+        id: medasr-model
+        uses: actions/cache@v4
+        with:
+          path: medasr-model
+          key: stt-medasr-ctc-en-int8-2c20f032
+
+      - name: Download + verify the MedASR CTC bundle
+        if: steps.medasr-model.outputs.cache-hit != 'true'
+        shell: bash
+        run: |
+          set -euo pipefail
+          base="https://huggingface.co/csukuangfj/sherpa-onnx-medasr-ctc-en-int8-2025-12-25/resolve/main"
+          mkdir -p medasr-model/test_wavs
+          curl -fL "$base/model.int8.onnx" -o medasr-model/model.int8.onnx
+          curl -fL "$base/tokens.txt"      -o medasr-model/tokens.txt
+          curl -fL "$base/test_wavs/0.wav" -o medasr-model/test_wavs/0.wav
+          echo "2c20f03265ee6144c566fd18b0f7bbb4f0d005d11ce9440dd641920210f4c33a  medasr-model/model.int8.onnx" | sha256sum -c -
+
+      - name: Time a real decode
+        shell: bash
+        working-directory: backend/RadioPad.Api
+        env:
+          RADIOPAD_MEDASR_SMOKE_MODEL_DIR: ${{ github.workspace }}/medasr-model
+        run: |
+          set -euo pipefail
+          start=$(date +%s%3N)
+          dotnet test --filter "FullyQualifiedName~MedAsrEngineSmokeTests" -c Release
+          end=$(date +%s%3N)
+          elapsed=$(( end - start ))
+          echo "medasr_suite_ms=$elapsed"
+          {
+            echo ""
+            echo "### MedASR"
+            echo ""
+            echo "Full smoke suite (model load + 2 decodes of the bundle's radiology sample): **${elapsed} ms**"
+          } >> "$GITHUB_STEP_SUMMARY"
+
+          # Not a clinical SLA — a canary. This exists to catch an order-of-magnitude regression
+          # (a model swap, a CPU-provider misconfiguration silently falling back to something slow),
+          # not to certify latency on any particular workstation.
+          if [ "$elapsed" -gt 300000 ]; then
+            echo "::error::MedASR smoke took ${elapsed} ms (>5 min) on a CPU-only runner — investigate before shipping"
+            exit 1
+          fi
+          echo "::notice::MedASR smoke suite: ${elapsed} ms on $(nproc) cores"

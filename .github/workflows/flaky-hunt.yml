@@ -1,0 +1,86 @@
+# Find the flaky backend test.
+#
+# During the audit one backend test failed once (1 of 977) and did not reproduce across three
+# subsequent clean runs. I could not name it — the output was consumed before I captured it — so it
+# was recorded as a known flake rather than as resolved. That is an honest state to be in, but not a
+# stable one: a test that fails one run in four is a test nobody will trust, and in this repo the
+# suite is the only thing standing between a formatter change and a wrong report.
+#
+# This runs the suite repeatedly with a TRX logger and prints the name of anything that fails, so
+# the flake gets identified instead of re-observed. Manual + weekly; it is far too heavy for a push.
+#
+# Likely culprit class, worth checking first if this catches something: tests that mutate process
+# environment. xUnit runs test classes in parallel and env vars are process-global, which already
+# bit this repo once (hence EnvironmentVariableCollection with DisableParallelization). A test that
+# sets an env var without that collection attribute will fail only when it races a test that reads
+# it — exactly the once-in-four signature.
+name: flaky-hunt
+
+on:
+  workflow_dispatch:
+    inputs:
+      runs:
+        description: 'How many times to run the backend suite'
+        required: false
+        default: '6'
+  schedule:
+    - cron: '0 6 * * 2'
+
+jobs:
+  repeat:
+    name: backend suite x N
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '8.0.x'
+
+      - name: Build once
+        working-directory: backend/RadioPad.Api
+        run: dotnet build -c Release --nologo
+
+      - name: Run the suite repeatedly and name every failure
+        working-directory: backend/RadioPad.Api
+        shell: bash
+        run: |
+          set -uo pipefail
+          runs="${{ github.event.inputs.runs || '6' }}"
+          failed_runs=0
+          : > "$RUNNER_TEMP/flaky.txt"
+
+          for i in $(seq 1 "$runs"); do
+            echo "::group::run $i of $runs"
+            dotnet test -c Release --no-build --nologo \
+              --logger "trx;LogFileName=run$i.trx" > "$RUNNER_TEMP/out$i.log" 2>&1
+            rc=$?
+            trx=$(find . -name "run$i.trx" | head -1)
+            if [ -n "$trx" ]; then
+              # Name every failing test — the whole point is to identify it, not just count it.
+              grep -oE 'testName="[^"]+"[^>]*outcome="Failed"' "$trx" \
+                | sed -E 's/testName="([^"]+)".*/\1/' >> "$RUNNER_TEMP/flaky.txt" || true
+            fi
+            if [ "$rc" -ne 0 ]; then
+              failed_runs=$(( failed_runs + 1 ))
+              echo "run $i FAILED (exit $rc)"
+              tail -40 "$RUNNER_TEMP/out$i.log"
+            else
+              echo "run $i passed"
+            fi
+            echo "::endgroup::"
+          done
+
+          echo "## Flaky hunt: $failed_runs of $runs runs failed" >> "$GITHUB_STEP_SUMMARY"
+          if [ -s "$RUNNER_TEMP/flaky.txt" ]; then
+            echo "" >> "$GITHUB_STEP_SUMMARY"
+            echo "| failures | test |" >> "$GITHUB_STEP_SUMMARY"
+            echo "|---|---|" >> "$GITHUB_STEP_SUMMARY"
+            sort "$RUNNER_TEMP/flaky.txt" | uniq -c | sort -rn \
+              | awk '{n=$1; $1=""; sub(/^ /,""); print "| " n " | `" $0 "` |"}' >> "$GITHUB_STEP_SUMMARY"
+            echo "::error::flaky test(s) identified — see the job summary"
+            exit 1
+          fi
+
+          echo "" >> "$GITHUB_STEP_SUMMARY"
+          echo "No failures across $runs consecutive runs." >> "$GITHUB_STEP_SUMMARY"
+          echo "::notice::no flake reproduced in $runs runs"
