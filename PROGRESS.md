@@ -4,6 +4,31 @@
 
 ---
 
+## F6 delivered + the three unverified claims closed (2026-07-20)
+
+- **F6 — rulebook validation on the dictation path.** The one planned feature recorded in neither
+  living doc, and a grep showed why: the dictation flow had never touched `ReportValidator`. Its own
+  guards answer "did the formatter invent or lose anything?"; the rulebook answers "is this a
+  complete, compliant report?" — required sections, forbidden terms, severities. Those ran only at
+  `/validate`, so a radiologist met them *after* applying the draft. Now returned with the draft and
+  rendered Blocker→red / Warning→amber / Info→blue. `validation: null` when no rulebook binds, kept
+  distinct from "clean" so the UI never implies a pass nobody performed. Projected onto an
+  `AsNoTracking` copy — the tracked report plus the §5.7 audit's `SaveChanges` would otherwise have
+  persisted an unapplied AI draft into the stored report. 7 projection tests.
+- **The packaged app is now actually exercised.** `desktop-bundle`'s launch smoke polls the sidecar
+  Tauri spawns and asserts MedASR is offered and MedGemma answers something other than 503 — the
+  first check that the *installed binary* produces a working on-device stack, rather than a sidecar
+  we started ourselves.
+- **MedASR latency measured**: 53.6 s for the full smoke suite (load + 2 decodes) on 4 CPU-only
+  cores. Published weekly by `on-device-latency.yml`. Order of magnitude and regression canary, not
+  an SLA — one runner is not a workstation. MedGemma latency still unmeasured.
+- **Flaky test hunted**: `flaky-hunt.yml` runs the suite N times and names failures. 6/6 passed —
+  9 consecutive clean runs now. Still unidentified, still not called fixed; weekly job will name it
+  if it returns.
+- Backend **983 passed / 5 skipped**, frontend **464 passed**, typecheck clean.
+
+---
+
 ## Adversarial audit remediation — every confirmed finding closed (2026-07-19/20)
 
 - **Date:** 2026-07-19 → 2026-07-20

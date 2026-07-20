@@ -29,6 +29,10 @@ The safety engine and the buildable competitive features are shipped, all TDD + 
   registered the extension, and tab-through wrapped into a keyboard trap (see §9).
 - **F4** measurement-sanity + findings/impression consistency (deterministic).
 - **F5** auto-comparison statement (deterministic; inserts into Comparison).
+- **F6** quality/safety gates on the dictation path — the tenant's rulebook now runs over the
+  DRAFTED text and its findings return with the draft (Blocker→red / Warning→amber / Info→blue).
+  Delivered 2026-07-20; it was the one planned feature previously recorded in neither doc, and
+  grepping confirmed the dictation flow had never touched `ReportValidator`.
 - **F7a/F7b** org + per-user correction dictionaries (backend + management UI).
 - **F8** one-command Sign & Send · RIS-driven report priority. *(Both were overstated until
   2026-07-20: Sign & Send signed before validating, was unretryable, and skipped the permission
@@ -227,10 +231,13 @@ Capabilities under the gate:
    no export step exists: the maintainer publishes a sherpa-onnx-native export. D3's fallback branch
    was never needed.
 3. ~~Exact MedGemma Q4_K_M GGUF artifact (URL + SHA-256 + size) to pin.~~ **RESOLVED** — pinned in §2.
-4. CPU-only latency on the 2-core target for MedASR + MedGemma formatting (benchmark). **OPEN** —
-   the only measurement so far is the dev workstation (MedASR 14.7 s for a full report; the weak-model
-   MedGemma run was a safety probe, not a benchmark). Per operator standing instruction this belongs
-   in a CI job, not on the laptop.
+4. ~~CPU-only latency for MedASR + MedGemma formatting (benchmark).~~ **MEASURED for MedASR**
+   (2026-07-20, `on-device-latency.yml`): the full smoke suite — model load plus two decodes of the
+   bundle's radiology sample — took **53.6 s on 4 CPU-only cores** (AMD EPYC 7763). That is suite
+   wall-clock, not per-utterance inference, and one runner is not a workstation; treat it as the
+   order of magnitude and as a canary against a silent provider fallback, not as an SLA. The
+   workflow publishes the number to its job summary weekly. **MedGemma formatting latency remains
+   unmeasured** — it needs the 2.5 GB model, so it belongs in `offline-formatter-smoke`.
 5. ~~**llama-server binary bundling in CI.**~~ **RESOLVED** — provisioned on demand instead of
    bundled, pinned to `b10068`; `offline-formatter-smoke.yml` exercises the full §4.2 pipeline.
 
@@ -300,6 +307,29 @@ Capabilities under the gate:
   **not** as resolved, because I could not identify it.
 
 ---
+
+## 8b. Verification gaps closed 2026-07-20 (and what is still open)
+
+Three things had been true all session and none of them were checked:
+
+- **Nobody had run the packaged app.** Every on-device check started a sidecar *we* launched. The
+  `desktop-bundle` no-panic launch smoke now goes further: while the shell is alive it polls the
+  sidecar's loopback health, asserts the model manager offers MedASR, and asserts `draft-local` does
+  not answer 503 — i.e. that **Tauri** spawns a working sidecar from the **real installed binary**.
+  Confirmed against a live run that the shell does stay alive on `windows-latest`, so the assertions
+  execute; if it ever exits early the step emits a warning that the engines were unverified rather
+  than letting a green tick imply cover it did not provide.
+- **Latency was unmeasured** → see §7 item 4. MedASR measured; MedGemma still open.
+- **The flaky test was never identified.** `flaky-hunt.yml` runs the suite N times and *names* what
+  fails. First run: **6/6 passed, flake not reproduced** — so it is now 9 consecutive clean runs
+  (3 local + 6 CI) since the single observed failure. Still **not identified**, and deliberately not
+  recorded as fixed; the job runs weekly and will name it if it recurs. Prime suspect documented in
+  the workflow: an env-mutating test missing `EnvironmentVariableCollection`, which produces exactly
+  this once-in-several signature and has bitten this repo before.
+
+Still open, honestly: **no CI installs the MSI and drives the UI** (the launch smoke runs the built
+binary, not the installed product, and never exercises the renderer), and **MedGemma latency** is
+unmeasured.
 
 ## 9. The pattern this build kept producing (read before the next change)
 
