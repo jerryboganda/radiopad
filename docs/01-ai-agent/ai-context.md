@@ -37,13 +37,13 @@ src/, daemon/, *.legacy.*    # Read-only Open Design reference
 - **Template** — JSON, scaffolds report sections (id/label/placeholder/required).
 - **Report** — `Draft → Validated → Acknowledged → Exported`.
 - **ReportVersion** — append-only edit snapshot per PATCH.
-- **Provider** — AI provider with `ProviderComplianceClass` (`Blocked / Sandbox / DeIdentifiedOnly / PhiApproved / LocalOnly`).
+- **Provider** — AI provider with `ProviderComplianceClass` (`Blocked / Sandbox / DeIdentifiedOnly / PhiApproved / LocalOnly`). Informational metadata; only `Blocked` affects routing.
 - **AuditEvent** — append-only with SHA-256 chain.
 
 ## Important flows
 
 - **Create + sign** → see [../00-product/use-cases.md UC-01](../00-product/use-cases.md).
-- **PHI gate** → `AiGateway.EnforcePhiPolicy`; audits `ProviderBlocked` before throwing.
+- **Provider-availability gate** → `AiGateway.EnforcePhiPolicy`; rejects only disabled providers and `Compliance = Blocked`, auditing `ProviderBlocked` before throwing. The PHI gate it is named after was removed on 2026-07-20 by operator decision, so PHI routes to any enabled provider; `ContainsPhi` is still computed and recorded on the audit and usage rows.
 - **Audit verify** → `radiopad audit verify` recomputes the chain locally.
 
 ## Current limitations

@@ -74,9 +74,11 @@ The decision is captured in EF migration `BillingHardening` (new fields on
   `tests/RadioPad.Api.Tests/Integration/` (webhook dedup, plan-quota gate,
   suspension guard, Connect gating, refund happy-path + RBAC, billing-audit
   PII hashing).
-- The PHI policy (`AiGateway.EnforcePhiPolicy` + provider compliance
-  classes) is unchanged. Plan-quota gating runs **after** PHI policy, so
-  blocked PHI requests still audit `AuditAction.ProviderBlocked` first.
+- `AiGateway.EnforcePhiPolicy` is unchanged by this ADR. (Since then, its
+  PHI routing gate was removed on 2026-07-20 by operator decision; it now
+  rejects only disabled and `Blocked` providers.) Plan-quota gating runs
+  **after** it, so requests it refuses still audit
+  `AuditAction.ProviderBlocked` first.
 - The append-only audit invariant is preserved: webhook dedup happens in
   the new `StripeWebhookEvents` table, not by mutating `AuditEvents`.
 - Tenant isolation is preserved: every new query filters by the resolved

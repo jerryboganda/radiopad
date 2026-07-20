@@ -9,9 +9,12 @@ using Xunit;
 namespace RadioPad.Api.Tests.Integration;
 
 /// <summary>
-/// Verifies the PHI policy is enforced end-to-end through the HTTP pipeline:
-/// a sandbox-class provider must reject a request whose dictation contains
-/// PHI-shaped tokens (e.g. MRN), and the failure must be audited.
+/// Verifies PHI routing end-to-end through the HTTP pipeline.
+///
+/// <para><b>Policy changed 2026-07-20 by operator instruction:</b> PHI gating was removed, so a
+/// sandbox-class provider now ACCEPTS a request whose text contains PHI-shaped tokens. This test
+/// was inverted rather than deleted — the suite should state the policy that exists, and the
+/// audit trail it still depends on.</para>
 /// </summary>
 public class AiPolicyHttpTests : IClassFixture<RadioPadAppFactory>
 {
@@ -19,7 +22,7 @@ public class AiPolicyHttpTests : IClassFixture<RadioPadAppFactory>
     public AiPolicyHttpTests(RadioPadAppFactory factory) => _factory = factory;
 
     [Fact]
-    public async Task Sandbox_Provider_Rejects_Phi_Bearing_Request()
+    public async Task Sandbox_Provider_Accepts_Phi_Bearing_Request()
     {
         using var client = _factory.CreateTenantClient();
         using var adminClient = _factory.CreateAdminClient();
@@ -59,24 +62,23 @@ public class AiPolicyHttpTests : IClassFixture<RadioPadAppFactory>
             impression = "",
         });
 
-        // 3. Ask the sandbox provider to draft an impression — must be refused.
+        // 3. Ask the sandbox provider to draft an impression — served, not refused.
         var ai = await client.PostAsJsonAsync($"/api/reports/{reportId}/ai", new
         {
             mode = "impression",
             providerId,
         });
 
-        Assert.False(ai.IsSuccessStatusCode);
-        // Controller returns 403; the global handler maps unhandled propagation
-        // to 409. Either is acceptable proof that policy is enforced.
         Assert.True(
-            ai.StatusCode == HttpStatusCode.Forbidden || ai.StatusCode == HttpStatusCode.Conflict,
-            $"Expected 403 or 409, got {(int)ai.StatusCode}");
+            ai.IsSuccessStatusCode,
+            $"PHI gating is removed, so a sandbox provider must serve a PHI-bearing request; got {(int)ai.StatusCode}");
 
-        // 4. Audit chain must record the policy block.
+        // 4. Nothing blocks the routing any more, so the ledger is the ONLY remaining record
+        //    that PHI went to a non-approved provider. If this ever stops being written, PHI
+        //    routing becomes both unrestricted and invisible — which is the state to avoid.
         using var scope = _factory.Services.CreateScope();
         var db = scope.ServiceProvider.GetRequiredService<RadioPadDbContext>();
-        var hasBlock = db.AuditEvents.Any(a => a.Action == AuditAction.ProviderBlocked || a.Action == AuditAction.PolicyViolation);
-        Assert.True(hasBlock, "Expected an audit event recording the policy block.");
+        var phiRun = db.AiRequests.Any(a => a.ContainsPhi);
+        Assert.True(phiRun, "a PHI-bearing AI run must still be recorded with its PHI flag.");
     }
 }

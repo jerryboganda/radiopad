@@ -43,10 +43,12 @@ type Preset = {
 };
 
 // Iter-32 AI-011 — operator presets that auto-fill `(adapter, endpointUrl,
-// compliance, model)` for the supported deployment shapes. The "local"
-// presets default to `LocalOnly` (compliance class 4) so the PHI policy
-// in `AiGateway.EnforcePhiPolicy` accepts them. Cloud presets default to
-// `PhiApproved` (3) where the vendor has BAA, otherwise `Sandbox` (1).
+// compliance, model)` for the supported deployment shapes. The compliance
+// value each preset carries is INFORMATIONAL only: PHI gating was removed on
+// 2026-07-20, so it no longer decides what a provider may receive — a class-1
+// (Sandbox) preset will be sent PHI exactly like a class-4 (LocalOnly) one.
+// The labels are kept because they still tell an operator what they are
+// pointing at, which is the only thing standing in for the old gate.
 const PRESETS: Preset[] = [
   { id: 'ollama-chat',  label: 'Ollama (local)',         patch: { adapter: 'ollama-chat',  endpointUrl: 'http://127.0.0.1:11434', compliance: 4, model: 'llama3.1:8b-instruct' } },
   { id: 'vllm',         label: 'vLLM (local)',           patch: { adapter: 'vllm',         endpointUrl: 'http://127.0.0.1:8000',  compliance: 4, model: 'default' } },

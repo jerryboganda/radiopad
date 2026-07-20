@@ -16,7 +16,7 @@ Dependency direction is one-way (downward in the diagram). Reversing it (e.g. Do
 
 ## Service responsibilities
 
-- **`AiGateway`** — Single entrypoint for AI. Enforces PHI policy → audits `ProviderBlocked` on block → routes to provider adapter → audits `AiRequest` + `AiResponse`.
+- **`AiGateway`** — Single entrypoint for AI. Rejects disabled and `Blocked` providers → audits `ProviderBlocked` on rejection → routes to provider adapter → audits `AiRequest` + `AiResponse`.
 - **`ReportValidator`** — Loads the rulebook by id+version, applies rules to a report, returns findings.
 - **`FhirDiagnosticReportSerializer`** — Builds narrative + FHIR JSON.
 - **`IAuditLog`** — Append-only writer; computes SHA-256 chain.

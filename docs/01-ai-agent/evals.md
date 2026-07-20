@@ -19,8 +19,8 @@ CI runs these on every push.
 
 | Eval | What it asserts |
 | --- | --- |
-| **PHI block recall** | A request with `containsPhi: true` to a `Sandbox`/`DeIdentifiedOnly` provider always returns 403 and audits `ProviderBlocked`. Target 100% on the synthetic PHI corpus. |
-| **PHI block precision** | A request with `containsPhi: false` to any compliant provider is never blocked. Target 100%. |
+| **PHI audit completeness** | A request with `containsPhi: true` reaches the provider and records `containsPhi` on its audit and usage rows. Target 100% on the synthetic PHI corpus. The PHI block this eval used to assert was removed on 2026-07-20 by operator decision; the audit record is what is now testable. |
+| **Provider-availability gate** | A request to a disabled provider, or one with `Compliance = Blocked`, always returns 403 and audits `ProviderBlocked`. Target 100%. |
 | **Audit completeness** | Every state transition writes the matching `AuditAction`. Target 100%. |
 | **Tenant escape** | A request with tenant slug A cannot read entity owned by tenant B. Target 100%. |
 

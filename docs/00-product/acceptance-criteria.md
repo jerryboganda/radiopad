@@ -36,11 +36,12 @@
 
 **Functional**
 - [ ] Non-PHI request to any provider returns a body wrapped in `.ai-mark`.
-- [ ] `containsPhi: true` to a non-compliant provider returns 403 `{ kind: "provider_policy" }`.
+- [ ] `containsPhi: true` reaches any enabled provider regardless of compliance class; the PHI gate was removed on 2026-07-20 by operator decision.
+- [ ] A request to a provider that is `Enabled = false` or `Compliance = Blocked` returns 403 `{ kind: "provider_policy" }`.
 - [ ] Audit log contains `AiRequest`, `AiResponse`, or `ProviderBlocked` for every call.
 
 **Security**
-- [ ] No provider call leaves the process before `EnforcePhiPolicy`.
+- [ ] `containsPhi` is computed and recorded on the audit and usage rows for every AI call — the audit trail, not a routing block, is what evidences PHI handling.
 
 ## F-04 Edit a report
 

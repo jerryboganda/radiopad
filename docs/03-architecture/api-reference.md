@@ -27,7 +27,7 @@ public tenant/user tuple.
 
 The enterprise identity foundation is backend-only in this release. `GlobalUser`, `ExternalIdentity`, `TenantMembership`, and `AuthSession` rows do not add public endpoints or response fields; `/api/tenant/me` continues to return the resolved tenant-scoped user.
 
-Errors are RFC 7807 `application/problem+json` for unhandled exceptions. PHI/policy failures from `POST /api/reports/{id}/ai` are converted to a `403 Forbidden` JSON body `{ error, kind: "provider_policy" }` by the controller - the global handler is the safety net for everything else:
+Errors are RFC 7807 `application/problem+json` for unhandled exceptions. Provider-policy failures from `POST /api/reports/{id}/ai` — a disabled provider or one with `Compliance = Blocked`, not PHI content — are converted to a `403 Forbidden` JSON body `{ error, kind: "provider_policy" }` by the controller - the global handler is the safety net for everything else:
 
 ```json
 {
@@ -172,7 +172,7 @@ The canonical `kind` enum surfaces in `openapi/openapi.yaml#/components/schemas/
 
 ### Adapter catalog
 
-The provider rows reference an `adapter` id from this fixed catalog. Compliance class shown is the **default for catalog seeding**; the operator-supplied `Compliance` column on the `ProviderConfig` row is what `AiGateway.EnforcePhiPolicy` actually evaluates at runtime.
+The provider rows reference an `adapter` id from this fixed catalog. Compliance class shown is the **default for catalog seeding**; the operator-supplied `Compliance` column on the `ProviderConfig` row is what `AiGateway.EnforcePhiPolicy` reads at runtime — and since the PHI gate was removed on 2026-07-20 by operator decision, the only value that changes routing is `Blocked`. Every other class is informational, and PHI reaches any enabled provider.
 
 | Adapter id | Kind | Default compliance | Notes |
 | --- | --- | --- | --- |
@@ -190,7 +190,7 @@ CLI adapters share these guard-rails (`RadioPad.Infrastructure.Providers.Cli.Cli
 - Binary allowlist via `RADIOPAD_CLI_PROVIDER_ALLOWED_PATHS` (semicolon-separated). Production API hosts require a non-empty allowlist before CLI providers can execute; missing production allowlists throw `ProviderPolicyException("cli_binary_allowlist_required")`. When set, the resolved binary path must be in the list or the adapter throws `ProviderPolicyException("cli_binary_not_allowed")`. Empty / unset allowlists are development-only and use PATH lookup.
 - The subprocess environment is scrubbed to OS basics (`PATH`, home/config/temp locations). Add only the variables a reviewed CLI needs via `RADIOPAD_CLI_PROVIDER_ENV_ALLOWLIST`.
 - Prompt sanitiser refuses NUL and other C0 control characters (tab / newline / CR are allowed).
-- Adapter-level policy refuses `containsPhi:true` and secret-shaped prompts before process launch.
+- Adapter-level policy refuses secret-shaped prompts before process launch. It does **not** refuse `containsPhi:true` — that claim was stale, and grepping `RadioPad.Infrastructure` for `ContainsPhi` returns only the persisted audit column. CLI providers receive PHI like any other provider (PHI gating removed 2026-07-20).
 
 ## UBAG Hub
 
@@ -235,7 +235,7 @@ Target readiness is tri-state: a gateway that registers **no** browser context f
 | Method | Path | Description |
 | --- | --- | --- |
 | GET | `/api/ai/routing/preview?phi=&modality=&input=&output=` | **Iter-32 AI-010.** Explains the gateway's routing decision for a hypothetical `(modality, phi, tokens)` tuple without performing a real AI call. Returns the chosen provider plus a per-candidate `costScore`, `qualityScore`, `latencyScore`, `compositeScore`, `eligible`, and `ineligibleReason`. Weights come from per-tenant `TenantSettings.RoutingWeightsJson` (default `{"cost":0.5,"quality":0.4,"latency":0.1}`). Tie-breaks use P95 24h latency from `AiRequest`. ItAdmin / MedicalDirector only. Audited as `RoutingPreviewQueried`. |
-| POST | `/api/ai/sandbox/compare` | **Iter-34 PROV-005.** Runs the same prompt across up to four sandbox-class providers serially and returns each `output`, `latencyMs`, `inputTokens`, `outputTokens`, plus a generic `error` string when a single provider failed. Body `{ reportId, mode, providerIds[] }` (1â€“4). Auth: Radiologist / MedicalDirector / ReportingAdmin / ItAdmin. Refuses `409 { kind:"sandbox_required" }` unless `Tenant.AllowSandboxRulebooks=true`; refuses `400 { kind:"providers_not_sandbox" }` when any provider is disabled, cross-tenant, or `Compliance != Sandbox`. PHI policy is still enforced inside `AiGateway.EnforcePhiPolicy` for every dispatch. Audits one wrapper `AiResponse` row with `details: { kind:"sandbox_compare", mode, providerCount }` in addition to the per-call rows the gateway writes. |
+| POST | `/api/ai/sandbox/compare` | **Iter-34 PROV-005.** Runs the same prompt across up to four sandbox-class providers serially and returns each `output`, `latencyMs`, `inputTokens`, `outputTokens`, plus a generic `error` string when a single provider failed. Body `{ reportId, mode, providerIds[] }` (1â€“4). Auth: Radiologist / MedicalDirector / ReportingAdmin / ItAdmin. Refuses `409 { kind:"sandbox_required" }` unless `Tenant.AllowSandboxRulebooks=true`; refuses `400 { kind:"providers_not_sandbox" }` when any provider is disabled, cross-tenant, or `Compliance != Sandbox`. Each dispatch still passes `AiGateway.EnforcePhiPolicy`, which since 2026-07-20 checks only that the provider is enabled and not `Blocked` — it does not gate on PHI. Audits one wrapper `AiResponse` row with `details: { kind:"sandbox_compare", mode, providerCount }` in addition to the per-call rows the gateway writes. |
 
 ## Prompt overrides
 

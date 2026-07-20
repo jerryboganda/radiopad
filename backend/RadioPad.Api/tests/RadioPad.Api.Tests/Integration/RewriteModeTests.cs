@@ -57,10 +57,16 @@ public class RewriteModeTests : IClassFixture<RadioPadAppFactory>
         Assert.Equal("rewrite-v1.iter30", doc.RootElement.GetProperty("promptVersion").GetString());
     }
 
+    /// <summary>
+    /// PHI gating was removed by operator instruction (2026-07-20): a PHI-bearing report may be
+    /// rewritten by ANY enabled provider, including a Sandbox-class one. This test previously
+    /// asserted the opposite; it is kept — inverted — rather than deleted, so the change of
+    /// policy is explicit in the suite instead of being a silently missing guarantee.
+    /// </summary>
     [Fact]
-    public async Task Rewrite_Phi_Policy_Blocks_NonCompliant_Provider()
+    public async Task Rewrite_Sends_Phi_To_A_NonCompliant_Provider()
     {
-        // Promote the mock adapter to a non-PHI provider, then mark the report
+        // Demote the mock adapter to a non-PHI (Sandbox) provider, then mark the report
         // as containing PHI by leaving an MRN-like token in the indication.
         using (var scope = _factory.Services.CreateScope())
         {
@@ -80,13 +86,18 @@ public class RewriteModeTests : IClassFixture<RadioPadAppFactory>
             });
             Assert.True(patch.IsSuccessStatusCode);
             var resp = await client.PostAsJsonAsync($"/api/reports/{id}/rewrite", new { mode = "concise" });
-            Assert.Equal(HttpStatusCode.Forbidden, resp.StatusCode);
+            Assert.True(
+                resp.IsSuccessStatusCode,
+                $"PHI gating is removed, so a Sandbox provider must serve this; got {(int)resp.StatusCode}");
 
+            // The routing is no longer prevented, but it MUST still be reconstructable: the
+            // request is recorded with its PHI flag, which is what an auditor asking "did PHI
+            // leave the approved boundary, and to whom?" has to work from.
             using var scope = _factory.Services.CreateScope();
             var db = scope.ServiceProvider.GetRequiredService<RadioPadDbContext>();
-            var blocked = await Microsoft.EntityFrameworkCore.EntityFrameworkQueryableExtensions
-                .CountAsync(db.AuditEvents, a => a.Action == AuditAction.ProviderBlocked);
-            Assert.True(blocked >= 1);
+            var phiRuns = await Microsoft.EntityFrameworkCore.EntityFrameworkQueryableExtensions
+                .CountAsync(db.AiRequests, a => a.ContainsPhi);
+            Assert.True(phiRuns >= 1, "a PHI-bearing AI run must still be recorded in the usage ledger");
         }
         finally
         {

@@ -32,7 +32,7 @@
 - Validation panel grouped by severity.
 
 **Quality gates**
-- All v0.1.0 gates plus integration test for `ProviderBlocked` audit on PHI gate.
+- All v0.1.0 gates plus integration test for the `ProviderBlocked` audit on a disabled or `Blocked` provider. (The PHI gate this originally covered was removed on 2026-07-20 by operator decision.)
 - Updated CHANGELOG entry under `[Unreleased]`.
 
 ## v0.3.0 — Clinical breadth (planned)

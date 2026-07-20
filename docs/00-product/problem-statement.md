@@ -27,11 +27,11 @@ Radiologists spend 30–60% of their reporting time on tasks that are mechanical
 
 - Sub-segment of $4B+ radiology IT market actively seeking AI-assisted reporting that is *safe, auditable, and self-hosted-capable*.
 - Open architecture (FHIR export, rulebooks, local AI providers) is unique vs. closed RIS vendors.
-- BAA-friendly architecture (`PhiApproved` / `LocalOnly` provider routing) opens hospital deployments without legal blockers.
+- Local and self-hosted provider adapters (`ollama`, `vllm`, `llama-cpp`, tenant-owned OpenAI-compatible endpoints) let a hospital keep AI traffic inside its own network. Note that this is a deployment option the operator chooses, not a control the product enforces: the compliance-class routing gate was removed on 2026-07-20 by operator decision, so PHI reaches any enabled provider and the audit trail is the only remaining evidence of where it went. Any BAA posture is the deploying organisation's to establish.
 
 ## Why now
 
 - Open-weights medical LLMs (Llama 3.1 medical fine-tunes, MedGemma, etc.) make on-prem AI viable.
 - FHIR R4 is the de facto interop standard.
-- Health systems are tightening PHI policies — AI vendors that can demonstrate provable routing controls have a structural advantage.
+- Health systems are tightening PHI policies — AI vendors that can evidence where PHI went have a structural advantage. RadioPad's answer is the append-only audit trail rather than a routing control.
 - Tauri 2 + Capacitor 6 make a single TypeScript codebase deployable across web/desktop/mobile, lowering go-to-market cost.

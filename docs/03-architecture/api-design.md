@@ -37,13 +37,15 @@
 ```json
 {
   "type": "https://radiopad.dev/errors/provider-policy",
-  "title": "Provider not allowed for PHI",
+  "title": "Provider not allowed",
   "status": 403,
-  "detail": "Provider 'anthropic-prod' has compliance class 'Sandbox' but containsPhi=true.",
+  "detail": "Provider 'anthropic-prod' is blocked by tenant policy.",
   "kind": "provider_policy",
   "traceId": "<X-Request-Id>"
 }
 ```
+
+`provider_policy` is now raised only when the provider is disabled or carries `Compliance = Blocked`. It is no longer raised for PHI content: the compliance-class routing gate was removed on 2026-07-20 by operator decision, so a `containsPhi: true` request to an enabled provider succeeds and is recorded in the audit trail rather than refused.
 
 The `kind` field is RadioPad-specific and stable. Known kinds: `provider_policy`, `validation`, `tenant_isolation`, `not_found`, `conflict`.
 

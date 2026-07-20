@@ -163,7 +163,7 @@ Push and stop — do not watch the run.
 
 1. RadioPad never auto-signs reports.
 2. AI text wears `.ai-mark` until reviewed.
-3. ~~PHI gate~~ **Removed by operator decision (2026-07-20).** The PHI/compliance gate is gone: every enabled provider may receive any request regardless of `ProviderComplianceClass` or PHI content. Do not reintroduce it unless the operator asks. Compliance classes remain as informational metadata only.
+3. ~~PHI gate~~ **Removed by explicit operator instruction (2026-07-20).** Every enabled provider may receive any request regardless of `ProviderComplianceClass` or PHI content — including third-party/browser-automation providers with no BAA. Compliance classes are informational metadata only. **Do not reintroduce it, and do not "fix" it as a bug** — it is deliberate, and `AiPolicyHttpTests` / `RewriteModeTests` assert the current behaviour. (This is worth stating twice because it already happened once: an agent read the removal as an accident and restored the gate.) Two non-PHI checks deliberately remain in `AiGateway.EnforcePhiPolicy`: `Enabled == false` and `Compliance == Blocked` are explicit operator switches. **What replaces the gate is the audit trail** — `ContainsPhi` is still computed and recorded on every audit + usage row, so PHI routing is unrestricted but reconstructable. Keep it that way: unrestricted *and* invisible is the state to avoid.
 4. Audit log is append-only; use `IAuditLog.AppendAsync` only.
 5. Backend binds `127.0.0.1` by default.
 6. Tenant isolation enforced via `TenantedController.ResolveContextAsync`.

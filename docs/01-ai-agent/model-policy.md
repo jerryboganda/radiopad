@@ -4,6 +4,8 @@
 
 ## Allowed providers (v0.1)
 
+Compliance classes below record the intended posture for each provider. They no longer gate PHI routing — see *Privacy constraints*.
+
 | Provider | Adapter | Compliance class | Use case |
 | --- | --- | --- | --- |
 | **Mock** | `mock` | `Sandbox` or `LocalOnly` by row | Default for dev, tests, demos. |
@@ -39,7 +41,7 @@ New providers must:
 
 ## Privacy constraints
 
-- PHI requests must use `PhiApproved` or `LocalOnly` providers.
+- PHI requests are not restricted by compliance class. The gate that required `PhiApproved` or `LocalOnly` was removed on 2026-07-20 by operator decision, so PHI may reach any enabled provider, including third-party and browser-automation adapters with no BAA. The compliance classes in the table above are informational metadata describing intended posture, not an enforced routing control; only `Blocked` still refuses traffic. What remains is the audit trail: `containsPhi` is computed per request and recorded on the audit and usage rows.
 - CLI providers default to `Sandbox` because a local binary may call a vendor cloud; the current adapters also refuse PHI and secret-shaped prompts at adapter level.
 - Provider responses never persist outside the tenant boundary.
 - API keys live in env vars referenced by `ApiKeySecretRef = "env:<NAME>"`.

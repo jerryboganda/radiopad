@@ -22,8 +22,8 @@
 
 - **Inputs:** `mode ∈ {impression, technique, recommendation}`, `providerId`, optional `containsPhi`.
 - **Outputs:** `{ text, highlightsJson }` or HTTP 403 `{ error, kind: "provider_policy" }`.
-- **Workflow:** `POST /api/reports/{id}/ai` → `AiGateway.RouteAsync` → policy gate → provider adapter → audit `AiRequest` + `AiResponse`. Blocked PHI requests audit `ProviderBlocked` and 403.
-- **Business rules:** `containsPhi: true` requires provider compliance ∈ {`PhiApproved`, `LocalOnly`}. Suggested text wears `.ai-mark` until acknowledged.
+- **Workflow:** `POST /api/reports/{id}/ai` → `AiGateway.RouteAsync` → provider-availability gate → provider adapter → audit `AiRequest` + `AiResponse`. Requests refused by the availability gate audit `ProviderBlocked` and 403.
+- **Business rules:** `containsPhi: true` no longer constrains provider choice — the PHI gate was removed on 2026-07-20 by operator decision, so PHI routes to any enabled provider. `EnforcePhiPolicy` now rejects only providers that are disabled or carry `Compliance = Blocked`, both operator switches rather than PHI gating. `containsPhi` is still computed and recorded on the audit and usage rows. Suggested text wears `.ai-mark` until acknowledged.
 
 ## F-04 Edit a report (with version history)
 

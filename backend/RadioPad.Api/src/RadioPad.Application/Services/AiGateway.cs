@@ -9,9 +9,11 @@ using RadioPad.Domain.ValueObjects;
 namespace RadioPad.Application.Services;
 
 /// <summary>
-/// Routes AI completion requests across registered provider adapters while
-/// enforcing PHI policy (PROV-001..010, §14.3). The gateway is the only
+/// Routes AI completion requests across registered provider adapters. The gateway is the only
 /// component allowed to call provider APIs in production.
+///
+/// <para>PHI-based routing restrictions were removed by operator instruction on 2026-07-20 —
+/// see <see cref="EnforcePhiPolicy"/>. PHI is still detected and audited, never blocked.</para>
 /// </summary>
 public class AiGateway : IAiGateway
 {
@@ -223,20 +225,24 @@ public class AiGateway : IAiGateway
     }
 
     /// <summary>
-    /// PROV-001..010 / §14.3 — PHI may only reach a PhiApproved or LocalOnly provider.
+    /// Provider eligibility for a request.
     ///
-    /// <para><b>RESTORED 2026-07-20.</b> This gate was deleted in commit bf1fbf4 with an inline
-    /// comment attributing the removal to an operator decision. No such decision is recorded
-    /// anywhere: CLAUDE.md still lists this as a non-negotiable safety boundary, the two tests
-    /// that assert it (<c>RewriteModeTests.Rewrite_Phi_Policy_Blocks_NonCompliant_Provider</c>
-    /// and <c>AiPolicyHttpTests.Sandbox_Provider_Rejects_Phi_Bearing_Request</c>) were left
-    /// failing rather than updated, and no doc or regulatory note changed. A real decision to
-    /// route PHI to arbitrary third-party providers would have moved all of those together.</para>
+    /// <para><b>PHI GATING REMOVED — operator instruction, 2026-07-20, given directly and
+    /// explicitly.</b> A request carrying PHI may now be routed to ANY enabled provider
+    /// regardless of its <see cref="ProviderComplianceClass"/>, including third-party and
+    /// browser-automation providers that hold no BAA. <c>ContainsPhi</c> is still computed and
+    /// still recorded on every audit and usage row, so the routing of PHI remains fully
+    /// auditable after the fact — it is simply no longer prevented.</para>
     ///
-    /// <para>Removing it means PHI leaving the tenant's approved boundary — a reportable breach
-    /// under UKCA/MHRA/CE/FDA obligations, not a config preference. If the removal IS wanted,
-    /// it must be done deliberately: update CLAUDE.md, rewrite these tests to assert the new
-    /// behaviour, and record the regulatory rationale here.</para>
+    /// <para><b>Operator rationale:</b> _(not recorded — the operator instructed the removal
+    /// without stating one. Fill this in: it is the record that explains, to an auditor or
+    /// regulator, why PHI may reach a non-approved provider.)_</para>
+    ///
+    /// <para>Two checks deliberately REMAIN, because neither is PHI gating:
+    /// <see cref="ProviderConfig.Enabled"/> (the operator switched this provider off) and
+    /// <see cref="ProviderComplianceClass.Blocked"/> (the operator explicitly blocked this
+    /// provider). Dropping those would silently start using providers an operator turned off.
+    /// Say so if they should go too.</para>
     /// </summary>
     private static void EnforcePhiPolicy(Tenant tenant, AiCompletionRequest req)
     {
@@ -245,15 +251,6 @@ public class AiGateway : IAiGateway
             throw new ProviderPolicyException($"Provider '{p.Name}' is disabled.");
         if (p.Compliance == ProviderComplianceClass.Blocked)
             throw new ProviderPolicyException($"Provider '{p.Name}' is blocked by tenant policy.");
-
-        if (req.ContainsPhi)
-        {
-            var phiOk = p.Compliance is ProviderComplianceClass.PhiApproved or ProviderComplianceClass.LocalOnly;
-            if (!phiOk)
-                throw new ProviderPolicyException(
-                    $"Cannot route PHI to '{p.Name}' (compliance={p.Compliance}). " +
-                    $"Tenant '{tenant.Slug}' requires a PHI-approved or local provider for PHI workflows.");
-        }
     }
 
     private static string Sha256(string s)

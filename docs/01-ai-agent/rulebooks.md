@@ -39,6 +39,6 @@
 
 ## Safety rules
 
-- PHI requests (`containsPhi: true`) are blocked unless `ProviderComplianceClass ∈ {PhiApproved, LocalOnly}`.
-- Blocks audit `ProviderBlocked` *before* rethrow.
+- PHI requests (`containsPhi: true`) route to any enabled provider. The compliance-class restriction was removed on 2026-07-20 by operator decision; `containsPhi` is still computed and recorded on the audit and usage rows, so PHI routing is unrestricted but auditable.
+- Requests to a disabled provider, or one with `ProviderComplianceClass = Blocked`, are still refused and audit `ProviderBlocked` *before* rethrow.
 - If a model hallucinates an entity not in the input, the radiologist must edit it out before sign-off; the AI quality rubric ([../05-data-ai/ai-quality-rubric.md](../05-data-ai/ai-quality-rubric.md)) tracks this.

@@ -32,8 +32,12 @@
 
 - **US-020 — As a P3 admin**, I want to register AI providers with explicit
   compliance classes (`Blocked`, `Sandbox`, `DeIdentifiedOnly`,
-  `PhiApproved`, `LocalOnly`), so that PHI is only routed to approved
-  destinations.
+  `PhiApproved`, `LocalOnly`), so that each destination's posture is
+  recorded. The classes are informational: the routing restriction they
+  once carried was removed on 2026-07-20 by operator decision, and PHI now
+  reaches any enabled provider. Only `Blocked` still refuses traffic, as an
+  operator switch. What remains is the audit trail — every AI call records
+  whether it carried PHI and which provider received it.
 - **US-021 — As a P4 compliance officer**, I want every AI call, report
   edit, export, and acknowledgement to appear in an append-only audit log
   with chain hashes, so that tampering is detectable.

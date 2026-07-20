@@ -60,13 +60,17 @@ at the repo root; this page is the engineering map onto that document.
    prompt string.
 2. The gateway computes whether the prompt contains PHI (heuristic — see
    `ReportingService.ContainsPhi`) and looks up the provider's compliance
-   class.
-3. **Policy decision matrix:**
-   - PHI + class ∈ {`PhiApproved`, `LocalOnly`} → allowed.
-   - PHI + any other class → `ProviderPolicyException` is thrown; an
-     `AuditAction.PolicyViolation` event is written; nothing is sent
-     downstream.
-   - Non-PHI + class != `Blocked` → allowed.
+   class. The PHI flag is recorded, not acted on: it is written to the
+   audit event and the `AiRequest` usage row.
+3. **Policy decision matrix** — the compliance-class routing gate was
+   removed on 2026-07-20 by operator decision, leaving two operator
+   switches:
+   - Provider `Enabled = false` → `ProviderPolicyException` is thrown;
+     nothing is sent downstream.
+   - Provider class `Blocked` → same.
+   - Anything else → allowed, whether or not the prompt contains PHI, and
+     regardless of compliance class. PHI may therefore reach a third-party
+     provider with no BAA; the audit trail is what records that it did.
 4. Allowed requests hit the provider adapter (Mock / Anthropic / Ollama).
 5. Both prompt and response are hashed (SHA-256) and persisted via
    `IAuditLog.AppendAsync` along with the response itself.

@@ -26,7 +26,7 @@ Lock the UI/UX to the Open Design (Claude.ai-inspired) warm-paper visual languag
 
 Record clinical-safety primitives early:
 
-- `AiGateway.EnforcePhiPolicy` blocks PHI requests to non-compliant providers.
+- `AiGateway.EnforcePhiPolicy` blocks PHI requests to non-compliant providers. (Superseded: this gate was removed on 2026-07-20 by operator decision. PHI now routes to any enabled provider and is recorded in the audit trail rather than blocked.)
 - `IAuditLog.AppendAsync` is append-only and SHA-256 chained.
 - Tenant isolation through `TenantedController.ResolveContextAsync`.
 

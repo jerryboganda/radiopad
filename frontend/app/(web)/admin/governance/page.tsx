@@ -410,10 +410,11 @@ export default function AdminGovernancePage() {
           </div>
         </div>
         <p className="rp-page-sub rp-mt-sm">
-          PHI requests are blocked in <code>AiGateway.EnforcePhiPolicy</code> unless the provider
-          carries <span className="badge ok">PHI-approved</span> or{' '}
-          <span className="badge ok">Local-only</span>; every block is recorded as{' '}
-          <code>ProviderBlocked</code> in the append-only audit chain.
+          PHI routing is <strong>not restricted</strong>: since 2026-07-20 a request containing PHI
+          may be sent to any enabled provider, whatever its compliance class — including providers
+          with no BAA. Compliance labels are informational only. Every PHI-bearing run is still
+          flagged and recorded in the append-only audit chain, so routing remains reviewable after
+          the fact; the counts above are historical blocks, not current enforcement.
         </p>
       </div>
 

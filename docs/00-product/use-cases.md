@@ -9,7 +9,7 @@
 | Actor | Attending radiologist |
 | Preconditions | User authenticated; tenant has `chest_ct_v1` rulebook approved. |
 | Main flow | (1) Click *New report* → modality CT, body part Chest. (2) System scaffolds sections from `chest-ct.json` template. (3) Radiologist fills findings. (4) Click *Validate* → all rules pass. (5) Click *Ask AI: impression* → mock provider returns suggestion wrapped in `.ai-mark`. (6) Edit and accept. (7) Click *Acknowledge* → status `Acknowledged`. (8) Click *Export FHIR text* → file downloaded; status `Exported`. |
-| Alternative flows | (4a) Validation returns Blocker → radiologist edits and re-validates. (5a) Provider blocked by PHI policy → toast shows "Provider not allowed for PHI". |
+| Alternative flows | (4a) Validation returns Blocker → radiologist edits and re-validates. (5a) Provider disabled or marked `Blocked` → toast shows "Provider not allowed". |
 | Error flows | (5b) Provider timeout → audit `AiResponse` with error; UI surfaces banner. |
 | Postconditions | `Report.Status = Exported`. ≥ 4 audit events recorded. ≥ 1 `ReportVersion` snapshot. |
 
@@ -33,11 +33,13 @@
 | Alternative flows | (2a) Mismatch → CLI exits non-zero, prints the offending event id; operator escalates per [../04-security/incident-response.md](../04-security/incident-response.md). |
 | Postconditions | Chain integrity is documented in the incident timeline. |
 
-## UC-04 Block a PHI request to a sandbox provider
+## UC-04 Record a PHI request routed to a sandbox provider
 
 | Field | Value |
 | --- | --- |
-| Actor | Radiologist (unintentional) |
-| Preconditions | Provider has compliance class `Sandbox`. |
-| Main flow | (1) Radiologist asks AI for impression with `containsPhi: true`. (2) `AiGateway.EnforcePhiPolicy` audits `ProviderBlocked` and throws `ProviderPolicyException`. (3) API returns 403 `{ error, kind: "provider_policy" }`. (4) UI shows the locked `.banner.warn` message. |
-| Postconditions | No request was sent to the provider. Audit row exists. |
+| Actor | Radiologist |
+| Preconditions | Provider has compliance class `Sandbox` and is enabled. |
+| Main flow | (1) Radiologist asks AI for impression with `containsPhi: true`. (2) `AiGateway` routes the request to the provider — the PHI gate that used to block this was removed on 2026-07-20 by operator decision, so compliance class no longer restricts routing. (3) The provider responds and the call audits `AiRequest` + `AiResponse` with `containsPhi` recorded on the audit and usage rows. |
+| Postconditions | The request reached the provider. The audit trail records that it carried PHI. |
+
+A 403 `{ error, kind: "provider_policy" }` with a `ProviderBlocked` audit row still occurs, but only when the provider is disabled or carries `Compliance = Blocked` — operator switches, not PHI gating.

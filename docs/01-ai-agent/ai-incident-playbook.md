@@ -57,5 +57,5 @@ Triage and response steps for AI-specific incidents. General incident response =
 
 1. Verify across tenants whether the outage is provider-wide.
 2. Surface the outage on the in-app status banner (locked `.banner.warn`).
-3. If the provider is the only `PhiApproved` option for a tenant, do **not** silently fall back.
+3. If the provider is the tenant's only `PhiApproved` option, do **not** silently fall back. Nothing in the gateway prevents the fallback — the compliance-class routing gate was removed on 2026-07-20 by operator decision — so this is an operator discipline, and any fallback will be visible in the audit trail rather than blocked.
 4. Postmortem if the outage exceeds the SLO error budget.

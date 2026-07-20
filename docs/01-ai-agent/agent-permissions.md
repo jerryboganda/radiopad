@@ -25,7 +25,7 @@
 ## Forbidden actions
 
 - Auto-signing reports.
-- Bypassing or weakening `EnforcePhiPolicy`.
+- Reintroducing a PHI routing gate in `EnforcePhiPolicy` without an explicit operator request; it was removed on 2026-07-20 by operator decision. Equally, weakening what the method still enforces — the `Enabled` and `Compliance = Blocked` operator switches — or removing the `containsPhi` computation or its recording on the audit and usage rows.
 - UPDATE/DELETE on `AuditEvents`.
 - Disabling tests, lint, or typecheck checks.
 - Force-push to any branch.
