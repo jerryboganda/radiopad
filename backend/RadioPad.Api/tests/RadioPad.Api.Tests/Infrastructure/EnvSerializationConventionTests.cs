@@ -119,6 +119,10 @@ public class EnvSerializationConventionTests
     /// Split a source file into top-level class segments: (class name, text up to the next
     /// top-level class). Nested private helpers are indented, so their content folds into the
     /// enclosing test class's segment — which is the attribution we want.
+    ///
+    /// <para>Known blind spot: the column-0 anchor assumes file-scoped namespaces (every test
+    /// file today). A block-scoped namespace would indent its classes and this scan would miss
+    /// them — if that style ever appears in the test project, teach this parser first.</para>
     /// </summary>
     private static IEnumerable<(string Name, string Body)> TopLevelClassSegments(string text)
     {

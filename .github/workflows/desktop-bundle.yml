@@ -394,6 +394,9 @@ jobs:
         shell: pwsh
         env:
           RADIOPAD_E2E_OUT: ${{ runner.temp }}/e2e-out
+          # On tag builds this job gates the release, so the script's headless-webview
+          # tolerance is disabled — a renderer that never came up must FAIL, not warn.
+          RADIOPAD_E2E_STRICT: ${{ startsWith(github.ref, 'refs/tags/') && '1' || '0' }}
         run: node scripts/desktop-msi-e2e.mjs
 
       - name: Uninstall the MSI

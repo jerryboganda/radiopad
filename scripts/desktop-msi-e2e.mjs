@@ -31,6 +31,9 @@ import path from 'node:path';
 const SIDECAR_URL = 'http://127.0.0.1:7457';
 const CDP_PORT = 9223;
 const OUT = process.env.RADIOPAD_E2E_OUT || path.join(process.cwd(), 'e2e-out');
+// Tag builds gate the release, so the headless-webview tolerance below must not apply there —
+// a renderer that never came up would otherwise warning-pass and the gate would verify nothing.
+const STRICT = process.env.RADIOPAD_E2E_STRICT === '1';
 
 const DICTATION =
   'CT chest with contrast. There is a three point two centimeter nodule in the right upper ' +
@@ -288,6 +291,11 @@ async function main() {
     }, 120_000, 2000);
   } catch (e) {
     if (app.exitCode !== null) {
+      if (STRICT) {
+        throw new Error(
+          `desktop shell exited (code ${app.exitCode}) before the webview came up — ` +
+          'a tag build must verify the renderer, so this is a failure, not a warning');
+      }
       console.log('::warning::desktop shell exited before the webview came up — RENDERER NOT VERIFIED in this run');
       return;
     }
@@ -400,11 +408,17 @@ async function main() {
     const el = document.querySelector('[data-testid="dictation-on-device-toggle"]');
     if (!el) return 'missing';
     if (!el.checked) el.click();
-    return 'on';
+    return 'clicked';
   })()`);
-  if (toggle !== 'on') {
+  if (toggle === 'missing') {
     throw new Error('on-device toggle missing from the draft panel in the REAL shell — the on-device path is unreachable to users');
   }
+  // Controlled checkbox: the click round-trips through React state, so re-read after a beat —
+  // existence alone is not proof the on-device path can actually be selected.
+  await sleep(500);
+  const onDevice = await cdp.eval(
+    `document.querySelector('[data-testid="dictation-on-device-toggle"]').checked`);
+  if (!onDevice) throw new Error('on-device toggle exists but could not be enabled in the real shell');
   await clickButton(cdp, 'Format (safety-checked)');
   await cdp.screenshot('05-formatting');
   log('formatting with on-device MedGemma (first call loads the 2.5 GB model — this takes minutes on CPU)');
