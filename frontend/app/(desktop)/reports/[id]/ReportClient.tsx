@@ -404,7 +404,6 @@ export default function ReportPage() {
       patchActivity(actId, { status: 'failed', error: msg, provider: providerName });
     } finally {
       setRewriteBusy(false);
-      setBusyAiAction(null);
     }
   }
 

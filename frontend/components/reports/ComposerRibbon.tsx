@@ -91,9 +91,9 @@ export interface ComposerRibbonProps {
 
 function RibbonGroup({ caption, children }: { caption: string; children: ReactNode }) {
   return (
-    <div className="rp-ribbon-group">
-      <div className="rp-ribbon-group-items">{children}</div>
-      <span className="rp-ribbon-group-caption">{caption}</span>
+    <div className="rp-composer-ribbon-group">
+      <div className="rp-composer-ribbon-group-items">{children}</div>
+      <span className="rp-composer-ribbon-group-caption">{caption}</span>
     </div>
   );
 }
@@ -109,9 +109,9 @@ function RibbonButton({
   'data-testid'?: string;
 } & ButtonHTMLAttributes<HTMLButtonElement>) {
   return (
-    <button type="button" className={`rp-ribbon-btn ${className}`.trim()} {...rest}>
-      <span className="rp-ribbon-btn-icon" aria-hidden>{icon}</span>
-      <span className="rp-ribbon-btn-label">{label}</span>
+    <button type="button" className={`rp-composer-ribbon-btn ${className}`.trim()} {...rest}>
+      <span className="rp-composer-ribbon-btn-icon" aria-hidden>{icon}</span>
+      <span className="rp-composer-ribbon-btn-label">{label}</span>
     </button>
   );
 }
@@ -121,6 +121,10 @@ export default function ComposerRibbon(p: ComposerRibbonProps) {
   const setRewriteOpen = p.onRewriteOpenChange;
   const rewriteRef = useRef<HTMLDivElement | null>(null);
   const [customInstruction, setCustomInstruction] = useState('');
+
+  useEffect(() => {
+    if (!rewriteOpen) setCustomInstruction('');
+  }, [rewriteOpen]);
 
   useEffect(() => {
     if (!rewriteOpen) return;
@@ -144,7 +148,7 @@ export default function ComposerRibbon(p: ComposerRibbonProps) {
   const showSignoffGroup = p.canEdit || p.canSign;
 
   return (
-    <div className="rp-ribbon" role="toolbar" aria-label="Report composer actions">
+    <div className="rp-composer-ribbon" role="toolbar" aria-label="Report composer actions">
       <RibbonGroup caption="Review">
         <RibbonButton
           icon={<Mic size={16} />}
@@ -270,6 +274,7 @@ export default function ComposerRibbon(p: ComposerRibbonProps) {
                       if (!instruction) return;
                       setRewriteOpen(false);
                       p.onRewrite('custom', instruction);
+                      setCustomInstruction('');
                     }}
                   >
                     <MessageSquarePlus size={13} aria-hidden /> Apply custom edit
@@ -287,7 +292,7 @@ export default function ComposerRibbon(p: ComposerRibbonProps) {
             onClick={p.onToggleStylePanel}
           />
 
-          <span className="rp-ribbon-scope" title="Section the rewrite actions apply to">
+          <span className="rp-composer-ribbon-scope" title="Section the rewrite actions apply to">
             Scope: {scopeLabel}
           </span>
         </RibbonGroup>

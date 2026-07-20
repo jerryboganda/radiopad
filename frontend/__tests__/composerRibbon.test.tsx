@@ -94,3 +94,20 @@ describe('ComposerRibbon — group gating', () => {
     expect(screen.getByRole('button', { name: /acknowledge . lock/i })).toBeTruthy();
   });
 });
+
+describe('ComposerRibbon — fixed toggle labels', () => {
+  it('keeps the Dictate button label fixed while active, signalling state via aria-pressed only', () => {
+    renderBar(vi.fn(), { dictating: true });
+    const dictate = screen.getByRole('button', { name: 'Dictate' });
+    expect(dictate).toBeTruthy();
+    expect(dictate.getAttribute('aria-pressed')).toBe('true');
+    expect(screen.queryByText(/listening/i)).toBeNull();
+  });
+
+  it('keeps the Compare button label fixed while expanded, signalling state via aria-expanded only', () => {
+    renderBar(vi.fn(), { showPrior: true });
+    const compare = screen.getByRole('button', { name: 'Compare' });
+    expect(compare).toBeTruthy();
+    expect(compare.getAttribute('aria-expanded')).toBe('true');
+  });
+});
