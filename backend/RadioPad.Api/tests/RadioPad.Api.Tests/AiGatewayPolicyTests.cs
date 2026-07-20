@@ -23,18 +23,29 @@ public class AiGatewayPolicyTests
     private static ProviderConfig Provider(ProviderComplianceClass cls, bool enabled = true) =>
         new() { Id = Guid.NewGuid(), Name = "P", Adapter = "test", Compliance = cls, Enabled = enabled };
 
-    // PHI policy (CLAUDE.md safety boundary 3, PROV-001..010 / §14.3): PHI may
-    // only reach a PhiApproved or LocalOnly provider. These two tests were
-    // inverted alongside the gate's removal in bf1fbf4 and are restored with it.
+    // PHI gating was REMOVED by operator instruction on 2026-07-20: compliance class no longer
+    // decides what a provider may receive. This test is inverted rather than deleted so the
+    // suite states the policy that exists — a Sandbox provider is served, and the run is
+    // audited, because the audit trail is now the only record of where PHI went.
     [Fact]
-    public async Task Phi_Request_To_Sandbox_Provider_Throws()
+    public async Task Phi_Request_To_Sandbox_Provider_Is_Served_And_Audited()
     {
         var (gw, audit) = BuildGateway();
         var req = new AiCompletionRequest(Provider(ProviderComplianceClass.Sandbox), "sys", "patient John Doe", "v1", ContainsPhi: true);
-        await Assert.ThrowsAsync<ProviderPolicyException>(() => gw.RouteAsync(Tenant(), req, default));
-        // The block is audited (ProviderBlocked) so operators keep a tamper-evident trail.
+        var r = await gw.RouteAsync(Tenant(), req, default);
+        Assert.Equal("ok", r.Text);
         Assert.Single(audit.Events);
-        Assert.Equal(AuditAction.ProviderBlocked, audit.Events[0].Action);
+        Assert.Equal(AuditAction.AiResponse, audit.Events[0].Action);
+    }
+
+    /// <summary>A provider the operator explicitly blocked is still refused — that switch is not
+    /// PHI gating, and it survived the removal deliberately.</summary>
+    [Fact]
+    public async Task Blocked_Provider_Is_Still_Refused()
+    {
+        var (gw, _) = BuildGateway();
+        var req = new AiCompletionRequest(Provider(ProviderComplianceClass.Blocked), "sys", "text", "v1", ContainsPhi: false);
+        await Assert.ThrowsAsync<ProviderPolicyException>(() => gw.RouteAsync(Tenant(), req, default));
     }
 
     [Fact]
