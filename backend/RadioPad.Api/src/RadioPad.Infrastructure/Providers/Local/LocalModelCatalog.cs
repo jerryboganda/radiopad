@@ -127,7 +127,7 @@ public sealed class LocalModelCatalog : ILocalModelCatalog
             // sherpa-onnx CPU runtime as Parakeet. Pinned in LocalSttModels (verified, HF gated:false).
             new(
                 Id: LocalSttModels.MedAsrModelName,
-                DisplayName: "MedASR (radiology) — primary speech-to-text",
+                DisplayName: "Custom Trained Radiology ASR Model",
                 Kind: ModelKind.Stt,
                 Engine: SherpaMedAsrSttClient.EngineName, // "medasr"
                 DownloadUrl: LocalSttModels.MedAsrModel.Url,
