@@ -111,7 +111,7 @@ vi.mock('@/lib/api', () => {
       },
     })),
   };
-  // AiActionsBar renders the provider PHI-policy pill off this map.
+  // AiActivityPanel renders the provider PHI-policy label off this map.
   const COMPLIANCE_LABELS: Record<number, string> = {
     0: 'Blocked', 1: 'Sandbox', 2: 'De-identified only', 3: 'PHI-approved', 4: 'Local only',
   };

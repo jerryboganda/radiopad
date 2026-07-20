@@ -22,9 +22,7 @@ function renderBar(onRewrite: (mode: RewriteMode, instruction?: string) => void)
       onRewriteOpenChange={vi.fn()}
       stylePanelOpen={false}
       onToggleStylePanel={vi.fn()}
-      providers={[]}
       providerId=""
-      onProviderChange={vi.fn()}
     />,
   );
 }

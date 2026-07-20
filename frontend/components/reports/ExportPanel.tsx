@@ -66,21 +66,36 @@ export default function ExportPanel(p: ExportPanelProps) {
       {/* 1 — Destinations */}
       <div className="rp-panel-title">Destinations</div>
       <ul className="rp-exportpanel-dests">
-        <li className="rp-exportpanel-dest">
-          <span className="rp-exportpanel-dest-icon" aria-hidden><HardDriveDownload size={15} /></span>
-          <div className="rp-exportpanel-dest-main">
-            <span className="rp-exportpanel-dest-name">Download to this device</span>
-            <span className="rp-exportpanel-dest-sub">Saved locally as the selected format</span>
-          </div>
-          <span className="badge ok">Ready</span>
+        <li>
+          <button
+            type="button"
+            className="rp-exportpanel-dest"
+            onClick={() => run(fmt)}
+            disabled={disabled}
+            title={disabled ? (p.exportBlockedReason ?? 'Resolve blockers before exporting.') : `Download as ${labelOf(fmt)}`}
+          >
+            <span className="rp-exportpanel-dest-icon" aria-hidden><HardDriveDownload size={15} /></span>
+            <div className="rp-exportpanel-dest-main">
+              <span className="rp-exportpanel-dest-name">Download to this device</span>
+              <span className="rp-exportpanel-dest-sub">Saved locally as the selected format</span>
+            </div>
+            <span className="badge ok">Ready</span>
+          </button>
         </li>
-        <li className="rp-exportpanel-dest">
-          <span className="rp-exportpanel-dest-icon" aria-hidden><ClipboardCopy size={15} /></span>
-          <div className="rp-exportpanel-dest-main">
-            <span className="rp-exportpanel-dest-name">RIS clipboard</span>
-            <span className="rp-exportpanel-dest-sub">Plain text · clipboard auto-clears in 30s</span>
-          </div>
-          <span className="badge ok">Ready</span>
+        <li>
+          <button
+            type="button"
+            className="rp-exportpanel-dest"
+            onClick={() => window.dispatchEvent(new CustomEvent('radiopad:copy-to-ris'))}
+            title="Copy report as plain text for RIS"
+          >
+            <span className="rp-exportpanel-dest-icon" aria-hidden><ClipboardCopy size={15} /></span>
+            <div className="rp-exportpanel-dest-main">
+              <span className="rp-exportpanel-dest-name">RIS clipboard</span>
+              <span className="rp-exportpanel-dest-sub">Plain text · clipboard auto-clears in 30s</span>
+            </div>
+            <span className="badge ok">Ready</span>
+          </button>
         </li>
       </ul>
 

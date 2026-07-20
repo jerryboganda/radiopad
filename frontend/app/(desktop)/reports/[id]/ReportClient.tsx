@@ -28,7 +28,7 @@ import CompanionHostPanel from '@/components/companion/CompanionHostPanel';
 import CriticalResultPanel from '@/components/critical/CriticalResultPanel';
 import SaveAsTeachingCaseButton from '@/components/teaching/SaveAsTeachingCaseButton';
 import { readQueryParam } from '@/lib/browserParams';
-import { resolveDefaultProvider, setPreferredProviderId } from '@/lib/ai/providerPref';
+import { resolveDefaultProvider } from '@/lib/ai/providerPref';
 import { detectCommand, stripCommand, type VoiceCommand, type CommandMatch } from '@/lib/voiceCommands';
 import {
   focusAdjacentSection,
@@ -1264,14 +1264,7 @@ export default function ReportPage() {
             onRewriteOpenChange={setRewriteOpen}
             stylePanelOpen={stylePanelOpen}
             onToggleStylePanel={() => setStylePanelOpen((v) => !v)}
-            providers={providers}
             providerId={providerId}
-            onProviderChange={(v) => {
-              setProviderId(v);
-              // Switching engines here is the radiologist stating a preference —
-              // remember it so the next report starts on the same engine.
-              if (v) setPreferredProviderId(v);
-            }}
           />
 
           <CompanionHostPanel />

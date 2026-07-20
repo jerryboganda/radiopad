@@ -6,12 +6,11 @@
 // Re-write / Make Concise / Patient-Friendly / Referring summary → the
 // rewrite endpoint's four modes, "In my style" → rewriteInMyStyle. Actions
 // with no backend (e.g. Translate) are deliberately absent. The scope chip
-// mirrors the rewrite target section; the route pill shows the selected
-// provider + its PHI compliance class (real policy data).
-import type { Provider, RewriteMode } from '@/lib/api';
-import { COMPLIANCE_LABELS } from '@/lib/api';
+// mirrors the rewrite target section. Provider selection happens at report
+// creation (NewReportWizard) and is remembered via providerPref — this bar
+// only needs to know whether a provider is resolved, not offer a picker.
+import type { RewriteMode } from '@/lib/api';
 import { Sparkles, Wand2, PenLine, ChevronDown } from 'lucide-react';
-import SearchableSelect from '@/components/ui/SearchableSelect';
 import { useEffect, useRef, useState } from 'react';
 
 export type AiBarAction =
@@ -44,9 +43,7 @@ export interface AiActionsBarProps {
   stylePanelOpen: boolean;
   onToggleStylePanel: () => void;
 
-  providers: Provider[];
   providerId: string;
-  onProviderChange: (id: string) => void;
 }
 
 export default function AiActionsBar(p: AiActionsBarProps) {
@@ -71,7 +68,6 @@ export default function AiActionsBar(p: AiActionsBarProps) {
     };
   }, [rewriteOpen, setRewriteOpen]);
 
-  const provider = p.providers.find((x) => x.id === p.providerId);
   const busy = (a: AiBarAction) => p.busyAction === a;
   const anyBusy = p.busyAction !== null || p.rewriteBusy;
   const scopeLabel = p.sections.find((s) => s.key === p.rewriteSection)?.label ?? p.rewriteSection;
@@ -227,28 +223,6 @@ export default function AiActionsBar(p: AiActionsBarProps) {
         <span className="rp-aibar-scope" title="Section the rewrite actions apply to">
           Scope: {scopeLabel}
         </span>
-        <div className="rp-aibar-route">
-          <SearchableSelect
-            className="rp-aibar-provider"
-            ariaLabel="AI provider"
-            value={p.providerId}
-            onChange={(v) => p.onProviderChange(v ?? '')}
-            placeholder="Select provider…"
-            searchPlaceholder="Search providers…"
-            options={p.providers.map((pr) => ({
-              value: pr.id,
-              label: pr.name,
-              searchText: `${pr.adapter} ${pr.model}`,
-              disabled: !pr.enabled,
-            }))}
-          />
-          {provider && (
-            <span className="rp-aibar-policy" title="Provider PHI policy class">
-              <span className="rp-aibar-policy-dot" aria-hidden />
-              {COMPLIANCE_LABELS[provider.compliance] ?? `Class ${provider.compliance}`}
-            </span>
-          )}
-        </div>
       </div>
     </div>
   );
