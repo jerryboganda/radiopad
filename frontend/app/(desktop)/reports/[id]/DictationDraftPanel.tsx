@@ -219,6 +219,31 @@ export default function DictationDraftPanel({ reportId, initialText, onApply }: 
             </Banner>
           )}
 
+          {/* F6 — rulebook findings over the drafted text. Severity mapping is the documented one:
+              Blocker→red, Warning→amber, Info/Style→blue. Shown here so the radiologist sees a
+              missing required section or a forbidden term while deciding whether to accept the
+              draft, instead of after applying it and running Validate. */}
+          {result.validation && result.validation.findings.length > 0 && (
+            <Banner
+              tone={result.validation.blockerPresent ? 'danger' : 'warn'}
+              title={
+                result.validation.blockerPresent
+                  ? 'Rulebook blockers in this draft'
+                  : 'Rulebook notes on this draft'
+              }
+            >
+              <ul className="rp-list">
+                {result.validation.findings.map((f, i) => (
+                  <li key={i}>
+                    <strong>{f.severity}</strong>
+                    {f.section ? ` · ${f.section}` : ''}: {f.message}{' '}
+                    <span className="rule"><code>{f.ruleId}</code></span>
+                  </li>
+                ))}
+              </ul>
+            </Banner>
+          )}
+
           {result.sentinelWarnings.length > 0 && (
             <Banner tone="warn" title={sentinelBannerTitle(result.sentinelWarnings)}>
               <ul className="rp-list">

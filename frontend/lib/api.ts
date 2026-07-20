@@ -49,6 +49,18 @@ export type DictationDraftResult = {
   requiresReview: boolean;
   violations: { reason: string; detail: string }[];
   sentinelWarnings: { kind: string; detail: string }[];
+  /**
+   * F6 — the tenant's rulebook run over the DRAFTED text, so completeness/quality problems surface
+   * while the radiologist is reviewing the draft rather than after they apply it and hit Validate.
+   * `null` when no rulebook binds to the study — deliberately distinct from "validated and clean",
+   * so the UI can say which is true instead of implying a pass nobody performed. Absent on the
+   * stateless on-device path, which has no DB and therefore no rulebook.
+   */
+  validation?: {
+    blockerPresent: boolean;
+    qualityScore: number;
+    findings: { ruleId: string; severity: string; message: string; section?: string | null }[];
+  } | null;
   provider: string;
   model: string;
   latencyMs: number;

@@ -1477,6 +1477,27 @@ public class ReportsController : TenantedController
     public record DictationDraftDto(string RawDictation);
 
     /// <summary>
+    /// Copy drafted section text onto a report instance so the rulebook can be run over it (F6).
+    /// Only the five canonical dictation sections are mapped; an unknown key is ignored rather than
+    /// guessed at, and a section the formatter did not produce leaves the report's own text alone.
+    /// </summary>
+    private static void ApplyDraftSections(Report target, IReadOnlyDictionary<string, string> sections)
+    {
+        foreach (var (key, value) in sections)
+        {
+            if (value is null) continue;
+            switch (key.Trim().ToLowerInvariant())
+            {
+                case "indication": target.Indication = value; break;
+                case "technique": target.Technique = value; break;
+                case "findings": target.Findings = value; break;
+                case "impression": target.Impression = value; break;
+                case "recommendations": target.Recommendations = value; break;
+            }
+        }
+    }
+
+    /// <summary>
     /// Dictation-engine brief §4.2 — the safety-wrapped dictation→report pipeline: §5.2 deterministic
     /// pass-through → formatter (PHI-gated AiGateway) → §5.3 validation-diff (fail-safe fallback) →
     /// §5.6 laterality/negation/gender sentinel → §5.7 local audit. Returns an editable draft that
@@ -1509,6 +1530,29 @@ public class ReportsController : TenantedController
         try
         {
             var draft = await service.BuildDraftAsync(tenant, user, report, dto.RawDictation, corrections, ct);
+
+            // F6 — run the tenant's rulebook over the DRAFTED text.
+            //
+            // The dictation pipeline's own guards (§5.2/§5.3/§5.6) answer "did the formatter invent
+            // or lose anything?", which is a different question from "is this a complete, compliant
+            // report?" — the rulebook's severities, required sections and forbidden terms. Those ran
+            // only at /validate, so a radiologist saw them after applying the draft and clicking
+            // Validate, never while reviewing the draft they were deciding whether to accept.
+            //
+            // Validated against an UNTRACKED copy: `report` is tracked by EF, and the §5.7 audit
+            // append later in this request calls SaveChanges — mutating the tracked entity would
+            // silently persist an unapplied draft into the report.
+            // Fully qualified: System.ComponentModel.DataAnnotations.ValidationResult is also in
+            // scope here and silently wins the unqualified name.
+            RadioPad.Domain.ValueObjects.ValidationResult? validation = null;
+            var probe = await _db.Reports.AsNoTracking()
+                .FirstOrDefaultAsync(r => r.Id == id && r.TenantId == tenant.Id, ct);
+            if (probe is not null)
+            {
+                ApplyDraftSections(probe, draft.DraftSections);
+                validation = await _reporting.ValidateAsync(tenant, probe, lexicon, ct);
+            }
+
             return Ok(new
             {
                 sections = draft.DraftSections,
@@ -1517,6 +1561,20 @@ public class ReportsController : TenantedController
                 requiresReview = draft.RequiresReview,
                 violations = draft.Violations.Select(v => new { reason = v.Reason.ToString(), detail = v.Detail }),
                 sentinelWarnings = draft.SentinelWarnings.Select(w => new { kind = w.Kind.ToString(), detail = w.Detail }),
+                // Null when no rulebook binds — distinct from "validated and clean", so the UI can
+                // say which is true instead of implying a pass nobody performed.
+                validation = validation is null ? null : new
+                {
+                    blockerPresent = validation.BlockerPresent,
+                    qualityScore = validation.QualityScore,
+                    findings = validation.Findings.Select(f => new
+                    {
+                        ruleId = f.RuleId,
+                        severity = f.Severity,
+                        message = f.Message,
+                        section = f.Section,
+                    }),
+                },
                 provider = draft.Provider,
                 model = draft.Model,
                 latencyMs = draft.LatencyMs,
