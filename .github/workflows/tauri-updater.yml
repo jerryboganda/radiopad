@@ -73,8 +73,7 @@ jobs:
           fi
           echo "tag=$TAG" >> "$GITHUB_OUTPUT"
           mkdir -p dist
-          gh release download "$TAG" --dir dist --pattern '*.msi' --pattern '*.exe' \
-            --pattern '*.AppImage' --pattern '*.deb' || true
+          gh release download "$TAG" --dir dist --pattern '*.msi' --pattern '*.exe' || true
 
       - name: Sign updater manifest
         if: steps.gate.outputs.secrets_present == '1'
@@ -86,13 +85,13 @@ jobs:
         run: |
           set -euo pipefail
           shopt -s nullglob
-          # Map each updater target to its Tauri updater artifact (NOT the
-          # plain installer): Windows ships the signed .msi, Linux the
-          # .AppImage. macOS is excluded until Apple signing is configured.
+          # Map each updater target to its Tauri updater artifact (NOT the plain
+          # installer). The desktop app is WINDOWS-ONLY (operator decision 2026-07-20),
+          # so the manifest advertises exactly one platform — an entry for a platform we
+          # no longer build would point installed clients at a download that 404s.
           # nullglob means a missing artifact simply yields no entry.
           declare -A platforms=( \
             [windows-x86_64]='*.msi' \
-            [linux-x86_64]='*.AppImage' \
           )
           MANIFEST=dist/latest.json
           echo "{\"version\":\"${TAG#v}\",\"notes\":\"RadioPad ${TAG}\",\"pub_date\":\"$(date -u +%Y-%m-%dT%H:%M:%SZ)\",\"platforms\":{}}" > "$MANIFEST"

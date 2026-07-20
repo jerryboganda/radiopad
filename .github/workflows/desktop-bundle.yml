@@ -2,19 +2,14 @@ name: desktop-bundle
 
 # PRD DESK-010..014 — Tauri 2 desktop bundle pipeline. Triggered on tag push
 # (v*.*.*) or manually. Builds the Next.js export, then `cargo tauri build`
-# on Windows / macOS / Linux. Signing is gated on the appropriate secrets
-# being present so PRs from forks still build (unsigned).
+# on Windows. The desktop app is WINDOWS-ONLY (see the matrix comment below).
+# Signing is gated on the secrets being present so forks still build (unsigned).
 #
 # Required repository secrets (optional — bundle is unsigned without them):
 #   TAURI_PRIVATE_KEY              Tauri 2 updater signing key (Ed25519).
 #   TAURI_KEY_PASSWORD             Password for the updater key.
 #   WINDOWS_CERTIFICATE_PFX_BASE64 Authenticode .pfx (base64, code-signing).
 #   WINDOWS_CERTIFICATE_PASSWORD   Password for the Authenticode .pfx.
-#   APPLE_CERTIFICATE_P12_BASE64   Apple Developer ID .p12 (base64).
-#   APPLE_CERTIFICATE_PASSWORD     Password for the Apple .p12.
-#   APPLE_NOTARIZE_APPLE_ID        Apple ID used for notarytool.
-#   APPLE_NOTARIZE_TEAM_ID         Apple Developer team id.
-#   APPLE_NOTARIZE_PASSWORD        App-specific password for notarytool.
 
 on:
   push:
@@ -27,18 +22,24 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        # macOS is excluded from releases until Apple Developer signing /
-        # notarization is configured (its sidecar + signing path is not yet
-        # set up). Re-add 'macos-latest' here to bring it back.
-        os: [windows-latest, ubuntu-22.04]
+        # PLATFORM RULE (operator decision, 2026-07-20): the desktop app targets
+        # WINDOWS ONLY. macOS and Linux are deliberately out of scope — they roughly
+        # doubled every release's wall-clock and produced installers nobody was going
+        # to run. The mobile companion (Android + iOS) is unaffected and still builds
+        # in mobile-bundle.yml.
+        #
+        # To bring a platform back: add it here, restore its build/sign steps (see the
+        # git history of this file for the Linux GPG and macOS notarisation steps),
+        # re-add its bundle target in desktop/src-tauri/tauri.conf.json, and re-add its
+        # verify job in desktop-installer-verify.yml. Also update CLAUDE.md, which
+        # states this rule.
+        os: [windows-latest]
     runs-on: ${{ matrix.os }}
     permissions:
       contents: write
     env:
       # Mirror secret presence into job env so step-level `if:` can read it
       # without referencing the `secrets` context.
-      APPLE_CERTIFICATE_P12_BASE64: ${{ secrets.APPLE_CERTIFICATE_P12_BASE64 }}
-      GPG_PRIVATE_KEY_BASE64: ${{ secrets.GPG_PRIVATE_KEY_BASE64 }}
       WINDOWS_CERTIFICATE_PFX_BASE64: ${{ secrets.WINDOWS_CERTIFICATE_PFX_BASE64 }}
 
     steps:
@@ -66,20 +67,16 @@ jobs:
         with:
           dotnet-version: '8.0.x'
 
-      - name: Install Linux deps
-        if: matrix.os == 'ubuntu-22.04'
-        run: |
-          sudo apt-get update
-          sudo apt-get install -y libwebkit2gtk-4.1-dev libssl-dev libgtk-3-dev libayatana-appindicator3-dev librsvg2-dev
-
       - name: Resolve sidecar target triple
         id: triple
         shell: bash
         run: |
+          # Windows-only by the platform rule at the top of this file. Anything else is a
+          # matrix entry someone added without restoring the rest of that platform's steps,
+          # so fail loudly rather than publish a sidecar for a target we do not ship.
           case "${{ matrix.os }}" in
             windows-latest) echo "rid=win-x64" >> $GITHUB_OUTPUT; echo "triple=x86_64-pc-windows-msvc" >> $GITHUB_OUTPUT ;;
-            macos-latest)   echo "rid=osx-arm64" >> $GITHUB_OUTPUT; echo "triple=aarch64-apple-darwin" >> $GITHUB_OUTPUT ;;
-            *)              echo "rid=linux-x64" >> $GITHUB_OUTPUT; echo "triple=x86_64-unknown-linux-gnu" >> $GITHUB_OUTPUT ;;
+            *) echo "::error::unsupported desktop target '${{ matrix.os }}' — the desktop app is Windows-only (see the matrix comment)"; exit 1 ;;
           esac
 
       - name: Publish .NET backend sidecar
@@ -90,12 +87,7 @@ jobs:
             -p:PublishSingleFile=true -p:IncludeNativeLibrariesForSelfExtract=true \
             -o publish/sidecar
           mkdir -p desktop/src-tauri/binaries
-          if [ "${{ matrix.os }}" = "windows-latest" ]; then
-            cp publish/sidecar/RadioPad.Api.exe "desktop/src-tauri/binaries/radiopad-api-${{ steps.triple.outputs.triple }}.exe"
-          else
-            cp publish/sidecar/RadioPad.Api "desktop/src-tauri/binaries/radiopad-api-${{ steps.triple.outputs.triple }}"
-            chmod +x "desktop/src-tauri/binaries/radiopad-api-${{ steps.triple.outputs.triple }}"
-          fi
+          cp publish/sidecar/RadioPad.Api.exe "desktop/src-tauri/binaries/radiopad-api-${{ steps.triple.outputs.triple }}.exe"
 
       - name: Install frontend deps
         working-directory: frontend
@@ -120,24 +112,6 @@ jobs:
           [IO.File]::WriteAllBytes("$env:RUNNER_TEMP/codesign.pfx", $bytes)
           echo "WINDOWS_CERTIFICATE_PATH=$env:RUNNER_TEMP/codesign.pfx" >> $env:GITHUB_ENV
 
-      # --- macOS Developer ID signing (if cert present) -------------------
-      - name: Import Apple certificate
-        if: matrix.os == 'macos-latest' && env.APPLE_CERTIFICATE_P12_BASE64 != ''
-        env:
-          APPLE_CERTIFICATE_P12_BASE64: ${{ secrets.APPLE_CERTIFICATE_P12_BASE64 }}
-          APPLE_CERTIFICATE_PASSWORD: ${{ secrets.APPLE_CERTIFICATE_PASSWORD }}
-        run: |
-          KEYCHAIN_PATH="$RUNNER_TEMP/build.keychain"
-          KEYCHAIN_PASSWORD=$(openssl rand -hex 16)
-          security create-keychain -p "$KEYCHAIN_PASSWORD" "$KEYCHAIN_PATH"
-          security set-keychain-settings -lut 21600 "$KEYCHAIN_PATH"
-          security unlock-keychain -p "$KEYCHAIN_PASSWORD" "$KEYCHAIN_PATH"
-          echo "$APPLE_CERTIFICATE_P12_BASE64" | base64 --decode > "$RUNNER_TEMP/cert.p12"
-          security import "$RUNNER_TEMP/cert.p12" -k "$KEYCHAIN_PATH" -P "$APPLE_CERTIFICATE_PASSWORD" -T /usr/bin/codesign
-          security list-keychains -d user -s "$KEYCHAIN_PATH" $(security list-keychains -d user | tr -d '"')
-          security set-key-partition-list -S apple-tool:,apple: -s -k "$KEYCHAIN_PASSWORD" "$KEYCHAIN_PATH"
-          rm "$RUNNER_TEMP/cert.p12"
-
       - name: Install tauri-cli
         uses: taiki-e/install-action@v2
         with:
@@ -155,10 +129,6 @@ jobs:
           # Windows
           WINDOWS_CERTIFICATE: ${{ runner.temp }}\codesign.pfx
           WINDOWS_CERTIFICATE_PASSWORD: ${{ secrets.WINDOWS_CERTIFICATE_PASSWORD }}
-          # macOS notarisation
-          APPLE_ID: ${{ secrets.APPLE_NOTARIZE_APPLE_ID }}
-          APPLE_PASSWORD: ${{ secrets.APPLE_NOTARIZE_PASSWORD }}
-          APPLE_TEAM_ID: ${{ secrets.APPLE_NOTARIZE_TEAM_ID }}
         # Unsigned bundle: do not emit updater artifacts. Tauri requires
         # TAURI_SIGNING_PRIVATE_KEY to sign them, which this pipeline does not
         # provide (the signed pipeline is desktop-release.yml). createUpdaterArtifacts
@@ -274,46 +244,6 @@ jobs:
                 /f $env:WINDOWS_CERTIFICATE_PATH /p $env:WINDOWS_CERTIFICATE_PASSWORD $_.FullName
             }
 
-      # --- macOS notarisation (post-build) --------------------------------
-      - name: Notarise (macOS)
-        if: matrix.os == 'macos-latest' && env.APPLE_CERTIFICATE_P12_BASE64 != ''
-        env:
-          APPLE_ID: ${{ secrets.APPLE_NOTARIZE_APPLE_ID }}
-          APPLE_PASSWORD: ${{ secrets.APPLE_NOTARIZE_PASSWORD }}
-          APPLE_TEAM_ID: ${{ secrets.APPLE_NOTARIZE_TEAM_ID }}
-        run: |
-          set -euo pipefail
-          shopt -s nullglob
-          for dmg in desktop/src-tauri/target/release/bundle/dmg/*.dmg; do
-            echo "Notarising $dmg"
-            xcrun notarytool submit "$dmg" \
-              --apple-id "$APPLE_ID" \
-              --password "$APPLE_PASSWORD" \
-              --team-id "$APPLE_TEAM_ID" \
-              --wait
-            xcrun stapler staple "$dmg" || true
-          done
-
-      # --- Linux GPG detached signature (if key present) ------------------
-      - name: GPG sign (Linux)
-        if: matrix.os == 'ubuntu-22.04' && env.GPG_PRIVATE_KEY_BASE64 != ''
-        env:
-          GPG_PRIVATE_KEY_BASE64: ${{ secrets.GPG_PRIVATE_KEY_BASE64 }}
-          GPG_PASSPHRASE: ${{ secrets.GPG_PASSPHRASE }}
-        run: |
-          set -euo pipefail
-          shopt -s nullglob
-          echo "$GPG_PRIVATE_KEY_BASE64" | base64 -d | gpg --batch --import
-          KEYID=$(gpg --list-secret-keys --with-colons | awk -F: '/^sec:/ {print $5; exit}')
-          for f in desktop/src-tauri/target/release/bundle/**/*.AppImage \
-                   desktop/src-tauri/target/release/bundle/**/*.deb; do
-            echo "Signing $f"
-            gpg --batch --yes --pinentry-mode loopback \
-              --passphrase "${GPG_PASSPHRASE:-}" \
-              --local-user "$KEYID" \
-              --detach-sign --armor "$f"
-          done
-
       - name: Upload signed artefacts
         if: always()
         uses: actions/upload-artifact@v4
@@ -355,8 +285,7 @@ jobs:
         run: |
           set -euo pipefail
           echo "--- installers found ---"
-          found=$(find dist -type f \( -name '*.msi' -o -name '*.exe' -o -name '*.dmg' \
-                                    -o -name '*.AppImage' -o -name '*.deb' \) -print | tee /dev/stderr | wc -l)
+          found=$(find dist -type f \( -name '*.msi' -o -name '*.exe' \) -print | tee /dev/stderr | wc -l)
           # An empty upload would create a release with no installers and let tauri-updater
           # publish a latest.json pointing at nothing — worse than failing here.
           if [ "$found" -eq 0 ]; then
@@ -375,8 +304,5 @@ jobs:
           files: |
             dist/**/*.msi
             dist/**/*.exe
-            dist/**/*.dmg
-            dist/**/*.AppImage
-            dist/**/*.deb
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

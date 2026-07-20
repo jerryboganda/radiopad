@@ -31,17 +31,17 @@ If a UI requirement cannot be met with the existing tokens/components, stop and 
 
 ## 0.5. MISSION-CRITICAL: CPU-INTENSIVE WORK RUNS ON GITHUB ACTIONS (not locally)
 
-> **All heavy, CPU/RAM-intensive tasks for this project — full builds, full test suites, linting, type-checking, static analysis/security scans, bundling, desktop/mobile packaging, Docker image builds, and coverage — are performed by GitHub Actions CI, NOT on a developer's or agent's local/VPS machine.** This is a permanent project rule.
+> **All heavy, CPU/RAM-intensive work — full builds, full test suites, lint/type-check sweeps, bundling, packaging, Docker builds — runs on GitHub Actions, never on the development laptop or the VPS.**
 
-Why: the production server (`/opt/radiopad`) hosts many tenants and the local dev box is shared; saturating either with compiler/test/lint jobs risks the live site and wastes time. CI runners are disposable, parallel, and free for this purpose.
+The full contract lives in [CLAUDE.md](CLAUDE.md) §"CPU-intensive work runs on GitHub Actions". Read it there; it is authoritative. Locally you may edit code, run one targeted test (`dotnet test --filter <Name>` or a single Vitest file), and run the app (`pnpm dev`, `dotnet run`) — nothing that compiles the whole solution or frontend, or runs a whole suite.
 
-Rules for every AI agent and contributor:
+---
 
-1. **Do not run full builds, full test suites, or lint/type-check sweeps locally or on the VPS** as part of normal work. Push your branch and let GitHub Actions do it. Read the run result with `gh run watch` / `gh run view --log-failed`.
-2. **Allowed locally:** focused, cheap feedback only — editing files, reading code, a single targeted unit test (`dotnet test --filter <Name>`), a quick type-check of one changed file, running the app to manually verify a change. Anything that compiles the whole solution, the whole frontend, or runs the whole suite belongs in CI.
-3. **Production VPS is for running the app only.** Never invoke `dotnet build/test`, `pnpm build/lint`, `cargo build`, or `docker compose build` on the VPS for development. Deploys pull pre-built images produced by CI (or, when a manual rebuild is unavoidable, it is an explicit operator action — not routine agent behaviour).
-4. **Every workflow that gates merge must live in `.github/workflows/`** — backend build+test, frontend typecheck+lint+build, CLI, and the desktop/mobile packaging jobs. If a heavy task is not yet covered by a workflow, add the workflow in the same PR rather than running it by hand.
-5. **The PR checklist (§7) is satisfied by green CI, not by local output.** "It builds on my machine" is not evidence; a passing Actions run is.
+## 0.5.1. MISSION-CRITICAL: CODE, DON'T BABYSIT
+
+> **Spend the session writing code. Do small quick checks only. Commit, push, and stop — never watch or poll CI. The operator monitors runs and reports failures.**
+
+Full contract: [CLAUDE.md](CLAUDE.md) §"code, don't babysit". Because CI is unobserved, report what changed and let CI decide — never claim a change builds or passes when you have not seen it do so.
 
 ---
 
@@ -59,7 +59,7 @@ How releases work (fully automated by GitHub Actions — do NOT build locally):
 2. The pushed tag triggers the pipeline with no further action:
    - **`desktop-bundle`** → builds + code-signs the Windows `.msi` and Linux `.AppImage`, creates the GitHub Release, attaches the installers.
    - **`tauri-updater`** → signs `latest.json` and uploads it to that release.
-3. The app's button reads `https://github.com/jerryboganda/radiopad/releases/latest/download/latest.json`, so every user auto-downloads the new build. Verify the run is green (`gh run watch …`); don't hand the operator manual steps.
+3. The app's button reads `https://github.com/jerryboganda/radiopad/releases/latest/download/latest.json`, so every user auto-downloads the new build. Push and stop — don't watch the run, and don't hand the operator manual steps.
 
 Rules:
 
@@ -127,9 +127,8 @@ pnpm build        # static export → frontend/out/
 # CLI
 dotnet run --project cli/RadioPad.Cli -- rulebook validate ../../rulebooks/chest_ct_v1.yaml
 
-# Desktop / mobile
-cargo tauri build          # in desktop/ after `pnpm build` in frontend/
-npx cap copy android       # in mobile/
+# Mobile
+npx cap copy android       # in mobile/  (a file copy, not a build)
 ```
 
 > **The commands above are for local *focused* feedback only (one targeted test, a quick run). Full builds, full test runs, and lint/type-check sweeps are CI's job — see §0.5. Do not run them locally or on the VPS.**
@@ -139,7 +138,7 @@ After any code change, validation is done by **GitHub Actions** on push/PR:
 2. Frontend `pnpm typecheck` + lint + `pnpm build`.
 3. CLI + desktop/mobile packaging jobs.
 
-Locally, at most run a single targeted test for the thing you changed (`dotnet test --filter <Name>`), then push and watch CI: `gh run watch` / `gh run view --log-failed`.
+Locally, at most run a single targeted test for the thing you changed (`dotnet test --filter <Name>`), then commit and push. Do not watch the run — see §0.5.1.
 
 ---
 

@@ -18,6 +18,37 @@ Hard rules:
 
 If a token doesn't exist for what you need, extend the RC primitives in `tokens.css` (light **and** dark values, and mirror any new scale in `tailwind.config.ts`); for shell/chrome extend `shell.css`. Update `docs/02-design/design.md` in the same change — never inline.
 
+## ⚠️ MISSION-CRITICAL: shipped platforms — Windows desktop + mobile companion ONLY
+
+**Operator decision (2026-07-20), permanent until they say otherwise.** RadioPad ships:
+
+| Product | Platforms |
+| --- | --- |
+| Desktop app | **Windows only** (`.msi`) |
+| Mobile companion (pairing + voice dictation) | **Android + iOS** |
+| Web | admin/platform surface, browser (unchanged) |
+
+**macOS and Linux DESKTOP builds are out of scope.** They roughly doubled every release's
+wall-clock and produced installers nobody was going to run. Do not add them back, do not "helpfully"
+restore a `.dmg`/`.AppImage`/`.deb` target, and do not add a macOS or Linux entry to a desktop build
+matrix. This is enforced in three places, all of which must change together if the decision ever
+reverses:
+
+1. [.github/workflows/desktop-bundle.yml](.github/workflows/desktop-bundle.yml) — matrix is
+   `[windows-latest]`, and the sidecar triple resolver **hard-fails** on any other target rather
+   than silently publishing a sidecar for a platform we do not ship.
+2. [desktop/src-tauri/tauri.conf.json](desktop/src-tauri/tauri.conf.json) — `bundle.targets` is
+   `["msi"]`; the `macOS` / `linux` bundle blocks are gone.
+3. [.github/workflows/tauri-updater.yml](.github/workflows/tauri-updater.yml) — `latest.json`
+   advertises `windows-x86_64` only. An entry for a platform we no longer build would point
+   installed clients at a 404 and surface as "Update failed".
+
+Also narrowed: `desktop-release.yml` (signed path) and `desktop-installer-verify.yml`
+(`verify-windows` only). The mobile companion is **unaffected** — `mobile-bundle.yml` keeps both its
+`android` and `ios` jobs, and the iOS job legitimately needs a macOS runner. Ubuntu runners used for
+*backend/CI* jobs (ci, sidecar-reachability, flaky-hunt, on-device-latency) are also unaffected:
+they test server code and cost nothing in release wall-clock.
+
 ## ⚠️ MISSION-CRITICAL: Desktop changes → cut a release (auto-update, DESK-001)
 
 The desktop app self-updates. **Whenever you change anything that ships in the desktop build (anything under `frontend/` or `desktop/`), shipping a new desktop release is PART OF THE TASK — do it automatically, the operator should never have to ask.** Builds run on GitHub Actions only; never build the desktop app locally or on the VPS.

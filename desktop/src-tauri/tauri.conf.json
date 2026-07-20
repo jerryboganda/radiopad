@@ -30,7 +30,7 @@
   },
   "bundle": {
     "active": true,
-    "targets": ["msi", "dmg", "deb", "appimage", "rpm"],
+    "targets": ["msi"],
     "icon": ["icons/icon.png", "icons/icon.icns", "icons/icon.ico"],
     "category": "Productivity",
     "shortDescription": "RadioPad — radiology reporting workspace",
@@ -57,21 +57,6 @@
         "installMode": "perMachine",
         "languages": ["English"]
       }
-    },
-    "macOS": {
-      "frameworks": [],
-      "minimumSystemVersion": "11.0",
-      "exceptionDomain": "",
-      "signingIdentity": null,
-      "providerShortName": null,
-      "entitlements": "entitlements.plist",
-      "hardenedRuntime": true,
-      "files": {}
-    },
-    "linux": {
-      "deb": { "depends": [] },
-      "appimage": { "bundleMediaFramework": false },
-      "rpm": { "depends": [] }
     }
   },
   "plugins": {
