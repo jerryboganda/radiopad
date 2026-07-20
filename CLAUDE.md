@@ -28,11 +28,34 @@ After your `frontend/`/`desktop/` changes are committed and pushed, run one comm
 pnpm release:desktop      # patch bump (0.1.23 → 0.1.24); also accepts `minor` / `major` / `X.Y.Z`
 ```
 
-It bumps `desktop/src-tauri/tauri.conf.json` **and** `desktop/src-tauri/Cargo.toml` in lock-step, commits, tags `vX.Y.Z`, and pushes. The tag then drives the pipeline end-to-end with no further steps: `desktop-bundle` builds + signs the Windows `.msi` / Linux `.AppImage` and creates the release; `tauri-updater` signs + publishes `latest.json`. The in-app "Check for updates" button reads the GitHub Releases `latest.json`, so every user auto-downloads the new build. Confirm the run is green with `gh run watch`.
+It bumps `desktop/src-tauri/tauri.conf.json` **and** `desktop/src-tauri/Cargo.toml` in lock-step, commits, tags `vX.Y.Z`, and pushes. The tag then drives the pipeline end-to-end with no further steps: `desktop-bundle` builds + signs the Windows `.msi` / Linux `.AppImage` and creates the release; `tauri-updater` signs + publishes `latest.json`. The in-app "Check for updates" button reads the GitHub Releases `latest.json`, so every user auto-downloads the new build.
 
 - Backend-only / CLI-only / docs-only changes do **not** need a desktop release.
 - Never bump only one version file or hand-edit a build (version mismatch → updater loop). Always use `pnpm release:desktop`.
 - Signing secrets (`TAURI_PRIVATE_KEY`, `TAURI_KEY_PASSWORD`) are already set in GitHub; the public key is embedded in `tauri.conf.json`. macOS is excluded from the matrix until Apple signing is configured.
+
+## ⚠️ MISSION-CRITICAL: CPU-intensive work runs on GitHub Actions, never locally
+
+**All heavy, CPU/RAM-intensive work for this project — full builds, full test suites, lint and type-check sweeps, static analysis, bundling, desktop/mobile packaging, Docker image builds, and coverage — runs on GitHub Actions. Not on the development laptop. Not on the VPS.** This is a permanent project rule that binds every agent and contributor.
+
+Why: the development machine is low-spec and saturating it stalls the whole session, and the production VPS (`/opt/radiopad`) hosts live tenants — a compiler or test run there risks the live site. CI runners are disposable, parallel, and free for this purpose.
+
+1. **Do not run full builds, full test suites, or lint/type-check sweeps** locally or on the VPS. Commit and push; GitHub Actions runs them.
+2. **Allowed locally** — focused, cheap feedback only: editing and reading code, one targeted unit test (`dotnet test --filter <Name>`, or a single Vitest file), and running the app to look at a change (`pnpm dev`, `dotnet run`). Anything that compiles the whole solution or the whole frontend, or runs a whole suite, belongs in CI.
+3. **The production VPS runs the app only.** Never invoke `dotnet build/test`, `pnpm build/lint`, `cargo build`, or `docker compose build` there for development. Deploys pull pre-built images produced by CI.
+4. **Every merge-gating task lives in `.github/workflows/`.** If a heavy task is not yet covered by a workflow, add the workflow in the same change rather than running it by hand.
+5. **Green CI is the evidence, not local output.** "It builds on my machine" proves nothing.
+
+A pre-tool-use guard (`hooks/pretooluse.mjs` / `.ps1`) prompts on these commands. If it fires, the answer is almost always to push instead — not to approve it.
+
+## ⚠️ MISSION-CRITICAL: code, don't babysit
+
+**Spend the session writing code, not waiting on machines. Do small quick checks only. When the work is done, commit, push, and stop.** The operator monitors CI and will report failures.
+
+1. **Never watch or poll CI.** No `gh run watch`, no sleep-and-retry loops, no waiting for a run to finish — including after a desktop release. Push and end the turn.
+2. **Checks stay small.** The allowed-locally set above is the ceiling: a targeted test, a look at the running app. Do not chain verification steps hunting for confidence.
+3. **Report honestly.** Because CI is unobserved, say what you changed and that CI will decide it. **Never claim a change builds, passes, or works when you have not seen it do so.** Push-and-stop is only safe if the report doesn't overstate.
+4. **The operator reports errors.** If something is broken, they will say so. Do not pre-emptively re-verify finished work.
 
 ## ⚠️ MISSION-CRITICAL: three specialised surfaces from one frontend (RADIOPAD_SURFACE)
 
@@ -77,18 +100,33 @@ No other frameworks. Do not propose Express/Fastify/NestJS/etc. for the backend.
 
 ## Commands
 
-```powershell
-# Backend
-cd backend/RadioPad.Api && dotnet build && dotnet test
-dotnet run --project src/RadioPad.Api    # → http://127.0.0.1:7457
+**Allowed locally** — cheap, focused feedback:
 
-# Frontend
-cd frontend && pnpm install && pnpm dev   # → http://localhost:3000
-pnpm typecheck && pnpm build
+```powershell
+# Run the app
+dotnet run --project backend/RadioPad.Api/src/RadioPad.Api   # → http://127.0.0.1:7457
+cd frontend && pnpm install && pnpm dev                      # → http://localhost:3000
+
+# One targeted test — never the whole suite
+dotnet test --filter <TestName>
+pnpm vitest run <one-file>
 
 # CLI
 dotnet run --project cli/RadioPad.Cli -- rulebook validate ../../rulebooks/chest_ct_v1.yaml
 ```
+
+**CI runs these — do not run them locally or on the VPS.** `.github/workflows/ci.yml`
+covers all of them on every push (backend build+test, CLI, frontend lint+typecheck+test+build):
+
+```powershell
+dotnet build          # ci.yml → backend
+dotnet test           # ci.yml → backend  (targeted --filter runs are fine locally)
+pnpm typecheck        # ci.yml → frontend
+pnpm build            # ci.yml → frontend
+cargo tauri build     # desktop-bundle.yml
+```
+
+Push and stop — do not watch the run.
 
 ## Safety boundaries (non-negotiable)
 
