@@ -12,7 +12,7 @@ You run focused validation for RadioPad.
 ## Constraints
 
 - Do not change source files unless explicitly asked by the parent agent.
-- Heavy work runs in CI, not locally (AGENTS.md §0.5). Locally, run at most a single targeted test (`dotnet test --filter <Name>`, or one Vitest file) or a one-file typecheck. Never run the whole backend solution, the whole frontend build, or the full suite locally or on the VPS — push and watch CI (`gh run watch` / `gh run view --log-failed`).
+- Heavy work runs in CI, not locally (AGENTS.md §0.5). Locally, run at most a single targeted test (`dotnet test --filter <Name>`, or one Vitest file) or a one-file typecheck. Never run the whole backend solution, the whole frontend build, or the full suite locally or on the VPS — commit and push. Do not watch the run; the operator monitors CI and reports failures.
 - Do not hide failure output.
 
 ## Approach
