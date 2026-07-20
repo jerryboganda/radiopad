@@ -328,7 +328,8 @@ public class ProvidersController : TenantedController
     {
         var (tenant, user) = await ResolveContextAsync(_db, ct);
         var deny = RequirePermission(user, RbacPermission.ProvidersManage);
-        if (deny is not null) return deny;
+        if (deny is not null && !await CanSelfServiceOnDeviceProviderAsync(user, tenant.Id, dto, ct))
+            return deny;
         if (!string.IsNullOrEmpty(dto.ApiKeySecretRef) &&
             !dto.ApiKeySecretRef.StartsWith("env:", StringComparison.OrdinalIgnoreCase))
         {
@@ -385,6 +386,36 @@ public class ProvidersController : TenantedController
             }),
         }, ct);
         return Ok(new { p.Id });
+    }
+
+    /// <summary>
+    /// Operator decision (2026-07-21): choosing the AI engine belongs to the radiologist
+    /// (see the <see cref="RbacPermission.ProvidersRead"/> grant in <c>RolePermissionMap</c>),
+    /// and that extends to turning on a model they already downloaded to their own
+    /// workstation. A user who only holds <see cref="RbacPermission.ProvidersRead"/> may
+    /// therefore self-register their on-device model as a report-generation provider
+    /// without the tenant-wide <see cref="RbacPermission.ProvidersManage"/> permission —
+    /// it runs on loopback, never leaves the workstation, and (per the frontend's
+    /// <c>ensureOnDeviceProvider</c>) is never sent as the tenant default (priority is
+    /// always the neutral 100, never 0). It must never become a back door to editing a
+    /// shared/cloud provider row, so it is strictly the local llama.cpp adapter at
+    /// LocalOnly compliance, and — when updating rather than creating — only a row that
+    /// is already on-device.
+    /// </summary>
+    private async Task<bool> CanSelfServiceOnDeviceProviderAsync(
+        User user, Guid tenantId, SaveProviderDto dto, CancellationToken ct)
+    {
+        if (RequirePermission(user, RbacPermission.ProvidersRead) is not null) return false;
+        if (!string.Equals(
+                dto.Adapter, RadioPad.Infrastructure.Providers.Local.LlamaCppProvider.AdapterId,
+                StringComparison.Ordinal))
+            return false;
+        if (dto.Compliance != ProviderComplianceClass.LocalOnly) return false;
+        if (dto.Id is null) return true;
+        return await _db.Providers.AnyAsync(
+            x => x.Id == dto.Id && x.TenantId == tenantId
+                && x.Adapter == RadioPad.Infrastructure.Providers.Local.LlamaCppProvider.AdapterId,
+            ct);
     }
 
     /// <summary>
