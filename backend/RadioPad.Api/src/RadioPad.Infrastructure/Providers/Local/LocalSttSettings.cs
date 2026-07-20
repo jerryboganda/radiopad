@@ -36,23 +36,34 @@ public sealed class LocalSttSettings : ILocalSttSettings
     public LocalSttSettings(string? path)
     {
         _path = path;
-        _primaryModelId = Load(path) ?? DefaultPrimaryModelId;
+        var saved = Load(path);
+
+        // Coerce a saved selection that points at a now-hidden engine back to the
+        // default. Without this, a workstation that had already chosen Windows SAPI or
+        // Edge before those cards were withheld would stay primary-ed on an engine that
+        // no longer appears anywhere in the UI — leaving the radiologist no way to
+        // switch off it. Persisted lazily: the file is only rewritten on the next
+        // explicit SetPrimary, so nothing is lost if the entry is un-hidden later.
+        if (saved is not null && LocalModelCatalog.IsHiddenId(saved)) saved = null;
+
+        _primaryModelId = saved ?? DefaultPrimaryModelId;
     }
 
     /// <summary>
-    /// The out-of-box primary on a fresh install: Windows on-device speech (SAPI)
-    /// when a Windows recognizer is actually installed — it is PHI-safe and needs no
-    /// download — else the downloadable **MedASR** model (decision D2: MedASR is the
-    /// default primary sherpa engine; Parakeet is the user-promotable fallback). The
-    /// recognizer check matters on Windows 11, where the legacy speech recognizer is
-    /// often absent; defaulting to SAPI only when present keeps the "Primary" badge
-    /// honest. Either way the ensemble's primary-pick falls back to the first available
-    /// engine, so this is always safe (e.g. while MedASR is still downloading).
+    /// The out-of-box primary on a fresh install: **MedASR** (decision D2 — MedASR is
+    /// the default primary sherpa engine; Parakeet is the user-promotable fallback).
+    /// The ensemble's primary-pick falls back to the first available engine, so this is
+    /// always safe (e.g. while MedASR is still downloading).
+    ///
+    /// <para>This previously preferred Windows on-device speech (SAPI) whenever a
+    /// Windows recognizer was installed. That engine is now hidden from the UI
+    /// (<see cref="LocalModelDescriptor.Hidden"/>), so defaulting to it would have
+    /// pointed the "Primary" badge at a card the radiologist cannot see. The SAPI
+    /// client, engine registration and recognizer probe are all still present and
+    /// working — restoring the old behaviour means un-hiding the catalog entry and
+    /// putting the <c>WindowsSapiSttClient.IsRecognizerInstalled()</c> check back here.</para>
     /// </summary>
-    internal static string DefaultPrimaryModelId =>
-        LocalSttModels.IsEnabled() && WindowsSapiSttClient.IsRecognizerInstalled()
-            ? LocalModelCatalog.WindowsSapiId
-            : LocalSttModels.MedAsrModelName;
+    internal static string DefaultPrimaryModelId => LocalSttModels.MedAsrModelName;
 
     private static string? Load(string? path)
     {

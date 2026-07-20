@@ -51,12 +51,28 @@ public sealed record LocalModelDescriptor(
     // are ignored (there is no hosted artifact).
     ModelProvisioning Provisioning = ModelProvisioning.HostedFile,
     // Free-text note shown on the card (e.g. an online/PHI warning). Optional.
-    string? Note = null);
+    string? Note = null,
+    // Withheld from the model-manager UI while the entry stays fully wired in code.
+    // Operator decision (2026-07-20): the three platform speech engines (Windows
+    // SAPI, the Windows languages/accuracy helper, and Edge Web Speech) are hidden
+    // from radiologists for now. Their descriptors, engines, provisioning paths and
+    // tests are all deliberately left intact so re-enabling one later is flipping
+    // this single flag — no re-implementation. Hidden entries are filtered ONLY at
+    // the API boundary (see ILocalModelCatalog.Visible); ById/All still resolve them
+    // so any already-persisted selection keeps working instead of hard-failing.
+    bool Hidden = false);
 
 /// <summary>The set of local models the desktop build can manage.</summary>
 public interface ILocalModelCatalog
 {
+    /// <summary>Every descriptor, including hidden ones. Used by the engines,
+    /// provisioner and status paths — these must keep resolving hidden entries.</summary>
     IReadOnlyList<LocalModelDescriptor> All { get; }
+
+    /// <summary>The subset the UI may show. This is what the controller returns;
+    /// <see cref="All"/> stays complete so nothing in the runtime breaks.</summary>
+    IReadOnlyList<LocalModelDescriptor> Visible { get; }
+
     LocalModelDescriptor? ById(string id);
 }
 
@@ -85,6 +101,17 @@ public sealed class LocalModelCatalog : ILocalModelCatalog
     public const string MedGemmaFileName = "medgemma-1.5-4b-it-Q4_K_M.gguf";
 
     public IReadOnlyList<LocalModelDescriptor> All { get; } = Build();
+
+    public IReadOnlyList<LocalModelDescriptor> Visible { get; } =
+        Build().Where(m => !m.Hidden).ToList();
+
+    /// <summary>Ids withheld from every UI. Consulted by <see cref="LocalSttSettings"/>
+    /// so a workstation is never left primary-ed on an engine the radiologist can no
+    /// longer see, and therefore could not switch away from.</summary>
+    private static readonly HashSet<string> HiddenIds =
+        Build().Where(m => m.Hidden).Select(m => m.Id).ToHashSet(StringComparer.Ordinal);
+
+    public static bool IsHiddenId(string id) => HiddenIds.Contains(id);
 
     public LocalModelDescriptor? ById(string id) =>
         All.FirstOrDefault(m => string.Equals(m.Id, id, StringComparison.Ordinal));
@@ -142,7 +169,8 @@ public sealed class LocalModelCatalog : ILocalModelCatalog
                 FileName: null,
                 Placeholder: false,
                 Provisioning: ModelProvisioning.WindowsBuiltIn,
-                Note: "Built into Windows. Runs fully on-device — audio never leaves the workstation."),
+                Note: "Built into Windows. Runs fully on-device — audio never leaves the workstation.",
+                Hidden: true),
 
             // Windows speech language/accuracy settings. NOTE: WinRT
             // Windows.Media.SpeechRecognition only recognizes the LIVE microphone
@@ -165,7 +193,8 @@ public sealed class LocalModelCatalog : ILocalModelCatalog
                 FileName: null,
                 Placeholder: false,
                 Provisioning: ModelProvisioning.WindowsLanguagePack,
-                Note: "Opens Windows speech settings to add languages and improve the on-device Windows recognizer. Runs fully on-device."),
+                Note: "Opens Windows speech settings to add languages and improve the on-device Windows recognizer. Runs fully on-device.",
+                Hidden: true),
 
             // Edge Web Speech API — highly accurate; runs in the desktop WebView2
             // (Edge), backed by Microsoft's online speech service. Online: audio
@@ -184,7 +213,8 @@ public sealed class LocalModelCatalog : ILocalModelCatalog
                 FileName: null,
                 Placeholder: false,
                 Provisioning: ModelProvisioning.BrowserWebSpeech,
-                Note: "Highly accurate, but processed online by Microsoft — audio leaves the device. Avoid for PHI dictation."),
+                Note: "Highly accurate, but processed online by Microsoft — audio leaves the device. Avoid for PHI dictation.",
+                Hidden: true),
 
             // ── Roadmap placeholders (no engine/URL yet). The manager renders these
             // as disabled "coming soon" cards. When the engine lands: flip Placeholder

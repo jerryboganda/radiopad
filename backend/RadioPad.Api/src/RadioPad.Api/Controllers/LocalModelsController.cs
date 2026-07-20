@@ -50,15 +50,21 @@ public sealed class LocalModelsController : ControllerBase
     }
 
     /// <summary>
-    /// The full catalog with per-model status. Works everywhere: <c>enabled</c> is
+    /// The visible catalog with per-model status. Works everywhere: <c>enabled</c> is
     /// false on a web/server build (no local engine), driving the UI's "managed in
     /// the desktop app" notice.
+    ///
+    /// <para>Uses <see cref="ILocalModelCatalog.Visible"/>, not <c>All</c>: entries
+    /// flagged <see cref="LocalModelDescriptor.Hidden"/> stay fully functional in the
+    /// runtime but are withheld from every UI. The other endpoints deliberately keep
+    /// resolving hidden ids via <c>ById</c>, so a workstation that already selected one
+    /// keeps working rather than 404-ing on its own saved choice.</para>
     /// </summary>
     [HttpGet]
     public IActionResult List()
     {
         var enabled = LocalSttModels.IsEnabled();
-        var models = _catalog.All.Select(d => Project(d, enabled)).ToList();
+        var models = _catalog.Visible.Select(d => Project(d, enabled)).ToList();
         return Ok(new { enabled, models });
     }
 

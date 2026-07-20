@@ -234,8 +234,11 @@ export default function DictationOverlay() {
       // radiologist knows to grant the mic or fall back to the on-device (HQ) path.
       const err = (e as { error?: string })?.error;
       if (err === 'network') {
+        // Deliberately does not name the underlying vendor engine: the platform speech
+        // providers are hidden from the UI, so surfacing one only in an error would be
+        // the one place a radiologist ever sees it. The remedy is what matters.
         setSttError(
-          'Live speech (Microsoft Edge) could not reach the speech service. Use the HQ button for on-device dictation, or check this machine’s connection.',
+          'Live speech could not reach the speech service. Use the HQ button for on-device dictation, or check this machine’s connection.',
         );
       } else if (err === 'not-allowed' || err === 'service-not-allowed') {
         setSttError('Microphone access is blocked. Allow the microphone to use live dictation.');
@@ -681,7 +684,7 @@ export default function DictationOverlay() {
           className="subtle"
           data-testid="dictation-mode"
           aria-label="On-device transcription engine mode"
-          title="On-device engine: Auto, Single (Parakeet) or Ensemble (Parakeet + Windows Speech, cross-checked)"
+          title="On-device engine: Auto, Single or Ensemble (two on-device engines, cross-checked)"
           value={mode}
           onChange={(e) => setMode(e.target.value as SttMode)}
         >
