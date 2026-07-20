@@ -84,6 +84,23 @@ jobs:
         with:
           workspaces: desktop/src-tauri
 
+      # The Rust unit tests ran NOWHERE in CI — including the ones guarding the sidecar's
+      # environment contract with the .NET backend, which is exactly how a missing
+      # RADIOPAD_LOCAL_FORMATTER_ENABLED shipped and left MedGemma unreachable in every build.
+      # This job already has the toolchain, the cache and (below) the real sidecar binary, so
+      # running them here costs almost nothing. Placed BEFORE the installer build: a broken
+      # contract should fail in seconds, not after a full bundle.
+      - name: Rust unit tests (desktop shell)
+        shell: pwsh
+        run: |
+          # The build script requires a sidecar binary to exist; the real one is produced by
+          # desktop-bundle. A placeholder is enough to compile and run the unit tests.
+          New-Item -ItemType Directory -Force -Path desktop/src-tauri/binaries | Out-Null
+          $stub = 'desktop/src-tauri/binaries/radiopad-api-x86_64-pc-windows-msvc.exe'
+          if (-not (Test-Path $stub)) { Set-Content -Path $stub -Value 'placeholder' -Encoding ascii }
+          cargo test --manifest-path desktop/src-tauri/Cargo.toml
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+
       - name: Build unsigned Windows installer
         shell: pwsh
         run: |

@@ -43,8 +43,18 @@ jobs:
         run: |
           set -euo pipefail
           src=desktop/src-tauri/src/sidecar_manager.rs
+
+          # Match the SETTING form specifically — the tuple `("NAME".to_string(), ...)` that
+          # sidecar_env() builds — not any mention of the name.
+          #
+          # The first version of this check grepped for the bare quoted name, and failed the build
+          # on correct code: it matched the unit test that asserts RADIOPAD_LOCAL_FORMATTER_DEFAULT
+          # is ABSENT. A guard looking for a string cannot tell "sets this" from "asserts this is
+          # never set", so it must look at the syntax that actually sets it.
+          sets() { grep -qE "\(\"$1\"\.to_string\(\)," "$src"; }
+
           for flag in RADIOPAD_LOCAL_STT_ENABLED RADIOPAD_LOCAL_FORMATTER_ENABLED; do
-            grep -q "\"$flag\"" "$src" || {
+            sets "$flag" || {
               echo "::error file=$src::$flag is no longer set by the Tauri sidecar launcher."
               echo "The backend gates a capability on it, so dropping it makes that feature"
               echo "unreachable in the shipped app while every component test stays green."
@@ -52,8 +62,9 @@ jobs:
             }
             echo "ok: launcher sets $flag"
           done
+
           # D1: capability != default. The launcher must NOT force local formatting.
-          if grep -q '"RADIOPAD_LOCAL_FORMATTER_DEFAULT"' "$src"; then
+          if sets RADIOPAD_LOCAL_FORMATTER_DEFAULT; then
             echo "::error file=$src::the launcher must not set RADIOPAD_LOCAL_FORMATTER_DEFAULT —"
             echo "cloud stays the default report formatter (decision D1); local is opt-in per draft."
             exit 1
