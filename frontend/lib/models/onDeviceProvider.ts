@@ -66,7 +66,7 @@ export async function ensureOnDeviceProvider(
 
   try {
     await api.providers.save({
-      id: existing?.id ?? null,
+      id: existing?.id,
       name: existing?.name ?? displayName,
       adapter: LOCAL_LLAMA_ADAPTER,
       model: modelId,
