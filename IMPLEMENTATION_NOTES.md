@@ -370,12 +370,41 @@ every `/api/stt/transcribe` response names MedASR, which would catch the audit-e
 wrong-engine-served-silently failure mode. The live Web-Speech "Dictate" button stays uncovered
 by choice: it is a platform engine, not RadioPad code.
 
-Still open, honestly: the `msi-e2e` job (including the mic phase — the fake-device flags are the
-one assumption CI has not yet confirmed against WebView2's permission layer; a failure there
-surfaces as the distinct mic-permission error text in the artifacts) and the latency
-instrumentation are **wired but not yet observed green** — the next dispatched/tag run is the
-evidence; and the original flake was never **named**, so "prime suspect eliminated" is not
-"flake resolved" — flaky-hunt stays as the watchdog.
+**MedGemma latency: observed green** on the first `offline-formatter-smoke` run — that gap is
+closed with evidence, not just wiring.
+
+### ⚠️ The msi-e2e gate stranded two releases — read before gating anything on a new harness
+
+`msi-e2e` was made a hard dependency of `release` the moment it was written. It had never passed.
+Consequence: **v0.1.91 and v0.1.92 each built a signed MSI and published nothing at all** — not a
+release object, not `latest.json` — because `release` needed `msi-e2e` *and* `tauri-updater` only
+fires when the whole `desktop-bundle` workflow concludes success. Every user sat on v0.1.90 while
+a *test* that could not attach a debugger blocked a perfectly good build. Fixed by making the
+harness **advisory** (it still runs and still reports loudly via `::warning` + a job-summary
+block) and cutting **v0.1.93**. The lesson is general: *a new verification gate earns blocking
+power by passing first, not by being written.*
+
+**Re-tighten when the E2E has passed on a runner once:** `release` back to
+`needs: [bundle, msi-e2e]` in `desktop-bundle.yml`, and the `msi-e2e` call to `advisory: false`.
+
+### WebView2 finding: `WEBVIEW2_ADDITIONAL_BROWSER_ARGUMENTS` does nothing in this app
+
+Microsoft documents that env var as being *appended* to the host app's own
+`additionalBrowserArguments`. In this Tauri/wry app it is not. Evidence (`webview-diagnostics.txt`
+in the `msi-e2e-evidence` artifact): a fully healthy webview process tree — browser, GPU, network,
+storage, renderer — whose browser argv carries wry's own `--autoplay-policy` and
+`--disable-features` and **none** of ours. That is why the very first single-flag attempt saw no
+CDP endpoint, and it also silently disabled the fake-audio device the mic phase needs. Flags are
+now delivered through the per-exe **HKCU WebView2 `AdditionalBrowserArguments` policy** instead —
+and the env var is deliberately left UNSET, because the registry is only consulted when no
+override env var exists (setting both, as the first fix did, made the "fallback" dead code).
+Not yet confirmed green; if the policy route also fails, the remaining option is Tauri's own
+`additionalBrowserArgs` gated behind an env check in Rust, which needs a security review before
+it goes near a PHI build.
+
+Still open, honestly: the `msi-e2e` job — including the mic phase — is **wired but has never yet
+completed a run**; the original flake was never **named**, so "prime suspect eliminated" is not
+"flake resolved" (flaky-hunt stays as the watchdog).
 
 ## 9. The pattern this build kept producing (read before the next change)
 

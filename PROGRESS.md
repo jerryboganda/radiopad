@@ -49,9 +49,18 @@
   content words landed in that section AND that every `/api/stt/transcribe` response names
   MedASR (fetch tap; the DOM hides engine identity) — the audit-era "wrong engine served
   silently" failure mode is now a hard E2E failure.
-- Honest state: `msi-e2e` (incl. the mic phase — fake-device flags vs WebView2's permission
-  layer is the one CI-unconfirmed assumption; it fails distinguishably if wrong) and the latency
-  instrumentation are wired but not yet observed green in CI.
+- **MedGemma latency: observed green** on the first `offline-formatter-smoke` run.
+- **The gate stranded two releases — fixed.** `msi-e2e` was made a hard dependency of `release`
+  before it had ever passed, so v0.1.91 and v0.1.92 each built a signed MSI and published
+  NOTHING (`release` needed it, and `tauri-updater` needs the workflow to conclude success).
+  Users sat on v0.1.90 because a test could not attach a debugger. The harness is now
+  **advisory** — runs on every bundle, reports via `::warning` + job summary, blocks nothing —
+  and **v0.1.93** was cut. Re-tighten (`needs: [bundle, msi-e2e]` + `advisory: false`) once it
+  passes once. General lesson: a gate earns blocking power by passing, not by being written.
+- **WebView2:** `WEBVIEW2_ADDITIONAL_BROWSER_ARGUMENTS` is NOT appended to wry's own
+  `additionalBrowserArguments` (captured browser argv proves it), so the CDP + fake-audio flags
+  never applied. Now delivered via the per-exe HKCU WebView2 policy, env var deliberately unset
+  (it suppresses the registry path). Not yet confirmed green.
 
 ---
 
