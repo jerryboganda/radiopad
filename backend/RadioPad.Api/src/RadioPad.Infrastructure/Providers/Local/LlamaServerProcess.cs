@@ -90,9 +90,20 @@ public sealed class LlamaServerProcess : IDisposable
             psi.ArgumentList.Add(Host);
             psi.ArgumentList.Add("--port");
             psi.ArgumentList.Add(Port.ToString());
-            // CPU-only budget (§1). Leave a core for the UI and the STT engine.
+            // CPU-only budget (§1). Leave a core for the UI and the STT engine, and cap the
+            // ceiling: llama.cpp's throughput does not keep scaling past roughly 8 threads on
+            // typical hardware, and on a many-core / multi-socket workstation blindly using
+            // "all but one" logical processor oversubscribes far past that point — threads spend
+            // more time synchronizing (and contending for cross-NUMA memory bandwidth) than
+            // computing, which pins CPU near 100% AND makes generation slower, not faster. That
+            // combination is exactly what turns a legitimate cold load into a client-visible
+            // timeout. Override with RADIOPAD_LLAMA_THREADS for a workstation benchmarked to do
+            // better with a different count.
+            var threads = int.TryParse(Environment.GetEnvironmentVariable("RADIOPAD_LLAMA_THREADS"), out var configuredThreads) && configuredThreads > 0
+                ? configuredThreads
+                : Math.Clamp(Environment.ProcessorCount - 1, 1, 8);
             psi.ArgumentList.Add("--threads");
-            psi.ArgumentList.Add(Math.Max(1, Environment.ProcessorCount - 1).ToString());
+            psi.ArgumentList.Add(threads.ToString());
             psi.ArgumentList.Add("--ctx-size");
             psi.ArgumentList.Add("4096");
 

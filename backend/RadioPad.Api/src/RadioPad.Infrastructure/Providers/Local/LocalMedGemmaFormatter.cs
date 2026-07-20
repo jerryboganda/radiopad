@@ -86,8 +86,9 @@ public sealed class LocalMedGemmaFormatter : ILocalReportFormatter
         if (baseUrl is null) return DefaultUrl;
 
         // Loading a multi-GB GGUF on CPU legitimately takes tens of seconds on a cold start; the
-        // first refused connection is not a failure.
-        await _server.WaitUntilHealthyAsync(_http.CreateClient("ai"), TimeSpan.FromMinutes(3), ct);
+        // first refused connection is not a failure. "ai-local" (not "ai") so this never shares
+        // the cloud-tuned attempt timeout or circuit breaker.
+        await _server.WaitUntilHealthyAsync(_http.CreateClient("ai-local"), TimeSpan.FromMinutes(3), ct);
         return baseUrl;
     }
 

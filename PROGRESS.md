@@ -4,6 +4,30 @@
 
 ---
 
+## On-device MedGemma self-test: CPU pegged then timed out (2026-07-21)
+
+Bug report: starting the MedGemma self-test drove CPU to ~99% and then the test failed with an
+error instead of completing. Root cause was two compounding bugs in
+`LlamaServerProcess`/`LlamaCppProvider`, both only visible on a many-core/multi-socket box (the
+dev Xeon reports `Environment.ProcessorCount == 36`):
+
+1. **Thread oversubscription.** `llama-server` was launched with `--threads (ProcessorCount - 1)`
+   — 35 threads on this box. llama.cpp's throughput does not keep scaling past ~8 threads on
+   typical hardware; past that, threads spend more time synchronizing (and contending for
+   cross-NUMA memory bandwidth on a dual-socket Xeon) than computing. Result: CPU pinned near
+   100% while generation got *slower*, not faster. Fixed by capping at
+   `Math.Clamp(ProcessorCount - 1, 1, 8)`, overrideable via `RADIOPAD_LLAMA_THREADS`.
+2. **Shared cloud-tuned HTTP timeout.** `LlamaCppProvider.CompleteAsync` and the self-test's
+   `WaitUntilHealthyAsync` calls used the `"ai"` named `HttpClient`, whose resilience pipeline
+   (Program.cs) caps a single attempt at ~60s — sized for a cloud API round-trip, not CPU-bound
+   local inference. Once thread oversubscription made a cold load + first completion take longer
+   than that, the call got cancelled mid-flight and reported as a failure even though the model
+   was working. It also meant a slow local call could trip the same circuit breaker gating
+   unrelated cloud providers. Fixed by adding a dedicated `"ai-local"` `HttpClient` (300s timeout,
+   no retry — retrying a slow-but-working local server just doubles the CPU load) and moving every
+   on-device call (`LlamaCppProvider`, `LocalMedGemmaFormatter`, `LocalModelsController`'s
+   self-test) onto it.
+
 ## msi-e2e CI job removed (2026-07-21)
 
 Operator decision: the renderer-driven MSI E2E (`desktop-bundle.yml`'s `msi-e2e` job +

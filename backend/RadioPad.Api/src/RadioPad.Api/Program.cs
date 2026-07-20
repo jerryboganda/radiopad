@@ -103,6 +103,19 @@ builder.Services.AddHttpClient("ai", c =>
     o.CircuitBreaker.FailureRatio = 0.9;
     o.CircuitBreaker.BreakDuration = TimeSpan.FromSeconds(15);
 });
+// On-device llama.cpp completions run on THIS workstation's CPU, not a cloud API — a cold
+// model load plus token generation legitimately takes minutes, not the ~60 s a cloud call
+// budgets for. Sharing the "ai" client above would (a) cut a still-loading/still-generating
+// local completion off mid-flight and report it as a failure even though it was working, and
+// (b) let a slow local call trip the SAME circuit breaker that gates unrelated cloud providers.
+// A dedicated client with a long timeout and NO retry (retrying a slow-but-working local
+// server just doubles the CPU load it's already straining under) avoids both. Overrideable via
+// RADIOPAD_LOCAL_AI_HTTP_TIMEOUT_SEC for a workstation that needs even longer.
+var localAiTimeoutSec = int.TryParse(Environment.GetEnvironmentVariable("RADIOPAD_LOCAL_AI_HTTP_TIMEOUT_SEC"), out var localAiSec) && localAiSec > 0 ? localAiSec : 300;
+builder.Services.AddHttpClient("ai-local", c =>
+{
+    c.Timeout = TimeSpan.FromSeconds(localAiTimeoutSec);
+}).ConfigurePrimaryHttpMessageHandler(() => new HttpClientHandler { AllowAutoRedirect = false });
 var ubagTimeoutMs = int.TryParse(Environment.GetEnvironmentVariable("RADIOPAD_UBAG_TIMEOUT_MS"), out var ubagMs) && ubagMs > 0 ? ubagMs : 120_000;
 builder.Services.AddHttpClient(RadioPad.Infrastructure.Providers.Ubag.UbagClient.HttpClientName, c =>
 {

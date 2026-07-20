@@ -58,7 +58,9 @@ public sealed class LlamaCppProvider : IAiProviderAdapter
         if (!string.IsNullOrWhiteSpace(request.Grammar))
             body["grammar"] = request.Grammar;
 
-        var client = _http.CreateClient("ai");
+        // Dedicated client (Program.cs "ai-local"): CPU-bound local inference needs minutes, not
+        // the cloud-tuned "ai" client's ~60 s attempt budget, and must not share its circuit breaker.
+        var client = _http.CreateClient("ai-local");
         var sw = Stopwatch.StartNew();
         HttpResponseMessage resp;
         try
@@ -120,7 +122,7 @@ public sealed class LlamaCppProvider : IAiProviderAdapter
         var baseUrl = string.IsNullOrWhiteSpace(endpointUrl) ? DefaultEndpoint : endpointUrl.TrimEnd('/');
         try
         {
-            var client = _http.CreateClient("ai");
+            var client = _http.CreateClient("ai-local");
             using var resp = await client.GetAsync($"{baseUrl}/health", ct);
             return resp.IsSuccessStatusCode ? (true, null) : (false, $"HTTP {(int)resp.StatusCode}");
         }

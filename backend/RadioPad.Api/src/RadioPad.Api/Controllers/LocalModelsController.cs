@@ -429,8 +429,9 @@ public sealed class LocalModelsController : ControllerBase
             endpoint = started;
 
             // A cold start loads ~2.5 GB from disk; the first refused connection is normal.
+            // "ai-local" (not "ai") so this never shares the cloud-tuned attempt timeout or circuit breaker.
             if (_http is not null
-                && !await _llama.WaitUntilHealthyAsync(_http.CreateClient("ai"), TimeSpan.FromMinutes(2), ct))
+                && !await _llama.WaitUntilHealthyAsync(_http.CreateClient("ai-local"), TimeSpan.FromMinutes(2), ct))
                 return Ok(Failure(
                     "The llama-server started but was still loading after 2 minutes. Try again shortly — the first "
                     + "start of a 2.5 GB model is the slow one.",
