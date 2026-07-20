@@ -30,11 +30,19 @@ public sealed class LlamaCppProvider : IAiProviderAdapter
 
     private readonly IHttpClientFactory _http;
     private readonly ILogger<LlamaCppProvider> _log;
+    private readonly LlamaServerProcess? _server;
+    private readonly ILocalModelCatalog? _catalog;
 
-    public LlamaCppProvider(IHttpClientFactory http, ILogger<LlamaCppProvider> log)
+    public LlamaCppProvider(
+        IHttpClientFactory http,
+        ILogger<LlamaCppProvider> log,
+        LlamaServerProcess? server = null,
+        ILocalModelCatalog? catalog = null)
     {
         _http = http;
         _log = log;
+        _server = server;
+        _catalog = catalog;
     }
 
     public string Id => AdapterId;
@@ -43,6 +51,31 @@ public sealed class LlamaCppProvider : IAiProviderAdapter
     {
         var p = request.Provider;
         var baseUrl = string.IsNullOrWhiteSpace(p.EndpointUrl) ? DefaultEndpoint : p.EndpointUrl.TrimEnd('/');
+
+        // The managed on-device server is started lazily on first use, not kept running as a
+        // background service — every caller that talks to OUR default loopback endpoint must
+        // make sure it is actually up first. The self-test path (LocalModelsController) and the
+        // dictation formatter (LocalMedGemmaFormatter) both already do this before calling in;
+        // the generic AiGateway → ProviderRouter → adapter path that "use for report generation"
+        // enables does not, so without this a fresh self-test could pass and the very next
+        // report-generation request would still get "Connection refused" against a server nobody
+        // ever started. An operator who pointed EndpointUrl at their OWN remote server is
+        // responsible for running it themselves, hence the endpoint-equality check.
+        if (_server is not null && !_server.IsRunning
+            && string.Equals(baseUrl, LlamaServerProcess.BaseUrl, StringComparison.OrdinalIgnoreCase))
+        {
+            var descriptor = _catalog?.ById(p.Model);
+            var modelDir = descriptor is null ? null : LocalSttModels.ResolveModelDir(descriptor.Id);
+            var modelPath = modelDir is null || descriptor?.FileName is null
+                ? null
+                : Path.Combine(modelDir, descriptor.FileName);
+            if (modelPath is not null && File.Exists(modelPath))
+            {
+                await _server.EnsureRunningAsync(modelPath, cancellationToken);
+                await _server.WaitUntilHealthyAsync(_http.CreateClient("ai-local"), TimeSpan.FromMinutes(3), cancellationToken);
+            }
+        }
+
         var url = $"{baseUrl}/completion";
         var prompt = $"SYSTEM: {request.SystemPrompt}\n\nUSER: {request.UserPrompt}\n\nASSISTANT:";
 
