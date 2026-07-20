@@ -87,6 +87,13 @@ public sealed class LlamaCppProvider : IAiProviderAdapter
             ["n_predict"] = 1024,
             ["stream"] = false,
             ["temperature"] = request.Temperature,
+            // /completion is a raw text-completion endpoint: nothing stops the model once it
+            // finishes answering, so without a grammar it happily hallucinates a fresh "SYSTEM:"/
+            // "USER:" turn and answers that too, and again, until it burns the full n_predict
+            // budget (observed: a one-word self-test reply looping for 1024 tokens / ~90s).
+            // These mirror the exact turn markers used in `prompt` above, so generation halts the
+            // instant the model tries to fabricate another turn. Harmless alongside a grammar too.
+            ["stop"] = new[] { "\nSYSTEM:", "\nUSER:" },
         };
         if (!string.IsNullOrWhiteSpace(request.Grammar))
             body["grammar"] = request.Grammar;
