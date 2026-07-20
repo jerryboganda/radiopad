@@ -53,17 +53,13 @@ they test server code and cost nothing in release wall-clock.
 
 The desktop app self-updates. **Whenever you change anything that ships in the desktop build (anything under `frontend/` or `desktop/`), shipping a new desktop release is PART OF THE TASK — do it automatically, the operator should never have to ask.** Builds run on GitHub Actions only; never build the desktop app locally or on the VPS.
 
-After your `frontend/`/`desktop/` changes are committed and pushed, run one command:
-
-```bash
-pnpm release:desktop      # patch bump (0.1.23 → 0.1.24); also accepts `minor` / `major` / `X.Y.Z`
-```
-
-It bumps `desktop/src-tauri/tauri.conf.json` **and** `desktop/src-tauri/Cargo.toml` in lock-step, commits, tags `vX.Y.Z`, and pushes. The tag then drives the pipeline end-to-end with no further steps: `desktop-bundle` builds + signs the Windows `.msi` and creates the release; `tauri-updater` signs + publishes `latest.json`. The in-app "Check for updates" button reads the GitHub Releases `latest.json`, so every user auto-downloads the new build.
+After your `frontend/`/`desktop/` changes are committed and pushed, run `pnpm release:desktop`
+(patch bump by default; also accepts `minor` / `major` / `X.Y.Z`). The full ritual and the pipeline
+it triggers are in [/release-desktop](.claude/commands/release-desktop.md).
 
 - Backend-only / CLI-only / docs-only changes do **not** need a desktop release.
 - Never bump only one version file or hand-edit a build (version mismatch → updater loop). Always use `pnpm release:desktop`.
-- Signing secrets (`TAURI_PRIVATE_KEY`, `TAURI_KEY_PASSWORD`) are already set in GitHub; the public key is embedded in `tauri.conf.json`. macOS and Linux desktop builds are **out of scope**, not pending — see the platforms section above. Nothing is blocked on Apple signing.
+- macOS and Linux desktop builds are **out of scope**, not pending — see the platforms section above. Nothing is blocked on Apple signing.
 
 ## ⚠️ MISSION-CRITICAL: CPU-intensive work runs on GitHub Actions, never locally
 
@@ -90,15 +86,14 @@ A pre-tool-use guard (`hooks/pretooluse.mjs` / `.ps1`) prompts on these commands
 
 ## ⚠️ MISSION-CRITICAL: three specialised surfaces from one frontend (RADIOPAD_SURFACE)
 
-RadioPad is **desktop-first, surface-specialised**. The single `frontend/` codebase builds into three scoped bundles selected by the `RADIOPAD_SURFACE` build flag:
+RadioPad is **desktop-first, surface-specialised**. One `frontend/` codebase builds three scoped
+bundles — **desktop** (the whole reporting product), **web** (master-admin ONLY, no reporting), and
+**mobile** (a dictation companion that pairs to a live desktop session, no standalone reporting).
+Routes are physically staged in or out per surface, so a route in the wrong group ships to the wrong
+product or vanishes from all three.
 
-- **desktop** = the entire reporting product (worklist, editor, dictation, library authoring, personal settings, **companion host**). Clinical roles.
-- **web** = master-admin / platform operations ONLY (`admin/*`, users, billing, SSO, providers, governance, usage). NO reporting. Clinical-only users get a "download the desktop app" interstitial ([WebAdminGate](frontend/components/shell/WebAdminGate.tsx)).
-- **mobile** = a dictation **companion** that pairs to a live desktop session (pairing + voice dictation + remote only). NO standalone reporting.
-
-How it works: routes live in App Router **route groups** `frontend/app/(desktop|web|mobile|shared)/`. [scripts/build-surface.mjs](frontend/scripts/build-surface.mjs) (`pnpm --filter @radiopad/frontend build:{desktop,web,mobile}`) sets the flag, stages non-target groups OUT of `app/` (and swaps the root `/` for a redirect on web/mobile), runs `next build`, and moves `out/` → `out-<surface>`. So each shell **physically** ships only its routes. [lib/surface.ts](frontend/lib/surface.ts) exposes `SURFACE`/`isWebSurface`/`surfaceAllows`; nav is surface-tagged in [nav.config.tsx](frontend/components/shell/nav.config.tsx). Tauri consumes `out-desktop` (`build:desktop`), Capacitor `out-mobile` (`build:mobile`), web deploy serves `out-web`. Plain `next dev` = full desktop app (all groups present).
-
-The **companion** relay is a cloud subsystem (`/ws/companion` + `/api/companion/*`, [lib/companion.ts](frontend/lib/companion.ts), [CompanionHostPanel](frontend/components/companion/CompanionHostPanel.tsx)) — desktop advertises a code, phone pairs and streams dictation into the desktop's focused section via `getLastFocusedSectionEditor().insertAtCursor`.
+**Before adding or moving any route, page, or nav entry, read [frontend/CLAUDE.md](frontend/CLAUDE.md)** —
+it carries the route-group layout, the build-flag mechanics, and the companion relay.
 
 ## Project mission
 
@@ -106,27 +101,13 @@ AI-assisted radiology reporting platform. Radiologist drafts, validates, and sig
 
 ## Strict tech stack
 
-| Layer | Technology |
-| --- | --- |
-| Web | Next.js 16 (App Router) |
-| Backend | ASP.NET Core 8 + EF Core |
-| Desktop | Tauri 2 (Rust) |
-| Mobile | Capacitor 6 |
-| CLI | .NET 8 global tool |
-
-No other frameworks. Do not propose Express/Fastify/NestJS/etc. for the backend.
+The stack is locked to what the manifests already pin. **No other frameworks — do not propose
+Express/Fastify/NestJS/etc. for the backend.**
 
 ## Repo map
 
-- `backend/RadioPad.Api/` — ASP.NET Core solution (Domain, Application, Validation, Infrastructure, Api, tests)
-- `frontend/` — Next.js app; routes grouped by surface under `app/(desktop|web|mobile|shared)/`, built per-surface via `build:{desktop,web,mobile}` (see surface-model note above)
-- `desktop/` — Tauri shell (consumes `frontend/out-desktop`)
-- `mobile/` — Capacitor project (companion; consumes `frontend/out-mobile`)
-- `cli/RadioPad.Cli/` — .NET global tool
-- `rulebooks/` — YAML rulebooks
-- `templates/` — JSON report templates
-- `docs/` — full documentation hierarchy
-- `subagents/` — portable AI subagent roles (explorer, code-reviewer, test-runner, feature-dev)
+The tree is self-describing; one non-obvious entry is worth stating:
+
 - `mcp-connectors/` — signed clinical data connectors (DICOM/FHIR/PACS) — a **product** feature, not developer MCP
 
 ## Commands
@@ -146,18 +127,8 @@ pnpm vitest run <one-file>
 dotnet run --project cli/RadioPad.Cli -- rulebook validate ../../rulebooks/chest_ct_v1.yaml
 ```
 
-**CI runs these — do not run them locally or on the VPS.** `.github/workflows/ci.yml`
-covers all of them on every push (backend build+test, CLI, frontend lint+typecheck+test+build):
-
-```powershell
-dotnet build          # ci.yml → backend
-dotnet test           # ci.yml → backend  (targeted --filter runs are fine locally)
-pnpm typecheck        # ci.yml → frontend
-pnpm build            # ci.yml → frontend
-cargo tauri build     # desktop-bundle.yml
-```
-
-Push and stop — do not watch the run.
+Everything heavier than the above — full builds, full suites, typecheck/lint sweeps, `cargo tauri
+build` — is CI's job, per the GitHub Actions rule above. Push and stop.
 
 ## Safety boundaries (non-negotiable)
 

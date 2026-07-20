@@ -8,6 +8,8 @@ This file is the entry point for every AI coding agent (Claude Code, Codex, Curs
 
 > **[CLAUDE.md](CLAUDE.md) is the authoritative project instruction file.** When anything here disagrees with CLAUDE.md, CLAUDE.md wins. This file and [GEMINI.md](GEMINI.md) are deliberately thin, platform-neutral pointers so every agent (Codex, Cursor, Copilot, Gemini, …) reads the same rules. Do not restate the full contract here — read CLAUDE.md.
 
+> **Directory-scoped memory:** some rules live in a nested `CLAUDE.md` next to the code they govern — currently [frontend/CLAUDE.md](frontend/CLAUDE.md) (the `RADIOPAD_SURFACE` route-group model). Claude Code loads these automatically when it touches that directory; **other agents do not** — if you are working under `frontend/`, open it yourself before adding or moving any route.
+
 ## 0.1. MISSION-CRITICAL UI/UX RULE
 
 > **RadioPad's visual identity is the "RC" design system: a light-first white/blue clinical-SaaS palette with a first-class deep-navy dark theme. BOTH themes are mandatory** (light is the first-run default; dark is first-class, never pure black). The APP SHELL is the canonical left-sidebar SaaS layout. You MUST NOT introduce a different design system, colour palette, or component/theme library (MUI / Ant / Chakra / Bootstrap). Build-time **Tailwind 3** IS part of the stack and allowed.

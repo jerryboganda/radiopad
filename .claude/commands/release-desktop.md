@@ -11,3 +11,14 @@ Run the RadioPad desktop release ritual exactly (CLAUDE.md DESK-001). Do NOT ski
 3. Report the new version and the tag that was pushed, then stop. Do not watch the run — `desktop-bundle` and `tauri-updater` take it from here, and the operator monitors CI.
 
 Never hand-edit only one version file — the Tauri updater loops on a version mismatch. `pnpm release:desktop` is the only correct way to bump.
+
+## What the tag triggers (no further steps needed)
+
+The pushed `vX.Y.Z` tag drives the pipeline end-to-end: `desktop-bundle` builds and signs the
+Windows `.msi` and creates the GitHub release; `tauri-updater` signs and publishes `latest.json`.
+The in-app "Check for updates" button reads that `latest.json` from GitHub Releases, so every
+installed client auto-downloads the new build.
+
+Signing secrets (`TAURI_PRIVATE_KEY`, `TAURI_KEY_PASSWORD`) are already set in GitHub; the public
+key is embedded in `tauri.conf.json`. Windows `.msi` is the only desktop target — macOS and Linux
+are out of scope, so nothing here is blocked on Apple signing.
