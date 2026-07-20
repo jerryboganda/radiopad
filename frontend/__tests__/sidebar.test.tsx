@@ -14,9 +14,12 @@ vi.mock('next/link', () => ({
 }));
 
 const LOCKED_GROUPS: ReadonlyArray<{ key: string; hrefs: string[] }> = [
-  { key: 'workspace', hrefs: ['/dashboard', '/worklist', '/reports/compose', '/templates', '/protocols', '/ai-assistant', '/findings-library'] },
-  { key: 'insights', hrefs: ['/reports', '/analytics', '/quality', '/validation', '/audit'] },
-  { key: 'library', hrefs: ['/rulebooks', '/modalities', '/body-parts', '/prompts', '/marketplace', '/terminology'] },
+  // '/critical-results', '/peer-review' and '/teaching' are the PowerScribe/Dragon parity
+  // modules added 2026-07-20; they are pinned here for the same reason as every other route —
+  // a primary surface that falls out of the nav is unreachable, not merely unstyled.
+  { key: 'workspace', hrefs: ['/dashboard', '/worklist', '/critical-results', '/reports/compose', '/templates', '/protocols', '/ai-assistant', '/findings-library'] },
+  { key: 'insights', hrefs: ['/reports', '/analytics', '/quality', '/peer-review', '/validation', '/audit'] },
+  { key: 'library', hrefs: ['/rulebooks', '/modalities', '/body-parts', '/prompts', '/marketplace', '/terminology', '/teaching'] },
   { key: 'integrations', hrefs: ['/providers', '/admin/ubag', '/admin/pacs', '/admin/fhir-import', '/offline'] },
   { key: 'admin', hrefs: ['/admin/users', '/admin/governance', '/admin/model-eval', '/admin/security', '/admin/feature-flags', '/admin/billing', '/admin/usage', '/admin/settings'] },
   // '/settings/models' is DESKTOP-only: the on-device engines run there, and the manager
