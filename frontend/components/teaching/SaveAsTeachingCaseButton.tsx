@@ -12,6 +12,8 @@ import {
 import { teachingCaseHref } from '@/lib/routes';
 import Banner from '@/components/ui/Banner';
 
+const DIFFICULTIES: readonly TeachingDifficulty[] = [0, 1, 2];
+
 export interface SaveAsTeachingCaseButtonProps {
   reportId: string;
   /** Optional seed for the case title (e.g. "CT Abdomen"). */
@@ -149,7 +151,7 @@ export default function SaveAsTeachingCaseButton({
           onChange={(e) => setDifficulty(Number(e.target.value) as TeachingDifficulty)}
           style={{ maxWidth: 220 }}
         >
-          {(Object.keys(TEACHING_DIFFICULTY_LABELS) as unknown as TeachingDifficulty[]).map((d) => (
+          {DIFFICULTIES.map((d) => (
             <option key={d} value={d}>{TEACHING_DIFFICULTY_LABELS[d]}</option>
           ))}
         </select>

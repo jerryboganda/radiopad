@@ -67,6 +67,10 @@ source for endpoint migration planning; where an endpoint has not yet moved to
 | `validation_packs.run` | Y | Y | Y |  | Y |  |
 | `mcp_tools.invoke` | Y | Y | Y |  | Y |  |
 | `mcp_tools.manage` |  | Y | Y |  | Y |  |
+| `critical_results.read` | Y | Y | Y | Y | Y |  |
+| `critical_results.manage` | Y |  | Y |  |  |  |
+| `teaching_cases.read` | Y | Y | Y | Y | Y |  |
+| `teaching_cases.manage` | Y | Y | Y |  | Y |  |
 
 ## Endpoint permission matrix (migration target)
 
@@ -90,6 +94,17 @@ source for endpoint migration planning; where an endpoint has not yet moved to
 | Validation pack manage/approve | `validation_packs.manage` | MedicalDirector, ItAdmin | Yes |
 | Validation pack run | `validation_packs.run` | Radiologist, ReportingAdmin, MedicalDirector, ItAdmin | No |
 | MCP invoke/manage | `mcp_tools.invoke` / `mcp_tools.manage` | Invoke: Radiologist, ReportingAdmin, MedicalDirector, ItAdmin. Manage: ReportingAdmin, MedicalDirector, ItAdmin. | Manage: Yes |
+| `GET /api/critical-results*` | `critical_results.read` | Radiologist, Resident, Fellow, Subspecialist, ReportingAdmin, MedicalDirector, ComplianceReviewer, ItAdmin, Auditor | No |
+| Critical-result log/communicate/acknowledge/escalate/close | `critical_results.manage` | Radiologist, Resident, Fellow, Subspecialist, MedicalDirector | No |
+| `GET /api/teaching-cases*` | `teaching_cases.read` | Radiologist, Resident, Fellow, Subspecialist, ReportingAdmin, MedicalDirector, ComplianceReviewer, ItAdmin, Researcher, Auditor | No |
+| Teaching-case create/update/publish/delete | `teaching_cases.manage` | Radiologist, Resident, Fellow, Subspecialist, ReportingAdmin, MedicalDirector, ItAdmin | No |
+
+**Teaching cases carry a second, non-permission gate.** `teaching_cases.manage`
+authorises authoring your OWN cases; editing, publishing, or deleting a case you
+did not author additionally requires a **library admin** role (`ItAdmin`,
+`MedicalDirector`, `ReportingAdmin`). Ownership is checked separately from the
+permission — see
+[docs/05-clinical/teaching-file.md](../05-clinical/teaching-file.md).
 
 Step-up MFA is a production requirement for the rows marked **Yes**. It is not
 fully enforced by all current endpoints yet; until implemented, treat those

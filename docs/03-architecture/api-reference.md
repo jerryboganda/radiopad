@@ -453,3 +453,46 @@ to the audit log.
 cadence) flips `Open` results past `dueAt` to `Escalated` and audits
 `CriticalResultEscalated` with `reason: "overdue_sweep"`. It never touches a
 result that was already communicated.
+
+## Teaching File (PRD §14.14, TF-001…TF-008)
+
+A per-tenant library of **de-identified** teaching cases. Full module notes:
+[docs/05-clinical/teaching-file.md](../05-clinical/teaching-file.md).
+
+**De-identification is mandatory and server-side (TF-002).** Every free-text
+field is passed through `TeachingCaseDeidentifier` before it is persisted —
+including the fields a caller supplies directly, so there is no DTO that can
+smuggle raw report text past the scrubber. `POST /from-report/{reportId}`
+additionally hands the study's accession number and patient reference to the
+scrubber as literals to strip, then re-checks the result and returns
+`500 { kind: "deidentification_failed" }` rather than saving a partially-scrubbed
+case. The `TeachingCases` table has **no column** for an accession number,
+patient reference, MRN, or date of birth.
+
+**Visibility (TF-007).** `Private` (0) is author-only; `Tenant` (1) is published
+to the whole tenant. Nothing widens a case beyond its owning tenant. Reading a
+private case you do not own returns `404`, never `403`.
+
+| Method | Path | Permission | Description |
+| --- | --- | --- | --- |
+| GET | `/api/teaching-cases` | `teaching_cases.read` | Search. Filters `?modality=`, `?bodyPart=`, `?difficulty=` (0 Introductory / 1 Intermediate / 2 Advanced), `?tag=`, `?q=`, `?mine=true`, `?skip=`, `?take=` (clamped 1–200). Returns `{ total, items }`. Scoped to tenant-published cases plus the caller's own private drafts. |
+| GET | `/api/teaching-cases/{id}` | `teaching_cases.read` | One case. Increments `viewCount` when the reader is not the author (TF-008). `sourceReportId` is returned only to the author or a library admin. |
+| POST | `/api/teaching-cases` | `teaching_cases.manage` | Create a hand-authored case. Body `{ title, modality?, bodyPart?, diagnosis?, teachingPoints?, clinicalHistory?, findingsText?, impressionText?, tags?, difficulty? }`. `400 { kind: "validation" }` on an empty title. Created `Private`. Audits `TeachingCaseCreated` (`origin: "blank"`). |
+| POST | `/api/teaching-cases/from-report/{reportId}` | `teaching_cases.manage` | TF-001/TF-002. Body `{ title?, diagnosis?, teachingPoints?, tags?, difficulty? }`. De-identifies the report's indication / findings / impression. `404` when the report is not in the caller's tenant. Created `Private`. Audits `TeachingCaseCreated` (`origin: "report"`, `deidentified: true`). |
+| PATCH | `/api/teaching-cases/{id}` | `teaching_cases.manage` | Update. Author or library admin only (`403 { kind: "forbidden" }`). Supplied text is re-scrubbed. |
+| POST | `/api/teaching-cases/{id}/publish` | `teaching_cases.manage` | TF-007 — set `Tenant` visibility, stamp `publishedAt`. Author or admin. Audits `TeachingCasePublished`. |
+| POST | `/api/teaching-cases/{id}/unpublish` | `teaching_cases.manage` | Back to `Private`, clears `publishedAt`. Audits `TeachingCaseUnpublished`. |
+| DELETE | `/api/teaching-cases/{id}` | `teaching_cases.manage` | Author or library admin only. Audits `TeachingCaseDeleted`. |
+
+**Library admin** = `ItAdmin`, `MedicalDirector`, or `ReportingAdmin`. Holding
+`teaching_cases.manage` alone does **not** let a clinician edit or delete a
+colleague's case — ownership is checked separately from the permission.
+
+**Audit hygiene.** Audit details carry the teaching-case id, the source report
+id, and the origin only. No case narrative and no patient identifier is written
+to the audit log.
+
+**Not yet implemented.** TF-003 (DICOM image attachment with pixel-level
+de-identification), TF-005 (quiz generator), TF-006 (MIRC export bundle), and the
+analytics dashboard half of TF-008 are out of this slice; `viewCount` is the
+data collection TF-008 will read from.

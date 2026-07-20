@@ -16,6 +16,8 @@ import Skeleton from '@/components/ui/Skeleton';
 import EmptyState from '@/components/ui/EmptyState';
 import ErrorState from '@/components/ui/ErrorState';
 
+const DIFFICULTIES: readonly TeachingDifficulty[] = [0, 1, 2];
+
 /**
  * PRD §14.14 (TF-004 / TF-007) — browse and search the tenant teaching library.
  *
@@ -142,7 +144,7 @@ export default function TeachingLibraryPage() {
               style={{ maxWidth: 180 }}
             >
               <option value="">All levels</option>
-              {(Object.keys(TEACHING_DIFFICULTY_LABELS) as unknown as TeachingDifficulty[]).map((d) => (
+              {DIFFICULTIES.map((d) => (
                 <option key={d} value={d}>{TEACHING_DIFFICULTY_LABELS[d]}</option>
               ))}
             </select>
