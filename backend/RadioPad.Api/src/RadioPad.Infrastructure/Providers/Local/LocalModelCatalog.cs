@@ -142,7 +142,7 @@ public sealed class LocalModelCatalog : ILocalModelCatalog
 
             new(
                 Id: parakeet.Name,
-                DisplayName: "Parakeet TDT 0.6B v3 — speech-to-text (alternative)",
+                DisplayName: "Custom Trained Radiology Ai TDT Model",
                 Kind: ModelKind.Stt,
                 Engine: SherpaParakeetSttClient.EngineName, // "parakeet"
                 DownloadUrl: parakeet.Url,

@@ -8,7 +8,7 @@ namespace RadioPad.Infrastructure.Providers.Local;
 /// </summary>
 public static class LocalSttModels
 {
-    public const string DefaultModelName = "parakeet-tdt-0.6b-v3";
+    public const string DefaultModelName = "radiology-tdt-v1-beta";
 
     /// <summary>
     /// NVIDIA Parakeet-TDT-0.6B-v3 INT8, packaged for sherpa-onnx (~465 MB).
