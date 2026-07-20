@@ -253,33 +253,6 @@ jobs:
             desktop/src-tauri/target/release/bundle/**/*.asc
           if-no-files-found: ignore
 
-  # --- MSI install + renderer-driven E2E --------------------------------------------------
-  #
-  # Full job lives in desktop-msi-e2e.yml (a reusable workflow, so it can ALSO be dispatched
-  # standalone against an already-built bundle artifact for fast iteration on the E2E itself).
-  # It installs the actual .msi, pre-places the pinned on-device models, and drives the
-  # installed renderer over CDP: login (incl. TOTP enrollment) → report → on-device MedGemma
-  # draft → apply → microphone dictation through MedASR.
-  #
-  # ADVISORY for now — it runs on every bundle and reports loudly, but does not block the
-  # release, because its CDP attach has never yet succeeded on a runner (see the note on the
-  # `release` job). Re-tighten once it has passed once.
-  msi-e2e:
-    name: msi-e2e
-    needs: bundle
-    permissions:
-      contents: read
-      actions: read
-    uses: ./.github/workflows/desktop-msi-e2e.yml
-    with:
-      advisory: true
-      # Verify the SHIPPED installer: it installs, its packaged sidecar serves, MedASR and
-      # MedGemma are present, the API answers. It cannot be driven through the UI — the
-      # shipped MSI has no CDP port and deliberately never will. The renderer + microphone
-      # flows are covered by the nightly `e2e-build` run against a throwaway bundle.
-      mode: shipped
-    secrets: inherit
-
   # --- Publish (single writer) ----------------------------------------------
   #
   # Attaching used to happen INSIDE the matrix, so both `bundle` jobs called
@@ -295,14 +268,10 @@ jobs:
   # artefacts.
   release:
     name: attach installers to the draft release
-    # NOT gated on msi-e2e while that harness is unproven. It was, briefly, and it stranded
-    # v0.1.91: the E2E's WebView2 CDP attach never worked on a runner, so `release` was skipped
-    # and `tauri-updater` (which needs this workflow to conclude success) never published
-    # latest.json — users stuck on an older build because a TEST could not attach a debugger.
-    # The packaged app is still verified by the bundle job's launch smoke (sidecar spawned,
-    # MedASR offered, draft-local not 503), which gated every release up to v0.1.90.
-    # RE-TIGHTEN to `needs: [bundle, msi-e2e]` (and flip the reusable workflow's `advisory`
-    # input to false) once msi-e2e has passed on a runner at least once.
+    # The packaged app is verified by the bundle job's launch smoke (sidecar spawned, MedASR
+    # offered, draft-local not 503). The renderer-driven MSI E2E (msi-e2e) was removed
+    # 2026-07-21 — operator decision to test releases manually rather than maintain an
+    # unproven CI harness (see PROGRESS.md).
     needs: bundle
     if: startsWith(github.ref, 'refs/tags/')
     runs-on: ubuntu-latest

@@ -4,6 +4,16 @@
 
 ---
 
+## msi-e2e CI job removed (2026-07-21)
+
+Operator decision: the renderer-driven MSI E2E (`desktop-bundle.yml`'s `msi-e2e` job +
+`desktop-msi-e2e.yml` reusable workflow + `scripts/desktop-msi-e2e.mjs`) is deleted. It was
+advisory-only and had never once completed a passing CDP-attach run on a Windows runner (see
+`IMPLEMENTATION_NOTES.md`'s "msi-e2e gate stranded two releases" note for the history) — it cost
+real CI time on every desktop release without ever gating anything. The operator will test
+releases manually and report issues directly. `release` in `desktop-bundle.yml` still needs only
+`bundle`, unchanged.
+
 ## PowerScribe/Dragon parity gap-closure sweep (2026-07-20)
 
 A PRD audit found seven real gaps against §14.13/§14.15/RPT-021/WL-00x/DESK-020.

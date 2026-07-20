@@ -6,28 +6,21 @@
 
 Browser-driven flows that exercise the static export against a running backend.
 
-## What ships today (2026-07-20)
+## What ships today (2026-07-21)
 
-**Desktop MSI E2E** — implemented, not planned. `desktop-bundle.yml`'s `msi-e2e` job installs the
-actual Windows `.msi` on every tag push, pre-places the pinned on-device models, and
-[`scripts/desktop-msi-e2e.mjs`](../../scripts/desktop-msi-e2e.mjs) (dependency-free Node 22
-driving the WebView2 devtools protocol) exercises the installed renderer: UI login including the
-mandatory TOTP enrollment, report creation, the dictation draft panel, a real on-device MedGemma
-format that must pass the safety validator (`.ai-mark`, "Requires review", spoken-measurement
-normalization asserted), Apply, and the **microphone capture path**: Chromium's fake audio
-device (`--use-file-for-fake-audio-capture`) plays the MedASR bundle's own radiology dictation
-sample into the overlay's real HQ mic button — getUserMedia → MediaRecorder → 16 kHz WAV →
-`/api/stt/transcribe` → on-device MedASR decode — and the E2E asserts the transcript's content
-words land in the focused section editor and that every transcribe response names MedASR as the
-serving model. The desktop release job depends on it. Screenshots and logs are uploaded as the
-`msi-e2e-evidence` artifact.
+**Desktop MSI E2E** — removed 2026-07-21 (operator decision: manual release testing instead of
+maintaining an unproven CI harness). It used to install the actual Windows `.msi` on every tag
+push and drive the installed renderer (login incl. TOTP enrollment, report creation, on-device
+MedGemma format + Apply, microphone dictation through MedASR) over CDP via
+`scripts/desktop-msi-e2e.mjs`; both the job (`desktop-bundle.yml`) and the reusable workflow
+(`desktop-msi-e2e.yml`) are gone. The desktop release is no longer gated on any renderer-driven
+test — see `PROGRESS.md` for the removal note.
 
-Not covered by it: the web/mobile surfaces (and the live Web-Speech "Dictate" mic, which is a
-platform engine, not RadioPad code — the on-device HQ path is the covered one).
+Not covered today: any automated renderer-driven verification of the desktop app. Releases are
+verified manually by the operator.
 
 ## Tooling
 
-- Desktop: raw CDP via `scripts/desktop-msi-e2e.mjs` (see above) — no framework, no npm deps.
 - Web: Playwright (still planned).
 
 ## Flows to cover
