@@ -1,0 +1,142 @@
+# Does the SHIPPED sidecar actually serve the on-device endpoints?
+#
+# Every other check in this repo verifies a component. This one verifies REACHABILITY, because that
+# is where the real defects were: MedGemma was pinned, provisioned, and covered by a green smoke
+# test in CI, while `POST /api/dictation/draft-local` returned `503 formatter_unavailable` in every
+# build ever shipped — the Tauri launcher never set `RADIOPAD_LOCAL_FORMATTER_ENABLED`, which
+# `LocalMedGemmaFormatter.Available` gates on. Nothing failed, because nothing asserted that a user
+# could get there.
+#
+# So this job publishes the sidecar EXACTLY as desktop-bundle does (self-contained single file),
+# starts it with EXACTLY the environment `sidecar_manager::sidecar_env()` produces, and then calls
+# the endpoints the desktop calls. The models are NOT downloaded here — that is deliberate. The
+# question is not "does inference work" (desktop-stt-smoke and offline-formatter-smoke answer that
+# with real models); it is "does the request reach the engine at all". A 503 "not available on this
+# build" means the capability never arrived and is a hard failure; a 502 transport error means the
+# flag arrived, the pipeline ran, and only the unprovisioned model was missing — which is a PASS.
+name: sidecar-reachability
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'backend/RadioPad.Api/**'
+      - 'desktop/src-tauri/src/sidecar_manager.rs'
+      - '.github/workflows/sidecar-reachability.yml'
+  workflow_dispatch:
+
+jobs:
+  reachability:
+    name: shipped sidecar serves the on-device endpoints
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '8.0.x'
+
+      # The launcher is the other half of the contract. If a capability flag is dropped there, the
+      # Rust unit test fails here rather than shipping a silently inert feature.
+      - name: Assert the launcher still sets every capability flag
+        shell: bash
+        run: |
+          set -euo pipefail
+          src=desktop/src-tauri/src/sidecar_manager.rs
+          for flag in RADIOPAD_LOCAL_STT_ENABLED RADIOPAD_LOCAL_FORMATTER_ENABLED; do
+            grep -q "\"$flag\"" "$src" || {
+              echo "::error file=$src::$flag is no longer set by the Tauri sidecar launcher."
+              echo "The backend gates a capability on it, so dropping it makes that feature"
+              echo "unreachable in the shipped app while every component test stays green."
+              exit 1
+            }
+            echo "ok: launcher sets $flag"
+          done
+          # D1: capability != default. The launcher must NOT force local formatting.
+          if grep -q '"RADIOPAD_LOCAL_FORMATTER_DEFAULT"' "$src"; then
+            echo "::error file=$src::the launcher must not set RADIOPAD_LOCAL_FORMATTER_DEFAULT —"
+            echo "cloud stays the default report formatter (decision D1); local is opt-in per draft."
+            exit 1
+          fi
+          echo "ok: launcher does not override the default formatter"
+
+      - name: Publish the sidecar exactly as the installer does
+        shell: bash
+        run: |
+          set -euo pipefail
+          dotnet publish backend/RadioPad.Api/src/RadioPad.Api/RadioPad.Api.csproj \
+            -c Release -r linux-x64 --self-contained true \
+            -p:PublishSingleFile=true -p:IncludeNativeLibrariesForSelfExtract=true \
+            -o publish/sidecar
+          chmod +x publish/sidecar/RadioPad.Api
+
+      - name: Start it with the launcher's environment
+        shell: bash
+        run: |
+          set -euo pipefail
+          # Mirrors sidecar_manager::sidecar_env() — including the deliberate ABSENCE of
+          # RADIOPAD_LOCAL_FORMATTER_DEFAULT.
+          RADIOPAD_BIND="http://127.0.0.1:7457" \
+          ASPNETCORE_ENVIRONMENT="Development" \
+          RADIOPAD_LOCAL_STT_ENABLED="1" \
+          RADIOPAD_LOCAL_FORMATTER_ENABLED="1" \
+          RADIOPAD_DB="Data Source=$RUNNER_TEMP/reach.db" \
+            ./publish/sidecar/RadioPad.Api > "$RUNNER_TEMP/sidecar.log" 2>&1 &
+          echo $! > "$RUNNER_TEMP/sidecar.pid"
+
+          for i in $(seq 1 60); do
+            if curl -fsS http://127.0.0.1:7457/api/health/ready >/dev/null 2>&1; then
+              echo "sidecar ready after ${i}s"; exit 0
+            fi
+            sleep 1
+          done
+          echo "::error::the sidecar never became ready"
+          cat "$RUNNER_TEMP/sidecar.log"
+          exit 1
+
+      - name: MedASR is offered by the on-device model manager
+        shell: bash
+        run: |
+          set -euo pipefail
+          body=$(curl -fsS http://127.0.0.1:7457/api/local-models)
+          echo "$body"
+          # The manager must LIST MedASR (not necessarily downloaded — this runner has no model).
+          # It shipping only to the web bundle, or dropping out of the catalog, both surface here.
+          echo "$body" | grep -q 'medasr' || {
+            echo "::error::/api/local-models does not offer MedASR — the default on-device engine"
+            echo "is not reachable from the shipped sidecar."
+            exit 1
+          }
+          echo "ok: MedASR offered"
+
+      - name: MedGemma on-device formatting is REACHABLE (not 503)
+        shell: bash
+        run: |
+          set -euo pipefail
+          code=$(curl -s -o "$RUNNER_TEMP/draft.json" -w '%{http_code}' \
+            -X POST http://127.0.0.1:7457/api/dictation/draft-local \
+            -H 'Content-Type: application/json' \
+            -d '{"rawDictation":"CT chest. No pneumothorax.","modality":"CT","bodyPart":"Chest"}')
+          echo "HTTP $code"; cat "$RUNNER_TEMP/draft.json"; echo
+
+          if [ "$code" = "503" ]; then
+            echo "::error::503 formatter_unavailable — the on-device formatter capability did NOT"
+            echo "reach the backend. This is the exact defect that shipped: MedGemma provisioned and"
+            echo "smoke-tested, yet unreachable to every user because the launcher never enabled it."
+            exit 1
+          fi
+
+          # 200 (a model happened to be present) or 502 (llama-server/GGUF absent on this runner)
+          # both prove the request got past the capability gate and into the pipeline.
+          case "$code" in
+            200|502) echo "ok: capability reached the backend (HTTP $code)" ;;
+            *) echo "::error::unexpected status $code from /api/dictation/draft-local"; exit 1 ;;
+          esac
+
+      - name: Stop the sidecar
+        if: always()
+        shell: bash
+        run: |
+          [ -f "$RUNNER_TEMP/sidecar.pid" ] && kill "$(cat "$RUNNER_TEMP/sidecar.pid")" 2>/dev/null || true
+          echo "--- sidecar log ---"
+          cat "$RUNNER_TEMP/sidecar.log" 2>/dev/null || true

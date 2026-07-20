@@ -25,6 +25,7 @@ namespace RadioPad.Infrastructure.Providers.Local;
 public sealed class LocalMedGemmaFormatter : ILocalReportFormatter
 {
     public const string EnabledEnv = "RADIOPAD_LOCAL_FORMATTER_ENABLED";
+    public const string DefaultEnv = "RADIOPAD_LOCAL_FORMATTER_DEFAULT";
     public const string UrlEnv = "RADIOPAD_LOCAL_LLAMA_URL";
     private const string DefaultUrl = "http://127.0.0.1:8080";
     private const string PromptVersion = "v1.dictation.medgemma";
@@ -87,6 +88,14 @@ public sealed class LocalMedGemmaFormatter : ILocalReportFormatter
     }
 
     public bool Available => !string.IsNullOrWhiteSpace(Environment.GetEnvironmentVariable(EnabledEnv));
+
+    /// <summary>
+    /// Opt-in, separate from <see cref="Available"/>: the desktop sidecar enables the CAPABILITY so
+    /// the on-device endpoint works, while cloud stays the default report formatter (decision D1).
+    /// Set <c>RADIOPAD_LOCAL_FORMATTER_DEFAULT</c> to route report-scoped drafting here too.
+    /// </summary>
+    public bool PreferredForReportDrafts =>
+        Available && !string.IsNullOrWhiteSpace(Environment.GetEnvironmentVariable(DefaultEnv));
 
     public async Task<FormatterOutput> FormatAsync(string protectedTranscript, DictationFormatContext context, CancellationToken ct)
     {

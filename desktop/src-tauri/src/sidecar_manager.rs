@@ -20,14 +20,49 @@ struct BackendStatus {
     restart_count: u32,
 }
 
-/// Loopback bind for the bundled STT sidecar.
+/// Environment the bundled sidecar is launched with.
 ///
-/// This sidecar is NOT the application's data backend — the desktop UI talks to
-/// the hosted production API (see `get_backend_url`). The sidecar exists ONLY to
-/// run on-device dictation transcription (Parakeet CPU engine), so
-/// its bind is a fixed loopback address, deliberately INDEPENDENT of
-/// `RADIOPAD_BACKEND` (which points the UI at production). `RADIOPAD_LOCAL_BIND`
-/// can override it for local development of the sidecar itself.
+/// This is a CONTRACT with the .NET backend: each `RADIOPAD_*_ENABLED` variable switches on an
+/// on-device capability that the backend gates by reading that exact name. The two sides live in
+/// different languages and different repos-worth of code, with nothing but this list joining them.
+///
+/// That gap shipped a real defect: `RADIOPAD_LOCAL_FORMATTER_ENABLED` was never set here, while
+/// `LocalMedGemmaFormatter.Available` gated on it — so `POST /api/dictation/draft-local` answered
+/// `503 formatter_unavailable` in every build ever shipped. MedGemma was provisioned, pinned,
+/// smoke-tested in CI and completely unreachable to a user, because one line was missing from this
+/// list. Hence the test below: it asserts the capability flags rather than trusting a reader to
+/// notice an absence.
+///
+/// Note the deliberate asymmetry: this enables the local formatter as a CAPABILITY, so the
+/// on-device endpoint serves. It does NOT set `RADIOPAD_LOCAL_FORMATTER_DEFAULT` — cloud stays the
+/// default report formatter per decision D1, and the radiologist opts in per draft.
+fn sidecar_env(bind: &str, db_conn: Option<&str>) -> Vec<(String, String)> {
+    let mut env = vec![
+        ("RADIOPAD_BIND".to_string(), bind.to_string()),
+        // Boot with local defaults instead of demanding cloud production secrets
+        // (RADIOPAD_AUTH_SECRET / RADIOPAD_COLUMN_KEY_*).
+        ("ASPNETCORE_ENVIRONMENT".to_string(), "Development".to_string()),
+        // On-device, offline STT (MedASR by default, Parakeet/SAPI selectable). The sidecar
+        // downloads the model to %LOCALAPPDATA% on first run and decodes the desktop's 16 kHz mono
+        // WAV in-process — no ffmpeg, no cloud.
+        ("RADIOPAD_LOCAL_STT_ENABLED".to_string(), "1".to_string()),
+        // On-device MedGemma report formatting (§4.2 local path), so the transcript never leaves
+        // the machine when the radiologist chooses it.
+        ("RADIOPAD_LOCAL_FORMATTER_ENABLED".to_string(), "1".to_string()),
+    ];
+    if let Some(conn) = db_conn {
+        env.push(("RADIOPAD_DB".to_string(), conn.to_string()));
+    }
+    env
+}
+
+/// Loopback bind for the bundled sidecar.
+///
+/// This sidecar is NOT the application's data backend — the desktop UI talks to the hosted
+/// production API (see `get_backend_url`). It exists ONLY to run on-device work (dictation
+/// transcription and, when the radiologist selects it, MedGemma report formatting), so its bind is
+/// a fixed loopback address, deliberately INDEPENDENT of `RADIOPAD_BACKEND` (which points the UI at
+/// production). `RADIOPAD_LOCAL_BIND` can override it for local development of the sidecar itself.
 fn stt_sidecar_bind() -> String {
     std::env::var("RADIOPAD_LOCAL_BIND").unwrap_or_else(|_| DEFAULT_BACKEND_URL.to_string())
 }
@@ -141,23 +176,10 @@ async fn supervise(app: AppHandle) {
             }
         };
 
-        // The bundled sidecar is a single-purpose, loopback-only ON-DEVICE STT host.
-        // It runs in the "Development" profile so it boots with local defaults
-        // instead of demanding cloud production secrets (RADIOPAD_AUTH_SECRET /
-        // RADIOPAD_COLUMN_KEY_*). It serves ONLY the anonymous, loopback-bound
-        // `/api/stt/transcribe` endpoint; the application's data, auth, and AI all
-        // go to the hosted production API, so no UBAG / proxy-token / dev-header
-        // wiring is needed here. The environment is scoped to this child process
-        // only — it does not touch machine env.
-        let mut command = sidecar
-            .env("RADIOPAD_BIND", &bind)
-            .env("ASPNETCORE_ENVIRONMENT", "Development")
-            // On-device, offline STT (NVIDIA Parakeet via sherpa-onnx).
-            // The sidecar downloads the model to %LOCALAPPDATA% on first run and
-            // decodes the desktop's 16 kHz mono WAV in-process — no ffmpeg, no cloud.
-            .env("RADIOPAD_LOCAL_STT_ENABLED", "1");
-        if let Some(ref conn) = db_conn {
-            command = command.env("RADIOPAD_DB", conn);
+        // The environment is scoped to this child process only — it does not touch machine env.
+        let mut command = sidecar;
+        for (key, value) in sidecar_env(&bind, db_conn.as_deref()) {
+            command = command.env(key, value);
         }
 
         let (mut rx, child) = match command.spawn() {
@@ -204,5 +226,45 @@ async fn supervise(app: AppHandle) {
 
         emit_status(&app, "restarting", None, restart_count);
         tokio::time::sleep(restart_delay(restart_count)).await;
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::sidecar_env;
+
+    fn value_of<'a>(env: &'a [(String, String)], key: &str) -> Option<&'a str> {
+        env.iter().find(|(k, _)| k == key).map(|(_, v)| v.as_str())
+    }
+
+    /// Every on-device capability the desktop depends on must actually be switched on for the
+    /// sidecar. `RADIOPAD_LOCAL_FORMATTER_ENABLED` was missing for the whole life of the feature,
+    /// so `/api/dictation/draft-local` returned 503 in every shipped build while MedGemma sat
+    /// downloaded and unreachable. Asserting the flags is the only thing that makes an ABSENCE
+    /// visible — nothing else fails when a line is simply not there.
+    #[test]
+    fn enables_every_on_device_capability() {
+        let env = sidecar_env("127.0.0.1:7457", None);
+        assert_eq!(value_of(&env, "RADIOPAD_LOCAL_STT_ENABLED"), Some("1"));
+        assert_eq!(value_of(&env, "RADIOPAD_LOCAL_FORMATTER_ENABLED"), Some("1"));
+        assert_eq!(value_of(&env, "RADIOPAD_BIND"), Some("127.0.0.1:7457"));
+        // Boots without cloud production secrets.
+        assert_eq!(value_of(&env, "ASPNETCORE_ENVIRONMENT"), Some("Development"));
+    }
+
+    /// Decision D1: cloud AI stays primary. Enabling the local formatter as a CAPABILITY must not
+    /// also make it the default report formatter — those are separate flags precisely so that
+    /// making the on-device endpoint reachable cannot silently reroute every desktop report draft.
+    #[test]
+    fn does_not_make_the_local_formatter_the_default() {
+        let env = sidecar_env("127.0.0.1:7457", None);
+        assert_eq!(value_of(&env, "RADIOPAD_LOCAL_FORMATTER_DEFAULT"), None);
+    }
+
+    #[test]
+    fn passes_the_db_connection_only_when_present() {
+        assert_eq!(value_of(&sidecar_env("127.0.0.1:7457", None), "RADIOPAD_DB"), None);
+        let with_db = sidecar_env("127.0.0.1:7457", Some("Data Source=x.db"));
+        assert_eq!(value_of(&with_db, "RADIOPAD_DB"), Some("Data Source=x.db"));
     }
 }

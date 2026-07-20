@@ -50,9 +50,13 @@ public sealed class DictationDraftService : IDictationDraftService
             // §5.4 — used by the local MedGemma formatter; the cloud formatter ignores it.
             Grammar: DictationGrammar.ReportSectionsGbnf);
 
-        // Optional offline formatter (MedGemma, on-device) when enabled + reachable; else the cloud
-        // formatter (default). The deterministic safety layers wrap whichever one runs.
-        IDictationFormatter formatter = _localFormatter.Available
+        // Cloud is the default report formatter (decision D1); the on-device one takes over here
+        // only when explicitly preferred, NOT merely because it is available. This used to read
+        // `Available ? local : cloud`, which conflated "can run here" with "should run by default"
+        // — so switching the capability on for the on-device endpoint would have silently rerouted
+        // every desktop report draft to MedGemma. The deterministic safety layers wrap whichever
+        // one runs.
+        IDictationFormatter formatter = _localFormatter.PreferredForReportDrafts
             ? _localFormatter
             : new CleanupServiceFormatter(_cleanup, tenant, user, report);
 
