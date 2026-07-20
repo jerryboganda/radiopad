@@ -22,7 +22,7 @@
 // Exit codes: 0 = pass (or tolerated headless-webview early-exit, loudly ::warning-ed),
 // non-zero = a real assertion failed. Screenshots land in RADIOPAD_E2E_OUT at every milestone.
 
-import { spawn } from 'node:child_process';
+import { spawn, spawnSync } from 'node:child_process';
 import { createHmac, randomBytes } from 'node:crypto';
 import { mkdirSync, writeFileSync, createWriteStream, existsSync, readdirSync, statSync } from 'node:fs';
 import { tmpdir } from 'node:os';
@@ -169,6 +169,28 @@ async function clickButton(cdp, label) {
   if (r !== 'ok') throw new Error(`button "${label}" not found`);
 }
 
+/**
+ * When CDP never comes up, the browser process command line is the definitive evidence: it
+ * shows whether --remote-debugging-port actually reached WebView2 (env var consumed) or the
+ * flag was lost (delivery problem) or no browser process exists at all (webview never
+ * initialized on this runner). Written to the evidence artifact and echoed to the log.
+ */
+function dumpWebviewDiagnostics() {
+  const ps = (cmd) =>
+    spawnSync('powershell', ['-NoProfile', '-Command', cmd], { encoding: 'utf8' }).stdout ?? '';
+  const procCmd =
+    "Get-CimInstance Win32_Process | Where-Object { $_.Name -match 'msedgewebview2|radiopad' } " +
+    '| Select-Object ProcessId,Name,CommandLine | Format-List | Out-String -Width 500';
+  const report = [
+    '--- msedgewebview2 / radiopad processes (command lines) ---',
+    ps(procCmd),
+    `--- listeners on :${CDP_PORT} ---`,
+    ps("netstat -ano | Select-String ':" + CDP_PORT + "'"),
+  ].join('\n');
+  console.log(report);
+  try { writeFileSync(path.join(OUT, 'webview-diagnostics.txt'), report); } catch { /* best effort */ }
+}
+
 // ── Locate the installed product ───────────────────────────────────────────────────────────
 function findInstalled() {
   const roots = [
@@ -281,16 +303,25 @@ async function main() {
   }
   // 16 kHz mono 16-bit PCM → 32000 bytes/second; record the whole utterance plus a tail.
   const micMs = Math.ceil(((statSync(micWav).size - 44) / 32000) * 1000);
+  const browserArgs = [
+    `--remote-debugging-port=${CDP_PORT}`,
+    '--use-fake-device-for-media-stream',
+    '--use-fake-ui-for-media-stream',
+    `--use-file-for-fake-audio-capture=${micWav}%noloop`,
+  ].join(' ');
+  // Belt and braces: WebView2 documents two delivery channels for additional browser args —
+  // the env var (checked first) and this per-exe HKCU policy value (checked when no env var
+  // is seen). Setting both means a broken env-inheritance path still gets the flags. The
+  // runner is ephemeral, so the policy value needs no cleanup.
+  spawnSync('reg', [
+    'add', 'HKCU\\Software\\Policies\\Microsoft\\Edge\\WebView2\\AdditionalBrowserArguments',
+    '/v', path.basename(appExe), '/t', 'REG_SZ', '/d', browserArgs, '/f',
+  ], { stdio: 'ignore' });
   const app = spawn(appExe, [], {
     env: {
       ...process.env,
       RADIOPAD_BACKEND: SIDECAR_URL,
-      WEBVIEW2_ADDITIONAL_BROWSER_ARGUMENTS: [
-        `--remote-debugging-port=${CDP_PORT}`,
-        '--use-fake-device-for-media-stream',
-        '--use-fake-ui-for-media-stream',
-        `--use-file-for-fake-audio-capture=${micWav}%noloop`,
-      ].join(' '),
+      WEBVIEW2_ADDITIONAL_BROWSER_ARGUMENTS: browserArgs,
     },
   });
   children.push([app, 'app']);
@@ -310,6 +341,7 @@ async function main() {
       return j && j.length ? j : null;
     }, 120_000, 2000);
   } catch (e) {
+    dumpWebviewDiagnostics();
     if (app.exitCode !== null) {
       if (STRICT) {
         throw new Error(

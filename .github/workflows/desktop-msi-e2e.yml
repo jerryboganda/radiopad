@@ -1,0 +1,193 @@
+name: desktop-msi-e2e
+
+# The MSI-install + renderer-driven E2E, extracted as a REUSABLE workflow so it runs two ways:
+#
+#   1. Called by desktop-bundle after every bundle (workflow_call, same-run artifact) — where it
+#      gates `release` on tag builds.
+#   2. Dispatched standalone against an ALREADY-BUILT bundle artifact (workflow_dispatch with the
+#      producing run's id) — a ~10-minute iteration loop for debugging the E2E itself without
+#      paying a full Tauri build each attempt.
+#
+# What it does: installs the actual .msi, pre-places the pinned on-device models where the
+# sidecar resolves them (%LOCALAPPDATA%\com.radiopad.desktop), then scripts/desktop-msi-e2e.mjs
+# drives the INSTALLED renderer over the WebView2 devtools protocol: login (incl. mandatory TOTP
+# enrollment computed from the secret the UI shows) → report → dictation draft panel → on-device
+# MedGemma format → apply → microphone dictation (Chromium's fake audio device plays the MedASR
+# bundle's radiology sample into the real HQ mic; every /api/stt/transcribe response must come
+# from MedASR).
+#
+# Strictness: on tag refs the script's headless-webview tolerance is disabled (a renderer that
+# never came up FAILS). github.ref inside a called workflow is the CALLER's ref, so tag builds
+# are strict and manual dispatches are tolerant, automatically.
+
+on:
+  workflow_call:
+    inputs:
+      run_id:
+        description: 'Run id to download the radiopad-windows-latest artifact from (empty = this run)'
+        required: false
+        type: string
+  workflow_dispatch:
+    inputs:
+      run_id:
+        description: 'desktop-bundle run id that produced the radiopad-windows-latest artifact'
+        required: true
+        type: string
+
+jobs:
+  msi-e2e:
+    name: install MSI + drive the renderer
+    runs-on: windows-latest
+    timeout-minutes: 60
+    permissions:
+      contents: read
+      actions: read # cross-run artifact download
+    env:
+      MEDGEMMA_SHA: b31becdf4f39561800505514cce67681604fe449d04dd35c8c92fd7848c6d7bd
+      LLAMA_TAG: b10068
+      LLAMA_WIN_SHA: 01d5f30876acfb4a0be59396710f450213495c7181d8fbcce2fad045835ceb89
+      MEDASR_SHA: 2c20f03265ee6144c566fd18b0f7bbb4f0d005d11ce9440dd641920210f4c33a
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22' # global WebSocket + fetch — the CDP driver has zero npm deps
+
+      - name: Download installer artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: radiopad-windows-latest
+          path: artifacts
+          run-id: ${{ inputs.run_id || github.run_id }}
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+
+      # Model/runtime downloads are cached and the MedGemma/MedASR keys deliberately match the
+      # ubuntu smoke workflows' keys — the blobs are platform-independent, so a weekly
+      # offline-formatter-smoke run keeps this job's 2.5 GB restore warm.
+      - name: Cache MedGemma GGUF
+        id: medgemma
+        uses: actions/cache@v4
+        with:
+          path: medgemma
+          key: medgemma-1.5-4b-q4-${{ env.MEDGEMMA_SHA }}
+
+      - name: Download + verify MedGemma
+        if: steps.medgemma.outputs.cache-hit != 'true'
+        shell: pwsh
+        run: |
+          New-Item -ItemType Directory -Force medgemma | Out-Null
+          curl.exe -fL --retry 5 --retry-all-errors -C - `
+            "https://huggingface.co/unsloth/medgemma-1.5-4b-it-GGUF/resolve/main/medgemma-1.5-4b-it-Q4_K_M.gguf" `
+            -o medgemma/medgemma-1.5-4b-it-Q4_K_M.gguf
+          if ($LASTEXITCODE -ne 0) { throw "MedGemma download failed" }
+          $h = (Get-FileHash -Algorithm SHA256 medgemma/medgemma-1.5-4b-it-Q4_K_M.gguf).Hash
+          if ($h -ine $env:MEDGEMMA_SHA) { throw "MedGemma SHA mismatch: $h" }
+
+      - name: Cache MedASR bundle
+        id: medasr
+        uses: actions/cache@v4
+        with:
+          path: medasr-model
+          key: stt-medasr-ctc-en-int8-2c20f032
+
+      - name: Download + verify MedASR
+        if: steps.medasr.outputs.cache-hit != 'true'
+        shell: pwsh
+        run: |
+          New-Item -ItemType Directory -Force medasr-model/test_wavs | Out-Null
+          $base = "https://huggingface.co/csukuangfj/sherpa-onnx-medasr-ctc-en-int8-2025-12-25/resolve/main"
+          curl.exe -fL "$base/model.int8.onnx" -o medasr-model/model.int8.onnx
+          if ($LASTEXITCODE -ne 0) { throw "MedASR model download failed" }
+          curl.exe -fL "$base/tokens.txt" -o medasr-model/tokens.txt
+          if ($LASTEXITCODE -ne 0) { throw "MedASR tokens download failed" }
+          # The sample WAV is NOT best-effort here: the E2E's microphone phase plays it as
+          # the fake capture device, so a missing file must fail now, not mid-drive.
+          curl.exe -fL "$base/test_wavs/0.wav" -o medasr-model/test_wavs/0.wav
+          if ($LASTEXITCODE -ne 0) { throw "MedASR sample wav download failed" }
+          $h = (Get-FileHash -Algorithm SHA256 medasr-model/model.int8.onnx).Hash
+          if ($h -ine $env:MEDASR_SHA) { throw "MedASR SHA mismatch: $h" }
+
+      - name: Cache llama-server runtime (windows)
+        id: llama
+        uses: actions/cache@v4
+        with:
+          path: llama-runtime-win
+          key: llama-server-${{ env.LLAMA_TAG }}-windows-x64
+
+      - name: Download + verify llama-server
+        if: steps.llama.outputs.cache-hit != 'true'
+        shell: pwsh
+        run: |
+          # Pin matches LocalRuntimes.LlamaServerArchive() for Windows. The WHOLE zip is kept:
+          # llama-server.exe is a 9 KB stub over llama-server-impl.dll + ggml-cpu-*.dll backends.
+          curl.exe -fL --retry 5 --retry-all-errors `
+            "https://github.com/ggml-org/llama.cpp/releases/download/$env:LLAMA_TAG/llama-$env:LLAMA_TAG-bin-win-cpu-x64.zip" `
+            -o llama.zip
+          if ($LASTEXITCODE -ne 0) { throw "llama-server download failed" }
+          $h = (Get-FileHash -Algorithm SHA256 llama.zip).Hash
+          if ($h -ine $env:LLAMA_WIN_SHA) { throw "llama-server SHA mismatch: $h" }
+          Expand-Archive llama.zip -DestinationPath llama-runtime-win
+          Remove-Item llama.zip
+
+      - name: Place models + runtime where the sidecar resolves them
+        shell: pwsh
+        run: |
+          # Mirrors LocalSttModels.ResolveModelDir / LocalRuntimes.ResolveRuntimeDir exactly —
+          # the script later asserts the sidecar reports these as downloaded, so a layout drift
+          # fails loudly rather than silently exercising the 502 path.
+          $root = Join-Path $env:LOCALAPPDATA 'com.radiopad.desktop'
+          New-Item -ItemType Directory -Force "$root/models/medgemma-1.5-4b-q4" | Out-Null
+          Copy-Item medgemma/medgemma-1.5-4b-it-Q4_K_M.gguf "$root/models/medgemma-1.5-4b-q4/"
+          New-Item -ItemType Directory -Force "$root/models/medasr-ctc-en-int8/test_wavs" | Out-Null
+          Copy-Item medasr-model/model.int8.onnx "$root/models/medasr-ctc-en-int8/"
+          Copy-Item medasr-model/tokens.txt "$root/models/medasr-ctc-en-int8/"
+          if (Test-Path medasr-model/test_wavs/0.wav) {
+            Copy-Item medasr-model/test_wavs/0.wav "$root/models/medasr-ctc-en-int8/test_wavs/"
+          }
+          New-Item -ItemType Directory -Force "$root/runtimes/llama-server-b10068" | Out-Null
+          Copy-Item -Recurse -Force llama-runtime-win/* "$root/runtimes/llama-server-b10068/"
+
+      - name: Install the MSI
+        shell: pwsh
+        run: |
+          $msi = Get-ChildItem artifacts -Recurse -Filter '*.msi' | Select-Object -First 1
+          if (-not $msi) { throw 'No MSI in the bundle artifact' }
+          Write-Host "Installing $($msi.FullName)"
+          $p = Start-Process msiexec -ArgumentList '/i', "`"$($msi.FullName)`"", '/qn', '/norestart', '/l*v', "$env:RUNNER_TEMP\msi-install.log" -Wait -PassThru
+          if ($p.ExitCode -ne 0 -and $p.ExitCode -ne 3010) {
+            Get-Content "$env:RUNNER_TEMP\msi-install.log" -Tail 60
+            throw "msiexec /i exited $($p.ExitCode)"
+          }
+          echo "RADIOPAD_E2E_MSI=$($msi.FullName)" >> $env:GITHUB_ENV
+
+      - name: Drive the installed app end to end
+        shell: pwsh
+        env:
+          RADIOPAD_E2E_OUT: ${{ runner.temp }}/e2e-out
+          # On tag builds this job gates the release, so the script's headless-webview
+          # tolerance is disabled — a renderer that never came up must FAIL, not warn.
+          RADIOPAD_E2E_STRICT: ${{ startsWith(github.ref, 'refs/tags/') && '1' || '0' }}
+          # The MedASR bundle's own radiology dictation sample, played by Chromium's fake
+          # audio device so the REAL mic button records real speech (mandatory phase).
+          RADIOPAD_E2E_MIC_WAV: ${{ github.workspace }}/medasr-model/test_wavs/0.wav
+        run: node scripts/desktop-msi-e2e.mjs
+
+      - name: Uninstall the MSI
+        if: always()
+        shell: pwsh
+        run: |
+          if ($env:RADIOPAD_E2E_MSI) {
+            $p = Start-Process msiexec -ArgumentList '/x', "`"$env:RADIOPAD_E2E_MSI`"", '/qn', '/norestart' -Wait -PassThru
+            if ($p.ExitCode -ne 0 -and $p.ExitCode -ne 3010) { throw "msiexec /x exited $($p.ExitCode)" }
+          }
+
+      - name: Upload E2E evidence (screenshots + logs)
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: msi-e2e-evidence
+          path: |
+            ${{ runner.temp }}/e2e-out/**/*
+            ${{ runner.temp }}/msi-install.log
+          if-no-files-found: warn
