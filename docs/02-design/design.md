@@ -55,7 +55,7 @@ If those files disagree with this document, this document wins.
 | RC-03 | Impression editor — numbered impressions, Accept/Undo per line | Empty / Generating / Awaiting review / Error |
 | RC-04 | Validation panel — severity tiles, inline linked issues, override | All clear / Mixed / Running / Engine offline |
 | RC-05 | Priors comparison — side-by-side diff, sync scroll | Changed/New blue vs Different amber chips |
-| RC-06 | AI actions bar — Generate Draft, scope chip, Route/Policy pill | AI activity rail |
+| RC-06 | Composer ribbon — Review / AI Compose / Sign-off grouped icon buttons, Rewrite ▾ menu, scope chip | AI activity rail |
 | RC-07 | Citation & provenance modal | Loading / Source unavailable |
 | RC-08 | Dictation bar | Idle blue / Listening green / Paused amber / Processing blue / Disconnected red / Error red |
 | RC-09 | Export panel — destinations, validation gate, step-up | Blocked / Sending / Delivered / Failed |
@@ -687,8 +687,12 @@ reporting-workspace anatomy (PRD §20.9) — pixel-faithful to the mockups:
   Technique / Findings / Impression) with "Copied from RIS" and "Requires
   review" chips and per-section ⋮ menus. Generated lines wear the §4.1
   treatment with Accept/Undo per line (RC-02/03, SectionEditor decorations).
-- **AI actions bar** (RC-06) — Generate Draft (blue filled) + action row,
-  scope chip, Route/Policy pill, AI activity rail.
+- **Composer ribbon** (RC-06) — unified Word-style ribbon merging report
+  tools and AI actions into three icon-button groups: Review (Dictate/Voice
+  cmds/Validate/Compare/Format draft), AI Compose (Generate Draft, blue
+  filled/Generate Impression/Rewrite ▾ — Concise/Formal/Patient-friendly/
+  Referring summary/Custom edit, each iconed/In my style/scope chip), and
+  Sign-off (Sign & send/Acknowledge & lock/Review & sign). AI activity rail.
 - **Right rail tabs** — Review checklist (progress ring) / Details /
   Validation (RC-04) / AI activity / Export (RC-09: destinations with Ready
   badges → per-destination format → validation gate → data-boundary notice →
