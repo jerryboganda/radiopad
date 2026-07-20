@@ -1,6 +1,6 @@
 # Design: compute discipline — heavy work on CI, no local babysitting
 
-**Date:** 2026-07-19
+**Date:** 2026-07-20
 **Status:** Approved (design), pending implementation
 
 Two related operator rules, both currently unenforced:
