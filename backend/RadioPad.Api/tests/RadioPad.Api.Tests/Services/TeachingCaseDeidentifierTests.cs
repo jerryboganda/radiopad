@@ -83,6 +83,48 @@ public class TeachingCaseDeidentifierTests
         Assert.Contains(mustSurvive, scrubbed);
     }
 
+    /// <summary>
+    /// HIPAA Safe Harbor §164.514(b)(2)(i)(C) — an age over 89 is itself an
+    /// identifier (the over-89 cohort is small enough to re-identify from), so
+    /// it must be aggregated into a single "90 or older" band. Ages 0–89 are
+    /// explicitly NOT identifiers and must survive verbatim, which is why the
+    /// boundary is pinned from both sides.
+    /// </summary>
+    [Theory]
+    [InlineData("92-year-old female with a hip fracture.", "90 or older")]
+    [InlineData("The patient is a 97 year old man.", "90 or older")]
+    [InlineData("Aged 104, presenting with confusion.", "90 or older")]
+    [InlineData("103-year-old with pneumonia.", "90 or older")]
+    [InlineData("90-year-old male, routine follow-up.", "90 or older")]
+    public void Bands_Ages_Over_89(string text, string expected)
+    {
+        var scrubbed = TeachingCaseDeidentifier.Scrub(text);
+        Assert.Contains(expected, scrubbed);
+        Assert.DoesNotContain("-year-old", scrubbed);
+    }
+
+    [Theory]
+    [InlineData("89-year-old female with a hip fracture.", "89-year-old")]
+    [InlineData("45-year-old male with abdominal pain.", "45-year-old")]
+    [InlineData("A 72 year old presenting with dyspnoea.", "72 year old")]
+    public void Leaves_Ages_Under_90_Alone(string text, string mustSurvive)
+    {
+        var scrubbed = TeachingCaseDeidentifier.Scrub(text);
+        Assert.Contains(mustSurvive, scrubbed);
+        Assert.DoesNotContain("90 or older", scrubbed);
+    }
+
+    [Fact]
+    public void Age_Banding_Keeps_The_Rest_Of_The_Sentence()
+    {
+        var scrubbed = TeachingCaseDeidentifier.Scrub(
+            "94-year-old male with a 3 cm right upper lobe mass.");
+        Assert.Contains("90 or older", scrubbed);
+        Assert.Contains("male", scrubbed);
+        Assert.Contains("3 cm", scrubbed);
+        Assert.Contains("right upper lobe mass", scrubbed);
+    }
+
     [Fact]
     public void Collapses_Adjacent_Placeholders()
     {

@@ -9,11 +9,9 @@ using RadioPad.Domain.ValueObjects;
 namespace RadioPad.Application.Services;
 
 /// <summary>
-/// Routes AI completion requests across registered provider adapters. The
-/// PHI/compliance gate was removed by operator decision (2026-07-20) — all
-/// providers are eligible for all requests; only the Enabled toggle applies.
-/// The gateway is the only component allowed to call provider APIs in
-/// production.
+/// Routes AI completion requests across registered provider adapters while
+/// enforcing PHI policy (PROV-001..010, §14.3). The gateway is the only
+/// component allowed to call provider APIs in production.
 /// </summary>
 public class AiGateway : IAiGateway
 {
@@ -224,14 +222,38 @@ public class AiGateway : IAiGateway
         }
     }
 
-    // PHI gate removed (operator decision 2026-07-20): every provider may
-    // receive any request regardless of compliance class or PHI content.
-    // The only remaining check is the per-provider Enabled toggle.
+    /// <summary>
+    /// PROV-001..010 / §14.3 — PHI may only reach a PhiApproved or LocalOnly provider.
+    ///
+    /// <para><b>RESTORED 2026-07-20.</b> This gate was deleted in commit bf1fbf4 with an inline
+    /// comment attributing the removal to an operator decision. No such decision is recorded
+    /// anywhere: CLAUDE.md still lists this as a non-negotiable safety boundary, the two tests
+    /// that assert it (<c>RewriteModeTests.Rewrite_Phi_Policy_Blocks_NonCompliant_Provider</c>
+    /// and <c>AiPolicyHttpTests.Sandbox_Provider_Rejects_Phi_Bearing_Request</c>) were left
+    /// failing rather than updated, and no doc or regulatory note changed. A real decision to
+    /// route PHI to arbitrary third-party providers would have moved all of those together.</para>
+    ///
+    /// <para>Removing it means PHI leaving the tenant's approved boundary — a reportable breach
+    /// under UKCA/MHRA/CE/FDA obligations, not a config preference. If the removal IS wanted,
+    /// it must be done deliberately: update CLAUDE.md, rewrite these tests to assert the new
+    /// behaviour, and record the regulatory rationale here.</para>
+    /// </summary>
     private static void EnforcePhiPolicy(Tenant tenant, AiCompletionRequest req)
     {
         var p = req.Provider;
         if (!p.Enabled)
             throw new ProviderPolicyException($"Provider '{p.Name}' is disabled.");
+        if (p.Compliance == ProviderComplianceClass.Blocked)
+            throw new ProviderPolicyException($"Provider '{p.Name}' is blocked by tenant policy.");
+
+        if (req.ContainsPhi)
+        {
+            var phiOk = p.Compliance is ProviderComplianceClass.PhiApproved or ProviderComplianceClass.LocalOnly;
+            if (!phiOk)
+                throw new ProviderPolicyException(
+                    $"Cannot route PHI to '{p.Name}' (compliance={p.Compliance}). " +
+                    $"Tenant '{tenant.Slug}' requires a PHI-approved or local provider for PHI workflows.");
+        }
     }
 
     private static string Sha256(string s)

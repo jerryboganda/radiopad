@@ -33,8 +33,20 @@ export function isSharedMacrosLoaded(): boolean {
  */
 export function loadSharedMacros(subspecialty?: string): Promise<SharedMacro[]> {
   if (inFlight) return inFlight;
-  inFlight = api.macros
-    .list(subspecialty)
+
+  // `api.macros` can be absent outright — a surface whose bundle predates the endpoint, or a
+  // caller holding a partial api object. That throws SYNCHRONOUSLY, before any promise exists,
+  // so the .catch() below never sees it; the rejection escapes into the caller's useEffect and
+  // React unmounts the entire report editor. A missing macro endpoint must degrade to "no
+  // shared macros", never to a dead screen — the same fail-soft contract the .catch() states.
+  const list = api.macros?.list;
+  if (typeof list !== 'function') {
+    loaded = true;
+    return Promise.resolve(cache);
+  }
+
+  inFlight = list
+    .call(api.macros, subspecialty)
     .then((rows) => {
       cache = rows;
       loaded = true;

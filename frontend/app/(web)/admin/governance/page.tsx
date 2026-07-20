@@ -410,9 +410,10 @@ export default function AdminGovernancePage() {
           </div>
         </div>
         <p className="rp-page-sub rp-mt-sm">
-          The PHI compliance gate was removed (operator decision 2026-07-20): every enabled
-          provider may receive PHI regardless of compliance class. Historical blocks remain
-          recorded as <code>ProviderBlocked</code> in the append-only audit chain.
+          PHI requests are blocked in <code>AiGateway.EnforcePhiPolicy</code> unless the provider
+          carries <span className="badge ok">PHI-approved</span> or{' '}
+          <span className="badge ok">Local-only</span>; every block is recorded as{' '}
+          <code>ProviderBlocked</code> in the append-only audit chain.
         </p>
       </div>
 

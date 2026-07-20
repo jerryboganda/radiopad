@@ -84,6 +84,27 @@ public static class TeachingCaseDeidentifier
         @"(?:\[de-identified\])(?:[\s,;]*\[de-identified\])+",
         Opts);
 
+    /// <summary>What an age over 89 is replaced with (HIPAA Safe Harbor band).</summary>
+    private const string ElderlyBand = "90 or older";
+
+    /// <summary>
+    /// An age carrying its unit — "92-year-old", "92 year old", "92 years old",
+    /// "92 y/o", "92yo". The whole match (number AND unit) is replaced, so
+    /// "92-year-old male" becomes "90 or older male"; anything after the unit is
+    /// outside the match and survives untouched.
+    /// </summary>
+    private static readonly Regex AgeWithUnit = new(
+        @"\b(?<age>\d{1,3})\s*-?\s*(?:year[s]?\s*-?\s*old|yrs?\s*-?\s*old|y\.?\s*/?\s*o\.?|yo)\b",
+        Opts);
+
+    /// <summary>
+    /// The "aged 92" phrasing, which carries no unit token for
+    /// <see cref="AgeWithUnit"/> to anchor on.
+    /// </summary>
+    private static readonly Regex AgedPrefix = new(
+        @"\baged\s+(?<age>\d{1,3})\b",
+        Opts);
+
     /// <summary>
     /// De-identify one free-text field. <paramref name="literalIdentifiers"/>
     /// carries identifiers already known for the source study (accession
@@ -125,11 +146,28 @@ public static class TeachingCaseDeidentifier
         // 5. Accession-shaped tokens that carried no label.
         s = AccessionShaped.Replace(s, Placeholder);
 
+        // 5b. HIPAA Safe Harbor §164.514(b)(2)(i)(C) — ages over 89 are an
+        //     identifier (the >89 cohort is small enough to re-identify), and
+        //     must be aggregated into a single "90 or older" band. Ages 0–89
+        //     are NOT identifiers and stay exactly as written, because
+        //     "45-year-old male" is the clinical substance of the case.
+        s = AgeWithUnit.Replace(s, m => IsElderly(m) ? ElderlyBand : m.Value);
+        s = AgedPrefix.Replace(s, m => IsElderly(m) ? $"aged {ElderlyBand}" : m.Value);
+
         // 6. Generic backstop — "Patient: Jane Doe", SSNs, long digit runs.
         s = PhiRedactor.Redact(s).Replace("<redacted:phi>", Placeholder);
 
         return PlaceholderRun.Replace(s, Placeholder).Trim();
     }
+
+    /// <summary>
+    /// True when the matched age is 90 or above — the point at which HIPAA
+    /// Safe Harbor treats the age itself as an identifier. An unparseable
+    /// capture is left alone rather than banded: mangling "12 mm" would cost
+    /// more than the (impossible) miss.
+    /// </summary>
+    private static bool IsElderly(Match m) =>
+        int.TryParse(m.Groups["age"].Value, out var age) && age >= 90;
 
     /// <summary>
     /// True when <paramref name="text"/> still contains any of the supplied

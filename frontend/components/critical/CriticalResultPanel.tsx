@@ -91,8 +91,19 @@ export default function CriticalResultPanel({ reportId }: CriticalResultPanelPro
   const load = useCallback(() => {
     setLoading(true);
     setErr(null);
-    api.criticalResults
-      .list({ reportId })
+    // `.catch` only sees promise rejections. If `api.criticalResults` is absent — a bundle that
+    // predates the endpoint, or a partial api object — the property access throws synchronously
+    // and the rejection escapes this effect, unmounting the whole report editor rather than just
+    // this panel. Degrade to an empty, error-labelled panel instead.
+    const list = api.criticalResults?.list;
+    if (typeof list !== 'function') {
+      setItems([]);
+      setErr('Critical results are unavailable in this build.');
+      setLoading(false);
+      return;
+    }
+    list
+      .call(api.criticalResults, { reportId })
       .then((rows) => setItems(rows))
       .catch((e: Error) => setErr(e.message))
       .finally(() => setLoading(false));
