@@ -25,6 +25,14 @@ import {
   type HotkeyCategory,
   type HotkeyDef,
 } from '@/lib/hotkeys';
+import {
+  FOOT_PEDAL_ACTIONS,
+  FOOT_PEDAL_CHANGE_EVENT,
+  getFootPedalBindings,
+  resetFootPedalBindings,
+  setFootPedalBinding,
+  type FootPedalBindings,
+} from '@/lib/dictation/footPedal';
 
 type CategoryFilter = 'all' | HotkeyCategory;
 
@@ -404,6 +412,103 @@ export default function HotkeysPage() {
           )}
         </>
       )}
+      <FootPedalPanel />
     </Container>
+  );
+}
+
+/* ── DESK-020 — foot pedal ────────────────────────────────────────────── */
+
+/**
+ * Foot-pedal bindings. Pedals in keyboard mode emit plain key events
+ * (typically F13–F24), so capture stores the raw KeyboardEvent.code — no
+ * modifier chords. Works while the RadioPad window has focus.
+ */
+function FootPedalPanel() {
+  const [bindings, setBindings] = useState<FootPedalBindings>(getFootPedalBindings);
+  const [capturing, setCapturing] = useState<keyof FootPedalBindings | null>(null);
+
+  useEffect(() => {
+    const sync = () => setBindings(getFootPedalBindings());
+    window.addEventListener(FOOT_PEDAL_CHANGE_EVENT, sync);
+    window.addEventListener('storage', sync);
+    return () => {
+      window.removeEventListener(FOOT_PEDAL_CHANGE_EVENT, sync);
+      window.removeEventListener('storage', sync);
+    };
+  }, []);
+
+  useEffect(() => {
+    if (!capturing) return;
+    const onKey = (e: KeyboardEvent) => {
+      e.preventDefault();
+      e.stopPropagation();
+      if (e.key === 'Escape') {
+        setCapturing(null);
+        return;
+      }
+      setFootPedalBinding(capturing, e.code);
+      setCapturing(null);
+    };
+    window.addEventListener('keydown', onKey, true);
+    return () => window.removeEventListener('keydown', onKey, true);
+  }, [capturing]);
+
+  return (
+    <div className="rp-panel" style={{ marginTop: 16 }}>
+      <div className="rp-panel-title">Foot pedal</div>
+      <p className="rp-page-sub" style={{ marginTop: 4 }}>
+        Transcription pedals in keyboard mode (Infinity, Olympus, Philips, VEC…) send ordinary
+        key presses — usually F13–F24. Press a pedal while capturing to bind it. Pedals work
+        while the RadioPad window is focused.
+      </p>
+      <div className="table-wrap">
+        <table className="rp-table">
+          <thead>
+            <tr>
+              <th>Action</th>
+              <th>Pedal key</th>
+              <th aria-label="Controls" />
+            </tr>
+          </thead>
+          <tbody>
+            {FOOT_PEDAL_ACTIONS.map(({ key, label, description }) => (
+              <tr key={key}>
+                <td>
+                  <div className="text-ink" style={{ fontWeight: 600 }}>{label}</div>
+                  <div className="rp-page-sub">{description}</div>
+                </td>
+                <td>
+                  {capturing === key ? (
+                    <span className="status-badge" data-tone="review">Press a pedal… (Esc cancels)</span>
+                  ) : bindings[key] ? (
+                    <Kbd binding={bindings[key]} />
+                  ) : (
+                    <span className="status-badge" data-tone="muted">Not bound</span>
+                  )}
+                </td>
+                <td>
+                  <div className="rp-row" style={{ gap: 6, justifyContent: 'flex-end' }}>
+                    <button className="subtle" onClick={() => setCapturing(key)}>
+                      <Pencil size={13} aria-hidden /> Capture
+                    </button>
+                    {bindings[key] && (
+                      <button className="subtle" onClick={() => setFootPedalBinding(key, '')}>
+                        Clear
+                      </button>
+                    )}
+                  </div>
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+      <div className="rp-row" style={{ marginTop: 8 }}>
+        <button className="subtle" onClick={() => resetFootPedalBindings()}>
+          <RotateCcw size={13} aria-hidden /> Reset to F13/F14/F15
+        </button>
+      </div>
+    </div>
   );
 }

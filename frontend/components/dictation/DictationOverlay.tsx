@@ -26,6 +26,7 @@ import { formatDictation } from '@/lib/dictation/medicalFormat';
 import { resolveCorrections, applyCorrections, type CorrectionRule } from '@/lib/dictation/resolveCorrections';
 import { parseVoiceEditCommand } from '@/lib/dictation/voiceEditCommands';
 import { createPushToTalk } from '@/lib/dictation/pushToTalk';
+import { useFootPedal } from '@/lib/dictation/footPedal';
 import { startInterimDecode } from '@/lib/dictation/interimDecode';
 import { blobToWav16kMono } from '@/lib/dictation/wavEncode';
 import {
@@ -71,6 +72,10 @@ function insertDictation(text: string): boolean {
 }
 
 export default function DictationOverlay() {
+  // DESK-020 — foot-pedal control (hold-to-talk / toggle / next field). The
+  // pedal module drives this overlay through the same toggle event the
+  // ribbon's Dictate button uses, so the overlay stays the single owner.
+  useFootPedal();
   const [supported, setSupported] = useState(false);
   const [listening, setListening] = useState(false);
   const [interim, setInterim] = useState('');
