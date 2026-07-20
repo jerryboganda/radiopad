@@ -1,13 +1,28 @@
 'use client';
 
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
+import {
+  BrainCircuit,
+  CircleCheck,
+  CircleDashed,
+  Download,
+  Mic,
+  Play,
+  RotateCcw,
+  Server,
+  Sparkles,
+  Trash2,
+  Volume2,
+} from 'lucide-react';
 import {
   api,
   type LocalModel,
   type LocalModelKind,
   type ModelProvisioning,
   type ModelTestResult,
+  type Provider,
 } from '@/lib/api';
+import { ensureOnDeviceProvider, findOnDeviceProvider } from '@/lib/models/onDeviceProvider';
 import { probeWebSpeechAvailable } from '@/lib/dictation/speech';
 import ErrorState from '@/components/ui/ErrorState';
 import { TableSkeleton } from '@/components/ui/Skeleton';
@@ -16,10 +31,17 @@ const KIND_ORDER: LocalModelKind[] = ['Stt', 'Tts', 'Orchestrator'];
 const KIND_LABEL: Record<LocalModelKind, string> = {
   Stt: 'Speech-to-text (dictation)',
   Tts: 'Text-to-speech',
-  Orchestrator: 'Orchestrator brain',
+  Orchestrator: 'Report formatting (on-device AI)',
+};
+const KIND_ICON: Record<LocalModelKind, typeof Mic> = {
+  Stt: Mic,
+  Tts: Volume2,
+  Orchestrator: BrainCircuit,
 };
 
 const ACTIVE_STATES = ['Downloading', 'Verifying', 'Extracting', 'Installing'];
+/** States where a percentage would be invented — the total is not known yet. */
+const INDETERMINATE_STATES = ['Verifying', 'Extracting', 'Installing'];
 
 function fmtBytes(n: number): string {
   if (!n) return '—';
@@ -32,16 +54,44 @@ function errText(e: unknown): string {
   return err?.body?.error ?? (e as Error)?.message ?? 'Something went wrong.';
 }
 
+function provisioningOf(m: LocalModel): ModelProvisioning {
+  return m.provisioning ?? 'HostedFile';
+}
+
+/** Orchestrator entries need a runtime as well as the model — see {@link ModelRuntime}. */
+function isOrchestrator(m: LocalModel): boolean {
+  return m.kind === 'Orchestrator' && !m.placeholder;
+}
+
+/**
+ * Is this entry usable right now? Deliberately not just `downloaded`: an orchestrator
+ * with its GGUF on disk but no runtime is not ready, and saying otherwise is what made
+ * the old card claim "Ready" for a model that could not run.
+ */
+function isReady(m: LocalModel): boolean {
+  if (m.placeholder) return false;
+  if (provisioningOf(m) !== 'HostedFile') return m.available;
+  if (m.kind === 'Orchestrator') return m.available;
+  return m.downloaded;
+}
+
 /**
  * On-device AI model manager — the "On-device models" tab of the AI models page.
- * Lists the local model catalog grouped by kind (STT actionable today; TTS +
- * orchestrator are "coming soon" placeholders), with download (live progress),
- * delete, test, and copyable diagnostics. Driven entirely by the backend
- * `enabled` flag, so on the web it renders read-only with a desktop-only notice.
+ * Lists the local model catalog grouped by kind, with download (live progress),
+ * re-download/repair, delete, test, and copyable diagnostics.
+ *
+ * Orchestrator models additionally expose their prerequisite chain (model → runtime →
+ * server) and can be registered as a report-generation provider, which is the only
+ * route to that from the desktop app: the provider admin screen lives in the `(web)`
+ * route group and is staged out of the desktop bundle.
+ *
+ * Driven entirely by the backend `enabled` flag, so on the web it renders read-only
+ * with a desktop-only notice.
  */
 export default function OnDeviceModels() {
   const [enabled, setEnabled] = useState(true);
   const [models, setModels] = useState<LocalModel[]>([]);
+  const [providers, setProviders] = useState<Provider[] | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
@@ -58,9 +108,21 @@ export default function OnDeviceModels() {
     }
   }, []);
 
+  // Which on-device models are already registered as report-generation providers.
+  // Best-effort: a user without ProvidersRead still gets a working model manager,
+  // they just do not see the "already selectable" state.
+  const refreshProviders = useCallback(async () => {
+    try {
+      setProviders(await api.providers.list());
+    } catch {
+      setProviders(null);
+    }
+  }, []);
+
   useEffect(() => {
     void refresh();
-  }, [refresh]);
+    void refreshProviders();
+  }, [refresh, refreshProviders]);
 
   // Poll while any model is mid-download so the progress bars advance.
   useEffect(() => {
@@ -71,6 +133,15 @@ export default function OnDeviceModels() {
     }, 1200);
     return () => clearInterval(t);
   }, [models, refresh]);
+
+  const grouped = useMemo(
+    () =>
+      KIND_ORDER.map((kind) => ({
+        kind,
+        items: models.filter((m) => m.kind === kind),
+      })).filter((g) => g.items.length > 0),
+    [models],
+  );
 
   if (loading && models.length === 0) return <TableSkeleton rows={3} cols={3} />;
   if (error && models.length === 0)
@@ -84,11 +155,6 @@ export default function OnDeviceModels() {
       />
     );
 
-  const grouped = KIND_ORDER.map((kind) => ({
-    kind,
-    items: models.filter((m) => m.kind === kind),
-  })).filter((g) => g.items.length > 0);
-
   return (
     <div>
       {!enabled && (
@@ -99,23 +165,47 @@ export default function OnDeviceModels() {
       )}
       {error && models.length > 0 && <div className="banner warn">{error}</div>}
 
-      {grouped.map((g) => (
-        <div key={g.kind} className="rp-panel" style={{ marginBottom: 16 }}>
-          <div className="rp-panel-title">{KIND_LABEL[g.kind]}</div>
-          <div className="rp-grid-2">
-            {g.items.map((m) => (
-              <ModelCard key={m.id} model={m} enabled={enabled} onChanged={refresh} />
-            ))}
-          </div>
-        </div>
-      ))}
+      {grouped.map((g) => {
+        const SectionIcon = KIND_ICON[g.kind];
+        const ready = g.items.filter(isReady).length;
+        const real = g.items.filter((m) => !m.placeholder).length;
+        return (
+          <section key={g.kind} className="rp-model-section">
+            <div className="rp-model-section-head">
+              <span className="rp-model-section-icon">
+                <SectionIcon aria-hidden size={16} />
+              </span>
+              <h3>{KIND_LABEL[g.kind]}</h3>
+              {real > 0 && (
+                <span className="rp-model-section-count">
+                  {ready} of {real} ready
+                </span>
+              )}
+            </div>
+            <div className="rp-model-grid">
+              {g.items.map((m) => (
+                <ModelCard
+                  key={m.id}
+                  model={m}
+                  enabled={enabled}
+                  provider={providers ? findOnDeviceProvider(providers, m.id) : undefined}
+                  onChanged={async () => {
+                    await refresh();
+                    await refreshProviders();
+                  }}
+                />
+              ))}
+            </div>
+          </section>
+        );
+      })}
     </div>
   );
 }
 
 function StateBadge({ model, edgeOk }: { model: LocalModel; edgeOk?: boolean | null }) {
   if (model.placeholder) return <span className="badge">Coming soon</span>;
-  const provisioning: ModelProvisioning = model.provisioning ?? 'HostedFile';
+  const provisioning = provisioningOf(model);
   if (provisioning === 'BrowserWebSpeech') {
     if (edgeOk == null) return <span className="badge">Checking…</span>;
     return edgeOk ? (
@@ -136,37 +226,115 @@ function StateBadge({ model, edgeOk }: { model: LocalModel; edgeOk?: boolean | n
     ) : (
       <span className="badge warn">Needs language pack</span>
     );
+
   const s = model.progress.state;
   if (ACTIVE_STATES.includes(s)) return <span className="badge ai">{s}…</span>;
   if (s === 'Failed') return <span className="badge danger">Failed</span>;
-  if (model.downloaded) return <span className="badge ok">Ready</span>;
-  return <span className="badge warn">Not downloaded</span>;
+  if (!model.downloaded) return <span className="badge warn">Not downloaded</span>;
+  // Downloaded but the rest of the chain is incomplete — say so rather than "Ready".
+  if (isOrchestrator(model) && !model.available)
+    return <span className="badge warn">Setup incomplete</span>;
+  return <span className="badge ok">Ready</span>;
+}
+
+/** Live download/install progress. Percentage only when the total is actually known. */
+function ProgressRow({ model }: { model: LocalModel }) {
+  const { state, bytesDownloaded, totalBytes } = model.progress;
+  const indeterminate = INDETERMINATE_STATES.includes(state) || totalBytes <= 0;
+  const pct = totalBytes > 0 ? Math.min(100, Math.round((bytesDownloaded / totalBytes) * 100)) : null;
+
+  return (
+    <div>
+      <div className="rp-progress-label">
+        <span>
+          {state}
+          {!indeterminate && totalBytes > 0 && (
+            <> — {fmtBytes(bytesDownloaded)} of {fmtBytes(totalBytes)}</>
+          )}
+        </span>
+        {!indeterminate && pct !== null && <b>{pct}%</b>}
+      </div>
+      <div
+        className="rp-progress"
+        data-indeterminate={indeterminate ? 'true' : 'false'}
+        role="progressbar"
+        aria-label={`${model.displayName} — ${state}`}
+        aria-valuenow={indeterminate || pct === null ? undefined : pct}
+        aria-valuemin={0}
+        aria-valuemax={100}
+      >
+        <span className="rp-progress-fill" style={indeterminate ? undefined : { width: `${pct ?? 0}%` }} />
+      </div>
+    </div>
+  );
+}
+
+/**
+ * The prerequisite chain for an orchestrator model. Each link is shown separately
+ * because any one of them can be the reason formatting is unavailable, and a single
+ * combined pill gives the user nothing to act on.
+ */
+function RuntimeChain({ model }: { model: LocalModel }) {
+  const runtime = model.runtime ?? null;
+  const steps = [
+    { label: 'Model file', ok: model.downloaded, note: fmtBytes(model.sizeBytes) },
+    {
+      label: 'llama.cpp runtime',
+      ok: runtime?.installed ?? false,
+      note: runtime?.installed ? 'installed' : 'arrives with the model',
+    },
+    {
+      label: 'Local server',
+      ok: runtime?.running ?? false,
+      note: runtime?.running ? 'running' : 'starts on first use',
+    },
+  ];
+
+  return (
+    <div className="rp-model-chain">
+      {steps.map((s) => (
+        <div key={s.label} className="rp-model-chain-step" data-ok={s.ok ? 'true' : 'false'}>
+          <span className="rp-model-chain-icon">
+            {s.ok ? <CircleCheck aria-hidden size={13} /> : <CircleDashed aria-hidden size={13} />}
+          </span>
+          <span>{s.label}</span>
+          <span className="rp-model-chain-note">{s.note}</span>
+        </div>
+      ))}
+    </div>
+  );
 }
 
 function ModelCard({
   model,
   enabled,
+  provider,
   onChanged,
 }: {
   model: LocalModel;
   enabled: boolean;
+  /** The registered report-generation provider for this model, if any. */
+  provider: Provider | undefined;
   onChanged: () => Promise<void> | void;
 }) {
   const [busy, setBusy] = useState<string | null>(null);
-  const [msg, setMsg] = useState<string | null>(null);
+  const [msg, setMsg] = useState<{ text: string; tone: 'error' | 'success' | 'plain' } | null>(null);
   const [test, setTest] = useState<ModelTestResult | null>(null);
   const [testOpen, setTestOpen] = useState(false);
   // Edge Web Speech availability — probed in the WebView, not reported by the
   // sidecar (null = not yet checked).
   const [edgeOk, setEdgeOk] = useState<boolean | null>(null);
 
-  const provisioning: ModelProvisioning = model.provisioning ?? 'HostedFile';
+  const provisioning = provisioningOf(model);
   const isBrowser = provisioning === 'BrowserWebSpeech';
   const isBuiltIn = provisioning === 'WindowsBuiltIn';
   const isLangPack = provisioning === 'WindowsLanguagePack';
   const isPlatform = provisioning !== 'HostedFile';
+  const orchestrator = isOrchestrator(model);
+  // Older sidecars omit `supportsPrimary`; primary has always been STT-only.
+  const supportsPrimary = model.supportsPrimary ?? model.kind === 'Stt';
+  const registered = Boolean(provider?.enabled);
 
-  // Probe the Edge engine once when the card mounts so its badge is accurate.
   useEffect(() => {
     if (!isBrowser || !enabled) return;
     let cancelled = false;
@@ -179,242 +347,289 @@ function ModelCard({
   }, [isBrowser, enabled]);
 
   const inProgress = ACTIVE_STATES.includes(model.progress.state);
-  const pct =
-    model.progress.totalBytes > 0
-      ? Math.min(100, Math.round((model.progress.bytesDownloaded / model.progress.totalBytes) * 100))
-      : null;
 
-  async function doDownload() {
-    setBusy('download');
+  async function run(key: string, fn: () => Promise<void>) {
+    setBusy(key);
     setMsg(null);
     try {
-      await api.localModels.download(model.id);
-      await onChanged();
+      await fn();
     } catch (e) {
-      setMsg(errText(e));
+      setMsg({ text: errText(e), tone: 'error' });
     } finally {
       setBusy(null);
     }
   }
 
-  async function doDelete() {
-    if (!window.confirm(`Delete ${model.displayName}? You can re-download it anytime.`)) return;
-    setBusy('delete');
-    setMsg(null);
-    try {
+  const doDownload = (force = false) =>
+    run(force ? 'redownload' : 'download', async () => {
+      await api.localModels.download(model.id, force);
+      await onChanged();
+    });
+
+  const doDelete = () =>
+    run('delete', async () => {
+      if (!window.confirm(`Delete ${model.displayName}? You can re-download it anytime.`)) return;
       await api.localModels.remove(model.id);
       await onChanged();
-    } catch (e) {
-      setMsg(errText(e));
-    } finally {
-      setBusy(null);
-    }
-  }
+    });
 
-  async function doTest() {
-    setBusy('test');
-    setMsg(null);
-    setTest(null);
-    setTestOpen(true);
-    try {
-      setTest(await api.localModels.test(model.id));
-    } catch (e) {
-      setMsg(errText(e));
-      setTestOpen(false);
-    } finally {
-      setBusy(null);
-    }
-  }
+  const doTest = () =>
+    run('test', async () => {
+      setTest(null);
+      setTestOpen(true);
+      try {
+        setTest(await api.localModels.test(model.id));
+      } catch (e) {
+        setTestOpen(false);
+        throw e;
+      }
+    });
 
-  async function doSetPrimary() {
-    setBusy('primary');
-    setMsg(null);
-    try {
+  const doSetPrimary = () =>
+    run('primary', async () => {
       await api.localModels.setPrimary(model.id);
       await onChanged();
-    } catch (e) {
-      setMsg(errText(e));
-    } finally {
-      setBusy(null);
-    }
-  }
+    });
+
+  /**
+   * Register this model as a selectable provider for report generation. Creates the
+   * tenant `ProviderConfig` row nothing else creates from the desktop app.
+   */
+  const doUseForReports = () =>
+    run('provider', async () => {
+      const res = await ensureOnDeviceProvider(model.id, `${model.displayName} (on-device)`);
+      if (res.status === 'forbidden') {
+        setMsg({
+          text:
+            'Adding a provider is an administrator action. Ask an admin to enable this model for '
+            + 'report generation — the model itself is installed and ready on this workstation.',
+          tone: 'error',
+        });
+        return;
+      }
+      setMsg({
+        text:
+          res.status === 'already'
+            ? 'Already available — pick it in the provider list when you generate a report.'
+            : 'Added. Pick it in the provider list when you generate a report; cloud stays the default until you do.',
+        tone: 'success',
+      });
+      await onChanged();
+    });
 
   // Edge Web Speech "Test" — run the live microphone probe in the WebView (the
-  // engine runs here, not in the sidecar). Reports a clear, non-silent result.
-  async function doProbeTest() {
-    setBusy('test');
-    setMsg(null);
-    try {
+  // engine runs here, not in the sidecar).
+  const doProbeTest = () =>
+    run('test', async () => {
       const r = await probeWebSpeechAvailable();
       setEdgeOk(r.ok);
-      setMsg(
-        r.ok
+      setMsg({
+        text: r.ok
           ? 'Microsoft Edge speech is available in this app window.'
           : `Edge speech is not available here (${r.error ?? 'unknown'}). Use an on-device engine instead.`,
-      );
-    } finally {
-      setBusy(null);
-    }
-  }
+        tone: r.ok ? 'success' : 'error',
+      });
+    });
 
-  // WinRT language pack — "download" opens Windows speech settings so the user can
-  // install/enable the on-device pack, then return and Test.
-  async function doOpenSettings() {
-    setBusy('download');
-    setMsg(null);
-    try {
+  // WinRT language pack — "download" opens Windows speech settings.
+  const doOpenSettings = () =>
+    run('download', async () => {
       await api.localModels.download(model.id);
-      setMsg('Opened Windows speech settings. Install/enable a language pack, then press Test.');
+      setMsg({
+        text: 'Opened Windows speech settings. Install/enable a language pack, then press Test.',
+        tone: 'plain',
+      });
       await onChanged();
-    } catch (e) {
-      setMsg(errText(e));
-    } finally {
-      setBusy(null);
-    }
-  }
+    });
 
   async function copyDiagnostics() {
     try {
       const diagnostics = await api.localModels.diagnostics(model.id);
       await navigator.clipboard.writeText(JSON.stringify({ test, diagnostics }, null, 2));
-      setMsg('Diagnostics copied to clipboard.');
+      setMsg({ text: 'Diagnostics copied to clipboard.', tone: 'success' });
     } catch (e) {
-      setMsg(errText(e));
+      setMsg({ text: errText(e), tone: 'error' });
     }
   }
 
+  const KindIcon = KIND_ICON[model.kind];
+  const cardState = model.progress.state === 'Failed' ? 'failed' : undefined;
+
   return (
-    <div className="rp-panel">
-      <div className="rp-row" style={{ justifyContent: 'space-between', alignItems: 'flex-start', gap: 8 }}>
-        <div>
-          <div style={{ fontWeight: 600 }}>{model.displayName}</div>
-          <div className="rp-faint" style={{ fontSize: 12 }}>
-            <code>{model.id}</code>
-          </div>
+    <div
+      className="rp-model-card"
+      data-selected={model.isPrimary || registered ? 'true' : 'false'}
+      data-state={cardState}
+    >
+      <div className="rp-model-card-head">
+        <span className="rp-model-icon" data-kind={model.kind}>
+          <KindIcon aria-hidden size={17} />
+        </span>
+        <div className="rp-model-headings">
+          <div className="rp-model-title">{model.displayName}</div>
+          <code className="rp-model-id">{model.id}</code>
         </div>
         <StateBadge model={model} edgeOk={edgeOk} />
       </div>
 
-      <div className="rp-row" style={{ gap: 6, marginTop: 8, flexWrap: 'wrap' }}>
+      <div className="rp-model-meta">
         {model.isPrimary && <span className="badge ai">Primary</span>}
-        {/* Platform engines have no meaningful download size. */}
+        {registered && <span className="badge ai">In report generation</span>}
         {!model.placeholder && !isPlatform && <span className="badge">{fmtBytes(model.sizeBytes)}</span>}
         {model.license && <span className="badge">{model.license}</span>}
-        {model.available && <span className="badge ok">Loaded</span>}
+        {model.available && !orchestrator && <span className="badge ok">Loaded</span>}
       </div>
 
       {model.note && (
-        <p
-          className="rp-faint"
-          style={{ marginTop: 8, marginBottom: 0, fontSize: 12 }}
-          data-testid="model-note"
-        >
+        <p className="rp-model-note" data-testid="model-note">
           {model.note}
         </p>
       )}
 
-      {inProgress && (
-        <div style={{ marginTop: 10 }}>
-          <div className="rp-faint" style={{ fontSize: 12, marginBottom: 4 }}>
-            {model.progress.state}
-            {pct !== null ? ` — ${pct}%` : '…'}
-          </div>
-          <div style={{ height: 6, background: 'var(--border)', borderRadius: 4, overflow: 'hidden' }}>
-            <div
-              style={{
-                height: '100%',
-                width: `${pct ?? 30}%`,
-                background: 'var(--accent)',
-                transition: 'width .3s ease',
-              }}
-            />
-          </div>
-        </div>
-      )}
+      {orchestrator && model.downloaded && <RuntimeChain model={model} />}
+
+      {inProgress && <ProgressRow model={model} />}
 
       {model.progress.state === 'Failed' && model.progress.error && (
-        <div className="banner danger" style={{ marginTop: 10, fontSize: 12 }}>
+        <div className="banner danger" style={{ fontSize: 12 }}>
           {model.progress.error}
         </div>
       )}
 
       {model.placeholder ? (
-        <p className="rp-faint" style={{ marginTop: 10, marginBottom: 0, fontSize: 13 }}>
+        <p className="rp-model-note">
           Coming in a future release — it will be downloadable and testable here, just like the
           speech-to-text models.
         </p>
       ) : isBrowser ? (
-        // Edge Web Speech — no download/delete; it runs in the app window. Probe
-        // tests it; Make primary routes the live "Dictate" button through it.
-        <div className="rp-row" style={{ gap: 8, marginTop: 12, flexWrap: 'wrap' }}>
+        <div className="rp-model-actions">
           {!model.isPrimary && (
-            <button className="primary-ghost" onClick={doSetPrimary} disabled={!enabled || busy !== null}>
+            <button
+              className="primary-ghost"
+              onClick={doSetPrimary}
+              disabled={!enabled || busy !== null}
+              aria-busy={busy === 'primary'}
+            >
               {busy === 'primary' ? 'Setting…' : 'Make primary'}
             </button>
           )}
-          <button className="subtle" onClick={doProbeTest} disabled={busy !== null}>
-            {busy === 'test' ? 'Testing…' : 'Test in app'}
+          <button className="subtle" onClick={doProbeTest} disabled={busy !== null} aria-busy={busy === 'test'}>
+            <Play aria-hidden size={14} /> {busy === 'test' ? 'Testing…' : 'Test in app'}
           </button>
         </div>
       ) : isPlatform ? (
-        // Windows speech engines (SAPI built-in / WinRT language pack). SAPI needs
-        // no download; WinRT offers an "open Windows settings" action. Neither has
-        // files to delete.
-        <div className="rp-row" style={{ gap: 8, marginTop: 12, flexWrap: 'wrap' }}>
+        <div className="rp-model-actions">
           {isLangPack && (
-            <button className="primary" onClick={doOpenSettings} disabled={!enabled || busy !== null}>
+            <button
+              className="primary"
+              onClick={doOpenSettings}
+              disabled={!enabled || busy !== null}
+              aria-busy={busy === 'download'}
+            >
               {busy === 'download' ? 'Opening…' : 'Open Windows speech settings'}
             </button>
           )}
-          {/* Only the SAPI built-in card is a selectable engine; the language-pack
-              card is a settings helper for the same recognizer. */}
           {isBuiltIn && !model.isPrimary && (
-            <button className="primary-ghost" onClick={doSetPrimary} disabled={!enabled || busy !== null}>
+            <button
+              className="primary-ghost"
+              onClick={doSetPrimary}
+              disabled={!enabled || busy !== null}
+              aria-busy={busy === 'primary'}
+            >
               {busy === 'primary' ? 'Setting…' : 'Make primary'}
             </button>
           )}
-          <button className="subtle" onClick={doTest} disabled={!enabled || busy !== null}>
-            {busy === 'test' ? 'Testing…' : 'Test'}
+          <button className="subtle" onClick={doTest} disabled={!enabled || busy !== null} aria-busy={busy === 'test'}>
+            <Play aria-hidden size={14} /> {busy === 'test' ? 'Testing…' : 'Test'}
           </button>
         </div>
       ) : (
-        <div className="rp-row" style={{ gap: 8, marginTop: 12, flexWrap: 'wrap' }}>
+        <div className="rp-model-actions">
           {!model.downloaded ? (
-            <button className="primary" onClick={doDownload} disabled={!enabled || busy !== null || inProgress}>
-              {busy === 'download' || inProgress ? 'Downloading…' : 'Download'}
+            <button
+              className="primary"
+              onClick={() => doDownload(false)}
+              disabled={!enabled || busy !== null || inProgress}
+              aria-busy={busy === 'download' || inProgress}
+            >
+              <Download aria-hidden size={14} />{' '}
+              {busy === 'download' || inProgress ? 'Downloading…' : `Download ${fmtBytes(model.sizeBytes)}`}
             </button>
           ) : (
             <>
-              {!model.isPrimary && (
-                <button className="primary-ghost" onClick={doSetPrimary} disabled={!enabled || busy !== null}>
+              {/* Orchestrator models are chosen per report through the provider picker,
+                  not as a dictation "primary" — the backend rejects the latter. */}
+              {orchestrator && !registered && (
+                <button
+                  className="primary"
+                  onClick={doUseForReports}
+                  // Gated on the model being usable, NOT on whether we could read the
+                  // provider list. Those are unrelated: failing to read providers is a
+                  // permissions question, and letting it enable a button for a model
+                  // whose runtime is missing would offer a choice that cannot work.
+                  disabled={!enabled || busy !== null || !model.available}
+                  aria-busy={busy === 'provider'}
+                  title={
+                    model.available
+                      ? undefined
+                      : 'Finish the setup above before using this model for report generation.'
+                  }
+                >
+                  <Sparkles aria-hidden size={14} />{' '}
+                  {busy === 'provider' ? 'Adding…' : 'Use for report generation'}
+                </button>
+              )}
+              {supportsPrimary && !model.isPrimary && (
+                <button
+              className="primary-ghost"
+              onClick={doSetPrimary}
+              disabled={!enabled || busy !== null}
+              aria-busy={busy === 'primary'}
+            >
                   {busy === 'primary' ? 'Setting…' : 'Make primary'}
                 </button>
               )}
-              <button className="subtle" onClick={doTest} disabled={!enabled || busy !== null}>
-                {busy === 'test' ? 'Testing…' : 'Test'}
+              <button className="subtle" onClick={doTest} disabled={!enabled || busy !== null} aria-busy={busy === 'test'}>
+                <Play aria-hidden size={14} /> {busy === 'test' ? 'Testing…' : 'Test'}
               </button>
-              <button className="ghost" onClick={doDelete} disabled={!enabled || busy !== null}>
-                {busy === 'delete' ? 'Deleting…' : 'Delete'}
+              {/* Always available once installed: the only in-app recovery for a
+                  corrupt or partial model, which otherwise reports "Ready" forever. */}
+              <button
+                className="subtle"
+                onClick={() => doDownload(true)}
+                disabled={!enabled || busy !== null || inProgress}
+                aria-busy={busy === 'redownload'}
+                title="Delete the installed files and fetch the model again"
+              >
+                <RotateCcw aria-hidden size={14} /> {busy === 'redownload' ? 'Repairing…' : 'Re-download'}
+              </button>
+              <button className="ghost" onClick={doDelete} disabled={!enabled || busy !== null} aria-busy={busy === 'delete'}>
+                <Trash2 aria-hidden size={14} /> {busy === 'delete' ? 'Deleting…' : 'Delete'}
               </button>
             </>
           )}
           {model.progress.state === 'Failed' && (
-            <button className="subtle" onClick={doDownload} disabled={!enabled || busy !== null || inProgress}>
-              Retry
+            <button
+              className="subtle"
+              onClick={() => doDownload(true)}
+              disabled={!enabled || busy !== null || inProgress}
+            >
+              <RotateCcw aria-hidden size={14} /> Retry
             </button>
           )}
         </div>
       )}
 
       {msg && (
-        <div className="rp-faint" style={{ marginTop: 8, fontSize: 12 }}>
-          {msg}
-        </div>
+        <p className="rp-model-msg" data-tone={msg.tone} role="status" aria-live="polite">
+          {msg.text}
+        </p>
       )}
 
       {testOpen && (
         <TestResultModal
           result={test}
+          model={model}
           loading={busy === 'test'}
           onClose={() => setTestOpen(false)}
           onCopy={copyDiagnostics}
@@ -424,40 +639,62 @@ function ModelCard({
   );
 }
 
+/** What each failed stage actually means, in the user's terms. */
+const STAGE_HINT: Record<string, string> = {
+  model: 'The model file is missing — download it from this screen.',
+  runtime: 'The llama.cpp runtime is missing. Re-download the model to fetch it again.',
+  adapter: 'This build has no llama.cpp adapter registered — report it to IT.',
+  server: 'The local server could not start or is still loading the model.',
+  completion: 'The server is running but the request failed.',
+};
+
 function TestResultModal({
   result,
+  model,
   loading,
   onClose,
   onCopy,
 }: {
   result: ModelTestResult | null;
+  model: LocalModel;
   loading: boolean;
   onClose: () => void;
   onCopy: () => void;
 }) {
+  const orchestrator = isOrchestrator(model);
   return (
     <div className="rp-modal-backdrop" onClick={onClose}>
       <div className="rp-panel rp-modal" onClick={(e) => e.stopPropagation()}>
-        <div className="rp-panel-title">Model test</div>
+        <div className="rp-panel-title">
+          <Server aria-hidden size={15} /> {model.displayName} — self test
+        </div>
 
         {loading || !result ? (
-          <p className="rp-faint">Running a sample through the engine…</p>
+          <p className="rp-faint">
+            {orchestrator
+              ? 'Starting the local server and running a prompt through the model. The first run after '
+                + 'a restart loads several gigabytes and can take a couple of minutes.'
+              : 'Running a sample through the engine…'}
+          </p>
         ) : (
           <>
             <div className="rp-row" style={{ gap: 6, flexWrap: 'wrap', marginBottom: 8 }}>
               <span className={`badge ${result.ok ? 'ok' : 'danger'}`}>{result.ok ? 'Working' : 'Failed'}</span>
               <span className="badge">{result.engine}</span>
               <span className="badge">{result.latencyMs} ms</span>
-              <span className="badge">
-                {result.sampleSource === 'model_sample' ? 'sample clip' : 'synthetic tone'}
-              </span>
+              {!orchestrator && (
+                <span className="badge">
+                  {result.sampleSource === 'model_sample' ? 'sample clip' : 'synthetic tone'}
+                </span>
+              )}
+              {result.endpoint && <span className="badge">{result.endpoint}</span>}
             </div>
 
             {result.ok ? (
               result.transcript ? (
                 <div>
                   <div className="rp-faint" style={{ fontSize: 12, marginBottom: 4 }}>
-                    Transcript
+                    {orchestrator ? 'Model reply' : 'Transcript'}
                   </div>
                   <div className="ai-mark" style={{ whiteSpace: 'pre-wrap' }}>
                     {result.transcript}
@@ -473,6 +710,11 @@ function TestResultModal({
                 <div className="banner danger" style={{ whiteSpace: 'pre-wrap' }}>
                   {result.error}
                 </div>
+                {result.stage && STAGE_HINT[result.stage] && (
+                  <p className="rp-model-note" style={{ marginTop: 8 }}>
+                    {STAGE_HINT[result.stage]}
+                  </p>
+                )}
                 {result.detail && (
                   <details style={{ marginTop: 8 }}>
                     <summary className="rp-faint" style={{ cursor: 'pointer' }}>

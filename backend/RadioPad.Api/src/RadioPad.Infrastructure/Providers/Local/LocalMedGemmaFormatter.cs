@@ -15,12 +15,16 @@ namespace RadioPad.Infrastructure.Providers.Local;
 /// <c>RADIOPAD_LOCAL_FORMATTER_ENABLED</c> (set by the desktop sidecar); inert everywhere else, so
 /// the cloud formatter stays the default.
 ///
-/// <para><b>The llama-server is NOT bundled yet.</b> This adapter speaks HTTP to one that is already
-/// listening on loopback — today the operator runs it themselves (llama.cpp's <c>llama-server</c>
-/// pointed at the provisioned GGUF). Shipping that binary is tracked in IMPLEMENTATION_NOTES.md.
-/// Until then a transport failure is surfaced as an actionable message rather than a bare
+/// <para><b>The llama-server is provisioned and supervised by RadioPad</b> (resolved 2026-07; see
+/// IMPLEMENTATION_NOTES.md). <see cref="SttModelProvisioner.EnsureMedGemmaWithRuntimeAsync"/> fetches
+/// the pinned llama.cpp runtime (<see cref="LocalRuntimes.LlamaServerId"/>) alongside the GGUF, and
+/// <see cref="LlamaServerProcess"/> starts it lazily on first use — the operator does not run it
+/// themselves. An explicit <c>RADIOPAD_LOCAL_LLAMA_URL</c> still wins, for the operator who wants to
+/// point at their own server.</para>
+///
+/// <para>A transport failure is nonetheless surfaced as an actionable message rather than a bare
 /// "connection refused": the model download alone is ~2.5 GB, and someone who paid that deserves to
-/// be told what is actually missing.</para>
+/// be told what is actually missing (runtime absent, server failed to start, or still loading).</para>
 /// </summary>
 public sealed class LocalMedGemmaFormatter : ILocalReportFormatter
 {
@@ -130,14 +134,14 @@ public sealed class LocalMedGemmaFormatter : ILocalReportFormatter
         }
         catch (ProviderTransportException ex)
         {
-            // Nothing is listening on loopback — almost always "the llama-server isn't running",
-            // not a bug. Say so, because the raw transport error ("connection refused") gives the
-            // radiologist no idea that a separate process is required.
+            // Nothing is listening on loopback. RadioPad provisions and starts the server itself, so
+            // name the link in that chain that actually broke rather than telling the radiologist to
+            // go install llama.cpp — which they have not needed to do since the runtime became
+            // auto-provisioned, and which sends them chasing a problem they do not have.
             throw new ProviderTransportException(
-                $"The on-device MedGemma formatter could not reach a llama-server at {endpoint}. " +
-                "Start llama.cpp's llama-server pointed at the downloaded MedGemma GGUF, or turn the " +
-                "offline formatter off to use the cloud formatter (the default). " +
-                $"Underlying error: {ex.Message}",
+                $"The on-device MedGemma formatter could not reach its llama-server at {endpoint}. " +
+                DiagnoseUnreachable() +
+                $" Cloud formatting still works in the meantime. Underlying error: {ex.Message}",
                 inner: ex);
         }
         var sections = ReportSectionJson.Parse(result.Text);
@@ -166,6 +170,31 @@ public sealed class LocalMedGemmaFormatter : ILocalReportFormatter
         indication, technique, findings, impression, recommendations (use empty strings for sections
         not dictated).
         """;
+
+    /// <summary>
+    /// Work out which link in the offline-formatting chain is missing, so the message names a
+    /// cause the user can act on. Ordered from the most likely and most fixable outward: model
+    /// absent → runtime absent → server present but not answering.
+    /// </summary>
+    private string DiagnoseUnreachable()
+    {
+        if (ResolveModelPath() is null)
+            return "The MedGemma model is not downloaded — download it from On-device models.";
+
+        var runtimeDir = LocalRuntimes.ResolveRuntimeDir(LocalRuntimes.LlamaServerId);
+        if (!LocalRuntimes.IsLlamaServerInstalled(runtimeDir))
+            return "The llama.cpp runtime that normally arrives with the model is missing — "
+                + "re-download MedGemma from On-device models to fetch it.";
+
+        if (!string.IsNullOrWhiteSpace(Environment.GetEnvironmentVariable(UrlEnv)))
+            return $"A custom endpoint is configured via {UrlEnv}; RadioPad did not start a server "
+                + "of its own. Check that yours is running, or clear that variable to let RadioPad manage it.";
+
+        return _server is null
+            ? "No managed llama-server is available in this build."
+            : "The model and runtime are both installed, so the server failed to start or is still "
+                + "loading — a first cold start of a 2.5 GB model can take a few minutes.";
+    }
 
     private static void EnsureLoopback(string url)
     {

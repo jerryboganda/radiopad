@@ -3128,3 +3128,201 @@
 .rp-dictation[data-state='processing'] .rp-dictation-statusline { color: var(--blue); }
 .rp-dictation[data-state='error'] .rp-dictation-statusline,
 .rp-dictation[data-state='disconnected'] .rp-dictation-statusline { color: var(--red); }
+
+/* ─────────────────────────────────────────────────────────────────────────────
+   On-device model manager (design.md §4.17)
+
+   The model manager shows a chain of prerequisites, not a flat list: an
+   orchestrator model needs its GGUF, a llama.cpp runtime, and a running server
+   before it can format anything. The old card collapsed all of that into one
+   "Ready" pill, so a half-installed chain looked identical to a working one.
+   These classes exist to keep each link visible and separately addressable.
+   ──────────────────────────────────────────────────────────────────────────── */
+
+.rp-model-section { margin-bottom: 20px; }
+
+.rp-model-section-head {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 10px;
+}
+.rp-model-section-head h3 {
+  font-size: 13px;
+  font-weight: 600;
+  letter-spacing: 0.01em;
+  margin: 0;
+  color: var(--text-strong);
+}
+.rp-model-section-icon {
+  display: inline-flex;
+  color: var(--text-faint);
+}
+.rp-model-section-count {
+  margin-left: auto;
+  font-size: 12px;
+  color: var(--text-faint);
+  white-space: nowrap;
+}
+
+.rp-model-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(340px, 1fr));
+  gap: 12px;
+}
+@media (max-width: 720px) {
+  .rp-model-grid { grid-template-columns: minmax(0, 1fr); }
+}
+
+.rp-model-card {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: 14px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: var(--bg-panel);
+  box-shadow: var(--shadow-xs);
+}
+/* The model the user has actively chosen — reads as selected without shouting. */
+.rp-model-card[data-selected='true'] {
+  border-color: var(--accent);
+  background: var(--bg-selected);
+}
+/* A model whose chain is broken. Never hue-only: the card also carries an
+   explicit reason line, per the accessibility rule in design.md §7. */
+.rp-model-card[data-state='failed'] { border-color: var(--red-border); }
+
+.rp-model-card-head {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+}
+
+.rp-model-icon {
+  flex: none;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 34px;
+  height: 34px;
+  border-radius: var(--radius-sm, 6px);
+  background: var(--bg-subtle);
+  color: var(--text-muted);
+}
+.rp-model-icon[data-kind='Orchestrator'] { background: var(--ai-bg); color: var(--ai); }
+.rp-model-icon[data-kind='Stt'] { background: var(--blue-bg); color: var(--blue); }
+
+.rp-model-headings { min-width: 0; flex: 1; }
+.rp-model-title {
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--text-strong);
+  line-height: 1.3;
+}
+.rp-model-id {
+  display: block;
+  margin-top: 2px;
+  font-family: var(--font-mono, ui-monospace, monospace);
+  font-size: 11px;
+  color: var(--text-faint);
+  overflow-wrap: anywhere;
+}
+
+.rp-model-meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.rp-model-note {
+  margin: 0;
+  font-size: 12px;
+  line-height: 1.5;
+  color: var(--text-muted);
+}
+
+/* Prerequisite chain — one row per link, so "which part is missing" is readable
+   at a glance instead of inferred from a failed action. */
+.rp-model-chain {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding: 8px 10px;
+  border: 1px solid var(--border-soft);
+  border-radius: var(--radius-sm, 6px);
+  background: var(--bg-subtle);
+}
+.rp-model-chain-step {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  font-size: 12px;
+  color: var(--text-muted);
+}
+.rp-model-chain-step[data-ok='true'] { color: var(--text); }
+.rp-model-chain-icon { flex: none; display: inline-flex; }
+.rp-model-chain-step[data-ok='true'] .rp-model-chain-icon { color: var(--green); }
+.rp-model-chain-step[data-ok='false'] .rp-model-chain-icon { color: var(--text-faint); }
+.rp-model-chain-note { margin-left: auto; font-size: 11px; color: var(--text-faint); }
+
+.rp-model-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: auto;
+  padding-top: 2px;
+}
+
+.rp-model-msg {
+  margin: 0;
+  font-size: 12px;
+  line-height: 1.5;
+  color: var(--text-muted);
+}
+.rp-model-msg[data-tone='error'] { color: var(--red); }
+.rp-model-msg[data-tone='success'] { color: var(--green); }
+
+/* ── Progress bar (shared primitive — design.md §3.10) ────────────────────── */
+
+.rp-progress {
+  height: 6px;
+  border-radius: 999px;
+  background: var(--bg-muted);
+  overflow: hidden;
+}
+.rp-progress-fill {
+  display: block;
+  height: 100%;
+  border-radius: 999px;
+  background: var(--accent);
+  transition: width 0.3s var(--ease-out, ease);
+}
+/* Work is happening but the total is unknown (verify / extract / install), so a
+   percentage would be a lie. Sweep instead of sitting at a fake width. */
+.rp-progress[data-indeterminate='true'] .rp-progress-fill {
+  width: 35%;
+  animation: rp-progress-sweep 1.4s ease-in-out infinite;
+}
+.rp-progress-label {
+  display: flex;
+  justify-content: space-between;
+  gap: 8px;
+  margin-bottom: 4px;
+  font-size: 12px;
+  color: var(--text-muted);
+}
+.rp-progress-label b { font-weight: 600; color: var(--text); }
+
+@keyframes rp-progress-sweep {
+  0% { transform: translateX(-100%); }
+  100% { transform: translateX(340%); }
+}
+@media (prefers-reduced-motion: reduce) {
+  .rp-progress-fill { transition: none; }
+  .rp-progress[data-indeterminate='true'] .rp-progress-fill {
+    animation: none;
+    width: 100%;
+    opacity: 0.5;
+  }
+}

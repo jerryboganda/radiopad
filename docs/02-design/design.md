@@ -516,6 +516,27 @@ in pages:
 - `.view-panel`, `.list-panel`, `.empty-state`, `.masthead`,
   `.source-pill` / `.section-kicker`.
 
+### 3.10 Progress bar (`.rp-progress`)
+
+The shared determinate/indeterminate progress primitive, in `radiopad.css`.
+Before it existed, every long-running surface hand-rolled a bar from inline
+`var(--border)` / `var(--accent)` styles, which is exactly what the colour rule
+forbids.
+
+```html
+<div class="rp-progress-label"><span>Downloading — 1.2 GB of 2.3 GB</span><b>52%</b></div>
+<div class="rp-progress" role="progressbar" aria-valuenow="52" aria-valuemin="0" aria-valuemax="100">
+  <span class="rp-progress-fill" style="width:52%"></span>
+</div>
+```
+
+- `.rp-progress-fill` takes its width from the caller; that inline `width` is
+  the one sanctioned inline style here (it is a value, not a colour).
+- `data-indeterminate="true"` on `.rp-progress` sweeps the fill instead, for
+  work whose total is genuinely unknown (verify / extract / install). **Do not
+  fake a percentage** — omit `aria-valuenow` in this mode.
+- The sweep is disabled under `prefers-reduced-motion` (§6).
+
 ---
 
 ## 4. RadioPad-specific patterns (built on the locked tokens)
@@ -740,6 +761,33 @@ failure. This trio is unchanged by the RC redesign — the components are
 restyled by the tokens and are the substrate for every mockup state frame
 (RC-01 "Loading", RC-03 "Empty", RC-04 "Engine offline", RC-09 "Failed", …).
 Do not hand-roll spinners, "no data" paragraphs, or error `<div>`s.
+
+### 4.17 On-device model manager (`.rp-model-*`)
+
+`components/models/OnDeviceModels.tsx`, in `radiopad.css`. Cards for the local
+model catalog, grouped by kind.
+
+- `.rp-model-section` + `.rp-model-section-head` (icon, `<h3>`, and a
+  right-aligned `.rp-model-section-count` reading "2 of 3 ready").
+- `.rp-model-grid` — `auto-fill minmax(340px, 1fr)`, single column ≤720px.
+- `.rp-model-card` — `.rp-model-card-head` (`.rp-model-icon[data-kind]`,
+  `.rp-model-headings` with `.rp-model-title` + mono `.rp-model-id`, badge),
+  then `.rp-model-meta` chips, `.rp-model-note`, `.rp-model-actions`, and
+  `.rp-model-msg[data-tone]`.
+  - `data-selected="true"` → accent border on `--bg-selected` (primary engine,
+    or registered as a report-generation provider).
+  - `data-state="failed"` → `--red-border`.
+- `.rp-model-chain` / `.rp-model-chain-step[data-ok]` — the **prerequisite
+  chain**. An orchestrator model needs its GGUF *and* a llama.cpp runtime *and*
+  a running server; each link is its own row so a half-installed chain is
+  readable rather than inferred from a failed action.
+
+**Truthfulness rule.** A model card must never show "Ready" for a state that
+cannot actually run, and must never offer an action the backend will reject
+(`SetPrimary` is STT-only; `Delete` is `HostedFile`-only). This screen regressed
+on exactly that once — the card claimed Ready, offered Test and Make primary,
+and both failed with a message blaming a missing download — so prefer an honest
+"Setup incomplete" badge plus a visible chain over a single optimistic pill.
 
 ---
 

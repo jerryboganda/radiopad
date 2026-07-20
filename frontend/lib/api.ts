@@ -1116,6 +1116,20 @@ export type ModelProvisioning =
   | 'WindowsLanguagePack'
   | 'BrowserWebSpeech';
 
+/**
+ * Runtime backing an orchestrator model — the llama.cpp server that actually executes
+ * the GGUF. Downloaded alongside the model and started on demand, but tracked
+ * separately, so a half-installed chain is visible instead of silently looking "Ready".
+ * Null for every non-orchestrator entry.
+ */
+export type ModelRuntime = {
+  id: string;
+  /** The llama-server binary is on disk. */
+  installed: boolean;
+  /** A llama-server this sidecar started is alive right now. */
+  running: boolean;
+};
+
 export type LocalModel = {
   id: string;
   displayName: string;
@@ -1132,13 +1146,28 @@ export type LocalModel = {
   downloaded: boolean;
   /** Engine loaded + usable right now (always false on a web build). */
   available: boolean;
+  /**
+   * Whether "primary dictation engine" means anything for this entry. Only STT models
+   * can be primary; the backend rejects anything else, so the card must not offer it.
+   * Optional for older sidecars — treat a missing value as "STT only".
+   */
+  supportsPrimary?: boolean;
   /** True when this is the selected primary dictation engine (STT only). */
   isPrimary: boolean;
+  /** Orchestrator models only — see {@link ModelRuntime}. */
+  runtime?: ModelRuntime | null;
   progress: ModelProgress;
 };
 
 /** `enabled` is false on a web/server build (no local engine) → the UI shows a desktop-only notice. */
 export type LocalModelsResponse = { enabled: boolean; models: LocalModel[] };
+
+/**
+ * Which link in an orchestrator's chain the self-test reached before failing. Lets the
+ * UI name the actual problem rather than a generic "test failed" — the chain is
+ * model → runtime → server → completion and any of them can be the broken one.
+ */
+export type ModelTestStage = 'model' | 'runtime' | 'adapter' | 'server' | 'completion' | 'ok';
 
 export type ModelTestResult = {
   ok: boolean;
@@ -1146,6 +1175,10 @@ export type ModelTestResult = {
   latencyMs: number;
   transcript: string | null;
   sampleSource: string;
+  /** Orchestrator self-tests only. */
+  stage?: ModelTestStage;
+  /** Orchestrator self-tests only — the loopback endpoint that was exercised. */
+  endpoint?: string;
   error?: string;
   /** Full exception text for IT hand-off (only on failure). */
   detail?: string;
@@ -1581,9 +1614,14 @@ export const api = {
    */
   localModels: {
     list: () => requestLocal<LocalModelsResponse>('/api/local-models'),
-    download: (id: string) =>
+    /**
+     * `force` re-fetches a model that is already installed — the repair path for a
+     * corrupt or partial download. The backend clears the installed files first, so it
+     * can legitimately fail with `in_use` when an engine still holds them open.
+     */
+    download: (id: string, force = false) =>
       requestLocal<{ id: string; state: ProvisionState; alreadyInstalled?: boolean; startedUtc?: string }>(
-        `/api/local-models/${encodeURIComponent(id)}/download`,
+        `/api/local-models/${encodeURIComponent(id)}/download${force ? '?force=true' : ''}`,
         { method: 'POST' },
       ),
     progress: (id: string) =>

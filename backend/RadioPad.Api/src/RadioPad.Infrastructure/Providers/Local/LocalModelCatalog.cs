@@ -234,12 +234,16 @@ public sealed class LocalModelCatalog : ILocalModelCatalog
             // MedGemma 1.5 4B (Q4_K_M) — the OPTIONAL on-device report formatter (dictation brief
             // §2.2). Downloaded on demand from the model manager (NOT auto-provisioned on first run;
             // only MedASR is). Run via the LlamaCppProvider LocalOnly adapter against a llama-server
-            // on loopback — NOT bundled in the installer yet, so downloading this model is necessary
-            // but not sufficient for offline formatting; the Note says so on the card, and
-            // LocalMedGemmaFormatter turns the resulting connection failure into an actionable
-            // message. Pin verified against the HF public API (repo gated:false, so the
-            // provisioner's anonymous SHA-256-verified download works). Cloud formatting stays the
-            // default — this is the fully-offline, no-PHI-to-cloud alternative.
+            // on loopback that RadioPad provisions and supervises itself:
+            // SttModelProvisioner.EnsureMedGemmaWithRuntimeAsync fetches the pinned llama.cpp
+            // runtime (LocalRuntimes.LlamaServerId) alongside this GGUF, and LlamaServerProcess
+            // starts it lazily on first use. One download therefore yields a working feature — do
+            // NOT reintroduce the old "bring your own llama-server" wording here or in the Note;
+            // it described a state resolved in 2026-07 (IMPLEMENTATION_NOTES.md) and had already
+            // outlived it once, telling users a shipped feature was inert. Pin verified against the
+            // HF public API (repo gated:false, so the provisioner's anonymous SHA-256-verified
+            // download works). Cloud formatting stays the default — this is the fully-offline,
+            // no-PHI-to-cloud alternative.
             new(
                 Id: MedGemmaId,
                 DisplayName: "MedGemma 1.5 4B (Q4_K_M) — on-device report formatter",
@@ -253,7 +257,7 @@ public sealed class LocalModelCatalog : ILocalModelCatalog
                 FileName: MedGemmaFileName,
                 Placeholder: false,
                 Provisioning: ModelProvisioning.HostedFile,
-                Note: "Optional offline report formatter (~2.5 GB). Formats dictated findings only — never invents findings, never reads images. Cloud formatting remains the default. Advanced: also requires a local llama-server (llama.cpp) running on loopback — it is not bundled yet, so the download alone does not enable offline formatting."),
+                Note: "Optional offline report formatter (~2.5 GB). Formats dictated findings only — never invents findings, never reads images. Nothing leaves this workstation: it runs against a llama.cpp server RadioPad downloads with the model and starts on loopback for you. Cloud formatting remains the default until you select this model for report generation."),
         };
     }
 }
