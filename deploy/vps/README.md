@@ -9,20 +9,34 @@ This differs from the root `deploy/` directory which uses Caddy for TLS.
 ## Architecture
 
 ```
-Internet → NPM (port 80/443) → 127.0.0.1:8093 → radiopad-web (nginx + Next.js static)
-                                     ↓ /api/* proxy
-                               radiopad-api:7457 (ASP.NET Core 8)
-                                     ↓
-                                radiopad-postgres:5432 (PostgreSQL volume)
+                    radiopadstudio.com, www  →  127.0.0.1:8094 → radiopad-marketing (nginx + Astro static)
+Internet → NPM (443)                                                  ↓ /api /ws /saml /scim proxy (back-compat)
+                    admin.radiopadstudio.com →  127.0.0.1:8093 → radiopad-web (nginx + Next.js static)
+                                                                       ↓ /api/* proxy
+                                                                 radiopad-api:7457 (ASP.NET Core 8)
+                                                                       ↓
+                                                                 radiopad-postgres:5432 (PostgreSQL volume)
 ```
+
+The root domain serves the marketing site (`marketing/`, Astro); the admin app
+(`frontend/`, `build:web` surface) lives on `admin.radiopadstudio.com`. The
+marketing container ALSO proxies `/api`, `/ws`, `/saml`, `/scim` straight
+through to `radiopad-api` — this is deliberate, not leftover: already-installed
+desktop clients default to `RADIOPAD_BACKEND=https://radiopadstudio.com`
+(baked in at build time) and must keep working indefinitely on the root
+domain, even though new desktop builds default to the admin subdomain. Do not
+remove those proxy blocks from `nginx-marketing.conf` without shipping and
+fully rolling out a desktop release first.
 
 ## Files
 
 | File | Purpose |
 |---|---|
-| `web.Dockerfile` | Multi-stage: pnpm 9.15.9 + Next.js build → nginx:alpine |
+| `web.Dockerfile` | Multi-stage: pnpm 9.15.9 + Next.js build → nginx:alpine (admin app) |
+| `marketing.Dockerfile` | Multi-stage: pnpm 9.15.9 + Astro build → nginx:alpine (marketing site) |
 | `api.Dockerfile` | Multi-stage: .NET SDK 8 build → aspnet:8.0 runtime |
-| `nginx.conf` | Nginx config: static SPA + `/api/*` proxy to API container |
+| `nginx.conf` | Nginx config for the admin app: static SPA + `/api/*` proxy to API container |
+| `nginx-marketing.conf` | Nginx config for the marketing site: static multi-page site + the same `/api /ws /saml /scim` proxy blocks (back-compat, see above) |
 | `docker-compose.yml` | Compose manifest for VPS (no Caddy — NPM handles TLS) |
 
 ## Prerequisites on VPS
@@ -197,16 +211,31 @@ sits behind operator Basic-auth.
 
 ## NPM Proxy Host
 
-Add a proxy host in Nginx Proxy Manager:
-- **Domain**: `radiopad.your-domain.com`
-- **Scheme**: `http`
-- **Forward Hostname/IP**: `127.0.0.1`
-- **Forward Port**: `8093`
-- **SSL**: Let's Encrypt (recommended)
+Two proxy hosts, both pointing at the same VPS:
 
-The compose file binds the web port to `127.0.0.1` by default:
-`127.0.0.1:${RADIOPAD_WEB_PORT:-8093}:80`. Do not change this to `0.0.0.0`
-unless a separate firewall and TLS exposure review has approved direct access.
+1. **Marketing / root domain** — `your-domain.com` + `www.your-domain.com`
+   - Forward Hostname/IP: `127.0.0.1`, Forward Port: `8094` (`radiopad-marketing`)
+   - SSL: Let's Encrypt
+2. **Admin app** — `admin.your-domain.com`
+   - Forward Hostname/IP: `127.0.0.1`, Forward Port: `8093` (`radiopad-web`)
+   - SSL: Let's Encrypt (separate cert; if the domain is Cloudflare-proxied,
+     it must be DNS-only/grey-cloud — Cloudflare's free Universal SSL does not
+     cover 2-level subdomains)
+
+The compose file binds both ports to `127.0.0.1` by default:
+`127.0.0.1:${RADIOPAD_WEB_PORT:-8093}:80` and
+`127.0.0.1:${RADIOPAD_MARKETING_PORT:-8094}:80`. Do not change these to
+`0.0.0.0` unless a separate firewall and TLS exposure review has approved
+direct access.
+
+When the admin app moves to its own subdomain, also update on the API
+container:
+- `RADIOPAD_PUBLIC_WEB_URL` → `https://admin.your-domain.com`
+- `RADIOPAD_WEBAUTHN_ORIGINS` → add `https://admin.your-domain.com` (keep the
+  root-domain origins too if any existing passkeys/sessions should keep
+  working — `RADIOPAD_WEBAUTHN_RP_ID` stays the parent domain; WebAuthn allows
+  the RP ID to be a registrable-domain suffix of the calling origin, so
+  existing passkeys keep working across the subdomain move without changes)
 
 ## Health and readiness checks
 

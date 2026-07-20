@@ -176,7 +176,7 @@ export async function apiUrl(path: string): Promise<string> {
  * cloud relay — a purely local-only desktop needs cloud connectivity for
  * companion mode (see the surface-companion design note).
  */
-const DEFAULT_COMPANION_BASE = 'https://radiopadstudio.com';
+const DEFAULT_COMPANION_BASE = 'https://admin.radiopadstudio.com';
 let resolvedCompanionBase: string | null = null;
 export function companionBase(): string {
   if (resolvedCompanionBase !== null) return resolvedCompanionBase;

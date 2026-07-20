@@ -114,6 +114,31 @@ services:
     networks:
       - radiopad
 
+  # Marketing landing site (Astro static, `marketing/`). Serves the public
+  # root domain; also proxies /api /ws /saml /scim to radiopad-api so already-
+  # installed desktop clients (which default to the root domain) keep working
+  # even after the admin app itself moves to an admin.* subdomain — see
+  # deploy/vps/README.md.
+  radiopad-marketing:
+    build:
+      context: ../..
+      dockerfile: deploy/vps/marketing.Dockerfile
+    container_name: radiopad-marketing
+    restart: unless-stopped
+    depends_on:
+      radiopad-api:
+        condition: service_healthy
+    ports:
+      - "127.0.0.1:${RADIOPAD_MARKETING_PORT:-8094}:80"
+    healthcheck:
+      test: ["CMD-SHELL", "wget -q --spider http://127.0.0.1/ || exit 1"]
+      interval: 30s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
+    networks:
+      - radiopad
+
 volumes:
   radiopad_pgdata:
     name: radiopad_pgdata

@@ -15,6 +15,7 @@ export const site = {
     { label: "Security", href: "/#security" },
     { label: "Pricing", href: "/#pricing" },
     { label: "Blog", href: "/blog" },
+    { label: "Sign in", href: "https://admin.radiopadstudio.com/login" },
   ],
   cta: { label: "Book a demo", href: "/#demo" },
   footer: {
