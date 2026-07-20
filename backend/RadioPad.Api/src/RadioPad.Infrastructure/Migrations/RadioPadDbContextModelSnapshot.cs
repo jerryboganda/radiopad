@@ -290,6 +290,264 @@ namespace RadioPad.Infrastructure.Migrations
                     b.ToTable("CompanionSessions");
                 });
 
+            modelBuilder.Entity("RadioPad.Domain.Entities.CriticalResult", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("TEXT");
+
+                    b.Property<long?>("AcknowledgedAt")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<string>("AcknowledgedBy")
+                        .HasColumnType("TEXT");
+
+                    b.Property<long?>("ClosedAt")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<long?>("CommunicatedAt")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<string>("CommunicatedTo")
+                        .HasColumnType("TEXT");
+
+                    b.Property<int?>("CommunicationMethod")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<long>("CreatedAt")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<int>("Criticality")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<long>("DueAt")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<long?>("EscalatedAt")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<string>("FindingSummary")
+                        .IsRequired()
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("Notes")
+                        .IsRequired()
+                        .HasColumnType("TEXT");
+
+                    b.Property<Guid>("ReportId")
+                        .HasColumnType("TEXT");
+
+                    b.Property<int>("Status")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<Guid>("TenantId")
+                        .HasColumnType("TEXT");
+
+                    b.Property<long>("UpdatedAt")
+                        .HasColumnType("INTEGER");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("TenantId", "ReportId");
+
+                    b.HasIndex("TenantId", "Status", "DueAt");
+
+                    b.ToTable("CriticalResults");
+                });
+
+            modelBuilder.Entity("RadioPad.Domain.Entities.PeerReview", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("TEXT");
+
+                    b.Property<Guid>("AssignedByUserId")
+                        .HasColumnType("TEXT");
+
+                    b.Property<bool>("Blinded")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<string>("Comments")
+                        .IsRequired()
+                        .HasColumnType("TEXT");
+
+                    b.Property<long?>("CompletedAt")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<int>("Complexity")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<long>("CreatedAt")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<int>("DiscrepancyCategory")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<string>("DisputeReason")
+                        .HasColumnType("TEXT");
+
+                    b.Property<long?>("DisputedAt")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<Guid>("OriginalAuthorUserId")
+                        .HasColumnType("TEXT");
+
+                    b.Property<Guid>("ReportId")
+                        .HasColumnType("TEXT");
+
+                    b.Property<int>("ReviewType")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<Guid>("ReviewerUserId")
+                        .HasColumnType("TEXT");
+
+                    b.Property<int>("Score")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<long?>("StartedAt")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<int>("Status")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<Guid>("TenantId")
+                        .HasColumnType("TEXT");
+
+                    b.Property<long>("UpdatedAt")
+                        .HasColumnType("INTEGER");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("TenantId", "ReportId");
+
+                    b.HasIndex("TenantId", "ReviewerUserId", "Status");
+
+                    b.ToTable("PeerReviews");
+                });
+
+            modelBuilder.Entity("RadioPad.Domain.Entities.TeachingCase", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("BodyPart")
+                        .IsRequired()
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("ClinicalHistory")
+                        .IsRequired()
+                        .HasColumnType("TEXT");
+
+                    b.Property<long>("CreatedAt")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<Guid>("CreatedByUserId")
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("Diagnosis")
+                        .IsRequired()
+                        .HasColumnType("TEXT");
+
+                    b.Property<int>("Difficulty")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<string>("FindingsText")
+                        .IsRequired()
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("ImpressionText")
+                        .IsRequired()
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("Modality")
+                        .IsRequired()
+                        .HasColumnType("TEXT");
+
+                    b.Property<long?>("PublishedAt")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<Guid?>("SourceReportId")
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("Tags")
+                        .IsRequired()
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("TeachingPoints")
+                        .IsRequired()
+                        .HasColumnType("TEXT");
+
+                    b.Property<Guid>("TenantId")
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("Title")
+                        .IsRequired()
+                        .HasColumnType("TEXT");
+
+                    b.Property<long>("UpdatedAt")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<int>("ViewCount")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<int>("Visibility")
+                        .HasColumnType("INTEGER");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("TenantId", "CreatedByUserId");
+
+                    b.HasIndex("TenantId", "Modality", "BodyPart");
+
+                    b.ToTable("TeachingCases");
+                });
+
+            modelBuilder.Entity("RadioPad.Domain.Entities.SharedMacro", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("Body")
+                        .IsRequired()
+                        .HasColumnType("TEXT");
+
+                    b.Property<long>("CreatedAt")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<Guid>("CreatedByUserId")
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("Description")
+                        .IsRequired()
+                        .HasColumnType("TEXT");
+
+                    b.Property<int>("Scope")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<string>("Subspecialty")
+                        .IsRequired()
+                        .HasColumnType("TEXT");
+
+                    b.Property<Guid>("TenantId")
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("Trigger")
+                        .IsRequired()
+                        .HasColumnType("TEXT");
+
+                    b.Property<long>("UpdatedAt")
+                        .HasColumnType("INTEGER");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("TenantId", "Scope", "Subspecialty", "Trigger")
+                        .IsUnique();
+
+                    b.ToTable("SharedMacros");
+                });
+
             modelBuilder.Entity("RadioPad.Domain.Entities.DeviceAuthRequest", b =>
                 {
                     b.Property<Guid>("Id")

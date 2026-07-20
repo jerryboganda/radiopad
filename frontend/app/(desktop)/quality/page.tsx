@@ -4,8 +4,10 @@ import { useEffect, useState, useCallback } from 'react';
 import Link from 'next/link';
 import { ArrowRight, Users } from 'lucide-react';
 import { api } from '@/lib/api';
-import type { QualityTrendsResponse, Report, ValidationResult } from '@/lib/api';
+import type { PeerReviewStats, QualityTrendsResponse, Report, ValidationResult } from '@/lib/api';
 import { reportHref } from '@/lib/routes';
+import { usePermissions } from '@/lib/permissions';
+import { formatRate, isOpen } from '@/lib/peerReview';
 import Container from '@/components/shell/Container';
 import PageHeader from '@/components/shell/PageHeader';
 import { TableSkeleton } from '@/components/ui/Skeleton';
@@ -48,7 +50,9 @@ function severityName(sev: string | number): string {
  * Quality & Peer Review — umbrella page for report quality.
  * Pulls the same analytics data as the full quality dashboard
  * (/analytics/quality) and shows a compact overview plus recent
- * validation outcomes. Peer review (double reads) is coming soon.
+ * validation outcomes. The peer-review panel (PRD §14.13) summarises the
+ * live double-read programme and links to /peer-review for the full queue,
+ * scoring form, and concordance dashboard.
  */
 export default function QualityHubPage() {
   const [summary, setSummary] = useState<Summary | null>(null);
@@ -134,7 +138,7 @@ export default function QualityHubPage() {
     <Container>
       <PageHeader
         title="Quality & Peer Review"
-        description="How your team's reports are holding up — quality scores, validation outcomes, and (soon) double reads."
+        description="How your team's reports are holding up — quality scores, validation outcomes, and peer-reviewed second reads."
         secondaryActions={
           <Link
             href="/analytics/quality"
@@ -333,32 +337,97 @@ export default function QualityHubPage() {
         )}
       </div>
 
-      {/* ── Peer review (coming soon) ───────────────────────────────── */}
-      <div className="rp-panel rp-anim-fade-in-up">
-        <div className="rp-panel-title">
-          Peer review <span className="badge info">coming soon</span>
-        </div>
-        <div style={{ display: 'flex', gap: 16, alignItems: 'flex-start' }}>
-          <div
-            className="rp-stat-tile"
-            style={{ flexShrink: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', width: 56, height: 56 }}
-            aria-hidden
-          >
-            <Users size={24} strokeWidth={1.8} />
-          </div>
-          <div>
-            <p className="rp-page-sub" style={{ maxWidth: 640 }}>
-              Double reads are on the way. A second radiologist will be able to review a signed
-              report, agree or flag discrepancies, and leave structured feedback — giving your team
-              an ongoing picture of inter-reader agreement without leaving RadioPad. Nothing here
-              yet; this panel will light up when the workflow ships.
-            </p>
-            <button className="ghost" disabled style={{ marginTop: 8 }}>
-              Set up double reads
-            </button>
-          </div>
-        </div>
-      </div>
+      {/* ── Peer review (PRD §14.13, PR-001..010) ───────────────────── */}
+      <PeerReviewSummaryPanel />
     </Container>
+  );
+}
+
+/**
+ * Compact peer-review summary for the quality hub: how many second reads are
+ * waiting on ME, and the tenant's concordance rate for anyone who runs the
+ * programme. The full queue, scoring form, and per-reader dashboard live on
+ * /peer-review — this panel is the doorway, not a second implementation.
+ */
+function PeerReviewSummaryPanel() {
+  const { can, loading: permsLoading } = usePermissions();
+  const isProgrammeAdmin = can('peer_review.manage');
+
+  const [open, setOpen] = useState<number | null>(null);
+  const [stats, setStats] = useState<PeerReviewStats | null>(null);
+  const [err, setErr] = useState<string | null>(null);
+  const [busy, setBusy] = useState(true);
+
+  const load = useCallback(() => {
+    setBusy(true);
+    setErr(null);
+    Promise.allSettled([
+      api.peerReview.mine(),
+      isProgrammeAdmin ? api.peerReview.stats() : Promise.resolve(null),
+    ]).then(([mineRes, statsRes]) => {
+      if (mineRes.status === 'fulfilled') {
+        setOpen(mineRes.value.filter(isOpen).length);
+      } else {
+        setErr((mineRes.reason as Error).message);
+      }
+      if (statsRes.status === 'fulfilled' && statsRes.value) setStats(statsRes.value);
+      setBusy(false);
+    });
+  }, [isProgrammeAdmin]);
+
+  useEffect(() => {
+    if (!permsLoading) load();
+  }, [permsLoading, load]);
+
+  return (
+    <div className="rp-panel rp-anim-fade-in-up" aria-live="polite" aria-busy={busy}>
+      <div className="rp-panel-title">
+        <Users size={15} strokeWidth={1.8} aria-hidden style={{ verticalAlign: -2, marginRight: 6 }} />
+        Peer review
+      </div>
+      <p className="rp-page-sub" style={{ marginBottom: 12, maxWidth: 680 }}>
+        Second reads of signed reports, scored on the RADPEER scale. A quality benchmark for
+        inter-reader agreement — it never changes or re-signs a report.
+      </p>
+
+      {busy ? (
+        <TableSkeleton rows={2} cols={3} />
+      ) : err ? (
+        <ErrorState title="Couldn't load peer review" message={err} onRetry={load} />
+      ) : (
+        <>
+          <div className="rp-grid-3 rp-stagger">
+            <div className="rp-stat-tile">
+              <div className="rp-stat-label">Waiting on you</div>
+              <div className="rp-stat-value">
+                {open === null ? '—' : <AnimatedNumber value={open} />}
+                {open !== null && open > 0 && (
+                  <span className="badge info" style={{ marginLeft: 8 }}>
+                    to review
+                  </span>
+                )}
+              </div>
+            </div>
+            {isProgrammeAdmin && (
+              <>
+                <div className="rp-stat-tile">
+                  <div className="rp-stat-label">Concordance rate</div>
+                  <div className="rp-stat-value">{formatRate(stats?.totals.concordanceRate)}</div>
+                </div>
+                <div className="rp-stat-tile">
+                  <div className="rp-stat-label">Discrepancies recorded</div>
+                  <div className="rp-stat-value">
+                    {stats ? <AnimatedNumber value={stats.totals.discrepancies} /> : '—'}
+                  </div>
+                </div>
+              </>
+            )}
+          </div>
+          <p className="rp-page-sub" style={{ marginTop: 12 }}>
+            <Link href="/peer-review">Open peer review →</Link>
+          </p>
+        </>
+      )}
+    </div>
   );
 }

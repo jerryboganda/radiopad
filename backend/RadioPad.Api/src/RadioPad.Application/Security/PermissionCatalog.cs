@@ -42,6 +42,23 @@ public static class PermissionCatalog
             [RbacPermission.ModalitiesManage] = Define(RbacPermission.ModalitiesManage, "modalities.manage", "Create, update, or delete imaging modalities.", clinical: true),
             [RbacPermission.BodyPartsRead] = Define(RbacPermission.BodyPartsRead, "body_parts.read", "Read the body-part catalog."),
             [RbacPermission.BodyPartsManage] = Define(RbacPermission.BodyPartsManage, "body_parts.manage", "Create, update, or delete body parts.", clinical: true),
+            // PRD §14.15 (CR-001..010) — critical-results communication tracking.
+            // Read covers the radiologist queue AND the compliance/medical-director list;
+            // Manage is the clinical act of logging, communicating, acknowledging, and closing.
+            [RbacPermission.CriticalResultsRead] = Define(RbacPermission.CriticalResultsRead, "critical_results.read", "Read critical results and the overdue queue."),
+            [RbacPermission.CriticalResultsManage] = Define(RbacPermission.CriticalResultsManage, "critical_results.manage", "Log, communicate, acknowledge, escalate, or close critical results.", clinical: true),
+            // PRD §14.14 (TF-001..008) — teaching file. Read is the library browse;
+            // Manage is authoring, publishing, and deleting a de-identified case.
+            [RbacPermission.TeachingCasesRead] = Define(RbacPermission.TeachingCasesRead, "teaching_cases.read", "Browse the de-identified teaching library."),
+            [RbacPermission.TeachingCasesManage] = Define(RbacPermission.TeachingCasesManage, "teaching_cases.manage", "Create, edit, publish, or delete teaching cases.", clinical: true),
+            // PRD §14.13 (PR-001..010) — RADPEER-aligned peer review.
+            // Read = my review queue + the reviews recorded against a report.
+            // Submit = the clinical act of scoring a peer's report (attendings/fellows).
+            // Manage = run the quality program: assign, random-sample, and read the
+            // per-reader concordance dashboard (PR-005) — director/quality-admin only.
+            [RbacPermission.PeerReviewRead] = Define(RbacPermission.PeerReviewRead, "peer_review.read", "Read peer-review assignments and the reviews recorded against a report."),
+            [RbacPermission.PeerReviewSubmit] = Define(RbacPermission.PeerReviewSubmit, "peer_review.submit", "Submit a RADPEER score for an assigned peer review, or dispute one.", clinical: true),
+            [RbacPermission.PeerReviewManage] = Define(RbacPermission.PeerReviewManage, "peer_review.manage", "Assign peer reviews, run random sampling, and read the quality/concordance dashboard."),
         };
 
     public static IReadOnlyCollection<PermissionDefinition> All => Definitions.Values.ToArray();

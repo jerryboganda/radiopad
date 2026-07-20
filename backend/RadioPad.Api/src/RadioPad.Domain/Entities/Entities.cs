@@ -513,6 +513,53 @@ public enum SignatureRole
     Addendum = 2,
 }
 
+/// <summary>
+/// PRD §14.15 (CR-001..010) — a PowerScribe-style critical-results communication
+/// record attached to a report. Tracks the closed loop from "critical finding
+/// logged" through "communicated to the ordering clinician" to
+/// "acknowledged / closed", with a deadline derived from the
+/// <see cref="Criticality"/>. First-class and queryable so the radiologist's
+/// queue and the compliance list can scan by (tenant, status, due) without
+/// parsing report bodies. NEVER auto-communicates and NEVER auto-signs — every
+/// state change is an explicit human action recorded in the append-only audit log.
+/// </summary>
+public class CriticalResult : Entity
+{
+    public Guid TenantId { get; set; }
+    public Guid ReportId { get; set; }
+    /// <summary>Criticality class; drives <see cref="DueAt"/> via <see cref="DeadlineFor"/>.</summary>
+    public Criticality Criticality { get; set; } = Criticality.Red;
+    /// <summary>Short human summary of the critical finding (e.g. "large pneumothorax, right").</summary>
+    public string FindingSummary { get; set; } = "";
+    public CriticalResultStatus Status { get; set; } = CriticalResultStatus.Open;
+    /// <summary>Who the result was communicated to (ordering/referring clinician label). Null until communicated.</summary>
+    public string? CommunicatedTo { get; set; }
+    /// <summary>How it was communicated. Null until communicated.</summary>
+    public CriticalCommunicationMethod? CommunicationMethod { get; set; }
+    public DateTimeOffset? CommunicatedAt { get; set; }
+    /// <summary>Free-text label of the person who acknowledged (read-back). Null until acknowledged.</summary>
+    public string? AcknowledgedBy { get; set; }
+    public DateTimeOffset? AcknowledgedAt { get; set; }
+    /// <summary>Communication deadline computed from <see cref="Criticality"/> at creation time.</summary>
+    public DateTimeOffset DueAt { get; set; }
+    public DateTimeOffset? EscalatedAt { get; set; }
+    public DateTimeOffset? ClosedAt { get; set; }
+    /// <summary>Optional running notes appended by each state change.</summary>
+    public string Notes { get; set; } = "";
+
+    /// <summary>
+    /// PRD §14.15 — communication deadline window per criticality class:
+    /// Red = 15 min (immediate), Orange = 1 h (urgent), Yellow = 24 h (actionable).
+    /// </summary>
+    public static TimeSpan DeadlineFor(Criticality criticality) => criticality switch
+    {
+        Criticality.Red => TimeSpan.FromMinutes(15),
+        Criticality.Orange => TimeSpan.FromHours(1),
+        Criticality.Yellow => TimeSpan.FromHours(24),
+        _ => TimeSpan.FromHours(1),
+    };
+}
+
 public class AiRequest : Entity
 {
     public Guid TenantId { get; set; }
@@ -1154,4 +1201,123 @@ public class CompanionSession : Entity
     public DateTimeOffset ExpiresAt { get; set; }
     /// <summary>When the phone paired; null while still advertising / ended / expired.</summary>
     public DateTimeOffset? PairedAt { get; set; }
+}
+
+/// <summary>
+/// PRD §14.13 (PR-001..010) — one RADPEER-aligned peer-review assignment of a
+/// signed report to a second radiologist. Never a clinical decision system: the
+/// score is a quality benchmark, it does not change the report and it never
+/// signs anything.
+///
+/// PR-002 (anonymized assignment) is modelled by <see cref="Blinded"/>: while the
+/// review is open the API withholds <see cref="OriginalAuthorUserId"/> from the
+/// reviewer's projection, so a reviewer scores the report, not the colleague.
+/// The column itself is always populated — the analytics in PR-009 need it, and
+/// hiding it in the DB would make per-reader concordance impossible to compute.
+/// </summary>
+public class PeerReview : Entity
+{
+    public Guid TenantId { get; set; }
+    public Guid ReportId { get; set; }
+    /// <summary>The second radiologist who scores the case. Never equal to <see cref="OriginalAuthorUserId"/>.</summary>
+    public Guid ReviewerUserId { get; set; }
+    /// <summary>The radiologist whose interpretation is under review (the report's author).</summary>
+    public Guid OriginalAuthorUserId { get; set; }
+    /// <summary>Who created the assignment (director/quality admin, or the sampling sweep's operator).</summary>
+    public Guid AssignedByUserId { get; set; }
+
+    public PeerReviewType ReviewType { get; set; } = PeerReviewType.Random;
+    public PeerReviewStatus Status { get; set; } = PeerReviewStatus.Assigned;
+
+    /// <summary>RADPEER 1..4; <see cref="PeerReviewScore.NotScored"/> until submitted.</summary>
+    public PeerReviewScore Score { get; set; } = PeerReviewScore.NotScored;
+    /// <summary>RADPEER difficulty modifier recorded with the score.</summary>
+    public PeerReviewComplexity Complexity { get; set; } = PeerReviewComplexity.Routine;
+    public PeerReviewDiscrepancyCategory DiscrepancyCategory { get; set; } = PeerReviewDiscrepancyCategory.None;
+
+    /// <summary>PR-003 — the reviewer's structured rationale / free-text comments.</summary>
+    public string Comments { get; set; } = "";
+
+    /// <summary>PR-002 — whether the reviewer is blinded to the author until they submit.</summary>
+    public bool Blinded { get; set; } = true;
+
+    public DateTimeOffset? StartedAt { get; set; }
+    public DateTimeOffset? CompletedAt { get; set; }
+
+    /// <summary>Author's rebuttal when they contest the score; null unless <see cref="Status"/> is Disputed.</summary>
+    public string? DisputeReason { get; set; }
+    public DateTimeOffset? DisputedAt { get; set; }
+
+    /// <summary>True once the reviewer has submitted — the point at which blinding lifts.</summary>
+    [System.ComponentModel.DataAnnotations.Schema.NotMapped]
+    public bool IsUnblinded => !Blinded || Status is PeerReviewStatus.Completed or PeerReviewStatus.Disputed;
+
+    /// <summary>A score of 2..4 is a recorded discrepancy; 1 (concur) and NotScored are not.</summary>
+    [System.ComponentModel.DataAnnotations.Schema.NotMapped]
+    public bool IsDiscrepancy => Score is PeerReviewScore.DiscrepancyUnlikelySignificant
+        or PeerReviewScore.DiscrepancyShouldBeMadeMostOfTheTime
+        or PeerReviewScore.DiscrepancyShouldBeMadeAlmostEveryTime;
+}
+
+/// <summary>
+/// PRD §14.14 (TF-001..008) — one de-identified teaching-file case.
+///
+/// SAFETY: this entity is a PHI-free surface by construction. It deliberately
+/// has NO accession number, NO patient reference/MRN, NO name, and NO date of
+/// birth column — there is nowhere to put them even by accident. Every text
+/// field that can originate from a report is passed through
+/// <c>TeachingCaseDeidentifier</c> before it is assigned (TF-002).
+/// <see cref="SourceReportId"/> is a tenant-internal provenance pointer only:
+/// it never travels with an export and resolving it still requires
+/// report-read permission in the same tenant.
+/// </summary>
+public class TeachingCase : Entity
+{
+    public Guid TenantId { get; set; }
+    /// <summary>Author — the only non-admin who may edit, publish, or delete the case.</summary>
+    public Guid CreatedByUserId { get; set; }
+
+    public string Title { get; set; } = "";
+    public string Modality { get; set; } = "";
+    public string BodyPart { get; set; } = "";
+
+    /// <summary>TF-004 — the teaching diagnosis ("acute appendicitis", "LI-RADS 5 HCC").</summary>
+    public string Diagnosis { get; set; } = "";
+
+    /// <summary>TF-004 — the teaching pearls: why this case is worth studying.</summary>
+    public string TeachingPoints { get; set; } = "";
+
+    /// <summary>De-identified clinical history / indication (TF-002).</summary>
+    public string ClinicalHistory { get; set; } = "";
+
+    /// <summary>De-identified findings narrative (TF-002).</summary>
+    public string FindingsText { get; set; } = "";
+
+    /// <summary>De-identified impression narrative (TF-002).</summary>
+    public string ImpressionText { get; set; } = "";
+
+    /// <summary>
+    /// TF-004 — comma-separated free tags ("RADS", subspecialty, pathology).
+    /// Matches the CSV convention already used by
+    /// <see cref="Rulebook.AppliesToModalities"/>; a child entity would buy
+    /// nothing at this cardinality.
+    /// </summary>
+    public string Tags { get; set; } = "";
+
+    public TeachingDifficulty Difficulty { get; set; } = TeachingDifficulty.Intermediate;
+
+    /// <summary>
+    /// Provenance of the report this case was de-identified from, or null for
+    /// a hand-authored case. Never exported and never surfaced to a reader who
+    /// is not the author.
+    /// </summary>
+    public Guid? SourceReportId { get; set; }
+
+    public TeachingVisibility Visibility { get; set; } = TeachingVisibility.Private;
+
+    /// <summary>Set when the case is first published to the tenant library; cleared on unpublish.</summary>
+    public DateTimeOffset? PublishedAt { get; set; }
+
+    /// <summary>TF-008 — read counter, incremented on each detail fetch by a non-author.</summary>
+    public int ViewCount { get; set; }
 }

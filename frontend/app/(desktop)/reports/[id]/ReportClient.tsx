@@ -25,6 +25,8 @@ import { isUseUbagEnabled } from '@/lib/dictation/crossCheckPrefs';
 import { anchorCorrections, applyCorrection } from '@/lib/dictation/anchorCorrections';
 import CrossCheckBadge from '@/components/dictation/CrossCheckBadge';
 import CompanionHostPanel from '@/components/companion/CompanionHostPanel';
+import CriticalResultPanel from '@/components/critical/CriticalResultPanel';
+import SaveAsTeachingCaseButton from '@/components/teaching/SaveAsTeachingCaseButton';
 import { readQueryParam } from '@/lib/browserParams';
 import { resolveDefaultProvider, setPreferredProviderId } from '@/lib/ai/providerPref';
 import { detectCommand, stripCommand, type VoiceCommand, type CommandMatch } from '@/lib/voiceCommands';
@@ -52,6 +54,7 @@ import {
 import { usePermissions } from '@/lib/permissions';
 import SectionEditor from '@/components/editor/SectionEditor';
 import { snippetKeyDown } from '@/lib/snippetInsert';
+import { loadSharedMacros } from '@/lib/sharedMacros';
 import { useRichEditorEnabled } from '@/lib/editor/richEditorFlag';
 import { saveDownload } from '@/lib/saveDownload';
 import PatientContextBar from '@/components/shell/PatientContextBar';
@@ -210,6 +213,10 @@ export default function ReportPage() {
       const def = resolveDefaultProvider(p);
       if (def) setProviderId(def.id);
     });
+    // RPT-021 — warm the shared-macro cache so trigger expansion (which runs
+    // synchronously on Tab) can see tenant/subspecialty macros, not just the
+    // radiologist's own snippets. Failures are absorbed inside the loader.
+    void loadSharedMacros();
     api.rulebooks.list().then(setRulebooks);
     api.templates.list().then(setTemplates).catch(() => {});
     api.modalities.list().then(setModalities).catch(() => {});
@@ -1269,6 +1276,12 @@ export default function ReportPage() {
 
           <CompanionHostPanel />
 
+          {/* PRD §14.15 (CR-001..010) — critical-results communication loop for
+              this report: log the finding, record the call, capture the
+              read-back. RadioPad never communicates on the radiologist's
+              behalf; every transition here is an explicit human action. */}
+          <CriticalResultPanel reportId={report.id} />
+
           {/* Transient AI working surfaces — appear between the AI bar and the cards. */}
           {stylePanelOpen && (
             <div className="rp-panel">
@@ -1595,7 +1608,18 @@ export default function ReportPage() {
           exportAllowed={exportAllowed}
           exportTitle={exportTitle}
           onExport={runExport}
-          risSlot={<CopyToRisButton reportId={report.id} />}
+          risSlot={
+            <>
+              <CopyToRisButton reportId={report.id} />
+              {/* PRD §14.14 TF-001 — start a teaching case from this report.
+                  De-identification runs server-side; the button states what
+                  will be stripped before the radiologist commits. */}
+              <SaveAsTeachingCaseButton
+                reportId={report.id}
+                defaultTitle={[report.study.modality, report.study.bodyPart].filter(Boolean).join(' ')}
+              />
+            </>
+          }
           canEdit={canEdit}
           canSign={canSign}
           primarySigned={primarySigned}

@@ -807,6 +807,27 @@ export type UbagStatus = {
   gatewayUnreachableSince?: string | null;
 };
 
+/** PRD WL-009 — one practice a teleradiologist's identity can read for. */
+export type TenantMembership = {
+  slug: string;
+  displayName: string;
+  role: string;
+  isCurrent: boolean;
+  isDefault: boolean;
+};
+
+/** PRD RPT-021 — a shared (tenant- or subspecialty-scoped) autotext macro. */
+export type SharedMacro = {
+  id: string;
+  trigger: string;
+  body: string;
+  description: string;
+  scope: 'Tenant' | 'Subspecialty';
+  /** Empty for tenant-wide macros. */
+  subspecialty: string;
+  updatedAt: string;
+};
+
 export type ValidationFinding = {
   ruleId: string;
   severity: 'Info' | 'Warning' | 'Blocker';
@@ -1907,6 +1928,34 @@ export const api = {
     },
   },
   /**
+   * PRD RPT-021 — shared autotext macros (tenant- and subspecialty-scoped).
+   * The personal, device-local half lives in `lib/snippets.ts`; a personal
+   * snippet always wins on a trigger collision (see `lib/sharedMacros.ts`).
+   * Backend: `SharedMacrosController`. Reading is open to the tenant;
+   * authoring is restricted to the reporting-governance roles.
+   */
+  macros: {
+    list: (subspecialty?: string) =>
+      request<SharedMacro[]>(
+        subspecialty
+          ? `/api/macros?subspecialty=${encodeURIComponent(subspecialty)}`
+          : '/api/macros',
+      ),
+    save: (body: {
+      id?: string | null;
+      trigger: string;
+      body: string;
+      description?: string;
+      scope?: 'Tenant' | 'Subspecialty';
+      subspecialty?: string;
+    }) =>
+      request<SharedMacro>('/api/macros', {
+        method: 'POST',
+        body: JSON.stringify(body),
+      }),
+    delete: (id: string) => request<void>(`/api/macros/${id}`, { method: 'DELETE' }),
+  },
+  /**
    * F7 (dictation brief §6) — the signed-in radiologist's personal correction dictionary.
    * Deterministic find→replace applied BEFORE the LLM and layered over the org lexicon (the
    * user's entry wins for the same term). Backend: `UserCorrectionsController`, upserts on `from`.
@@ -1923,6 +1972,20 @@ export const api = {
       request<void>(`/api/user-corrections/${id}`, { method: 'DELETE' }),
   },
   tenant: {
+    /**
+     * PRD WL-009 — practices this identity can read for. A single-workspace
+     * user gets exactly one row and the switcher stays hidden.
+     */
+    memberships: () => request<TenantMembership[]>('/api/tenant/memberships'),
+    /**
+     * PRD WL-009 — re-authenticate into another practice. The server mints a
+     * NEW bearer bound to that tenant; the caller must store it and reload.
+     */
+    switch: (slug: string) =>
+      request<{ token: string; tenant: string; user: string; displayName: string; role: string }>(
+        '/api/tenant/switch',
+        { method: 'POST', body: JSON.stringify({ slug }) },
+      ),
     settings: {
       get: () =>
         request<{
@@ -2561,6 +2624,73 @@ export const api = {
       ),
   },
   /**
+   * PRD §14.13 (PR-001..010) — RADPEER-aligned peer review & quality.
+   * `mine` is the reviewer's own queue; while an assignment is still open the
+   * server WITHHOLDS the original author (PR-002), so `originalAuthorUserId` /
+   * `originalAuthorName` are absent and `authorHidden` is true. Never render a
+   * placeholder that implies the author is known.
+   */
+  peerReview: {
+    /** My queue as the REVIEWER (default), or `as: 'author'` for PR-008 feedback on my own reports. */
+    mine: (opts?: { status?: PeerReviewStatusName; as?: 'reviewer' | 'author' }) => {
+      const q = new URLSearchParams();
+      if (opts?.status) q.set('status', opts.status);
+      if (opts?.as === 'author') q.set('as', 'author');
+      const qs = q.toString();
+      return request<PeerReviewItem[]>(`/api/peer-reviews/mine${qs ? `?${qs}` : ''}`);
+    },
+    forReport: (reportId: string) =>
+      request<PeerReviewItem[]>(`/api/peer-reviews/report/${reportId}`),
+    assign: (body: {
+      reportId: string;
+      reviewerUserId: string;
+      reviewType?: number;
+      blinded?: boolean;
+    }) =>
+      request<PeerReviewItem>('/api/peer-reviews', {
+        method: 'POST',
+        body: JSON.stringify(body),
+      }),
+    sample: (body: {
+      count?: number;
+      ratePercent?: number;
+      from?: string;
+      to?: string;
+      reviewerUserIds?: string[];
+    }) =>
+      request<PeerReviewSampleResult>('/api/peer-reviews/sample', {
+        method: 'POST',
+        body: JSON.stringify(body),
+      }),
+    start: (id: string) =>
+      request<PeerReviewItem>(`/api/peer-reviews/${id}/start`, { method: 'POST' }),
+    submit: (
+      id: string,
+      body: {
+        score: 1 | 2 | 3 | 4;
+        discrepancyCategory: number;
+        complexity?: number;
+        comments?: string;
+      },
+    ) =>
+      request<PeerReviewItem>(`/api/peer-reviews/${id}/submit`, {
+        method: 'POST',
+        body: JSON.stringify(body),
+      }),
+    dispute: (id: string, reason: string) =>
+      request<PeerReviewItem>(`/api/peer-reviews/${id}/dispute`, {
+        method: 'POST',
+        body: JSON.stringify({ reason }),
+      }),
+    stats: (range?: { from?: string; to?: string }) => {
+      const q = new URLSearchParams();
+      if (range?.from) q.set('from', range.from);
+      if (range?.to) q.set('to', range.to);
+      const qs = q.toString();
+      return request<PeerReviewStats>(`/api/peer-reviews/stats${qs ? `?${qs}` : ''}`);
+    },
+  },
+  /**
    * Desktop↔phone companion pairing. The desktop (report open) advertises a
    * session and shows the code; the phone pairs by code and then streams
    * dictation over the WebSocket relay (`lib/companion.ts`). No PHI is sent to
@@ -2582,6 +2712,267 @@ export const api = {
     getSession: (sessionId: string) =>
       requestCompanion<CompanionSessionInfo>(`/api/companion/sessions/${sessionId}`),
   },
+  /**
+   * PRD §14.15 (CR-001..010) — critical-results communication tracking. The
+   * report editor panel loads by `reportId`; the radiologist queue lists across
+   * reports and filters to what is still open or overdue. Every mutation is an
+   * explicit clinician action — nothing here communicates or acknowledges
+   * automatically.
+   */
+  criticalResults: {
+    list: (params: CriticalResultListParams = {}) => {
+      const sp = new URLSearchParams();
+      if (params.status) sp.set('status', params.status);
+      if (params.criticality) sp.set('criticality', params.criticality);
+      if (params.reportId) sp.set('reportId', params.reportId);
+      if (params.overdue) sp.set('overdue', 'true');
+      if (params.take !== undefined) sp.set('take', String(params.take));
+      const qs = sp.toString();
+      return request<CriticalResult[]>(`/api/critical-results${qs ? '?' + qs : ''}`);
+    },
+    overdue: () => request<CriticalResult[]>('/api/critical-results/overdue'),
+    get: (id: string) => request<CriticalResult>(`/api/critical-results/${id}`),
+    create: (body: {
+      reportId: string;
+      criticality: CriticalityLevel;
+      findingSummary: string;
+      notes?: string;
+    }) =>
+      request<CriticalResult>('/api/critical-results', {
+        method: 'POST',
+        body: JSON.stringify(body),
+      }),
+    communicate: (
+      id: string,
+      body: { communicatedTo: string; method: CriticalCommunicationMethod; notes?: string },
+    ) =>
+      request<CriticalResult>(`/api/critical-results/${id}/communicate`, {
+        method: 'POST',
+        body: JSON.stringify(body),
+      }),
+    acknowledge: (id: string, body: { acknowledgedBy?: string; notes?: string } = {}) =>
+      request<CriticalResult>(`/api/critical-results/${id}/acknowledge`, {
+        method: 'POST',
+        body: JSON.stringify(body),
+      }),
+    escalate: (id: string, body: { notes?: string } = {}) =>
+      request<CriticalResult>(`/api/critical-results/${id}/escalate`, {
+        method: 'POST',
+        body: JSON.stringify(body),
+      }),
+    close: (id: string, body: { notes?: string } = {}) =>
+      request<CriticalResult>(`/api/critical-results/${id}/close`, {
+        method: 'POST',
+        body: JSON.stringify(body),
+      }),
+  },
+  /** PRD §14.14 (TF-001..008) — the de-identified teaching library. */
+  teachingCases: {
+    search: (params: TeachingCaseSearch = {}) => {
+      const sp = new URLSearchParams();
+      if (params.modality) sp.set('modality', params.modality);
+      if (params.bodyPart) sp.set('bodyPart', params.bodyPart);
+      if (params.difficulty !== undefined && params.difficulty !== null) {
+        sp.set('difficulty', String(params.difficulty));
+      }
+      if (params.tag) sp.set('tag', params.tag);
+      if (params.q) sp.set('q', params.q);
+      if (params.mine) sp.set('mine', 'true');
+      if (params.skip !== undefined) sp.set('skip', String(params.skip));
+      if (params.take !== undefined) sp.set('take', String(params.take));
+      const qs = sp.toString();
+      return request<TeachingCaseSearchResult>(`/api/teaching-cases${qs ? '?' + qs : ''}`);
+    },
+    get: (id: string) => request<TeachingCase>(`/api/teaching-cases/${id}`),
+    create: (body: TeachingCaseInput) =>
+      request<TeachingCase>('/api/teaching-cases', {
+        method: 'POST',
+        body: JSON.stringify(body),
+      }),
+    /**
+     * TF-001/TF-002 — create a case from a report. The server de-identifies the
+     * narrative; the client never scrubs anything itself and must not imply it did.
+     */
+    createFromReport: (reportId: string, body: TeachingCaseFromReportInput = {}) =>
+      request<TeachingCase>(`/api/teaching-cases/from-report/${reportId}`, {
+        method: 'POST',
+        body: JSON.stringify(body),
+      }),
+    update: (id: string, body: TeachingCaseInput) =>
+      request<TeachingCase>(`/api/teaching-cases/${id}`, {
+        method: 'PATCH',
+        body: JSON.stringify(body),
+      }),
+    publish: (id: string) =>
+      request<TeachingCase>(`/api/teaching-cases/${id}/publish`, { method: 'POST' }),
+    unpublish: (id: string) =>
+      request<TeachingCase>(`/api/teaching-cases/${id}/unpublish`, { method: 'POST' }),
+    delete: (id: string) =>
+      request<void>(`/api/teaching-cases/${id}`, { method: 'DELETE' }),
+  },
+};
+
+/** PRD §14.14 (TF-004) — teaching difficulty band (mirrors the backend enum). */
+export type TeachingDifficulty = 0 | 1 | 2;
+
+/** PRD §14.14 (TF-007) — 0 = Private (author only), 1 = Tenant (published). */
+export type TeachingVisibility = 0 | 1;
+
+export const TEACHING_DIFFICULTY_LABELS: Record<TeachingDifficulty, string> = {
+  0: 'Introductory',
+  1: 'Intermediate',
+  2: 'Advanced',
+};
+
+export type TeachingCase = {
+  id: string;
+  title: string;
+  modality: string;
+  bodyPart: string;
+  diagnosis: string;
+  teachingPoints: string;
+  /** De-identified clinical history (TF-002). */
+  clinicalHistory: string;
+  findingsText: string;
+  impressionText: string;
+  /** Comma-separated, normalised lower-case by the server. */
+  tags: string;
+  difficulty: TeachingDifficulty;
+  difficultyName: string;
+  visibility: TeachingVisibility;
+  visibilityName: string;
+  publishedAt: string | null;
+  viewCount: number;
+  /**
+   * Author-only provenance. Withheld from every other reader — and because the
+   * API drops null properties (`JsonIgnoreCondition.WhenWritingNull`), withheld
+   * means the key is ABSENT, not null. Hence optional.
+   */
+  sourceReportId?: string | null;
+  isOwner: boolean;
+  canEdit: boolean;
+  createdAt: string;
+  updatedAt: string;
+};
+
+export type TeachingCaseSearch = {
+  modality?: string;
+  bodyPart?: string;
+  difficulty?: TeachingDifficulty | null;
+  tag?: string;
+  q?: string;
+  mine?: boolean;
+  skip?: number;
+  take?: number;
+};
+
+export type TeachingCaseSearchResult = { total: number; items: TeachingCase[] };
+
+export type TeachingCaseInput = {
+  title?: string;
+  modality?: string;
+  bodyPart?: string;
+  diagnosis?: string;
+  teachingPoints?: string;
+  clinicalHistory?: string;
+  findingsText?: string;
+  impressionText?: string;
+  tags?: string;
+  difficulty?: TeachingDifficulty;
+};
+
+export type TeachingCaseFromReportInput = {
+  title?: string;
+  diagnosis?: string;
+  teachingPoints?: string;
+  tags?: string;
+  difficulty?: TeachingDifficulty;
+};
+
+/* ── PRD §14.13 (PR-001..010) — Peer Review & Quality ─────────────────────── */
+
+export type PeerReviewStatusName = 'Assigned' | 'InProgress' | 'Completed' | 'Disputed';
+export type PeerReviewTypeName = 'Random' | 'Targeted' | 'Consensus' | 'Addendum';
+export type PeerReviewComplexityName = 'Routine' | 'Complex';
+export type PeerReviewDiscrepancyCategoryName =
+  | 'None'
+  | 'Perceptual'
+  | 'Interpretive'
+  | 'Communication'
+  | 'Technique';
+
+/** RADPEER 1..4; `0` means the review has not been scored yet. */
+export type PeerReviewScoreValue = 0 | 1 | 2 | 3 | 4;
+
+/**
+ * One peer-review assignment as the server projects it FOR THE CALLER.
+ * `authorHidden` is the PR-002 blinding flag: when true the author fields are
+ * genuinely absent from the payload, not blanked out.
+ */
+export type PeerReviewItem = {
+  id: string;
+  reportId: string;
+  reviewerUserId: string;
+  reviewerName: string | null;
+  reviewType: PeerReviewTypeName;
+  status: PeerReviewStatusName;
+  score: PeerReviewScoreValue;
+  scoreName: string;
+  complexity: PeerReviewComplexityName;
+  discrepancyCategory: PeerReviewDiscrepancyCategoryName;
+  comments: string;
+  blinded: boolean;
+  authorHidden: boolean;
+  originalAuthorUserId?: string;
+  originalAuthorName?: string | null;
+  startedAt: string | null;
+  completedAt: string | null;
+  disputeReason: string | null;
+  disputedAt: string | null;
+  createdAt: string;
+  study?: { accessionNumber: string; modality: string; bodyPart: string };
+};
+
+export type PeerReviewCategoryCounts = {
+  perceptual: number;
+  interpretive: number;
+  communication: number;
+  technique: number;
+};
+
+/** PR-005/PR-009 — quality dashboard rollup. `concordanceRate` is 0..1. */
+export type PeerReviewStats = {
+  from: string;
+  to: string;
+  totals: {
+    reviewed: number;
+    concur: number;
+    discrepancies: number;
+    concordanceRate: number;
+    pending: number;
+    byCategory: PeerReviewCategoryCounts;
+  };
+  perReader: Array<{
+    userId: string;
+    displayName: string;
+    reviewed: number;
+    concur: number;
+    discrepancies: number;
+    concordanceRate: number;
+    byScore: { concur: number; minor: number; moderate: number; major: number };
+    byCategory: PeerReviewCategoryCounts;
+    complexCases: number;
+    disputed: number;
+  }>;
+};
+
+/** PR-001 — result of one random-sampling sweep. */
+export type PeerReviewSampleResult = {
+  assigned: number;
+  eligible: number;
+  requested: number;
+  skippedNoEligibleReviewer: number;
+  reviews: PeerReviewItem[];
 };
 
 /** PRD §16.4 — Prompt Studio types. */
@@ -2606,6 +2997,93 @@ export type PromptVersionDiff = {
   v2: number;
   oldBody: string;
   newBody: string;
+};
+
+/* ── PRD §14.15 (CR-001..010) — critical-results communication tracking ───── */
+
+/**
+ * Criticality class of a critical finding. Drives the communication deadline
+ * (Red = 15 min, Orange = 1 h, Yellow = 24 h) and the badge tone.
+ */
+export type CriticalityLevel = 'Red' | 'Orange' | 'Yellow';
+
+/** Lifecycle of a critical result. `Closed` is terminal. */
+export type CriticalResultStatus =
+  | 'Open'
+  | 'Communicated'
+  | 'Acknowledged'
+  | 'Escalated'
+  | 'Closed';
+
+/** How the result reached the ordering/referring clinician. */
+export type CriticalCommunicationMethod = 'Phone' | 'SecureMessage' | 'InPerson' | 'Other';
+
+export type CriticalResult = {
+  id: string;
+  reportId: string;
+  criticality: CriticalityLevel;
+  status: CriticalResultStatus;
+  findingSummary: string;
+  communicatedTo: string | null;
+  communicationMethod: CriticalCommunicationMethod | null;
+  communicatedAt: string | null;
+  acknowledgedBy: string | null;
+  acknowledgedAt: string | null;
+  /** Communication deadline derived from `criticality` at creation time. */
+  dueAt: string;
+  escalatedAt: string | null;
+  closedAt: string | null;
+  notes: string;
+  /** Server-computed: loop still open (never communicated) AND past `dueAt`. */
+  isOverdue: boolean;
+  createdAt: string;
+  updatedAt: string;
+};
+
+export type CriticalResultListParams = {
+  status?: CriticalResultStatus;
+  criticality?: CriticalityLevel;
+  reportId?: string;
+  overdue?: boolean;
+  take?: number;
+};
+
+/**
+ * Criticality → badge tone. Mirrors the documented severity map
+ * (Blocker→red, Warning→amber, Info→blue): Red is the blocker-grade
+ * life-threatening class, Orange the urgent warning, Yellow the actionable
+ * informational one. Never hue-only — every badge carries its label text too.
+ */
+export const CRITICALITY_BADGE_TONE: Record<CriticalityLevel, 'danger' | 'warn' | 'info'> = {
+  Red: 'danger',
+  Orange: 'warn',
+  Yellow: 'info',
+};
+
+/** Human labels for the criticality classes, including the deadline promise. */
+export const CRITICALITY_LABELS: Record<CriticalityLevel, string> = {
+  Red: 'Red — immediate',
+  Orange: 'Orange — urgent',
+  Yellow: 'Yellow — actionable',
+};
+
+/** Status → badge tone. Escalated is the only status that reads as a failure. */
+export const CRITICAL_STATUS_BADGE_TONE: Record<
+  CriticalResultStatus,
+  'danger' | 'warn' | 'info' | 'ok'
+> = {
+  Open: 'warn',
+  Communicated: 'info',
+  Acknowledged: 'ok',
+  Escalated: 'danger',
+  Closed: 'ok',
+};
+
+export const COMMUNICATION_METHOD_LABELS: Record<CriticalCommunicationMethod, string> = {
+  Phone: 'Phone',
+  SecureMessage: 'Secure message',
+  InPerson: 'In person',
+  Other: 'Other',
 };
 
 export const PLAN_LABELS: Record<number, string> = {

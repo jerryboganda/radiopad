@@ -4,6 +4,38 @@
 
 ---
 
+## PowerScribe/Dragon parity gap-closure sweep (2026-07-20)
+
+A PRD audit found seven real gaps against §14.13/§14.15/RPT-021/WL-00x/DESK-020.
+All seven are now implemented; CI decides whether they build.
+
+- **Voice navigation commands** (Dragon parity) — `lib/voiceCommands.ts` gains
+  next/previous field, "go to <section>", new line/paragraph, scratch that, and
+  "sign and send" (which only OPENS the sign panel — signing is never automated).
+  `focusAdjacentSection` moved into `sectionEditorRegistry` so companion remote and
+  voice share one implementation. 55 tests.
+- **Foot pedal (DESK-020)** — `lib/dictation/footPedal.ts`. Keyboard-mode pedals
+  (F13–F24) with true hold-to-talk (down=start / up=stop), toggle, and next-field;
+  bindable in Settings → Hotkeys. System-wide HID capture remains out of scope and is
+  documented in the module header. 7 tests.
+- **Shared macros (RPT-021)** — `SharedMacro` entity + `SharedMacrosController`
+  (read: whole tenant; author: governance roles), `lib/sharedMacros.ts` resolving
+  personal snippet → subspecialty macro → tenant macro. A personal snippet always
+  wins so an admin edit cannot silently change what someone dictates. 6 FE + 6 BE tests.
+- **Worklist WL-003/004/005** — `lib/worklist/readerLoad.ts` (session log, fatigue
+  streak heuristic, procedure mix + estimated wRVU) and `smartAssign.ts` (suggested
+  next read). Informational only per PRD: clinical priority always outranks every
+  comfort factor, and nothing is ever auto-assigned. 10 tests.
+- **WL-009 multi-tenant switcher** — `TenantSwitchController` (memberships + switch)
+  and `<TenantSwitcher />`. Switching is a real re-auth that mints a bearer bound to
+  the target tenant, not a client header swap, so tenant isolation is unchanged.
+  Hidden for single-practice identities.
+- **Critical Results (CR-001..010)**, **Peer Review (PR-001..010)**, **Teaching Files
+  (TF-001..008)** — new entities, controllers, migrations and desktop UI; see the
+  module commits.
+- **Not a gap after all:** HL7 ORM^O01 ingest already shipped (`Hl7MessageHandler`
+  + `Hl7MllpListener`, registered in `Program.cs`). The audit's "missing" call was wrong.
+
 ## AI engine selection moved to the radiologist (2026-07-20)
 
 - **Operator decision:** which AI engine a report uses (cloud provider, UBAG, or on-device

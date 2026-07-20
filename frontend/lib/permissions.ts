@@ -51,7 +51,14 @@ export type PermissionKey =
   | 'modalities.read'
   | 'modalities.manage'
   | 'body_parts.read'
-  | 'body_parts.manage';
+  | 'body_parts.manage'
+  | 'critical_results.read'
+  | 'critical_results.manage'
+  | 'teaching_cases.read'
+  | 'teaching_cases.manage'
+  | 'peer_review.read'
+  | 'peer_review.submit'
+  | 'peer_review.manage';
 
 /** Pure check: does this permission set grant the given key? */
 export function can(

@@ -458,6 +458,10 @@ builder.Services.AddSingleton<RadioPad.Application.Services.WebAuthn.IFidoMdsMet
 // AnomalyDetected rows + structured-log warnings.
 builder.Services.AddHostedService<RadioPad.Api.Services.AnomalyDetector>();
 
+// PRD §14.15 CR-007 — escalate critical results whose communication deadline
+// lapsed while still Open. Flags for a human; never closes the loop itself.
+builder.Services.AddHostedService<RadioPad.Api.Services.CriticalResultEscalationService>();
+
 // PRD MOB-007 — mobile push senders (APNs / FCM). Both adapters are registered
 // even when env vars are missing; the controller surfaces a 503 with
 // `kind=push_not_configured` for runtime mis-configuration so we never crash

@@ -64,6 +64,18 @@ public class RadioPadDbContext : DbContext
     /// <summary>Desktop↔phone companion pairing sessions (short-code relay handshake).</summary>
     public DbSet<CompanionSession> CompanionSessions => Set<CompanionSession>();
 
+    /// <summary>PRD §14.15 (CR-001..010) — critical-results communication tracking.</summary>
+    public DbSet<CriticalResult> CriticalResults => Set<CriticalResult>();
+
+    /// <summary>PRD §14.13 (PR-001..010) — RADPEER-aligned peer-review assignments.</summary>
+    public DbSet<PeerReview> PeerReviews => Set<PeerReview>();
+
+    /// <summary>PRD §14.14 (TF-001..008) — de-identified teaching-file cases.</summary>
+    public DbSet<TeachingCase> TeachingCases => Set<TeachingCase>();
+
+    /// <summary>PRD RPT-021 — tenant / subspecialty shared autotext macros.</summary>
+    public DbSet<SharedMacro> SharedMacros => Set<SharedMacro>();
+
     protected override void OnModelCreating(ModelBuilder b)
     {
         b.Entity<Tenant>().HasIndex(x => x.Slug).IsUnique();
@@ -131,6 +143,28 @@ public class RadioPadDbContext : DbContext
         // lookup; unique so an active code resolves to exactly one session.
         b.Entity<CompanionSession>().HasIndex(x => x.PairingCode).IsUnique();
         b.Entity<CompanionSession>().HasIndex(x => new { x.TenantId, x.UserId, x.Status });
+
+        // PRD §14.15 — critical results. The radiologist queue + overdue sweep scan by
+        // (tenant, status, due); the report editor panel loads by (tenant, report).
+        b.Entity<CriticalResult>().HasIndex(x => new { x.TenantId, x.Status, x.DueAt });
+        b.Entity<CriticalResult>().HasIndex(x => new { x.TenantId, x.ReportId });
+
+        // PRD §14.13 — peer review. The reviewer's own queue scans by
+        // (tenant, reviewer, status); the per-report panel and the "already
+        // assigned?" sampling guard load by (tenant, report).
+        b.Entity<PeerReview>().HasIndex(x => new { x.TenantId, x.ReviewerUserId, x.Status });
+        b.Entity<PeerReview>().HasIndex(x => new { x.TenantId, x.ReportId });
+
+        // PRD §14.14 — teaching library. Browsing filters on modality + body part;
+        // "my cases" (and the owner-or-admin edit check) loads by (tenant, author).
+        b.Entity<TeachingCase>().HasIndex(x => new { x.TenantId, x.Modality, x.BodyPart });
+        b.Entity<TeachingCase>().HasIndex(x => new { x.TenantId, x.CreatedByUserId });
+
+        // PRD RPT-021 — shared macros. Expansion resolves by trigger within a
+        // scope, and a duplicate (scope, subspecialty, trigger) would make the
+        // expansion non-deterministic, so the key is unique per tenant.
+        b.Entity<SharedMacro>()
+            .HasIndex(x => new { x.TenantId, x.Scope, x.Subspecialty, x.Trigger }).IsUnique();
 
         b.Entity<Report>().OwnsOne(x => x.Study);
         b.Entity<Report>().HasMany(x => x.Versions).WithOne().HasForeignKey(v => v.ReportId);

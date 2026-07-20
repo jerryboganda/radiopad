@@ -77,6 +77,35 @@ public static class EndpointPermissionMatrix
             Define("GET", "/api/billing/features", RbacPermission.BillingRead, "Read plan features/entitlements."),
             Define("GET", "/api/billing/credits", RbacPermission.BillingRead, "Read AI credit usage."),
             Define("GET", "/api/validation-packs", RbacPermission.ValidationPacksRead, "List validation packs."),
+
+            // PRD §14.15 (CR-001..010) — critical-results communication tracking.
+            Define("GET", "/api/critical-results", RbacPermission.CriticalResultsRead, "List critical results (status/criticality/report/overdue filters)."),
+            Define("GET", "/api/critical-results/overdue", RbacPermission.CriticalResultsRead, "List critical results past their communication deadline."),
+            Define("POST", "/api/critical-results", RbacPermission.CriticalResultsManage, "Log a critical result against a report."),
+            Define("POST", "/api/critical-results/{id}/communicate", RbacPermission.CriticalResultsManage, "Record communication to the ordering clinician."),
+            Define("POST", "/api/critical-results/{id}/acknowledge", RbacPermission.CriticalResultsManage, "Record the receiver's read-back acknowledgement."),
+            Define("POST", "/api/critical-results/{id}/escalate", RbacPermission.CriticalResultsManage, "Escalate an un-communicated critical result."),
+            Define("POST", "/api/critical-results/{id}/close", RbacPermission.CriticalResultsManage, "Close out a critical result."),
+
+            // PRD §14.13 (PR-001..010) — RADPEER-aligned peer review & quality.
+            Define("GET", "/api/peer-reviews/mine", RbacPermission.PeerReviewRead, "List the signed-in reviewer's own peer-review assignments (author blinded until submitted)."),
+            Define("GET", "/api/peer-reviews/report/{reportId}", RbacPermission.PeerReviewRead, "List the peer reviews recorded against one report."),
+            Define("POST", "/api/peer-reviews", RbacPermission.PeerReviewManage, "Assign one signed report to a peer reviewer."),
+            Define("POST", "/api/peer-reviews/sample", RbacPermission.PeerReviewManage, "Randomly sample N signed reports into the peer-review queue."),
+            Define("GET", "/api/peer-reviews/stats", RbacPermission.PeerReviewManage, "Per-radiologist concordance rate and discrepancy breakdown over a date range."),
+            Define("POST", "/api/peer-reviews/{id}/start", RbacPermission.PeerReviewSubmit, "Mark an assigned peer review as opened."),
+            Define("POST", "/api/peer-reviews/{id}/submit", RbacPermission.PeerReviewSubmit, "Submit a RADPEER score with structured rationale."),
+            Define("POST", "/api/peer-reviews/{id}/dispute", RbacPermission.PeerReviewSubmit, "Dispute a completed peer review of your own report."),
+
+            // PRD §14.14 (TF-001..008) — teaching file & education module.
+            Define("GET", "/api/teaching-cases", RbacPermission.TeachingCasesRead, "Search the de-identified teaching library (modality/body part/difficulty/tag/free text)."),
+            Define("GET", "/api/teaching-cases/{id}", RbacPermission.TeachingCasesRead, "Read one teaching case and increment its view counter."),
+            Define("POST", "/api/teaching-cases", RbacPermission.TeachingCasesManage, "Create a blank teaching case."),
+            Define("POST", "/api/teaching-cases/from-report/{reportId}", RbacPermission.TeachingCasesManage, "Create a teaching case from a report, de-identifying its narrative (TF-001/TF-002)."),
+            Define("PATCH", "/api/teaching-cases/{id}", RbacPermission.TeachingCasesManage, "Update a teaching case you authored (or any case, as an administrator)."),
+            Define("POST", "/api/teaching-cases/{id}/publish", RbacPermission.TeachingCasesManage, "Publish a teaching case to the tenant library (TF-007)."),
+            Define("POST", "/api/teaching-cases/{id}/unpublish", RbacPermission.TeachingCasesManage, "Withdraw a teaching case from the tenant library (TF-007)."),
+            Define("DELETE", "/api/teaching-cases/{id}", RbacPermission.TeachingCasesManage, "Delete a teaching case you authored (or any case, as an administrator)."),
         };
 
     public static IReadOnlyCollection<EndpointPermissionDefinition> All => Entries;

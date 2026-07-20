@@ -395,3 +395,21 @@ Account-lockout policy: 5 failed sign-ins within a 15-minute sliding window flip
 
 These endpoints affect chrome only. Rulebook YAML, finding text, and
 `RadioPad.Validation` engine messages are never translated.
+
+---
+
+## Peer Review & Quality (PRD §14.13, PR-001…PR-010)
+
+RADPEER-aligned second reads. Never signs, never alters a report. Full module
+notes: [docs/05-clinical/peer-review.md](../05-clinical/peer-review.md).
+
+| Method | Path | Permission | Description |
+| --- | --- | --- | --- |
+| GET | `/api/peer-reviews/mine` | `peer_review.read` | My queue as REVIEWER. `?status=Assigned\|InProgress\|Completed\|Disputed` filters; `?as=author` flips to PR-008 feedback on my own reports (completed/disputed rows only). While a blinded assignment is open, `originalAuthorUserId`/`originalAuthorName` are **absent** and `authorHidden` is true. |
+| GET | `/api/peer-reviews/report/{reportId}` | `peer_review.read` | Reviews recorded against one report. Returns only rows the caller is party to (their assignment, their own report) unless they hold `peer_review.manage`. Never 403s a caller with no stake — it returns an empty list. |
+| POST | `/api/peer-reviews` | `peer_review.manage` | Assign one report. Body `{ reportId, reviewerUserId, reviewType?, blinded? }`. `400 { kind: "peer_review_self" }` when the reviewer authored or signed it; `400 { kind: "peer_review_reviewer_role" }` when their role cannot score; `409` on a duplicate open assignment. Audits `PeerReviewAssigned`. |
+| POST | `/api/peer-reviews/sample` | `peer_review.manage` | PR-001 random sampling. Body `{ count?, ratePercent?, from?, to?, reviewerUserIds? }`; defaults to 5 % of reports signed in the last 30 days, capped at 200. Returns `{ assigned, eligible, requested, skippedNoEligibleReviewer, reviews }`. Never assigns a report to its own author. |
+| POST | `/api/peer-reviews/{id}/start` | `peer_review.submit` | Marks an assignment `InProgress`. Assignee only (`403 { kind: "peer_review_not_reviewer" }`). |
+| POST | `/api/peer-reviews/{id}/submit` | `peer_review.submit` | PR-003. Body `{ score: 1..4, discrepancyCategory, complexity?, comments? }`. Score 1 must carry category `None`; 2–4 must carry a real category (`400 { kind: "peer_review_rationale" }`). Assignee only, once. Unblinds the author. Audits `PeerReviewSubmitted` (structured verdict only — never the rationale text). |
+| POST | `/api/peer-reviews/{id}/dispute` | `peer_review.submit` | Body `{ reason }`. Reviewed author only (`403 { kind: "peer_review_not_author" }`); the review must be `Completed`. Audits `PeerReviewDisputed`. |
+| GET | `/api/peer-reviews/stats` | `peer_review.manage` | PR-005/PR-009. `?from=&to=` (default last 90 days). Returns tenant totals plus a `perReader` array: reviewed / concur / discrepancies / `concordanceRate` (0..1) / `byScore` / `byCategory` / `complexCases` / `disputed`. |

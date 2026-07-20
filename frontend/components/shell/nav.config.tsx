@@ -10,6 +10,7 @@ import {
   FileInput, WifiOff, Scale, FlaskConical, ShieldCheck, Flag, CreditCard,
   Activity, Settings2, Fingerprint, Users, ScanLine, Bone, Cpu,
   LayoutDashboard, ListTodo, PenLine, Layers, Sparkles, Library, BadgeCheck,
+  GraduationCap, UsersRound, AlertTriangle,
 } from 'lucide-react';
 import type { PermissionKey } from '@/lib/permissions';
 import { UBAG_HUB_ROLES } from '@/lib/roles';
@@ -55,11 +56,13 @@ export interface NavGroup {
 export const Icons: Record<string, NavIcon> = {
   dashboard: LayoutDashboard,
   worklist: ListTodo,
+  criticalResults: AlertTriangle,
   composer: PenLine,
   protocols: Layers,
   aiAssistant: Sparkles,
   findingsLibrary: Library,
   quality: BadgeCheck,
+  peerReview: UsersRound,
   reports: FileText,
   validation: ClipboardCheck,
   audit: ScrollText,
@@ -69,6 +72,7 @@ export const Icons: Record<string, NavIcon> = {
   prompts: MessageSquareText,
   marketplace: Store,
   terminology: BookText,
+  teaching: GraduationCap,
   modalities: ScanLine,
   bodyParts: Bone,
   providers: Server,
@@ -96,6 +100,9 @@ export const navGroups: NavGroup[] = [
     items: [
       { href: '/dashboard', labelKey: 'dashboard', icon: Icons.dashboard, permission: 'reports.read' },
       { href: '/worklist', labelKey: 'worklist', icon: Icons.worklist, permission: 'reports.read' },
+      // PRD §14.15 — the open critical-communication loops are an actionable queue,
+      // so they sit with the reporting flow rather than the read-only insight group.
+      { href: '/critical-results', labelKey: 'criticalResults', icon: Icons.criticalResults, permission: 'critical_results.read' },
       { href: '/reports/compose', labelKey: 'composer', icon: Icons.composer, permission: 'reports.draft', matchPrefix: '/reports/view' },
       { href: '/templates', labelKey: 'templates', icon: Icons.templates, permission: 'templates.read' },
       { href: '/protocols', labelKey: 'protocols', icon: Icons.protocols },
@@ -111,6 +118,7 @@ export const navGroups: NavGroup[] = [
       { href: '/reports', labelKey: 'reports', icon: Icons.reports, permission: 'reports.read' },
       { href: '/analytics', labelKey: 'analytics', icon: Icons.analytics, permission: 'reports.read' },
       { href: '/quality', labelKey: 'quality', icon: Icons.quality, permission: 'reports.read' },
+      { href: '/peer-review', labelKey: 'peerReview', icon: Icons.peerReview, permission: 'peer_review.read' },
       { href: '/validation', labelKey: 'validation', icon: Icons.validation, permission: 'validation_packs.read' },
       { href: '/audit', labelKey: 'audit', icon: Icons.audit, permission: 'audit.read' },
     ],
@@ -126,6 +134,15 @@ export const navGroups: NavGroup[] = [
       { href: '/prompts', labelKey: 'prompts', icon: Icons.prompts, permission: 'prompt_overrides.manage' },
       { href: '/marketplace', labelKey: 'marketplace', icon: Icons.marketplace },
       { href: '/terminology', labelKey: 'terminology', icon: Icons.terminology },
+      // PRD §14.14 (TF-001..008) — the de-identified teaching library. Desktop
+      // only: it is authored from reports, which live in the reporting product.
+      {
+        href: '/teaching',
+        labelKey: 'teaching',
+        icon: Icons.teaching,
+        permission: 'teaching_cases.read',
+        matchPrefix: '/teaching',
+      },
     ],
   },
   {

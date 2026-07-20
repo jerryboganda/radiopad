@@ -10,6 +10,11 @@ export function rulebookHref(id: string): string {
   return withParam('/rulebooks/view', 'id', id);
 }
 
+/** PRD §14.14 — teaching-case detail. Query-param routing keeps `output: 'export'` static. */
+export function teachingCaseHref(id: string): string {
+  return withParam('/teaching/view', 'id', id);
+}
+
 export function providerOAuthHref(id: string): string {
   return withParam('/admin/providers/oauth', 'id', id);
 }

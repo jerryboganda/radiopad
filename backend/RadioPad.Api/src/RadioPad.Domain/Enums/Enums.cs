@@ -48,6 +48,48 @@ public enum ReportPriority
 }
 
 /// <summary>
+/// PRD §14.15 (CR-001..010) — clinical criticality class of a critical result,
+/// PowerScribe-style. Drives the communication deadline (see
+/// <see cref="Entities.CriticalResult.DeadlineFor"/>): Red is immediate /
+/// life-threatening, Orange is urgent, Yellow is actionable-but-routine.
+/// </summary>
+public enum Criticality
+{
+    /// <summary>Immediate / life-threatening — must be communicated at once.</summary>
+    Red = 0,
+    /// <summary>Urgent — communicate within the hour.</summary>
+    Orange = 1,
+    /// <summary>Actionable — communicate within the working day.</summary>
+    Yellow = 2,
+}
+
+/// <summary>
+/// PRD §14.15 — lifecycle of a <see cref="Entities.CriticalResult"/>. New rows
+/// land <see cref="Open"/>; recording the call/message moves them to
+/// <see cref="Communicated"/>; the receiver read-back acknowledgement moves them
+/// to <see cref="Acknowledged"/>. <see cref="Escalated"/> is set (manually or by
+/// the overdue background sweep) when an Open result blows its deadline;
+/// <see cref="Closed"/> is terminal.
+/// </summary>
+public enum CriticalResultStatus
+{
+    Open = 0,
+    Communicated = 1,
+    Acknowledged = 2,
+    Escalated = 3,
+    Closed = 4,
+}
+
+/// <summary>PRD §14.15 — how the critical result was communicated to the ordering/referring clinician.</summary>
+public enum CriticalCommunicationMethod
+{
+    Phone = 0,
+    SecureMessage = 1,
+    InPerson = 2,
+    Other = 3,
+}
+
+/// <summary>
 /// Lifecycle of a <see cref="Entities.CompanionSession"/> (desktop↔phone pairing).
 /// A session is created <see cref="Advertising"/>; the phone joining by code moves
 /// it to <see cref="Paired"/>. <see cref="Ended"/> (explicit teardown) and
@@ -120,6 +162,16 @@ public enum RbacPermission
     ModalitiesManage = 221,
     BodyPartsRead = 240,
     BodyPartsManage = 241,
+    // PRD §14.15 (CR-001..010) — critical-results communication tracking.
+    CriticalResultsRead = 260,
+    CriticalResultsManage = 261,
+    // PRD §14.13 (PR-001..010) — RADPEER-aligned peer review & quality.
+    PeerReviewRead = 300,
+    PeerReviewSubmit = 301,
+    PeerReviewManage = 302,
+    // PRD §14.14 (TF-001..008) — teaching file & education module.
+    TeachingCasesRead = 320,
+    TeachingCasesManage = 321,
 }
 
 public enum AuditAction
@@ -250,6 +302,44 @@ public enum AuditAction
     /// session (<c>POST /api/companion/pair</c>). Details record the session id only;
     /// never any dictation text or report content (transient relay, no PHI).</summary>
     CompanionPaired = 62,
+    /// <summary>PRD §14.15 (CR-001) — a critical result was logged against a report.
+    /// Details record the critical-result id, report id, criticality, and due time;
+    /// never the finding narrative (which may carry clinical text).</summary>
+    CriticalResultCreated = 63,
+    /// <summary>PRD §14.15 (CR-004) — the ordering/referring clinician was notified of a
+    /// critical result. Details record the id, method, and recipient label — no PHI narrative.</summary>
+    CriticalResultCommunicated = 64,
+    /// <summary>PRD §14.15 (CR-005) — a critical result communication was acknowledged (read-back).</summary>
+    CriticalResultAcknowledged = 65,
+    /// <summary>PRD §14.15 (CR-007) — a critical result was escalated (manually, or by the overdue sweep when its deadline lapsed while Open).</summary>
+    CriticalResultEscalated = 66,
+    /// <summary>PRD §14.15 (CR-008) — a critical result was closed out (terminal).</summary>
+    CriticalResultClosed = 67,
+    /// <summary>PRD §14.13 (PR-001/PR-002) — a signed report was assigned to a peer reviewer
+    /// (single assignment or a random-sampling batch). Details record the review id, report id,
+    /// review type, and whether the assignment is blinded — never report narrative.</summary>
+    PeerReviewAssigned = 80,
+    /// <summary>PRD §14.13 (PR-003) — a reviewer submitted a RADPEER-style score. Details record
+    /// the review id, score, complexity, and discrepancy category — never the free-text rationale.</summary>
+    PeerReviewSubmitted = 81,
+    /// <summary>PRD §14.13 — the original author disputed a completed peer review.</summary>
+    PeerReviewDisputed = 82,
+    /// <summary>PRD §14.14 (TF-001/TF-002) — a teaching case was created (blank, or de-identified
+    /// from a source report). Details record the teaching-case id, the source report id, and
+    /// whether de-identification ran — never the case narrative or any patient identifier.</summary>
+    TeachingCaseCreated = 100,
+    /// <summary>PRD §14.14 (TF-007) — a teaching case was published to the tenant library
+    /// (Private → Tenant visibility).</summary>
+    TeachingCasePublished = 101,
+    /// <summary>PRD §14.14 (TF-007) — a teaching case was withdrawn from the tenant library
+    /// (Tenant → Private visibility).</summary>
+    TeachingCaseUnpublished = 102,
+    /// <summary>PRD §14.14 — a teaching case was deleted by its owner or an administrator.</summary>
+    TeachingCaseDeleted = 103,
+    /// <summary>PRD RPT-021 — a shared (tenant / subspecialty) autotext macro was created,
+    /// updated, or deleted. Details record the macro id, trigger, scope and which action ran;
+    /// the expansion body is authored boilerplate but is not echoed into the audit trail.</summary>
+    MacroChanged = 120,
 }
 
 /// <summary>
@@ -331,4 +421,107 @@ public enum TemplateVariant
     FollowUp = 2,
     Screening = 3,
     Urgent = 4,
+}
+
+/// <summary>
+/// PRD §14.13 (PR-001) — how a case entered the peer-review queue.
+/// <see cref="Random"/> is the routine RADPEER sampling stream; the rest are
+/// rule-based / workflow-driven selections.
+/// </summary>
+public enum PeerReviewType
+{
+    /// <summary>PR-001 — picked by the random sampling sweep over signed reports.</summary>
+    Random = 0,
+    /// <summary>PR-001/PR-006 — deliberately selected (STAT, high-risk finding, complaint follow-up).</summary>
+    Targeted = 1,
+    /// <summary>PR-006 — second read sought before the case is closed; both reads stand together.</summary>
+    Consensus = 2,
+    /// <summary>Review triggered by an addendum to an already-signed report.</summary>
+    Addendum = 3,
+}
+
+/// <summary>
+/// PRD §14.13 (PR-003) — RADPEER-style 4-point agreement score. 1 = concur;
+/// 2..4 grade the discrepancy by how reliably the finding should have been made.
+/// <see cref="NotScored"/> is the pre-submission sentinel so an Assigned row is
+/// never mistaken for a recorded "concur".
+/// </summary>
+public enum PeerReviewScore
+{
+    /// <summary>Not yet scored — the review is still Assigned/InProgress.</summary>
+    NotScored = 0,
+    /// <summary>RADPEER 1 — concur with the original interpretation.</summary>
+    Concur = 1,
+    /// <summary>RADPEER 2 — discrepancy, unlikely to be clinically significant.</summary>
+    DiscrepancyUnlikelySignificant = 2,
+    /// <summary>RADPEER 3 — discrepancy that should be made most of the time.</summary>
+    DiscrepancyShouldBeMadeMostOfTheTime = 3,
+    /// <summary>RADPEER 4 — discrepancy that should be made almost every time.</summary>
+    DiscrepancyShouldBeMadeAlmostEveryTime = 4,
+}
+
+/// <summary>
+/// PRD §14.13 (PR-003) — the RADPEER difficulty modifier ("a"/"b"). Recorded
+/// alongside the score so a discrepancy on a genuinely hard study is not
+/// benchmarked against a routine one.
+/// </summary>
+public enum PeerReviewComplexity
+{
+    /// <summary>RADPEER "a" — routine study / unremarkable difficulty.</summary>
+    Routine = 0,
+    /// <summary>RADPEER "b" — difficult study (complex anatomy, limited technique, subtle finding).</summary>
+    Complex = 1,
+}
+
+/// <summary>PRD §14.13 (PR-003/PR-009) — structured rationale: where the discrepancy came from.</summary>
+public enum PeerReviewDiscrepancyCategory
+{
+    /// <summary>No discrepancy (pairs with <see cref="PeerReviewScore.Concur"/>).</summary>
+    None = 0,
+    /// <summary>The finding was present on the images but not seen.</summary>
+    Perceptual = 1,
+    /// <summary>The finding was seen but characterised or graded differently.</summary>
+    Interpretive = 2,
+    /// <summary>Finding correct, but the report/communication failed to convey it.</summary>
+    Communication = 3,
+    /// <summary>Acquisition/protocol limitation drove the difference.</summary>
+    Technique = 4,
+}
+
+/// <summary>PRD §14.13 — lifecycle of one <see cref="Entities.PeerReview"/> assignment.</summary>
+public enum PeerReviewStatus
+{
+    /// <summary>Assigned to a reviewer, not opened yet.</summary>
+    Assigned = 0,
+    /// <summary>Reviewer has opened the case but not submitted a score.</summary>
+    InProgress = 1,
+    /// <summary>Score submitted — unblinds the original author to the reviewer.</summary>
+    Completed = 2,
+    /// <summary>The original author contests the submitted score; awaits director adjudication.</summary>
+    Disputed = 3,
+}
+
+/// <summary>
+/// PRD §14.14 (TF-004) — teaching-difficulty banding used to filter the
+/// teaching library for the right audience (medical student / resident /
+/// fellow-level material).
+/// </summary>
+public enum TeachingDifficulty
+{
+    Introductory = 0,
+    Intermediate = 1,
+    Advanced = 2,
+}
+
+/// <summary>
+/// PRD §14.14 (TF-007) — per-tenant private teaching library with opt-in
+/// sharing. <see cref="Private"/> cases are visible only to their author;
+/// <see cref="Tenant"/> cases are published to everyone in the same tenant.
+/// Cross-tenant / public sharing is deliberately NOT modelled here — nothing
+/// in this enum can widen a case beyond its owning tenant.
+/// </summary>
+public enum TeachingVisibility
+{
+    Private = 0,
+    Tenant = 1,
 }
