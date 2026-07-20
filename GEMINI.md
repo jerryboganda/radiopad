@@ -10,6 +10,14 @@ RadioPad is an AI-assisted radiology reporting platform. A radiologist drafts a 
 
 The frontend uses the **RC design system**: a light-first white/blue clinical-SaaS palette with a **first-class deep-navy dark theme — both themes are mandatory**. The canonical token source is [frontend/app/tokens.css](frontend/app/tokens.css) (RC primitives + alias layer) with `var()`-based scales in [frontend/tailwind.config.ts](frontend/tailwind.config.ts); build-time **Tailwind 3 IS part of the stack**. Full contract: [CLAUDE.md](CLAUDE.md) + [docs/02-design/design.md](docs/02-design/design.md). Use only the documented alias tokens and `.rp-*` component classes. **Do not** hardcode colours, add accent colours, introduce MUI/Ant/Chakra/Bootstrap, use emoji-as-icons, or use any primary navigation other than the left-sidebar shell. (The retired "Open Design warm-paper / no-dark-mode / no-Tailwind" rule no longer applies.)
 
+## ⚠️ Compute runs on GitHub Actions — not this machine
+
+**All heavy work — full builds, full test suites, lint/type-check sweeps, bundling, packaging, Docker builds — runs on GitHub Actions, never on the development laptop or the VPS.** Locally: edit code, run one targeted test (`dotnet test --filter <Name>` or a single Vitest file), run the app (`pnpm dev`, `dotnet run`). Nothing more. Full contract in [CLAUDE.md](CLAUDE.md).
+
+## ⚠️ Code, don't babysit
+
+**Write code; don't wait on machines.** Small quick checks only. When the work is done, commit, push, and stop — never watch or poll CI (`gh run watch` is out). The operator monitors runs and reports failures. Because CI is unobserved, report what you changed and let CI decide — never claim a change builds or passes when you have not seen it do so. Full contract in [CLAUDE.md](CLAUDE.md).
+
 ## Strict tech stack
 
 | Layer | Technology |
