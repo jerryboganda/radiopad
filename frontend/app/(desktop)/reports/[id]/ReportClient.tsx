@@ -60,7 +60,7 @@ import { saveDownload } from '@/lib/saveDownload';
 import PatientContextBar from '@/components/shell/PatientContextBar';
 import StudyContextPanel from '@/components/reports/StudyContextPanel';
 import SectionCard, { type SectionCardMenuItem } from '@/components/reports/SectionCard';
-import AiActionsBar, { type AiBarAction } from '@/components/reports/AiActionsBar';
+import ComposerRibbon, { type RibbonAction } from '@/components/reports/ComposerRibbon';
 import ProvenanceModal from '@/components/reports/ProvenanceModal';
 import { type AiActivityEntry } from '@/components/reports/AiActivityPanel';
 import { type ExportFormat } from '@/components/reports/ExportPanel';
@@ -73,11 +73,6 @@ import {
   ListChecks,
   Star,
   Lightbulb,
-  Mic,
-  ShieldCheck,
-  GitCompareArrows,
-  Lock,
-  FileSignature,
 } from 'lucide-react';
 
 type RewriteState = {
@@ -121,7 +116,7 @@ export default function ReportPage() {
   const [findings, setFindings] = useState<ValidationFinding[]>([]);
   const [qualityScore, setQualityScore] = useState<number | null>(null);
   const [aiBusy, setAiBusy] = useState(false);
-  const [busyAiAction, setBusyAiAction] = useState<AiBarAction | null>(null);
+  const [busyAiAction, setBusyAiAction] = useState<RibbonAction | null>(null);
   const [aiHighlights, setAiHighlights] = useState<Record<string, boolean>>({});
   // RC-03 Undo — pre-AI text snapshots per section, captured whenever an AI
   // action overwrites a section so "Undo" can restore what the model replaced.
@@ -380,12 +375,6 @@ export default function ReportPage() {
     if (sectionOverride) setRewriteSection(sectionOverride);
     setRewriteOpen(false);
     setRewriteBusy(true);
-    const barAction: AiBarAction =
-      mode === 'concise' ? 'concise'
-        : mode === 'patient_friendly' ? 'patient_friendly'
-          : mode === 'referring_summary' ? 'referring_summary'
-            : 'rewrite';
-    setBusyAiAction(barAction);
     setError(null);
     const modeLabel = REWRITE_MODES.find((m) => m.mode === mode)?.label ?? mode;
     const sectionLabel = SECTIONS.find((s) => s.key === section)?.label ?? String(section);
@@ -1183,59 +1172,6 @@ export default function ReportPage() {
           <div className="rp-composer-head">
             <h1 className="rp-composer-title">Report Composer</h1>
             <span className={`rp-status ${statusTone(report.status)}`}>{statusLabel(report.status)}</span>
-            <div className="rp-composer-tools" role="toolbar" aria-label="Report tools">
-              <button className="ghost" type="button" onClick={() => window.dispatchEvent(new CustomEvent('radiopad:dictate'))} aria-pressed={dictating}>
-                <Mic size={13} aria-hidden />
-                {dictating ? 'Listening…' : 'Dictate'}
-              </button>
-              <button
-                className="ghost"
-                type="button"
-                onClick={() => setVoiceCommandMode((v) => !v)}
-                aria-pressed={voiceCommandMode}
-                data-testid="voice-command-toggle"
-              >
-                {voiceCommandMode ? 'Voice cmds: on' : 'Voice cmds'}
-              </button>
-              {canValidate && (
-                <button className="ghost" type="button" onClick={validate}>
-                  <ShieldCheck size={13} aria-hidden /> Validate
-                </button>
-              )}
-              <button className="ghost" type="button" onClick={() => setShowPrior((v) => !v)} aria-expanded={showPrior}>
-                <GitCompareArrows size={13} aria-hidden />
-                {showPrior ? 'Hide compare' : 'Compare'}
-              </button>
-              <button className="ghost" type="button" onClick={() => setShowDictationDraft((v) => !v)} aria-expanded={showDictationDraft}>
-                {showDictationDraft ? 'Hide draft' : 'Format draft'}
-              </button>
-              {/* Sign & send validates, signs and exports in one action, so it needs the same
-                  permissions as the individual buttons beside it — it was the only one of the row
-                  rendered unconditionally, offering a user without reports.sign an action that
-                  cannot succeed while the plain "Review & sign" button correctly stayed hidden. */}
-              {canSign && canExport && (
-                <button className="ghost" type="button" onClick={() => setShowSignSend((v) => !v)} aria-expanded={showSignSend}>
-                  {showSignSend ? 'Hide sign & send' : 'Sign & send'}
-                </button>
-              )}
-              {canEdit && (
-                <button
-                  className="ghost"
-                  type="button"
-                  disabled={blockers > 0}
-                  title={blockers > 0 ? 'Resolve blockers before acknowledging' : undefined}
-                  onClick={acknowledge}
-                >
-                  <Lock size={13} aria-hidden /> Acknowledge &amp; lock
-                </button>
-              )}
-              {canSign && (
-                <button className="primary-ghost" type="button" onClick={() => setInspectorTab('signoff')}>
-                  <FileSignature size={13} aria-hidden />
-                  {primarySigned ? 'Sign-off' : 'Review & sign'}
-                </button>
-              )}
-            </div>
           </div>
 
           {voiceCommandPills.length > 0 && (
@@ -1246,7 +1182,17 @@ export default function ReportPage() {
             </div>
           )}
 
-          <AiActionsBar
+          <ComposerRibbon
+            dictating={dictating}
+            onDictate={() => window.dispatchEvent(new CustomEvent('radiopad:dictate'))}
+            voiceCommandMode={voiceCommandMode}
+            onToggleVoiceCommands={() => setVoiceCommandMode((v) => !v)}
+            canValidate={canValidate}
+            onValidate={validate}
+            showPrior={showPrior}
+            onToggleCompare={() => setShowPrior((v) => !v)}
+            showDictationDraft={showDictationDraft}
+            onToggleFormatDraft={() => setShowDictationDraft((v) => !v)}
             canEdit={canEdit}
             busyAction={busyAiAction}
             onGenerateDraft={() => { void runGenerateDraft(); }}
@@ -1265,6 +1211,14 @@ export default function ReportPage() {
             stylePanelOpen={stylePanelOpen}
             onToggleStylePanel={() => setStylePanelOpen((v) => !v)}
             providerId={providerId}
+            canSign={canSign}
+            canExport={canExport}
+            showSignSend={showSignSend}
+            onToggleSignSend={() => setShowSignSend((v) => !v)}
+            blockers={blockers}
+            onAcknowledge={acknowledge}
+            primarySigned={primarySigned}
+            onOpenSignoff={() => setInspectorTab('signoff')}
           />
 
           <CompanionHostPanel />
