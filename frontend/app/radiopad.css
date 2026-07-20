@@ -545,9 +545,14 @@
   width: 100%;
   text-align: left;
   display: flex;
+  flex-direction: column;
   align-items: flex-start;
-  gap: 8px;
+  gap: 2px;
   padding: 8px 10px;
+}
+.rp-rewrite-option > button.subtle:has(.rp-rewrite-option-icon) {
+  flex-direction: row;
+  gap: 8px;
 }
 .rp-rewrite-option-icon { flex: none; color: var(--text-soft); margin-top: 1px; }
 .rp-rewrite-option-text { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
