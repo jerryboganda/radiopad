@@ -24,7 +24,7 @@
 
 import { spawn, spawnSync } from 'node:child_process';
 import { createHmac, randomBytes } from 'node:crypto';
-import { mkdirSync, writeFileSync, createWriteStream, existsSync, readdirSync, statSync } from 'node:fs';
+import { mkdirSync, writeFileSync, createWriteStream, existsSync, readdirSync, statSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
 
@@ -309,19 +309,45 @@ async function main() {
     '--use-fake-ui-for-media-stream',
     `--use-file-for-fake-audio-capture=${micWav}%noloop`,
   ].join(' ');
-  // Belt and braces: WebView2 documents two delivery channels for additional browser args —
-  // the env var (checked first) and this per-exe HKCU policy value (checked when no env var
-  // is seen). Setting both means a broken env-inheritance path still gets the flags. The
-  // runner is ephemeral, so the policy value needs no cleanup.
-  spawnSync('reg', [
-    'add', 'HKCU\\Software\\Policies\\Microsoft\\Edge\\WebView2\\AdditionalBrowserArguments',
-    '/v', path.basename(appExe), '/t', 'REG_SZ', '/d', browserArgs, '/f',
-  ], { stdio: 'ignore' });
+
+  // HOW THE FLAGS ARE DELIVERED — and why NOT via WEBVIEW2_ADDITIONAL_BROWSER_ARGUMENTS.
+  //
+  // Microsoft documents that env var as being *appended* to the host app's own
+  // additionalBrowserArguments. Empirically, in this Tauri/wry app, it is not: the failed
+  // run's captured browser process command line (webview-diagnostics.txt) carried wry's own
+  // `--autoplay-policy` / `--disable-features` and none of ours, with a fully healthy
+  // renderer. So the env var route silently does nothing here.
+  //
+  // The per-exe HKCU policy value is the other documented channel — but it is only consulted
+  // when NO override env var exists, so setting both (as the first attempt did) makes this
+  // one dead weight. Hence: registry ONLY, env var deliberately unset.
+  //
+  // Ephemeral runner, so no cleanup; and this is a debugging/policy key, not product config.
+  const regKey = 'HKCU\\Software\\Policies\\Microsoft\\Edge\\WebView2\\AdditionalBrowserArguments';
+  const reg = spawnSync('reg', [
+    'add', regKey, '/v', path.basename(appExe), '/t', 'REG_SZ', '/d', browserArgs, '/f',
+  ], { encoding: 'utf8' });
+  if (reg.status !== 0) {
+    throw new Error(`could not set the WebView2 AdditionalBrowserArguments policy: ${reg.stderr ?? reg.stdout}`);
+  }
+  log(`WebView2 browser args set via policy for ${path.basename(appExe)}`);
+
+  // A WebView2 browser process is shared per user-data-folder, and a already-running one
+  // would be reused WITHOUT these args — so make sure nothing is holding one open and start
+  // from a clean profile. Both are cheap and remove a whole class of "why did my flags not
+  // apply" ambiguity from every future run.
+  spawnSync('taskkill', ['/IM', path.basename(appExe), '/T', '/F'], { stdio: 'ignore' });
+  spawnSync('taskkill', ['/IM', 'msedgewebview2.exe', '/T', '/F'], { stdio: 'ignore' });
+  const webviewData = path.join(
+    process.env.LOCALAPPDATA ?? '', 'com.radiopad.desktop', 'EBWebView');
+  try { rmSync(webviewData, { recursive: true, force: true }); } catch { /* first run */ }
+
   const app = spawn(appExe, [], {
     env: {
       ...process.env,
       RADIOPAD_BACKEND: SIDECAR_URL,
-      WEBVIEW2_ADDITIONAL_BROWSER_ARGUMENTS: browserArgs,
+      // WEBVIEW2_ADDITIONAL_BROWSER_ARGUMENTS is deliberately NOT set — see the note above.
+      // Its presence would suppress the registry policy that actually delivers the flags.
     },
   });
   children.push([app, 'app']);
