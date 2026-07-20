@@ -59,11 +59,11 @@ After your `frontend/`/`desktop/` changes are committed and pushed, run one comm
 pnpm release:desktop      # patch bump (0.1.23 → 0.1.24); also accepts `minor` / `major` / `X.Y.Z`
 ```
 
-It bumps `desktop/src-tauri/tauri.conf.json` **and** `desktop/src-tauri/Cargo.toml` in lock-step, commits, tags `vX.Y.Z`, and pushes. The tag then drives the pipeline end-to-end with no further steps: `desktop-bundle` builds + signs the Windows `.msi` / Linux `.AppImage` and creates the release; `tauri-updater` signs + publishes `latest.json`. The in-app "Check for updates" button reads the GitHub Releases `latest.json`, so every user auto-downloads the new build.
+It bumps `desktop/src-tauri/tauri.conf.json` **and** `desktop/src-tauri/Cargo.toml` in lock-step, commits, tags `vX.Y.Z`, and pushes. The tag then drives the pipeline end-to-end with no further steps: `desktop-bundle` builds + signs the Windows `.msi` and creates the release; `tauri-updater` signs + publishes `latest.json`. The in-app "Check for updates" button reads the GitHub Releases `latest.json`, so every user auto-downloads the new build.
 
 - Backend-only / CLI-only / docs-only changes do **not** need a desktop release.
 - Never bump only one version file or hand-edit a build (version mismatch → updater loop). Always use `pnpm release:desktop`.
-- Signing secrets (`TAURI_PRIVATE_KEY`, `TAURI_KEY_PASSWORD`) are already set in GitHub; the public key is embedded in `tauri.conf.json`. macOS is excluded from the matrix until Apple signing is configured.
+- Signing secrets (`TAURI_PRIVATE_KEY`, `TAURI_KEY_PASSWORD`) are already set in GitHub; the public key is embedded in `tauri.conf.json`. macOS and Linux desktop builds are **out of scope**, not pending — see the platforms section above. Nothing is blocked on Apple signing.
 
 ## ⚠️ MISSION-CRITICAL: CPU-intensive work runs on GitHub Actions, never locally
 

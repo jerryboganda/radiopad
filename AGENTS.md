@@ -57,7 +57,7 @@ How releases work (fully automated by GitHub Actions — do NOT build locally):
    ```
    It bumps the version in `desktop/src-tauri/tauri.conf.json` **and** `desktop/src-tauri/Cargo.toml` (they must stay in lock-step), commits, tags `vX.Y.Z`, and pushes the tag.
 2. The pushed tag triggers the pipeline with no further action:
-   - **`desktop-bundle`** → builds + code-signs the Windows `.msi` and Linux `.AppImage`, creates the GitHub Release, attaches the installers.
+   - **`desktop-bundle`** → builds + code-signs the Windows `.msi`, creates the GitHub Release, attaches the installer.
    - **`tauri-updater`** → signs `latest.json` and uploads it to that release.
 3. The app's button reads `https://github.com/jerryboganda/radiopad/releases/latest/download/latest.json`, so every user auto-downloads the new build. Push and stop — don't watch the run, and don't hand the operator manual steps.
 
@@ -66,7 +66,7 @@ Rules:
 - **Backend-only / CLI-only / docs-only changes do NOT need a desktop release** (they don't ship in the desktop bundle). Frontend or `desktop/` changes DO.
 - **Never bump only one of the two version files**, and never hand-edit a build — a version mismatch makes the updater loop. Always use `pnpm release:desktop`.
 - **Signing keys are operator secrets** already configured in GitHub (`TAURI_PRIVATE_KEY`, `TAURI_KEY_PASSWORD`). The updater public key is embedded in `tauri.conf.json`. Don't regenerate or commit private keys.
-- **macOS is intentionally excluded** from the release matrix until Apple Developer signing is set up (see the `os:` list in `.github/workflows/desktop-bundle.yml`). Windows + Linux ship.
+- **The desktop app is Windows-only.** macOS and Linux desktop builds are out of scope by operator decision (2026-07-20) — not pending, not blocked on signing. Do not restore a `.dmg`/`.AppImage`/`.deb` target or add either to the build matrix. Full contract: [CLAUDE.md](CLAUDE.md) §"shipped platforms". The mobile companion (Android + iOS) is unaffected.
 
 ---
 
