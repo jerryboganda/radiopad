@@ -49,6 +49,10 @@ tsconfig.tsbuildinfo
 # Local CodeGraph index — large local DB, never commit.
 .codegraph/
 
+# Local tool caches/state — machine-local, never commit.
+.od/
+.serena/
+
 # Secrets & env files — NEVER commit (this is a PHI app). `.env.example` is the
 # only env file that may be tracked.
 .env
