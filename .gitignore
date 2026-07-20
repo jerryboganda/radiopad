@@ -90,6 +90,8 @@ ds-bundle/
 .design-sync/.cache/
 .design-sync/learnings/
 .design-sync/node_modules
+# Generated .d.ts tree for the design-sync props extractor (tsconfig.design-sync.json).
+frontend/types/
 
 # Local git worktrees (superpowers:using-git-worktrees fallback) — machine-local, never commit.
 .worktrees/

@@ -3,12 +3,22 @@
   "shape": "package",
   "pkg": "@radiopad/frontend",
   "globalName": "RadioPad",
+  "entry": "frontend/.synth-entry-placeholder.mjs",
   "srcDir": "components",
   "tsconfig": "tsconfig.json",
-  "cssEntry": "app/globals.css",
-  "tokensGlob": ["app/tokens.css", "app/motion.css", "app/radiopad.css", "app/shell.css"],
-  "extraFonts": ["node_modules/@fontsource-variable/inter/index.css"],
+  "cssEntry": "app/shell.css",
+  "extraFonts": [
+    "node_modules/@fontsource-variable/inter/index.css",
+    "../.design-sync/fonts/inter-alias.css"
+  ],
   "guidelinesGlob": ["../docs/02-design/design.md"],
+  "overrides": {
+    "ProvenanceModal": { "cardMode": "single", "viewport": "900x640" },
+    "GenerationOverlay": { "cardMode": "single", "viewport": "900x640" }
+  },
+  "libOverrides": {
+    "source-kit.mjs": "synth entry restricted to componentSrcMap pins + browser process.env shim (Next.js app modules read process.env at module init)"
+  },
   "componentSrcMap": {
     "StatusBadge": "components/ui/StatusBadge.tsx",
     "Banner": "components/ui/Banner.tsx",

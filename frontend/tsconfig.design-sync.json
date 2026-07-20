@@ -1,0 +1,19 @@
+{
+  // design-sync (claude.ai/design) support config — NOT part of the app build.
+  // Emits a real .d.ts tree into frontend/types/ so the design-sync converter's
+  // props extractor reads genuine <Name>Props interfaces instead of stubs
+  // (the app ships no dist, so there is no shipped .d.ts tree otherwise).
+  // Run: npx tsc -p frontend/tsconfig.design-sync.json   (see .design-sync/NOTES.md)
+  "extends": "./tsconfig.json",
+  "compilerOptions": {
+    "noEmit": false,
+    "declaration": true,
+    "emitDeclarationOnly": true,
+    "noCheck": true,
+    "outDir": "types",
+    "rootDir": ".",
+    "incremental": false,
+    "plugins": []
+  },
+  "include": ["components/**/*.tsx", "components/**/*.ts"]
+}
