@@ -21,6 +21,14 @@ public static class RolePermissionMap
                 RbacPermission.ValidationPacksRead,
                 RbacPermission.ValidationPacksRun,
                 RbacPermission.McpToolsInvoke,
+                // Operator decision (2026-07-20): choosing the AI engine belongs to the
+                // radiologist, not only to an administrator. Without ProvidersRead the
+                // desktop AI panel 403s and tells them "provider details are managed by
+                // your workspace admin" -- they could not see, let alone choose between,
+                // cloud / UBAG / on-device models. This is READ only: it does not grant
+                // ProvidersManage, so a clinician cannot rewrite the tenant-wide config
+                // that every other user in the org depends on.
+                RbacPermission.ProvidersRead,
                 RbacPermission.BillingRead,
                 RbacPermission.UsersRead,
                 RbacPermission.AuditRead),
@@ -174,7 +182,8 @@ public static class RolePermissionMap
                 RbacPermission.BodyPartsRead,
                 RbacPermission.ValidationPacksRead,
                 RbacPermission.ValidationPacksRun,
-                RbacPermission.McpToolsInvoke),
+                RbacPermission.McpToolsInvoke,
+                RbacPermission.ProvidersRead), // see Radiologist -- trainees dictate too
 
             // Iter-0c (AUTH-002) — senior trainee: as Resident plus export of
             // preliminary reports; final sign still reserved for attendings.
@@ -190,7 +199,8 @@ public static class RolePermissionMap
                 RbacPermission.BodyPartsRead,
                 RbacPermission.ValidationPacksRead,
                 RbacPermission.ValidationPacksRun,
-                RbacPermission.McpToolsInvoke),
+                RbacPermission.McpToolsInvoke,
+                RbacPermission.ProvidersRead), // see Radiologist -- trainees dictate too
 
             // Iter-0c (AUTH-002) — attending subspecialist: full reporting
             // authority, identical to a general Radiologist.
@@ -208,6 +218,7 @@ public static class RolePermissionMap
                 RbacPermission.ValidationPacksRead,
                 RbacPermission.ValidationPacksRun,
                 RbacPermission.McpToolsInvoke,
+                RbacPermission.ProvidersRead, // see Radiologist -- engine choice is the clinician's
                 RbacPermission.BillingRead,
                 RbacPermission.UsersRead,
                 RbacPermission.AuditRead),
