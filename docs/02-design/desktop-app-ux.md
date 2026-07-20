@@ -6,9 +6,9 @@ The desktop app is a Tauri 2 shell wrapping the Next.js static export.
 
 ## Installation
 
-- Windows: signed `.msi` installer (planned). Dev build: `cargo tauri build` produces an unsigned bundle.
-- macOS: notarised `.dmg` (planned).
-- Linux: `.AppImage` and `.deb`.
+- Windows: signed `.msi` installer, built and signed by `desktop-bundle.yml`. **This is the only desktop platform RadioPad ships.**
+- macOS and Linux: **out of scope** by operator decision (2026-07-20) — not planned, not pending. See [CLAUDE.md](../../CLAUDE.md) §"shipped platforms".
+- The mobile companion (Android + iOS) is a separate product surface and is unaffected.
 
 ## Auto-update
 

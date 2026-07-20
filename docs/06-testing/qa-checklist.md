@@ -31,7 +31,7 @@
 
 - [ ] Tauri updater public key is populated for the target channel or updater artifacts are disabled for an internal unsigned test build.
 - [ ] Windows, macOS, and Linux bundles were produced or blockers are documented in the release notes.
-- [ ] Signed artifacts pass platform verification (Authenticode, Gatekeeper/notary, GPG/AppImage signature as applicable).
+- [ ] Signed artifacts pass platform verification (Authenticode on the Windows `.msi` — the only desktop artifact RadioPad ships).
 - [ ] App launches and reaches backend `ready` state.
 - [ ] Missing sidecar does not crash the app; desktop status banner appears.
 - [ ] Sidecar exit triggers controlled restart or final failed state.

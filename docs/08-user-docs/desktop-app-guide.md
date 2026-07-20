@@ -8,8 +8,12 @@ spoken audio is transcribed locally and never leaves the computer.
 
 ## Install
 
-Pre-built installers for Windows (`.msi`), macOS (`.dmg`), and Linux
-(`.deb` / `.AppImage`) are produced by CI and published to the releases page.
+RadioPad Desktop runs on **Windows**. A pre-built, signed `.msi` installer is
+produced by CI and published to the releases page.
+
+macOS and Linux are not supported. If you work on one of those, use the web
+admin surface in a browser, or the mobile companion (Android / iOS) for
+dictation alongside a Windows desktop session.
 
 ## First run
 

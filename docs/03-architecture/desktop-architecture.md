@@ -88,7 +88,7 @@ keeps PHI audio on the machine. The frontend routes ONLY
 
 - `pnpm --filter frontend build` produces `frontend/out/`.
 - `cargo tauri build` consumes `frontend/out/` (configured in `tauri.conf.json` `frontendDist`).
-- Output: `.msi` (Windows), `.app` / `.dmg` (macOS), `.AppImage` / `.deb` (Linux).
+- Output: `.msi` (Windows) only — `tauri.conf.json` sets `"targets": ["msi"]`. macOS and Linux desktop bundles are out of scope; see [CLAUDE.md](../../CLAUDE.md) §"shipped platforms".
 
 ## Testing
 
