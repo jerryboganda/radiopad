@@ -57,6 +57,23 @@ export function getSectionEditorsInOrder(): SectionEditorHandle[] {
   return [...registry.values()];
 }
 
+/**
+ * Move focus to the next/previous mounted section editor relative to the
+ * last-focused one (wraps around; starts at the first when none is focused).
+ * Shared by the companion remote and the voice navigation commands.
+ * Returns the focused section key, or null when no editors are mounted.
+ */
+export function focusAdjacentSection(direction: 1 | -1): string | null {
+  const editors = getSectionEditorsInOrder();
+  if (editors.length === 0) return null;
+  const current = getLastFocusedSectionEditor();
+  const idx = current ? editors.findIndex((e) => e.sectionKey === current.sectionKey) : -1;
+  const nextIdx = idx < 0 ? 0 : (idx + direction + editors.length) % editors.length;
+  const target = editors[nextIdx];
+  target.focus();
+  return target.sectionKey;
+}
+
 /** Test-only reset of module state. */
 export function _resetSectionEditorRegistry(): void {
   registry.clear();

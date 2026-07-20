@@ -71,6 +71,47 @@ describe('voiceCommands — detectCommand', () => {
     expect(result!.command).toBe('cleanup_dictation');
   });
 
+  // --- navigation & editing commands (PowerScribe/Dragon parity) ---
+  it.each([
+    ['next field', 'next_field'],
+    ['next section', 'next_field'],
+    ['previous field', 'previous_field'],
+    ['prior section', 'previous_field'],
+    ['last field', 'previous_field'],
+    ['new paragraph', 'new_paragraph'],
+    ['new line', 'new_line'],
+    ['scratch that', 'undo_that'],
+    ['undo that', 'undo_that'],
+    ['open sign and send', 'open_sign'],
+    ['sign and send', 'open_sign'],
+    ['sign the report', 'open_sign'],
+  ] as const)('matches "%s" → %s', (phrase, command) => {
+    const result = detectCommand(phrase);
+    expect(result).not.toBeNull();
+    expect(result!.command).toBe(command);
+  });
+
+  it.each([
+    ['go to findings', 'findings'],
+    ['go to the impression', 'impression'],
+    ['jump to impressions', 'impression'],
+    ['go to technique', 'technique'],
+    ['go to comparison', 'comparison'],
+    ['go to indication', 'indication'],
+    ['go to history', 'indication'],
+    ['jump to recommendations', 'recommendations'],
+  ] as const)('maps "%s" to section key %s', (phrase, sectionKey) => {
+    const result = detectCommand(phrase);
+    expect(result).not.toBeNull();
+    expect(result!.command).toBe('go_to_section');
+    expect(result!.sectionKey).toBe(sectionKey);
+  });
+
+  it('does not treat prose mentioning sections as navigation', () => {
+    expect(detectCommand('The findings are stable.')).toBeNull();
+    expect(detectCommand('Comparison with the prior study shows no change.')).toBeNull();
+  });
+
   // --- command at end of transcript ---
   it('detects a command in the last sentence of a longer transcript', () => {
     const transcript =

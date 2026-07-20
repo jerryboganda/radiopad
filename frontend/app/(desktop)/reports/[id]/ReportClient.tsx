@@ -28,6 +28,11 @@ import CompanionHostPanel from '@/components/companion/CompanionHostPanel';
 import { readQueryParam } from '@/lib/browserParams';
 import { resolveDefaultProvider, setPreferredProviderId } from '@/lib/ai/providerPref';
 import { detectCommand, stripCommand, type VoiceCommand, type CommandMatch } from '@/lib/voiceCommands';
+import {
+  focusAdjacentSection,
+  getLastFocusedSectionEditor,
+  getSectionEditor,
+} from '@/lib/editor/sectionEditorRegistry';
 import RewriteStylePanel from './RewriteStylePanel';
 import PriorComparePanel from './PriorComparePanel';
 import DictationDraftPanel from './DictationDraftPanel';
@@ -646,12 +651,32 @@ export default function ReportPage() {
     }, 3000);
 
     // Execute command
-    void executeDesktopCommand(match.command);
+    void executeDesktopCommand(match.command, match);
     return stripCommand(transcript, match);
   }
 
-  async function executeDesktopCommand(command: VoiceCommand) {
+  async function executeDesktopCommand(command: VoiceCommand, match?: CommandMatch) {
     if (!report) return;
+    // Navigation & editing commands are local and instant — no AI round-trip,
+    // so they skip the AI-busy lifecycle entirely. Signing is never automated:
+    // "sign report" only opens the sign panel for the radiologist.
+    switch (command) {
+      case 'next_field': focusAdjacentSection(1); return;
+      case 'previous_field': focusAdjacentSection(-1); return;
+      case 'go_to_section':
+        if (match?.sectionKey) getSectionEditor(match.sectionKey)?.focus();
+        return;
+      case 'new_line': getLastFocusedSectionEditor()?.newLine?.(); return;
+      case 'new_paragraph': {
+        const ed = getLastFocusedSectionEditor();
+        ed?.newLine?.();
+        ed?.newLine?.();
+        return;
+      }
+      case 'undo_that': getLastFocusedSectionEditor()?.undo?.(); return;
+      case 'open_sign': setShowSignSend(true); return;
+      default: break;
+    }
     setAiBusy(true);
     setError(null);
     try {

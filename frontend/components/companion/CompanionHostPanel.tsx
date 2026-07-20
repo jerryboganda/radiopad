@@ -30,6 +30,7 @@ import { getSttMode } from '@/lib/dictation/sttMode';
 import { raceTimeout } from '@/lib/asyncTimeout';
 import { readQueryParam } from '@/lib/browserParams';
 import {
+  focusAdjacentSection,
   getLastFocusedSectionEditor,
   getSectionEditor,
   getSectionEditorsInOrder,
@@ -54,17 +55,6 @@ function hostDeviceName(): string {
   if (/mac/i.test(navigator.platform)) return 'Mac desktop';
   if (/win/i.test(navigator.platform)) return 'Windows desktop';
   return 'RadioPad desktop';
-}
-
-function focusAdjacentSection(direction: 1 | -1): string | null {
-  const editors = getSectionEditorsInOrder();
-  if (editors.length === 0) return null;
-  const current = getLastFocusedSectionEditor();
-  const idx = current ? editors.findIndex((e) => e.sectionKey === current.sectionKey) : -1;
-  const nextIdx = idx < 0 ? 0 : (idx + direction + editors.length) % editors.length;
-  const target = editors[nextIdx];
-  target.focus();
-  return target.sectionKey;
 }
 
 export default function CompanionHostPanel() {
