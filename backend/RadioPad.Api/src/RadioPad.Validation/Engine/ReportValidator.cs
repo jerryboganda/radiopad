@@ -367,23 +367,50 @@ public class ReportValidator
     private static IEnumerable<ValidationFinding> CheckNegationConflict(Report r, RulebookSpec.RuleSpec rule)
     {
         // Negation conflict: a concept denied in Findings is asserted in Impression.
-        var negations = Regex.Matches(r.Findings, @"\bno\s+([^.;\n]{3,80})", RegexOptions.IgnoreCase);
-        foreach (Match neg in negations)
+        // Scoped per clause (sentence/bullet) on both sides so that a denial in one
+        // clause isn't matched against an unrelated clause. When the denying clause
+        // has a determinate single laterality (left-only or right-only), a candidate
+        // match in Impression from a clause asserting the opposite side is skipped —
+        // e.g. "no renal calculus" about the right kidney does not conflict with a
+        // left renal calculus asserted elsewhere in Impression; that's different
+        // anatomy, not a contradiction.
+        var findingClauses = Regex.Split(r.Findings ?? string.Empty, @"(?<=[.;\n])\s+|\n+");
+        var impressionClauses = Regex.Split(r.Impression ?? string.Empty, @"(?<=[.;\n])\s+|\n+");
+
+        foreach (var clause in findingClauses)
         {
-            foreach (var concept in SplitNegatedConcepts(neg.Groups[1].Value))
+            var clauseSide = DetermineSide(clause);
+            foreach (Match neg in Regex.Matches(clause, @"\bno\s+([^.;\n]{3,80})", RegexOptions.IgnoreCase))
             {
-                if (!ContainsConcept(r.Impression, concept)) continue;
-                if (IsNegatedMention(r.Impression, concept)) continue;
-                yield return new ValidationFinding(
-                    RuleId: rule.Id,
-                    Severity: rule.Severity,
-                    Message: $"Findings deny '{concept}' but Impression appears to assert it.",
-                    Section: "Impression",
-                    Snippet: concept);
-                yield break;
+                foreach (var concept in SplitNegatedConcepts(neg.Groups[1].Value))
+                {
+                    var asserted = impressionClauses.FirstOrDefault(ic =>
+                        ContainsConcept(ic, concept) &&
+                        !IsNegatedMention(ic, concept) &&
+                        !ConflictsOnSide(clauseSide, DetermineSide(ic)));
+                    if (asserted is null) continue;
+                    yield return new ValidationFinding(
+                        RuleId: rule.Id,
+                        Severity: rule.Severity,
+                        Message: $"Findings deny '{concept}' but Impression appears to assert it.",
+                        Section: "Impression",
+                        Snippet: concept);
+                    yield break;
+                }
             }
         }
     }
+
+    private static string? DetermineSide(string text)
+    {
+        var hasLeft = LeftRe.IsMatch(text ?? string.Empty);
+        var hasRight = RightRe.IsMatch(text ?? string.Empty);
+        if (hasLeft && !hasRight) return "left";
+        if (hasRight && !hasLeft) return "right";
+        return null; // bilateral, unspecified, or ambiguous — don't filter on side
+    }
+
+    private static bool ConflictsOnSide(string? a, string? b) => a is not null && b is not null && a != b;
 
     private static IEnumerable<string> SplitNegatedConcepts(string raw)
     {

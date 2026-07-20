@@ -118,6 +118,26 @@ public class ValidationEngineTests
     }
 
     [Fact]
+    public void NegationConflictNotRaisedAcrossOppositeLaterality()
+    {
+        // "No renal calculus" describes the RIGHT kidney; the calculus asserted
+        // in Impression is explicitly the LEFT kidney. Different anatomy, not a
+        // contradiction — the engine must not flag this as a negation conflict.
+        var report = new Report
+        {
+            Indication = "Flank pain",
+            Findings = "A 6.7 mm calculus is present at the mid pole of the left kidney, associated with " +
+                "mild left hydronephrosis. No left ureteric calculus, hydroureter, perinephric collection, " +
+                "or perinephric fat stranding is present. The right kidney is normal in size, contour, and " +
+                "attenuation, with no renal calculus, hydronephrosis, hydroureter, or perinephric " +
+                "inflammatory change.",
+            Impression = "1. 6.7 mm left renal calculus with mild left hydronephrosis.",
+        };
+        var v = new ReportValidator().Validate(report, ChestCt());
+        Assert.DoesNotContain(v.Findings, f => f.RuleId == "negation_conflict");
+    }
+
+    [Fact]
     public void CriticalLanguageRequiresEscalationPhrase()
     {
         var report = new Report
