@@ -27,19 +27,60 @@ const riskyCommands = [
   },
 ];
 
+const heavyCommands = [
+  {
+    pattern: /\bdotnet\s+build\b/i,
+    reason: 'a full dotnet build belongs in CI (ci.yml → backend job), not this laptop',
+  },
+  {
+    pattern: /\bdotnet\s+test\b(?![^\n]*--filter)/i,
+    reason: 'the full dotnet suite belongs in CI; locally run `dotnet test --filter <Name>`',
+  },
+  {
+    pattern: /\bpnpm\s+(?:--filter\s+\S+\s+)?(?:run\s+)?(?:build|typecheck|lint)\b/i,
+    reason: 'full frontend build/typecheck/lint belongs in CI (ci.yml → frontend job)',
+  },
+  {
+    pattern: /\b(?:npx\s+)?next\s+build\b/i,
+    reason: 'a Next.js production build belongs in CI',
+  },
+  {
+    pattern: /\btauri\s+build\b/i,
+    reason: 'desktop bundling runs on GitHub Actions only (desktop-bundle.yml)',
+  },
+  {
+    pattern: /\bcargo\s+(?:build|test)\b/i,
+    reason: 'cargo build/test is expensive; CI runs it',
+  },
+  {
+    pattern: /\bdocker\s+(?:compose\s+)?build\b/i,
+    reason: 'docker image builds run in CI, never on the laptop or the VPS',
+  },
+  {
+    pattern: /\bgh\s+run\s+watch\b/i,
+    reason: 'do not wait on CI — push and stop; the operator monitors runs and reports failures',
+  },
+];
+
 const payload = await readHookPayload();
 const command = commandFromPayload(payload);
 const toolName = toolNameFromPayload(payload);
-const match = command ? riskyCommands.find(({ pattern }) => pattern.test(command)) : null;
+const risky = command ? riskyCommands.find(({ pattern }) => pattern.test(command)) : null;
+const heavy = !risky && command ? heavyCommands.find(({ pattern }) => pattern.test(command)) : null;
+const match = risky || heavy;
 
 if (match) {
+  const label = risky ? 'safety guard' : 'compute-discipline guard';
+  const detail = risky
+    ? `Potentially destructive command requires confirmation: ${match.reason}.`
+    : `RadioPad compute rule (CLAUDE.md): ${match.reason}.`;
   writeHookResult({
     continue: true,
-    systemMessage: `RadioPad safety guard flagged ${toolName || 'a tool'}: ${match.reason}.`,
+    systemMessage: `RadioPad ${label} flagged ${toolName || 'a tool'}: ${match.reason}.`,
     hookSpecificOutput: {
       hookEventName: 'PreToolUse',
       permissionDecision: 'ask',
-      permissionDecisionReason: `Potentially destructive command requires confirmation: ${match.reason}.`,
+      permissionDecisionReason: detail,
     },
   });
 } else {
