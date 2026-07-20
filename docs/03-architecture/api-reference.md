@@ -413,3 +413,43 @@ notes: [docs/05-clinical/peer-review.md](../05-clinical/peer-review.md).
 | POST | `/api/peer-reviews/{id}/submit` | `peer_review.submit` | PR-003. Body `{ score: 1..4, discrepancyCategory, complexity?, comments? }`. Score 1 must carry category `None`; 2–4 must carry a real category (`400 { kind: "peer_review_rationale" }`). Assignee only, once. Unblinds the author. Audits `PeerReviewSubmitted` (structured verdict only — never the rationale text). |
 | POST | `/api/peer-reviews/{id}/dispute` | `peer_review.submit` | Body `{ reason }`. Reviewed author only (`403 { kind: "peer_review_not_author" }`); the review must be `Completed`. Audits `PeerReviewDisputed`. |
 | GET | `/api/peer-reviews/stats` | `peer_review.manage` | PR-005/PR-009. `?from=&to=` (default last 90 days). Returns tenant totals plus a `perReader` array: reviewed / concur / discrepancies / `concordanceRate` (0..1) / `byScore` / `byCategory` / `complexCases` / `disputed`. |
+
+## Critical Results (PRD §14.15, CR-001…CR-010)
+
+PowerScribe-style closed-loop communication tracking for critical findings.
+RadioPad **never** contacts anyone, acknowledges, or closes a loop on a
+clinician's behalf — every transition below is an explicit human action that
+appends an append-only audit row. Full module notes:
+[docs/05-clinical/critical-results.md](../05-clinical/critical-results.md).
+
+Criticality drives the communication deadline (`dueAt = createdAt + window`):
+
+| Criticality | Meaning | Deadline window | Badge tone |
+| --- | --- | ---: | --- |
+| `Red` | Immediate / life-threatening | 15 min | red (`danger`) |
+| `Orange` | Urgent | 1 h | amber (`warn`) |
+| `Yellow` | Actionable | 24 h | blue (`info`) |
+
+Status flow: `Open` → `Communicated` → `Acknowledged` → `Closed`, with
+`Escalated` set manually or by the overdue sweep when an `Open` result blows its
+deadline. `Closed` is terminal.
+
+| Method | Path | Permission | Description |
+| --- | --- | --- | --- |
+| GET | `/api/critical-results` | `critical_results.read` | List for the tenant, soonest deadline first. Filters: `?status=`, `?criticality=`, `?reportId=`, `?overdue=true`, `?take=` (clamped 1–500). Unknown enum values return `400 { kind: "invalid_status" \| "invalid_criticality" }`. |
+| GET | `/api/critical-results/overdue` | `critical_results.read` | Results whose loop is still open (`Open`/`Escalated`) and whose `dueAt` has passed. |
+| GET | `/api/critical-results/{id}` | `critical_results.read` | One result. A cross-tenant id is a `404`, never a `403` — the response must not confirm the row exists. |
+| POST | `/api/critical-results` | `critical_results.manage` | Log a critical finding. Body `{ reportId, criticality, findingSummary, notes? }`. `404 { kind: "report_not_found" }` when the report is not in the caller's tenant; `400 { kind: "missing_finding_summary" }` on an empty summary. Sets `dueAt` from the criticality. Audits `CriticalResultCreated`. |
+| POST | `/api/critical-results/{id}/communicate` | `critical_results.manage` | Record the notification. Body `{ communicatedTo, method, notes? }` where `method` is `Phone\|SecureMessage\|InPerson\|Other`. `400 { kind: "missing_recipient" \| "invalid_method" }`; `409 { kind: "already_closed" }`. Audits `CriticalResultCommunicated` (records `onTime`). |
+| POST | `/api/critical-results/{id}/acknowledge` | `critical_results.manage` | Capture the read-back. Body `{ acknowledgedBy?, notes? }` (defaults to `communicatedTo`). `409 { kind: "not_communicated" }` when no communication was recorded first — an acknowledgement with no call is not a closed loop. Audits `CriticalResultAcknowledged`. |
+| POST | `/api/critical-results/{id}/escalate` | `critical_results.manage` | Escalate an open loop. Body `{ notes? }`. `409 { kind: "already_resolved" }` when already acknowledged/closed. Audits `CriticalResultEscalated` (`reason: "manual"`). |
+| POST | `/api/critical-results/{id}/close` | `critical_results.manage` | Close out. Body `{ notes? }`. `409 { kind: "already_closed" }`. Audits `CriticalResultClosed`. |
+
+**Audit hygiene.** Audit details carry ids, criticality, method, recipient label,
+and timings only. The finding narrative (`findingSummary`) is **never** written
+to the audit log.
+
+**Overdue sweep.** `CriticalResultEscalationService` (hosted service, 60 s
+cadence) flips `Open` results past `dueAt` to `Escalated` and audits
+`CriticalResultEscalated` with `reason: "overdue_sweep"`. It never touches a
+result that was already communicated.
