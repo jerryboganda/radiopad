@@ -32,17 +32,31 @@ on:
         required: false
         default: true
         type: boolean
+      mode:
+        description: '"shipped" = install the released MSI (install phase only); "e2e-build" = build a throwaway CDP-enabled MSI and drive the renderer'
+        required: false
+        default: shipped
+        type: string
   workflow_dispatch:
     inputs:
       run_id:
-        description: 'desktop-bundle run id that produced the radiopad-windows-latest artifact'
-        required: true
+        description: 'desktop-bundle run id with the radiopad-windows-latest artifact (mode=shipped only)'
+        required: false
         type: string
       advisory:
         description: 'Report a drive failure as a warning instead of failing the job'
         required: false
         default: false
         type: boolean
+      mode:
+        description: 'shipped | e2e-build'
+        required: false
+        default: e2e-build
+        type: string
+  schedule:
+    # Nightly full renderer + microphone run. Too heavy for a release (it builds its own
+    # bundle and loads a 2.5 GB model), but cheap enough once a day to catch UI regressions.
+    - cron: '0 3 * * *'
 
 jobs:
   msi-e2e:
@@ -57,6 +71,11 @@ jobs:
       LLAMA_TAG: b10068
       LLAMA_WIN_SHA: 01d5f30876acfb4a0be59396710f450213495c7181d8fbcce2fad045835ceb89
       MEDASR_SHA: 2c20f03265ee6144c566fd18b0f7bbb4f0d005d11ce9440dd641920210f4c33a
+      # schedule/dispatch default to the full renderer run; desktop-bundle passes mode=shipped.
+      E2E_MODE: ${{ inputs.mode || 'e2e-build' }}
+      # Absolute, deterministic path — this string is BAKED into the e2e build's
+      # --use-file-for-fake-audio-capture flag, so the runtime copy must match it exactly.
+      MIC_WAV: C:\radiopad-e2e\mic.wav
     steps:
       - uses: actions/checkout@v4
 
@@ -64,13 +83,109 @@ jobs:
         with:
           node-version: '22' # global WebSocket + fetch — the CDP driver has zero npm deps
 
-      - name: Download installer artifact
+      - name: Download installer artifact (shipped mode)
+        if: env.E2E_MODE == 'shipped'
         uses: actions/download-artifact@v4
         with:
           name: radiopad-windows-latest
           path: artifacts
           run-id: ${{ inputs.run_id || github.run_id }}
           github-token: ${{ secrets.GITHUB_TOKEN }}
+
+      # --- e2e-build mode: a throwaway MSI that can be driven ------------------------------
+      #
+      # Neither WEBVIEW2_ADDITIONAL_BROWSER_ARGUMENTS nor the WebView2 registry policy reaches
+      # this app (both verified inert — Tauri sets additionalBrowserArguments itself and
+      # WebView2 does not append to it). The ONLY way to open a CDP port is Tauri's own
+      # additionalBrowserArgs, so it is patched in here, at build time, for a bundle that is
+      # installed, driven, and discarded within this job. The shipped installer produced by
+      # desktop-bundle never contains a debug port — deliberately, because a loopback CDP port
+      # exposes the rendered DOM (PHI) to any local process.
+      - name: Setup pnpm
+        if: env.E2E_MODE == 'e2e-build'
+        uses: pnpm/action-setup@v3
+        with:
+          version: 9
+
+      - uses: dtolnay/rust-toolchain@stable
+        if: env.E2E_MODE == 'e2e-build'
+
+      - name: Cache cargo
+        if: env.E2E_MODE == 'e2e-build'
+        uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: desktop/src-tauri
+
+      - uses: actions/setup-dotnet@v4
+        if: env.E2E_MODE == 'e2e-build'
+        with:
+          dotnet-version: '8.0.x'
+
+      - name: Publish .NET sidecar
+        if: env.E2E_MODE == 'e2e-build'
+        shell: bash
+        run: |
+          set -euo pipefail
+          dotnet publish backend/RadioPad.Api/src/RadioPad.Api/RadioPad.Api.csproj \
+            -c Release -r win-x64 --self-contained true \
+            -p:PublishSingleFile=true -p:IncludeNativeLibrariesForSelfExtract=true \
+            -o publish/sidecar
+          mkdir -p desktop/src-tauri/binaries
+          cp publish/sidecar/RadioPad.Api.exe desktop/src-tauri/binaries/radiopad-api-x86_64-pc-windows-msvc.exe
+
+      - name: Build frontend (desktop surface)
+        if: env.E2E_MODE == 'e2e-build'
+        working-directory: frontend
+        run: |
+          pnpm install --frozen-lockfile
+          pnpm build:desktop
+
+      - name: Bake the CDP + fake-media browser args into this build only
+        if: env.E2E_MODE == 'e2e-build'
+        shell: bash
+        run: |
+          set -euo pipefail
+          node -e '
+            const fs = require("fs");
+            const p = "desktop/src-tauri/tauri.conf.json";
+            const c = JSON.parse(fs.readFileSync(p, "utf8"));
+            const w = c.app.windows[0];
+            if (w.additionalBrowserArgs) throw new Error("additionalBrowserArgs is already set in the shipped config — refusing to clobber it; merge by hand");
+            // additionalBrowserArgs REPLACES wry defaults, so restate them verbatim.
+            w.additionalBrowserArgs = [
+              "--disable-features=msWebOOUI,msPdfOOUI,msSmartScreenProtection",
+              "--autoplay-policy=no-user-gesture-required",
+              "--remote-debugging-port=9223",
+              "--use-fake-device-for-media-stream",
+              "--use-fake-ui-for-media-stream",
+              "--use-file-for-fake-audio-capture=C:\\\\radiopad-e2e\\\\mic.wav%noloop",
+            ].join(" ");
+            fs.writeFileSync(p, JSON.stringify(c, null, 2) + "\n");
+            console.log("patched additionalBrowserArgs:", w.additionalBrowserArgs);
+          '
+          # Loud, because a human reading this log must never mistake it for the shipped build.
+          echo "::warning::THROWAWAY e2e build — CDP port 9223 enabled. This MSI is never released."
+
+      - name: Install tauri-cli
+        if: env.E2E_MODE == 'e2e-build'
+        uses: taiki-e/install-action@v2
+        with:
+          tool: tauri-cli
+
+      - name: Build the throwaway MSI
+        if: env.E2E_MODE == 'e2e-build'
+        working-directory: desktop
+        run: cargo tauri build --config '{"bundle":{"createUpdaterArtifacts":false}}'
+
+      - name: Collect the built MSI
+        if: env.E2E_MODE == 'e2e-build'
+        shell: pwsh
+        run: |
+          New-Item -ItemType Directory -Force artifacts | Out-Null
+          $msi = Get-ChildItem desktop/src-tauri/target/release/bundle -Recurse -Filter '*.msi' | Select-Object -First 1
+          if (-not $msi) { throw 'the e2e build produced no MSI' }
+          Copy-Item $msi.FullName artifacts/
+          Write-Host "e2e MSI: $($msi.Name)"
 
       # Model/runtime downloads are cached and the MedGemma/MedASR keys deliberately match the
       # ubuntu smoke workflows' keys — the blobs are platform-independent, so a weekly
@@ -158,6 +273,12 @@ jobs:
           New-Item -ItemType Directory -Force "$root/runtimes/llama-server-b10068" | Out-Null
           Copy-Item -Recurse -Force llama-runtime-win/* "$root/runtimes/llama-server-b10068/"
 
+          # The fake microphone reads this exact absolute path — it is compiled into the e2e
+          # build's browser args, so it cannot be derived from the workspace location.
+          New-Item -ItemType Directory -Force 'C:\radiopad-e2e' | Out-Null
+          Copy-Item medasr-model/test_wavs/0.wav $env:MIC_WAV
+          if (-not (Test-Path $env:MIC_WAV)) { throw "mic sample not staged at $env:MIC_WAV" }
+
       - name: Install the MSI
         shell: pwsh
         run: |
@@ -185,9 +306,12 @@ jobs:
           # On tag builds this job gates the release, so the script's headless-webview
           # tolerance is disabled — a renderer that never came up must FAIL, not warn.
           RADIOPAD_E2E_STRICT: ${{ startsWith(github.ref, 'refs/tags/') && '1' || '0' }}
+          # 'shipped' MSIs have no CDP port by design, so they verify the packaged product
+          # only; the throwaway e2e build additionally drives the renderer + microphone.
+          RADIOPAD_E2E_PHASES: ${{ env.E2E_MODE == 'e2e-build' && 'full' || 'install' }}
           # The MedASR bundle's own radiology dictation sample, played by Chromium's fake
-          # audio device so the REAL mic button records real speech (mandatory phase).
-          RADIOPAD_E2E_MIC_WAV: ${{ github.workspace }}/medasr-model/test_wavs/0.wav
+          # audio device so the REAL mic button records real speech.
+          RADIOPAD_E2E_MIC_WAV: ${{ env.MIC_WAV }}
         run: node scripts/desktop-msi-e2e.mjs
 
       - name: Report an advisory failure loudly

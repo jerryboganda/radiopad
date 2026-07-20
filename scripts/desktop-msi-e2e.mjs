@@ -35,6 +35,16 @@ const OUT = process.env.RADIOPAD_E2E_OUT || path.join(process.cwd(), 'e2e-out');
 // a renderer that never came up would otherwise warning-pass and the gate would verify nothing.
 const STRICT = process.env.RADIOPAD_E2E_STRICT === '1';
 
+// Which half of the E2E to run.
+//   'install' — install the SHIPPED msi and verify the packaged product: sidecar spawns, the
+//               model manager reports MedASR + MedGemma present, the API answers. Fast, runs on
+//               every bundle. Cannot drive the renderer: the shipped MSI has no CDP port, and
+//               it deliberately never will (see the header note on browser arguments).
+//   'full'    — additionally drive the renderer end to end. Requires an MSI built with the CDP
+//               + fake-media browser args baked into Tauri's own additionalBrowserArgs, which
+//               only the e2e build produces. Never a shipped artifact.
+const PHASE = process.env.RADIOPAD_E2E_PHASES === 'full' ? 'full' : 'install';
+
 const DICTATION =
   'CT chest with contrast. There is a three point two centimeter nodule in the right upper ' +
   'lobe. No pneumothorax. Impression acute pulmonary embolism in the left lower lobe.';
@@ -245,6 +255,7 @@ async function main() {
 
   // 1. Pre-start the installed sidecar with a bootstrap secret + throwaway DB. The desktop
   //    shell will adopt it (it answers /api/health/ready on the default bind).
+  log(`phase: ${PHASE}${PHASE === 'install' ? ' (packaged product only — renderer not driven)' : ' (renderer + microphone)'}`);
   const bootstrapSecret = randomBytes(24).toString('hex');
   const dbPath = path.join(tmpdir(), `radiopad-e2e-${Date.now()}.db`);
   const sidecar = spawn(sidecarExe, [], {
@@ -291,10 +302,20 @@ async function main() {
   const { slug, adminEmail } = boot.json;
   log(`bootstrapped org "${slug}" admin ${adminEmail}`);
 
+  if (PHASE === 'install') {
+    // Everything above ran against the REAL installed product: its own sidecar binary, its own
+    // model store, its own API. That is the half a shipped MSI can prove.
+    log('PASS (install phase): shipped MSI installs, packaged sidecar serves, ' +
+        'MedASR + MedGemma present, API answers');
+    return;
+  }
+
   // 4. Launch the installed app. RADIOPAD_BACKEND points its webview at the sidecar (CSP
   //    allows loopback). The WebView2 flags: devtools protocol for this process only, plus
   //    Chromium's fake media stack so the REAL mic button records the MedASR bundle's own
   //    radiology dictation sample (%noloop = play once, then silence) with no permission UI.
+  // Must be the SAME absolute path baked into the e2e build's --use-file-for-fake-audio-capture
+  // flag, or the fake microphone plays nothing and the mic phase fails for the wrong reason.
   const micWav = process.env.RADIOPAD_E2E_MIC_WAV;
   if (!micWav || !existsSync(micWav)) {
     throw new Error(
@@ -303,35 +324,20 @@ async function main() {
   }
   // 16 kHz mono 16-bit PCM → 32000 bytes/second; record the whole utterance plus a tail.
   const micMs = Math.ceil(((statSync(micWav).size - 44) / 32000) * 1000);
-  const browserArgs = [
-    `--remote-debugging-port=${CDP_PORT}`,
-    '--use-fake-device-for-media-stream',
-    '--use-fake-ui-for-media-stream',
-    `--use-file-for-fake-audio-capture=${micWav}%noloop`,
-  ].join(' ');
-
-  // HOW THE FLAGS ARE DELIVERED — and why NOT via WEBVIEW2_ADDITIONAL_BROWSER_ARGUMENTS.
+  // HOW THE FLAGS GET IN — and why neither external channel is used.
   //
-  // Microsoft documents that env var as being *appended* to the host app's own
-  // additionalBrowserArguments. Empirically, in this Tauri/wry app, it is not: the failed
-  // run's captured browser process command line (webview-diagnostics.txt) carried wry's own
-  // `--autoplay-policy` / `--disable-features` and none of ours, with a fully healthy
-  // renderer. So the env var route silently does nothing here.
+  // WebView2 documents two ways to add browser arguments from outside an app: the
+  // WEBVIEW2_ADDITIONAL_BROWSER_ARGUMENTS env var, and a per-exe registry policy. BOTH were
+  // tried against this app and BOTH are inert (runs 29739333987 / 29743040588): the captured
+  // browser command line carries exactly wry's own defaults and none of ours, with a fully
+  // healthy renderer. Tauri calls SetAdditionalBrowserArguments itself and WebView2 does not
+  // append external values to it.
   //
-  // The per-exe HKCU policy value is the other documented channel — but it is only consulted
-  // when NO override env var exists, so setting both (as the first attempt did) makes this
-  // one dead weight. Hence: registry ONLY, env var deliberately unset.
+  // So the flags are baked into Tauri's OWN additionalBrowserArgs at build time, by the e2e
+  // build in desktop-msi-e2e.yml. That MSI is built from the same commit, used once, and
+  // thrown away — the shipped installer never carries a debug port. `browserArgs` below is
+  // therefore only used to sanity-check what the running browser actually got.
   //
-  // Ephemeral runner, so no cleanup; and this is a debugging/policy key, not product config.
-  const regKey = 'HKCU\\Software\\Policies\\Microsoft\\Edge\\WebView2\\AdditionalBrowserArguments';
-  const reg = spawnSync('reg', [
-    'add', regKey, '/v', path.basename(appExe), '/t', 'REG_SZ', '/d', browserArgs, '/f',
-  ], { encoding: 'utf8' });
-  if (reg.status !== 0) {
-    throw new Error(`could not set the WebView2 AdditionalBrowserArguments policy: ${reg.stderr ?? reg.stdout}`);
-  }
-  log(`WebView2 browser args set via policy for ${path.basename(appExe)}`);
-
   // A WebView2 browser process is shared per user-data-folder, and a already-running one
   // would be reused WITHOUT these args — so make sure nothing is holding one open and start
   // from a clean profile. Both are cheap and remove a whole class of "why did my flags not

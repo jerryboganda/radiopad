@@ -273,6 +273,11 @@ jobs:
     uses: ./.github/workflows/desktop-msi-e2e.yml
     with:
       advisory: true
+      # Verify the SHIPPED installer: it installs, its packaged sidecar serves, MedASR and
+      # MedGemma are present, the API answers. It cannot be driven through the UI — the
+      # shipped MSI has no CDP port and deliberately never will. The renderer + microphone
+      # flows are covered by the nightly `e2e-build` run against a throwaway bundle.
+      mode: shipped
     secrets: inherit
 
   # --- Publish (single writer) ----------------------------------------------
