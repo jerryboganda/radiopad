@@ -4,6 +4,7 @@
   "pkg": "@radiopad/frontend",
   "globalName": "RadioPad",
   "entry": "frontend/.synth-entry-placeholder.mjs",
+  "buildCmd": "cd frontend && node ../.ds-sync/node_modules/typescript/bin/tsc -p tsconfig.design-sync.json",
   "srcDir": "components",
   "tsconfig": "tsconfig.json",
   "cssEntry": "app/shell.css",
@@ -12,9 +13,13 @@
     "../.design-sync/fonts/inter-alias.css"
   ],
   "guidelinesGlob": ["../docs/02-design/design.md"],
+  "readmeHeader": ".design-sync/conventions.md",
   "overrides": {
     "ProvenanceModal": { "cardMode": "single", "viewport": "900x640" },
-    "GenerationOverlay": { "cardMode": "single", "viewport": "900x640" }
+    "GenerationOverlay": { "cardMode": "single", "viewport": "900x640" },
+    "AnimatedNumber": { "cardMode": "column" },
+    "ToastProvider": { "cardMode": "single", "primaryStory": "ExportedToPacs" },
+    "CrossCheckBadge": { "cardMode": "single", "primaryStory": "Running" }
   },
   "libOverrides": {
     "source-kit.mjs": "synth entry restricted to componentSrcMap pins + browser process.env shim (Next.js app modules read process.env at module init)"
@@ -42,7 +47,7 @@
     "GenerationOverlay": "components/reports/GenerationOverlay.tsx",
     "ProvenanceModal": "components/reports/ProvenanceModal.tsx",
     "CrossCheckBadge": "components/dictation/CrossCheckBadge.tsx",
-    "AuthScaffold": "components/auth/AuthScaffold.tsx",
+    "AuthScaffold": null,
     "AppShell": null,
     "AuthGate": null,
     "Breadcrumbs": null,
