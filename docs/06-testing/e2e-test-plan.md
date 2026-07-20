@@ -14,11 +14,16 @@ actual Windows `.msi` on every tag push, pre-places the pinned on-device models,
 driving the WebView2 devtools protocol) exercises the installed renderer: UI login including the
 mandatory TOTP enrollment, report creation, the dictation draft panel, a real on-device MedGemma
 format that must pass the safety validator (`.ai-mark`, "Requires review", spoken-measurement
-normalization asserted), and Apply. The desktop release job depends on it. Screenshots and logs
-are uploaded as the `msi-e2e-evidence` artifact.
+normalization asserted), Apply, and the **microphone capture path**: Chromium's fake audio
+device (`--use-file-for-fake-audio-capture`) plays the MedASR bundle's own radiology dictation
+sample into the overlay's real HQ mic button — getUserMedia → MediaRecorder → 16 kHz WAV →
+`/api/stt/transcribe` → on-device MedASR decode — and the E2E asserts the transcript's content
+words land in the focused section editor and that every transcribe response names MedASR as the
+serving model. The desktop release job depends on it. Screenshots and logs are uploaded as the
+`msi-e2e-evidence` artifact.
 
-Not covered by it: the microphone capture path (dictation is seeded as text — audio-device
-injection is not wired) and the web/mobile surfaces.
+Not covered by it: the web/mobile surfaces (and the live Web-Speech "Dictate" mic, which is a
+platform engine, not RadioPad code — the on-device HQ path is the covered one).
 
 ## Tooling
 

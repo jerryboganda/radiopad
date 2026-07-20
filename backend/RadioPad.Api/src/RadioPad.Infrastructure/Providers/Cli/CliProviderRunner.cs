@@ -98,16 +98,12 @@ internal static class CliProviderRunner
     }
 
     /// <summary>
-    /// <paramref name="allowPhi"/> lets an adapter that has been explicitly
-    /// promoted to PhiApproved (operator decision — currently only
-    /// <see cref="GeminiCliProvider"/>, 2026-07-12) bypass the CLI-level PHI
-    /// refusal; the tenant/provider compliance gates in AiGateway still apply.
-    /// The secret screen is never bypassed.
+    /// CLI-level PHI refusal removed (operator decision 2026-07-20) — every
+    /// CLI adapter accepts PHI. The secret screen remains: it stops
+    /// credentials from leaking to an external CLI, which is not a PHI rule.
     /// </summary>
-    public static void EnforceRequestPolicy(string adapterId, AiCompletionRequest request, bool allowPhi = false)
+    public static void EnforceRequestPolicy(string adapterId, AiCompletionRequest request)
     {
-        if (request.ContainsPhi && !allowPhi)
-            throw new ProviderPolicyException($"{adapterId}: phi_not_supported");
         if (LooksLikeSecret(request.SystemPrompt) || LooksLikeSecret(request.UserPrompt))
             throw new ProviderPolicyException($"{adapterId}: secret_not_supported");
     }

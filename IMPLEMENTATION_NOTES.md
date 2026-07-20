@@ -358,11 +358,24 @@ enrollment → report → dictation draft panel → real on-device MedGemma form
 flaky-test prime suspect was eliminated by serializing every env-mutating test class, with
 `EnvSerializationConventionTests` enforcing the invariant.
 
-Still open, honestly: the `msi-e2e` job and the latency instrumentation are **wired but not yet
-observed green** — the next tag push / weekly run is the evidence; the **microphone capture path**
-(press mic → MedASR decode through the UI) is still not driven in CI — the E2E seeds dictation as
-text, so audio-device injection remains uncovered; and the original flake was never **named**, so
-"prime suspect eliminated" is not "flake resolved" — flaky-hunt stays as the watchdog.
+**Microphone capture closed too (2026-07-20, same day):** the E2E now also drives the overlay's
+HQ mic — Chromium's fake audio device (`--use-file-for-fake-audio-capture=<0.wav>%noloop` via
+`WEBVIEW2_ADDITIONAL_BROWSER_ARGUMENTS`) plays the MedASR bundle's own radiology sample into the
+real button after focusing the empty technique section (the overlay deliberately discards a
+recording with no focused target). Asserted: recording starts (`aria-pressed`, with the
+mic-permission error text distinguished from decode failures), the decoded transcript's content
+words (`chest/lobe/right/embolus/pneumothorax`, the smoke test's own tolerance) land in that
+section, and — via an in-page fetch tap, since the DOM deliberately hides engine identity —
+every `/api/stt/transcribe` response names MedASR, which would catch the audit-era
+wrong-engine-served-silently failure mode. The live Web-Speech "Dictate" button stays uncovered
+by choice: it is a platform engine, not RadioPad code.
+
+Still open, honestly: the `msi-e2e` job (including the mic phase — the fake-device flags are the
+one assumption CI has not yet confirmed against WebView2's permission layer; a failure there
+surfaces as the distinct mic-permission error text in the artifacts) and the latency
+instrumentation are **wired but not yet observed green** — the next dispatched/tag run is the
+evidence; and the original flake was never **named**, so "prime suspect eliminated" is not
+"flake resolved" — flaky-hunt stays as the watchdog.
 
 ## 9. The pattern this build kept producing (read before the next change)
 

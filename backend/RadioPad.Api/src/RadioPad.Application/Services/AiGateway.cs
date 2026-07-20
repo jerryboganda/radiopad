@@ -9,9 +9,11 @@ using RadioPad.Domain.ValueObjects;
 namespace RadioPad.Application.Services;
 
 /// <summary>
-/// Routes AI completion requests across registered provider adapters while
-/// enforcing PHI policy (PROV-001..010, §14.3). The gateway is the only
-/// component allowed to call provider APIs in production.
+/// Routes AI completion requests across registered provider adapters. The
+/// PHI/compliance gate was removed by operator decision (2026-07-20) — all
+/// providers are eligible for all requests; only the Enabled toggle applies.
+/// The gateway is the only component allowed to call provider APIs in
+/// production.
 /// </summary>
 public class AiGateway : IAiGateway
 {
@@ -222,30 +224,14 @@ public class AiGateway : IAiGateway
         }
     }
 
+    // PHI gate removed (operator decision 2026-07-20): every provider may
+    // receive any request regardless of compliance class or PHI content.
+    // The only remaining check is the per-provider Enabled toggle.
     private static void EnforcePhiPolicy(Tenant tenant, AiCompletionRequest req)
     {
         var p = req.Provider;
         if (!p.Enabled)
             throw new ProviderPolicyException($"Provider '{p.Name}' is disabled.");
-        if (p.Compliance == ProviderComplianceClass.Blocked)
-            throw new ProviderPolicyException($"Provider '{p.Name}' is blocked by tenant policy.");
-
-        if (req.ContainsPhi)
-        {
-            var phiOk = p.Compliance is ProviderComplianceClass.PhiApproved or ProviderComplianceClass.LocalOnly;
-            if (!phiOk)
-                throw new ProviderPolicyException(
-                    $"Cannot route PHI to '{p.Name}' (compliance={p.Compliance}). " +
-                    $"Tenant '{tenant.Slug}' requires a PHI-approved or local provider for PHI workflows.");
-        }
-        else
-        {
-            // Even non-PHI requests are blocked from sandbox if tenant locks down sandbox use.
-            if (p.Compliance == ProviderComplianceClass.Sandbox && tenant.RequirePhiApprovedProvider)
-            {
-                // Allowed for non-PHI work, but logged at info level by callers.
-            }
-        }
     }
 
     private static string Sha256(string s)

@@ -163,7 +163,7 @@ Push and stop — do not watch the run.
 
 1. RadioPad never auto-signs reports.
 2. AI text wears `.ai-mark` until reviewed.
-3. PHI requests blocked unless provider compliance is `PhiApproved` or `LocalOnly` (enforced in `AiGateway`; throws `ProviderPolicyException`).
+3. ~~PHI gate~~ **Removed by operator decision (2026-07-20).** The PHI/compliance gate is gone: every enabled provider may receive any request regardless of `ProviderComplianceClass` or PHI content. Do not reintroduce it unless the operator asks. Compliance classes remain as informational metadata only.
 4. Audit log is append-only; use `IAuditLog.AppendAsync` only.
 5. Backend binds `127.0.0.1` by default.
 6. Tenant isolation enforced via `TenantedController.ResolveContextAsync`.

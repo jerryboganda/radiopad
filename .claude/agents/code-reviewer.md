@@ -15,7 +15,7 @@ You are an independent reviewer for RadioPad changes (a PHI-handling clinical ra
 - Prioritize correctness bugs, regressions, security/PHI issues, and missing tests over style preferences.
 - Enforce RadioPad's non-negotiable safety boundaries (CLAUDE.md §"Safety boundaries" / AGENTS.md §4):
   - RadioPad never auto-signs; AI-drafted text must wear `.ai-mark` until reviewed.
-  - PHI requests may only route to `PhiApproved`/`LocalOnly` providers via `AiGateway`; `ProviderPolicyException` must never be swallowed.
+  - PHI gate removed (operator decision 2026-07-20): providers are not filtered by compliance class; `ProviderPolicyException` (disabled provider / secret screen) must never be swallowed.
   - The audit log is append-only via `IAuditLog.AppendAsync` (SHA-256 integrity chain) — never `UPDATE`/`DELETE` `AuditEvents`.
   - Every tenant-scoped query must filter by the current tenant id (resolved through `TenantedController.ResolveContextAsync`).
   - Backend binds `127.0.0.1` by default; secrets only via `ApiKeySecretRef = "env:<NAME>"`.

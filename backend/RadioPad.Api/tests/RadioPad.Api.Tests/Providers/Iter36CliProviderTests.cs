@@ -279,7 +279,7 @@ public class Iter36CliProviderTests
     }
 
     [Fact]
-    public async Task Gemini_AllowsPhi_PerOperatorPromotion_CodexStillRefuses()
+    public async Task Cli_Providers_Allow_Phi()
     {
         static AiCompletionRequest PhiRequest(string adapter) => new(
             new ProviderConfig
@@ -294,16 +294,16 @@ public class Iter36CliProviderTests
             "v1",
             ContainsPhi: true);
 
-        // Operator promotion 2026-07-12: gemini-cli is PhiApproved and must not
-        // refuse PHI at the CLI layer (AiGateway compliance gates still apply).
+        // PHI gate removed (operator decision 2026-07-20): every CLI adapter
+        // accepts PHI.
         var gemini = new GeminiCliProvider(StubLauncher.Ok("phi ok"), NullLogger<GeminiCliProvider>.Instance);
         var r = await gemini.CompleteAsync(PhiRequest(GeminiCliProvider.AdapterId), CancellationToken.None);
         Assert.Equal("phi ok", r.Text);
 
-        // Codex keeps the Sandbox default and the CLI-level PHI refusal.
         using var env = EnvVarScope.Set("RADIOPAD_CODEX_CLI_ENABLED", "1");
-        var codex = new CodexCliProvider(StubLauncher.Ok("never"), NullLogger<CodexCliProvider>.Instance);
-        await Assert.ThrowsAsync<ProviderPolicyException>(() => codex.CompleteAsync(PhiRequest(CodexCliProvider.AdapterId), CancellationToken.None));
+        var codex = new CodexCliProvider(StubLauncher.Ok("phi ok too"), NullLogger<CodexCliProvider>.Instance);
+        var r2 = await codex.CompleteAsync(PhiRequest(CodexCliProvider.AdapterId), CancellationToken.None);
+        Assert.Equal("phi ok too", r2.Text);
     }
 
     // -----------------------------------------------------------------

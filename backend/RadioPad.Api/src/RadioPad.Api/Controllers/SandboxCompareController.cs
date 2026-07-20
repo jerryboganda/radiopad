@@ -12,13 +12,10 @@ namespace RadioPad.Api.Controllers;
 /// <summary>
 /// PRD PROV-005 (iter-34) — sandbox model comparison. Runs the same prompt
 /// across up to four sandbox-class providers in series so the radiologist
-/// can diff outputs before promoting a model to <c>PhiApproved</c>. PHI
-/// policy is NOT bypassed: every dispatch goes through
-/// <see cref="ReportingService.RunAsync"/> → <see cref="IAiGateway.RouteAsync"/>,
-/// which still calls <c>EnforcePhiPolicy</c>. The endpoint additionally
-/// gates the call on <see cref="Tenant.AllowSandboxRulebooks"/> and refuses
-/// any provider whose <see cref="ProviderComplianceClass"/> is not
-/// <see cref="ProviderComplianceClass.Sandbox"/>.
+/// can diff outputs. The PHI compliance gate was removed (operator decision
+/// 2026-07-20): any enabled tenant provider may be compared regardless of
+/// compliance class. The endpoint still gates the call on
+/// <see cref="Tenant.AllowSandboxRulebooks"/>.
 /// </summary>
 [ApiController]
 [Route("api/ai/sandbox")]
@@ -104,13 +101,14 @@ public class SandboxCompareController : TenantedController
         var providers = tenantProviders
             .Where(p => providerIdSet.Contains(p.Id))
             .ToList();
+        // Compliance-class restriction removed (operator decision 2026-07-20):
+        // any enabled tenant provider may be compared.
         if (providers.Count != providerIds.Length
-            || providers.Any(p => !p.Enabled)
-            || providers.Any(p => p.Compliance != ProviderComplianceClass.Sandbox))
+            || providers.Any(p => !p.Enabled))
         {
             return BadRequest(new
             {
-                error = "Every providerId must be an enabled, tenant-owned provider with Compliance = Sandbox.",
+                error = "Every providerId must be an enabled, tenant-owned provider.",
                 kind = "providers_not_sandbox",
             });
         }

@@ -43,10 +43,8 @@ type Preset = {
 };
 
 // Iter-32 AI-011 — operator presets that auto-fill `(adapter, endpointUrl,
-// compliance, model)` for the supported deployment shapes. The "local"
-// presets default to `LocalOnly` (compliance class 4) so the PHI policy
-// in `AiGateway.EnforcePhiPolicy` accepts them. Cloud presets default to
-// `PhiApproved` (3) where the vendor has BAA, otherwise `Sandbox` (1).
+// compliance, model)` for the supported deployment shapes. Compliance class
+// is informational only since the PHI gate was removed (2026-07-20).
 const PRESETS: Preset[] = [
   { id: 'ollama-chat',  label: 'Ollama (local)',         patch: { adapter: 'ollama-chat',  endpointUrl: 'http://127.0.0.1:11434', compliance: 4, model: 'llama3.1:8b-instruct' } },
   { id: 'vllm',         label: 'vLLM (local)',           patch: { adapter: 'vllm',         endpointUrl: 'http://127.0.0.1:8000',  compliance: 4, model: 'default' } },
@@ -409,9 +407,8 @@ export default function ProvidersPage() {
  * PRD PROV-005 (iter-34) — sandbox model comparison panel. Only rendered
  * when the tenant has at least one enabled `Sandbox`-class provider. The
  * radiologist picks a draft report + a mode + 1..4 sandbox providers and
- * the backend runs each in series via `POST /api/ai/sandbox/compare`. PHI
- * policy is still enforced inside `AiGateway.EnforcePhiPolicy` — this
- * panel never bypasses it.
+ * the backend runs each in series via `POST /api/ai/sandbox/compare`. The
+ * PHI compliance gate was removed (2026-07-20), so no provider is blocked.
  */
 function SandboxComparePanel({ providers }: { providers: Provider[] }) {
   const sandbox = useMemo(

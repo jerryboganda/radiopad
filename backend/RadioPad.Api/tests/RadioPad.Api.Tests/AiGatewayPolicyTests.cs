@@ -23,38 +23,17 @@ public class AiGatewayPolicyTests
     private static ProviderConfig Provider(ProviderComplianceClass cls, bool enabled = true) =>
         new() { Id = Guid.NewGuid(), Name = "P", Adapter = "test", Compliance = cls, Enabled = enabled };
 
+    // PHI gate removed (operator decision 2026-07-20): PHI routes to any
+    // compliance class, including Sandbox and Blocked.
     [Fact]
-    public async Task Phi_Request_To_Sandbox_Provider_Throws()
+    public async Task Phi_Request_To_Sandbox_Provider_Succeeds()
     {
         var (gw, audit) = BuildGateway();
         var req = new AiCompletionRequest(Provider(ProviderComplianceClass.Sandbox), "sys", "patient John Doe", "v1", ContainsPhi: true);
-        await Assert.ThrowsAsync<ProviderPolicyException>(() => gw.RouteAsync(Tenant(), req, default));
-        // Policy block is audited (ProviderBlocked) so operators have a tamper-evident trail.
+        var r = await gw.RouteAsync(Tenant(), req, default);
+        Assert.Equal("ok", r.Text);
         Assert.Single(audit.Events);
-        Assert.Equal(AuditAction.ProviderBlocked, audit.Events[0].Action);
-    }
-
-    [Theory]
-    [InlineData("gemini-cli")]
-    [InlineData("openai-compatible")]
-    [InlineData("ubag")]
-    public async Task Phi_Request_To_NewSandbox_Provider_Ids_Throws_And_Audits(string adapterId)
-    {
-        var (gw, audit) = BuildGateway();
-        var provider = new ProviderConfig
-        {
-            Id = Guid.NewGuid(),
-            Name = adapterId,
-            Adapter = adapterId,
-            Compliance = ProviderComplianceClass.Sandbox,
-            Enabled = true,
-        };
-        var req = new AiCompletionRequest(provider, "sys", "synthetic patient data", "v1", ContainsPhi: true);
-
-        await Assert.ThrowsAsync<ProviderPolicyException>(() => gw.RouteAsync(Tenant(), req, default));
-
-        Assert.Single(audit.Events);
-        Assert.Equal(AuditAction.ProviderBlocked, audit.Events[0].Action);
+        Assert.Equal(AuditAction.AiResponse, audit.Events[0].Action);
     }
 
     [Fact]
@@ -86,11 +65,12 @@ public class AiGatewayPolicyTests
     }
 
     [Fact]
-    public async Task Blocked_Provider_Throws()
+    public async Task Blocked_Compliance_Class_No_Longer_Blocks()
     {
         var (gw, _) = BuildGateway();
         var req = new AiCompletionRequest(Provider(ProviderComplianceClass.Blocked), "sys", "x", "v1", false);
-        await Assert.ThrowsAsync<ProviderPolicyException>(() => gw.RouteAsync(Tenant(), req, default));
+        var r = await gw.RouteAsync(Tenant(), req, default);
+        Assert.Equal("ok", r.Text);
     }
 
     [Fact]

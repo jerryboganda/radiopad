@@ -42,6 +42,10 @@ const DICTATION =
 const log = (m) => console.log(`[e2e ${new Date().toISOString().slice(11, 19)}] ${m}`);
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 
+/** Thrown inside a waitFor predicate to abort immediately instead of retrying to timeout —
+ *  for conditions that can only get worse (a dictation error banner is already showing). */
+class FatalError extends Error {}
+
 async function waitFor(what, fn, timeoutMs, intervalMs = 1000) {
   const deadline = Date.now() + timeoutMs;
   let lastErr;
@@ -50,6 +54,7 @@ async function waitFor(what, fn, timeoutMs, intervalMs = 1000) {
       const v = await fn();
       if (v) return v;
     } catch (e) {
+      if (e instanceof FatalError) throw e;
       lastErr = e;
     }
     await sleep(intervalMs);
@@ -265,12 +270,27 @@ async function main() {
   log(`bootstrapped org "${slug}" admin ${adminEmail}`);
 
   // 4. Launch the installed app. RADIOPAD_BACKEND points its webview at the sidecar (CSP
-  //    allows loopback); the WebView2 flag opens the devtools protocol for this process only.
+  //    allows loopback). The WebView2 flags: devtools protocol for this process only, plus
+  //    Chromium's fake media stack so the REAL mic button records the MedASR bundle's own
+  //    radiology dictation sample (%noloop = play once, then silence) with no permission UI.
+  const micWav = process.env.RADIOPAD_E2E_MIC_WAV;
+  if (!micWav || !existsSync(micWav)) {
+    throw new Error(
+      `RADIOPAD_E2E_MIC_WAV must point at the MedASR sample WAV (got: ${micWav ?? 'unset'}) — ` +
+      'the microphone phase is a mandatory part of this E2E');
+  }
+  // 16 kHz mono 16-bit PCM → 32000 bytes/second; record the whole utterance plus a tail.
+  const micMs = Math.ceil(((statSync(micWav).size - 44) / 32000) * 1000);
   const app = spawn(appExe, [], {
     env: {
       ...process.env,
       RADIOPAD_BACKEND: SIDECAR_URL,
-      WEBVIEW2_ADDITIONAL_BROWSER_ARGUMENTS: `--remote-debugging-port=${CDP_PORT}`,
+      WEBVIEW2_ADDITIONAL_BROWSER_ARGUMENTS: [
+        `--remote-debugging-port=${CDP_PORT}`,
+        '--use-fake-device-for-media-stream',
+        '--use-fake-ui-for-media-stream',
+        `--use-file-for-fake-audio-capture=${micWav}%noloop`,
+      ].join(' '),
     },
   });
   children.push([app, 'app']);
@@ -456,7 +476,98 @@ async function main() {
   if (!applied) throw new Error('applied draft content is not visible in the report editor');
   await cdp.screenshot('07-applied');
 
-  log('PASS: installed MSI → UI login (password + TOTP) → report → on-device MedGemma draft → applied');
+  // 13. Microphone dictation — the real capture path, not typed text. The fake audio device
+  //     plays the MedASR bundle's own radiology sample, so pressing the overlay's HQ mic
+  //     exercises getUserMedia → MediaRecorder → 16 kHz WAV encode → /api/stt/transcribe →
+  //     on-device MedASR decode → insertion into the focused section editor.
+  log(`mic phase: recording ~${Math.ceil(micMs / 1000)}s of the radiology sample through the fake microphone`);
+
+  // The transcript goes to the last-FOCUSED section editor — without one the overlay
+  // deliberately discards the recording. Use the empty "technique" section so the landing
+  // spot is unambiguous (the typed-dictation phase never wrote there, and its words overlap
+  // the sample's except "embolus").
+  const focused = await cdp.eval(`(() => {
+    const el = document.querySelector('[data-section-editor="technique"] .ProseMirror');
+    if (!el) return 'missing';
+    el.click();
+    el.focus();
+    return 'ok';
+  })()`);
+  if (focused !== 'ok') throw new Error('technique section editor not found to receive the dictation');
+
+  // Engine identity (model=medasr) is only in the network response — the DOM deliberately
+  // does not show it — so tap fetch and keep every /api/stt/transcribe response.
+  await cdp.eval(`(() => {
+    const orig = window.fetch.bind(window);
+    window.__e2eStt = [];
+    window.fetch = async (...a) => {
+      const r = await orig(...a);
+      try {
+        if (String(a[0]).includes('/api/stt/transcribe')) window.__e2eStt.push(await r.clone().json());
+      } catch {}
+      return r;
+    };
+    return true;
+  })()`);
+
+  const hqClick = () => cdp.eval(`(() => {
+    const b = document.querySelector('[data-testid="dictation-hq"]');
+    if (!b) return 'missing';
+    if (b.disabled) return 'disabled';
+    b.click();
+    return 'ok';
+  })()`);
+  const dictationError = async () => {
+    const err = await cdp.eval(
+      `document.querySelector('[data-testid="dictation-error"]')?.innerText ?? ''`);
+    if (err) throw new FatalError(`dictation error banner: ${err}`);
+  };
+
+  const hqStart = await hqClick();
+  if (hqStart !== 'ok') throw new Error(`HQ dictation button not clickable: ${hqStart}`);
+  // A mic-permission failure shows its own error text and the button never flips to Stop —
+  // distinguishable in the artifacts from a decode failure after recording.
+  await waitFor('HQ recording to start', async () => {
+    await dictationError();
+    return cdp.eval(
+      `document.querySelector('[data-testid="dictation-hq"]')?.getAttribute('aria-pressed') === 'true'`);
+  }, 20_000);
+  await cdp.screenshot('08-mic-recording');
+
+  await sleep(micMs + 3000); // let the fake device play the whole utterance, plus a tail
+  const hqStop = await hqClick();
+  if (hqStop !== 'ok') throw new Error(`HQ stop click failed: ${hqStop}`);
+
+  // Whole-buffer MedASR decode on CPU (the first request may also load the model).
+  await waitFor('mic transcript inserted into the technique section', async () => {
+    await dictationError();
+    return cdp.eval(
+      `/embolus/i.test(document.querySelector('[data-section-editor="technique"]')?.innerText ?? '')`);
+  }, 10 * 60_000, 5000);
+  await cdp.screenshot('09-mic-transcript');
+
+  const mic = await cdp.eval(`(() => ({
+    text: document.querySelector('[data-section-editor="technique"]')?.innerText ?? '',
+    stt: window.__e2eStt,
+  }))()`);
+  // Content-word assertions only — MedAsrEngineSmokeTests documents that CTC casing and
+  // punctuation are not contractually stable, and the client adds corrections/formatting.
+  for (const word of ['chest', 'lobe', 'right', 'embolus', 'pneumothorax']) {
+    if (!new RegExp(word, 'i').test(mic.text)) {
+      throw new Error(`mic transcript is missing expected content word "${word}" — got: ${mic.text.slice(0, 300)}`);
+    }
+  }
+  if (!mic.stt.length) throw new Error('no /api/stt/transcribe response captured — the mic path never reached the sidecar');
+  const wrongEngine = mic.stt.filter((r) => !/medasr/i.test(String(r.model ?? '')));
+  if (wrongEngine.length) {
+    // The exact audit-era failure mode: dictation silently served by the wrong engine while
+    // MedASR sits installed and idle.
+    throw new Error('STT served by something other than MedASR: ' +
+      JSON.stringify(wrongEngine.map((r) => ({ provider: r.provider, model: r.model }))));
+  }
+  log(`mic dictation decoded by "${mic.stt[mic.stt.length - 1].model}" and inserted into the report`);
+
+  log('PASS: installed MSI → UI login (password + TOTP) → report → on-device MedGemma draft → applied → mic dictation via MedASR');
 }
 
 try {

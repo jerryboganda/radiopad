@@ -25,8 +25,16 @@
   new `EnvSerializationConventionTests` (source scan + reflection) enforces the invariant on every
   CI run — locally verified to fail on a violation and pass at HEAD. Recorded as "prime suspect
   eliminated", NOT "flake resolved": the flake was never named; weekly `flaky-hunt` stays.
-- Honest state: `msi-e2e` and the latency instrumentation are wired but not yet observed green in
-  CI; the microphone capture path (press mic → MedASR through the UI) remains un-driven in CI.
+- **Microphone capture path driven too (same day):** the E2E's mic phase plays the MedASR
+  bundle's radiology sample through Chromium's fake audio device into the overlay's real HQ
+  button (after focusing the empty technique section — the overlay discards recordings with no
+  focused target), waits out the whole-buffer on-device decode, and asserts the transcript's
+  content words landed in that section AND that every `/api/stt/transcribe` response names
+  MedASR (fetch tap; the DOM hides engine identity) — the audit-era "wrong engine served
+  silently" failure mode is now a hard E2E failure.
+- Honest state: `msi-e2e` (incl. the mic phase — fake-device flags vs WebView2's permission
+  layer is the one CI-unconfirmed assumption; it fails distinguishably if wrong) and the latency
+  instrumentation are wired but not yet observed green in CI.
 
 ---
 

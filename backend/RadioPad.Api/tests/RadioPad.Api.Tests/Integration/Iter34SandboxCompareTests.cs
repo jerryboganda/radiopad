@@ -43,8 +43,9 @@ public class Iter34SandboxCompareTests : IClassFixture<RadioPadAppFactory>
     }
 
     [Fact]
-    public async Task Returns_400_When_Any_Provider_Is_Not_Sandbox()
+    public async Task Allows_Mixed_Compliance_Classes()
     {
+        // Compliance-class restriction removed (operator decision 2026-07-20).
         await SetSandboxFlagAsync(true);
         var (sandboxA, _) = await EnsureSandboxProvidersAsync();
         var deidProviderId = await EnsureProviderAsync(
@@ -59,9 +60,9 @@ public class Iter34SandboxCompareTests : IClassFixture<RadioPadAppFactory>
             providerIds = new[] { sandboxA, deidProviderId },
         });
 
-        Assert.Equal(HttpStatusCode.BadRequest, resp.StatusCode);
+        Assert.Equal(HttpStatusCode.OK, resp.StatusCode);
         using var doc = await JsonDocument.ParseAsync(await resp.Content.ReadAsStreamAsync());
-        Assert.Equal("providers_not_sandbox", doc.RootElement.GetProperty("kind").GetString());
+        Assert.Equal(2, doc.RootElement.GetProperty("runs").GetArrayLength());
     }
 
     [Fact]
@@ -104,8 +105,10 @@ public class Iter34SandboxCompareTests : IClassFixture<RadioPadAppFactory>
     }
 
     [Fact]
-    public async Task Refuses_DeIdentifiedOnly_Providers_When_Phi_Present()
+    public async Task Allows_DeIdentifiedOnly_Providers_When_Phi_Present()
     {
+        // PHI gate removed (operator decision 2026-07-20): PHI reports may be
+        // compared on any enabled provider.
         await SetSandboxFlagAsync(true);
         var deidA = await EnsureProviderAsync("iter34-deid-a", ProviderComplianceClass.DeIdentifiedOnly);
         var deidB = await EnsureProviderAsync("iter34-deid-b", ProviderComplianceClass.DeIdentifiedOnly);
@@ -119,11 +122,9 @@ public class Iter34SandboxCompareTests : IClassFixture<RadioPadAppFactory>
             providerIds = new[] { deidA, deidB },
         });
 
-        // Endpoint refuses non-sandbox providers up-front — PHI never
-        // reaches the gateway because compliance fails the validation gate.
-        Assert.Equal(HttpStatusCode.BadRequest, resp.StatusCode);
+        Assert.Equal(HttpStatusCode.OK, resp.StatusCode);
         using var doc = await JsonDocument.ParseAsync(await resp.Content.ReadAsStreamAsync());
-        Assert.Equal("providers_not_sandbox", doc.RootElement.GetProperty("kind").GetString());
+        Assert.Equal(2, doc.RootElement.GetProperty("runs").GetArrayLength());
     }
 
     // ===== helpers =====

@@ -7,7 +7,7 @@ These rules apply to every AI coding agent (Claude Code, Cursor, Codex, Gemini, 
 ## Hard rules
 
 1. **Never auto-sign reports.** RadioPad is human-in-the-loop. AI text wears `.ai-mark` until acknowledged.
-2. **Never weaken or bypass the PHI policy.** `AiGateway.EnforcePhiPolicy` is the cornerstone of clinical safety. The gate must audit `ProviderBlocked` before rethrowing `ProviderPolicyException`.
+2. **PHI gate removed (operator decision 2026-07-20).** `AiGateway` no longer blocks requests by compliance class or PHI content; only the per-provider `Enabled` toggle applies. Do not reintroduce the gate without an explicit operator request.
 3. **Never modify the audit log destructively.** `AuditEvents` is append-only; SHA-256 chain. Use `IAuditLog.AppendAsync`.
 4. **Never invent API contracts.** Update `openapi/openapi.yaml` and `docs/03-architecture/api-reference.md` when changing the API.
 5. **Never invent rulebook semantics.** Rulebook YAML schema and approval flow live in `docs/05-clinical/rulebook-authoring.md`.

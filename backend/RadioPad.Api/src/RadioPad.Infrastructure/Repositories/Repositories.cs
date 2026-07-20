@@ -300,15 +300,11 @@ public class EfProviderRouter : IProviderRouter
         var rankings = new List<ProviderRanking>(providers.Count);
         foreach (var p in providers)
         {
+            // PHI/compliance eligibility filters removed (operator decision
+            // 2026-07-20) — every provider is eligible regardless of
+            // compliance class or PHI content.
             string? ineligible = null;
-            if (p.Compliance == ProviderComplianceClass.Blocked)
-                ineligible = "compliance_blocked";
-            else if (containsPhi && p.Compliance is not (ProviderComplianceClass.PhiApproved or ProviderComplianceClass.LocalOnly))
-                ineligible = "phi_not_allowed";
-            else if (!containsPhi && tenant.RequirePhiApprovedProvider
-                     && p.Compliance is not (ProviderComplianceClass.PhiApproved or ProviderComplianceClass.LocalOnly or ProviderComplianceClass.DeIdentifiedOnly))
-                ineligible = "tenant_requires_phi_grade_provider";
-            else if (failingProviders.Contains(p.Name))
+            if (failingProviders.Contains(p.Name))
                 ineligible = "recent_failures";
 
             var costPerCall = (p.CostPerInputKToken * estimatedInputTokens / 1000m)
@@ -459,9 +455,7 @@ public class EfRoutingPreviewService : IRoutingPreviewService
         return new RoutingPreview(
             SelectedProviderId: winner?.Provider.Id,
             SelectedProviderName: winner?.Provider.Name,
-            Reason: winner is null
-                ? (containsPhi ? "no_phi_eligible_provider" : "no_eligible_provider")
-                : "composite_score",
+            Reason: winner is null ? "no_eligible_provider" : "composite_score",
             Candidates: candidates,
             Weights: w);
     }

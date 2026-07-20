@@ -81,8 +81,7 @@ public sealed class OpenAiCompatibleProvider : IAiProviderAdapter, IAiProviderHe
         var p = request.Provider;
         if (string.IsNullOrWhiteSpace(p.EndpointUrl))
             throw new ProviderTransportException($"{AdapterId}: provider '{p.Name}' is missing an endpoint URL.");
-        if (request.ContainsPhi && p.Compliance != ProviderComplianceClass.LocalOnly && Environment.GetEnvironmentVariable("RADIOPAD_OPENAI_COMPATIBLE_ALLOW_PHI") != "1")
-            throw new ProviderPolicyException($"{AdapterId}: phi_requires_reviewed_provider");
+        // Adapter-level PHI refusal removed (operator decision 2026-07-20).
 
         var baseUrl = p.EndpointUrl.TrimEnd('/');
         var model = string.IsNullOrWhiteSpace(p.Model) ? "default" : p.Model;

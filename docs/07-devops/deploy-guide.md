@@ -64,7 +64,6 @@ All knobs are environment variables:
 | `RADIOPAD_CLI_PROVIDER_ALLOWED_PATHS` | required for production CLI providers | Semicolon-separated allowlist for CLI binaries; must list the EXACT resolved binary path (matched against `RADIOPAD_GEMINI_BIN`). Missing production allowlists and unlisted binaries are blocked. The VPS compose defaults both this and `RADIOPAD_GEMINI_BIN` to `/usr/local/bin/gemini` (the gemini binary baked into the api image) so gemini-cli works out of the box. |
 | `RADIOPAD_CLI_PROVIDER_ENV_ALLOWLIST` | optional | Extra env vars passed to CLI subprocesses beyond OS basics. Keep minimal and provider-specific. |
 | `RADIOPAD_CODEX_CLI_ENABLED` | optional | Defaults `0`; must be `1` before `codex-cli` executes. |
-| `RADIOPAD_OPENAI_COMPATIBLE_ALLOW_PHI` | optional | Defaults `0`; set only after reviewed approval for a remote OpenAI-compatible PHI endpoint. |
 | `RADIOPAD_UBAG_BASE_URL` | optional | UBAG gateway base URL. Production uses the internal docker-network address `http://ubag-vps-gateway-1:8080` (see "UBAG production wiring" below); the public `https://ubag.polytronx.com` is behind operator Basic-auth and must not be used by RadioPad. Backend only; never expose this as a frontend public env var. |
 | `RADIOPAD_UBAG_API_VERSION` | optional | Defaults `2026-05-22`; sent in UBAG job/workflow envelopes. |
 | `RADIOPAD_UBAG_TIMEOUT_MS` | optional | Defaults `120000`; HTTP timeout and adapter polling budget. |

@@ -260,7 +260,10 @@ jobs:
   # sidecar expects them (%LOCALAPPDATA%\com.radiopad.desktop — so the UI's Format action runs
   # the REAL MedGemma, not the 502 fail-safe), then drives the installed app's renderer over
   # the WebView2 devtools protocol: login (including the mandatory TOTP enrollment, computed
-  # from the secret the UI shows) → report → dictation draft panel → on-device format → apply.
+  # from the secret the UI shows) → report → dictation draft panel → on-device format → apply
+  # → MICROPHONE dictation (Chromium's fake audio device plays the MedASR bundle's radiology
+  # sample into the real HQ mic button; the decoded transcript must land in the focused
+  # section and every /api/stt/transcribe response must come from MedASR).
   # scripts/desktop-msi-e2e.mjs is the driver — dependency-free Node 22, raw CDP.
   #
   # The webview uses the bundled sidecar as its data backend (RADIOPAD_BACKEND=loopback, which
@@ -333,7 +336,10 @@ jobs:
           if ($LASTEXITCODE -ne 0) { throw "MedASR model download failed" }
           curl.exe -fL "$base/tokens.txt" -o medasr-model/tokens.txt
           if ($LASTEXITCODE -ne 0) { throw "MedASR tokens download failed" }
+          # The sample WAV is NOT best-effort here: the E2E's microphone phase plays it as
+          # the fake capture device, so a missing file must fail now, not mid-drive.
           curl.exe -fL "$base/test_wavs/0.wav" -o medasr-model/test_wavs/0.wav
+          if ($LASTEXITCODE -ne 0) { throw "MedASR sample wav download failed" }
           $h = (Get-FileHash -Algorithm SHA256 medasr-model/model.int8.onnx).Hash
           if ($h -ine $env:MEDASR_SHA) { throw "MedASR SHA mismatch: $h" }
 
@@ -397,6 +403,9 @@ jobs:
           # On tag builds this job gates the release, so the script's headless-webview
           # tolerance is disabled — a renderer that never came up must FAIL, not warn.
           RADIOPAD_E2E_STRICT: ${{ startsWith(github.ref, 'refs/tags/') && '1' || '0' }}
+          # The MedASR bundle's own radiology dictation sample, played by Chromium's fake
+          # audio device so the REAL mic button records real speech (mandatory phase).
+          RADIOPAD_E2E_MIC_WAV: ${{ github.workspace }}/medasr-model/test_wavs/0.wav
         run: node scripts/desktop-msi-e2e.mjs
 
       - name: Uninstall the MSI

@@ -54,7 +54,7 @@ public sealed class GeminiCliProvider : IAiProviderAdapter, IAiProviderHealthPro
 
     public async Task<AiResult> CompleteAsync(AiCompletionRequest request, CancellationToken cancellationToken)
     {
-        CliProviderRunner.EnforceRequestPolicy(AdapterId, request, allowPhi: true);
+        CliProviderRunner.EnforceRequestPolicy(AdapterId, request);
         var p = request.Provider;
         var bin = CliProviderRunner.ResolveBinary(BinaryEnvVar, DefaultBinary);
         CliProviderRunner.EnforceBinaryAllowlist(AdapterId, bin);
