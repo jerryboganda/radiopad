@@ -26,6 +26,7 @@ namespace RadioPad.Api.Tests.Iter33;
 ///   sink-side analysts see the well-known action label), message embedded
 ///   as the action name <c>radiopad-iter33-smoke</c>.
 /// </summary>
+[Collection(RadioPad.Api.Tests.Infrastructure.EnvironmentVariableCollection.Name)]
 public sealed class SiemLiveSmokeTests
 {
     private const string Gate = "RADIOPAD_RUN_SIEM_LIVE";

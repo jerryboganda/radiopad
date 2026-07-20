@@ -24,6 +24,7 @@ namespace RadioPad.Api.Tests.Iter35;
 /// <see cref="OAuthRefreshRotationService"/> scan loop driven by a
 /// fake <see cref="IOAuthTokenIssuer"/>.
 /// </summary>
+[Collection(RadioPad.Api.Tests.Infrastructure.EnvironmentVariableCollection.Name)]
 public class Iter35OAuthVaultTests
 {
     private const string KekEnvName = "RADIOPAD_TENANT_KEK_DEFAULT";

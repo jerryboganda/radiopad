@@ -14,6 +14,7 @@ namespace RadioPad.Api.Tests.Iter33;
 /// Iter-33 INT-007 — vendor PACS adapter tests. HTTP traffic is stubbed
 /// via <see cref="StubHandler"/>; no real PACS / vendor server is contacted.
 /// </summary>
+[Collection(RadioPad.Api.Tests.Infrastructure.EnvironmentVariableCollection.Name)]
 public class PacsVendorAdaptersTests
 {
     private sealed class StubHandler : HttpMessageHandler

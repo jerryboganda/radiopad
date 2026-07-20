@@ -469,6 +469,7 @@ public class SiemExportTests : IClassFixture<RadioPadAppFactory>
     }
 }
 
+[Collection(RadioPad.Api.Tests.Infrastructure.EnvironmentVariableCollection.Name)]
 public class ScimUsersTests : IClassFixture<RadioPadAppFactory>
 {
     private const string Bearer = "test-scim-bearer-token";
@@ -811,6 +812,7 @@ public class ScimUsersTests : IClassFixture<RadioPadAppFactory>
     }
 }
 
+[Collection(RadioPad.Api.Tests.Infrastructure.EnvironmentVariableCollection.Name)]
 public class SecurityWebhookAdminTests : IClassFixture<RadioPadAppFactory>
 {
     private readonly RadioPadAppFactory _factory;
@@ -998,6 +1000,7 @@ internal static class TaskAwaitHelper
     public static T Let<T>(this object self, Func<object, T> f) => f(self);
 }
 
+[Collection(RadioPad.Api.Tests.Infrastructure.EnvironmentVariableCollection.Name)]
 public class CmkVerifyTests : IClassFixture<RadioPadAppFactory>
 {
     private readonly RadioPadAppFactory _factory;
@@ -1042,6 +1045,7 @@ public class CmkVerifyTests : IClassFixture<RadioPadAppFactory>
     }
 }
 
+[Collection(RadioPad.Api.Tests.Infrastructure.EnvironmentVariableCollection.Name)]
 public class AuthFlowsTests : IClassFixture<RadioPadAppFactory>
 {
     private readonly RadioPadAppFactory _factory;

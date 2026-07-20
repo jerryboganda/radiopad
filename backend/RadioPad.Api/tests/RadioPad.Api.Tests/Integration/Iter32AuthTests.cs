@@ -180,6 +180,7 @@ public class Iter32AccountLockoutTests : IClassFixture<RadioPadAppFactory>
 /// <see cref="OidcProfiles.ApplyToEnvironment"/> populates env vars
 /// without overwriting operator-supplied overrides.
 /// </summary>
+[Collection(RadioPad.Api.Tests.Infrastructure.EnvironmentVariableCollection.Name)]
 public class Iter32OidcPresetTests
 {
     [Fact]

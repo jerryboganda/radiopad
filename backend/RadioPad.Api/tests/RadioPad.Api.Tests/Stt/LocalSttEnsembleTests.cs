@@ -11,6 +11,7 @@ namespace RadioPad.Api.Tests;
 /// two hypotheses (ensemble on, ≥2 engines) or transcribes single-engine. Uses
 /// fake engines; the real engines are tested separately.
 /// </summary>
+[Collection(RadioPad.Api.Tests.Infrastructure.EnvironmentVariableCollection.Name)]
 public class LocalSttEnsembleTests
 {
     private sealed class FakeEngine : ILocalSttEngine

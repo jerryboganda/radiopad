@@ -10,6 +10,7 @@ namespace RadioPad.Api.Tests.Integration;
 /// <c>RadioPad.Cli.PluginVerifier</c>; here we verify the wire format and
 /// trust-model edges (missing key, hash mismatch, signature mismatch).
 /// </summary>
+[Collection(RadioPad.Api.Tests.Infrastructure.EnvironmentVariableCollection.Name)]
 public class PacsPluginsVerifierTests
 {
     [Fact]

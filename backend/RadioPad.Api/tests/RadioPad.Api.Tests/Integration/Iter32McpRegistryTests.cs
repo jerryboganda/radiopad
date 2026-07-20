@@ -17,6 +17,7 @@ namespace RadioPad.Api.Tests.Integration;
 /// Iter-32 MCP-001..007 — registry hardening: lifecycle status, manifest
 /// signing, default-deny scope policy, sandbox runner, invocation audit.
 /// </summary>
+[Collection(RadioPad.Api.Tests.Infrastructure.EnvironmentVariableCollection.Name)]
 public class Iter32McpRegistryTests : IClassFixture<RadioPadAppFactory>
 {
     private readonly RadioPadAppFactory _factory;

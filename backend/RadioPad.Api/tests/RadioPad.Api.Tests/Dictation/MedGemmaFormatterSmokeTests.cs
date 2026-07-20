@@ -21,6 +21,7 @@ namespace RadioPad.Api.Tests;
 /// for NOT fabricating a section, and before that the engine routing silently used the wrong
 /// model. These are integration properties — each unit was green while the system was broken.</para>
 /// </summary>
+[Collection(RadioPad.Api.Tests.Infrastructure.EnvironmentVariableCollection.Name)]
 public class MedGemmaFormatterSmokeTests
 {
     private readonly Xunit.Abstractions.ITestOutputHelper _out;
@@ -69,8 +70,14 @@ public class MedGemmaFormatterSmokeTests
             SectionKeys: DictationGrammar.DefaultSections,
             Grammar: DictationGrammar.ReportSectionsGbnf);
 
+        var sw = System.Diagnostics.Stopwatch.StartNew();
         var draft = await engine.RunAsync(
             Dictation, context, Array.Empty<CorrectionRule>(), patientSex: "F", formatter, CancellationToken.None);
+        sw.Stop();
+        // Greppable marker consumed by offline-formatter-smoke.yml, which publishes the number to
+        // its job summary — closes the "MedGemma latency unmeasured" half of §7 item 4. The server
+        // is already warm when this runs, so this is per-call §4.2 pipeline latency, not model load.
+        _out.WriteLine($"medgemma_format_ms={sw.ElapsedMilliseconds}");
 
         foreach (var (k, v) in draft.DraftSections)
             _out.WriteLine($"[{k}] {v}");
@@ -123,9 +130,12 @@ public class MedGemmaFormatterSmokeTests
         var context = new DictationFormatContext(
             "CT", "Chest", "Screening", DictationGrammar.DefaultSections, DictationGrammar.ReportSectionsGbnf);
 
+        var sw = System.Diagnostics.Stopwatch.StartNew();
         var draft = await engine.RunAsync(
             "CT chest. There is a nodule in the right upper lobe. No pneumothorax.",
             context, Array.Empty<CorrectionRule>(), null, formatter, CancellationToken.None);
+        sw.Stop();
+        _out.WriteLine($"medgemma_format_ms={sw.ElapsedMilliseconds}");
 
         foreach (var (k, v) in draft.DraftSections) _out.WriteLine($"[{k}] {v}");
 

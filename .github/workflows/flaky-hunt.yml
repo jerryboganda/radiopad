@@ -14,6 +14,15 @@
 # bit this repo once (hence EnvironmentVariableCollection with DisableParallelization). A test that
 # sets an env var without that collection attribute will fail only when it races a test that reads
 # it — exactly the once-in-four signature.
+#
+# 2026-07-20: that suspect class was audited exhaustively rather than waited on. ~20 env-mutating
+# test classes sat OUTSIDE any parallel-disabled collection (three files shared
+# STRIPE_WEBHOOK_SECRET with only partial coverage; "OrgCreationSerial" had no CollectionDefinition
+# at all, so its serialization was members-only). All are now serialized, and
+# EnvSerializationConventionTests enforces the invariant on every run — a new env-mutating test
+# without the collection fails CI with instructions instead of becoming the next unnamed flake.
+# The original flake was never reproduced or NAMED, so this fix is recorded as "prime suspect
+# eliminated", not "flake resolved" — this job stays as the watchdog that would name a survivor.
 name: flaky-hunt
 
 on:

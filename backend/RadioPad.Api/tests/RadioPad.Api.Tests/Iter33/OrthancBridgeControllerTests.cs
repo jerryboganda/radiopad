@@ -18,6 +18,7 @@ namespace RadioPad.Api.Tests.Iter33;
 /// HTTP pipeline. Verifies bearer auth (constant-time), audit emission, and
 /// HL7 outbox handoff for a synthetic DICOM SR.
 /// </summary>
+[Collection(RadioPad.Api.Tests.Infrastructure.EnvironmentVariableCollection.Name)]
 public class OrthancBridgeControllerTests : IClassFixture<RadioPadAppFactory>, IDisposable
 {
     private readonly RadioPadAppFactory _factory;

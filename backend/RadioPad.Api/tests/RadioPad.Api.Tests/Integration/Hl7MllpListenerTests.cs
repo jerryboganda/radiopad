@@ -13,6 +13,7 @@ namespace RadioPad.Api.Tests.Integration;
 /// Iter-31 INT-006 — verifies MLLP framing roundtrip, ORU^R01 parsing into
 /// a Draft <see cref="Report"/>, ACK shape, and accession-number dedupe.
 /// </summary>
+[Collection(RadioPad.Api.Tests.Infrastructure.EnvironmentVariableCollection.Name)]
 public class Hl7MllpListenerTests : IClassFixture<RadioPadAppFactory>
 {
     private const string Facility = "GENERAL_HOSPITAL_RAD";

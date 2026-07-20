@@ -4,6 +4,32 @@
 
 ---
 
+## The three §8b verification gaps closed end to end (2026-07-20)
+
+- **MSI install + renderer-driven E2E** — new `msi-e2e` job in `desktop-bundle.yml` + driver
+  `scripts/desktop-msi-e2e.mjs` (dependency-free Node 22, raw CDP). Installs the actual `.msi`,
+  pre-places the pinned MedGemma/llama-server/MedASR artefacts where the sidecar resolves them,
+  then drives the INSTALLED renderer: UI login including mandatory TOTP enrollment (code computed
+  from the secret the UI shows), report seeding with the UI-minted token, dictation draft panel,
+  on-device toggle, a REAL MedGemma format that must pass the safety validator, `.ai-mark` /
+  "3.2 cm" / "Requires review" assertions, Apply, screenshots at every milestone, uninstall.
+  `release` now depends on it — an installer whose UI cannot complete a draft is not published.
+- **MedGemma formatting latency instrumented** — `MedGemmaFormatterSmokeTests` emits
+  `medgemma_format_ms=` per §4.2 format call; `offline-formatter-smoke.yml` publishes the numbers
+  to its job summary weekly (server warm, so per-call latency) and fails on >10 min/call or a
+  missing marker. First numbers land on that workflow's next run.
+- **Flaky-test prime suspect eliminated** — audit found ~20 env-mutating test classes outside any
+  parallel-disabled collection (three files sharing `STRIPE_WEBHOOK_SECRET` only partially covered;
+  `"OrgCreationSerial"` had no CollectionDefinition, i.e. members-only serialization). All
+  serialized into `EnvironmentVariableCollection` (or a now-parallel-disabled collection), and the
+  new `EnvSerializationConventionTests` (source scan + reflection) enforces the invariant on every
+  CI run — locally verified to fail on a violation and pass at HEAD. Recorded as "prime suspect
+  eliminated", NOT "flake resolved": the flake was never named; weekly `flaky-hunt` stays.
+- Honest state: `msi-e2e` and the latency instrumentation are wired but not yet observed green in
+  CI; the microphone capture path (press mic → MedASR through the UI) remains un-driven in CI.
+
+---
+
 ## F6 delivered + the three unverified claims closed (2026-07-20)
 
 - **F6 — rulebook validation on the dictation path.** The one planned feature recorded in neither

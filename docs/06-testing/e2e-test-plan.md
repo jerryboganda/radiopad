@@ -1,15 +1,29 @@
 # End-to-End Test Plan
 
-**Status:** Draft  ·  **Owner:** Engineering + QA  ·  **Last Updated:** 2026-05-04
+**Status:** Partially implemented  ·  **Owner:** Engineering + QA  ·  **Last Updated:** 2026-07-20
 
 ## Scope
 
 Browser-driven flows that exercise the static export against a running backend.
 
+## What ships today (2026-07-20)
+
+**Desktop MSI E2E** — implemented, not planned. `desktop-bundle.yml`'s `msi-e2e` job installs the
+actual Windows `.msi` on every tag push, pre-places the pinned on-device models, and
+[`scripts/desktop-msi-e2e.mjs`](../../scripts/desktop-msi-e2e.mjs) (dependency-free Node 22
+driving the WebView2 devtools protocol) exercises the installed renderer: UI login including the
+mandatory TOTP enrollment, report creation, the dictation draft panel, a real on-device MedGemma
+format that must pass the safety validator (`.ai-mark`, "Requires review", spoken-measurement
+normalization asserted), and Apply. The desktop release job depends on it. Screenshots and logs
+are uploaded as the `msi-e2e-evidence` artifact.
+
+Not covered by it: the microphone capture path (dictation is seeded as text — audio-device
+injection is not wired) and the web/mobile surfaces.
+
 ## Tooling
 
-- Playwright (planned).
-- One project for the web app; reuses the Tauri bundle for desktop smoke (Phase 3).
+- Desktop: raw CDP via `scripts/desktop-msi-e2e.mjs` (see above) — no framework, no npm deps.
+- Web: Playwright (still planned).
 
 ## Flows to cover
 

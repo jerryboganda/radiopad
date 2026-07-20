@@ -17,6 +17,7 @@ namespace RadioPad.Api.Tests.Providers;
 /// but since 2026-07-11 their Enabled flag mirrors live login state, and a logout
 /// transition audits + alerts the operator (throttled email + Hub banner).
 /// </summary>
+[Collection(RadioPad.Api.Tests.Infrastructure.EnvironmentVariableCollection.Name)]
 public class UbagProviderDiscoveryServiceTests
 {
     private static readonly Guid Tenant = Guid.Parse("11111111-1111-1111-1111-111111111111");

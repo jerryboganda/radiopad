@@ -9,6 +9,7 @@ using Xunit;
 
 namespace RadioPad.Api.Tests.Providers;
 
+[Collection(RadioPad.Api.Tests.Infrastructure.EnvironmentVariableCollection.Name)]
 public class GoogleVertexAiProviderTests
 {
     private const string OkBody = """

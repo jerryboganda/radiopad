@@ -236,8 +236,12 @@ Capabilities under the gate:
    bundle's radiology sample — took **53.6 s on 4 CPU-only cores** (AMD EPYC 7763). That is suite
    wall-clock, not per-utterance inference, and one runner is not a workstation; treat it as the
    order of magnitude and as a canary against a silent provider fallback, not as an SLA. The
-   workflow publishes the number to its job summary weekly. **MedGemma formatting latency remains
-   unmeasured** — it needs the 2.5 GB model, so it belongs in `offline-formatter-smoke`.
+   workflow publishes the number to its job summary weekly. **MedGemma formatting latency is now
+   instrumented (2026-07-20):** `MedGemmaFormatterSmokeTests` times each §4.2 format call
+   (`medgemma_format_ms=` marker) and `offline-formatter-smoke.yml` publishes the numbers to its
+   job summary weekly — server already warm, so per-call pipeline latency, not model load — and
+   fails on >10 min/call. A missing marker fails the job rather than publishing nothing. First
+   actual numbers land on that workflow's next run; none observed yet.
 5. ~~**llama-server binary bundling in CI.**~~ **RESOLVED** — provisioned on demand instead of
    bundled, pinned to `b10068`; `offline-formatter-smoke.yml` exercises the full §4.2 pipeline.
 
@@ -306,6 +310,26 @@ Capabilities under the gate:
   full run and did not reproduce across three subsequent clean runs — recorded as a known flake,
   **not** as resolved, because I could not identify it.
 
+- **2026-07-20 — the three remaining §8b gaps closed end to end.** (1) **MSI E2E:**
+  `desktop-bundle.yml` gained an `msi-e2e` job — installs the actual `.msi`, pre-places the pinned
+  MedGemma GGUF + llama-server runtime + MedASR bundle under `%LOCALAPPDATA%\com.radiopad.desktop`
+  (cache keys shared with the ubuntu smokes), then `scripts/desktop-msi-e2e.mjs` (dependency-free
+  Node 22, raw CDP over `WEBVIEW2_ADDITIONAL_BROWSER_ARGUMENTS`) drives the INSTALLED renderer:
+  UI login including the mandatory TOTP enrollment (code computed from the secret the UI shows),
+  report seeding via the token the UI's own login minted, the dictation draft panel with the
+  on-device toggle, a real MedGemma format ("Passed the safety validator" required — fallback or
+  error fails), `.ai-mark`/"3.2 cm"/"Requires review" assertions, and Apply. The webview talks to
+  the bundled sidecar as its data backend (`RADIOPAD_BACKEND` loopback, CSP-allowed); the sidecar
+  is pre-started with a bootstrap secret + throwaway SQLite DB and the shell adopts it. `release`
+  now depends on `msi-e2e`, so an installer whose UI cannot complete a draft is not published.
+  (2) **MedGemma latency instrumented** — §7 item 4. (3) **Flaky-test prime suspect eliminated:**
+  the audit found ~20 env-mutating test classes outside any parallel-disabled collection —
+  including three files sharing `STRIPE_WEBHOOK_SECRET` with only partial coverage, and
+  `"OrgCreationSerial"` having **no CollectionDefinition at all** (members-only serialization) —
+  all now serialized, and `EnvSerializationConventionTests` (source-scan + reflection) enforces
+  the invariant on every run; verified locally that it fails on a violation and passes at HEAD.
+  Deliberately NOT recorded as "flake resolved": the flake was never named.
+
 ---
 
 ## 8b. Verification gaps closed 2026-07-20 (and what is still open)
@@ -327,9 +351,18 @@ Three things had been true all session and none of them were checked:
   the workflow: an env-mutating test missing `EnvironmentVariableCollection`, which produces exactly
   this once-in-several signature and has bitten this repo before.
 
-Still open, honestly: **no CI installs the MSI and drives the UI** (the launch smoke runs the built
-binary, not the installed product, and never exercises the renderer), and **MedGemma latency** is
-unmeasured.
+**All three closed on 2026-07-20** (see the change-log entry): the `msi-e2e` job installs the
+actual MSI and drives the installed renderer end to end over CDP (login incl. mandatory TOTP
+enrollment → report → dictation draft panel → real on-device MedGemma format → Apply), and
+`release` now depends on it; MedGemma latency is instrumented in `offline-formatter-smoke`; the
+flaky-test prime suspect was eliminated by serializing every env-mutating test class, with
+`EnvSerializationConventionTests` enforcing the invariant.
+
+Still open, honestly: the `msi-e2e` job and the latency instrumentation are **wired but not yet
+observed green** — the next tag push / weekly run is the evidence; the **microphone capture path**
+(press mic → MedASR decode through the UI) is still not driven in CI — the E2E seeds dictation as
+text, so audio-device injection remains uncovered; and the original flake was never **named**, so
+"prime suspect eliminated" is not "flake resolved" — flaky-hunt stays as the watchdog.
 
 ## 9. The pattern this build kept producing (read before the next change)
 

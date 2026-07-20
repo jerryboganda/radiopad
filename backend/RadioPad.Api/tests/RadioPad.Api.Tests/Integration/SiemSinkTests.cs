@@ -12,6 +12,7 @@ namespace RadioPad.Api.Tests.Integration;
 /// captured by an in-memory <see cref="IUdpSender"/>. Real endpoints are
 /// never contacted.
 /// </summary>
+[Collection(RadioPad.Api.Tests.Infrastructure.EnvironmentVariableCollection.Name)]
 public class SiemSinkTests : IDisposable
 {
     public SiemSinkTests()

@@ -191,6 +191,7 @@ public class KmsGcpAdapterTests
     }
 }
 
+[Collection(RadioPad.Api.Tests.Infrastructure.EnvironmentVariableCollection.Name)]
 public class KmsEnvelopeRoundTripTests
 {
     [Fact]

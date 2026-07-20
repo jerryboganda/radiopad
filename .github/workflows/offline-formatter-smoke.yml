@@ -107,13 +107,58 @@ jobs:
           done
           echo "llama-server never became healthy"; tail -50 llama-server.log; exit 1
 
+      - name: Record the runner's actual capability
+        shell: bash
+        run: |
+          {
+            echo "### Runner"
+            echo ""
+            echo "| | |"
+            echo "|---|---|"
+            echo "| cores | $(nproc) |"
+            echo "| cpu | $(grep -m1 'model name' /proc/cpuinfo | cut -d: -f2- | xargs) |"
+            echo "| memory | $(free -g | awk '/^Mem:/{print $2}') GB |"
+          } >> "$GITHUB_STEP_SUMMARY"
+
       - name: Run the offline formatter smoke through the full §4.2 pipeline
         working-directory: backend/RadioPad.Api
         env:
           RADIOPAD_MEDGEMMA_SMOKE_URL: http://127.0.0.1:8080
         run: |
+          set -euo pipefail
           dotnet test --filter "FullyQualifiedName~MedGemmaFormatterSmokeTests" -c Release \
-            --logger "console;verbosity=detailed"
+            --logger "console;verbosity=detailed" | tee "$RUNNER_TEMP/formatter-smoke.log"
+
+      - name: Publish MedGemma formatting latency
+        # Closes IMPLEMENTATION_NOTES §7 item 4's unmeasured half. The llama-server is already
+        # warm (health-checked above), so each number is per-call §4.2 pipeline latency —
+        # inference + safety layers — not model load. Same stance as on-device-latency.yml:
+        # an order-of-magnitude canary on a pessimistic CPU-only runner, not a clinical SLA.
+        shell: bash
+        run: |
+          set -euo pipefail
+          mapfile -t times < <(grep -oE 'medgemma_format_ms=[0-9]+' "$RUNNER_TEMP/formatter-smoke.log" | cut -d= -f2)
+          if [ "${#times[@]}" -eq 0 ]; then
+            # A missing measurement must FAIL, not silently publish nothing — the marker is
+            # emitted by MedGemmaFormatterSmokeTests, which provably ran (the step above passed).
+            echo "::error::no medgemma_format_ms marker in the test output — the latency measurement is mis-wired"
+            exit 1
+          fi
+          {
+            echo ""
+            echo "### MedGemma offline formatting latency (§4.2 pipeline, server warm, CPU-only)"
+            echo ""
+            echo "| format call | ms |"
+            echo "|---|---|"
+            i=1; for t in "${times[@]}"; do echo "| $i | $t |"; i=$((i+1)); done
+          } >> "$GITHUB_STEP_SUMMARY"
+          for t in "${times[@]}"; do
+            if [ "$t" -gt 600000 ]; then
+              echo "::error::a single MedGemma format took ${t} ms (>10 min) on a CPU-only runner — investigate before shipping"
+              exit 1
+            fi
+          done
+          echo "::notice::MedGemma format latency: ${times[*]} ms on $(nproc) cores"
 
       - name: llama-server log on failure
         if: failure()
