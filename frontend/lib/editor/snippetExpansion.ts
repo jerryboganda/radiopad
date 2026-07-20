@@ -15,7 +15,8 @@
 import { Extension, type Editor } from '@tiptap/core';
 import type { Node as PmNode } from '@tiptap/pm/model';
 import { stringToDoc } from '@/lib/editor/plainText';
-import { findSnippetByTrigger, findFields, type Snippet } from '@/lib/snippets';
+import { findFields } from '@/lib/snippets';
+import { resolveTrigger } from '@/lib/sharedMacros';
 
 /** The whitespace-delimited word immediately before the caret (the candidate trigger). */
 export function triggerWordBefore(textBeforeCaret: string): string {
@@ -23,14 +24,20 @@ export function triggerWordBefore(textBeforeCaret: string): string {
   return m ? m[1] : '';
 }
 
-/** The snippet whose trigger is the word right before the caret, or null. Reads the local store. */
+/**
+ * The expansion for the word right before the caret, or null.
+ *
+ * Resolution order (RPT-021): the radiologist's own device-local snippet, then
+ * a subspecialty macro, then a tenant-wide macro — so a personal snippet always
+ * overrides a departmental one without needing an admin.
+ */
 export function computeTriggerExpansion(
   textBeforeCaret: string,
-): { word: string; snippet: Snippet } | null {
+): { word: string; body: string; source: 'personal' | 'subspecialty' | 'tenant' } | null {
   const word = triggerWordBefore(textBeforeCaret);
   if (!word) return null;
-  const snippet = findSnippetByTrigger(word);
-  return snippet ? { word, snippet } : null;
+  const hit = resolveTrigger(word);
+  return hit ? { word, body: hit.body, source: hit.source } : null;
 }
 
 export interface PmFieldRange {
@@ -92,7 +99,7 @@ export const SnippetExpansion = Extension.create({
               .focus()
               // Build the paragraphs explicitly rather than handing Tiptap a raw string, so a
               // multi-line canned block keeps its lines regardless of Tiptap's string parsing.
-              .insertContentAt({ from: wordStartPos, to: sel.from }, stringToDoc(match.snippet.body).content)
+              .insertContentAt({ from: wordStartPos, to: sel.from }, stringToDoc(match.body).content)
               .run();
             // Every field of the freshly inserted body starts at/after where it was inserted.
             selectNextField(editor, wordStartPos);

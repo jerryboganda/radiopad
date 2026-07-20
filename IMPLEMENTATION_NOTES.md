@@ -395,12 +395,23 @@ in the `msi-e2e-evidence` artifact): a fully healthy webview process tree — br
 storage, renderer — whose browser argv carries wry's own `--autoplay-policy` and
 `--disable-features` and **none** of ours. That is why the very first single-flag attempt saw no
 CDP endpoint, and it also silently disabled the fake-audio device the mic phase needs. Flags are
-now delivered through the per-exe **HKCU WebView2 `AdditionalBrowserArguments` policy** instead —
-and the env var is deliberately left UNSET, because the registry is only consulted when no
-override env var exists (setting both, as the first fix did, made the "fallback" dead code).
-Not yet confirmed green; if the policy route also fails, the remaining option is Tauri's own
-`additionalBrowserArgs` gated behind an env check in Rust, which needs a security review before
-it goes near a PHI build.
+**The HKCU policy route was then tried and ALSO ignored** (run 29743040588: same clean argv, no
+listener on the port). So *both* documented external channels — env var and registry policy — are
+inert for this app.
+
+**Why, and what it means.** The observed browser argv is exactly wry's own defaults
+(`--autoplay-policy=no-user-gesture-required --disable-features=msWebOOUI,msPdfOOUI,msSmartScreenProtection`),
+i.e. Tauri calls `SetAdditionalBrowserArguments` itself and WebView2 does not append external
+values to it. **The only way to add a browser flag to this app is through Tauri's own argument
+string** — `additionalBrowserArgs` in `tauri.conf.json`, or the equivalent Rust builder call.
+Both mean the capability ships inside the MSI, so this is no longer a CI-plumbing question but a
+product-security one (a loopback CDP port exposes the rendered DOM — i.e. PHI — to any local
+process while enabled). **Parked for an operator decision** rather than quietly shipping a debug
+hook into a clinical build.
+
+What the E2E *does* verify today, and it is not nothing: the real MSI installs, the packaged
+sidecar starts, the model manager reports MedASR and MedGemma present, and the bootstrap/API
+layer answers — all against the installed product. Only the renderer-driving half is blocked.
 
 Still open, honestly: the `msi-e2e` job — including the mic phase — is **wired but has never yet
 completed a run**; the original flake was never **named**, so "prime suspect eliminated" is not

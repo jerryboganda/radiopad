@@ -69,7 +69,7 @@ export function snippetKeyDown(el: EditableEl): boolean {
   if (start === end) {
     const match = computeTriggerExpansion(el.value.slice(0, start));
     if (match) {
-      replaceRangeWithSnippet(el, start - match.word.length, start, match.snippet.body);
+      replaceRangeWithSnippet(el, start - match.word.length, start, match.body);
       return true;
     }
   }

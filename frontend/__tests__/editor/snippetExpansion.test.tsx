@@ -37,7 +37,8 @@ describe('computeTriggerExpansion', () => {
     saveSnippet({ trigger: 'nlchest', body: 'The lungs are clear. ${finding}' });
     const r = computeTriggerExpansion('Impression: NLCHEST');
     expect(r?.word).toBe('NLCHEST');
-    expect(r?.snippet.body).toContain('lungs are clear');
+    expect(r?.body).toContain('lungs are clear');
+    expect(r?.source).toBe('personal');
   });
   it('returns null when the last word is not a trigger', () => {
     saveSnippet({ trigger: 'nlchest', body: 'x' });

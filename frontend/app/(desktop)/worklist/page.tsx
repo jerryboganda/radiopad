@@ -5,6 +5,15 @@ import { useRouter } from 'next/navigation';
 import { RefreshCw } from 'lucide-react';
 import { api, type Report } from '@/lib/api';
 import { reportHref } from '@/lib/routes';
+import {
+  computeFatigue,
+  computeProcedureMix,
+  getSessionReads,
+  recordRead,
+  type ReadEvent,
+} from '@/lib/worklist/readerLoad';
+import { suggestNext } from '@/lib/worklist/smartAssign';
+import TenantSwitcher from '@/components/shell/TenantSwitcher';
 import Container from '@/components/shell/Container';
 import PageHeader from '@/components/shell/PageHeader';
 import { TableSkeleton } from '@/components/ui/Skeleton';
@@ -237,12 +246,52 @@ function WorklistInner() {
       });
   }, [reports, statusFilter, modalityFilter, query, now]);
 
+  // WL-004 — the reader's own session log, refreshed whenever they open a case.
+  const [readHistory, setReadHistory] = useState<ReadEvent[]>([]);
+  useEffect(() => {
+    setReadHistory(getSessionReads());
+  }, []);
+
   const openReport = useCallback(
     (id: string) => {
+      // WL-004/WL-005 — record the read locally so the load, fatigue and
+      // procedure-mix panels reflect this session. Report id + labels only.
+      const opened = (reports ?? []).find((r) => r.id === id);
+      if (opened) {
+        recordRead({
+          reportId: id,
+          modality: opened.study.modality,
+          bodyPart: opened.study.bodyPart,
+        });
+        setReadHistory(getSessionReads());
+      }
       router.push(reportHref(id));
     },
-    [router],
+    [router, reports],
   );
+
+  // WL-003 — suggested next read. Informational: it highlights a row, nothing more.
+  const suggestion = useMemo(
+    () =>
+      suggestNext(
+        rows.map((row) => ({
+          reportId: row.report.id,
+          priority: row.priority,
+          modality: row.report.study.modality,
+          bodyPart: row.report.study.bodyPart,
+          waitingSince: new Date(row.report.updatedAt).getTime(),
+        })),
+        { now, history: readHistory },
+      ),
+    [rows, now, readHistory],
+  );
+  const suggestedRow = useMemo(
+    () => rows.find((r) => r.report.id === suggestion?.reportId) ?? null,
+    [rows, suggestion],
+  );
+
+  const fatigue = useMemo(() => computeFatigue(now, readHistory), [now, readHistory]);
+  const mix = useMemo(() => computeProcedureMix(readHistory, now), [readHistory, now]);
 
   const total = reports?.length ?? 0;
   const filtersActive = statusFilter !== 'all' || modalityFilter !== 'all' || query.trim() !== '';
@@ -267,10 +316,77 @@ function WorklistInner() {
         }
       />
 
+      {/* WL-009 — teleradiologists reading for several practices. Renders
+          nothing when this identity belongs to a single workspace. */}
+      <TenantSwitcher />
+
       {refreshError && (
         <Banner tone="warn" title="Couldn't refresh the queue">
           Showing the last loaded list. {refreshError}
         </Banner>
+      )}
+
+      {/* WL-004 — a break nudge the reader sees about their own session. It
+          never blocks a read and is never reported anywhere. */}
+      {fatigue.breakSuggested && (
+        <Banner tone="warn" title="Consider a short break">
+          {fatigue.message} Reading accuracy drops with unbroken stretches — the queue will
+          still be here.
+        </Banner>
+      )}
+
+      {/* WL-003 — informational suggestion; the reader picks whatever they want. */}
+      {suggestedRow && (
+        <div className="rp-panel" style={{ marginBottom: 12 }}>
+          <div className="rp-row" style={{ justifyContent: 'space-between', gap: 12, flexWrap: 'wrap' }}>
+            <div style={{ minWidth: 0 }}>
+              <div className="rp-panel-title" style={{ marginBottom: 2 }}>Suggested next read</div>
+              <p className="rp-page-sub" style={{ margin: 0 }}>
+                {procedureLabel(suggestedRow.report)}
+                {suggestedRow.report.study.accessionNumber
+                  ? ` · ${suggestedRow.report.study.accessionNumber}`
+                  : ''}
+                {suggestion && suggestion.reasons.length > 0
+                  ? ` — ${suggestion.reasons.join(', ')}`
+                  : ''}
+              </p>
+            </div>
+            <div className="rp-row" style={{ gap: 8, alignItems: 'center' }}>
+              <PriorityChip priority={suggestedRow.priority} />
+              <button
+                type="button"
+                className="primary"
+                onClick={() => openReport(suggestedRow.report.id)}
+              >
+                Open this case
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* WL-004 / WL-005 — reader load and procedure mix for this session. */}
+      {mix.totalCases > 0 && (
+        <div className="rp-panel" style={{ marginBottom: 12 }}>
+          <div className="rp-panel-title">Your session</div>
+          <p className="rp-page-sub" style={{ marginTop: 0 }}>
+            {mix.totalCases} case{mix.totalCases === 1 ? '' : 's'} read
+            {fatigue.streakMs > 0
+              ? ` · ${Math.round(fatigue.streakMs / 60_000)} min since your last break`
+              : ''}
+            {' · '}
+            <span title="Planning estimate from modality averages — not a billing figure.">
+              ~{mix.totalWRvu} estimated wRVU
+            </span>
+          </p>
+          <div className="rp-row" style={{ gap: 6, flexWrap: 'wrap' }}>
+            {mix.rows.map((r) => (
+              <span key={r.modality} className="badge">
+                {r.modality} · {r.count} ({Math.round(r.share * 100)}%)
+              </span>
+            ))}
+          </div>
+        </div>
       )}
 
       {truncated && (
