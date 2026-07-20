@@ -23,17 +23,18 @@ public class AiGatewayPolicyTests
     private static ProviderConfig Provider(ProviderComplianceClass cls, bool enabled = true) =>
         new() { Id = Guid.NewGuid(), Name = "P", Adapter = "test", Compliance = cls, Enabled = enabled };
 
-    // PHI gate removed (operator decision 2026-07-20): PHI routes to any
-    // compliance class, including Sandbox and Blocked.
+    // PHI policy (CLAUDE.md safety boundary 3, PROV-001..010 / §14.3): PHI may
+    // only reach a PhiApproved or LocalOnly provider. These two tests were
+    // inverted alongside the gate's removal in bf1fbf4 and are restored with it.
     [Fact]
-    public async Task Phi_Request_To_Sandbox_Provider_Succeeds()
+    public async Task Phi_Request_To_Sandbox_Provider_Throws()
     {
         var (gw, audit) = BuildGateway();
         var req = new AiCompletionRequest(Provider(ProviderComplianceClass.Sandbox), "sys", "patient John Doe", "v1", ContainsPhi: true);
-        var r = await gw.RouteAsync(Tenant(), req, default);
-        Assert.Equal("ok", r.Text);
+        await Assert.ThrowsAsync<ProviderPolicyException>(() => gw.RouteAsync(Tenant(), req, default));
+        // The block is audited (ProviderBlocked) so operators keep a tamper-evident trail.
         Assert.Single(audit.Events);
-        Assert.Equal(AuditAction.AiResponse, audit.Events[0].Action);
+        Assert.Equal(AuditAction.ProviderBlocked, audit.Events[0].Action);
     }
 
     [Fact]
@@ -65,12 +66,11 @@ public class AiGatewayPolicyTests
     }
 
     [Fact]
-    public async Task Blocked_Compliance_Class_No_Longer_Blocks()
+    public async Task Blocked_Provider_Throws()
     {
         var (gw, _) = BuildGateway();
         var req = new AiCompletionRequest(Provider(ProviderComplianceClass.Blocked), "sys", "x", "v1", false);
-        var r = await gw.RouteAsync(Tenant(), req, default);
-        Assert.Equal("ok", r.Text);
+        await Assert.ThrowsAsync<ProviderPolicyException>(() => gw.RouteAsync(Tenant(), req, default));
     }
 
     [Fact]
