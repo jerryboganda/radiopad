@@ -4,6 +4,23 @@
 
 ---
 
+## AI engine selection moved to the radiologist (2026-07-20)
+
+- **Operator decision:** which AI engine a report uses (cloud provider, UBAG, or on-device
+  MedASR/MedGemma) is the radiologist's call. Admin keeps *managing* provider configs
+  (endpoints, keys, enable/disable); the *choice* among enabled providers is per-user.
+- Follows up `feat(rbac)` (428ccb9, clinical roles can read providers): the missing
+  **selection layer** now exists — `frontend/lib/ai/providerPref.ts`, a per-user persisted
+  default engine (localStorage + in-memory, same pattern as the STT-mode pref).
+  - Report editor (`ReportClient`) and New Report wizard default to the saved engine and
+    persist every switch the radiologist makes in the AI bar / wizard picker.
+  - AI Assistant hub provider cards gained "Set as my default" / "My default engine"
+    (enabled providers only); stale/disabled saved ids fall back to priority order.
+  - Tests: `frontend/__tests__/providerPref.test.ts` (5) + existing wizard test pass locally.
+- **Platform STT engines stay hidden** (af491a5): Windows SAPI, the languages-&-accuracy
+  helper, and Edge Web Speech are `Hidden` in the catalog — descriptors/clients/tests all
+  intact for later re-enable; UI lists only Visible engines (MedASR default).
+
 ## The three §8b verification gaps closed end to end (2026-07-20)
 
 - **MSI install + renderer-driven E2E** — new `msi-e2e` job in `desktop-bundle.yml` + driver

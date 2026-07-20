@@ -26,6 +26,7 @@ import { anchorCorrections, applyCorrection } from '@/lib/dictation/anchorCorrec
 import CrossCheckBadge from '@/components/dictation/CrossCheckBadge';
 import CompanionHostPanel from '@/components/companion/CompanionHostPanel';
 import { readQueryParam } from '@/lib/browserParams';
+import { resolveDefaultProvider, setPreferredProviderId } from '@/lib/ai/providerPref';
 import { detectCommand, stripCommand, type VoiceCommand, type CommandMatch } from '@/lib/voiceCommands';
 import RewriteStylePanel from './RewriteStylePanel';
 import PriorComparePanel from './PriorComparePanel';
@@ -199,7 +200,9 @@ export default function ReportPage() {
     }).catch((e: Error) => setError(e.message));
     api.providers.list().then((p) => {
       setProviders(p);
-      const def = p.find((x) => x.enabled) || p[0];
+      // The radiologist's own saved default engine wins; fall back to the
+      // workspace's highest-priority enabled provider.
+      const def = resolveDefaultProvider(p);
       if (def) setProviderId(def.id);
     });
     api.rulebooks.list().then(setRulebooks);
@@ -1231,7 +1234,12 @@ export default function ReportPage() {
             onToggleStylePanel={() => setStylePanelOpen((v) => !v)}
             providers={providers}
             providerId={providerId}
-            onProviderChange={setProviderId}
+            onProviderChange={(v) => {
+              setProviderId(v);
+              // Switching engines here is the radiologist stating a preference —
+              // remember it so the next report starts on the same engine.
+              if (v) setPreferredProviderId(v);
+            }}
           />
 
           <CompanionHostPanel />

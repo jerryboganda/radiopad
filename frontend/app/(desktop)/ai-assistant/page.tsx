@@ -5,6 +5,7 @@ import Link from 'next/link';
 import {
   ArrowRight,
   BookOpenCheck,
+  Check,
   FileText,
   Mic,
   RefreshCw,
@@ -19,6 +20,7 @@ import { TableSkeleton } from '@/components/ui/Skeleton';
 import EmptyState from '@/components/ui/EmptyState';
 import ErrorState from '@/components/ui/ErrorState';
 import { STT_MODES, useSttMode } from '@/lib/dictation/sttMode';
+import { usePreferredProviderId } from '@/lib/ai/providerPref';
 import { useCrossCheckEnabled, useUseUbag } from '@/lib/dictation/crossCheckPrefs';
 import type { SttMode } from '@/lib/api';
 
@@ -68,6 +70,8 @@ function ProvidersPanel() {
   const [error, setError] = useState<string | null>(null);
   const [noAccess, setNoAccess] = useState(false);
   const [health, setHealth] = useState<Record<string, { state: HealthResult; note?: string }>>({});
+  // The radiologist's own default engine — personal, not an admin setting.
+  const [preferredId, setPreferredId] = usePreferredProviderId();
 
   const probe = useCallback((rows: Provider[]) => {
     const enabled = rows.filter((p) => p.enabled);
@@ -124,6 +128,12 @@ function ProvidersPanel() {
           </button>
         )}
       </div>
+      {!loading && !noAccess && providers.length > 0 && (
+        <p className="rp-page-sub" style={{ marginTop: 0 }}>
+          Pick the engine your reports use — a cloud provider, UBAG, or an on-device model.
+          This is your personal default; you can still switch per report in the editor.
+        </p>
+      )}
 
       {loading ? (
         <TableSkeleton rows={3} cols={3} />
@@ -162,6 +172,29 @@ function ProvidersPanel() {
                 </div>
                 {h?.state === 'down' && h.note && (
                   <p className="rp-card-meta" style={{ marginTop: 4 }}>{h.note}</p>
+                )}
+                {p.enabled && (
+                  <div className="rp-row" style={{ marginTop: 8 }}>
+                    {preferredId === p.id ? (
+                      <button
+                        className="subtle"
+                        aria-pressed="true"
+                        title="This is your default engine. Click to clear and fall back to the workspace default."
+                        onClick={() => setPreferredId('')}
+                      >
+                        <Check size={13} strokeWidth={2} aria-hidden /> My default engine
+                      </button>
+                    ) : (
+                      <button
+                        className="subtle"
+                        aria-pressed="false"
+                        title="New reports will start on this engine (you can still switch per report)"
+                        onClick={() => setPreferredId(p.id)}
+                      >
+                        Set as my default
+                      </button>
+                    )}
+                  </div>
                 )}
               </div>
             );

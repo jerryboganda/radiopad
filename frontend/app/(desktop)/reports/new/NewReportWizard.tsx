@@ -16,6 +16,7 @@ import SearchableSelect from '@/components/ui/SearchableSelect';
 import RichTextEditor from '@/components/editor/RichTextEditor';
 import GenerationOverlay from '@/components/reports/GenerationOverlay';
 import { reportHref } from '@/lib/routes';
+import { resolveDefaultProvider, setPreferredProviderId } from '@/lib/ai/providerPref';
 
 type Step = 1 | 2 | 3 | 4;
 
@@ -69,9 +70,9 @@ export default function NewReportWizard() {
         setBodyParts(b);
         const enabled = p.filter((x) => x.enabled);
         setProviders(enabled);
-        // Default to the highest-priority enabled provider so the radiologist can
-        // generate in one click; they can still switch (incl. Gemini CLI).
-        const preferred = [...enabled].sort((a, c) => (a.priority ?? 999) - (c.priority ?? 999))[0];
+        // The radiologist's saved default engine wins; otherwise the
+        // highest-priority enabled provider, so they can generate in one click.
+        const preferred = resolveDefaultProvider(enabled);
         if (preferred) setProviderId(preferred.id);
       })
       .catch((e: Error) => {
@@ -275,7 +276,10 @@ export default function NewReportWizard() {
               ariaLabel="AI provider"
               options={providerOptions}
               value={providerId}
-              onChange={(v) => setProviderId(v ?? '')}
+              onChange={(v) => {
+                setProviderId(v ?? '');
+                if (v) setPreferredProviderId(v);
+              }}
               placeholder="Select a model…"
               emptyLabel="No models enabled — add one under AI models"
             />
