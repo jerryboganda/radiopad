@@ -202,7 +202,7 @@ public class RegistrationController : ControllerBase
         });
         await _db.SaveChangesAsync(ct);
 
-        // Surface the curated UBAG models (Gemini Web + DeepSeek Web) on the new org's
+        // Surface the curated UBAG models (Gemini + DeepSeek) on the new org's
         // AI-models page from day one. Isolated + idempotent: a gateway/seed hiccup must
         // never fail org creation, so swallow + log.
         try { await UbagPrimarySeed.EnsureCuratedPrimariesAsync(_db, tenant.Id, ct); }

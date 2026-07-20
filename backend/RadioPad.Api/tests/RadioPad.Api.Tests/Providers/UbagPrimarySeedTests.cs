@@ -8,7 +8,7 @@ using Xunit;
 namespace RadioPad.Api.Tests.Providers;
 
 /// <summary>
-/// The curated UBAG primaries (Gemini Web + DeepSeek Web) must be seedable for ANY
+/// The curated UBAG primaries (Gemini + DeepSeek) must be seedable for ANY
 /// tenant — not just the DevSeed "dev" org — so production orgs created via
 /// bootstrap-org / registration (and existing orgs backfilled at startup) surface
 /// the UBAG models on the AI-models page. <see cref="UbagPrimarySeed"/> is the single
@@ -47,7 +47,7 @@ public class UbagPrimarySeedTests
         Assert.Equal(2, rows.Count);
 
         var gemini = rows[0];
-        Assert.Equal("UBAG (Gemini Web)", gemini.Name);
+        Assert.Equal("UBAG (Gemini)", gemini.Name);
         Assert.Equal("gemini_web", gemini.Model);
         // Policy change (2026-06-27): UBAG is PHI-approved so AI features are not
         // blocked by the PHI gates.
@@ -55,7 +55,7 @@ public class UbagPrimarySeedTests
         Assert.True(gemini.Enabled);
 
         var deepseek = rows[1];
-        Assert.Equal("UBAG (DeepSeek Web)", deepseek.Name);
+        Assert.Equal("UBAG (DeepSeek)", deepseek.Name);
         Assert.Equal("deepseek_web", deepseek.Model);
         Assert.True(deepseek.Enabled);
     }
@@ -79,7 +79,7 @@ public class UbagPrimarySeedTests
         db.Providers.Add(new ProviderConfig
         {
             TenantId = Tenant,
-            Name = "UBAG (Gemini Web)",
+            Name = "UBAG (Gemini)",
             Adapter = "ubag",
             Model = "gemini_web",
             Compliance = ProviderComplianceClass.Sandbox,
@@ -100,8 +100,8 @@ public class UbagPrimarySeedTests
         using var db = CreateDb();
         // Two pre-existing rows as production seeded them before the policy change.
         db.Providers.AddRange(
-            new ProviderConfig { TenantId = Tenant, Name = "UBAG (Gemini Web)", Adapter = "ubag", Model = "gemini_web", Compliance = ProviderComplianceClass.Sandbox, Enabled = true },
-            new ProviderConfig { TenantId = Tenant, Name = "UBAG (DeepSeek Web)", Adapter = "ubag", Model = "deepseek_web", Compliance = ProviderComplianceClass.PhiApproved, Enabled = true });
+            new ProviderConfig { TenantId = Tenant, Name = "UBAG (Gemini)", Adapter = "ubag", Model = "gemini_web", Compliance = ProviderComplianceClass.Sandbox, Enabled = true },
+            new ProviderConfig { TenantId = Tenant, Name = "UBAG (DeepSeek)", Adapter = "ubag", Model = "deepseek_web", Compliance = ProviderComplianceClass.PhiApproved, Enabled = true });
         await db.SaveChangesAsync();
 
         var promoted = await UbagPrimarySeed.EnsureCuratedComplianceAsync(db, default);
@@ -112,6 +112,30 @@ public class UbagPrimarySeedTests
             p => Assert.Equal(ProviderComplianceClass.PhiApproved, p.Compliance));
         // Idempotent: a second run touches nothing.
         Assert.Equal(0, await UbagPrimarySeed.EnsureCuratedComplianceAsync(db, default));
+    }
+
+    [Fact]
+    public async Task Name_backfill_strips_web_suffix_from_curated_and_discovered_rows()
+    {
+        using var db = CreateDb();
+        // A curated primary and an auto-discovered row, both seeded before the
+        // 2026-07-21 "never say Web" decision.
+        db.Providers.AddRange(
+            new ProviderConfig { TenantId = Tenant, Name = "UBAG (Gemini Web)", Adapter = "ubag", Model = "gemini_web", Compliance = ProviderComplianceClass.PhiApproved, Enabled = true },
+            new ProviderConfig { TenantId = Tenant, Name = "UBAG (ChatGPT Web)", Adapter = "ubag", Model = "chatgpt_web", Compliance = ProviderComplianceClass.Sandbox, Enabled = true },
+            new ProviderConfig { TenantId = Tenant, Name = "My Custom Web Thing", Adapter = "ubag", Model = "custom", Compliance = ProviderComplianceClass.Sandbox, Enabled = true });
+        await db.SaveChangesAsync();
+
+        var renamed = await UbagPrimarySeed.EnsureCuratedNamesAsync(db, default);
+
+        Assert.Equal(2, renamed);
+        Assert.Equal("UBAG (Gemini)", (await db.Providers.SingleAsync(p => p.Model == "gemini_web")).Name);
+        Assert.Equal("UBAG (ChatGPT)", (await db.Providers.SingleAsync(p => p.Model == "chatgpt_web")).Name);
+        // Doesn't end in " Web)" so an operator's own naming is left alone.
+        Assert.Equal("My Custom Web Thing", (await db.Providers.SingleAsync(p => p.Model == "custom")).Name);
+
+        // Idempotent: a second run touches nothing.
+        Assert.Equal(0, await UbagPrimarySeed.EnsureCuratedNamesAsync(db, default));
     }
 
     [Fact]

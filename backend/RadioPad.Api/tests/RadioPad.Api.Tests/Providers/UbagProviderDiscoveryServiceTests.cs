@@ -53,7 +53,9 @@ public class UbagProviderDiscoveryServiceTests
         var row = await db.Providers.SingleAsync(p => p.Model == "chatgpt_web");
         Assert.Equal("ubag", row.Adapter);
         Assert.True(row.Enabled);
-        Assert.Equal("UBAG (ChatGPT Web)", row.Name);
+        // Operator decision (2026-07-21): provider names never say "Web", including
+        // targets the gateway itself labels "ChatGPT Web".
+        Assert.Equal("UBAG (ChatGPT)", row.Name);
     }
 
     [Fact]
@@ -169,7 +171,7 @@ public class UbagProviderDiscoveryServiceTests
 
         Assert.Equal(1, await Service(db, client).SyncAsync(Tenant, default));
         var row = await db.Providers.SingleAsync(p => p.Model == "chatgpt_web");
-        Assert.Equal("UBAG (ChatGPT Web)", row.Name);
+        Assert.Equal("UBAG (ChatGPT)", row.Name);
         Assert.True(row.Enabled);
     }
 

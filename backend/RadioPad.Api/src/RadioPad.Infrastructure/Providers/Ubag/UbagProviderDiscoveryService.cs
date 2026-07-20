@@ -1,3 +1,4 @@
+using System.Text.RegularExpressions;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
@@ -36,6 +37,14 @@ public sealed class UbagProviderDiscoveryService
     // Non-provider / placeholder catalog entries that must never become pickers.
     private static readonly HashSet<string> Excluded =
         new(StringComparer.OrdinalIgnoreCase) { "mock", "generic_chat", "generic_form" };
+
+    // Operator decision (2026-07-21): a provider name must never say "Web" — the
+    // gateway's raw target label (e.g. "ChatGPT Web") is stripped before it's used
+    // to name a newly discovered row. See UbagPrimarySeed.EnsureCuratedNamesAsync
+    // for the one-time backfill of rows created before this existed.
+    private static readonly Regex WebSuffixRe = new(@"\s+Web$", RegexOptions.IgnoreCase | RegexOptions.Compiled);
+
+    private static string DisplayName(UbagTarget t) => $"UBAG ({WebSuffixRe.Replace(t.Name, string.Empty)})";
 
     private readonly IUbagClient _client;
     private readonly RadioPadDbContext _db;
@@ -168,7 +177,7 @@ public sealed class UbagProviderDiscoveryService
                 _db.Providers.Add(new ProviderConfig
                 {
                     TenantId = tenantId,
-                    Name = $"UBAG ({t.Name})",
+                    Name = DisplayName(t),
                     Adapter = UbagProviderAdapter.AdapterId,
                     Model = t.Id,
                     Compliance = UbagProviderAdapter.DefaultComplianceClass,
@@ -407,6 +416,13 @@ public sealed class UbagProviderDiscoveryHostedService : BackgroundService
             if (promoted > 0)
                 _logger.LogInformation(
                     "UBAG compliance backfill: promoted {Count} row(s) to PhiApproved", promoted);
+
+            // Rename backfill (2026-07-21): provider names must never say "Web".
+            var webStripped = await Stage("UBAG name",
+                () => UbagPrimarySeed.EnsureCuratedNamesAsync(db, stoppingToken));
+            if (webStripped > 0)
+                _logger.LogInformation(
+                    "UBAG name backfill: stripped 'Web' from {Count} row(s)", webStripped);
 
             // Rehydrate operator-alert state from the audit trail (audit fix
             // 2026-07-18): banner "since" timestamps and the 1/day email throttle

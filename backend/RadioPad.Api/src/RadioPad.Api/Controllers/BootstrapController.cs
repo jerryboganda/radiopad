@@ -122,7 +122,7 @@ public class BootstrapController : ControllerBase
         await _db.SaveChangesAsync(ct);
         await EnterpriseIdentityBridge.EnsureMembershipForUserAsync(_db, admin, ct);
 
-        // Surface the curated UBAG models (Gemini Web + DeepSeek Web) on the new org's
+        // Surface the curated UBAG models (Gemini + DeepSeek) on the new org's
         // AI-models page immediately. Idempotent + isolated: never fail org bootstrap on
         // a seed/DB hiccup — the startup backfill would catch it on the next restart.
         try { await UbagPrimarySeed.EnsureCuratedPrimariesAsync(_db, tenant.Id, ct); }

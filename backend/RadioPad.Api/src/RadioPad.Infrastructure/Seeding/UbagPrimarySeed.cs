@@ -8,9 +8,10 @@ namespace RadioPad.Infrastructure.Seeding;
 
 /// <summary>
 /// Single, idempotent source of truth for the curated UBAG primary providers every
-/// RadioPad org gets — <b>UBAG (Gemini Web)</b> (the unattended primary) and
-/// <b>UBAG (DeepSeek Web)</b> (the secondary). Both were verified end-to-end against
-/// the production gateway (2026-06-22).
+/// RadioPad org gets — <b>UBAG (Gemini)</b> (the unattended primary) and
+/// <b>UBAG (DeepSeek)</b> (the secondary). Both were verified end-to-end against
+/// the production gateway (2026-06-22). Operator decision (2026-07-21): provider
+/// names must never surface "Web" — these are AI models, not web pages.
 ///
 /// Historically these rows were inlined in <see cref="DevSeed"/>, so only the
 /// development "dev" tenant ever received them; production orgs created via
@@ -37,7 +38,7 @@ public static class UbagPrimarySeed
         new ProviderConfig
         {
             TenantId = tenantId,
-            Name = "UBAG (Gemini Web)",
+            Name = "UBAG (Gemini)",
             Adapter = UbagProviderAdapter.AdapterId,
             Model = "gemini_web",
             Compliance = ProviderComplianceClass.PhiApproved,
@@ -48,7 +49,7 @@ public static class UbagPrimarySeed
         new ProviderConfig
         {
             TenantId = tenantId,
-            Name = "UBAG (DeepSeek Web)",
+            Name = "UBAG (DeepSeek)",
             Adapter = UbagProviderAdapter.AdapterId,
             Model = "deepseek_web",
             Compliance = ProviderComplianceClass.PhiApproved,
@@ -103,5 +104,28 @@ public static class UbagPrimarySeed
         db.Providers.AddRange(toAdd);
         await db.SaveChangesAsync(ct);
         return toAdd.Count;
+    }
+
+    /// <summary>
+    /// One-time rename backfill (2026-07-21): UBAG provider names used to mirror the
+    /// gateway's raw target label verbatim — "UBAG (Gemini Web)", "UBAG (ChatGPT Web)",
+    /// etc. Operator decision: a provider name must never say "Web", for a curated
+    /// primary or any auto-discovered target, now or in future — these are AI models,
+    /// not web pages. <see cref="Providers.Ubag.UbagProviderDiscoveryService"/> already
+    /// strips the suffix before naming newly discovered rows; this backfill fixes rows
+    /// created before that change. Matches only names ending in " Web)", so an operator's
+    /// own custom rename is left untouched. Idempotent — converges to zero. Mirrors
+    /// <see cref="CliProviderSeed.EnsureGeminiCliNameAsync"/>.
+    /// </summary>
+    public static async Task<int> EnsureCuratedNamesAsync(RadioPadDbContext db, CancellationToken ct)
+    {
+        var stale = await db.Providers
+            .Where(p => p.Adapter == UbagProviderAdapter.AdapterId && p.Name.EndsWith(" Web)"))
+            .ToListAsync(ct);
+        if (stale.Count == 0) return 0;
+        foreach (var p in stale)
+            p.Name = p.Name[..^" Web)".Length] + ")";
+        await db.SaveChangesAsync(ct);
+        return stale.Count;
     }
 }

@@ -97,7 +97,7 @@ public static class DevSeed
                     Priority = 10,
                 });
 
-            // UBAG browser-automation AI gateway (Gemini Web + DeepSeek Web). These
+            // UBAG browser-automation AI gateway (Gemini + DeepSeek). These
             // curated primaries now live in UbagPrimarySeed — the single source of
             // truth shared by org bootstrap/registration and the startup backfill, so
             // EVERY org gets them (not just this dev tenant) and the definitions never

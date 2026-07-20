@@ -9,8 +9,8 @@ using Xunit;
 namespace RadioPad.Api.Tests.Integration;
 
 /// <summary>
-/// A brand-new organization must surface the curated UBAG models (Gemini Web +
-/// DeepSeek Web) on its AI-models page the moment it is created — not only the dev
+/// A brand-new organization must surface the curated UBAG models (Gemini +
+/// DeepSeek) on its AI-models page the moment it is created — not only the dev
 /// org. This drives the regression where production orgs created via the real
 /// org-creation pipeline started with zero providers.
 /// </summary>
