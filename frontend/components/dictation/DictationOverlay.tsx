@@ -34,7 +34,7 @@ import {
   parseSpeechResults,
   type SpeechRecognitionLike,
 } from '@/lib/dictation/speech';
-import { api, type SttMode, type SttSpan } from '@/lib/api';
+import { api, localSttBase, type SttMode, type SttSpan } from '@/lib/api';
 import { STT_MODES, useSttMode } from '@/lib/dictation/sttMode';
 import { readQueryParam } from '@/lib/browserParams';
 
@@ -279,7 +279,13 @@ export default function DictationOverlay() {
     const hasTarget = !!getLastFocusedSectionEditor() || !!getLastFocusedEditable();
     // Guard failures must SAY why the recording went nowhere — the audio the
     // radiologist just spoke is otherwise silently discarded.
-    if (!reportId) {
+    //
+    // The on-device sidecar (desktop) transcribes anonymously — it needs only
+    // the audio, no report id (see `api.reports.transcribe`) — so the New
+    // Report wizard can still use HQ while dictating findings/clinical history
+    // before a report exists. Only the cloud/web fallback is report-scoped, so
+    // that's the only case a missing id should block on.
+    if (!reportId && !(await localSttBase())) {
       setSttError('HQ dictation needs an open report — the recording was not transcribed.');
       return;
     }
@@ -350,8 +356,11 @@ export default function DictationOverlay() {
   // web each one would be a billed cloud transcription of audio we are about to send in full anyway.
   const startInterimPreview = useCallback((stream: MediaStream) => {
     if (typeof window === 'undefined' || !('__TAURI__' in window)) return;
+    // No report-id bail here: this only ever runs inside the desktop shell
+    // (checked above), where the on-device sidecar transcribes anonymously —
+    // an empty id (e.g. dictating in the New Report wizard, before a report
+    // exists) still resolves via the local sidecar in `api.reports.transcribe`.
     const reportId = readQueryParam('id');
-    if (!reportId) return;
 
     stopInterimPreviewRef.current?.();
     stopInterimPreviewRef.current = startInterimDecode(stream, {
