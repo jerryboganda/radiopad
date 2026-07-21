@@ -20,7 +20,7 @@ vi.mock('@/lib/api', () => ({
   localSttBase: () => localSttBaseMock(),
 }));
 
-const readQueryParamMock = vi.fn(() => 'rpt-1');
+const readQueryParamMock = vi.fn((_name?: string) => 'rpt-1');
 vi.mock('@/lib/browserParams', () => ({ readQueryParam: (name: string) => readQueryParamMock(name) }));
 
 import DictationOverlay from '@/components/dictation/DictationOverlay';
