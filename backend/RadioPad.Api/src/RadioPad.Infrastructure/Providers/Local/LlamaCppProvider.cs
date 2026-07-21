@@ -4,6 +4,7 @@ using System.Text.Json;
 using Microsoft.Extensions.Logging;
 using RadioPad.Application.Abstractions;
 using RadioPad.Application.Services;
+using RadioPad.Domain.Entities;
 using RadioPad.Domain.Enums;
 using RadioPad.Domain.ValueObjects;
 
@@ -51,6 +52,8 @@ public sealed class LlamaCppProvider : IAiProviderAdapter
     {
         var p = request.Provider;
         var baseUrl = string.IsNullOrWhiteSpace(p.EndpointUrl) ? DefaultEndpoint : p.EndpointUrl.TrimEnd('/');
+        var managesEndpoint = _server is not null
+            && string.Equals(baseUrl, LlamaServerProcess.BaseUrl, StringComparison.OrdinalIgnoreCase);
 
         // The managed on-device server is started lazily on first use, not kept running as a
         // background service — every caller that talks to OUR default loopback endpoint must
@@ -61,14 +64,9 @@ public sealed class LlamaCppProvider : IAiProviderAdapter
         // report-generation request would still get "Connection refused" against a server nobody
         // ever started. An operator who pointed EndpointUrl at their OWN remote server is
         // responsible for running it themselves, hence the endpoint-equality check.
-        if (_server is not null && !_server.IsRunning
-            && string.Equals(baseUrl, LlamaServerProcess.BaseUrl, StringComparison.OrdinalIgnoreCase))
+        if (managesEndpoint && _server is not null && !_server.IsRunning)
         {
-            var descriptor = _catalog?.ById(p.Model);
-            var modelDir = descriptor is null ? null : LocalSttModels.ResolveModelDir(descriptor.Id);
-            var modelPath = modelDir is null || descriptor?.FileName is null
-                ? null
-                : Path.Combine(modelDir, descriptor.FileName);
+            var modelPath = ResolveManagedModelPath(p);
             if (modelPath is not null && File.Exists(modelPath))
             {
                 await _server.EnsureRunningAsync(modelPath, cancellationToken);
@@ -110,7 +108,14 @@ public sealed class LlamaCppProvider : IAiProviderAdapter
         catch (HttpRequestException hre)
         {
             sw.Stop();
-            throw new ProviderTransportException($"{AdapterId}: HTTP transport failure: {hre.Message}", inner: hre);
+            // A bare "Connection refused" against OUR managed endpoint tells a radiologist nothing
+            // actionable — name which link in the auto-start chain above is actually missing, mirroring
+            // LocalMedGemmaFormatter.DiagnoseUnreachable for the dictation path. This is the generic
+            // report-generation path (AiGateway → ProviderRouter), which had no equivalent until now —
+            // see the comment on the auto-start guard above for why that gap existed. An operator's own
+            // remote EndpointUrl gets the raw message unchanged: we never tried to manage that server.
+            var diagnosis = managesEndpoint ? $" {DiagnoseUnreachable(p)}" : "";
+            throw new ProviderTransportException($"{AdapterId}: HTTP transport failure: {hre.Message}.{diagnosis}", inner: hre);
         }
         catch (TaskCanceledException tce) when (!cancellationToken.IsCancellationRequested)
         {
@@ -154,6 +159,41 @@ public sealed class LlamaCppProvider : IAiProviderAdapter
         {
             resp.Dispose();
         }
+    }
+
+    /// <summary>
+    /// Absolute path of the on-device model file <paramref name="p"/> would run against under our
+    /// managed model store, or null when it cannot be resolved (unknown model id, or no
+    /// local-app-data dir). Existence is deliberately not checked here — callers decide what an
+    /// absent file means.
+    /// </summary>
+    private string? ResolveManagedModelPath(ProviderConfig p)
+    {
+        var descriptor = _catalog?.ById(p.Model);
+        var modelDir = descriptor is null ? null : LocalSttModels.ResolveModelDir(descriptor.Id);
+        return modelDir is null || descriptor?.FileName is null
+            ? null
+            : Path.Combine(modelDir, descriptor.FileName);
+    }
+
+    /// <summary>
+    /// Work out which link in the auto-start chain is missing, so a "Connection refused" against our
+    /// OWN managed endpoint names a cause the caller can act on. Ordered from the most likely and
+    /// most fixable outward: model absent → runtime absent → server present but not answering yet.
+    /// </summary>
+    private string DiagnoseUnreachable(ProviderConfig p)
+    {
+        var modelPath = ResolveManagedModelPath(p);
+        if (modelPath is null || !File.Exists(modelPath))
+            return "The model is not downloaded on this workstation — download it from On-device models.";
+
+        var runtimeDir = LocalRuntimes.ResolveRuntimeDir(LocalRuntimes.LlamaServerId);
+        if (!LocalRuntimes.IsLlamaServerInstalled(runtimeDir))
+            return "The llama.cpp runtime that normally arrives with the model is missing — " +
+                "re-download it from On-device models to fetch it.";
+
+        return "The model and runtime are both installed, so the server failed to start or is still " +
+            "loading — a first cold start of a multi-GB model can take a few minutes; try again.";
     }
 
     /// <summary>Probe <c>GET {base}/health</c> (returns <c>{"status":"ok"}</c>).</summary>
