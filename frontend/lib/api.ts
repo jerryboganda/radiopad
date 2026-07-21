@@ -1574,7 +1574,7 @@ export const api = {
   },
   providers: {
     list: () => request<Provider[]>('/api/providers'),
-    save: (body: Partial<Provider> & { id?: string | null; apiKeySecretRef?: string }) =>
+    save: (body: Omit<Partial<Provider>, 'id'> & { id?: string | null; apiKeySecretRef?: string }) =>
       request<{ id: string }>('/api/providers', { method: 'POST', body: JSON.stringify(body) }),
     health: (id: string) =>
       request<{ ok: boolean; error?: string | null; note?: string | null }>(
