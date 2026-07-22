@@ -201,11 +201,13 @@ public class ReportingService
 
     /// <summary>
     /// Pure prompt builder for <see cref="GenerateStructuredAsync"/>, extracted so a caller with no
-    /// DB/tenant access (the on-device local-generation path) can build the identical prompt from an
-    /// in-memory <see cref="Report"/> that was never loaded from or persisted to a DbContext — mirrors
-    /// the existing <see cref="BuildPromptForMode"/> pattern for the simpler /ai modes.
+    /// DB/tenant access (the on-device local-generation path, in the separate RadioPad.Api project)
+    /// can build the identical prompt from an in-memory <see cref="Report"/> that was never loaded
+    /// from or persisted to a DbContext — mirrors the existing <see cref="BuildPromptForMode"/>
+    /// pattern for the simpler /ai modes. Public (unlike <see cref="BuildPromptForMode"/>) because
+    /// its caller lives in a different assembly.
     /// </summary>
-    internal static (string system, string instructions, string userPrompt) BuildStructuredPrompt(
+    public static (string system, string instructions, string userPrompt) BuildStructuredPrompt(
         Report report, RulebookSpec? rulebook, IReadOnlyDictionary<string, string>? overrides = null)
     {
         overrides ??= new Dictionary<string, string>();

@@ -5,6 +5,7 @@ using RadioPad.Application.Dictation;
 using RadioPad.Application.Services;
 using RadioPad.Domain.Entities;
 using RadioPad.Domain.Enums;
+using RadioPad.Domain.ValueObjects;
 using RadioPad.Infrastructure.Providers.Local;
 
 namespace RadioPad.Api.Controllers;

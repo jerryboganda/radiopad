@@ -4,6 +4,7 @@ using Microsoft.Extensions.Logging.Abstractions;
 using RadioPad.Api.Controllers;
 using RadioPad.Application.Abstractions;
 using RadioPad.Application.Services;
+using RadioPad.Domain.ValueObjects;
 using RadioPad.Infrastructure.Providers.Local;
 using Xunit;
 
@@ -103,9 +104,9 @@ public class LocalGenerationControllerTests : IClassFixture<RadioPadAppFactory>
     [Fact]
     public async Task Enabled_TransportFailure_Returns_502_With_The_Adapters_Actionable_Message()
     {
-        using var _ = new EnvScope("RADIOPAD_LOCAL_STT_ENABLED", "1");
+        using var env = new EnvScope("RADIOPAD_LOCAL_STT_ENABLED", "1");
 
-        var adapter = new FakeLlamaAdapter(_ =>
+        var adapter = new FakeLlamaAdapter(req =>
             throw new ProviderTransportException("llama-cpp: HTTP transport failure: Connection refused."));
         var controller = new LocalGenerationController(new[] { adapter }, NullLogger<LocalGenerationController>.Instance);
 
