@@ -99,6 +99,20 @@ public class LocalGenerationControllerTests : IClassFixture<RadioPadAppFactory>
         Assert.Contains("5mm right renal calculus", captured!.UserPrompt);
         Assert.Contains("Flank pain", captured.UserPrompt);
         Assert.NotNull(captured.Grammar);
+
+        // The on-device path uses its own few-shot, example-led prompt (not
+        // ReportingService.BuildStructuredPrompt's prose-only instructions) — empirically the only
+        // thing that reliably gets MedGemma to reproduce heading+bullet structure. The example uses
+        // bracketed placeholders, not concrete clinical values — a concrete-value version measurably
+        // caused the model to leak the example's fabricated finding into unrelated cases. And a
+        // moderate repeat penalty is set to prevent the model degenerating into repeating its last
+        // line once a long systematic review runs out of new content to add (also verified empirically).
+        Assert.Contains("EXAMPLE LAYOUT", captured.UserPrompt);
+        Assert.Contains("<PAIRED ORGAN> RIGHT:", captured.UserPrompt);
+        Assert.DoesNotContain("8 mm", captured.UserPrompt);
+        Assert.DoesNotContain("12 mm", captured.UserPrompt);
+        Assert.Equal(1.1, captured.RepeatPenalty);
+        Assert.Equal(256, captured.RepeatLastN);
     }
 
     [Fact]

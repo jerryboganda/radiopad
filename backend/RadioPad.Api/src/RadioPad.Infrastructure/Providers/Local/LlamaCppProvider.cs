@@ -95,6 +95,10 @@ public sealed class LlamaCppProvider : IAiProviderAdapter
         };
         if (!string.IsNullOrWhiteSpace(request.Grammar))
             body["grammar"] = request.Grammar;
+        if (request.RepeatPenalty is { } rp)
+            body["repeat_penalty"] = rp;
+        if (request.RepeatLastN is { } rln)
+            body["repeat_last_n"] = rln;
 
         // Dedicated client (Program.cs "ai-local"): CPU-bound local inference needs minutes, not
         // the cloud-tuned "ai" client's ~60 s attempt budget, and must not share its circuit breaker.

@@ -90,6 +90,25 @@ public sealed record AiCompletionRequest(
     /// prose-instructed JSON is fragile; tolerant JSON parsing remains the secondary net.
     /// </summary>
     public string? Grammar { get; init; }
+
+    /// <summary>
+    /// Optional llama.cpp <c>repeat_penalty</c> sampling parameter — discourages resampling recently
+    /// used tokens. Null = the adapter's/server's own default. A long, exhaustive generation (e.g.
+    /// on-device whole-report drafting) can otherwise degenerate into repeating the same line
+    /// verbatim until it exhausts its token budget once a small model runs out of genuinely new
+    /// content to add; a moderate penalty (empirically ~1.1) fixes this without measurably
+    /// distorting content the way a stronger penalty does (verified against MedGemma 1.5 4B: 1.3
+    /// caused the model to fabricate a different measurement rather than repeat the dictated one).
+    /// Only meaningful to local llama.cpp adapters; other providers ignore it.
+    /// </summary>
+    public double? RepeatPenalty { get; init; }
+
+    /// <summary>
+    /// Optional llama.cpp <c>repeat_last_n</c> — how many recent tokens <see cref="RepeatPenalty"/>
+    /// looks back over. Null = the adapter's/server's own default. Only meaningful to local
+    /// llama.cpp adapters; other providers ignore it.
+    /// </summary>
+    public int? RepeatLastN { get; init; }
 }
 
 public interface IUbagClient

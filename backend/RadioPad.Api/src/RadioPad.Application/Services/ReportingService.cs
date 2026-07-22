@@ -342,9 +342,7 @@ public class ReportingService
             var lines = body
                 .Split('\n', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)
                 .Where(line => line.Length > 0)
-                .Select(line => System.Text.RegularExpressions.Regex.IsMatch(line, @"^(?:•|[-–—]|\d+[.)])\s+")
-                    ? line
-                    : $"• {line}")
+                .Select(NormalizeBulletLine)
                 .ToArray();
 
             blocks.Add(lines.Length == 0
@@ -353,6 +351,21 @@ public class ReportingService
         }
 
         return string.Join("\n\n", blocks);
+    }
+
+    /// <summary>
+    /// MedGemma sometimes substitutes "*" for the requested "•" bullet despite explicit instructions
+    /// otherwise (observed empirically against the on-device model) — normalize it to "•" instead of
+    /// treating the line as unformatted, which would otherwise double-bullet it as "• * ...".
+    /// </summary>
+    private static string NormalizeBulletLine(string line)
+    {
+        var asterisk = System.Text.RegularExpressions.Regex.Match(line, @"^\*\s+(.*)$");
+        if (asterisk.Success) return $"• {asterisk.Groups[1].Value}";
+
+        return System.Text.RegularExpressions.Regex.IsMatch(line, @"^(?:•|[-–—]|\d+[.)])\s+")
+            ? line
+            : $"• {line}";
     }
 
     private async Task<string> GenerateMissingRecommendationsAsync(

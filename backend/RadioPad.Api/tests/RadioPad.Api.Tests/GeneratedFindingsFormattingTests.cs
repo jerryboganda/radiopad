@@ -32,4 +32,18 @@ public class GeneratedFindingsFormattingTests
 
         Assert.Equal(raw, ReportingService.FormatGeneratedFindings(raw));
     }
+
+    /// <summary>
+    /// MedGemma (on-device) sometimes writes "*" instead of the requested "•" bullet. Without
+    /// normalization this would be treated as unformatted and double-bulleted as "• * ...".
+    /// </summary>
+    [Fact]
+    public void Normalizes_Asterisk_Bullets_To_The_Standard_Marker()
+    {
+        const string raw = "KIDNEYS:\n* Normal in size and cortical thickness bilaterally.\n* No hydronephrosis.";
+
+        Assert.Equal(
+            "KIDNEYS:\n• Normal in size and cortical thickness bilaterally.\n• No hydronephrosis.",
+            ReportingService.FormatGeneratedFindings(raw));
+    }
 }
