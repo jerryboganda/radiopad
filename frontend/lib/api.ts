@@ -1640,6 +1640,34 @@ export const api = {
         { method: 'POST' },
       ),
   },
+  /**
+   * On-device whole-report generation. Unlike `reports.generate` (always the hosted API), this
+   * always goes to the local sidecar via `requestLocal` — the entire point of an on-device
+   * provider is that generation happens on this workstation, not in the hosted container where
+   * the model/llama-server don't exist. Callers PATCH the returned sections onto the report
+   * through the normal `reports.patch` — only the AI completion step is local.
+   */
+  localGenerate: {
+    report: (body: {
+      modality?: string | null;
+      bodyPart?: string | null;
+      contrast?: string | null;
+      age?: number | null;
+      gender?: string | null;
+      indication?: string | null;
+      findings?: string | null;
+    }) =>
+      requestLocal<{
+        indication: string;
+        technique: string;
+        findings: string;
+        impression: string;
+        recommendations: string;
+        provider: string;
+        model: string;
+        latencyMs: number;
+      }>('/api/local-generation/report', { method: 'POST', body: JSON.stringify(body) }),
+  },
   ai: {
     routingPreview: (params: {
       phi?: boolean;

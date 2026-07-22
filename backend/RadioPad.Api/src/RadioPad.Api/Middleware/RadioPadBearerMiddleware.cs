@@ -137,6 +137,11 @@ public sealed class RadioPadBearerMiddleware
         // reachability exposes no tenant data, secrets, or PHI. Whitelisted here so
         // it returns those inert results instead of a 401.
         path.StartsWithSegments("/api/local-models") ||
+        // On-device whole-report generation (LocalGenerationController) — same safety
+        // model as /api/local-models: loopback-only on the desktop sidecar, gated on
+        // RADIOPAD_LOCAL_STT_ENABLED and inert (503) on a hosted build, so anonymous
+        // reachability exposes no tenant data, secrets, or PHI.
+        path.StartsWithSegments("/api/local-generation") ||
         path.StartsWithSegments("/api/auth/logout") ||
         path.StartsWithSegments("/api/auth/oidc/authorize-url") ||
         path.StartsWithSegments("/api/auth/magic-link/request") ||

@@ -158,6 +158,57 @@ public class ReportingService
             ? new Dictionary<string, string>()
             : await _overrides.LoadAsync(tenant.Id, rulebookEntity.RulebookId, ct);
 
+        var (system, _, userPrompt) = BuildStructuredPrompt(report, rulebook, overrides);
+
+        var containsPhi = ContainsPhi(report) || ContainsPhiText(system, userPrompt);
+        var result = await _gateway.RouteAsync(tenant, new AiCompletionRequest(
+            Provider: provider,
+            SystemPrompt: system,
+            UserPrompt: userPrompt,
+            PromptVersion: PromptVersion,
+            ContainsPhi: containsPhi)
+        {
+            RulebookId = rulebookEntity?.Id,
+            RulebookVersion = rulebookEntity?.Version,
+        }, ct);
+
+        var sections = ReportSectionJson.Parse(result.Text);
+        var recommendations = sections.GetValueOrDefault("recommendations", string.Empty).Trim();
+        if (recommendations.Length == 0)
+        {
+            recommendations = await GenerateMissingRecommendationsAsync(
+                tenant,
+                provider,
+                report,
+                sections.GetValueOrDefault("findings", report.Findings),
+                sections.GetValueOrDefault("impression", report.Impression),
+                rulebookEntity,
+                ct);
+        }
+
+        return new StructuredReportResult(
+            Indication: sections.GetValueOrDefault("indication", string.Empty),
+            Technique: sections.GetValueOrDefault("technique", string.Empty),
+            Comparison: string.Empty,
+            Findings: FormatGeneratedFindings(sections.GetValueOrDefault("findings", string.Empty)),
+            Impression: sections.GetValueOrDefault("impression", string.Empty),
+            Recommendations: recommendations,
+            Provider: result.Provider,
+            Model: result.Model,
+            LatencyMs: result.LatencyMs,
+            PromptVersion: result.PromptVersion);
+    }
+
+    /// <summary>
+    /// Pure prompt builder for <see cref="GenerateStructuredAsync"/>, extracted so a caller with no
+    /// DB/tenant access (the on-device local-generation path) can build the identical prompt from an
+    /// in-memory <see cref="Report"/> that was never loaded from or persisted to a DbContext — mirrors
+    /// the existing <see cref="BuildPromptForMode"/> pattern for the simpler /ai modes.
+    /// </summary>
+    internal static (string system, string instructions, string userPrompt) BuildStructuredPrompt(
+        Report report, RulebookSpec? rulebook, IReadOnlyDictionary<string, string>? overrides = null)
+    {
+        overrides ??= new Dictionary<string, string>();
         string? Resolve(string key) =>
             (overrides.TryGetValue(key, out var ov) && !string.IsNullOrWhiteSpace(ov))
                 ? ov
@@ -262,43 +313,7 @@ public class ReportingService
             must not be empty.
             """;
 
-        var containsPhi = ContainsPhi(report) || ContainsPhiText(system, userPrompt);
-        var result = await _gateway.RouteAsync(tenant, new AiCompletionRequest(
-            Provider: provider,
-            SystemPrompt: system,
-            UserPrompt: userPrompt,
-            PromptVersion: PromptVersion,
-            ContainsPhi: containsPhi)
-        {
-            RulebookId = rulebookEntity?.Id,
-            RulebookVersion = rulebookEntity?.Version,
-        }, ct);
-
-        var sections = ReportSectionJson.Parse(result.Text);
-        var recommendations = sections.GetValueOrDefault("recommendations", string.Empty).Trim();
-        if (recommendations.Length == 0)
-        {
-            recommendations = await GenerateMissingRecommendationsAsync(
-                tenant,
-                provider,
-                report,
-                sections.GetValueOrDefault("findings", report.Findings),
-                sections.GetValueOrDefault("impression", report.Impression),
-                rulebookEntity,
-                ct);
-        }
-
-        return new StructuredReportResult(
-            Indication: sections.GetValueOrDefault("indication", string.Empty),
-            Technique: sections.GetValueOrDefault("technique", string.Empty),
-            Comparison: string.Empty,
-            Findings: FormatGeneratedFindings(sections.GetValueOrDefault("findings", string.Empty)),
-            Impression: sections.GetValueOrDefault("impression", string.Empty),
-            Recommendations: recommendations,
-            Provider: result.Provider,
-            Model: result.Model,
-            LatencyMs: result.LatencyMs,
-            PromptVersion: result.PromptVersion);
+        return (system, instructions, userPrompt);
     }
 
     public static string FormatGeneratedFindings(string? findings)

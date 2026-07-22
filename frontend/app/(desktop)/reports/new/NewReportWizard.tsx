@@ -17,6 +17,7 @@ import RichTextEditor from '@/components/editor/RichTextEditor';
 import GenerationOverlay from '@/components/reports/GenerationOverlay';
 import { reportHref } from '@/lib/routes';
 import { resolveDefaultProvider, setPreferredProviderId } from '@/lib/ai/providerPref';
+import { LOCAL_LLAMA_ADAPTER } from '@/lib/models/onDeviceProvider';
 
 type Step = 1 | 2 | 3 | 4;
 
@@ -115,7 +116,31 @@ export default function NewReportWizard() {
         indication: history,
       });
       await api.reports.patch(created.id, { findings });
-      await api.reports.generate(created.id, { providerId: providerId || undefined });
+
+      if (selectedProvider?.adapter === LOCAL_LLAMA_ADAPTER) {
+        // On-device provider: the whole point of picking it is that generation never
+        // touches the network, so the actual completion runs against the local sidecar
+        // (never the hosted API, which has neither the model nor a llama-server on its
+        // own loopback) and only the result gets saved through the normal patch call.
+        const local = await api.localGenerate.report({
+          modality,
+          bodyPart,
+          contrast,
+          age: age === '' ? null : Number(age),
+          gender,
+          indication: history,
+          findings,
+        });
+        await api.reports.patch(created.id, {
+          indication: local.indication || undefined,
+          technique: local.technique || undefined,
+          findings: local.findings || findings,
+          impression: local.impression || undefined,
+          recommendations: local.recommendations || undefined,
+        });
+      } else {
+        await api.reports.generate(created.id, { providerId: providerId || undefined });
+      }
       setDone(true);
       // Brief beat on "Report ready" before opening the pre-populated editor.
       window.setTimeout(() => {
@@ -125,7 +150,7 @@ export default function NewReportWizard() {
       const err = e as { body?: { error?: string }; message?: string };
       setGenError(err.body?.error || err.message || 'Report generation failed. Please try again.');
     }
-  }, [modality, bodyPart, contrast, age, gender, history, findings, providerId, router]);
+  }, [modality, bodyPart, contrast, age, gender, history, findings, providerId, selectedProvider, router]);
 
   return (
     <Container>

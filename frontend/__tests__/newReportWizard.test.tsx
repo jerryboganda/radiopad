@@ -8,6 +8,7 @@ const providersListMock = vi.fn();
 const createMock = vi.fn();
 const patchMock = vi.fn();
 const generateMock = vi.fn();
+const localGenerateReportMock = vi.fn();
 const routerPushMock = vi.fn();
 
 vi.mock('next/navigation', () => ({
@@ -24,6 +25,9 @@ vi.mock('@/lib/api', () => ({
       create: (...a: unknown[]) => createMock(...a),
       patch: (...a: unknown[]) => patchMock(...a),
       generate: (...a: unknown[]) => generateMock(...a),
+    },
+    localGenerate: {
+      report: (...a: unknown[]) => localGenerateReportMock(...a),
     },
   },
 }));
@@ -72,6 +76,7 @@ describe('new report wizard', () => {
     createMock.mockReset().mockResolvedValue({ id: 'r1' });
     patchMock.mockReset().mockResolvedValue({ id: 'r1' });
     generateMock.mockReset().mockResolvedValue({ id: 'r1' });
+    localGenerateReportMock.mockReset();
     routerPushMock.mockReset();
   });
 
@@ -112,6 +117,61 @@ describe('new report wizard', () => {
     // The staged overlay reaches its ready state.
     await waitFor(() => expect(screen.getByText('Report ready')).toBeInTheDocument());
     await waitFor(() => expect(routerPushMock).toHaveBeenCalledWith('/reports/view?id=r1'), { timeout: 1_500 });
+  });
+
+  it('routes generation through the local sidecar (not the hosted API) when an on-device provider is selected', async () => {
+    providersListMock.mockReset().mockResolvedValue([
+      {
+        id: 'p-local', name: 'MedGemma (on-device)', adapter: 'llama-cpp', model: 'medgemma-1.5-4b-q4',
+        compliance: 4, enabled: true, priority: 100,
+      },
+    ]);
+    localGenerateReportMock.mockResolvedValue({
+      indication: 'Suspected infarct.',
+      technique: 'Non-contrast CT.',
+      findings: 'Large left MCA territory infarct.',
+      impression: '1. Acute infarct.',
+      recommendations: 'No specific follow-up is indicated.',
+      provider: 'llama-cpp',
+      model: 'medgemma-1.5-4b-q4',
+      latencyMs: 500,
+    });
+
+    render(<NewReportWizard />);
+
+    await waitFor(() => expect(screen.getByLabelText('Modality')).toBeInTheDocument());
+    fireEvent.change(screen.getByLabelText('Modality'), { target: { value: 'CT' } });
+    fireEvent.change(screen.getByLabelText('Body part'), { target: { value: 'Brain' } });
+    fireEvent.click(screen.getByText('Next →'));
+    fireEvent.change(screen.getByLabelText('Positive findings'), {
+      target: { value: 'Large left MCA territory infarct.' },
+    });
+    fireEvent.click(screen.getByText('Next →'));
+    fireEvent.click(screen.getByText('Next →'));
+
+    const genBtn = await screen.findByText('Generate report');
+    fireEvent.click(genBtn);
+
+    await waitFor(() => expect(localGenerateReportMock).toHaveBeenCalledTimes(1));
+    expect(localGenerateReportMock.mock.calls[0][0]).toMatchObject({
+      modality: 'CT',
+      bodyPart: 'Brain',
+      findings: 'Large left MCA territory infarct.',
+    });
+    // The completion never goes through the hosted generate endpoint.
+    expect(generateMock).not.toHaveBeenCalled();
+
+    await waitFor(() =>
+      expect(patchMock).toHaveBeenCalledWith('r1', {
+        indication: 'Suspected infarct.',
+        technique: 'Non-contrast CT.',
+        findings: 'Large left MCA territory infarct.',
+        impression: '1. Acute infarct.',
+        recommendations: 'No specific follow-up is indicated.',
+      }),
+    );
+
+    await waitFor(() => expect(screen.getByText('Report ready')).toBeInTheDocument());
   });
 
   it('keeps Generate disabled until findings are provided', async () => {
