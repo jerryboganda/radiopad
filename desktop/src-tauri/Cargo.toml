@@ -1,6 +1,6 @@
 [package]
 name = "radiopad-desktop"
-version = "0.1.110"
+version = "0.1.111"
 description = "RadioPad desktop shell"
 authors = ["RadioPad"]
 edition = "2021"
