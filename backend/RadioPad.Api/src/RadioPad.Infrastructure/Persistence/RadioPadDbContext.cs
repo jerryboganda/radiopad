@@ -76,6 +76,9 @@ public class RadioPadDbContext : DbContext
     /// <summary>PRD RPT-021 — tenant / subspecialty shared autotext macros.</summary>
     public DbSet<SharedMacro> SharedMacros => Set<SharedMacro>();
 
+    /// <summary>Durable AI generation jobs — the restart-surviving counterpart to AiJobRegistry.</summary>
+    public DbSet<AiJob> AiJobs => Set<AiJob>();
+
     protected override void OnModelCreating(ModelBuilder b)
     {
         b.Entity<Tenant>().HasIndex(x => x.Slug).IsUnique();
@@ -165,6 +168,22 @@ public class RadioPadDbContext : DbContext
         // expansion non-deterministic, so the key is unique per tenant.
         b.Entity<SharedMacro>()
             .HasIndex(x => new { x.TenantId, x.Scope, x.Subspecialty, x.Trigger }).IsUnique();
+
+        // Durable AI jobs. The widget rehydration list scans by (tenant, user, recency);
+        // single-flight dedupe and the per-report job history scan by (tenant, report,
+        // status); the boot recovery sweep and retention cleanup scan by (status, completedAt).
+        b.Entity<AiJob>().HasIndex(x => new { x.TenantId, x.UserId, x.CreatedAt });
+        b.Entity<AiJob>().HasIndex(x => new { x.TenantId, x.ReportId, x.Status });
+        b.Entity<AiJob>().HasIndex(x => new { x.Status, x.CompletedAt });
+        // Status as a concurrency token: every SaveChangesAsync that updates an AiJob
+        // row implicitly adds "AND Status = {the value it had when loaded}" to the
+        // generated UPDATE. AiJobCoordinator relies on this to make the queued→running
+        // claim (AiJobCoordinator.RunAsync) and the queued→cancelled request
+        // (AiJobCoordinator.RequestCancelAsync) mutually exclusive against the SAME
+        // row without hand-rolled locking: whichever commits first wins outright, and
+        // the loser's SaveChangesAsync throws DbUpdateConcurrencyException instead of
+        // silently overwriting the winner's outcome.
+        b.Entity<AiJob>().Property(x => x.Status).IsConcurrencyToken();
 
         b.Entity<Report>().OwnsOne(x => x.Study);
         b.Entity<Report>().HasMany(x => x.Versions).WithOne().HasForeignKey(v => v.ReportId);

@@ -109,5 +109,27 @@ public sealed class RetentionWorker : BackgroundService
                 "Retention sweep: tenant {TenantId} purged {AiRequests} AI requests, {Versions} report versions (cutoff {Cutoff:o})",
                 p.TenantId, aiPurged, versionPurged, cutoff);
         }
+
+        // Durable AI jobs — a global (not per-tenant-policy) housekeeping pass: shed
+        // the heavy ResultJson payload 24h after completion (the widget re-fetches
+        // on demand, so it need not linger), then delete terminal rows after 30 days.
+        // Non-terminal rows are never touched here — the boot recovery sweep owns those.
+        var aiResultCutoff = DateTimeOffset.UtcNow.AddHours(-24);
+        var aiRowCutoff = DateTimeOffset.UtcNow.AddDays(-30);
+
+        var aiResultsCleared = await db.AiJobs
+            .Where(j => j.Status != "queued" && j.Status != "running"
+                        && j.ResultJson != null
+                        && j.CompletedAt != null && j.CompletedAt < aiResultCutoff)
+            .ExecuteUpdateAsync(s => s.SetProperty(j => j.ResultJson, (string?)null), ct);
+
+        var aiJobsDeleted = await db.AiJobs
+            .Where(j => j.CompletedAt != null && j.CompletedAt < aiRowCutoff)
+            .ExecuteDeleteAsync(ct);
+
+        if (aiResultsCleared > 0 || aiJobsDeleted > 0)
+            _log.LogInformation(
+                "Retention sweep: AI jobs — cleared {Cleared} result payload(s) (>24h), deleted {Deleted} row(s) (>30d)",
+                aiResultsCleared, aiJobsDeleted);
     }
 }

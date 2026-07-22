@@ -4,6 +4,102 @@
 
 ---
 
+## Durable async-AI-job platform — Phase 6 trigger-site refactors (2026-07-23)
+
+The report editor and New Report wizard now **submit-and-continue** through the global
+`JobsProvider` instead of blocking on an inline request/poll cycle. Frontend-only slice
+(desktop surface); backend contracts unchanged.
+
+- **`ReportClient.tsx`**: `runAi('impression')`, `runGenerateDraft`, and the
+  `radiopad:generate-impression` hotkey now `flushEdits()` then `jobs.submit(...)` and return
+  immediately. The blanket `aiBusy`/`busyAiAction` disable-everything is gone — `AiActionsBar`
+  gets an additive `activeActions` prop derived from `useJobsForReport(id)`, so only the button
+  whose own `(reportId, kind, mode)` job is non-terminal is disabled; impression / draft / a
+  rewrite run concurrently. A shared `applyJobResult` applies a finished result the SAME way the
+  old inline success handler did (impression wearing `.ai-mark`, Undo snapshot), driven both by a
+  live-completion effect (jobs watched go active→ok while mounted) and the `?aiJob=`/`?localJob=`
+  deep-link — only when the target is unchanged since submit (`canAutoApplyAiResult`), else a
+  non-destructive Apply/Dismiss preview; a 404/expired result toasts "run it again". `generate`
+  jobs persist server-side, so on ok the editor auto-refetches when pristine, else offers a
+  "Refresh to see it" affordance (dirty-tracked). The AI activity rail now DERIVES its
+  impression/draft/local rows from the tracked jobs (merged with the sync-only rewrite / cleanup /
+  cross-check entries), so panel + widget can't disagree.
+- **`NewReportWizard.tsx`**: online → `jobs.submit({kind:'generate'})`, on-device →
+  `jobs.submit({kind:'local-generate', dto})`; then a "Generation queued" toast (with an
+  "Open report" shortcut) and the form **resets for the next case** (operator batch-posting
+  decision) instead of `router.push`-ing into the report. `GenerationOverlay` usage deleted.
+- **New `GenerationBanner.tsx`** — slim, non-modal, dismissible banner (`.banner ai .rp-genbanner`,
+  RC tokens, both themes) rendered atop the editor while a generate/local-generate job for that
+  report is still running (elapsed timer + local stage). Documented in `docs/02-design/design.md`.
+- **Deviation (documented):** `runRewrite` was **not** migrated to `jobs.submit`. The backend
+  rewrite path is a separate *synchronous* service (`IReportRewriteService`) with a preview +
+  §5.3 fabrication-violations contract — it is not one of the async job kinds (`ai`=impression /
+  `generate` / `local-generate`), and fire-and-forget would destroy the "flag before accept" gate.
+  It stays on its inline preview path (like `runDictationCleanup`/`runCrossCheck`, also inline v1).
+- **Tests**: `jobsApply` (`canAutoApplyAiResult` staleness gate, 4), `generationBanner` (render
+  states + live timer + dismiss, 6). Existing `aiActionsBarCustom` stays green (prop change is
+  additive). Full ReportClient `?aiJob=` integration test deferred — the component's heavy mount
+  surface makes the extracted decision helper the higher-value unit.
+- Ships in the desktop bundle → desktop release required (`pnpm release:desktop`).
+
+---
+
+## Durable async-AI-job platform — Phase 4.2/4.3/5 frontend (2026-07-23)
+
+Global `JobsProvider` (`components/jobs/JobsProvider.tsx`) + top-right `JobsIndicator`
+(`components/jobs/JobsIndicator.tsx`) + shared model (`lib/jobs.ts`), wired into `AppShell`
+(under `AuthGate`, inside `ToastProvider`) and `Topbar` (before the notifications bell).
+
+- **Provider**: React Context + `useReducer` (house style, no store lib). One shared
+  `setTimeout`-chained poll ticker — fast 300ms first poll ramping to a 2s cadence (5s floor
+  while `document.hidden`), idle when no active jobs. Hosted jobs poll `api.jobs.get` with a
+  fallback to the still-live report-scoped `aiJobStatus` (JobsController may still be rolling
+  out); local jobs poll `api.localGenerate.jobStatus` (404 → `sidecar_restart`). Rehydrates from
+  `api.jobs.list({active})` + `api.localGenerate.listJobs()` (Tauri only) + a metadata-only
+  localStorage seed (`rp.jobs.v1`, ids/timestamps only, tenant-guarded — never clinical text).
+  Fire-once terminal side effects (toast + `notify()` bell + `radiopad:job-terminal` PHI-min
+  event + `aria-live`). Hard 401 clears all + stops. **Fixed a mount-order bug the tests caught:
+  the persistence effect wiped the seed on the empty first commit before rehydration read it.**
+- **Widget**: Sparkles button + spinner ring + count badge (active/success/danger tones);
+  `role="dialog"` popover with per-status rows (Cancel/Retry/Open report/Dismiss), stage text
+  for local jobs, elapsed timer, "Clear finished" footer, `EmptyState`. Outside-click/Esc close.
+  New `.rp-jobs-*` CSS family in `shell.css` (cloned from `.rp-bell`), RC tokens only, both
+  themes + `prefers-reduced-motion` handled. Documented in `docs/02-design/design.md`.
+- **`submit()` contract (Phase 6 depends on it)**: `submit(spec: JobSubmitSpec): Promise<string>`
+  where `JobSubmitSpec` is a discriminated union over hosted `ai` / hosted `generate` / local
+  `local-generate` (local carries the study-context `dto` + `correlationId=reportId`). Dedupes
+  a non-terminal `(reportId, kind, mode)` before submitting.
+- **Tests**: `jobsReducer` (24), `jobsIndicator` (15), `jobsProvider` (3) — 42 green locally.
+  Backend JobsController + sidecar job endpoints land in parallel (separate PR); the provider
+  tolerates their 404s gracefully in the interim.
+
+---
+
+## Async AI generation jobs — durable backend core (Phase 1.3/1.4 + 2.2 UBAG, 2026-07-23)
+
+AI report generation now runs on a durable, restart-surviving job platform instead of a
+detached `Task.Run`. Backend slice (frontend widget + sidecar jobs land in later PRs):
+
+- **`AiJobs` table** (`AiJob` entity, migration `20260723090000_AddAiJobs`) fronted by the
+  in-memory `AiJobRegistry` hot cache. Status `queued|running|ok|error|cancelled`.
+- **`AiJobCoordinator`** (new) — write-through layer + new home of the job-execution logic
+  lifted verbatim from `ReportsController` (freshness guard, typed errorKinds, `ApplyStructuredResultAsync`).
+  Registry-first / DB-second ordering; DB single-flight; queued-cancel short-circuit (zero provider
+  cost); retry always a new row (`Attempt+1`, `RetryOfJobId`) that re-runs the regulated-feature gate.
+- **`AiJobRunner`** (new hosted `BackgroundService`) — unbounded `Channel<AiJobWork>`, bounded
+  concurrency (`AiJobs:MaxConcurrency`, default 4), per-job CTS = shutdown + safety timeout + cancel.
+- **`AiJobRecoveryHostedService`** (new) — boot sweep marks orphaned queued/running rows
+  `error`/`server_restart`; never re-enqueues.
+- **`RetentionWorker`** extended — nulls `ResultJson` after 24h, deletes rows after 30 days.
+- **`ReportsController`** submit/poll rewired, contract-preserving: submit still `202 { jobId, status }`;
+  poll falls back to the durable row on a registry miss (a restart surfaces `errorKind: server_restart`
+  instead of a 404).
+- **UBAG** `CompleteAsync` best-effort cancels the gateway job on cancellation before rethrowing.
+- Tests: `Services/AiJobCoordinatorTests.cs` (state machine, single-flight, retry linkage, cancel
+  short-circuit, boot recovery), `Integration/AiJobEndpointsTests.cs` (submit 202, poll DB fallback,
+  server_restart surfacing, tenant isolation). Guardrails `AiJobRegistryTests` / `RewriteModeTests` /
+  `AiPolicyHttpTests` untouched and unaffected. CI decides whether it all builds.
+
 ## On-device MedGemma self-test: CPU pegged then timed out (2026-07-21)
 
 Bug report: starting the MedGemma self-test drove CPU to ~99% and then the test failed with an

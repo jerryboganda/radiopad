@@ -384,6 +384,36 @@ shows an accent dot (`.rp-update-dot`) when an update is waiting; status text
 (`.rp-update-label`) uses the semantic families — blue for checking/
 downloading, green for up-to-date, red for failure.
 
+**Async AI jobs widget (`.rp-jobs-*`, desktop shell only).** A topbar icon
+button (Sparkles, on `.rp-topbar-iconbtn`) sits immediately before the
+notifications bell and tracks every durable AI generation job — hosted
+(impression / rewrite / draft generation) and on-device sidecar (local draft).
+A spinner ring (`.rp-jobs-ring`) shows while anything is queued/running and a
+count badge (`.rp-jobs-badge`, tone `active` → `--color-ai`, `success` →
+`--color-success`, `danger` → `--color-danger`) reflects running vs. unseen
+finished. The `role="dialog"` popover (`.rp-jobs-popover`, cloned from
+`.rp-bell-popover`) lists one `.rp-jobs-item` per job — tinted by the semantic
+families (Blocker/fail → red, cancelled → amber, running → blue, ready → green)
+— with a per-status action set (Cancel / Retry / Open report / Dismiss) and a
+"Clear finished" footer. Outside-click + `Escape` close it (same pattern as the
+bell); terminal transitions are announced through a visually-hidden
+`aria-live="polite"` region in `JobsProvider`. `prefers-reduced-motion` swaps
+the spinner rotation for an opacity pulse (`rp-jobs-pulse`) and drops the
+popover animation. RC tokens only — both themes come for free.
+
+**In-editor generation banner (`.rp-genbanner`, report editor only).** A slim,
+non-modal, dismissible banner (`GenerationBanner`, built on `.banner.ai` so the
+AI tint resolves in both themes) is rendered at the top of the report composer
+while a whole-report generate / local-generate job for the open report is still
+running in the background — what a radiologist sees if they open a report
+mid-generation (submitted from the New Report wizard, the AI bar, or elsewhere).
+It carries a `.rp-spinner`, a "Generating draft…" label, the sidecar `stage`
+text for local jobs, and a `.rp-genbanner-timer` elapsed clock (`--mono`), and
+reads the SAME tracked `Job` the topbar widget does so the two never disagree.
+It replaces the old full-surface `GenerationOverlay` modal — the wizard no
+longer traps the user on a spinner; generation is submit-and-continue. RC
+tokens only.
+
 #### 3.1.1 In-page two-pane primitive (`.split`)
 
 `.split` defaults to `grid-template-columns: minmax(380px, 460px) 1fr` and is

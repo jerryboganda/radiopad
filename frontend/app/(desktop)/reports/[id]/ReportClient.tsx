@@ -19,7 +19,20 @@ import {
   type ReportSignature,
   type CrossCheckCorrection,
   type CatalogItem,
+  type JobKind,
+  type LocalGenerateResult,
 } from '@/lib/api';
+import { describeAiError } from '@/lib/aiErrors';
+import { useJobs, useJobsForReport } from '@/components/jobs/JobsProvider';
+import GenerationBanner from '@/components/reports/GenerationBanner';
+import { useToast } from '@/components/ui/ToastProvider';
+import {
+  canAutoApplyAiResult,
+  isActiveStatus,
+  jobKindLabel,
+  type Job,
+  type JobOrigin,
+} from '@/lib/jobs';
 import { getSessionAudio } from '@/lib/dictation/audioBuffer';
 import { isUseUbagEnabled } from '@/lib/dictation/crossCheckPrefs';
 import { anchorCorrections, applyCorrection } from '@/lib/dictation/anchorCorrections';
@@ -90,6 +103,53 @@ type RewriteState = {
   violations?: import('@/lib/api').RewriteViolation[];
 };
 
+/**
+ * A finished async-AI result that could NOT be auto-applied because the target
+ * field changed since the job was submitted — held for a non-destructive
+ * confirm/preview instead of a silent overwrite (Phase 6.1 clinical-safety gate).
+ */
+type PendingAiResult =
+  | { jobId: string; kind: 'impression'; text: string }
+  | { jobId: string; kind: 'local'; sections: LocalGenerateResult };
+
+/** A deterministic 404 (result expired / job gone) — distinct from a transient
+ *  poll error, which the JobsProvider's ticker keeps retrying. */
+function isNotFoundError(e: unknown): boolean {
+  return (e as { status?: number })?.status === 404;
+}
+
+/** Stable numeric key for a guid job id (AiActivityEntry.id is a number). */
+function hashJobId(s: string): number {
+  let h = 0;
+  for (let i = 0; i < s.length; i++) h = (h * 31 + s.charCodeAt(i)) | 0;
+  return Math.abs(h);
+}
+
+/** Map a tracked async `Job` → an AI-activity rail entry so the rail derives
+ *  impression/draft/local rows from the SAME state the topbar widget shows
+ *  (the sync-only rewrite/cleanup/cross-check ops still log locally alongside). */
+function jobToActivityEntry(job: Job): AiActivityEntry {
+  const status: AiActivityEntry['status'] =
+    job.status === 'ok'
+      ? 'completed'
+      : job.status === 'error' || job.status === 'cancelled'
+        ? 'failed'
+        : 'running';
+  return {
+    id: hashJobId(job.id),
+    startedAt: job.startedAt ?? job.createdAt,
+    action: jobKindLabel(job),
+    status,
+    scope: job.kind === 'ai' ? 'Impression' : 'All sections',
+    error:
+      status === 'failed'
+        ? job.status === 'cancelled'
+          ? 'Cancelled'
+          : job.error || describeAiError(job.errorKind)
+        : undefined,
+  };
+}
+
 // RC display titles for the section cards (data keys are unchanged).
 const SECTION_TITLES: Record<string, string> = {
   indication: 'Clinical information',
@@ -120,7 +180,6 @@ export default function ReportPage() {
   const [bodyParts, setBodyParts] = useState<CatalogItem[]>([]);
   const [findings, setFindings] = useState<ValidationFinding[]>([]);
   const [qualityScore, setQualityScore] = useState<number | null>(null);
-  const [aiBusy, setAiBusy] = useState(false);
   const [busyAiAction, setBusyAiAction] = useState<AiBarAction | null>(null);
   const [aiHighlights, setAiHighlights] = useState<Record<string, boolean>>({});
   // RC-03 Undo — pre-AI text snapshots per section, captured whenever an AI
@@ -188,6 +247,41 @@ export default function ReportPage() {
   const aiUndoRef = useRef(aiUndo);
   aiUndoRef.current = aiUndo;
 
+  // --- Phase 6.1 durable async-job wiring ----------------------------------
+  // The generate / impression / local-generate paths now submit-and-continue
+  // through the global JobsProvider; the topbar widget owns polling. This page
+  // derives per-button busy state, the in-editor banner, and the activity rail
+  // from the SAME tracked jobs the widget shows, so they can never disagree.
+  const jobs = useJobs();
+  const reportJobs = useJobsForReport(id ?? '');
+  const { toast } = useToast();
+  // Impression text captured at submit, keyed by jobId — lets the completion
+  // apply detect the field was edited under the running job (staleness check).
+  const aiJobBefore = useRef<Map<string, string>>(new Map());
+  // Jobs we watched go terminal-ok while mounted — ONLY these auto-apply; a job
+  // already finished on arrival must never clobber current editor content.
+  const seenActiveRef = useRef<Set<string>>(new Set());
+  // Jobs whose result we have already applied/handled (a terminal decision has
+  // been reached — never re-fetch or re-apply).
+  const appliedJobsRef = useRef<Set<string>>(new Set());
+  // Jobs whose result fetch is in flight right now (guards concurrent dispatch
+  // from the two effects; cleared when the fetch settles so a still-running job
+  // can be retried when it finishes).
+  const dispatchedRef = useRef<Set<string>>(new Set());
+  // Editor-dirty tracker for the generate-ok refetch decision (set true on a
+  // section edit, cleared on a successful save/reload).
+  const dirtyRef = useRef(false);
+  // The ?aiJob=/?localJob= deep-link is consumed exactly once per mount.
+  const queryJobHandledRef = useRef(false);
+  // A finished result that could not be auto-applied (target changed under it) —
+  // surfaced as a non-destructive preview rather than a silent overwrite.
+  const [pendingAiResult, setPendingAiResult] = useState<PendingAiResult | null>(null);
+  // A finished generate job whose auto-refetch is deferred because the editor is
+  // dirty (unsaved keystrokes) — offered as an explicit "Refresh" affordance.
+  const [generateReadyJobId, setGenerateReadyJobId] = useState<string | null>(null);
+  // Per-jobId dismissal of the in-editor GenerationBanner.
+  const [dismissedGenBanner, setDismissedGenBanner] = useState<string | null>(null);
+
   // Re-render every 30s so the "Saved N min ago" label stays fresh.
   const [, setSavedTick] = useState(0);
   useEffect(() => {
@@ -247,6 +341,7 @@ export default function ReportPage() {
       setReport(next);
       setSaveError(null);
       setSavedAt(Date.now());
+      dirtyRef.current = false;
     } catch (e) {
       // RC-02 unsaved warning — keep the on-screen text (local draft) and let
       // "Retry sync" re-send it rather than silently dropping the edit.
@@ -282,6 +377,7 @@ export default function ReportPage() {
       setReport(next);
       setSaveError(null);
       setSavedAt(Date.now());
+      dirtyRef.current = false;
     } catch (e) {
       setSaveError((e as Error).message || 'Changes are not yet synced.');
       throw e;
@@ -293,86 +389,263 @@ export default function ReportPage() {
     try { setSignatures(await api.reports.signatures(report.id)); } catch { /* noop */ }
   }
 
+  /** The non-PHI study descriptor the widget/banner rows label with (no fetch —
+   *  pulled from the already-loaded report). */
+  function reportInfo() {
+    const r = reportRef.current;
+    if (!r) return undefined;
+    return { accession: r.study.accessionNumber, modality: r.study.modality, bodyPart: r.study.bodyPart };
+  }
+
+  /**
+   * Generate Impression — submit-and-continue (Phase 6.1). Flush unsaved edits
+   * first (so the model drafts from what's on screen), then enqueue an `ai` job
+   * and return immediately; the button is busy only for this sub-second submit.
+   * The impression text lands via `applyJobResult` — driven by the completion
+   * effect when the job finishes here, or by the ?aiJob= deep-link if the report
+   * was opened from the widget after finishing elsewhere.
+   */
   async function runAi(mode: string) {
     if (!report || !providerId) return;
-    setAiBusy(true);
-    setBusyAiAction('impression');
     setError(null);
-    const providerName = providers.find((x) => x.id === providerId)?.name;
-    const actId = logActivity('Generate Impression', 'Impression');
     try {
-      // Persist unsaved edits first so the AI drafts from what's on screen.
       await flushEdits();
       const before = String(reportRef.current?.impression ?? '');
-      const out = await api.reports.runAi(report.id, { mode: mode as 'impression', providerId });
-      setAiUndo((prev) => ({ ...prev, impression: before }));
-      const nextHighlights = { ...aiHighlightsRef.current, impression: true };
-      setAiHighlights(nextHighlights);
-      await update({ impression: out.text, aiHighlightsJson: JSON.stringify(nextHighlights) });
-      patchActivity(actId, {
-        status: 'completed',
-        provider: out.provider || providerName,
-        model: out.model,
-        promptVersion: out.promptVersion,
-        latencyMs: out.latencyMs,
+      const jobId = await jobs.submit({
+        origin: 'hosted',
+        kind: 'ai',
+        reportId: report.id,
+        mode,
+        providerId,
+        report: reportInfo(),
       });
+      // Snapshot the field at submit so the completion apply can tell whether it
+      // was edited under the running job (dedupe may return an existing id — keep
+      // that job's original snapshot).
+      if (!aiJobBefore.current.has(jobId)) aiJobBefore.current.set(jobId, before);
     } catch (e) {
       const err = e as { body?: { error?: string; kind?: string }; message: string };
-      const msg = err.body?.error || err.message;
-      setError(msg);
-      patchActivity(actId, { status: 'failed', error: msg, provider: providerName });
-    } finally {
-      setAiBusy(false);
-      setBusyAiAction(null);
+      // Prefer the server's specific message; fall back to shared errorKind copy.
+      setError(err.body?.error || describeAiError(err.body?.kind, err.message));
     }
   }
 
   /**
-   * RC-06 "Generate Draft" — whole-report generation through the existing
-   * async job endpoint (`/generate/jobs`). Every AI-populated section comes
-   * back flagged; pre-generation text is snapshotted per section for Undo.
+   * RC-06 "Generate Draft" — whole-report generation, submit-and-continue
+   * (Phase 6.1). A `generate` job PERSISTS its result server-side (sections +
+   * `ReportVersion`), so nothing is applied client-side here: when the tracked
+   * job finishes ok, the completion effect refetches the report (pristine
+   * editor) or offers a non-blocking "Refresh" (unsaved keystrokes present).
    */
   async function runGenerateDraft() {
     if (!report) return;
-    setAiBusy(true);
-    setBusyAiAction('draft');
     setError(null);
-    const provider = providers.find((x) => x.id === providerId);
-    const actId = logActivity('Generate Draft', 'All sections');
     try {
       await flushEdits();
-      const before = reportRef.current as Report;
-      const next = await api.reports.generate(report.id, providerId ? { providerId } : {});
-      const undo: Record<string, string> = {};
-      for (const { key } of SECTIONS) {
-        const prevVal = String((before as Record<string, unknown>)[key as string] ?? '');
-        const newVal = String((next as Record<string, unknown>)[key as string] ?? '');
-        if (prevVal !== newVal) undo[key as string] = prevVal;
-      }
-      let flags: Record<string, boolean> = {};
-      try { flags = JSON.parse(next.aiHighlightsJson || '{}'); } catch { flags = {}; }
-      if (!Object.values(flags).some(Boolean) && Object.keys(undo).length > 0) {
-        // Server did not flag the sections — flag the ones it changed so the
-        // clinical-safety marking never goes missing.
-        flags = Object.fromEntries(Object.keys(undo).map((k) => [k, true]));
-        await api.reports.patch(next.id, { aiHighlightsJson: JSON.stringify(flags) }).catch(() => {});
-      }
-      setAiUndo((prev) => ({ ...prev, ...undo }));
-      setReport(next);
-      setAiHighlights(flags);
-      setSaveError(null);
-      setSavedAt(Date.now());
-      patchActivity(actId, { status: 'completed', provider: provider?.name, model: provider?.model });
+      await jobs.submit({
+        origin: 'hosted',
+        kind: 'generate',
+        reportId: report.id,
+        providerId: providerId || undefined,
+        report: reportInfo(),
+      });
     } catch (e) {
       const err = e as { body?: { error?: string; kind?: string }; message: string };
-      const msg = err.body?.error || err.message;
-      setError(msg);
-      patchActivity(actId, { status: 'failed', error: msg, provider: provider?.name });
-    } finally {
-      setAiBusy(false);
-      setBusyAiAction(null);
+      setError(err.body?.error || describeAiError(err.body?.kind, err.message));
     }
   }
+
+  // ---- Phase 6.1 apply-on-completion (shared by the live-job path + the
+  //      ?aiJob=/?localJob= deep-link) ----------------------------------------
+
+  /** Mark a job's result as applied — locally (fire-once) and, when tracked, on
+   *  the provider (clears the widget's unapplied "Open report" hint). */
+  function markAppliedJob(jobId: string) {
+    appliedJobsRef.current.add(jobId);
+    try { jobs.markApplied(jobId); } catch { /* not tracked (deep-link, evicted) */ }
+  }
+
+  /** Apply a single generated impression, wearing `.ai-mark`, with an Undo snapshot. */
+  async function applyImpression(text: string) {
+    const before = String(reportRef.current?.impression ?? '');
+    setAiUndo((prev) => ({ ...prev, impression: before }));
+    const next = { ...aiHighlightsRef.current, impression: true };
+    setAiHighlights(next);
+    await update({ impression: text, aiHighlightsJson: JSON.stringify(next) });
+  }
+
+  /** Apply the on-device generator's structured sections, each wearing `.ai-mark`. */
+  async function applyLocalSections(cs: LocalGenerateResult) {
+    const patch: Partial<Report> = {};
+    const nextHighlights = { ...aiHighlightsRef.current };
+    const undo: Record<string, string> = {};
+    (['indication', 'technique', 'findings', 'impression', 'recommendations'] as const).forEach((k) => {
+      const v = cs[k];
+      if (v && v.trim()) {
+        undo[k] = String((reportRef.current as Record<string, unknown> | null)?.[k] ?? '');
+        (patch as Record<string, unknown>)[k] = v;
+        nextHighlights[k] = true;
+      }
+    });
+    if (Object.keys(patch).length === 0) return;
+    setAiUndo((prev) => ({ ...prev, ...undo }));
+    setAiHighlights(nextHighlights);
+    await update({ ...patch, aiHighlightsJson: JSON.stringify(nextHighlights) } as Partial<Report>);
+  }
+
+  const expiredToast = () =>
+    toast({ tone: 'info', title: 'Result expired', message: 'This AI result is no longer available — run it again.' });
+
+  /** Fetch a finished job's retained result and apply it — auto when the target
+   *  is unchanged since submit, else via a non-destructive preview. Called both
+   *  from the live-completion effect and the ?aiJob=/?localJob= deep-link. Owns
+   *  its own idempotency: a still-running job is left unmarked so it re-applies
+   *  once it settles; a terminal decision (apply / preview / expired) is final. */
+  async function applyJobResult(jobId: string, origin: JobOrigin, kind: JobKind) {
+    if (appliedJobsRef.current.has(jobId) || dispatchedRef.current.has(jobId)) return;
+    dispatchedRef.current.add(jobId);
+    try {
+      let status: string | undefined;
+      let result: unknown;
+      try {
+        if (origin === 'local') {
+          const env = await api.localGenerate.jobStatus(jobId);
+          status = env.status; result = env.result;
+        } else {
+          try {
+            const detail = await api.jobs.get(jobId);
+            status = detail.status; result = detail.result;
+          } catch (e) {
+            if (isNotFoundError(e)) throw e;
+            // Unified engine unavailable/evicted → the proven report-scoped poll.
+            const env = await api.reports.aiJobStatus(reportRef.current!.id, jobId);
+            status = env.status; result = env.result;
+          }
+        }
+      } catch (e) {
+        // 404 = gone for good (expired / restart-swept). Any other error is
+        // transient — leave the job unmarked so a later tick can retry.
+        if (isNotFoundError(e)) { appliedJobsRef.current.add(jobId); expiredToast(); }
+        return;
+      }
+
+      // Still running (deep-link opened mid-generation), or failed — nothing to
+      // apply here; the live-completion effect and the widget own those states.
+      if (status && status !== 'ok') return;
+      if (result == null) { appliedJobsRef.current.add(jobId); expiredToast(); return; }
+
+      if (kind === 'local-generate') {
+        const cs = result as LocalGenerateResult;
+        // Whole-report apply — only auto-apply onto a pristine editor.
+        if (dirtyRef.current) {
+          appliedJobsRef.current.add(jobId);
+          setPendingAiResult({ jobId, kind: 'local', sections: cs });
+          return;
+        }
+        await applyLocalSections(cs);
+        markAppliedJob(jobId);
+      } else {
+        const text = (result as { text?: string }).text;
+        if (typeof text !== 'string') { markAppliedJob(jobId); return; }
+        const before = aiJobBefore.current.get(jobId);
+        const current = String(reportRef.current?.impression ?? '');
+        if (canAutoApplyAiResult(current, before)) {
+          await applyImpression(text);
+          markAppliedJob(jobId);
+        } else {
+          appliedJobsRef.current.add(jobId);
+          setPendingAiResult({ jobId, kind: 'impression', text });
+        }
+      }
+    } finally {
+      dispatchedRef.current.delete(jobId);
+    }
+  }
+
+  /** Apply the result held in the non-destructive preview, then clear it. */
+  async function applyPendingResult() {
+    const p = pendingAiResult;
+    if (!p) return;
+    if (p.kind === 'impression') await applyImpression(p.text);
+    else await applyLocalSections(p.sections);
+    markAppliedJob(p.jobId);
+    setPendingAiResult(null);
+  }
+
+  /** Dismiss the preview without applying — do not re-prompt for this job. */
+  function dismissPendingResult() {
+    if (pendingAiResult) appliedJobsRef.current.add(pendingAiResult.jobId);
+    setPendingAiResult(null);
+  }
+
+  /** Refetch the report after a finished generate job persisted it server-side. */
+  async function reloadReport() {
+    const r = reportRef.current;
+    if (!r) return;
+    try {
+      const next = await api.reports.get(r.id);
+      setReport(next);
+      setSavedAt(new Date(next.updatedAt).getTime() || Date.now());
+      try { setAiHighlights(JSON.parse(next.aiHighlightsJson || '{}')); } catch { /* noop */ }
+      dirtyRef.current = false;
+      setSaveError(null);
+    } catch { /* keep current view; the widget still lets them open it */ }
+  }
+
+  async function handleGenerateOk(jobId: string) {
+    // Respect in-progress typing: defer the refetch behind an explicit Refresh
+    // when the editor has unsaved/unsynced edits (dirtyRef stays true after a
+    // failed sync too); otherwise pull the freshly generated sections in.
+    if (dirtyRef.current) {
+      setGenerateReadyJobId(jobId);
+      return;
+    }
+    await reloadReport();
+    markAppliedJob(jobId);
+  }
+
+  // Live-completion path: apply results for jobs we watched finish while mounted.
+  // A job already-terminal on arrival (rehydration) is never auto-applied — it
+  // must not clobber the current editor content.
+  useEffect(() => {
+    if (!report) return;
+    for (const job of reportJobs) {
+      if (isActiveStatus(job.status)) { seenActiveRef.current.add(job.id); continue; }
+      if (job.status !== 'ok' || !seenActiveRef.current.has(job.id)) continue;
+      if (job.kind === 'generate') {
+        if (appliedJobsRef.current.has(job.id)) continue;
+        appliedJobsRef.current.add(job.id);
+        void handleGenerateOk(job.id);
+      } else {
+        // applyJobResult owns its own idempotency (applied/dispatched guards).
+        void applyJobResult(job.id, job.origin, job.kind);
+      }
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [reportJobs, report]);
+
+  // Deep-link path: apply the ?aiJob=/?localJob= result once the report is loaded
+  // (opened from the widget after the job finished elsewhere). Strip the param so
+  // a manual refresh cannot re-apply. A still-running deep-link job is left for
+  // the live-completion effect to apply when it settles.
+  useEffect(() => {
+    if (!report || queryJobHandledRef.current) return;
+    const aiJob = readQueryParam('aiJob');
+    const localJob = readQueryParam('localJob');
+    const jobId = aiJob || localJob;
+    if (!jobId) return;
+    queryJobHandledRef.current = true;
+    if (typeof window !== 'undefined') {
+      const url = new URL(window.location.href);
+      url.searchParams.delete('aiJob');
+      url.searchParams.delete('localJob');
+      window.history.replaceState({}, '', url.toString());
+    }
+    // The widget only emits ?aiJob= for `ai` results and ?localJob= for local
+    // drafts (generate jobs persist server-side and need no deep-link apply).
+    void applyJobResult(jobId, localJob ? 'local' : 'hosted', localJob ? 'local-generate' : 'ai');
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [report?.id]);
 
   async function runRewrite(mode: RewriteMode, sectionOverride?: keyof Report, instruction?: string) {
     if (!report) return;
@@ -1098,6 +1371,28 @@ export default function ReportPage() {
   const matchedRulebook = rulebooks.find((r) => r.id === report.rulebookId);
   const matchedTemplate = templates.find((t) => t.id === report.templateId);
 
+  // --- Phase 6.1 job-derived render state ----------------------------------
+  // Per-button busy for the async AI actions (concurrent by design — no blanket
+  // disable). The sync rewrite family keeps its own `busyAiAction`.
+  const activeAiActions: AiBarAction[] = [];
+  if (reportJobs.some((j) => j.kind === 'generate' && isActiveStatus(j.status))) activeAiActions.push('draft');
+  if (reportJobs.some((j) => j.kind === 'ai' && j.mode === 'impression' && isActiveStatus(j.status)))
+    activeAiActions.push('impression');
+
+  // Active whole-report job for this report → the slim in-editor GenerationBanner.
+  const generatingJob = reportJobs.find(
+    (j) => (j.kind === 'generate' || j.kind === 'local-generate') && isActiveStatus(j.status),
+  );
+
+  // AI activity rail: async jobs derived from the tracked list + the sync-only
+  // ops (rewrite / cleanup / cross-check) that still log to `aiActivity`.
+  const mergedActivity: AiActivityEntry[] = [
+    ...aiActivity,
+    ...reportJobs
+      .filter((j) => j.kind === 'ai' || j.kind === 'generate' || j.kind === 'local-generate')
+      .map(jobToActivityEntry),
+  ];
+
   // The template editor's per-section "req" checkbox was persisted into sectionsJson and then read
   // by nothing — a template author could mark Findings required and a report could be signed with
   // it empty, no warning anywhere. Surfaced here as a review prompt rather than a hard block: the
@@ -1246,9 +1541,51 @@ export default function ReportPage() {
             </div>
           )}
 
+          {generatingJob && dismissedGenBanner !== generatingJob.id && (
+            <GenerationBanner
+              job={generatingJob}
+              onDismiss={() => setDismissedGenBanner(generatingJob.id)}
+            />
+          )}
+
+          {generateReadyJobId && (
+            <div className="banner info" role="status" data-testid="draft-ready-banner">
+              A freshly generated draft is ready.
+              <button
+                className="ghost"
+                type="button"
+                style={{ marginLeft: 8 }}
+                onClick={() => {
+                  const jid = generateReadyJobId;
+                  setGenerateReadyJobId(null);
+                  void reloadReport().then(() => { if (jid) markAppliedJob(jid); });
+                }}
+              >
+                Refresh to see it
+              </button>
+            </div>
+          )}
+
+          {pendingAiResult && (
+            <div className="banner ai" role="status" data-testid="pending-ai-result">
+              <span className="badge ai">✨ generated</span>{' '}
+              {pendingAiResult.kind === 'impression' ? 'A new impression' : 'A generated draft'} is
+              ready, but this report changed since it was requested — review before applying.
+              <div className="rp-toolbar rp-mt-sm">
+                <button className="primary" type="button" onClick={() => { void applyPendingResult(); }}>
+                  Apply
+                </button>
+                <button className="ghost" type="button" onClick={dismissPendingResult}>
+                  Dismiss
+                </button>
+              </div>
+            </div>
+          )}
+
           <AiActionsBar
             canEdit={canEdit}
             busyAction={busyAiAction}
+            activeActions={activeAiActions}
             onGenerateDraft={() => { void runGenerateDraft(); }}
             onGenerateImpression={() => { void runAi('impression'); }}
             rewriteModes={REWRITE_MODES}
@@ -1534,6 +1871,7 @@ export default function ReportPage() {
                         corrections[keyStr] ?? [],
                       )}
                       onChange={(val) => {
+                        dirtyRef.current = true;
                         const next = { ...aiHighlights };
                         if (next[keyStr]) delete next[keyStr];
                         setAiHighlights(next);
@@ -1558,6 +1896,7 @@ export default function ReportPage() {
                         if (snippetKeyDown(e.currentTarget)) e.preventDefault();
                       }}
                       onChange={(e) => {
+                        dirtyRef.current = true;
                         const next = { ...aiHighlights };
                         if (next[keyStr]) delete next[keyStr];
                         setAiHighlights(next);
@@ -1594,7 +1933,7 @@ export default function ReportPage() {
           canValidate={canValidate}
           onValidate={validate}
           onJumpToSection={jumpToSection}
-          aiActivity={aiActivity}
+          aiActivity={mergedActivity}
           provider={selectedProvider}
           onShowProvenance={(entry) => setProvenance({ open: true, entry })}
           canExport={canExport}

@@ -340,6 +340,14 @@ public enum AuditAction
     /// updated, or deleted. Details record the macro id, trigger, scope and which action ran;
     /// the expansion body is authored boilerplate but is not echoed into the audit trail.</summary>
     MacroChanged = 120,
+    /// <summary>A radiologist cancelled a running or queued async AI job via
+    /// <c>POST /api/jobs/{id}/cancel</c>. Details record the job id and the status it held
+    /// when cancellation was requested; no clinical text is echoed into the audit trail.</summary>
+    AiJobCancelled = 121,
+    /// <summary>A radiologist retried a failed or cancelled async AI job via
+    /// <c>POST /api/jobs/{id}/retry</c>. Details link the new job id to the one it retried
+    /// (<c>retryOfJobId</c>); no clinical text is echoed into the audit trail.</summary>
+    AiJobRetried = 122,
 }
 
 /// <summary>

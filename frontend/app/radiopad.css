@@ -364,6 +364,24 @@
   font-size: 11px;
 }
 
+/* Phase 6.2 — slim, non-modal generation banner at the top of the report editor
+   while a whole-report generate / local-generate job for that report runs in the
+   background. Non-blocking (the radiologist keeps working); `.banner.ai` supplies
+   the both-theme AI tint, `.rp-spinner` inherits its currentColor. */
+.rp-genbanner {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+.rp-genbanner-label { font-weight: 600; }
+.rp-genbanner-stage { color: var(--text-muted); }
+.rp-genbanner-timer {
+  margin-left: auto;
+  font-family: var(--mono);
+  font-size: 12px;
+}
+.rp-genbanner-dismiss { margin-left: 4px; }
+
 /* ----------- /admin/billing dashboard helpers (locked tokens only) ------ */
 .rp-grid-3 { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px; }
 @media (max-width: 760px) {

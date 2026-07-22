@@ -14,6 +14,7 @@ import BillingStatusBanner from '@/components/BillingStatusBanner';
 import DesktopStatusBanner from '@/components/DesktopStatusBanner';
 import PageTransition from '@/components/ui/PageTransition';
 import { ToastProvider } from '@/components/ui/ToastProvider';
+import JobsProvider from '@/components/jobs/JobsProvider';
 
 function ShellRoot({ children }: { children: ReactNode }) {
   const { collapsed } = useShell();
@@ -71,7 +72,9 @@ export default function AppShell({ children }: { children: ReactNode }) {
     <ToastProvider>
       <ShellProvider>
         <PageActionsProvider>
-          <AuthGate>{shell}</AuthGate>
+          <AuthGate>
+            <JobsProvider>{shell}</JobsProvider>
+          </AuthGate>
         </PageActionsProvider>
       </ShellProvider>
     </ToastProvider>

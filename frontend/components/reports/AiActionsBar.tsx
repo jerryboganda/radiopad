@@ -23,8 +23,17 @@ export type AiBarAction =
 
 export interface AiActionsBarProps {
   canEdit: boolean;
-  /** Which action is currently running (drives per-button spinners). */
+  /** Which SYNCHRONOUS action is currently running inline (rewrite family) —
+   *  drives that button's per-button spinner. The async submit-and-continue
+   *  actions (Generate Draft / Impression) come through `activeActions`. */
   busyAction: AiBarAction | null;
+  /**
+   * Async actions with a non-terminal tracked job for this report (Phase 6.1).
+   * Each such button shows a spinner and is disabled on its own, so other
+   * actions stay live — different modes (impression vs draft vs a rewrite) now
+   * run concurrently instead of the old blanket "one AI action at a time".
+   */
+  activeActions?: AiBarAction[];
 
   onGenerateDraft: () => void;
   onGenerateImpression: () => void;
@@ -68,8 +77,12 @@ export default function AiActionsBar(p: AiActionsBarProps) {
     };
   }, [rewriteOpen, setRewriteOpen]);
 
-  const busy = (a: AiBarAction) => p.busyAction === a;
-  const anyBusy = p.busyAction !== null || p.rewriteBusy;
+  // A button is "busy" when its sync inline op is running OR it has a
+  // non-terminal tracked async job. No blanket `anyBusy` any more — each button
+  // gates on its own state so the page never freezes on a background job.
+  const busy = (a: AiBarAction) => p.busyAction === a || (p.activeActions?.includes(a) ?? false);
+  // The rewrite family shares one preview surface, so it is gated together.
+  const rewriteFamilyBusy = p.rewriteBusy;
   const scopeLabel = p.sections.find((s) => s.key === p.rewriteSection)?.label ?? p.rewriteSection;
 
   if (!p.canEdit) return null;
@@ -80,7 +93,7 @@ export default function AiActionsBar(p: AiActionsBarProps) {
         <button
           className="primary rp-aibar-generate"
           type="button"
-          disabled={anyBusy || !p.providerId}
+          disabled={busy('draft') || !p.providerId}
           aria-busy={busy('draft')}
           onClick={p.onGenerateDraft}
         >
@@ -91,7 +104,7 @@ export default function AiActionsBar(p: AiActionsBarProps) {
         <button
           className="primary-ghost"
           type="button"
-          disabled={anyBusy || !p.providerId}
+          disabled={busy('impression') || !p.providerId}
           aria-busy={busy('impression')}
           onClick={p.onGenerateImpression}
         >
@@ -103,7 +116,7 @@ export default function AiActionsBar(p: AiActionsBarProps) {
           <button
             className="ghost"
             type="button"
-            disabled={anyBusy}
+            disabled={rewriteFamilyBusy}
             aria-busy={p.rewriteBusy}
             aria-haspopup="menu"
             aria-expanded={rewriteOpen}
@@ -181,7 +194,7 @@ export default function AiActionsBar(p: AiActionsBarProps) {
         <button
           className="ghost"
           type="button"
-          disabled={anyBusy}
+          disabled={rewriteFamilyBusy}
           aria-busy={busy('concise')}
           onClick={() => p.onRewrite('concise')}
         >
@@ -191,7 +204,7 @@ export default function AiActionsBar(p: AiActionsBarProps) {
         <button
           className="ghost"
           type="button"
-          disabled={anyBusy}
+          disabled={rewriteFamilyBusy}
           aria-busy={busy('patient_friendly')}
           onClick={() => p.onRewrite('patient_friendly')}
         >
@@ -201,7 +214,7 @@ export default function AiActionsBar(p: AiActionsBarProps) {
         <button
           className="ghost"
           type="button"
-          disabled={anyBusy}
+          disabled={rewriteFamilyBusy}
           aria-busy={busy('referring_summary')}
           onClick={() => p.onRewrite('referring_summary')}
         >

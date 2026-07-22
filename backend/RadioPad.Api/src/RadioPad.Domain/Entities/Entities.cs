@@ -1203,6 +1203,66 @@ public class CompanionSession : Entity
     public DateTimeOffset? PairedAt { get; set; }
 }
 
+
+/// <summary>
+/// Durable counterpart to <c>RadioPad.Api.Services.AiJobRegistry</c>'s in-memory
+/// hot cache — the row of record for one AI report-generation attempt
+/// (impression/rewrite or whole-report generate), across the local/on-device,
+/// UBAG, and hosted-provider paths. The registry serves the ~2s poll cadence
+/// from memory; this table is what survives a restart: <c>AiJobCoordinator</c>
+/// (RadioPad.Api/Services) writes here on every state transition, and the
+/// boot-time recovery sweep marks orphaned queued/running rows as failed
+/// (errorKind "server_restart") rather than silently forgetting them — a job
+/// is never auto-re-run without a radiologist present to supervise it.
+/// </summary>
+public class AiJob : Entity
+{
+    public Guid TenantId { get; set; }
+    public Guid ReportId { get; set; }
+    public Guid UserId { get; set; }
+
+    /// <summary>"ai" (impression/rewrite) | "generate" (whole-report).</summary>
+    public string Kind { get; set; } = "";
+
+    /// <summary>The AI mode when Kind == "ai" (impression, rewrite, ...); "generate" when Kind == "generate".</summary>
+    public string Mode { get; set; } = "";
+
+    public Guid? ProviderId { get; set; }
+
+    /// <summary>queued | running | ok | error | cancelled — mirrors AiJobRegistry.AiJobState.Status
+    /// plus the additive "queued"/"cancelled" values the durable layer adds.</summary>
+    public string Status { get; set; } = "queued";
+
+    /// <summary>Endpoint-shaped JSON payload for Kind == "ai" once Status == "ok"; null for
+    /// Kind == "generate" (the report row + its ReportVersion snapshot ARE the result — never
+    /// duplicate clinical text into a second store). Cleared 24h after completion by RetentionWorker.</summary>
+    public string? ResultJson { get; set; }
+
+    public string? Error { get; set; }
+
+    /// <summary>Stable machine-readable failure reason: not_found, report_modified, quota_exceeded,
+    /// provider_policy, provider_transport, rulebook_governance, timeout, server_error, or the
+    /// durable-layer addition server_restart (boot recovery sweep).</summary>
+    public string? ErrorKind { get; set; }
+
+    /// <summary>UBAG gateway job id, when the provider path is UBAG — captured for a future
+    /// re-attach-after-restart capability; unused (but cheap to keep) until that ships.</summary>
+    public string? ProviderJobId { get; set; }
+
+    public int Attempt { get; set; } = 1;
+
+    /// <summary>Set when this row was created by POST /api/jobs/{id}/retry — links to the job
+    /// it retried. Retrying always creates a new row; it never resurrects the old one.</summary>
+    public Guid? RetryOfJobId { get; set; }
+
+    /// <summary>Set by POST /api/jobs/{id}/cancel while Status is queued/running; observed by
+    /// the runner's linked cancellation token on its next check.</summary>
+    public bool CancelRequested { get; set; }
+
+    public DateTimeOffset? StartedAt { get; set; }
+    public DateTimeOffset? CompletedAt { get; set; }
+}
+
 /// <summary>
 /// PRD §14.13 (PR-001..010) — one RADPEER-aligned peer-review assignment of a
 /// signed report to a second radiologist. Never a clinical decision system: the

@@ -237,6 +237,11 @@ builder.Services.AddScoped<RadioPad.Application.Dictation.IDictationDraftService
 // lazily by LlamaServerProcess — singleton so one process is shared and disposed with the host,
 // never leaving an orphan holding gigabytes of model.
 builder.Services.AddSingleton<RadioPad.Infrastructure.Providers.Local.LlamaServerProcess>();
+// Desktop sidecar's async on-device generation runner (LocalGenerationController /jobs endpoints).
+// Singleton so its single-slot semaphore serialises every local job behind the single-request
+// llama-server, and its in-memory stage map is shared across polls. Inert on web/server (the
+// controller gates every endpoint on RADIOPAD_LOCAL_STT_ENABLED), so registering it always is safe.
+builder.Services.AddSingleton<RadioPad.Api.Services.LocalGenerationJobRunner>();
 builder.Services.AddSingleton<RadioPad.Application.Dictation.ILocalReportFormatter,
     RadioPad.Infrastructure.Providers.Local.LocalMedGemmaFormatter>();
 // Cross-check LLM medical-accuracy review (hosted-side; routes via IAiGateway so
@@ -356,6 +361,17 @@ builder.Services.AddSingleton<RadioPad.Application.Services.Pacs.IPacsVendorRout
     RadioPad.Infrastructure.Pacs.PacsVendorRouter>();
 
 builder.Services.AddHostedService<RadioPad.Api.Services.RetentionWorker>();
+
+// Async AI generation jobs (durable job platform). The unbounded channel is the
+// hand-off between the request-scoped coordinator (writer) and the hosted runner
+// (reader); the coordinator write-throughs every state transition to the AiJobs
+// table so a restart/reload no longer forgets a running job.
+// AiJobRecoveryHostedService is registered BEFORE the runner so its boot sweep
+// marks orphaned queued/running rows server_restart before any new work is consumed.
+builder.Services.AddSingleton(System.Threading.Channels.Channel.CreateUnbounded<RadioPad.Api.Services.AiJobWork>());
+builder.Services.AddScoped<RadioPad.Api.Services.AiJobCoordinator>();
+builder.Services.AddHostedService<RadioPad.Api.Services.AiJobRecoveryHostedService>();
+builder.Services.AddHostedService<RadioPad.Api.Services.AiJobRunner>();
 
 // PRD §18.2 — model drift detection background service. Periodically runs
 // golden-case regression against sandbox AI providers and raises SystemAlert

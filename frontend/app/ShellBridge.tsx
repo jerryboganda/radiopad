@@ -22,6 +22,100 @@ function getTauri(): TauriGlobal | null {
   return (window as typeof window & { __TAURI__?: TauriGlobal }).__TAURI__ ?? null;
 }
 
+// ---------------------------------------------------------------------------
+// Native OS notifications for finished AI jobs (async-jobs Phase 7)
+//
+// `JobsProvider` dispatches `radiopad:job-terminal` exactly once per job on
+// every terminal transition. When that fires while the desktop window is
+// unfocused/minimised, raise a native Windows toast so the radiologist knows a
+// generation finished without watching the app. Body is PHI-minimised
+// (NOTIF-011): modality/bodyPart only — never accession, name, or MRN.
+// ---------------------------------------------------------------------------
+
+type JobTerminalDetail = {
+  jobId?: string;
+  status?: 'ok' | 'error' | 'cancelled';
+  kind?: string;
+  mode?: string;
+  reportId?: string;
+  // PHI-minimised by construction (JobsProvider strips accession/identifiers).
+  report?: { modality?: string; bodyPart?: string } | null;
+};
+
+/**
+ * The app is "away" — so a finished job warrants an OS toast — whenever its
+ * window is not the active foreground window. `document.hidden` covers
+ * minimised / occluded; `!document.hasFocus()` covers the visible-but-blurred
+ * case (another app in front). Both are standard DOM APIs, so no extra Tauri
+ * import or capability is needed just to read focus state.
+ */
+function appIsAway(): boolean {
+  if (typeof document === 'undefined') return false;
+  if (document.hidden) return true;
+  return typeof document.hasFocus === 'function' ? !document.hasFocus() : false;
+}
+
+/** PHI-safe toast title from the terminal status + job kind/mode. */
+function jobToastTitle(detail: JobTerminalDetail): string {
+  if (detail.status === 'error') return 'Generation failed';
+  if (detail.status === 'cancelled') return 'Generation cancelled';
+  // status === 'ok'
+  if (detail.kind === 'ai') {
+    if (detail.mode === 'impression') return 'Impression ready';
+    if (detail.mode === 'rewrite') return 'Rewrite ready';
+    return 'AI result ready';
+  }
+  return 'Draft ready'; // generate / local-generate
+}
+
+/**
+ * PHI-minimised toast body: modality + body-part only (e.g. "CT Chest"). Never
+ * the accession, patient name, MRN, or any identifier — this string sits in the
+ * system tray, visible to anyone glancing at the screen (NOTIF-011). Empty when
+ * no study descriptor is present, in which case only the title is shown.
+ */
+function jobToastBody(detail: JobTerminalDetail): string {
+  const r = detail.report;
+  if (!r) return '';
+  return [r.modality, r.bodyPart]
+    .map((s) => (typeof s === 'string' ? s.trim() : ''))
+    .filter((s) => s.length > 0)
+    .join(' ');
+}
+
+/**
+ * Fire a native OS notification for a finished AI job when the app window is
+ * unfocused/minimised. Best-effort throughout: guarded to the desktop (Tauri)
+ * shell, checks/requests permission, and fails silently (logs, never throws) so
+ * it can never block ShellBridge's other side effects. On Windows, clicking the
+ * toast activates the app window (OS default); deep-linking to the report is a
+ * deferred nice-to-have.
+ */
+async function notifyJobTerminal(detail: JobTerminalDetail): Promise<void> {
+  // Defense in depth: JobsProvider is desktop-gated, but this is a plain browser
+  // event that could be dispatched on any surface. Only the desktop shell has
+  // the notification plugin registered.
+  if (typeof window === 'undefined' || !('__TAURI__' in window)) return;
+  // Focused → the in-app toast + jobs widget already surface the result; a
+  // second OS toast would be noise.
+  if (!appIsAway()) return;
+  try {
+    const { isPermissionGranted, requestPermission, sendNotification } = await import(
+      '@tauri-apps/plugin-notification'
+    );
+    let granted = await isPermissionGranted();
+    if (!granted) granted = (await requestPermission()) === 'granted';
+    if (!granted) return; // permission denied — degrade silently
+    const title = jobToastTitle(detail);
+    const body = jobToastBody(detail);
+    sendNotification(body ? { title, body } : { title });
+  } catch (err) {
+    // Not under Tauri, plugin missing, or the OS refused — never throw into the
+    // caller; the rest of ShellBridge's side effects must keep running.
+    console.warn('[shell-bridge] OS notification failed', err);
+  }
+}
+
 /**
  * Bridges native shells (Tauri desktop, Capacitor mobile) to the Next.js app.
  *
@@ -40,6 +134,17 @@ export default function ShellBridge() {
   useEffect(() => {
     let unsub: Array<() => void> = [];
     let cancelled = false;
+
+    // Async-jobs Phase 7 — native OS notification when an AI generation job
+    // finishes while the window is unfocused/minimised. `JobsProvider` emits
+    // this event (desktop surface only); the handler self-guards to Tauri and to
+    // the away state, so it is inert everywhere else.
+    const onJobTerminal = (event: Event) => {
+      const detail = (event as CustomEvent<JobTerminalDetail>).detail;
+      if (detail) void notifyJobTerminal(detail);
+    };
+    window.addEventListener('radiopad:job-terminal', onJobTerminal);
+
     (async () => {
       try {
         const tauri = getTauri();
@@ -111,6 +216,7 @@ export default function ShellBridge() {
     })();
     return () => {
       cancelled = true;
+      window.removeEventListener('radiopad:job-terminal', onJobTerminal);
       uninstallDictationHotkey();
       uninstallDesktopHotkeySync();
       for (const u of unsub) {

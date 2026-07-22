@@ -435,16 +435,86 @@ async function request<T>(path: string, init?: RequestInit): Promise<T> {
   return (await res.text()) as unknown as T;
 }
 
-/** Envelope returned by GET /api/reports/{id}/ai/jobs/{jobId}. */
-type AiJobEnvelope<T> = {
+/** Job lifecycle status shared by the hosted job engine and the desktop sidecar.
+ *  `queued`/`cancelled` were added by the durable async-job platform (2026-07-23);
+ *  the original `running|ok|error` wire vocabulary is a subset, so existing
+ *  consumers are unaffected. */
+export type JobStatus = 'queued' | 'running' | 'ok' | 'error' | 'cancelled';
+
+/** Which generation path a job belongs to. `local-generate` runs on the desktop
+ *  sidecar; `ai`/`generate` run in the hosted API. */
+export type JobKind = 'ai' | 'generate' | 'local-generate';
+
+/** Envelope returned by GET /api/reports/{id}/ai/jobs/{jobId} (and the desktop
+ *  sidecar's parity endpoint). Exported so the durable JobsProvider can share the
+ *  exact poll/parse shape instead of re-declaring it. */
+export type AiJobEnvelope<T> = {
   jobId: string;
-  kind: 'ai' | 'generate';
+  kind: JobKind;
   mode: string;
-  status: 'running' | 'ok' | 'error';
+  status: JobStatus;
   elapsedMs: number;
   result: T | null;
   error: string | null;
   errorKind: string | null;
+};
+
+/** Tenant-scoped report descriptor the unified jobs list projects for the widget.
+ *  May be absent (e.g. a local-generate job the sidecar can't join to a report). */
+export type JobReportDescriptor = {
+  accession: string;
+  modality: string;
+  bodyPart: string;
+  status: string;
+};
+
+/** A row from GET /api/jobs — deliberately light (no `result`); the top-right jobs
+ *  widget lists from these. Timestamps are ISO-8601 strings (DateTimeOffset). */
+export type JobSummary = {
+  jobId: string;
+  kind: JobKind;
+  mode: string;
+  status: JobStatus;
+  errorKind: string | null;
+  error: string | null;
+  attempt: number;
+  retryOfJobId: string | null;
+  reportId: string;
+  report: JobReportDescriptor | null;
+  createdAt: string;
+  startedAt: string | null;
+  completedAt: string | null;
+  elapsedMs: number;
+};
+
+/** A row from GET /api/jobs/{id} — a JobSummary plus the retained `result`
+ *  payload (held 24 h server-side; null once evicted). */
+export type JobDetail<T = unknown> = JobSummary & {
+  result: T | null;
+};
+
+/** Study context the on-device generator needs to draft a report offline; the
+ *  transcript/context never leaves the machine. */
+export type LocalGenerateDto = {
+  modality?: string | null;
+  bodyPart?: string | null;
+  contrast?: string | null;
+  age?: number | null;
+  gender?: string | null;
+  indication?: string | null;
+  findings?: string | null;
+};
+
+/** The drafted sections the on-device generator returns (sync + job result). */
+export type LocalGenerateResult = {
+  indication: string;
+  technique: string;
+  findings: string;
+  impression: string;
+  recommendations: string;
+  provider: string;
+  model: string;
+  latencyMs: number;
 };
 
 const AI_JOB_POLL_MS = 2_000;
@@ -456,10 +526,39 @@ const AI_JOB_MAX_WAIT_MS = 10 * 60_000;
  * a transient 500 (SQLite busy under the detached job's write) must not abandon
  * a multi-minute generation. Deterministic failures (401/403, 404
  * job_not_found after a server restart) fail fast. */
-function isTransientPollError(e: unknown): boolean {
+export function isTransientPollError(e: unknown): boolean {
   const { status, kind } = e as { status?: number; kind?: string };
   if (kind === 'network') return true;
   return status === 408 || status === 429 || status === 500 || status === 502 || status === 503 || status === 504;
+}
+
+/** POST /api/reports/{id}/ai/jobs — submit an async AI job (impression, rewrite,
+ *  cleanup, …). Returns the job id immediately; poll with `aiJobStatusRequest`. */
+function submitAiJobRequest(
+  reportId: string,
+  body: { mode: string; providerId?: string },
+): Promise<{ jobId: string }> {
+  return request<{ jobId: string }>(`/api/reports/${reportId}/ai/jobs`, {
+    method: 'POST',
+    body: JSON.stringify(body),
+  });
+}
+
+/** POST /api/reports/{id}/generate/jobs — submit an async whole-report generation. */
+function submitGenerateJobRequest(
+  reportId: string,
+  body: { providerId?: string },
+): Promise<{ jobId: string }> {
+  return request<{ jobId: string }>(`/api/reports/${reportId}/generate/jobs`, {
+    method: 'POST',
+    body: JSON.stringify(body),
+  });
+}
+
+/** GET /api/reports/{id}/ai/jobs/{jobId} — poll one async job. Both `ai` and
+ *  `generate` kinds poll this same report-scoped path. */
+function aiJobStatusRequest<T>(reportId: string, jobId: string): Promise<AiJobEnvelope<T>> {
+  return request<AiJobEnvelope<T>>(`/api/reports/${reportId}/ai/jobs/${jobId}`);
 }
 
 /**
@@ -473,10 +572,13 @@ function isTransientPollError(e: unknown): boolean {
  * providers) don't pay a fixed 2s tax.
  */
 async function runReportAiJob<T>(reportId: string, submitPath: string, body: unknown): Promise<T> {
-  const submitted = await request<{ jobId: string }>(submitPath, {
-    method: 'POST',
-    body: JSON.stringify(body),
-  });
+  // Composed from the exported submit/poll primitives so the compat callers
+  // (dictation cleanup / cross-check) keep the exact ramping-backoff, 10-min
+  // deadline and transient-retry behaviour, while the durable JobsProvider can
+  // drive the same steps individually for its shared poll ticker.
+  const submitted = submitPath.endsWith('/generate/jobs')
+    ? await submitGenerateJobRequest(reportId, body as { providerId?: string })
+    : await submitAiJobRequest(reportId, body as { mode: string; providerId?: string });
   const started = Date.now();
   let waitMs = AI_JOB_FIRST_POLL_MS;
   for (;;) {
@@ -484,7 +586,7 @@ async function runReportAiJob<T>(reportId: string, submitPath: string, body: unk
     waitMs = Math.min(waitMs * 2, AI_JOB_POLL_MS);
     let s: AiJobEnvelope<T>;
     try {
-      s = await request<AiJobEnvelope<T>>(`/api/reports/${reportId}/ai/jobs/${submitted.jobId}`);
+      s = await aiJobStatusRequest<T>(reportId, submitted.jobId);
     } catch (e) {
       if (isTransientPollError(e) && Date.now() - started < AI_JOB_MAX_WAIT_MS) continue;
       throw e;
@@ -1312,6 +1414,23 @@ export const api = {
         `/api/reports/${id}/generate/jobs`,
         body.providerId ? { providerId: body.providerId } : {},
       ),
+    /**
+     * Async-job primitives (durable job platform, 2026-07-23). `runAi`/`generate`
+     * above compose submit+poll for callers that await a result inline; these
+     * expose the individual steps so the global JobsProvider can submit-and-continue
+     * and own a single shared poll ticker (reusing `isTransientPollError`). Cancel
+     * and retry live on `api.jobs.*` — jobId alone is their primary key.
+     */
+    submitAiJob: (
+      id: string,
+      body: { mode: string; providerId?: string },
+    ): Promise<{ jobId: string }> => submitAiJobRequest(id, body),
+    submitGenerateJob: (
+      id: string,
+      body: { providerId?: string } = {},
+    ): Promise<{ jobId: string }> => submitGenerateJobRequest(id, body),
+    aiJobStatus: <T>(id: string, jobId: string): Promise<AiJobEnvelope<T>> =>
+      aiJobStatusRequest<T>(id, jobId),
     prior: (id: string) =>
       request<{ current: { id: string; bodyPart: string }; prior: Report | null }>(
         `/api/reports/${id}/prior`,
@@ -1555,6 +1674,29 @@ export const api = {
       }),
     measurements: (id: string) => request<ExtractedMeasurement[]>(`/api/reports/${id}/measurements`),
   },
+  /**
+   * Unified async-job engine (durable job platform, 2026-07-23). Spans every
+   * hosted generation attempt (`ai` + `generate`) for the current user; the
+   * desktop sidecar's local-generation jobs live under `api.localGenerate.*`.
+   * `list` is deliberately light (no `result`); fetch `get(id)` for the retained
+   * payload. `cancel`/`retry` key off the jobId alone.
+   */
+  jobs: {
+    list: (opts: { active?: boolean; limit?: number } = {}) => {
+      const q = new URLSearchParams();
+      if (opts.active) q.set('active', 'true');
+      if (opts.limit != null) q.set('limit', String(opts.limit));
+      const qs = q.toString();
+      return request<{ jobs: JobSummary[] }>(`/api/jobs${qs ? `?${qs}` : ''}`);
+    },
+    get: (id: string) => request<JobDetail>(`/api/jobs/${id}`),
+    cancel: (id: string) =>
+      request<{ status: string; cancelRequested?: boolean }>(`/api/jobs/${id}/cancel`, {
+        method: 'POST',
+      }),
+    retry: (id: string) =>
+      request<{ jobId: string }>(`/api/jobs/${id}/retry`, { method: 'POST' }),
+  },
   rulebooks: {
     list: () => request<Rulebook[]>('/api/rulebooks'),
     get: (id: string) => request<Rulebook & { sourceYaml: string }>(`/api/rulebooks/${id}`),
@@ -1667,6 +1809,37 @@ export const api = {
         model: string;
         latencyMs: number;
       }>('/api/local-generation/report', { method: 'POST', body: JSON.stringify(body) }),
+    /**
+     * Async on-device generation (durable job platform, 2026-07-23). `correlationId`
+     * is the HOSTED report id, so the widget can navigate to the right report once
+     * the sidecar job finishes. Submit returns immediately; poll with `jobStatus`
+     * (which adds a `stage` the sync `report` path never had). Same loopback routing
+     * as `report` above (`requestLocal` → sidecar on desktop, hosted fallback on web,
+     * which returns `enabled:false`). The sidecar's job registry is in-memory by
+     * doctrine — a sidecar restart surfaces as an `errorKind: 'sidecar_restart'`.
+     */
+    submitJob: (
+      body: LocalGenerateDto & { correlationId: string },
+    ): Promise<{ jobId: string }> =>
+      requestLocal<{ jobId: string }>('/api/local-generation/jobs', {
+        method: 'POST',
+        body: JSON.stringify(body),
+      }),
+    jobStatus: <T = LocalGenerateResult>(
+      jobId: string,
+    ): Promise<AiJobEnvelope<T> & { stage?: 'queued' | 'model-loading' | 'generating' }> =>
+      requestLocal<AiJobEnvelope<T> & { stage?: 'queued' | 'model-loading' | 'generating' }>(
+        `/api/local-generation/jobs/${jobId}`,
+      ),
+    listJobs: (): Promise<{ jobs: JobSummary[] }> =>
+      requestLocal<{ jobs: JobSummary[] }>('/api/local-generation/jobs'),
+    cancelJob: (
+      jobId: string,
+    ): Promise<{ status: string; cancelRequested?: boolean }> =>
+      requestLocal<{ status: string; cancelRequested?: boolean }>(
+        `/api/local-generation/jobs/${jobId}/cancel`,
+        { method: 'POST' },
+      ),
   },
   ai: {
     routingPreview: (params: {

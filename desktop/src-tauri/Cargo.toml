@@ -21,6 +21,10 @@ tauri-plugin-single-instance = "2.0"
 tauri-plugin-dialog = "2.0"
 tauri-plugin-clipboard-manager = "2.0"
 tauri-plugin-global-shortcut = "2.0"
+# Native OS notifications (Windows toast). Fired from the frontend when an AI
+# generation job finishes while the app window is unfocused/minimised
+# (async-jobs Phase 7). PHI-minimised body — modality/bodyPart only.
+tauri-plugin-notification = "2.0"
 # DESK-006 — encrypted offline-draft / cache backing store.
 tauri-plugin-store = "2.0"
 # DESK-001 — Tauri auto-updater (ed25519 signed; channel-aware endpoints).

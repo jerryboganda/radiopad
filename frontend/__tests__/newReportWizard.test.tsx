@@ -8,7 +8,8 @@ const providersListMock = vi.fn();
 const createMock = vi.fn();
 const patchMock = vi.fn();
 const generateMock = vi.fn();
-const localGenerateReportMock = vi.fn();
+const submitMock = vi.fn();
+const toastMock = vi.fn();
 const routerPushMock = vi.fn();
 
 vi.mock('next/navigation', () => ({
@@ -26,10 +27,17 @@ vi.mock('@/lib/api', () => ({
       patch: (...a: unknown[]) => patchMock(...a),
       generate: (...a: unknown[]) => generateMock(...a),
     },
-    localGenerate: {
-      report: (...a: unknown[]) => localGenerateReportMock(...a),
-    },
   },
+}));
+
+// Phase 6.2 — generation is submit-and-continue through the global JobsProvider,
+// confirmed via a toast; mock both boundaries.
+vi.mock('@/components/jobs/JobsProvider', () => ({
+  useJobs: () => ({ submit: submitMock }),
+}));
+vi.mock('@/components/ui/ToastProvider', () => ({
+  useToast: () => ({ toast: toastMock, dismiss: vi.fn() }),
+  ToastProvider: ({ children }: { children: React.ReactNode }) => children,
 }));
 
 // Stub the rich editor + dictation overlay (Tiptap/ProseMirror is heavy in jsdom) so
@@ -73,14 +81,18 @@ describe('new report wizard', () => {
     providersListMock.mockReset().mockResolvedValue([
       { id: 'p1', name: 'Gemini CLI (OAuth)', adapter: 'gemini-cli', model: '', compliance: 1, enabled: true, priority: 5 },
     ]);
-    createMock.mockReset().mockResolvedValue({ id: 'r1' });
+    createMock.mockReset().mockResolvedValue({
+      id: 'r1',
+      study: { accessionNumber: 'ACC1', modality: 'CT', bodyPart: 'Brain' },
+    });
     patchMock.mockReset().mockResolvedValue({ id: 'r1' });
     generateMock.mockReset().mockResolvedValue({ id: 'r1' });
-    localGenerateReportMock.mockReset();
+    submitMock.mockReset().mockResolvedValue('job1');
+    toastMock.mockReset();
     routerPushMock.mockReset();
   });
 
-  it('walks intake → generate and calls create, patch(findings), and generate(provider)', async () => {
+  it('walks intake → generate and calls create, patch(findings), then submits a generate JOB', async () => {
     render(<NewReportWizard />);
 
     // Step 1 — study context loads and populates the selects.
@@ -112,30 +124,29 @@ describe('new report wizard', () => {
       gender: 'Female',
     });
     await waitFor(() => expect(patchMock).toHaveBeenCalledWith('r1', { findings: 'Large left MCA territory infarct.' }));
-    await waitFor(() => expect(generateMock).toHaveBeenCalledWith('r1', { providerId: 'p1' }));
+    // A hosted `generate` JOB is submitted — no inline blocking generate call.
+    await waitFor(() =>
+      expect(submitMock).toHaveBeenCalledWith(
+        expect.objectContaining({ origin: 'hosted', kind: 'generate', reportId: 'r1', providerId: 'p1' }),
+      ),
+    );
+    expect(generateMock).not.toHaveBeenCalled();
 
-    // The staged overlay reaches its ready state.
-    await waitFor(() => expect(screen.getByText('Report ready')).toBeInTheDocument());
-    await waitFor(() => expect(routerPushMock).toHaveBeenCalledWith('/reports/view?id=r1'), { timeout: 1_500 });
+    // Confirms with a toast; does NOT navigate into the report (batch-posting flow).
+    await waitFor(() => expect(toastMock).toHaveBeenCalled());
+    expect(routerPushMock).not.toHaveBeenCalled();
+
+    // Form resets for the next case — back on step 1 with a cleared modality.
+    await waitFor(() => expect((screen.getByLabelText('Modality') as HTMLSelectElement).value).toBe(''));
   });
 
-  it('routes generation through the local sidecar (not the hosted API) when an on-device provider is selected', async () => {
+  it('routes generation through the local sidecar JOB when an on-device provider is selected', async () => {
     providersListMock.mockReset().mockResolvedValue([
       {
         id: 'p-local', name: 'MedGemma (on-device)', adapter: 'llama-cpp', model: 'medgemma-1.5-4b-q4',
         compliance: 4, enabled: true, priority: 100,
       },
     ]);
-    localGenerateReportMock.mockResolvedValue({
-      indication: 'Suspected infarct.',
-      technique: 'Non-contrast CT.',
-      findings: 'Large left MCA territory infarct.',
-      impression: '1. Acute infarct.',
-      recommendations: 'No specific follow-up is indicated.',
-      provider: 'llama-cpp',
-      model: 'medgemma-1.5-4b-q4',
-      latencyMs: 500,
-    });
 
     render(<NewReportWizard />);
 
@@ -152,26 +163,20 @@ describe('new report wizard', () => {
     const genBtn = await screen.findByText('Generate report');
     fireEvent.click(genBtn);
 
-    await waitFor(() => expect(localGenerateReportMock).toHaveBeenCalledTimes(1));
-    expect(localGenerateReportMock.mock.calls[0][0]).toMatchObject({
-      modality: 'CT',
-      bodyPart: 'Brain',
-      findings: 'Large left MCA territory infarct.',
-    });
-    // The completion never goes through the hosted generate endpoint.
-    expect(generateMock).not.toHaveBeenCalled();
-
+    await waitFor(() => expect(createMock).toHaveBeenCalled());
+    // A local-generate JOB carrying the study-context dto is submitted…
     await waitFor(() =>
-      expect(patchMock).toHaveBeenCalledWith('r1', {
-        indication: 'Suspected infarct.',
-        technique: 'Non-contrast CT.',
-        findings: 'Large left MCA territory infarct.',
-        impression: '1. Acute infarct.',
-        recommendations: 'No specific follow-up is indicated.',
-      }),
+      expect(submitMock).toHaveBeenCalledWith(
+        expect.objectContaining({
+          origin: 'local',
+          kind: 'local-generate',
+          reportId: 'r1',
+          dto: expect.objectContaining({ modality: 'CT', bodyPart: 'Brain', findings: 'Large left MCA territory infarct.' }),
+        }),
+      ),
     );
-
-    await waitFor(() => expect(screen.getByText('Report ready')).toBeInTheDocument());
+    // …never the hosted generate endpoint.
+    expect(generateMock).not.toHaveBeenCalled();
   });
 
   it('keeps Generate disabled until findings are provided', async () => {

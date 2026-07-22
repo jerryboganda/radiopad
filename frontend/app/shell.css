@@ -1006,6 +1006,126 @@
 .rp-bell-item.tone-warn .rp-bell-item-title { color: var(--amber); }
 .rp-bell-item.tone-success .rp-bell-item-title { color: var(--green); }
 
+/* -------- Async AI jobs widget (.rp-jobs-*) ------------------------- */
+/* Cloned from the .rp-bell family. RC tokens only, so both light and dark
+   resolve for free; the running spinner degrades to an opacity pulse under
+   prefers-reduced-motion. */
+.rp-jobs { position: relative; }
+.rp-jobs-btn { position: relative; }
+
+/* Spinner ring shown around the icon while any job is queued/running. */
+.rp-jobs-ring {
+  position: absolute;
+  inset: 4px;
+  border-radius: 50%;
+  border: 1.5px solid var(--color-ai-border);
+  border-top-color: var(--color-ai);
+  animation: rp-spin 0.9s linear infinite;
+  pointer-events: none;
+}
+.rp-jobs-badge {
+  position: absolute;
+  top: 2px;
+  right: 2px;
+  min-width: 14px;
+  height: 14px;
+  padding: 0 3px;
+  border-radius: var(--radius-pill);
+  font: 700 9px/14px var(--sans);
+  text-align: center;
+  color: var(--accent-fg);
+}
+.rp-jobs-badge.tone-active { background: var(--color-ai); }
+.rp-jobs-badge.tone-success { background: var(--color-success); }
+.rp-jobs-badge.tone-danger { background: var(--color-danger); }
+
+.rp-jobs-popover {
+  position: absolute;
+  top: calc(100% + 8px);
+  right: 0;
+  width: 340px;
+  max-height: 460px;
+  overflow: auto;
+  background: var(--bg-elevated);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-panel);
+  box-shadow: var(--shadow-md);
+  padding: 8px;
+  z-index: calc(var(--rp-shell-z-topbar) + 2);
+  animation: rp-popover-in var(--anim-fast) var(--ease-pop) both;
+}
+.rp-jobs-popover-title {
+  font: 600 11px/1.2 var(--sans);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--text-faint);
+  padding: 6px 8px;
+}
+.rp-jobs-list { display: flex; flex-direction: column; gap: 4px; }
+
+.rp-jobs-item {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding: 9px 10px;
+  border-radius: var(--radius-control);
+  border: 1px solid var(--border-soft);
+  background: var(--bg-subtle);
+}
+.rp-jobs-item.tone-success { border-color: var(--color-success-border); background: var(--color-success-soft); }
+.rp-jobs-item.tone-danger { border-color: var(--color-danger-border); background: var(--color-danger-soft); }
+.rp-jobs-item.tone-warning { border-color: var(--color-warning-border); background: var(--color-warning-soft); }
+.rp-jobs-item.tone-info { border-color: var(--color-info-border); background: var(--color-info-soft); }
+
+.rp-jobs-item-head { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+.rp-jobs-item-title { display: inline-flex; align-items: center; gap: 6px; font: 600 12.5px/1.3 var(--sans); color: var(--text); }
+.rp-jobs-item-sub { font: 400 12px/1.4 var(--sans); color: var(--text-muted); }
+.rp-jobs-item-foot { display: flex; align-items: center; justify-content: space-between; gap: 8px; margin-top: 2px; }
+.rp-jobs-item-meta { font: 500 11.5px/1 var(--sans); color: var(--text-soft); font-variant-numeric: tabular-nums; }
+.rp-jobs-item-actions { display: inline-flex; gap: 6px; margin-left: auto; }
+.rp-jobs-item-actions button { padding: 3px 9px; font-size: 12px; }
+
+.rp-jobs-status { font: 600 10.5px/1.4 var(--sans); text-transform: uppercase; letter-spacing: 0.04em; white-space: nowrap; }
+.rp-jobs-status.tone-success { color: var(--color-success); }
+.rp-jobs-status.tone-danger { color: var(--color-danger); }
+.rp-jobs-status.tone-warning { color: var(--color-warning); }
+.rp-jobs-status.tone-info { color: var(--color-info); }
+
+.rp-jobs-spinner {
+  width: 11px;
+  height: 11px;
+  border: 1.5px solid var(--color-ai-border);
+  border-top-color: var(--color-ai);
+  border-radius: 50%;
+  animation: rp-spin 0.9s linear infinite;
+}
+.rp-jobs-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--color-warning);
+  animation: rp-jobs-pulse 1.4s ease-in-out infinite;
+}
+
+.rp-jobs-footer { display: flex; justify-content: flex-end; padding: 6px 4px 2px; border-top: 1px solid var(--border-soft); margin-top: 6px; }
+
+.rp-jobs-toast { display: inline-flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+.rp-jobs-toast-btn { padding: 2px 8px; font-size: 12px; }
+
+@keyframes rp-jobs-pulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.35; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .rp-jobs-ring,
+  .rp-jobs-spinner {
+    animation: rp-jobs-pulse 1.4s ease-in-out infinite;
+    border-top-color: var(--color-ai);
+  }
+  .rp-jobs-popover { animation: none; }
+}
+
 /* Topbar variant of the profile menu: popover drops DOWN from the right. */
 .rp-profile-menu--topbar { position: relative; }
 .rp-profile-menu--topbar .rp-profile-trigger { width: auto; padding: 4px 8px; }

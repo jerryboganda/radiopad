@@ -15,6 +15,7 @@ import { PageActionsSlot } from './PageActionsSlot';
 import CheckUpdatesButton from './CheckUpdatesButton';
 import CommandPalette from './CommandPalette';
 import NotificationsBell from './NotificationsBell';
+import JobsIndicator from '@/components/jobs/JobsIndicator';
 import ProfileMenu from './ProfileMenu';
 import ThemeToggle from '@/components/ui/ThemeToggle';
 import { bindingFromKeyboardEvent, getBinding, normalizeBinding } from '@/lib/hotkeys';
@@ -83,6 +84,7 @@ export default function Topbar() {
           <span>{tBar('hipaa')}</span>
         </span>
         <CheckUpdatesButton />
+        <JobsIndicator />
         <NotificationsBell />
         <ThemeToggle />
         <ProfileMenu variant="topbar" />

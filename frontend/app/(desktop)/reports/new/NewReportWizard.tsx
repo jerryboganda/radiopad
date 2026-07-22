@@ -3,9 +3,14 @@
 // Guided multi-step report intake (PRD RPT — "new report" flow). Replaces the old
 // zero-input "+ New report → empty editor" jump: the radiologist supplies study
 // context + patient demographics, dictates/types the positive findings and the
-// clinical history in rich editors, picks an AI provider, then hits Generate. A
-// staged overlay runs while we create the draft, seed it, and generate the whole
-// report; on success we redirect straight into the pre-populated /reports editor.
+// clinical history in rich editors, picks an AI provider, then hits Generate.
+//
+// Phase 6.2 — generation is now a durable async JOB, not an inline blocking call.
+// We create + seed the draft, submit a `generate` (online) or `local-generate`
+// (on-device) job, confirm with a toast (+ an "Open report" shortcut), then RESET
+// the form so the radiologist can immediately post the next case. The topbar jobs
+// widget tracks each running job; the report editor shows a GenerationBanner if
+// they open one mid-generation.
 
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useRouter } from 'next/navigation';
@@ -14,7 +19,8 @@ import Container from '@/components/shell/Container';
 import PageHeader from '@/components/shell/PageHeader';
 import SearchableSelect from '@/components/ui/SearchableSelect';
 import RichTextEditor from '@/components/editor/RichTextEditor';
-import GenerationOverlay from '@/components/reports/GenerationOverlay';
+import { useJobs } from '@/components/jobs/JobsProvider';
+import { useToast } from '@/components/ui/ToastProvider';
 import { reportHref } from '@/lib/routes';
 import { resolveDefaultProvider, setPreferredProviderId } from '@/lib/ai/providerPref';
 import { LOCAL_LLAMA_ADAPTER } from '@/lib/models/onDeviceProvider';
@@ -36,6 +42,8 @@ function catalogOptions(items: CatalogItem[]) {
 
 export default function NewReportWizard() {
   const router = useRouter();
+  const jobs = useJobs();
+  const { toast } = useToast();
   const [step, setStep] = useState<Step>(1);
 
   const [modalities, setModalities] = useState<CatalogItem[]>([]);
@@ -50,16 +58,19 @@ export default function NewReportWizard() {
   const [age, setAge] = useState('');
   const [gender, setGender] = useState('');
 
-  // Steps 2 & 3 — rich text (serialized to clean Markdown by the editor).
+  // Steps 2 & 3 — rich text (serialized to clean Markdown by the editor). The
+  // editors are uncontrolled, so remount them on reset by bumping `formKey`.
   const [findings, setFindings] = useState('');
   const [history, setHistory] = useState('');
+  const [formKey, setFormKey] = useState(0);
 
   // Step 4 — provider.
   const [providerId, setProviderId] = useState('');
 
-  // Generation lifecycle.
-  const [generating, setGenerating] = useState(false);
-  const [done, setDone] = useState(false);
+  // Submit lifecycle — `submitting` guards the button while we create the draft
+  // and enqueue the job (a sub-second round trip; the generation itself runs in
+  // the background and is tracked by the topbar widget, not here).
+  const [submitting, setSubmitting] = useState(false);
   const [genError, setGenError] = useState<string | null>(null);
 
   useEffect(() => {
@@ -93,20 +104,34 @@ export default function NewReportWizard() {
   const selectedProvider = providers.find((p) => p.id === providerId) ?? null;
 
   const step1Ok = !!modality && !!bodyPart;
-  const canGenerate = step1Ok && findings.trim().length > 0 && !generating;
+  const canGenerate = step1Ok && findings.trim().length > 0 && !submitting;
+
+  /** Clear the form back to a blank first case, keeping the preferred provider
+   *  so the next study defaults to the same engine. Remounts the rich editors. */
+  const resetForm = useCallback(() => {
+    setStep(1);
+    setModality(null);
+    setBodyPart(null);
+    setContrast('None');
+    setAge('');
+    setGender('');
+    setFindings('');
+    setHistory('');
+    setGenError(null);
+    setFormKey((k) => k + 1);
+  }, []);
 
   const runGeneration = useCallback(async () => {
     if (!modality || !bodyPart) {
       setStep(1);
       return;
     }
-    setGenerating(true);
-    setDone(false);
+    setSubmitting(true);
     setGenError(null);
     try {
       // 1) Create the draft with study context + demographics + clinical history
-      //    (indication). 2) Seed the dictated positive findings. 3) Generate the
-      //    whole structured report from those inputs via the chosen provider.
+      //    (indication). 2) Seed the dictated positive findings. 3) Enqueue a
+      //    durable generation JOB — the radiologist does not wait for it.
       const created = await api.reports.create({
         modality,
         bodyPart,
@@ -117,40 +142,81 @@ export default function NewReportWizard() {
       });
       await api.reports.patch(created.id, { findings });
 
+      const info = {
+        accession: created.study.accessionNumber,
+        modality: created.study.modality,
+        bodyPart: created.study.bodyPart,
+      };
+
       if (selectedProvider?.adapter === LOCAL_LLAMA_ADAPTER) {
-        // On-device provider: the whole point of picking it is that generation never
-        // touches the network, so the actual completion runs against the local sidecar
-        // (never the hosted API, which has neither the model nor a llama-server on its
-        // own loopback) and only the result gets saved through the normal patch call.
-        const local = await api.localGenerate.report({
-          modality,
-          bodyPart,
-          contrast,
-          age: age === '' ? null : Number(age),
-          gender,
-          indication: history,
-          findings,
-        });
-        await api.reports.patch(created.id, {
-          indication: local.indication || undefined,
-          technique: local.technique || undefined,
-          findings: local.findings || findings,
-          impression: local.impression || undefined,
-          recommendations: local.recommendations || undefined,
+        // On-device provider: generation never touches the network, so the job
+        // runs on the local sidecar (correlated to this hosted report id). The
+        // report editor applies the drafted sections when the job finishes.
+        await jobs.submit({
+          origin: 'local',
+          kind: 'local-generate',
+          reportId: created.id,
+          dto: {
+            modality,
+            bodyPart,
+            contrast,
+            age: age === '' ? null : Number(age),
+            gender,
+            indication: history,
+            findings,
+          },
+          report: info,
         });
       } else {
-        await api.reports.generate(created.id, { providerId: providerId || undefined });
+        await jobs.submit({
+          origin: 'hosted',
+          kind: 'generate',
+          reportId: created.id,
+          providerId: providerId || undefined,
+          report: info,
+        });
       }
-      setDone(true);
-      // Brief beat on "Report ready" before opening the pre-populated editor.
-      window.setTimeout(() => {
-        router.push(reportHref(created.id));
-      }, 750);
+
+      // Operator decision: confirm + offer a shortcut, then clear for the next
+      // case (batch-posting flow) rather than navigating into the report.
+      toast({
+        tone: 'success',
+        title: 'Generation queued',
+        message: (
+          <span className="rp-jobs-toast">
+            The draft is being generated in the background.
+            <button
+              type="button"
+              className="subtle rp-jobs-toast-btn"
+              onClick={() => router.push(reportHref(created.id))}
+            >
+              Open report
+            </button>
+          </span>
+        ),
+      });
+      resetForm();
     } catch (e) {
       const err = e as { body?: { error?: string }; message?: string };
-      setGenError(err.body?.error || err.message || 'Report generation failed. Please try again.');
+      setGenError(err.body?.error || err.message || 'Could not queue generation. Please try again.');
+    } finally {
+      setSubmitting(false);
     }
-  }, [modality, bodyPart, contrast, age, gender, history, findings, providerId, selectedProvider, router]);
+  }, [
+    modality,
+    bodyPart,
+    contrast,
+    age,
+    gender,
+    history,
+    findings,
+    providerId,
+    selectedProvider,
+    jobs,
+    toast,
+    router,
+    resetForm,
+  ]);
 
   return (
     <Container>
@@ -267,6 +333,7 @@ export default function NewReportWizard() {
               bullets, numbering, and emphasis. The model expands these into a structured report.
             </p>
             <RichTextEditor
+              key={`intake-findings-${formKey}`}
               sectionKey="intake-findings"
               ariaLabel="Positive findings"
               className="rp-rte-tall"
@@ -284,6 +351,7 @@ export default function NewReportWizard() {
               report’s indication and steers the impression.
             </p>
             <RichTextEditor
+              key={`intake-history-${formKey}`}
               sectionKey="intake-history"
               ariaLabel="Clinical history"
               className="rp-rte-tall"
@@ -346,6 +414,12 @@ export default function NewReportWizard() {
           </div>
         </div>
 
+        {genError && (
+          <div className="banner warn" role="alert" style={{ marginTop: 12 }}>
+            {genError}
+          </div>
+        )}
+
         {/* Footer nav */}
         <div className="rp-wizard-footer">
           <button
@@ -365,26 +439,11 @@ export default function NewReportWizard() {
             </button>
           ) : (
             <button className="primary" disabled={!canGenerate} onClick={runGeneration}>
-              Generate report
+              {submitting ? 'Queuing…' : 'Generate report'}
             </button>
           )}
         </div>
       </div>
-
-      <GenerationOverlay
-        active={generating}
-        done={done}
-        providerName={selectedProvider?.name}
-        error={genError}
-        onRetry={() => {
-          setGenError(null);
-          void runGeneration();
-        }}
-        onBack={() => {
-          setGenerating(false);
-          setGenError(null);
-        }}
-      />
     </Container>
   );
 }

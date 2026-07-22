@@ -18,6 +18,7 @@
     "store:allow-delete",
     "store:allow-keys",
     "store:allow-save",
+    "notification:default",
     "updater:default",
     "process:allow-restart"
   ]

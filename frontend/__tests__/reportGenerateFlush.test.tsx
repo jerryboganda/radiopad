@@ -3,23 +3,23 @@
  * from what's on screen, not stale/empty server state.
  *
  * Section textareas in ReportClient only persist on blur (`onChange` updates
- * React state; `onBlur` fires the PATCH). The AI endpoint
- * (`POST /api/reports/{id}/ai`) reads the report from the DB, so clicking
- * "Generate impression" straight from typing the Findings — with no blur in
- * between — used to race the save and send EMPTY findings to the model
- * ("No findings were provided in the report…").
+ * React state; `onBlur` fires the PATCH). The AI job reads the report from the
+ * DB, so clicking "Generate impression" straight from typing the Findings —
+ * with no blur in between — used to race the save and send EMPTY findings.
  *
- * This test mounts the real ReportClient with a stateful fake API where the
- * AI mock records whatever `findings` are persisted at the moment it runs.
- * The fix flushes the editor state with a synchronous PATCH before the AI
- * call, so the recorded findings must equal the freshly-typed text.
+ * Phase 6.1 made generation submit-and-continue: `runAi` now `flushEdits()`
+ * then `jobs.submit(...)` (the topbar widget owns polling). The invariant this
+ * test protects is unchanged — the flush PATCH must land BEFORE the submit, so
+ * the job the coordinator picks up drafts from the freshly-typed findings. We
+ * mock the JobsProvider/ToastProvider boundaries and record what is persisted
+ * to the DB at the instant `submit` is called.
  */
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { render, fireEvent, screen, waitFor } from '@testing-library/react';
 import * as React from 'react';
 
 // Shared mutable state for the fake backend, created in hoisted scope so the
-// (hoisted) vi.mock factory below can close over it.
+// (hoisted) vi.mock factories below can close over it.
 const h = vi.hoisted(() => {
   const initialReport = {
     id: 'r1',
@@ -37,22 +37,37 @@ const h = vi.hoisted(() => {
     aiHighlightsJson: '{}',
     updatedAt: '2026-01-01T00:00:00Z',
   };
-  return {
-    initialReport,
-    state: {
-      db: { ...initialReport } as Record<string, unknown>,
-      // Findings the AI saw in the DB at the moment runAi executed.
-      aiReadFindings: null as string | null,
-    },
+  const state = {
+    db: { ...initialReport } as Record<string, unknown>,
+    // Findings persisted to the DB at the moment `jobs.submit` executed.
+    submitFindings: null as string | null,
   };
+  // The mocked JobsProvider.submit — records the DB findings at submit time.
+  const submit = vi.fn(async () => {
+    state.submitFindings = String(state.db.findings ?? '');
+    return 'job1';
+  });
+  return { initialReport, state, submit };
 });
 
 vi.mock('next/navigation', () => ({
   useRouter: () => ({ push: vi.fn(), replace: vi.fn(), prefetch: vi.fn() }),
 }));
 
+// Only the `id` param resolves — the ?aiJob=/?localJob= deep-link is empty here.
 vi.mock('@/lib/browserParams', () => ({
-  readQueryParam: () => 'r1',
+  readQueryParam: (name: string) => (name === 'id' ? 'r1' : ''),
+}));
+
+// Phase 6.1 — ReportClient submits generation through the global JobsProvider
+// and confirms through the toast API; mock both boundaries.
+vi.mock('@/components/jobs/JobsProvider', () => ({
+  useJobs: () => ({ submit: h.submit, markApplied: vi.fn() }),
+  useJobsForReport: () => [],
+}));
+vi.mock('@/components/ui/ToastProvider', () => ({
+  useToast: () => ({ toast: vi.fn(), dismiss: vi.fn() }),
+  ToastProvider: ({ children }: { children: React.ReactNode }) => children,
 }));
 
 // Sub-components are irrelevant to this flow and pull in extra weight; stub them.
@@ -67,18 +82,6 @@ vi.mock('@/lib/api', () => {
       patch: vi.fn(async (_id: string, body: Record<string, unknown>) => {
         h.state.db = { ...h.state.db, ...body };
         return { ...h.state.db };
-      }),
-      runAi: vi.fn(async (_id: string, body: { mode: string }) => {
-        // The real backend reads findings from the DB — mirror that here.
-        h.state.aiReadFindings = String(h.state.db.findings ?? '');
-        return {
-          text: `IMPRESSION drafted from: ${h.state.db.findings}`,
-          provider: 'p',
-          model: 'm',
-          latencyMs: 1,
-          promptVersion: 'v1',
-          mode: body.mode,
-        };
       }),
       signatures: vi.fn(async () => []),
       // RC composer additions — priors lookup (context bar / study panel) and
@@ -99,10 +102,8 @@ vi.mock('@/lib/api', () => {
     // Iter-36 — ReportClient fetches the admin catalogs for the study-context dropdowns.
     modalities: { list: vi.fn(async () => []) },
     bodyParts: { list: vi.fn(async () => []) },
-    // RBAC mirror (added in the per-controller RBAC pass): ReportClient calls
-    // usePermissions() → api.me() to decide which actions to render. Grant the
-    // full reporting permission set so editor affordances (Generate impression,
-    // etc.) are shown.
+    // RBAC mirror: ReportClient calls usePermissions() → api.me() to decide which
+    // actions to render. Grant the full reporting permission set.
     me: vi.fn(async () => ({
       user: {
         permissions: ['reports.read', 'reports.draft', 'reports.edit', 'reports.validate', 'reports.sign', 'reports.export'],
@@ -123,14 +124,15 @@ import { api } from '@/lib/api';
 
 beforeEach(() => {
   h.state.db = { ...h.initialReport };
-  h.state.aiReadFindings = null;
+  h.state.submitFindings = null;
+  h.submit.mockClear();
   // This test exercises the flush-before-AI logic, which is identical for both
   // editors; pin the plain-textarea path so it doesn't depend on driving Tiptap.
   window.localStorage.setItem('radiopad:rich-editor', '0');
 });
 
-describe('Generate impression — flush before AI (HANDOFF gotcha #3)', () => {
-  it('sends the on-screen findings to the AI even when typed right before clicking (no blur)', async () => {
+describe('Generate impression — flush before submit (HANDOFF gotcha #3)', () => {
+  it('submits with the on-screen findings even when typed right before clicking (no blur)', async () => {
     const { container } = render(<ReportPage />);
 
     const genBtn = await screen.findByRole('button', { name: 'Generate Impression' });
@@ -148,13 +150,17 @@ describe('Generate impression — flush before AI (HANDOFF gotcha #3)', () => {
 
     fireEvent.click(genBtn);
 
-    await waitFor(() => expect(h.state.aiReadFindings).not.toBeNull());
+    await waitFor(() => expect(h.submit).toHaveBeenCalledTimes(1));
 
-    // The AI must have seen the freshly-typed findings, not the empty DB value.
-    expect(h.state.aiReadFindings).toBe('Liver and spleen are normal.');
-    // And the flush PATCH must have run before the AI call.
+    // The flush PATCH must have persisted the freshly-typed findings BEFORE submit.
+    expect(h.state.submitFindings).toBe('Liver and spleen are normal.');
     const firstPatch = Math.min(...(api.reports.patch as ReturnType<typeof vi.fn>).mock.invocationCallOrder);
-    const firstAi = (api.reports.runAi as ReturnType<typeof vi.fn>).mock.invocationCallOrder[0];
-    expect(firstPatch).toBeLessThan(firstAi);
+    const firstSubmit = h.submit.mock.invocationCallOrder[0];
+    expect(firstPatch).toBeLessThan(firstSubmit);
+
+    // The submitted spec is the impression `ai` job for this report.
+    expect(h.submit).toHaveBeenCalledWith(
+      expect.objectContaining({ origin: 'hosted', kind: 'ai', reportId: 'r1', mode: 'impression' }),
+    );
   });
 });

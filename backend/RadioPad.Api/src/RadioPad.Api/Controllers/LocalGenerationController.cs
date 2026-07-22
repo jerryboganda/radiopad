@@ -1,5 +1,6 @@
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
+using RadioPad.Api.Services;
 using RadioPad.Application.Abstractions;
 using RadioPad.Application.Dictation;
 using RadioPad.Application.Services;
@@ -57,19 +58,47 @@ namespace RadioPad.Api.Controllers;
 public sealed class LocalGenerationController : ControllerBase
 {
     private readonly IReadOnlyList<IAiProviderAdapter> _adapters;
+    private readonly AiJobRegistry _registry;
+    private readonly LocalGenerationJobRunner _runner;
     private readonly ILogger<LocalGenerationController> _log;
 
     public LocalGenerationController(
         IEnumerable<IAiProviderAdapter> adapters,
+        AiJobRegistry registry,
+        LocalGenerationJobRunner runner,
         ILogger<LocalGenerationController> log)
     {
         _adapters = adapters.ToList();
+        _registry = registry;
+        _runner = runner;
         _log = log;
     }
+
+    // Registry identity for this tenant-less, single-user, loopback-only path: there is no tenant
+    // and no user, so both keys are Guid.Empty. The job's ReportId carries the client-supplied
+    // correlation id (the HOSTED report's Guid) instead — see GenerateReportJobDto.
+    private const string JobKind = "local-generate";
+    private const string JobMode = "report";
 
     public record GenerateReportDto(
         string? Modality, string? BodyPart, string? Contrast, int? Age, string? Gender,
         string? Indication, string? Findings);
+
+    /// <summary>
+    /// Submit body for the async job endpoints: the same fields as <see cref="GenerateReportDto"/>
+    /// plus <c>CorrelationId</c> — the HOSTED report's Guid, supplied by the desktop frontend and
+    /// opaque to the sidecar (which has no reports DB of its own). It becomes the job's ReportId so
+    /// the top-right jobs widget can navigate to the right hosted report on completion, and the
+    /// single-flight key so a re-submit for the same report returns the in-flight job rather than
+    /// stacking a second generation onto the single-request llama-server.
+    /// </summary>
+    public record GenerateReportJobDto(
+        string? Modality, string? BodyPart, string? Contrast, int? Age, string? Gender,
+        string? Indication, string? Findings, Guid CorrelationId)
+    {
+        public GenerateReportDto ToReportDto() =>
+            new(Modality, BodyPart, Contrast, Age, Gender, Indication, Findings);
+    }
 
     public record GeneratedReportSections(
         string Indication, string Technique, string Findings, string Impression, string Recommendations,
@@ -129,6 +158,25 @@ public sealed class LocalGenerationController : ControllerBase
         specific follow-up is indicated when none is warranted.
         """;
 
+
+    /// <summary>
+    /// Kept as its own plain (non-interpolated) raw string so its literal <c>{</c>/<c>}</c>
+    /// characters never collide with <see cref="BuildUserPrompt"/>'s single-brace
+    /// interpolation holes — a <c>$"""..."""</c> raw string with one <c>$</c> treats
+    /// every single <c>{</c> as the start of an interpolation, so a literal JSON
+    /// brace inline there fails to compile (CS9006). Interpolated into the prompt
+    /// as a single <c>{JsonSchemaExample}</c> hole instead.
+    /// </summary>
+    private const string JsonSchemaExample = """
+        {
+          "indication": "",
+          "technique": "",
+          "findings": "",
+          "impression": "",
+          "recommendations": ""
+        }
+        """;
+
     private static string BuildUserPrompt(GenerateReportDto dto)
     {
         var age = dto.Age is { } a ? a.ToString() : "Unknown";
@@ -150,18 +198,71 @@ public sealed class LocalGenerationController : ControllerBase
             {InstructionsTemplate}
 
             Respond with a single JSON object exactly matching this schema:
-            {{
-              "indication": "",
-              "technique": "",
-              "findings": "",
-              "impression": "",
-              "recommendations": ""
-            }}
+            {JsonSchemaExample}
             Return the raw JSON object only. Escape every line break inside a string value as \n; never
             emit a raw newline inside a quoted string.
             """;
     }
 
+    /// <summary>
+    /// The on-device provider config is fixed — there is only ever one target (the MedGemma model on
+    /// this workstation), so no tenant/registry lookup. Shared by the sync endpoint and the async job
+    /// runner so both paths build the byte-identical request (prompt, GBNF grammar, repeat penalty).
+    /// </summary>
+    internal static AiCompletionRequest BuildCompletionRequest(GenerateReportDto dto)
+    {
+        var provider = new ProviderConfig
+        {
+            Name = "local-medgemma",
+            Adapter = LlamaCppProvider.AdapterId,
+            Model = LocalModelCatalog.MedGemmaId,
+            EndpointUrl = LlamaServerProcess.BaseUrl,
+            Compliance = ProviderComplianceClass.LocalOnly,
+            Enabled = true,
+        };
+
+        return new AiCompletionRequest(
+            Provider: provider,
+            SystemPrompt: SystemPrompt,
+            UserPrompt: BuildUserPrompt(dto),
+            PromptVersion: "local-generate-v2-fewshot",
+            ContainsPhi: true)
+        {
+            Grammar = DictationGrammar.ReportSectionsGbnf,
+            // Empirically tuned against the real model — see class remarks for what was tried and why.
+            RepeatPenalty = 1.1,
+            RepeatLastN = 256,
+        };
+    }
+
+    /// <summary>
+    /// Post-process a raw model result into the section-shaped response — shared by the sync endpoint
+    /// (returned in the HTTP body) and the async job runner (handed to the registry as the poll
+    /// payload, so the frontend's origin-agnostic poller sees the same shape from either path).
+    /// </summary>
+    internal static GeneratedReportSections BuildSections(AiResult result)
+    {
+        var sections = ReportSectionJson.Parse(result.Text);
+        return new GeneratedReportSections(
+            Indication: sections.GetValueOrDefault("indication", string.Empty),
+            Technique: sections.GetValueOrDefault("technique", string.Empty),
+            Findings: ReportingService.FormatGeneratedFindings(sections.GetValueOrDefault("findings", string.Empty)),
+            Impression: sections.GetValueOrDefault("impression", string.Empty),
+            Recommendations: sections.GetValueOrDefault("recommendations", string.Empty),
+            Provider: result.Provider,
+            Model: result.Model,
+            LatencyMs: result.LatencyMs);
+    }
+
+    /// <summary>
+    /// Synchronous whole-report generation — holds the HTTP request open for the entire model run
+    /// (cold-start model load up to ~3 min, then CPU-bound generation for minutes).
+    ///
+    /// <para><b>Deprecated in favour of the <c>/jobs</c> endpoints below</b>, which decouple the run
+    /// from the connection so a dropped webview fetch no longer aborts generation. Kept working,
+    /// unchanged, for one release because older desktop builds still call it; remove once no shipped
+    /// build depends on it.</para>
+    /// </summary>
     [HttpPost("report")]
     public async Task<IActionResult> GenerateReport([FromBody] GenerateReportDto dto, CancellationToken ct)
     {
@@ -174,33 +275,10 @@ public sealed class LocalGenerationController : ControllerBase
             return StatusCode(StatusCodes.Status503ServiceUnavailable,
                 new { error = "The on-device AI adapter is not registered.", kind = "adapter_unavailable" });
 
-        var provider = new ProviderConfig
-        {
-            Name = "local-medgemma",
-            Adapter = LlamaCppProvider.AdapterId,
-            Model = LocalModelCatalog.MedGemmaId,
-            EndpointUrl = LlamaServerProcess.BaseUrl,
-            Compliance = ProviderComplianceClass.LocalOnly,
-            Enabled = true,
-        };
-
-        var request = new AiCompletionRequest(
-            Provider: provider,
-            SystemPrompt: SystemPrompt,
-            UserPrompt: BuildUserPrompt(dto),
-            PromptVersion: "local-generate-v2-fewshot",
-            ContainsPhi: true)
-        {
-            Grammar = DictationGrammar.ReportSectionsGbnf,
-            // Empirically tuned against the real model — see class remarks for what was tried and why.
-            RepeatPenalty = 1.1,
-            RepeatLastN = 256,
-        };
-
         AiResult result;
         try
         {
-            result = await llama.CompleteAsync(request, ct);
+            result = await llama.CompleteAsync(BuildCompletionRequest(dto), ct);
         }
         catch (ProviderTransportException ex)
         {
@@ -208,15 +286,149 @@ public sealed class LocalGenerationController : ControllerBase
             return StatusCode(StatusCodes.Status502BadGateway, new { error = ex.Message, kind = "provider_transport" });
         }
 
-        var sections = ReportSectionJson.Parse(result.Text);
-        return Ok(new GeneratedReportSections(
-            Indication: sections.GetValueOrDefault("indication", string.Empty),
-            Technique: sections.GetValueOrDefault("technique", string.Empty),
-            Findings: ReportingService.FormatGeneratedFindings(sections.GetValueOrDefault("findings", string.Empty)),
-            Impression: sections.GetValueOrDefault("impression", string.Empty),
-            Recommendations: sections.GetValueOrDefault("recommendations", string.Empty),
-            Provider: result.Provider,
-            Model: result.Model,
-            LatencyMs: result.LatencyMs));
+        return Ok(BuildSections(result));
     }
+
+    // ── Async job endpoints ─────────────────────────────────────────────────────────────────────
+    // Decouple generation from the HTTP connection: submit returns a job id immediately, the client
+    // polls with fast requests, and a dropped webview fetch no longer aborts a minutes-long run. The
+    // registry is in-memory ONLY here (the sidecar's SQLite is throwaway by doctrine, and a sidecar
+    // restart kills the llama-server child anyway) — the same envelope keys as the hosted poll
+    // endpoint (ReportsController.AiJobStatus) so the frontend poller is origin-agnostic, plus a
+    // computed live `stage`.
+
+    private IActionResult? SttGate() =>
+        LocalSttModels.IsEnabled()
+            ? null
+            : StatusCode(StatusCodes.Status503ServiceUnavailable,
+                new { error = "On-device generation is only available in the RadioPad desktop app.", kind = "stt_unavailable" });
+
+    /// <summary>
+    /// Submit an on-device generation job. Returns <c>202 { jobId, status }</c> immediately; the
+    /// actual run is handed to <see cref="LocalGenerationJobRunner"/>, which serialises it behind the
+    /// single-request llama-server. Re-submitting for the same correlation id (hosted report) while a
+    /// job is still running returns that in-flight job rather than stacking a second generation.
+    /// </summary>
+    [HttpPost("jobs")]
+    public IActionResult SubmitJob([FromBody] GenerateReportJobDto dto)
+    {
+        if (SttGate() is { } gate) return gate;
+
+        if (dto.CorrelationId == Guid.Empty)
+            return BadRequest(new { error = "correlationId is required.", kind = "correlation_required" });
+
+        var llama = _adapters.FirstOrDefault(a => a.Id == LlamaCppProvider.AdapterId);
+        if (llama is null)
+            return StatusCode(StatusCodes.Status503ServiceUnavailable,
+                new { error = "The on-device AI adapter is not registered.", kind = "adapter_unavailable" });
+
+        // Single-flight on the correlation id (used as ReportId). A running job for the same hosted
+        // report is returned instead of launching a duplicate — mirrors the hosted submit endpoints.
+        if (_registry.TryGetRunning(Guid.Empty, dto.CorrelationId, JobKind, JobMode, out var running))
+            return Accepted(new { jobId = running.Id, status = running.Status });
+
+        var job = _registry.Create(Guid.Empty, dto.CorrelationId, Guid.Empty, JobKind, JobMode);
+        // Fire-and-forget: RunAsync runs its synchronous prefix (stage → "queued", CTS registered)
+        // on this thread before yielding, so a poll immediately after this 202 already sees the job.
+        _ = _runner.RunAsync(job.Id, dto.ToReportDto());
+        return Accepted(new { jobId = job.Id, status = job.Status });
+    }
+
+    /// <summary>
+    /// Poll a job. Same envelope keys as the hosted <c>ReportsController.AiJobStatus</c> so the
+    /// frontend poller is origin-agnostic, PLUS <c>stage</c> ("queued" | "model-loading" |
+    /// "generating"), computed live from the runner (never stored on the registry record).
+    /// </summary>
+    [HttpGet("jobs/{jobId:guid}")]
+    public IActionResult JobStatus(Guid jobId)
+    {
+        if (SttGate() is { } gate) return gate;
+
+        if (!_registry.TryGet(jobId, out var job) || job.Kind != JobKind)
+            return NotFound(new
+            {
+                error = "On-device generation job not found — the sidecar may have restarted mid-generation. Please try again.",
+                kind = "job_not_found",
+            });
+
+        return Ok(new
+        {
+            jobId = job.Id,
+            kind = job.Kind,
+            mode = job.Mode,
+            status = job.Status,
+            elapsedMs = (long)((job.CompletedAt ?? DateTimeOffset.UtcNow) - job.CreatedAt).TotalMilliseconds,
+            result = job.Status == "ok" ? job.Payload : null,
+            error = job.Error,
+            errorKind = job.ErrorKind,
+            stage = StageOf(job),
+        });
+    }
+
+    /// <summary>
+    /// List this sidecar's jobs, newest/running first — lets the desktop widget rehydrate after an app
+    /// restart. Per-item shape mirrors the poll endpoint minus <c>result</c> (kept light); the
+    /// correlation id travels as <c>reportId</c> so the widget can open the right hosted report.
+    /// </summary>
+    [HttpGet("jobs")]
+    public IActionResult ListJobs()
+    {
+        if (SttGate() is { } gate) return gate;
+
+        var jobs = _registry.ListForUser(Guid.Empty, Guid.Empty);
+        // Wrapped in { jobs } to match the hosted JobsController.List envelope —
+        // the frontend's api.localGenerate.listJobs() types and destructures this
+        // shape identically for both origins (a bare array here silently no-ops
+        // the sidecar rehydration path instead of throwing).
+        return Ok(new
+        {
+            jobs = jobs.Select(job => new
+            {
+                jobId = job.Id,
+                kind = job.Kind,
+                mode = job.Mode,
+                status = job.Status,
+                elapsedMs = (long)((job.CompletedAt ?? DateTimeOffset.UtcNow) - job.CreatedAt).TotalMilliseconds,
+                error = job.Error,
+                errorKind = job.ErrorKind,
+                stage = StageOf(job),
+                reportId = job.ReportId,
+            }),
+        });
+    }
+
+    /// <summary>
+    /// Request cancellation of a job. Best-effort: the runner's per-job CTS aborts the outbound
+    /// <c>/completion</c> call, and llama.cpp cancels the generation slot on client disconnect in
+    /// current builds — but a full stop can take up to ~a minute mid-generation. Idempotent for a job
+    /// that has already reached a terminal status; 404 for an unknown job.
+    /// </summary>
+    [HttpPost("jobs/{jobId:guid}/cancel")]
+    public IActionResult CancelJob(Guid jobId)
+    {
+        if (SttGate() is { } gate) return gate;
+
+        if (!_registry.TryGet(jobId, out var job) || job.Kind != JobKind)
+            return NotFound(new
+            {
+                error = "On-device generation job not found.",
+                kind = "job_not_found",
+            });
+
+        // Registry status is "running" for both a queued (waiting on the semaphore) and an actively
+        // generating job; the runner tells them apart via the stage. A queued job cancelled here
+        // never reaches the provider — its semaphore wait observes the cancellation and goes straight
+        // to "cancelled".
+        if (job.Status != "running")
+            return Ok(new { jobId = job.Id, status = job.Status, cancelRequested = false });
+
+        _registry.TryRequestCancel(jobId);
+        return Accepted(new { jobId = job.Id, status = "running", cancelRequested = true });
+    }
+
+    /// <summary>Live stage for a job: the runner's tracked stage while active, else null once terminal
+    /// (the runner drops the entry). Falls back to "queued" for the brief window before the runner's
+    /// synchronous prefix records a stage.</summary>
+    private string? StageOf(AiJobRegistry.AiJobState job) =>
+        _runner.StageOf(job.Id) ?? (job.Status == "running" ? LocalGenerationJobRunner.StageQueued : null);
 }

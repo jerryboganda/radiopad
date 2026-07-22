@@ -44,7 +44,24 @@ public sealed class UbagProviderAdapter : IAiProviderAdapter, IAiProviderHealthP
             idempotencyKey,
             cancellationToken);
 
-        var terminal = await WaitForJobAsync(created, cancellationToken);
+        UbagJob terminal;
+        try
+        {
+            terminal = await WaitForJobAsync(created, cancellationToken);
+        }
+        catch (OperationCanceledException)
+        {
+            // The gateway job was already created when cancellation raced in (a
+            // radiologist hit Cancel, or AiJobCoordinator's per-job CTS fired). Make a
+            // best-effort gateway cancel so the shared browser worker is released,
+            // then rethrow unchanged so the coordinator's cancel-vs-timeout logic
+            // still fires. WaitForJobAsync already cancels on its own abort path; this
+            // is the belt-and-suspenders guarantee at the CompleteAsync seam, and a
+            // cancel-of-a-cancel must never throw.
+            try { await _client.CancelJobAsync(created.Id, CancellationToken.None); }
+            catch { /* best-effort — the gateway's own job timeout is the backstop */ }
+            throw;
+        }
         // manual_action (logged-out session / interstitial) is NOT a policy
         // block — it means THIS provider is temporarily unusable. Classify as
         // transport so the auto-routing failover chain tries the next provider

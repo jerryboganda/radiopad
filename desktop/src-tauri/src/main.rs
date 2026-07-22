@@ -210,6 +210,11 @@ fn main() {
         .plugin(tauri_plugin_updater::Builder::new().build())
         .plugin(tauri_plugin_process::init())
         .plugin(tauri_plugin_clipboard_manager::init())
+        // Native OS notifications (Windows toast). Driven from the frontend
+        // (`ShellBridge`) when an AI generation job finishes while the window is
+        // unfocused/minimised (async-jobs Phase 7). The `notification:default`
+        // capability grants the main window the permission/notify commands.
+        .plugin(tauri_plugin_notification::init())
         .plugin(tauri_plugin_store::Builder::new().build())
         .plugin(
             tauri_plugin_global_shortcut::Builder::new()

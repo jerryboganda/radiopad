@@ -91,23 +91,20 @@ public class ReportsController : TenantedController
     private readonly ReportingService _reporting;
     private readonly IAuditLog _audit;
     private readonly Services.AiJobRegistry _aiJobs;
-    private readonly IServiceScopeFactory _scopes;
-    private readonly IHostApplicationLifetime _lifetime;
+    private readonly Services.AiJobCoordinator _coordinator;
 
     public ReportsController(
         RadioPadDbContext db,
         ReportingService reporting,
         IAuditLog audit,
         Services.AiJobRegistry aiJobs,
-        IServiceScopeFactory scopes,
-        IHostApplicationLifetime lifetime)
+        Services.AiJobCoordinator coordinator)
     {
         _db = db;
         _reporting = reporting;
         _audit = audit;
         _aiJobs = aiJobs;
-        _scopes = scopes;
-        _lifetime = lifetime;
+        _coordinator = coordinator;
     }
 
     public record CreateReportDto(
@@ -736,7 +733,7 @@ public class ReportsController : TenantedController
                 (result, _) = await _reporting.GenerateStructuredAutoAsync(tenant, user, report, ct);
             }
 
-            await ApplyStructuredResultAsync(_db, report, user, result, ct);
+            await Services.AiJobCoordinator.ApplyStructuredResultAsync(_db, report, user, result, ct);
 
             return Ok(report);
         }
@@ -760,50 +757,6 @@ public class ReportsController : TenantedController
         {
             return Conflict(new { error = rge.Message, kind = "rulebook_governance" });
         }
-    }
-
-    /// <summary>
-    /// Adopts each non-empty AI section onto the report — flagging it for the
-    /// .ai-mark review style; empty sections keep whatever the intake seeded —
-    /// and snapshots a version (mirrors PATCH) so the editor's history/diff
-    /// captures the generation as an authored step. Shared by the synchronous
-    /// <see cref="Generate"/> endpoint and the async generate job.
-    /// </summary>
-    private static async Task ApplyStructuredResultAsync(
-        RadioPadDbContext db, Report report, User user, ReportingService.StructuredReportResult result, CancellationToken ct)
-    {
-        var highlights = ParseHighlights(report.AiHighlightsJson);
-        void Adopt(string key, string value, Action<string> set)
-        {
-            if (string.IsNullOrWhiteSpace(value)) return;
-            set(value);
-            highlights[key] = true;
-        }
-        Adopt("indication", result.Indication, v => report.Indication = v);
-        Adopt("technique", result.Technique, v => report.Technique = v);
-        Adopt("comparison", result.Comparison, v => report.Comparison = v);
-        Adopt("findings", result.Findings, v => report.Findings = v);
-        Adopt("impression", result.Impression, v => report.Impression = v);
-        Adopt("recommendations", result.Recommendations, v => report.Recommendations = v);
-        report.AiHighlightsJson = System.Text.Json.JsonSerializer.Serialize(highlights);
-        report.UpdatedAt = DateTimeOffset.UtcNow;
-
-        var nextSeq = await db.ReportVersions.Where(v => v.ReportId == report.Id).CountAsync(ct);
-        db.ReportVersions.Add(new Domain.Entities.ReportVersion
-        {
-            ReportId = report.Id,
-            Sequence = nextSeq + 1,
-            AuthorUserId = user.Id,
-            Action = "generate",
-            RulebookId = report.RulebookId,
-            SnapshotJson = System.Text.Json.JsonSerializer.Serialize(new
-            {
-                report.Indication, report.Technique, report.Comparison,
-                report.Findings, report.Impression, report.Recommendations,
-                report.AiHighlightsJson,
-            }),
-        });
-        await db.SaveChangesAsync(ct);
     }
 
     // -----------------------------------------------------------------
@@ -855,15 +808,19 @@ public class ReportsController : TenantedController
             return BadRequest(new { error = "Provider not found.", kind = "not_found" });
         }
 
-        // Single-flight: attach to an already-running identical job instead of
-        // stacking a second generation (retry-after-disconnect is the expected
-        // recovery path; the first job is still running by design).
+        // Fast in-memory single-flight: attach to an already-running identical job
+        // instead of stacking a second generation (retry-after-disconnect is the
+        // expected recovery path; the first job is still running by design). The
+        // coordinator's DB-level single-flight is the authoritative backstop for the
+        // queued state the registry doesn't know about yet.
         if (_aiJobs.TryGetRunning(tenant.Id, id, "ai", mode, out var running))
             return Accepted(new { jobId = running.Id, status = running.Status });
 
-        var job = _aiJobs.Create(tenant.Id, id, user.Id, "ai", mode);
-        _ = Task.Run(() => ExecuteAiJobAsync(job.Id, tenant.Id, user.Id, id, mode, dto.ProviderId));
-        return Accepted(new { jobId = job.Id, status = job.Status });
+        // Enqueue onto the durable job platform; the runner picks it up. Status may
+        // now be "queued" on a fresh submit (additive — the client only polls, never
+        // reads submit-status).
+        var (jobId, status, _) = await _coordinator.SubmitAsync(tenant, user, id, "ai", mode, dto.ProviderId, ct);
+        return Accepted(new { jobId, status });
     }
 
     [HttpPost("{id:guid}/generate/jobs")]
@@ -885,9 +842,8 @@ public class ReportsController : TenantedController
         if (_aiJobs.TryGetRunning(tenant.Id, id, "generate", "generate", out var running))
             return Accepted(new { jobId = running.Id, status = running.Status });
 
-        var job = _aiJobs.Create(tenant.Id, id, user.Id, "generate", "generate");
-        _ = Task.Run(() => ExecuteGenerateJobAsync(job.Id, tenant.Id, user.Id, id, dto.ProviderId));
-        return Accepted(new { jobId = job.Id, status = job.Status });
+        var (jobId, status, _) = await _coordinator.SubmitAsync(tenant, user, id, "generate", "generate", dto.ProviderId, ct);
+        return Accepted(new { jobId, status });
     }
 
     /// <summary>
@@ -901,197 +857,66 @@ public class ReportsController : TenantedController
         var (tenant, user) = await ResolveContextAsync(_db, ct);
         var deny = RequirePermission(user, RbacPermission.ReportsEdit);
         if (deny is not null) return deny;
-        if (!_aiJobs.TryGet(jobId, out var job) || job.TenantId != tenant.Id || job.ReportId != id)
+
+        // Hot path: serve from the in-memory registry without touching the DB.
+        if (_aiJobs.TryGet(jobId, out var job) && job.TenantId == tenant.Id && job.ReportId == id)
         {
-            return NotFound(new
+            return Ok(new
             {
-                error = "AI job not found — the server may have restarted mid-generation. Please try again.",
-                kind = "job_not_found",
+                jobId = job.Id,
+                kind = job.Kind,
+                mode = job.Mode,
+                status = job.Status,
+                elapsedMs = (long)((job.CompletedAt ?? DateTimeOffset.UtcNow) - job.CreatedAt).TotalMilliseconds,
+                result = job.Status == "ok" ? job.Payload : null,
+                error = job.Error,
+                errorKind = job.ErrorKind,
             });
         }
-        return Ok(new
+
+        // Registry miss — evicted, or the process restarted mid-generation. Fall
+        // back to the durable row so a restart surfaces status=error,
+        // errorKind=server_restart instead of a bare 404, and a still-queued job is
+        // visible before the runner has created its hot entry. The envelope shape is
+        // identical to the hot path so old and new bodies are indistinguishable.
+        var row = await _db.AiJobs
+            .FirstOrDefaultAsync(j => j.Id == jobId && j.TenantId == tenant.Id && j.ReportId == id, ct);
+        if (row is not null)
         {
-            jobId = job.Id,
-            kind = job.Kind,
-            mode = job.Mode,
-            status = job.Status,
-            elapsedMs = (long)((job.CompletedAt ?? DateTimeOffset.UtcNow) - job.CreatedAt).TotalMilliseconds,
-            result = job.Status == "ok" ? job.Payload : null,
-            error = job.Error,
-            errorKind = job.ErrorKind,
-        });
-    }
-
-    /// <summary>Safety ceiling for a background AI job; generous multiple of the provider timeouts.</summary>
-    private static readonly TimeSpan AiJobSafetyTimeout = TimeSpan.FromMinutes(10);
-
-    private async Task ExecuteAiJobAsync(Guid jobId, Guid tenantId, Guid userId, Guid reportId, string mode, Guid? providerId)
-    {
-        await ExecuteJobCoreAsync(jobId, tenantId, async (scope, ct) =>
-        {
-            var db = scope.ServiceProvider.GetRequiredService<RadioPadDbContext>();
-            var reporting = scope.ServiceProvider.GetRequiredService<ReportingService>();
-            var (tenant, user, report) = await LoadJobContextAsync(db, tenantId, userId, reportId, ct);
-
-            if (providerId is { } pid && pid != Guid.Empty)
+            object? result = null;
+            if (row.Status == "ok")
             {
-                var provider = await db.Providers.FirstOrDefaultAsync(p => p.Id == pid && p.TenantId == tenantId, ct)
-                    ?? throw new InvalidOperationException("provider_not_found");
-                var result = await reporting.RunAsync(tenant, user, report, provider, mode, ct);
-                _aiJobs.Complete(jobId, new
+                if (string.Equals(row.Kind, "generate", StringComparison.Ordinal))
                 {
-                    text = result.Text,
-                    provider = result.Provider,
-                    model = result.Model,
-                    latencyMs = result.LatencyMs,
-                    promptVersion = result.PromptVersion,
-                    mode,
-                    routedBy = "manual",
-                });
-            }
-            else
-            {
-                var (result, picked) = await reporting.RunAutoAsync(tenant, user, report, mode, ct);
-                _aiJobs.Complete(jobId, new
+                    // Generate has no ResultJson — the report row IS the result, mirroring
+                    // the registry payload the hot path returns for a generate job.
+                    result = await _db.Reports
+                        .FirstOrDefaultAsync(r => r.Id == row.ReportId && r.TenantId == tenant.Id, ct);
+                }
+                else if (!string.IsNullOrWhiteSpace(row.ResultJson))
                 {
-                    text = result.Text,
-                    provider = result.Provider,
-                    model = result.Model,
-                    latencyMs = result.LatencyMs,
-                    promptVersion = result.PromptVersion,
-                    mode,
-                    routedBy = "auto",
-                    selectedProviderId = picked.Id,
-                });
+                    result = System.Text.Json.JsonSerializer
+                        .Deserialize<System.Text.Json.JsonElement>(row.ResultJson);
+                }
             }
+            return Ok(new
+            {
+                jobId = row.Id,
+                kind = row.Kind,
+                mode = row.Mode,
+                status = row.Status,
+                elapsedMs = (long)((row.CompletedAt ?? DateTimeOffset.UtcNow) - row.CreatedAt).TotalMilliseconds,
+                result,
+                error = row.Error,
+                errorKind = row.ErrorKind,
+            });
+        }
+
+        return NotFound(new
+        {
+            error = "AI job not found — the server may have restarted mid-generation. Please try again.",
+            kind = "job_not_found",
         });
-    }
-
-    private async Task ExecuteGenerateJobAsync(Guid jobId, Guid tenantId, Guid userId, Guid reportId, Guid? providerId)
-    {
-        await ExecuteJobCoreAsync(jobId, tenantId, async (scope, ct) =>
-        {
-            var db = scope.ServiceProvider.GetRequiredService<RadioPadDbContext>();
-            var reporting = scope.ServiceProvider.GetRequiredService<ReportingService>();
-            var (tenant, user, report) = await LoadJobContextAsync(db, tenantId, userId, reportId, ct);
-
-            // Freshness guard: the provider call runs for minutes DETACHED from
-            // the client, so the radiologist may edit the report meanwhile (the
-            // old sync endpoint could not hit this — disconnect cancelled it).
-            // A stale write-back would silently clobber authored medical text.
-            var updatedAtAtSubmit = report.UpdatedAt;
-
-            ReportingService.StructuredReportResult result;
-            if (providerId is { } pid && pid != Guid.Empty)
-            {
-                var provider = await db.Providers.FirstOrDefaultAsync(p => p.Id == pid && p.TenantId == tenantId, ct)
-                    ?? throw new InvalidOperationException("provider_not_found");
-                result = await reporting.GenerateStructuredAsync(tenant, user, report, provider, ct);
-            }
-            else
-            {
-                (result, _) = await reporting.GenerateStructuredAutoAsync(tenant, user, report, ct);
-            }
-
-            await db.Entry(report).ReloadAsync(ct);
-            if (report.UpdatedAt != updatedAtAtSubmit)
-                throw new InvalidOperationException("report_modified");
-
-            await ApplyStructuredResultAsync(db, report, user, result, ct);
-            _aiJobs.Complete(jobId, report);
-        });
-    }
-
-    private static async Task<(Tenant tenant, User user, Report report)> LoadJobContextAsync(
-        RadioPadDbContext db, Guid tenantId, Guid userId, Guid reportId, CancellationToken ct)
-    {
-        var tenant = await db.Tenants.FirstOrDefaultAsync(t => t.Id == tenantId, ct)
-            ?? throw new InvalidOperationException("context_gone");
-        var user = await db.Users.FirstOrDefaultAsync(u => u.Id == userId && u.TenantId == tenantId, ct)
-            ?? throw new InvalidOperationException("context_gone");
-        var report = await db.Reports.FirstOrDefaultAsync(r => r.Id == reportId && r.TenantId == tenantId, ct)
-            ?? throw new InvalidOperationException("context_gone");
-        return (tenant, user, report);
-    }
-
-    /// <summary>
-    /// Runs a job body in its own DI scope, detached from the HTTP request:
-    /// the client disconnecting no longer cancels the provider call (the 2026-07-12
-    /// incident). Cancellation comes only from app shutdown or the safety ceiling.
-    /// Every failure path lands in the registry so a poll always terminates.
-    /// </summary>
-    private async Task ExecuteJobCoreAsync(Guid jobId, Guid tenantId, Func<IServiceScope, CancellationToken, Task> body)
-    {
-        try
-        {
-            using var scope = _scopes.CreateScope();
-            using var cts = CancellationTokenSource.CreateLinkedTokenSource(_lifetime.ApplicationStopping);
-            cts.CancelAfter(AiJobSafetyTimeout);
-            await body(scope, cts.Token);
-        }
-        catch (InvalidOperationException ioe) when (ioe.Message == "provider_not_found")
-        {
-            _aiJobs.Fail(jobId, "Provider not found.", "not_found");
-        }
-        catch (InvalidOperationException ioe) when (ioe.Message == "context_gone")
-        {
-            _aiJobs.Fail(jobId, "The report, user, or organisation was removed while the job was queued.", "not_found");
-        }
-        catch (InvalidOperationException ioe) when (ioe.Message == "report_modified")
-        {
-            _aiJobs.Fail(
-                jobId,
-                "The report was edited while the AI generation was running, so the AI result was discarded to protect your edits. Re-run generation if you still want it.",
-                "report_modified");
-        }
-        catch (Application.Services.QuotaExceededException qex)
-        {
-            // Sync endpoints surface this via the global handler as 402
-            // quota_exceeded; without this catch it would masquerade as a
-            // server_error and be logged as an unexpected fault.
-            _aiJobs.Fail(jobId, qex.Message, "quota_exceeded");
-        }
-        catch (Application.Services.ProviderPolicyException pex)
-        {
-            _aiJobs.Fail(jobId, pex.Message, "provider_policy");
-        }
-        catch (Application.Services.ProviderTransportException tex)
-        {
-            _aiJobs.Fail(jobId, tex.Message, "provider_transport");
-        }
-        catch (Application.Services.RulebookGovernanceException rge)
-        {
-            _aiJobs.Fail(jobId, rge.Message, "rulebook_governance");
-        }
-        catch (OperationCanceledException)
-        {
-            _aiJobs.Fail(jobId, "The AI generation timed out or the server is shutting down.", "timeout");
-        }
-        catch (Exception ex)
-        {
-            try
-            {
-                using var logScope = _scopes.CreateScope();
-                logScope.ServiceProvider.GetRequiredService<ILogger<ReportsController>>()
-                    .LogError(ex, "Async AI job {JobId} (tenant {TenantId}) failed unexpectedly", jobId, tenantId);
-            }
-            catch { /* logging must never mask the job failure */ }
-            _aiJobs.Fail(jobId, "Unexpected server error during AI generation.", "server_error");
-        }
-    }
-
-    /// <summary>Read the report's AiHighlights map (section key → generated?) tolerantly.</summary>
-    private static Dictionary<string, bool> ParseHighlights(string? json)
-    {
-        if (string.IsNullOrWhiteSpace(json)) return new();
-        try
-        {
-            return System.Text.Json.JsonSerializer.Deserialize<Dictionary<string, bool>>(json) ?? new();
-        }
-        catch (System.Text.Json.JsonException)
-        {
-            return new();
-        }
     }
 
     [HttpPost("{id:guid}/acknowledge")]
