@@ -35,6 +35,12 @@ import {
   type Job,
   type JobOrigin,
 } from '@/lib/jobs';
+import {
+  assembleDictationRaw,
+  planCleanupApply,
+  type CleanupJobResult,
+  type CleanupSectionMap,
+} from '@/lib/cleanup';
 import { getSessionAudio } from '@/lib/dictation/audioBuffer';
 import { isUseUbagEnabled } from '@/lib/dictation/crossCheckPrefs';
 import { anchorCorrections, applyCorrection } from '@/lib/dictation/anchorCorrections';
@@ -112,7 +118,8 @@ type RewriteState = {
  */
 type PendingAiResult =
   | { jobId: string; kind: 'impression'; text: string }
-  | { jobId: string; kind: 'local'; sections: LocalGenerateResult };
+  | { jobId: string; kind: 'local'; sections: LocalGenerateResult }
+  | { jobId: string; kind: 'cleanup'; sections: CleanupSectionMap; provider?: string };
 
 /** A deterministic 404 (result expired / job gone) — distinct from a transient
  *  poll error, which the JobsProvider's ticker keeps retrying. */
@@ -263,6 +270,16 @@ export default function ReportPage() {
   // Jobs we watched go terminal-ok while mounted — ONLY these auto-apply; a job
   // already finished on arrival must never clobber current editor content.
   const seenActiveRef = useRef<Set<string>>(new Set());
+  // Dictation-cleanup submit snapshots: all five section values captured at
+  // submit, keyed by jobId, so the terminal apply can tell (per section) whether
+  // the radiologist edited it under the running job (the all-or-preview gate).
+  // Also marks a cleanup job as "submitted this session" for terminal ownership.
+  const cleanupBeforeRef = useRef<Map<string, Record<string, string>>>(new Map());
+  // jobId → the "Fix dictation" activity-rail entry id, so the terminal handler
+  // can resolve it to completed/failed (the submit only creates it as running).
+  const cleanupActivityRef = useRef<Map<string, number>>(new Map());
+  // Cleanup terminals already handled — fire-once (mirrors seenActiveRef's shape).
+  const cleanupHandledRef = useRef<Set<string>>(new Set());
   // Jobs whose result we have already applied/handled (a terminal decision has
   // been reached — never re-fetch or re-apply).
   const appliedJobsRef = useRef<Set<string>>(new Set());
@@ -479,23 +496,74 @@ export default function ReportPage() {
     await update({ impression: text, aiHighlightsJson: JSON.stringify(next) });
   }
 
-  /** Apply the on-device generator's structured sections, each wearing `.ai-mark`. */
-  async function applyLocalSections(cs: LocalGenerateResult) {
+  /** Apply an arbitrary section map — each written section wearing `.ai-mark`,
+   *  with an Undo snapshot, in a single PATCH. Only non-empty string values among
+   *  the five report sections are written; returns the keys actually applied
+   *  (empty map → no PATCH). Shared by the on-device draft apply and the
+   *  dictation-cleanup apply/preview paths so they can never drift. */
+  async function applySectionMap(cs: Record<string, unknown>): Promise<string[]> {
     const patch: Partial<Report> = {};
     const nextHighlights = { ...aiHighlightsRef.current };
     const undo: Record<string, string> = {};
     (['indication', 'technique', 'findings', 'impression', 'recommendations'] as const).forEach((k) => {
       const v = cs[k];
-      if (v && v.trim()) {
+      if (typeof v === 'string' && v.trim()) {
         undo[k] = String((reportRef.current as Record<string, unknown> | null)?.[k] ?? '');
         (patch as Record<string, unknown>)[k] = v;
         nextHighlights[k] = true;
       }
     });
-    if (Object.keys(patch).length === 0) return;
+    const keys = Object.keys(patch);
+    if (keys.length === 0) return keys;
     setAiUndo((prev) => ({ ...prev, ...undo }));
     setAiHighlights(nextHighlights);
     await update({ ...patch, aiHighlightsJson: JSON.stringify(nextHighlights) } as Partial<Report>);
+    return keys;
+  }
+
+  /** Apply the on-device generator's structured sections, each wearing `.ai-mark`. */
+  async function applyLocalSections(cs: LocalGenerateResult) {
+    await applySectionMap(cs as unknown as Record<string, unknown>);
+  }
+
+  /**
+   * Apply (or preview) a settled dictation-cleanup suggestion set. NEVER a
+   * partial apply (CLAUDE.md clinical-safety gate): the per-section staleness
+   * check runs the same `canAutoApplyAiResult` the impression path uses, keyed by
+   * the submit snapshot in `cleanupBeforeRef` (absent → deep-link, empty-only
+   * rule). Every target section passes → auto-apply all wearing `.ai-mark`; any
+   * fails → the WHOLE result routes to the non-destructive preview. Emits the
+   * final cleanup overlay and resolves the "Fix dictation" activity entry.
+   */
+  async function applyCleanupResult(jobId: string, res: CleanupJobResult) {
+    const cs: CleanupSectionMap = res.cleanedSections ?? {};
+    const r = reportRef.current;
+    const current: CleanupSectionMap = {
+      indication: String(r?.indication ?? ''),
+      technique: String(r?.technique ?? ''),
+      findings: String(r?.findings ?? ''),
+      impression: String(r?.impression ?? ''),
+      recommendations: String(r?.recommendations ?? ''),
+    };
+    const plan = planCleanupApply(cs, current, cleanupBeforeRef.current.get(jobId));
+    const provider = res.provider || 'AI provider';
+    const actId = cleanupActivityRef.current.get(jobId);
+    if (plan.action === 'no-changes') {
+      markAppliedJob(jobId);
+      emitCleanupResult('no-changes', `${provider} returned no changes for this dictation.`);
+    } else if (plan.action === 'apply') {
+      const written = await applySectionMap(cs as unknown as Record<string, unknown>);
+      markAppliedJob(jobId);
+      const n = written.length;
+      emitCleanupResult('success', `Cleaned ${n} section${n === 1 ? '' : 's'} via ${provider}.`);
+    } else {
+      // A target section was edited under the job (or occupied on a snapshot-less
+      // deep-link) → no partial apply: route the WHOLE suggestion set to preview.
+      appliedJobsRef.current.add(jobId);
+      setPendingAiResult({ jobId, kind: 'cleanup', sections: cs, provider: res.provider });
+      emitCleanupResult('success', 'Cleanup ready — review the proposed changes.');
+    }
+    if (actId != null) patchActivity(actId, { status: 'completed', provider: res.provider });
   }
 
   const expiredToast = () =>
@@ -506,12 +574,15 @@ export default function ReportPage() {
    *  from the live-completion effect and the ?aiJob=/?localJob= deep-link. Owns
    *  its own idempotency: a still-running job is left unmarked so it re-applies
    *  once it settles; a terminal decision (apply / preview / expired) is final. */
-  async function applyJobResult(jobId: string, origin: JobOrigin, kind: JobKind) {
+  async function applyJobResult(jobId: string, origin: JobOrigin, kind: JobKind, modeHint?: string) {
     if (appliedJobsRef.current.has(jobId) || dispatchedRef.current.has(jobId)) return;
     dispatchedRef.current.add(jobId);
     try {
       let status: string | undefined;
       let result: unknown;
+      // Dispatch keys off the FETCHED detail's mode (decision #9) — the deep-link
+      // only knows the jobId, so cleanup vs impression is decided post-fetch.
+      let mode: string | undefined = modeHint;
       try {
         if (origin === 'local') {
           const env = await api.localGenerate.jobStatus(jobId);
@@ -519,12 +590,12 @@ export default function ReportPage() {
         } else {
           try {
             const detail = await api.jobs.get(jobId);
-            status = detail.status; result = detail.result;
+            status = detail.status; result = detail.result; mode = detail.mode ?? mode;
           } catch (e) {
             if (isNotFoundError(e)) throw e;
             // Unified engine unavailable/evicted → the proven report-scoped poll.
             const env = await api.reports.aiJobStatus(reportRef.current!.id, jobId);
-            status = env.status; result = env.result;
+            status = env.status; result = env.result; mode = env.mode ?? mode;
           }
         }
       } catch (e) {
@@ -549,6 +620,9 @@ export default function ReportPage() {
         }
         await applyLocalSections(cs);
         markAppliedJob(jobId);
+      } else if (mode === 'cleanup') {
+        // Dictation cleanup — a suggestion set; apply-or-preview (never partial).
+        await applyCleanupResult(jobId, result as CleanupJobResult);
       } else {
         const text = (result as { text?: string }).text;
         if (typeof text !== 'string') { markAppliedJob(jobId); return; }
@@ -572,6 +646,7 @@ export default function ReportPage() {
     const p = pendingAiResult;
     if (!p) return;
     if (p.kind === 'impression') await applyImpression(p.text);
+    else if (p.kind === 'cleanup') await applySectionMap(p.sections as unknown as Record<string, unknown>);
     else await applyLocalSections(p.sections);
     markAppliedJob(p.jobId);
     setPendingAiResult(null);
@@ -621,9 +696,45 @@ export default function ReportPage() {
         if (appliedJobsRef.current.has(job.id)) continue;
         appliedJobsRef.current.add(job.id);
         void handleGenerateOk(job.id);
+      } else if (job.kind === 'ai' && job.mode === 'cleanup') {
+        // Cleanup terminals (ok/error/cancelled) are owned by the dedicated effect
+        // below — it emits the cleanup overlay and resolves the activity entry.
+        continue;
       } else {
         // applyJobResult owns its own idempotency (applied/dispatched guards).
         void applyJobResult(job.id, job.origin, job.kind);
+      }
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [reportJobs, report]);
+
+  // Dictation-cleanup terminal handling (durable async-job platform). The cleanup
+  // job is a hosted `ai`/`cleanup` job tracked like any other; when it settles we
+  // apply-or-preview its suggestion set (never a partial apply) on `ok`, or emit
+  // the failure overlay on error/cancelled — the pieces the generic completion
+  // path above doesn't cover. Owned only for a cleanup we submitted this session
+  // (`cleanupBeforeRef`) or watched run (`seenActiveRef`); one that finished in
+  // another window is reached instead via the ?aiJob= deep-link (empty-only gate).
+  // The Set ref makes each terminal fire exactly once.
+  useEffect(() => {
+    if (!report) return;
+    for (const job of reportJobs) {
+      if (job.kind !== 'ai' || job.mode !== 'cleanup') continue;
+      if (isActiveStatus(job.status)) continue;
+      if (cleanupHandledRef.current.has(job.id)) continue;
+      if (!cleanupBeforeRef.current.has(job.id) && !seenActiveRef.current.has(job.id)) continue;
+      cleanupHandledRef.current.add(job.id);
+      if (job.status === 'ok') {
+        // applyJobResult fetches the retained cleanedSections and, seeing
+        // mode='cleanup', routes to applyCleanupResult (overlay + activity patch).
+        void applyJobResult(job.id, job.origin, job.kind, job.mode);
+      } else {
+        const actId = cleanupActivityRef.current.get(job.id);
+        const cancelled = job.status === 'cancelled';
+        const msg = cancelled ? 'Cleanup cancelled.' : describeAiError(job.errorKind, job.error);
+        if (!cancelled) setError(msg);
+        emitCleanupResult('error', msg);
+        if (actId != null) patchActivity(actId, { status: 'failed', error: cancelled ? 'Cancelled' : msg });
       }
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -1012,21 +1123,22 @@ export default function ReportPage() {
   }
 
   /**
-   * "Fix everything" from the dictation overlay — runs the report's dictated
-   * prose through the UBAG-routed cleanup pipeline and applies the structured
-   * medical sections it returns. AI-touched sections wear `.ai-mark` until the
-   * radiologist acknowledges them (CLAUDE.md rule 3).
+   * "Fix everything" from the dictation overlay — submit-and-continue (durable
+   * async-job platform). Flush unsaved edits, assemble the five sections into raw
+   * dictation, then enqueue a hosted `ai`/`cleanup` job (carrying the raw text to
+   * `/dictation/cleanup/jobs`) and return — non-blocking. The returned suggestion
+   * set is applied or previewed by the cleanup terminal effect when the tracked
+   * job settles; NOTHING here writes the report. AI-touched sections wear
+   * `.ai-mark` until the radiologist acknowledges them (CLAUDE.md rule 3).
    */
   async function runDictationCleanup() {
     if (!report) {
       emitCleanupResult('error', 'Open a report before running Fix.');
       return;
     }
-    setAiBusy(true);
     setError(null);
-    // Tell the floating overlay to show its "Fixing…" spinner immediately — the
-    // UBAG cleanup is a web-automation round trip that can take up to a minute,
-    // so the radiologist needs a live indication the action is in progress.
+    // Show the overlay's "Fixing…" spinner immediately; the tracked job's terminal
+    // effect replaces it with the success/no-changes/error line when it settles.
     emitCleanupResult('busy');
     const actId = logActivity('Fix dictation', 'All sections');
     try {
@@ -1037,45 +1149,42 @@ export default function ReportPage() {
         patchActivity(actId, { status: 'failed', error: 'Report not loaded.' });
         return;
       }
-      const raw = [
-        current.indication, current.technique,
-        current.findings, current.impression, current.recommendations,
-      ]
-        .map((s) => (s ?? '').trim())
-        .filter(Boolean)
-        .join('\n');
+      // The five sections, coerced to strings — used both for the raw dictation
+      // and, verbatim, as the per-section submit snapshot for the staleness gate.
+      const sections = {
+        indication: String(current.indication ?? ''),
+        technique: String(current.technique ?? ''),
+        findings: String(current.findings ?? ''),
+        impression: String(current.impression ?? ''),
+        recommendations: String(current.recommendations ?? ''),
+      };
+      const raw = assembleDictationRaw(sections);
       if (!raw) {
         emitCleanupResult('empty', 'Nothing to clean up yet — dictate or type into a section first.');
         patchActivity(actId, { status: 'failed', error: 'Nothing to clean up.' });
         return;
       }
-      const res = await api.reports.cleanupDictation(current.id, raw);
-      const cs = res.cleanedSections;
-      const patch: Partial<Report> = {};
-      const nextHighlights = { ...aiHighlightsRef.current };
-      const undo: Record<string, string> = {};
-      (['indication', 'technique', 'findings', 'impression', 'recommendations'] as const).forEach((k) => {
-        const v = cs[k];
-        if (v && v.trim()) {
-          undo[k] = String(current[k] ?? '');
-          (patch as Record<string, unknown>)[k] = v;
-          nextHighlights[k] = true;
-        }
+      // Submit as a tracked hosted `ai`/`cleanup` job (widget + AiActivityPanel
+      // show it for free); the provider routes the raw to the durable cleanup
+      // endpoint. dedupe returns an existing id on a double-tap — keep that job's
+      // ORIGINAL five-section snapshot so the staleness gate stays honest.
+      const jobId = await jobs.submit({
+        origin: 'hosted',
+        kind: 'ai',
+        reportId: current.id,
+        mode: 'cleanup',
+        rawDictation: raw,
+        providerId: providerId || undefined,
+        report: reportInfo(),
       });
-      const changed = Object.keys(patch).length;
-      if (changed === 0) {
-        emitCleanupResult('no-changes', `${res.provider || 'AI provider'} returned no changes for this dictation.`);
-        patchActivity(actId, { status: 'completed', provider: res.provider });
-        return;
-      }
-      setAiUndo((prev) => ({ ...prev, ...undo }));
-      setAiHighlights(nextHighlights);
-      await update({ ...patch, aiHighlightsJson: JSON.stringify(nextHighlights) } as Partial<Report>);
-      emitCleanupResult('success', `Cleaned ${changed} section${changed === 1 ? '' : 's'} via ${res.provider || 'AI provider'}.`);
-      patchActivity(actId, { status: 'completed', provider: res.provider });
+      if (!cleanupBeforeRef.current.has(jobId)) cleanupBeforeRef.current.set(jobId, sections);
+      cleanupActivityRef.current.set(jobId, actId);
+      // Non-blocking from here: progress/error/ok all flow from the tracked job.
     } catch (e) {
+      // Only the SUBMIT itself failed (no jobId exists) — the job never started,
+      // so this is the sole owner of the error for it. Once a jobId exists, all
+      // subsequent state comes from the tracked job (the cleanup terminal effect).
       const err = e as { kind?: string; body?: { error?: string; detail?: string; title?: string; kind?: string }; message: string };
-      // Branch on the backend's error `kind` discriminator for actionable text.
       const kind = err.kind ?? err.body?.kind;
       let msg = err.body?.error || err.body?.detail || err.body?.title || err.message || 'Fix failed.';
       if (kind === 'target_not_allowed') {
@@ -1086,8 +1195,6 @@ export default function ReportPage() {
       setError(msg);
       emitCleanupResult('error', msg);
       patchActivity(actId, { status: 'failed', error: msg });
-    } finally {
-      setAiBusy(false);
     }
   }
 
@@ -1600,8 +1707,12 @@ export default function ReportPage() {
           {pendingAiResult && (
             <div className="banner ai" role="status" data-testid="pending-ai-result">
               <span className="badge ai">✨ generated</span>{' '}
-              {pendingAiResult.kind === 'impression' ? 'A new impression' : 'A generated draft'} is
-              ready, but this report changed since it was requested — review before applying.
+              {pendingAiResult.kind === 'impression'
+                ? 'A new impression'
+                : pendingAiResult.kind === 'cleanup'
+                  ? 'Cleaned-up dictation'
+                  : 'A generated draft'}{' '}
+              is ready, but this report changed since it was requested — review before applying.
               <div className="rp-toolbar rp-mt-sm">
                 <button className="primary" type="button" onClick={() => { void applyPendingResult(); }}>
                   Apply

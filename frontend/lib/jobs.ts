@@ -86,6 +86,13 @@ export type JobSubmitSpec =
       reportId: string;
       mode: string;
       providerId?: string;
+      /** For `mode: 'cleanup'` only — the assembled raw dictation (the five
+       *  sections joined). When present the provider routes the submit to the
+       *  durable cleanup endpoint (`/dictation/cleanup/jobs`, structured
+       *  `cleanedSections` result) instead of the generic `/ai/jobs` path, while
+       *  the job is still tracked/deduped as a normal hosted `ai`/`cleanup` job.
+       *  Held in memory only — never persisted (no clinical text at rest). */
+      rawDictation?: string;
       report?: JobReportInfo;
     }
   | {

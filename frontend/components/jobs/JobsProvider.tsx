@@ -526,10 +526,17 @@ export default function JobsProvider({ children }: { children: ReactNode }) {
         }));
         localSpecs.current.set(jobId, spec);
       } else if (spec.kind === 'ai') {
-        ({ jobId } = await api.reports.submitAiJob(spec.reportId, {
-          mode: spec.mode,
-          providerId: spec.providerId,
-        }));
+        if (spec.mode === 'cleanup' && spec.rawDictation != null) {
+          // Dictation cleanup carries its raw text to the durable cleanup
+          // endpoint (structured `cleanedSections` result); still tracked/deduped
+          // as a normal hosted `ai`/`cleanup` job by the ADD + ticker below.
+          ({ jobId } = await api.reports.submitCleanupJob(spec.reportId, spec.rawDictation));
+        } else {
+          ({ jobId } = await api.reports.submitAiJob(spec.reportId, {
+            mode: spec.mode,
+            providerId: spec.providerId,
+          }));
+        }
       } else {
         ({ jobId } = await api.reports.submitGenerateJob(spec.reportId, {
           providerId: spec.providerId,

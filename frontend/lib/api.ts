@@ -594,6 +594,26 @@ function submitCrossCheckJobRequest(
   });
 }
 
+/**
+ * POST /api/reports/{id}/dictation/cleanup/jobs — submit the async dictation
+ * cleanup job (durable async-job platform, 2026-07-23). Mirrors
+ * `submitAiJobRequest`/`submitCrossCheckJobRequest` exactly (same header/credential
+ * plumbing and error shape via `request`). The `rawDictation` (the five sections
+ * joined, assembled client-side exactly as the sync `cleanupDictation` did) is
+ * carried in the body so a server-side retry is faithful. Returns the job id
+ * immediately; poll via `api.jobs.get` — the result is the structured
+ * `{ cleanedSections, provider, model, latencyMs, promptVersion }` suggestion set.
+ */
+function submitCleanupJobRequest(
+  reportId: string,
+  rawDictation: string,
+): Promise<{ jobId: string }> {
+  return request<{ jobId: string }>(`/api/reports/${reportId}/dictation/cleanup/jobs`, {
+    method: 'POST',
+    body: JSON.stringify({ rawDictation }),
+  });
+}
+
 /** Options for {@link connectEventStream} — the low-level SSE connector. */
 export interface EventStreamConnectOpts {
   /** Aborting this signal ends the stream and resolves the connect promise cleanly. */
@@ -1572,6 +1592,15 @@ export const api = {
       id: string,
       body: { text: string; sectionKey?: string; useUbag?: boolean },
     ): Promise<{ jobId: string }> => submitCrossCheckJobRequest(id, body),
+    /**
+     * Submit the async dictation-cleanup job (durable async-job platform,
+     * 2026-07-23). `rawDictation` is the five sections joined client-side
+     * (mirroring the sync `cleanupDictation`). Returns the job id immediately;
+     * poll via `api.jobs.get`. The sync `cleanupDictation` above stays for old
+     * desktop builds.
+     */
+    submitCleanupJob: (id: string, rawDictation: string): Promise<{ jobId: string }> =>
+      submitCleanupJobRequest(id, rawDictation),
     aiJobStatus: <T>(id: string, jobId: string): Promise<AiJobEnvelope<T>> =>
       aiJobStatusRequest<T>(id, jobId),
     prior: (id: string) =>
