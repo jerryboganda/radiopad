@@ -2,7 +2,7 @@
 
 import { Suspense, useEffect, useMemo, useRef, useState } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
-import { Eye, EyeOff } from 'lucide-react';
+import { ArrowLeft, ArrowRight, Building2, ChevronRight, Eye, EyeOff, Fingerprint, HelpCircle, Lock, Mail, QrCode, ShieldCheck, Usb, UserRound } from 'lucide-react';
 import AuthScaffold from '@/components/auth/AuthScaffold';
 import { api, publicEnv, setActiveAuthToken } from '@/lib/api';
 import { setAuthToken, isAuthTokenSecure } from '@/lib/secureAuth';
@@ -16,7 +16,7 @@ const DEV_LOGIN_FLAG = process.env.NEXT_PUBLIC_ALLOW_DEV_LOGIN;
 const SSO_FLAG = process.env.NEXT_PUBLIC_ENABLE_SSO;
 
 type SessionResult = { token?: string; tenant?: string; user?: string };
-type Stage = 'credentials' | 'totp' | 'enroll' | 'biometric-offer' | 'reset';
+type Stage = 'credentials' | 'method' | 'totp' | 'enroll' | 'biometric-offer' | 'reset';
 
 function safeReturnTo(value: string | null | undefined): string {
   if (!value || !value.startsWith('/') || value.startsWith('//') || value.includes('\\')) return '/';
@@ -133,7 +133,9 @@ function LoginContent() {
       localStorage.setItem(LS_USER, result.user ?? u);
       if (result.mfaRequired) {
         setCode('');
-        setStage('totp');
+        // Step 2 opens on the method chooser; picking "Authenticator app"
+        // advances to the 6-digit entry (stage 'totp').
+        setStage('method');
       } else if (result.mfaSetupRequired && result.setupToken) {
         setSetupToken(result.setupToken);
         enrollIdentity.current = { tenant: result.tenant ?? t, user: result.user ?? u };
@@ -336,15 +338,22 @@ function LoginContent() {
           <form className="rp-auth-form" onSubmit={submitPassword}>
             <div className="section-block">
               <label htmlFor="li-tenant">Organization</label>
-              <input id="li-tenant" value={tenant} onChange={(e) => setTenant(e.target.value)} required autoComplete="organization" placeholder="your-org" />
+              <div className="rp-field-icon">
+                <Building2 className="rp-field-icon-lead" size={16} aria-hidden />
+                <input id="li-tenant" value={tenant} onChange={(e) => setTenant(e.target.value)} required autoComplete="organization" placeholder="Your organization" />
+              </div>
             </div>
             <div className="section-block">
               <label htmlFor="li-email">Work email</label>
-              <input id="li-email" type="email" value={user} onChange={(e) => setUser(e.target.value)} required autoComplete="username" placeholder="you@org.example" />
+              <div className="rp-field-icon">
+                <UserRound className="rp-field-icon-lead" size={16} aria-hidden />
+                <input id="li-email" type="email" value={user} onChange={(e) => setUser(e.target.value)} required autoComplete="username" placeholder="you@org.example" />
+              </div>
             </div>
             <div className="section-block">
               <label htmlFor="li-pw">Password</label>
-              <div className="rp-pw-field">
+              <div className="rp-field-icon rp-pw-field">
+                <Lock className="rp-field-icon-lead" size={16} aria-hidden />
                 <input
                   id="li-pw"
                   type={showPassword ? 'text' : 'password'}
@@ -366,8 +375,10 @@ function LoginContent() {
             </div>
 
             <div className="rp-auth-actions">
-              <button className="primary" type="submit" disabled={busy !== null}>
-                {busy === 'password' || busy === 'enroll-begin' ? 'Signing in…' : 'Sign in'}
+              <button className="primary rp-auth-submit" type="submit" disabled={busy !== null}>
+                <Fingerprint className="rp-auth-submit-lead" size={18} aria-hidden />
+                <span>{busy === 'password' || busy === 'enroll-begin' ? 'Signing in…' : 'Sign in'}</span>
+                <ArrowRight className="rp-auth-submit-trail" size={18} aria-hidden />
               </button>
               {helloAvailable && (
                 <button className="primary-ghost" type="button" onClick={signInWithHello} disabled={busy !== null}>
@@ -378,17 +389,19 @@ function LoginContent() {
           </form>
 
           <div className="rp-auth-divider">Other options</div>
-          <div className="rp-auth-actions">
-            {ssoEnabled && (
-              <button className="ghost" type="button" onClick={beginSso} disabled={busy !== null}>
-                {busy === 'sso' ? 'Starting SSO…' : 'Continue with SSO'}
-              </button>
-            )}
+          <div className="rp-auth-optionrow">
             {/* /pair is a (desktop) route. Login is (shared) and ships everywhere, so on the web
                 console and the mobile companion this button led straight to "Page not found". */}
             {isDesktopSurface && (
-              <button className="ghost" type="button" onClick={() => router.push('/pair')} disabled={busy !== null}>
-                Pair a device
+              <button className="ghost rp-auth-option" type="button" onClick={() => router.push('/pair')} disabled={busy !== null}>
+                <QrCode size={16} aria-hidden />
+                <span>Pair a device</span>
+              </button>
+            )}
+            {ssoEnabled && (
+              <button className="ghost rp-auth-option" type="button" onClick={beginSso} disabled={busy !== null}>
+                <ShieldCheck size={16} aria-hidden />
+                <span>{busy === 'sso' ? 'Starting SSO…' : 'Sign in with SSO'}</span>
               </button>
             )}
           </div>
@@ -412,6 +425,113 @@ function LoginContent() {
         </>
       )}
 
+      {/* ── Second-factor method chooser ──────────────────────────────
+          Passkey and TOTP are live. Email codes have no API endpoint at all,
+          and a FIDO2 security key currently runs the SAME WebAuthn ceremony as
+          the passkey row — so both are rendered as documented-unavailable
+          rather than as buttons that would dead-end. */}
+      {stage === 'method' && (
+        <>
+          <div className="rp-auth-head">
+            <div className="rp-auth-eyebrow">Step 2 of 3</div>
+            <h1 className="rp-auth-title">Verify your identity</h1>
+            <p className="rp-auth-sub">Choose an authentication method to continue.</p>
+          </div>
+
+          <ul className="rp-auth-methods">
+            <li>
+              <button
+                type="button"
+                className="rp-auth-method is-recommended"
+                onClick={signInWithHello}
+                disabled={busy !== null || !helloAvailable}
+              >
+                <span className="rp-auth-method-icon tone-blue"><Fingerprint size={22} aria-hidden /></span>
+                <span className="rp-auth-method-text">
+                  <span className="rp-auth-method-head">
+                    <span className="rp-auth-method-title">Passkey (Recommended)</span>
+                    <span className="rp-auth-method-tag tone-green">Most secure</span>
+                  </span>
+                  <span className="rp-auth-method-sub">
+                    {helloAvailable
+                      ? 'Use your fingerprint, face, or device screen lock.'
+                      : 'No passkey is available on this device.'}
+                  </span>
+                </span>
+                <ChevronRight className="rp-auth-method-chev" size={18} aria-hidden />
+              </button>
+            </li>
+
+            <li>
+              <button
+                type="button"
+                className="rp-auth-method"
+                onClick={() => { resetTransient(); setStage('totp'); }}
+                disabled={busy !== null}
+              >
+                <span className="rp-auth-method-icon tone-green rp-auth-method-digits" aria-hidden>123<br />456</span>
+                <span className="rp-auth-method-text">
+                  <span className="rp-auth-method-head">
+                    <span className="rp-auth-method-title">Authenticator app (TOTP)</span>
+                    <span className="rp-auth-method-tag tone-blue">Secure</span>
+                  </span>
+                  <span className="rp-auth-method-sub">Enter the 6-digit code from your authenticator app.</span>
+                </span>
+                <ChevronRight className="rp-auth-method-chev" size={18} aria-hidden />
+              </button>
+            </li>
+
+            <li>
+              <button type="button" className="rp-auth-method" disabled aria-describedby="li-m-email-note">
+                <span className="rp-auth-method-icon tone-purple"><Mail size={22} aria-hidden /></span>
+                <span className="rp-auth-method-text">
+                  <span className="rp-auth-method-head">
+                    <span className="rp-auth-method-title">Email verification code</span>
+                    <span className="rp-auth-method-tag">Unavailable</span>
+                  </span>
+                  <span className="rp-auth-method-sub" id="li-m-email-note">Not enabled for your organization.</span>
+                </span>
+                <ChevronRight className="rp-auth-method-chev" size={18} aria-hidden />
+              </button>
+            </li>
+
+            <li>
+              <button type="button" className="rp-auth-method" disabled aria-describedby="li-m-key-note">
+                <span className="rp-auth-method-icon tone-amber"><Usb size={22} aria-hidden /></span>
+                <span className="rp-auth-method-text">
+                  <span className="rp-auth-method-head">
+                    <span className="rp-auth-method-title">Security key (FIDO2)</span>
+                    <span className="rp-auth-method-tag">Unavailable</span>
+                  </span>
+                  <span className="rp-auth-method-sub" id="li-m-key-note">Enrol a security key from your profile, then use Passkey above.</span>
+                </span>
+                <ChevronRight className="rp-auth-method-chev" size={18} aria-hidden />
+              </button>
+            </li>
+          </ul>
+
+          <div className="rp-auth-methods-rule" aria-hidden><Lock size={14} /></div>
+
+          <div className="rp-auth-help">
+            <HelpCircle className="rp-auth-help-icon" size={17} aria-hidden />
+            <div>
+              <div className="rp-auth-help-title">Need help?</div>
+              <p className="rp-auth-help-sub">Contact your administrator if you can&rsquo;t access your account.</p>
+            </div>
+          </div>
+
+          <div className="rp-auth-methods-actions">
+            <button className="ghost rp-auth-back" type="button" onClick={() => { setStage('credentials'); resetTransient(); }} disabled={busy !== null}>
+              <ArrowLeft size={16} aria-hidden />
+              <span>Back</span>
+            </button>
+            <button className="subtle" type="button" onClick={() => { setStage('credentials'); resetTransient(); }} disabled={busy !== null}>
+              Cancel
+            </button>
+          </div>
+        </>
+      )}
+
       {/* ── TOTP step-up ──────────────────────────────────────────── */}
       {stage === 'totp' && (
         <>
@@ -429,7 +549,7 @@ function LoginContent() {
               <button className="primary" type="submit" disabled={busy !== null || code.length !== 6}>
                 {busy === 'totp' ? 'Verifying…' : 'Verify & sign in'}
               </button>
-              <button className="ghost" type="button" onClick={() => { setStage('credentials'); setCode(''); }} disabled={busy !== null}>Back</button>
+              <button className="ghost" type="button" onClick={() => { setStage('method'); setCode(''); }} disabled={busy !== null}>Back</button>
             </div>
           </form>
         </>

@@ -53,7 +53,7 @@ beforeEach(() => {
 
 describe('LoginPage auth choices', () => {
   it('hides the dev tenant/user bearer form by default', () => {
-    // The "Continue with SSO" button only renders when SSO is enabled
+    // The "Sign in with SSO" button only renders when SSO is enabled
     // (NEXT_PUBLIC_ENABLE_SSO=true); enable it here so the production sign-in
     // option is asserted. The dev bearer form stays hidden regardless.
     vi.stubEnv('NEXT_PUBLIC_ENABLE_SSO', 'true');
@@ -62,7 +62,7 @@ describe('LoginPage auth choices', () => {
 
     expect(screen.getByRole('heading', { name: 'Sign in to RadioPad' })).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Sign in' })).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: 'Continue with SSO' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Sign in with SSO' })).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Pair a device' })).toBeInTheDocument();
     // Magic-link sign-in was removed (auth is now password + mandatory TOTP + biometric).
     expect(screen.queryByRole('button', { name: 'Email me a sign-in link' })).not.toBeInTheDocument();

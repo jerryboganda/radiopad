@@ -298,8 +298,9 @@ only for genuinely structural differences, never for colour flips.
    *primitive* in the dark block of `tokens.css` — do not sprinkle
    `html[data-theme='dark']` selectors through feature stylesheets.
 4. **Intentionally-dark exceptions** (dark in *both* themes, by design): the
-   `.op-bash` terminal block (globals.css) and presentation/present-mode
-   surfaces. Do not "fix" them.
+   `.op-bash` terminal block (globals.css), presentation/present-mode
+   surfaces, and the auth showcase aside `.rp-auth-aside` (§4.14). Do not
+   "fix" them.
 
 ---
 
@@ -788,19 +789,44 @@ indicator) over `.rp-grid-2.rp-studio-grid`. Block editor classes
 
 The only routes that bypass the sidebar shell (`AppShell` renders them inside
 `.rp-public-auth-content`). All share `components/auth/AuthScaffold.tsx` — a
-split-screen with a branded aside (blue brand panel in the RC restyle) and
-the focused auth card. **A `<ThemeToggle />` sits on the auth card
-(THEME-002).** Classes: `.rp-auth-split` / `.rp-auth-aside` (hidden ≤880px) /
+split-screen with a branded aside and the focused auth card. **A
+`<ThemeToggle />` sits on the auth card (THEME-002).** Classes:
+`.rp-auth-split` / `.rp-auth-aside` (hidden ≤880px) /
 `.rp-auth-aside-motif` / `.rp-auth-main` / `.rp-auth-card` (entrance
 animation gated by `prefers-reduced-motion`), aside content
-(`.rp-auth-brand`, `.rp-auth-headline`, `.rp-auth-features`,
-`.rp-auth-trust`), card chrome (`.rp-auth-head/-form/-actions/-divider/`
-`-hint`, `.rp-field-hint`/`.rp-field-error`, `.rp-auth-foot`), pairing rail
-(`.rp-pair-steps` over the `.rp-pair-code` chip). Viewport-fit compaction
-tiers at `≤1020px` / `≤840px` keep the entrance scroll-free.
+(`.rp-auth-brand` + `-text`/`-name`/`-kicker`, `.rp-auth-headline` +
+`-accent`, `.rp-auth-illus`, `.rp-auth-features`, `.rp-auth-trust` +
+`-item`/`-icon`), card chrome (`.rp-auth-head/-form/-actions/-divider/`
+`-hint`, `.rp-field-icon` + `-lead`, `.rp-auth-submit`,
+`.rp-auth-optionrow`/`.rp-auth-option`, `.rp-field-hint`/`.rp-field-error`,
+`.rp-auth-foot`), pairing rail (`.rp-pair-steps` over the `.rp-pair-code`
+chip; consecutive steps are joined by a connector rail). Viewport-fit
+compaction tiers at `≤1020px` / `≤840px` keep the entrance scroll-free.
+
+**The aside is an intentionally-dark surface in BOTH themes** — a third
+sanctioned exception alongside `.op-bash` and present-mode (§4 rule 4). It is
+a branded showcase rather than app chrome, so it keeps its deep-navy identity
+while the app runs in light mode. Its palette is declared once as
+theme-neutral locals on `.rp-auth-aside` (`--rp-showcase-bg-1/-bg-2/-fg/`
+`-muted/-accent/-line/-card`); nothing inside the aside may read the themed
+surface tokens, which flip to white in light mode and would break it. The
+`.rp-auth-illus` mark is a hand-built isometric SVG (stacked plates +
+extruded letterform), decorative and `aria-hidden`, hidden in print.
+
+Step 2 is a **second-factor method chooser** (`.rp-auth-methods` /
+`.rp-auth-method` + `-icon`/`-text`/`-head`/`-title`/`-sub`/`-tag`/`-chev`,
+`.rp-auth-methods-rule`, `.rp-auth-help`, `.rp-auth-methods-actions`). The
+recommended row is marked with an accent ring (`.is-recommended`), never a
+fill. Icon tones use the semantic families (blue/green/purple/amber). Methods
+with no backing endpoint render `disabled` and dimmed **with the reason
+visible** — never as buttons that dead-end.
 
 Functional model: **password + mandatory TOTP + biometric** (magic-link
 removed); SSO when enabled; device pairing; org bootstrap is CLI-gated.
+Live second factors are passkey (WebAuthn) and TOTP. Email verification codes
+have **no** API endpoint, and a FIDO2 security key currently runs the same
+WebAuthn ceremony as the passkey row — both are shown as unavailable until
+they are backed by real endpoints.
 
 ### 4.15 Friendly copy + widescreen layout (locked copy rules)
 
