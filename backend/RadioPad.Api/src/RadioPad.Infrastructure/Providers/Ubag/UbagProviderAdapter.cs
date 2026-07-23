@@ -44,6 +44,12 @@ public sealed class UbagProviderAdapter : IAiProviderAdapter, IAiProviderHealthP
             idempotencyKey,
             cancellationToken);
 
+        // PR-B4 — the gateway job exists now; hand its id to the re-attach seam so a
+        // restart mid-poll can re-attach instead of losing the run. The hook is
+        // synchronous by contract and must never fail the run.
+        try { request.OnProviderJobCreated?.Invoke(created.Id); }
+        catch { /* a hook must never fail the run */ }
+
         UbagJob terminal;
         try
         {

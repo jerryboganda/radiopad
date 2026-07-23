@@ -1245,8 +1245,11 @@ public class AiJob : Entity
     /// durable-layer addition server_restart (boot recovery sweep).</summary>
     public string? ErrorKind { get; set; }
 
-    /// <summary>UBAG gateway job id, when the provider path is UBAG — captured for a future
-    /// re-attach-after-restart capability; unused (but cheap to keep) until that ships.</summary>
+    /// <summary>UBAG gateway job id, when the provider path is UBAG. Invariant (PR-B4):
+    /// ONLY the UBAG adapter populates this (via <c>AiCompletionRequest.OnProviderJobCreated</c>);
+    /// boot recovery treats its presence on a still-<c>running</c> row as "a UBAG gateway job may
+    /// still be running", and re-attaches + re-polls that gateway job instead of sweeping the row
+    /// to <c>server_restart</c>. Empty for every non-UBAG provider path.</summary>
     public string? ProviderJobId { get; set; }
 
     public int Attempt { get; set; } = 1;

@@ -139,6 +139,31 @@ public class ReportingService
         string Provider, string Model, int LatencyMs, string PromptVersion);
 
     /// <summary>
+    /// PR-B4 — the pure, provider-agnostic shaping tail of <see cref="GenerateStructuredAsync"/>:
+    /// parse the model's section JSON, format the findings, and build the result record. Extracted
+    /// so <c>AiJobCoordinator.ReattachUbagAsync</c> can shape a re-attached UBAG gateway job's
+    /// output IDENTICALLY without re-issuing any provider call. The
+    /// <see cref="GenerateMissingRecommendationsAsync"/> backfill deliberately stays in
+    /// <see cref="GenerateStructuredAsync"/> — it is a SECOND AI call, which boot re-attach skips.
+    /// </summary>
+    public static StructuredReportResult ShapeStructuredResult(
+        string text, string provider, string model, int latencyMs, string promptVersion)
+    {
+        var sections = ReportSectionJson.Parse(text);
+        return new StructuredReportResult(
+            Indication: sections.GetValueOrDefault("indication", string.Empty),
+            Technique: sections.GetValueOrDefault("technique", string.Empty),
+            Comparison: string.Empty,
+            Findings: FormatGeneratedFindings(sections.GetValueOrDefault("findings", string.Empty)),
+            Impression: sections.GetValueOrDefault("impression", string.Empty),
+            Recommendations: sections.GetValueOrDefault("recommendations", string.Empty).Trim(),
+            Provider: provider,
+            Model: model,
+            LatencyMs: latencyMs,
+            PromptVersion: promptVersion);
+    }
+
+    /// <summary>
     /// Whole-report generation for the guided intake flow. Unlike the free-text
     /// <c>draft</c> mode, this asks the model for a strict section-keyed JSON object
     /// (Indication/Technique/Findings/Impression/Recommendations) so the
@@ -184,11 +209,11 @@ public class ReportingService
             OnProviderJobCreated = hooks?.OnProviderJobCreated,
         }, ct);
 
-        var sections = ReportSectionJson.Parse(result.Text);
-        var recommendations = sections.GetValueOrDefault("recommendations", string.Empty).Trim();
-        if (recommendations.Length == 0)
+        var shaped = ShapeStructuredResult(result.Text, result.Provider, result.Model, result.LatencyMs, result.PromptVersion);
+        if (shaped.Recommendations.Length == 0)
         {
-            recommendations = await GenerateMissingRecommendationsAsync(
+            var sections = ReportSectionJson.Parse(result.Text);
+            var recommendations = await GenerateMissingRecommendationsAsync(
                 tenant,
                 provider,
                 report,
@@ -196,19 +221,10 @@ public class ReportingService
                 sections.GetValueOrDefault("impression", report.Impression),
                 rulebookEntity,
                 ct);
+            shaped = shaped with { Recommendations = recommendations };
         }
 
-        return new StructuredReportResult(
-            Indication: sections.GetValueOrDefault("indication", string.Empty),
-            Technique: sections.GetValueOrDefault("technique", string.Empty),
-            Comparison: string.Empty,
-            Findings: FormatGeneratedFindings(sections.GetValueOrDefault("findings", string.Empty)),
-            Impression: sections.GetValueOrDefault("impression", string.Empty),
-            Recommendations: recommendations,
-            Provider: result.Provider,
-            Model: result.Model,
-            LatencyMs: result.LatencyMs,
-            PromptVersion: result.PromptVersion);
+        return shaped;
     }
 
     /// <summary>

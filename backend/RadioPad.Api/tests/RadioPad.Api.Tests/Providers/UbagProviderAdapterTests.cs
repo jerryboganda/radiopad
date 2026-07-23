@@ -107,6 +107,42 @@ public class UbagProviderAdapterTests
         Assert.Contains("job_1", fake.CancelledJobIds);
     }
 
+    [Fact]
+    public async Task CompleteAsync_InvokesOnProviderJobCreated_WithGatewayJobId()
+    {
+        // PR-B4 — the moment the gateway job exists, the adapter hands its id to the
+        // re-attach seam so a restart mid-poll can re-attach instead of losing the run.
+        var fake = new FakeUbagClient();
+        var adapter = new UbagProviderAdapter(fake);
+        string? captured = null;
+        var request = new AiCompletionRequest(Provider("gemini_web"), "sys", "deidentified prompt", "v1", ContainsPhi: false)
+        {
+            OnProviderJobCreated = id => captured = id,
+        };
+
+        var result = await adapter.CompleteAsync(request, default);
+
+        Assert.Equal("ubag response", result.Text);
+        Assert.Equal("job_1", captured); // FakeUbagClient.CreateJobAsync returns job_1
+    }
+
+    [Fact]
+    public async Task CompleteAsync_HookThrow_DoesNotFailRun()
+    {
+        // The hook is best-effort bookkeeping — a throwing callback must never surface
+        // into (or fail) the provider run.
+        var fake = new FakeUbagClient();
+        var adapter = new UbagProviderAdapter(fake);
+        var request = new AiCompletionRequest(Provider("gemini_web"), "sys", "deidentified prompt", "v1", ContainsPhi: false)
+        {
+            OnProviderJobCreated = _ => throw new InvalidOperationException("boom"),
+        };
+
+        var result = await adapter.CompleteAsync(request, default);
+
+        Assert.Equal("ubag response", result.Text);
+    }
+
     // ── ProbeAsync context-based readiness ────────────────────────────────────
 
     [Fact]

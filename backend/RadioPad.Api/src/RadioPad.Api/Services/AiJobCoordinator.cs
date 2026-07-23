@@ -44,6 +44,12 @@ public sealed class AiJobCoordinator
     private readonly int _streamPublishMinIntervalMs;
     private readonly int _streamPublishTokenBatch;
 
+    // PR-B4 — UBAG re-attach budget + poll cadence (see ReattachUbagAsync). The poll
+    // interval is configurable (default 2s, mirroring UbagProviderAdapter.PollDelay) so
+    // tests can drive the re-poll loop fast without waiting on wall-clock seconds.
+    private readonly int _reattachTimeoutSeconds;
+    private readonly double _reattachPollSeconds;
+
     public AiJobCoordinator(
         RadioPadDbContext db,
         AiJobRegistry registry,
@@ -63,6 +69,10 @@ public sealed class AiJobCoordinator
         _streamPublishTokenBatch = config?.GetValue<int?>("AiJobs:StreamPublishTokenBatch") ?? 20;
         if (_streamPublishMinIntervalMs < 0) _streamPublishMinIntervalMs = 150;
         if (_streamPublishTokenBatch < 1) _streamPublishTokenBatch = 20;
+        _reattachTimeoutSeconds = config?.GetValue<int?>("AiJobs:ReattachTimeoutSeconds") ?? 300;
+        if (_reattachTimeoutSeconds < 1) _reattachTimeoutSeconds = 300;
+        _reattachPollSeconds = config?.GetValue<double?>("AiJobs:ReattachPollSeconds") ?? 2.0;
+        if (_reattachPollSeconds <= 0) _reattachPollSeconds = 2.0;
     }
 
     /// <summary>Mutable, lock-guarded per-job throttle state for the streaming bus publish.</summary>
@@ -336,10 +346,12 @@ public sealed class AiJobCoordinator
         }
     }
 
-    /// <summary>AI-013 — the streaming hooks for a running job: every chunk drives
-    /// <see cref="OnStreamChunk"/>. OnProviderJobCreated stays null until PR-B4 wires it.</summary>
+    /// <summary>AI-013 / PR-B4 — the run hooks for a running job: every streamed chunk drives
+    /// <see cref="OnStreamChunk"/>, and the provider-job-created seam persists the UBAG gateway
+    /// job id (only the UBAG adapter ever fires it) so a restart mid-run can re-attach.</summary>
     private AiRunHooks StreamHooksFor(AiJob row) =>
-        new(new SynchronousProgress<AiStreamChunk>(chunk => OnStreamChunk(row, chunk)), OnProviderJobCreated: null);
+        new(new SynchronousProgress<AiStreamChunk>(chunk => OnStreamChunk(row, chunk)),
+            OnProviderJobCreated: pid => OnProviderJobCreated(row.Id, pid));
 
     private async Task RunAiAsync(
         RadioPadDbContext db, ReportingService reporting, AiJob row,
@@ -484,6 +496,203 @@ public sealed class AiJobCoordinator
             _bus.PublishProgress(new AiJobProgressEvent(
                 row.Id, row.TenantId, row.UserId, row.ReportId, row.Kind, row.Mode,
                 tokens, null, delta));
+    }
+
+    // ── UBAG re-attach (PR-B4) ─────────────────────────────────────────────────────────────────
+
+    /// <summary>
+    /// PR-B4 — the <c>OnProviderJobCreated</c> seam: the UBAG adapter fires this the instant a
+    /// gateway job exists, so a restart mid-poll can re-attach to it. Fire-and-forget on the
+    /// thread pool with a full try/catch — the callback is synchronous by contract and the
+    /// (minutes-long) provider run must never block on, or be broken by, this write.
+    /// </summary>
+    private void OnProviderJobCreated(Guid jobId, string providerJobId)
+    {
+        _ = Task.Run(async () =>
+        {
+            try
+            {
+                await PersistProviderJobIdAsync(jobId, providerJobId);
+            }
+            catch (Exception ex)
+            {
+                _log.LogWarning(ex, "Failed to persist UBAG gateway job id for AI job {JobId}", jobId);
+            }
+        });
+    }
+
+    /// <summary>
+    /// Persists the UBAG gateway job id onto the durable row on a FRESH scope.
+    /// <c>ExecuteUpdate</c> is deliberate: it does NOT touch <c>Status</c> (so it can never race
+    /// the Status concurrency-token terminal write), and <c>ProviderJobId</c> is a plain string
+    /// column with no <c>DateTimeOffset</c>⇒ticks value converter to honour. <c>UpdatedAt</c> is
+    /// intentionally left untouched — capturing the gateway id is bookkeeping, not a state change.
+    /// </summary>
+    internal async Task PersistProviderJobIdAsync(Guid jobId, string providerJobId)
+    {
+        using var scope = _scopes.CreateScope();
+        var db = scope.ServiceProvider.GetRequiredService<RadioPadDbContext>();
+        await db.AiJobs
+            .Where(j => j.Id == jobId)
+            .ExecuteUpdateAsync(s => s.SetProperty(j => j.ProviderJobId, providerJobId));
+    }
+
+    /// <summary>
+    /// PR-B4 — re-attaches to a UBAG gateway job that was still running when the server restarted
+    /// (its gateway job id was captured in <see cref="AiJob.ProviderJobId"/>). Opens a fresh scope,
+    /// makes the job poll-visible + cancellable again, re-polls the gateway job to completion, and
+    /// commits the terminal outcome through the SAME registry-first / DB-second path a live run uses
+    /// so the poll/widget render identically.
+    ///
+    /// <para><b>Re-attach is re-poll ONLY — it never issues a fresh AI call.</b> Boot must not fan
+    /// out new provider work. For a <c>generate</c> re-attach the
+    /// <c>GenerateMissingRecommendationsAsync</c> backfill is therefore SKIPPED (via the extracted
+    /// <see cref="ReportingService.ShapeStructuredResult"/>, which omits it) — empty recommendations
+    /// are acceptable. The freshness guard uses <see cref="AiJob.StartedAt"/> as the conservative
+    /// stand-in for the submit-time snapshot we no longer hold post-restart: any human edit after
+    /// the job started discards the AI result to protect authored text.</para>
+    ///
+    /// <para>Any re-attach that CANNOT CONCLUDE — budget exhausted, a second shutdown, an
+    /// unreachable gateway — falls back to <c>server_restart</c>, the same safe state the boot
+    /// sweep produces ("Interrupted by a restart — Retry"). A gateway job that concludes as a
+    /// definitive failure maps to <c>provider_transport</c>, mirroring the live adapter.</para>
+    /// </summary>
+    internal async Task ReattachUbagAsync(Guid jobId, CancellationToken appStopping)
+    {
+        using var scope = _scopes.CreateScope();
+        var db = scope.ServiceProvider.GetRequiredService<RadioPadDbContext>();
+
+        var row = await db.AiJobs.FirstOrDefaultAsync(j => j.Id == jobId, appStopping);
+        // Bail unless the row is still a genuine re-attach candidate: a cancel/sweep/completion
+        // may have moved it, or another instance already re-attached, since boot partitioned it.
+        if (row is null || row.Status != "running" || string.IsNullOrEmpty(row.ProviderJobId))
+            return;
+
+        var providerJobId = row.ProviderJobId!;
+
+        using var cts = CancellationTokenSource.CreateLinkedTokenSource(appStopping);
+        cts.CancelAfter(TimeSpan.FromSeconds(_reattachTimeoutSeconds));
+        var ct = cts.Token;
+
+        // Poll-visible AND cancellable: RequestCancelAsync's running branch flips this CTS via the
+        // registry, ending the poll loop; the OperationCanceledException path then best-effort
+        // cancels the gateway job. RegisterCancellation must land BEFORE the first await.
+        _registry.Create(jobId, row.TenantId, row.ReportId, row.UserId, row.Kind, row.Mode);
+        _registry.RegisterCancellation(jobId, cts);
+
+        try
+        {
+            var ubag = scope.ServiceProvider.GetRequiredService<IUbagClient>();
+
+            UbagJob terminal;
+            while (true)
+            {
+                var job = await ubag.GetJobAsync(providerJobId, ct);
+                if (job.Terminal || !string.IsNullOrWhiteSpace(job.ManualAction))
+                {
+                    terminal = job;
+                    break;
+                }
+                await Task.Delay(TimeSpan.FromSeconds(_reattachPollSeconds), ct);
+            }
+
+            // Terminal shaping mirrors UbagProviderAdapter.CompleteAsync's classification: a
+            // manual_action / error / failed / empty-output terminal is a definitive provider
+            // failure → provider_transport (NOT the "cannot conclude" server_restart fallback).
+            if (!string.IsNullOrWhiteSpace(terminal.ManualAction)
+                || !string.IsNullOrWhiteSpace(terminal.Error)
+                || terminal.Failed
+                || string.IsNullOrWhiteSpace(terminal.Output))
+            {
+                var msg = !string.IsNullOrWhiteSpace(terminal.ManualAction)
+                    ? $"ubag: manual_action_required:{terminal.Target}"
+                    : (!string.IsNullOrWhiteSpace(terminal.Error) || terminal.Failed)
+                        ? $"ubag: {terminal.Error ?? terminal.Status}"
+                        : "ubag: empty_output";
+                await FailAsync(jobId, msg, "provider_transport");
+                return;
+            }
+
+            var providerName = row.ProviderId is { } pid && pid != Guid.Empty
+                ? (await db.Providers.AsNoTracking()
+                        .FirstOrDefaultAsync(p => p.Id == pid && p.TenantId == row.TenantId, ct))?.Name ?? "ubag"
+                : "ubag";
+            var model = string.IsNullOrWhiteSpace(terminal.Target) ? "ubag" : terminal.Target;
+
+            if (string.Equals(row.Kind, "generate", StringComparison.Ordinal))
+            {
+                // Shape identically to a live generate — but WITHOUT the recommendations backfill
+                // (that is a second AI call; boot must not fan out fresh provider work).
+                var result = ReportingService.ShapeStructuredResult(
+                    terminal.Output!, providerName, model, terminal.LatencyMs ?? 0, "reattach");
+
+                var report = await db.Reports.FirstOrDefaultAsync(r => r.Id == row.ReportId && r.TenantId == row.TenantId, ct)
+                    ?? throw new InvalidOperationException("context_gone");
+                var user = await db.Users.FirstOrDefaultAsync(u => u.Id == row.UserId && u.TenantId == row.TenantId, ct)
+                    ?? throw new InvalidOperationException("context_gone");
+
+                // Freshness guard: StartedAt is the honest conservative stand-in for the
+                // submit-time snapshot we can no longer hold post-restart — discard the AI
+                // result if a human edited the report after the job started.
+                if (row.StartedAt is { } startedAt && report.UpdatedAt > startedAt)
+                    throw new InvalidOperationException("report_modified");
+
+                await ApplyStructuredResultAsync(db, report, user, result, ct);
+                _registry.Complete(jobId, report);
+                await MarkTerminalOkDbAsync(jobId, resultJson: null); // report row + ReportVersion ARE the result
+            }
+            else
+            {
+                // Kind == "ai": same envelope keys as RunAiAsync so the poll/widget render
+                // identically; routedBy "reattach" marks the origin.
+                var payload = new
+                {
+                    text = terminal.Output,
+                    provider = providerName,
+                    model,
+                    latencyMs = terminal.LatencyMs ?? 0,
+                    promptVersion = "reattach",
+                    mode = row.Mode,
+                    routedBy = "reattach",
+                };
+                _registry.Complete(jobId, payload);
+                await MarkTerminalOkDbAsync(jobId, System.Text.Json.JsonSerializer.Serialize(payload));
+            }
+        }
+        catch (OperationCanceledException) when (_registry.WasCancelRequested(jobId))
+        {
+            // Deliberate user cancel — best-effort release the gateway worker, then mark cancelled.
+            try
+            {
+                var ubag = scope.ServiceProvider.GetRequiredService<IUbagClient>();
+                await ubag.CancelJobAsync(providerJobId, CancellationToken.None);
+            }
+            catch { /* best-effort — the gateway's own job timeout is the backstop */ }
+            _registry.Cancel(jobId);
+            await MarkTerminalDbAsync(jobId, "cancelled", null, null);
+        }
+        catch (InvalidOperationException ioe) when (ioe.Message == "report_modified")
+        {
+            await FailAsync(
+                jobId,
+                "The report was edited while the AI generation was running, so the AI result was discarded to protect your edits. Re-run generation if you still want it.",
+                "report_modified");
+        }
+        catch (InvalidOperationException ioe) when (ioe.Message == "context_gone")
+        {
+            await FailAsync(jobId, "The report or user was removed while the job was interrupted.", "not_found");
+        }
+        catch (Exception ex)
+        {
+            // Any re-attach that cannot conclude — budget/shutdown OperationCanceledException with
+            // no user cancel, an unreachable gateway, an unexpected fault — falls back to the SAME
+            // safe state the boot sweep produces. server_restart is the REQUIRED failure mode here.
+            if (ex is not OperationCanceledException)
+                _log.LogWarning(ex, "UBAG re-attach for job {JobId} could not conclude; falling back to server_restart", jobId);
+            const string msg = "Interrupted by a server restart. Retry to run it again.";
+            _registry.Fail(jobId, msg, "server_restart");
+            await MarkTerminalDbAsync(jobId, "error", msg, "server_restart");
+        }
     }
 
     // ── shared helpers ───────────────────────────────────────────────────────────────────────────

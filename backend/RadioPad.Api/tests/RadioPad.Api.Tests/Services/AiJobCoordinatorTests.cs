@@ -328,6 +328,40 @@ public sealed class AiJobCoordinatorTests : IDisposable
     }
 
     [Fact]
+    public async Task PersistProviderJobId_WritesColumnWithoutTouchingStatus()
+    {
+        // PR-B4 — the UBAG gateway id is written via ExecuteUpdate, which touches ONLY
+        // ProviderJobId. Status (a concurrency token) is untouched, so the write can never
+        // race a terminal Status transition.
+        var reportId = Guid.NewGuid();
+        Guid jobId;
+        using (var scope = _sp.CreateScope())
+        {
+            var db = Db(scope);
+            var job = new AiJob
+            {
+                TenantId = _tenant.Id, ReportId = reportId, UserId = _user.Id,
+                Kind = "ai", Mode = "rewrite", Status = "running", StartedAt = DateTimeOffset.UtcNow,
+            };
+            db.AiJobs.Add(job);
+            await db.SaveChangesAsync();
+            jobId = job.Id;
+        }
+
+        using (var scope = _sp.CreateScope())
+        {
+            await Coordinator(scope).PersistProviderJobIdAsync(jobId, "ubag-gw-42");
+        }
+
+        using (var scope = _sp.CreateScope())
+        {
+            var row = await Db(scope).AiJobs.AsNoTracking().FirstAsync(j => j.Id == jobId);
+            Assert.Equal("ubag-gw-42", row.ProviderJobId);
+            Assert.Equal("running", row.Status); // ExecuteUpdate left Status alone
+        }
+    }
+
+    [Fact]
     public async Task BootRecovery_MarksQueuedAndRunning_ServerRestart_LeavingTerminalRowsAlone()
     {
         var reportId = Guid.NewGuid();
