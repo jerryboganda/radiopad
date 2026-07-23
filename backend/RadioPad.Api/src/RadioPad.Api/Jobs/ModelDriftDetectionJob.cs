@@ -8,21 +8,26 @@ using RadioPad.Infrastructure.Persistence;
 using RadioPad.Validation.Engine;
 using RadioPad.Validation.Rulebook;
 
-namespace RadioPad.Api.Services;
+namespace RadioPad.Api.Jobs;
 
 /// <summary>
-/// PRD §18.2 — background service that periodically runs golden-case
-/// regression against active AI providers and raises
-/// <see cref="AuditAction.SystemAlert"/> events when quality degrades
-/// beyond a configurable threshold.
+/// PRD §18.2 — periodically runs golden-case regression against active AI
+/// providers and raises <see cref="AuditAction.SystemAlert"/> events when quality
+/// degrades beyond a configurable threshold.
 ///
 /// Only sandbox-class providers are tested to avoid production costs.
-/// The service is a no-op if no tenants have approved validation packs.
+/// The job is a no-op if no tenants have approved validation packs.
+///
+/// Migrated from the former <c>ModelDriftDetectionService</c> BackgroundService
+/// (PR-N1) to a Hangfire recurring job (cron derived from <see cref="ResolveInterval"/>
+/// hours, maintenance queue). All method bodies are byte-identical;
+/// <see cref="RunAllTenantsAsync"/> and <see cref="GetStatusAsync"/> stay public
+/// because <c>DriftController</c> invokes them for the admin drift endpoints.
 /// </summary>
-public sealed class ModelDriftDetectionService : BackgroundService
+public sealed class ModelDriftDetectionJob
 {
     private readonly IServiceScopeFactory _scopeFactory;
-    private readonly ILogger<ModelDriftDetectionService> _log;
+    private readonly ILogger<ModelDriftDetectionJob> _log;
 
     /// <summary>
     /// Default interval between drift checks (hours). Overridden by
@@ -36,13 +41,21 @@ public sealed class ModelDriftDetectionService : BackgroundService
     /// </summary>
     internal const int DefaultThreshold = 15;
 
-    public ModelDriftDetectionService(
+    public ModelDriftDetectionJob(
         IServiceScopeFactory scopeFactory,
-        ILogger<ModelDriftDetectionService> log)
+        ILogger<ModelDriftDetectionJob> log)
     {
         _scopeFactory = scopeFactory;
         _log = log;
     }
+
+    /// <summary>
+    /// Hangfire recurring entry point. Returns plain <see cref="Task"/> so the
+    /// AddOrUpdate expression body stays a direct method call — Hangfire rejects a
+    /// Convert-wrapped <c>Task&lt;T&gt;</c> body. Discards the aggregated results
+    /// (only the audit side effects matter on the schedule).
+    /// </summary>
+    public Task RunRecurringAsync(CancellationToken ct) => RunAllTenantsAsync(ct);
 
     internal static TimeSpan ResolveInterval()
     {
@@ -58,31 +71,6 @@ public sealed class ModelDriftDetectionService : BackgroundService
         if (int.TryParse(raw, out var t) && t > 0)
             return t;
         return DefaultThreshold;
-    }
-
-    protected override async Task ExecuteAsync(CancellationToken ct)
-    {
-        // Startup delay — let the API warm up before scanning.
-        try { await Task.Delay(TimeSpan.FromSeconds(30), ct); }
-        catch (OperationCanceledException) { return; }
-
-        var interval = ResolveInterval();
-
-        while (!ct.IsCancellationRequested)
-        {
-            try
-            {
-                await RunAllTenantsAsync(ct);
-            }
-            catch (OperationCanceledException) { return; }
-            catch (Exception ex)
-            {
-                _log.LogError(ex, "Model drift detection sweep failed");
-            }
-
-            try { await Task.Delay(interval, ct); }
-            catch (OperationCanceledException) { return; }
-        }
     }
 
     /// <summary>

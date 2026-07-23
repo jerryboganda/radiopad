@@ -92,7 +92,7 @@ prompt_blocks:
                              && e.DetailsJson.Contains("model_drift"));
 
         // Act: run drift detection.
-        var driftService = _factory.Services.GetRequiredService<ModelDriftDetectionService>();
+        var driftService = _factory.Services.GetRequiredService<RadioPad.Api.Jobs.ModelDriftDetectionJob>();
         var results = await driftService.RunAllTenantsAsync(CancellationToken.None);
 
         // Assert: drift should be detected (golden cases produce findings
@@ -143,7 +143,7 @@ prompt_blocks:
         db.DriftBaselines.RemoveRange(existingBaselines);
         await db.SaveChangesAsync();
 
-        var driftService = _factory.Services.GetRequiredService<ModelDriftDetectionService>();
+        var driftService = _factory.Services.GetRequiredService<RadioPad.Api.Jobs.ModelDriftDetectionJob>();
 
         // First run — establishes baseline.
         var results1 = await driftService.RunAllTenantsAsync(CancellationToken.None);
@@ -177,10 +177,10 @@ prompt_blocks:
     public void ThresholdConfiguration_ReadsEnvVar()
     {
         // Default threshold is 15.
-        Assert.Equal(15, ModelDriftDetectionService.DefaultThreshold);
+        Assert.Equal(15, RadioPad.Api.Jobs.ModelDriftDetectionJob.DefaultThreshold);
 
         // ResolveThreshold should use default when env var is not set.
-        var threshold = ModelDriftDetectionService.ResolveThreshold();
+        var threshold = RadioPad.Api.Jobs.ModelDriftDetectionJob.ResolveThreshold();
         Assert.True(threshold > 0);
     }
 

@@ -4,6 +4,39 @@
 
 ---
 
+## Hangfire cron platform bootstrap + BackgroundService migration — PR-N1 (2026-07-23)
+
+Cron-shaped background work now runs on **Hangfire** (single-process, in-C#, same database).
+Backend-only; no wire/schema change. Docs: `docs/03-architecture/queues-jobs.md`.
+
+- **Packages (the only four added):** `Hangfire.Core` / `Hangfire.AspNetCore` `1.8.24`,
+  `Hangfire.PostgreSql` `1.21.1`, `Hangfire.InMemory` `1.0.0` (in `RadioPad.Api.csproj` only).
+- **Bootstrap (`RadioPad.Api.Jobs`):** `HangfireStorageSelector` mirrors the EF connection-string
+  sniff (`Host=`/`Server=` → PostgreSql in its own `hangfire` schema, else → InMemory for
+  SQLite/desktop). `HangfireSetup.AddRadioPadHangfire` wires storage + a processing server
+  (`WorkerCount clamp(2×CPU,4,16)`, queues `critical>default>maintenance`, `SchedulePolling 15s`,
+  `JobExpirationTimeout 30d`) and swaps Hangfire's built-in retry for `JitteredRetryAttribute`
+  (exp `30s·2^n` + 0–30s jitter, 5 attempts, then the Failed set = DLQ). No dashboard mapped
+  (auth doesn't compose with the custom identity; PHI-adjacent; 127.0.0.1 bind).
+- **Testing env:** `AddRadioPadHangfire`/`UseRadioPadRecurringJobs` are skipped (UBAG-discovery
+  precedent); job classes are registered in DI unconditionally, so tests drive their sweep/scan
+  methods directly. `HangfireTestingModeTests` asserts no storage/server but resolvable jobs.
+- **Migrated 5 BackgroundServices → `Jobs/*Job.cs` recurring jobs (old `Services/*.cs` deleted,
+  `AddHostedService` lines removed), sweep bodies byte-identical, public test-entry methods kept:**
+  `RetentionSweepJob.SweepAsync` (6h), `CriticalResultEscalationJob.ScanOnceAsync` (1m, + 200/pass
+  storm cap), `AnomalyScanJob.ScanOnceAsync` (1m), `OAuthRefreshRotationJob.ScanOnceAsync` (15m),
+  `ModelDriftDetectionJob.RunAllTenantsAsync` (N h from `RADIOPAD_DRIFT_CHECK_INTERVAL_HOURS`).
+  Existing tests re-pointed with a one-line type change; `DriftController` re-pointed to the job.
+- **Deviation (documented):** the migration plan labelled the OAuth/ModelDrift entry methods
+  `RotateOnceAsync`/`RunOnceAsync`, but the dominant rule ("keep the public test-entry method
+  verbatim, one-line test re-point") + `DriftController`'s consumption of `RunAllTenantsAsync`/
+  `GetStatusAsync` won — the existing names (`ScanOnceAsync`/`RunAllTenantsAsync`) are preserved.
+- **Kept as BackgroundServices (rationale commented in `Program.cs`):** `AiJobRunner`,
+  `AiJobRecovery`/`SttModelProvision` (boot-once), `Hl7MllpListener` (socket),
+  `AvailabilityMonitorService` (sliding window), `SiemPushService` (5s stateful), `UbagDiscovery`.
+- **Tests:** `Jobs/HangfireStorageSelectorTests`, `Integration/HangfireTestingModeTests` (new);
+  Retention/CriticalResult/Anomaly/OAuth/Drift service tests re-pointed at the job classes.
+
 ## Durable async-AI-job platform — Phase 6 trigger-site refactors (2026-07-23)
 
 The report editor and New Report wizard now **submit-and-continue** through the global

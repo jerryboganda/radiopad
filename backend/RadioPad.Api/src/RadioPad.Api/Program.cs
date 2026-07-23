@@ -3,6 +3,7 @@ using Microsoft.AspNetCore.RateLimiting;
 using Microsoft.EntityFrameworkCore;
 using OpenTelemetry.Metrics;
 using RadioPad.Api.Auth;
+using RadioPad.Api.Jobs;
 using RadioPad.Api.Middleware;
 using RadioPad.Application.Abstractions;
 using RadioPad.Application.Providers;
@@ -44,11 +45,14 @@ var bindUrl = Environment.GetEnvironmentVariable("RADIOPAD_BIND") ?? "http://127
 if (!bindUrl.Contains("://", StringComparison.Ordinal)) bindUrl = $"http://{bindUrl}";
 builder.WebHost.UseUrls(bindUrl);
 
+// Connection string is resolved once at top level so both EF Core and Hangfire
+// share the exact same sniff (Host=/Server= => Postgres, else SQLite / Hangfire
+// InMemory). The AddDbContext lambda below closes over this outer `conn`.
+var conn = builder.Configuration.GetConnectionString("RadioPad")
+    ?? Environment.GetEnvironmentVariable("RADIOPAD_DB")
+    ?? "Data Source=radiopad.dev.db";
 builder.Services.AddDbContext<RadioPadDbContext>(opt =>
 {
-    var conn = builder.Configuration.GetConnectionString("RadioPad")
-        ?? Environment.GetEnvironmentVariable("RADIOPAD_DB")
-        ?? "Data Source=radiopad.dev.db";
     // Connection-string sniff: "Host=..." or "Server=...;Port=..." => Postgres,
     // anything else falls back to SQLite for the dev workstation case.
     if (conn.Contains("Host=", StringComparison.OrdinalIgnoreCase) ||
@@ -61,6 +65,16 @@ builder.Services.AddDbContext<RadioPadDbContext>(opt =>
         opt.UseSqlite(conn);
     }
 });
+
+// PR-N1 — Hangfire cron platform bootstrap (storage + processing server + global
+// retry policy). Storage mirrors the EF sniff above (Postgres => PostgreSql in its
+// own `hangfire` schema; SQLite/desktop => InMemory). Skipped under the Testing
+// environment — like DevSeed and the UBAG discovery sweeper — so integration tests
+// never spin up a processing server or contend on a per-fixture database; tests
+// drive the job classes' sweep/scan methods directly. The job CLASSES are
+// registered unconditionally further below so they resolve even under Testing.
+if (!builder.Environment.IsEnvironment("Testing"))
+    builder.AddRadioPadHangfire(conn);
 
 builder.Services.AddHttpClient();
 // In-memory store for short-lived, single-use WebAuthn challenges (AUTH-001).
@@ -192,6 +206,8 @@ builder.Services.AddScoped<RadioPad.Infrastructure.Providers.Ubag.UbagProviderDi
 // The background sweeper is skipped under the Testing environment (like DevSeed) so it
 // never contends on a per-fixture SQLite database during integration tests; the on-demand
 // POST /api/ubag/refresh-targets path still uses the scoped service above.
+// Kept as a BackgroundService (NOT migrated to Hangfire): its first pass ~8s after boot
+// is a startup-seed-critical discovery that must run before the first AI call.
 if (!builder.Environment.IsEnvironment("Testing"))
     builder.Services.AddHostedService<RadioPad.Infrastructure.Providers.Ubag.UbagProviderDiscoveryHostedService>();
 
@@ -302,6 +318,7 @@ builder.Services.AddSingleton<RadioPad.Application.Abstractions.ICrossCheckServi
     RadioPad.Infrastructure.Providers.Local.CrossCheckService>();
 // First-run download of the on-device STT model. The hosted service is a no-op
 // unless RADIOPAD_LOCAL_STT_ENABLED is set (desktop), so web/server are unaffected.
+// Kept as a BackgroundService (NOT migrated to Hangfire): boot-once provisioning.
 builder.Services.AddSingleton<RadioPad.Infrastructure.Providers.Local.SttModelProvisioner>();
 if (!builder.Environment.IsEnvironment("Testing"))
     builder.Services.AddHostedService<RadioPad.Infrastructure.Providers.Local.SttModelProvisionHostedService>();
@@ -364,7 +381,19 @@ builder.Services.AddKeyedSingleton<RadioPad.Application.Services.Pacs.IPacsVendo
 builder.Services.AddSingleton<RadioPad.Application.Services.Pacs.IPacsVendorRouter,
     RadioPad.Infrastructure.Pacs.PacsVendorRouter>();
 
-builder.Services.AddHostedService<RadioPad.Api.Services.RetentionWorker>();
+// PR-N1 — cron-shaped background work now runs on Hangfire (see AddRadioPadHangfire
+// / UseRadioPadRecurringJobs). The former BackgroundServices — RetentionWorker,
+// CriticalResultEscalationService, AnomalyDetector, OAuthRefreshRotationService,
+// ModelDriftDetectionService — are replaced by recurring jobs in RadioPad.Api.Jobs.
+// The job classes are registered UNCONDITIONALLY (even under Testing, where no
+// Hangfire server runs) so tests can resolve and invoke their sweep/scan methods
+// directly. They hold only IServiceScopeFactory (+ logger / IHttpClientFactory)
+// and open their own scope per pass, so a singleton lifetime is safe.
+builder.Services.AddSingleton<RadioPad.Api.Jobs.RetentionSweepJob>();
+builder.Services.AddSingleton<RadioPad.Api.Jobs.CriticalResultEscalationJob>();
+builder.Services.AddSingleton<RadioPad.Api.Jobs.AnomalyScanJob>();
+builder.Services.AddSingleton<RadioPad.Api.Jobs.OAuthRefreshRotationJob>();
+builder.Services.AddSingleton<RadioPad.Api.Jobs.ModelDriftDetectionJob>();
 
 // Async AI generation jobs (durable job platform). The unbounded channel is the
 // hand-off between the request-scoped coordinator (writer) and the hosted runner
@@ -374,15 +403,16 @@ builder.Services.AddHostedService<RadioPad.Api.Services.RetentionWorker>();
 // marks orphaned queued/running rows server_restart before any new work is consumed.
 builder.Services.AddSingleton(System.Threading.Channels.Channel.CreateUnbounded<RadioPad.Api.Services.AiJobWork>());
 builder.Services.AddScoped<RadioPad.Api.Services.AiJobCoordinator>();
+// Kept as BackgroundServices (NOT migrated to Hangfire): AiJobRecovery is boot-once
+// (runs before the runner consumes), and AiJobRunner is a channel consumer, not a
+// cron — neither is a scheduled sweep.
 builder.Services.AddHostedService<RadioPad.Api.Services.AiJobRecoveryHostedService>();
 builder.Services.AddHostedService<RadioPad.Api.Services.AiJobRunner>();
 
-// PRD §18.2 — model drift detection background service. Periodically runs
-// golden-case regression against sandbox AI providers and raises SystemAlert
-// audit events when quality degrades beyond the configured threshold.
-builder.Services.AddSingleton<RadioPad.Api.Services.ModelDriftDetectionService>();
-builder.Services.AddHostedService(sp =>
-    sp.GetRequiredService<RadioPad.Api.Services.ModelDriftDetectionService>());
+// PRD §18.2 model drift detection now runs as the recurring Hangfire job
+// RadioPad.Api.Jobs.ModelDriftDetectionJob (registered above; cron derived from
+// ResolveInterval() in UseRadioPadRecurringJobs). DriftController resolves the same
+// job class for the manual /api/admin/drift run + status endpoints.
 
 // Iter-35 PERF-004 — synthetic availability monitor. Runs an in-process
 // HTTP probe loop against a configurable list of relative paths (default
@@ -402,10 +432,14 @@ builder.Services.AddHostedService(sp =>
 builder.Services.AddSingleton<RadioPad.Api.Services.IAvailabilitySnapshotProvider,
     RadioPad.Api.Services.AvailabilitySnapshotProvider>();
 builder.Services.AddSingleton<RadioPad.Api.Services.AvailabilityMonitorService>();
+// Kept as a BackgroundService (NOT migrated to Hangfire): a seconds-level probe
+// interval plus in-memory 5-minute sliding-window state — Hangfire's 1-minute
+// granularity + stateless job instances would change its semantics.
 builder.Services.AddHostedService(sp =>
     sp.GetRequiredService<RadioPad.Api.Services.AvailabilityMonitorService>());
 // Iter-31 INT-006 — HL7 v2 MLLP listener. No-op when RADIOPAD_HL7_MLLP_PORT
 // is not set; binds 127.0.0.1 by default (override with RADIOPAD_HL7_MLLP_BIND).
+// Kept as a BackgroundService (NOT migrated to Hangfire): a socket listener, not a cron.
 builder.Services.AddSingleton<RadioPad.Infrastructure.Integration.Hl7MessageHandler>();
 builder.Services.AddHostedService<RadioPad.Infrastructure.Integration.Hl7MllpListener>();
 // Iter-33 INT-008 — Orthanc bridge HL7 outbox (in-process; future iter swaps
@@ -434,9 +468,9 @@ builder.Services.AddSingleton<RadioPad.Infrastructure.Kms.ITenantDekCache, Radio
 builder.Services.AddScoped<RadioPad.Application.Services.OAuthRefreshVault>();
 builder.Services.AddSingleton<RadioPad.Application.Abstractions.IOAuthTokenIssuer,
     RadioPad.Application.Abstractions.NoopOAuthTokenIssuer>();
-builder.Services.AddSingleton<RadioPad.Api.Services.OAuthRefreshRotationService>();
-builder.Services.AddHostedService(sp =>
-    sp.GetRequiredService<RadioPad.Api.Services.OAuthRefreshRotationService>());
+// PROV-007 rotation now runs as the recurring Hangfire job
+// RadioPad.Api.Jobs.OAuthRefreshRotationJob (registered above; cron */15 * * * *).
+// It still exits early when the issuer reports CanRefresh = false.
 
 // Iter-31 SEC-002 — at-rest column-level encryption. The data key is
 // resolved once at startup from RADIOPAD_COLUMN_KEY_REF (KMS reference) +
@@ -486,14 +520,13 @@ builder.Services.AddSingleton<RadioPad.Application.Abstractions.IPluginSandbox>(
 builder.Services.AddSingleton<RadioPad.Application.Services.WebAuthn.IFidoMdsMetadataSource>(
     _ => new RadioPad.Application.Services.WebAuthn.EmbeddedFidoMdsMetadataSource());
 
-// Iter-31 SEC-011 — anomaly detector background service. Scans the audit
-// log every 5 minutes for known burst patterns and writes
-// AnomalyDetected rows + structured-log warnings.
-builder.Services.AddHostedService<RadioPad.Api.Services.AnomalyDetector>();
+// Iter-31 SEC-011 — anomaly detection now runs as the recurring Hangfire job
+// RadioPad.Api.Jobs.AnomalyScanJob (registered above; cron * * * * *), scanning the
+// audit log for burst patterns and writing AnomalyDetected/SecurityAlert rows.
 
-// PRD §14.15 CR-007 — escalate critical results whose communication deadline
-// lapsed while still Open. Flags for a human; never closes the loop itself.
-builder.Services.AddHostedService<RadioPad.Api.Services.CriticalResultEscalationService>();
+// PRD §14.15 CR-007 — critical-result escalation now runs as the recurring Hangfire
+// job RadioPad.Api.Jobs.CriticalResultEscalationJob (registered above; cron * * * * *).
+// Flags for a human; never closes the loop itself.
 
 // PRD MOB-007 — mobile push senders (APNs / FCM). Both adapters are registered
 // even when env vars are missing; the controller surfaces a 503 with
@@ -523,6 +556,8 @@ builder.Services.AddSingleton<RadioPad.Application.Services.Siem.ISiemSink>(sp =
 builder.Services.AddSingleton<RadioPad.Application.Services.Siem.ISiemSink>(sp =>
     new RadioPad.Application.Services.Siem.SyslogUdpSink(
         sp.GetRequiredService<RadioPad.Application.Services.Siem.IUdpSender>()));
+// Kept as a BackgroundService (NOT migrated to Hangfire): a 5s near-real-time flush
+// loop with a stateful cursor + in-loop backoff — sub-minute and not cron-shaped.
 builder.Services.AddHostedService<RadioPad.Api.Services.SiemPushService>();
 
 // Iter-33 PERF-004 — OpenTelemetry metrics for the continuous P95 SLO
@@ -680,6 +715,13 @@ if (!app.Environment.IsEnvironment("Testing"))
     // including auth flows (MagicLinkToken, DeviceAuthRequest), retention,
     // CMK and SCIM additions.
     await db.Database.MigrateAsync();
+    // PR-N1 — (re)register the recurring Hangfire crons now that storage exists.
+    // This whole block is already gated on !IsEnvironment("Testing"), which is the
+    // same gate as AddRadioPadHangfire, so Hangfire's JobStorage is guaranteed
+    // registered here. AddOrUpdate is idempotent (upsert by id), and every job body
+    // is safe to run twice — so this is how InMemory storage recovers its schedules
+    // after a restart.
+    app.UseRadioPadRecurringJobs();
     // The enterprise-identity tables (GlobalUsers / ExternalIdentities /
     // TenantMemberships / AuthSessions) are not materialised by an EF migration;
     // EnsureSchemaAsync creates them on SQLite (no-op on Postgres). This must run

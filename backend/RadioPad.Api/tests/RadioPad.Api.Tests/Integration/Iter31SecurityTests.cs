@@ -88,9 +88,9 @@ public class Iter31SecurityTests : IClassFixture<RadioPadAppFactory>
             }, default);
         }
 
-        var detector = ActivatorUtilities.CreateInstance<AnomalyDetector>(
+        var detector = ActivatorUtilities.CreateInstance<RadioPad.Api.Jobs.AnomalyScanJob>(
             scope.ServiceProvider,
-            new NullLogger<AnomalyDetector>());
+            new NullLogger<RadioPad.Api.Jobs.AnomalyScanJob>());
         await detector.ScanOnceAsync(default);
 
         var alerts = await db.AuditEvents.AsNoTracking()

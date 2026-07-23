@@ -3,58 +3,51 @@ using System.Text;
 using System.Text.Json;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
-using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
 using RadioPad.Application.Abstractions;
 using RadioPad.Domain.Entities;
 using RadioPad.Domain.Enums;
 using RadioPad.Infrastructure.Persistence;
 
-namespace RadioPad.Api.Services;
+namespace RadioPad.Api.Jobs;
 
 /// <summary>
-/// Iter-31/Iter-32 SEC-011 — periodic background service that scans the last
-/// 5 minutes of audit events every 60 seconds and raises alerts for known
-/// burst patterns. Each alert is recorded as an append-only audit row
-/// (<see cref="AuditAction.SecurityAlert"/> for iter-32 patterns,
-/// <see cref="AuditAction.AnomalyDetected"/> for the legacy patterns kept
-/// for back-compat), emitted to the structured log at
+/// Iter-31/Iter-32 SEC-011 — periodic scan of the last 5 minutes of audit events
+/// that raises alerts for known burst patterns. Each alert is recorded as an
+/// append-only audit row (<see cref="AuditAction.SecurityAlert"/> for iter-32
+/// patterns, <see cref="AuditAction.AnomalyDetected"/> for the legacy patterns
+/// kept for back-compat), emitted to the structured log at
 /// <see cref="LogLevel.Warning"/>, and (optionally) POSTed to
 /// <c>RADIOPAD_SECURITY_WEBHOOK_URL</c> with an
 /// <c>X-RadioPad-Signature: sha256=&lt;hex&gt;</c> HMAC header derived from
 /// <c>RADIOPAD_SECURITY_WEBHOOK_SECRET</c>. The legacy
 /// <c>RADIOPAD_ANOMALY_WEBHOOK_URL</c> is still honoured for back-compat.
 /// Bodies are JSON-only and never include PHI; the webhook is fire-and-forget
-/// so a down receiver cannot stall the detector loop.
+/// so a down receiver cannot stall the loop.
+///
+/// Migrated from the former <c>AnomalyDetector</c> BackgroundService (PR-N1) to a
+/// Hangfire recurring job (cron <c>* * * * *</c>, maintenance queue). Stateless
+/// per pass — the 5-minute / 24-hour windows are recomputed from the DB each run,
+/// so moving to Hangfire changes nothing. <see cref="ScanOnceAsync"/> stays public
+/// so tests can drive a pass deterministically.
 /// </summary>
-public sealed class AnomalyDetector : BackgroundService
+public sealed class AnomalyScanJob
 {
-    private static readonly TimeSpan Interval = TimeSpan.FromSeconds(60);
     private static readonly TimeSpan Window = TimeSpan.FromMinutes(5);
     private static readonly TimeSpan BaselineWindow = TimeSpan.FromHours(24);
 
     private readonly IServiceScopeFactory _scopeFactory;
-    private readonly ILogger<AnomalyDetector> _log;
+    private readonly ILogger<AnomalyScanJob> _log;
     private readonly IHttpClientFactory _http;
 
-    public AnomalyDetector(IServiceScopeFactory scopeFactory, ILogger<AnomalyDetector> log, IHttpClientFactory http)
+    public AnomalyScanJob(IServiceScopeFactory scopeFactory, ILogger<AnomalyScanJob> log, IHttpClientFactory http)
     { _scopeFactory = scopeFactory; _log = log; _http = http; }
 
-    protected override async Task ExecuteAsync(CancellationToken stoppingToken)
-    {
-        // Tiny initial delay so we don't race the migrator on cold start.
-        try { await Task.Delay(TimeSpan.FromSeconds(15), stoppingToken); } catch { return; }
-
-        while (!stoppingToken.IsCancellationRequested)
-        {
-            try { await ScanOnceAsync(stoppingToken); }
-            catch (OperationCanceledException) { return; }
-            catch (Exception ex) { _log.LogWarning(ex, "Anomaly detector scan failed; will retry."); }
-
-            try { await Task.Delay(Interval, stoppingToken); }
-            catch (OperationCanceledException) { return; }
-        }
-    }
+    /// <summary>
+    /// Hangfire recurring entry point. Delegates to <see cref="ScanOnceAsync"/>;
+    /// a dedicated entry keeps the AddOrUpdate registrations uniform across jobs.
+    /// </summary>
+    public Task RunRecurringAsync(CancellationToken ct) => ScanOnceAsync(ct);
 
     /// <summary>
     /// Single scan pass. Public so integration tests can drive it

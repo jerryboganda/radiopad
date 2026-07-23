@@ -39,5 +39,13 @@
     <!-- 2026-07-11 UBAG hardening — retry / circuit-breaker / per-attempt
          timeout pipelines on the "ubag" and "ai" named HttpClients. -->
     <PackageReference Include="Microsoft.Extensions.Http.Resilience" Version="10.0.0" />
+    <!-- PR-N1 — Hangfire cron platform. Storage sniffs the same connection string
+         as EF Core: Host=/Server= => Hangfire.PostgreSql (its own `hangfire`
+         schema), else => Hangfire.InMemory (SQLite dev + desktop sidecar). The
+         dashboard is intentionally not mapped (see Jobs/HangfireSetup.cs). -->
+    <PackageReference Include="Hangfire.Core" Version="1.8.24" />
+    <PackageReference Include="Hangfire.AspNetCore" Version="1.8.24" />
+    <PackageReference Include="Hangfire.PostgreSql" Version="1.21.1" />
+    <PackageReference Include="Hangfire.InMemory" Version="1.0.0" />
   </ItemGroup>
 </Project>

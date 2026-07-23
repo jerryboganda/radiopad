@@ -21,7 +21,7 @@ namespace RadioPad.Api.Tests.Iter35;
 /// crypto round-trip with an in-process KMS, the admin HTTP surface
 /// (save / delete / status — never returns ciphertext), RBAC gating,
 /// tenant isolation, append-only audit, and the
-/// <see cref="OAuthRefreshRotationService"/> scan loop driven by a
+/// <see cref="RadioPad.Api.Jobs.OAuthRefreshRotationJob"/> scan loop driven by a
 /// fake <see cref="IOAuthTokenIssuer"/>.
 /// </summary>
 [Collection(RadioPad.Api.Tests.Infrastructure.EnvironmentVariableCollection.Name)]
@@ -385,7 +385,7 @@ public class Iter35OAuthVaultTests
             f.Issuer.CanRefresh = true;
 
             using var scope = f.Services.CreateScope();
-            var worker = scope.ServiceProvider.GetRequiredService<OAuthRefreshRotationService>();
+            var worker = scope.ServiceProvider.GetRequiredService<RadioPad.Api.Jobs.OAuthRefreshRotationJob>();
             var rotated = await worker.ScanOnceAsync(default);
             Assert.Equal(1, rotated);
 
@@ -431,7 +431,7 @@ public class Iter35OAuthVaultTests
 
             f.Issuer.CanRefresh = false;
             using var scope = f.Services.CreateScope();
-            var worker = scope.ServiceProvider.GetRequiredService<OAuthRefreshRotationService>();
+            var worker = scope.ServiceProvider.GetRequiredService<RadioPad.Api.Jobs.OAuthRefreshRotationJob>();
             var rotated = await worker.ScanOnceAsync(default);
             Assert.Equal(0, rotated);
         }

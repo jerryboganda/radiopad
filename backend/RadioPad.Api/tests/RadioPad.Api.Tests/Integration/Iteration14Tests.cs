@@ -934,7 +934,7 @@ public class RetentionWorkerTests : IClassFixture<RadioPadAppFactory>
         // Act: run one sweep manually.
         using (var scope = _factory.Services.CreateScope())
         {
-            var worker = ActivatorUtilities.CreateInstance<RadioPad.Api.Services.RetentionWorker>(
+            var worker = ActivatorUtilities.CreateInstance<RadioPad.Api.Jobs.RetentionSweepJob>(
                 scope.ServiceProvider);
             await worker.GetType()
                 .GetMethod("SweepAsync", System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance)!
@@ -981,7 +981,7 @@ public class RetentionWorkerTests : IClassFixture<RadioPadAppFactory>
 
         using (var scope = _factory.Services.CreateScope())
         {
-            var worker = ActivatorUtilities.CreateInstance<RadioPad.Api.Services.RetentionWorker>(scope.ServiceProvider);
+            var worker = ActivatorUtilities.CreateInstance<RadioPad.Api.Jobs.RetentionSweepJob>(scope.ServiceProvider);
             await (Task)worker.GetType()
                 .GetMethod("SweepAsync", System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance)!
                 .Invoke(worker, new object[] { CancellationToken.None })!;

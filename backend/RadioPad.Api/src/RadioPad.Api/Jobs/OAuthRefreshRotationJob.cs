@@ -1,7 +1,6 @@
 using System.Text.Json;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
-using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
 using RadioPad.Application.Abstractions;
 using RadioPad.Application.Services;
@@ -10,50 +9,40 @@ using RadioPad.Domain.Entities;
 using RadioPad.Domain.Enums;
 using RadioPad.Infrastructure.Persistence;
 
-namespace RadioPad.Api.Services;
+namespace RadioPad.Api.Jobs;
 
 /// <summary>
-/// Iter-35 PROV-007 — wakes every 15 minutes and rotates OAuth refresh
-/// tokens whose policy + expiry indicate they are due. The service is a
-/// no-op when the registered <see cref="IOAuthTokenIssuer"/> reports
-/// <c>CanRefresh = false</c> (the default <c>NoopOAuthTokenIssuer</c>).
+/// Iter-35 PROV-007 — rotates OAuth refresh tokens whose policy + expiry indicate
+/// they are due. A no-op when the registered <see cref="IOAuthTokenIssuer"/>
+/// reports <c>CanRefresh = false</c> (the default <c>NoopOAuthTokenIssuer</c>).
 /// Successful rotations audit <see cref="AuditAction.OAuthRefreshRotated"/>
 /// with <c>kind = "rotated"</c>; failures audit
 /// <see cref="AuditAction.ProviderBlocked"/> with the failure reason.
+///
+/// Migrated from the former <c>OAuthRefreshRotationService</c> BackgroundService
+/// (PR-N1) to a Hangfire recurring job (cron <c>*/15 * * * *</c>, maintenance
+/// queue). The <see cref="ScanOnceAsync"/> body is byte-identical and stays public
+/// so tests can drive a pass deterministically.
 /// </summary>
-public sealed class OAuthRefreshRotationService : BackgroundService
+public sealed class OAuthRefreshRotationJob
 {
-    private static readonly TimeSpan Interval = TimeSpan.FromMinutes(15);
-
     private readonly IServiceScopeFactory _scopeFactory;
-    private readonly ILogger<OAuthRefreshRotationService> _log;
+    private readonly ILogger<OAuthRefreshRotationJob> _log;
 
-    public OAuthRefreshRotationService(
+    public OAuthRefreshRotationJob(
         IServiceScopeFactory scopeFactory,
-        ILogger<OAuthRefreshRotationService> log)
+        ILogger<OAuthRefreshRotationJob> log)
     {
         _scopeFactory = scopeFactory;
         _log = log;
     }
 
-    protected override async Task ExecuteAsync(CancellationToken stoppingToken)
-    {
-        try { await Task.Delay(TimeSpan.FromSeconds(30), stoppingToken); }
-        catch { return; }
-
-        while (!stoppingToken.IsCancellationRequested)
-        {
-            try { await ScanOnceAsync(stoppingToken); }
-            catch (OperationCanceledException) { return; }
-            catch (Exception ex)
-            {
-                _log.LogWarning(ex, "OAuth refresh rotation scan failed; will retry.");
-            }
-
-            try { await Task.Delay(Interval, stoppingToken); }
-            catch (OperationCanceledException) { return; }
-        }
-    }
+    /// <summary>
+    /// Hangfire recurring entry point. Returns plain <see cref="Task"/> so the
+    /// AddOrUpdate expression body stays a direct method call — Hangfire rejects a
+    /// Convert-wrapped <c>Task&lt;T&gt;</c> body.
+    /// </summary>
+    public Task RunRecurringAsync(CancellationToken ct) => ScanOnceAsync(ct);
 
     /// <summary>
     /// Single scan pass. Public so integration tests can drive it
@@ -70,13 +59,12 @@ public sealed class OAuthRefreshRotationService : BackgroundService
         var audit = scope.ServiceProvider.GetRequiredService<IAuditLog>();
 
         var now = DateTimeOffset.UtcNow;
-        // Cross-tenant sweep is intentional: this is a singleton
-        // BackgroundService that owns the rotation cadence for every
-        // tenant. Tenant isolation is preserved further down — each
-        // candidate's TenantId is re-resolved before the per-tenant
-        // KEK is fetched and the audit row is written. No request-
-        // scoped tenant context exists here, so TenantedController.
-        // ResolveContextAsync is deliberately not used.
+        // Cross-tenant sweep is intentional: this is a singleton job that owns the
+        // rotation cadence for every tenant. Tenant isolation is preserved further
+        // down — each candidate's TenantId is re-resolved before the per-tenant
+        // KEK is fetched and the audit row is written. No request-scoped tenant
+        // context exists here, so TenantedController.ResolveContextAsync is
+        // deliberately not used.
         // Pull only candidates that have a stored token; final policy gate
         // happens in-memory via OAuthRefreshVault.ShouldRotate.
         var candidates = await db.Providers

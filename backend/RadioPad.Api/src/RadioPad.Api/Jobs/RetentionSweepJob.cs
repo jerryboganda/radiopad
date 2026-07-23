@@ -4,11 +4,12 @@ using RadioPad.Domain.Entities;
 using RadioPad.Domain.Enums;
 using RadioPad.Infrastructure.Persistence;
 
-namespace RadioPad.Api.Services;
+namespace RadioPad.Api.Jobs;
 
 /// <summary>
-/// PRD §13.3 — retention enforcement worker. Runs every 6 hours; for each
-/// tenant with <see cref="TenantSettings.RetentionDays"/> &gt; 0 AND
+/// PRD §13.3 — retention enforcement. Runs every 6 hours as a Hangfire recurring
+/// job (cron <c>0 */6 * * *</c>, maintenance queue); for each tenant with
+/// <see cref="TenantSettings.RetentionDays"/> &gt; 0 AND
 /// <see cref="TenantSettings.LegalHold"/> = false, purges:
 ///   • <see cref="AiRequest"/> rows older than the cutoff (already
 ///     PHI-minimised — only input/output hashes are stored, never the bodies);
@@ -22,46 +23,28 @@ namespace RadioPad.Api.Services;
 ///
 /// LegalHold = true short-circuits the entire pass for that tenant — no
 /// deletions are issued, even if RetentionDays is configured.
+///
+/// Migrated from the former <c>RetentionWorker</c> BackgroundService (PR-N1); the
+/// <see cref="SweepAsync"/> body is byte-identical, and stays <c>internal</c> so
+/// the existing reflection-driven tests re-point with only a type-name change.
 /// </summary>
-public sealed class RetentionWorker : BackgroundService
+public sealed class RetentionSweepJob
 {
     private readonly IServiceScopeFactory _scopeFactory;
-    private readonly ILogger<RetentionWorker> _log;
+    private readonly ILogger<RetentionSweepJob> _log;
 
-    /// <summary>Sweep cadence. Six hours is short enough that admin policy
-    /// changes take effect quickly and long enough that a misconfiguration
-    /// only burns CPU four times a day.</summary>
-    private static readonly TimeSpan Interval = TimeSpan.FromHours(6);
-
-    public RetentionWorker(IServiceScopeFactory scopeFactory, ILogger<RetentionWorker> log)
+    public RetentionSweepJob(IServiceScopeFactory scopeFactory, ILogger<RetentionSweepJob> log)
     {
         _scopeFactory = scopeFactory;
         _log = log;
     }
 
-    protected override async Task ExecuteAsync(CancellationToken ct)
-    {
-        // First pass after a 30s delay so the API is fully warm before we
-        // start scanning rows.
-        try { await Task.Delay(TimeSpan.FromSeconds(30), ct); }
-        catch (OperationCanceledException) { return; }
-
-        while (!ct.IsCancellationRequested)
-        {
-            try
-            {
-                await SweepAsync(ct);
-            }
-            catch (OperationCanceledException) { return; }
-            catch (Exception ex)
-            {
-                _log.LogError(ex, "Retention sweep failed");
-            }
-
-            try { await Task.Delay(Interval, ct); }
-            catch (OperationCanceledException) { return; }
-        }
-    }
+    /// <summary>
+    /// Hangfire recurring entry point. Returns plain <see cref="Task"/> so the
+    /// AddOrUpdate expression body stays a direct method call — Hangfire rejects a
+    /// Convert-wrapped <c>Task&lt;T&gt;</c> body.
+    /// </summary>
+    public Task RunRecurringAsync(CancellationToken ct) => SweepAsync(ct);
 
     internal async Task SweepAsync(CancellationToken ct)
     {

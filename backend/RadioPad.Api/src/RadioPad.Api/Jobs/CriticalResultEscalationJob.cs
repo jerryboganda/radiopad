@@ -1,14 +1,13 @@
 using System.Text.Json;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
-using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
 using RadioPad.Application.Abstractions;
 using RadioPad.Domain.Entities;
 using RadioPad.Domain.Enums;
 using RadioPad.Infrastructure.Persistence;
 
-namespace RadioPad.Api.Services;
+namespace RadioPad.Api.Jobs;
 
 /// <summary>
 /// PRD §14.15 (CR-007) — periodic sweep that escalates critical results whose
@@ -17,39 +16,37 @@ namespace RadioPad.Api.Services;
 /// append-only audit row. It never communicates, acknowledges, or closes on a
 /// clinician's behalf — escalation is a flag for a human, not a substitute for one.
 ///
-/// Follows the <see cref="AnomalyDetector"/> pattern (scoped DbContext per pass,
-/// failures logged and retried on the next tick, <see cref="ScanOnceAsync"/>
-/// public so tests can drive a pass deterministically).
+/// Migrated from the former <c>CriticalResultEscalationService</c> BackgroundService
+/// (PR-N1) to a Hangfire recurring job (cron <c>* * * * *</c>, maintenance queue).
+/// The Open→Escalated flip + audit are byte-identical; the only addition is a
+/// <see cref="BatchCap"/> per pass as a storm guard. <see cref="ScanOnceAsync"/>
+/// stays public so tests can drive a pass deterministically.
 /// </summary>
-public sealed class CriticalResultEscalationService : BackgroundService
+public sealed class CriticalResultEscalationJob
 {
-    private static readonly TimeSpan Interval = TimeSpan.FromMinutes(1);
+    /// <summary>
+    /// Storm guard: at most this many results escalate per pass. A backlog spike
+    /// (e.g. the loop was down for an hour) drains over subsequent minute passes
+    /// rather than in one giant transaction. Idempotent — nothing is lost.
+    /// </summary>
+    private const int BatchCap = 200;
 
     private readonly IServiceScopeFactory _scopeFactory;
-    private readonly ILogger<CriticalResultEscalationService> _log;
+    private readonly ILogger<CriticalResultEscalationJob> _log;
 
-    public CriticalResultEscalationService(
-        IServiceScopeFactory scopeFactory, ILogger<CriticalResultEscalationService> log)
+    public CriticalResultEscalationJob(
+        IServiceScopeFactory scopeFactory, ILogger<CriticalResultEscalationJob> log)
     {
         _scopeFactory = scopeFactory;
         _log = log;
     }
 
-    protected override async Task ExecuteAsync(CancellationToken stoppingToken)
-    {
-        // Small initial delay so we don't race the migrator on cold start.
-        try { await Task.Delay(TimeSpan.FromSeconds(20), stoppingToken); } catch { return; }
-
-        while (!stoppingToken.IsCancellationRequested)
-        {
-            try { await ScanOnceAsync(stoppingToken); }
-            catch (OperationCanceledException) { return; }
-            catch (Exception ex) { _log.LogWarning(ex, "Critical-result escalation sweep failed; will retry."); }
-
-            try { await Task.Delay(Interval, stoppingToken); }
-            catch (OperationCanceledException) { return; }
-        }
-    }
+    /// <summary>
+    /// Hangfire recurring entry point. Returns plain <see cref="Task"/> so the
+    /// AddOrUpdate expression body stays a direct method call — Hangfire rejects a
+    /// Convert-wrapped <c>Task&lt;T&gt;</c> body.
+    /// </summary>
+    public Task RunRecurringAsync(CancellationToken ct) => ScanOnceAsync(ct);
 
     /// <summary>
     /// Single sweep. Returns the number of results escalated. Public so tests can
@@ -64,8 +61,12 @@ public sealed class CriticalResultEscalationService : BackgroundService
         var now = DateTimeOffset.UtcNow;
 
         // Open past its deadline == the ordering clinician was never told in time.
+        // Oldest-overdue first + a per-pass cap so a backlog spike can't build one
+        // enormous transaction; the remainder escalates on the next minute's pass.
         var overdue = await db.CriticalResults
             .Where(c => c.Status == CriticalResultStatus.Open && c.DueAt < now)
+            .OrderBy(c => c.DueAt)
+            .Take(BatchCap)
             .ToListAsync(ct);
 
         if (overdue.Count == 0) return 0;

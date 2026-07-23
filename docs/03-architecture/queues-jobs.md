@@ -1,8 +1,8 @@
 # Queues & Background Jobs
 
-**Status:** One durable job subsystem shipped (async AI generation); Hangfire still planned for Phase-2 cron work  ·  **Owner:** Engineering  ·  **Last Updated:** 2026-07-23
+**Status:** Two job subsystems shipped — async AI generation (durable rows + SSE) and the Hangfire cron platform (PR-N1)  ·  **Owner:** Engineering  ·  **Last Updated:** 2026-07-23
 
-Most operations remain synchronous on the request thread. The one exception is **async AI report generation**, which now runs on a first-class durable job platform (below). Cron-style background work (the "Planned jobs" table) is still unbuilt and remains a Phase-2 Hangfire candidate.
+Most operations remain synchronous on the request thread. Two exceptions run on job platforms: **async AI report generation** (a first-class durable subsystem, below) and **cron-shaped background work**, which as of PR-N1 runs on **Hangfire** (below). The "Planned jobs" table lists the four new jobs still to be built on top of that platform (PR-N2).
 
 ## Shipped: durable AI generation jobs
 
@@ -22,6 +22,54 @@ Impression/rewrite (`kind = "ai"`) and whole-report (`kind = "generate"`) genera
 
 **Not durable by design:** the desktop sidecar's local-generation jobs stay in-memory only (its SQLite is throwaway).
 
+## Shipped: Hangfire cron platform (PR-N1)
+
+Cron-shaped background work runs on **Hangfire** (single-process, in-C#, on the same database). Bootstrap lives in `RadioPad.Api.Jobs.HangfireSetup` (`AddRadioPadHangfire` / `UseRadioPadRecurringJobs`); the job classes live in `RadioPad.Api.Jobs.*Job`.
+
+### Storage matrix
+
+Hangfire's storage is chosen by the same connection-string sniff EF Core uses (`RadioPad.Api.Jobs.HangfireStorageSelector.Select`):
+
+| Deployment | Connection string | Hangfire storage |
+| --- | --- | --- |
+| Postgres (VPS / prod) | `Host=` / `Server=` | `Hangfire.PostgreSql` — Hangfire provisions and owns its own `hangfire` schema (`PrepareSchemaIfNecessary` default true, independent of EF's hand-written migrations; the DB role needs CREATE on first boot) |
+| SQLite dev workstation + desktop sidecar | anything else | `Hangfire.InMemory` |
+
+**InMemory loses schedules + delayed retries on restart — accepted.** Every recurring job is re-registered at boot via idempotent `RecurringJob.AddOrUpdate`, and every job body is safe to run twice, so a restart simply re-arms the schedules. The desktop sidecar therefore runs all five crons in-process exactly as the old BackgroundServices did — no behavioural regression.
+
+### Server + retry / DLQ
+
+- **Server:** `WorkerCount = clamp(ProcessorCount * 2, 4, 16)`, three queues drained in priority order `critical > default > maintenance`, `SchedulePollingInterval = 15s`, `JobExpirationTimeout = 30 days`.
+- **Retry:** one global policy — `JitteredRetryAttribute` (exponential `30s * 2^attempt` + `0..30s` jitter, 5 attempts). Hangfire's built-in 10-attempt `AutomaticRetry` is removed at bootstrap so this is the only retry filter in effect.
+- **DLQ:** the Hangfire Failed set (retained 30 days). Payloads are ids only, so it is inherently PHI-redacted. Requeue/triage is a future tenanted admin surface over `Hangfire.MonitoringApi` (named seam: `JobsAdminController`, Phase-3).
+- **Dashboard:** intentionally NOT mapped — its filter-based auth does not compose with RadioPad's custom `HttpContext.Items` identity, its pages would expose PHI-adjacent job arguments, and the backend binds 127.0.0.1.
+- **Testing:** `AddRadioPadHangfire` / `UseRadioPadRecurringJobs` are skipped under the `Testing` environment (mirrors the DevSeed / UBAG-discovery precedent). The job classes are still registered in DI, and tests drive their sweep/scan methods directly — fully deterministic, no processing server.
+
+### Migrated crons (PR-N1)
+
+Five former `BackgroundService`s were extracted into recurring jobs; their sweep bodies are byte-identical and their public test-entry methods are preserved (existing tests re-point with a one-line type change):
+
+| Job (`RadioPad.Api.Jobs`) | Method | Cron | Migrated from |
+| --- | --- | --- | --- |
+| `RetentionSweepJob` | `SweepAsync` | `0 */6 * * *` | `RetentionWorker` |
+| `CriticalResultEscalationJob` | `ScanOnceAsync` | `* * * * *` | `CriticalResultEscalationService` (+ 200-row/pass storm cap) |
+| `AnomalyScanJob` | `ScanOnceAsync` | `* * * * *` | `AnomalyDetector` |
+| `OAuthRefreshRotationJob` | `ScanOnceAsync` | `*/15 * * * *` | `OAuthRefreshRotationService` |
+| `ModelDriftDetectionJob` | `RunAllTenantsAsync` | `0 */N * * *` (N from `RADIOPAD_DRIFT_CHECK_INTERVAL_HOURS`, default 6) | `ModelDriftDetectionService` |
+
+All run on the `maintenance` queue. `ModelDriftDetectionJob` also keeps `GetStatusAsync` + the manual-trigger `RunAllTenantsAsync` for `DriftController`. Every sweep is idempotent (absolute-deadline scans, not tick counts), so moving 1-minute services onto a 15s scheduler poll preserves semantics.
+
+### Kept as BackgroundServices (deliberately NOT migrated)
+
+| Service | Why it is not cron-shaped |
+| --- | --- |
+| `AiJobRunner` | channel consumer, not scheduled |
+| `AiJobRecoveryHostedService`, `SttModelProvisionHostedService` | boot-once semantics |
+| `Hl7MllpListener` | socket listener |
+| `AvailabilityMonitorService` | seconds-level probe + in-memory 5-minute sliding-window state (Hangfire's 1-min granularity + stateless instances would change semantics) |
+| `SiemPushService` | 5s near-real-time flush with a stateful cursor + in-loop backoff |
+| `UbagProviderDiscoveryHostedService` | 5-min loop, but its ~8s-after-boot first pass is startup-seed-critical |
+
 ## Planned jobs
 
 | Job | Trigger | Purpose |
@@ -32,10 +80,10 @@ Impression/rewrite (`kind = "ai"`) and whole-report (`kind = "generate"`) genera
 | Rulebook golden retest | Push to `main` | Run all rulebook golden suites in CI (already in CI, not a runtime job). |
 | Cleanup of orphaned drafts | Cron weekly | Archive drafts not touched in N days (configurable per tenant). |
 
-## Queue choice (planned, Phase 2)
+## Queue choice (decided: Hangfire)
 
-- **Hangfire** is the leading candidate for in-process background jobs because it stays in C# and can use the same Postgres database.
-- Alternatives: Quartz.NET, MassTransit (introduces RabbitMQ — heavier, only if multi-process scheduling is required).
+- **Hangfire** is the shipped engine for in-process background jobs as of PR-N1 — it stays in C# and uses the same database (Postgres in prod, InMemory on SQLite/desktop). The PRD names candidate stacks (NATS / River); the architecture doc + implementation standardize on Hangfire single-process.
+- Alternatives considered and not taken: Quartz.NET, MassTransit (introduces RabbitMQ — heavier, only if multi-process scheduling is required).
 
 ## Retry rules
 

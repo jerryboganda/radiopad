@@ -1,4 +1,5 @@
 using Microsoft.AspNetCore.Mvc;
+using RadioPad.Api.Jobs;
 using RadioPad.Api.Services;
 using RadioPad.Domain.Enums;
 using RadioPad.Infrastructure.Persistence;
@@ -15,9 +16,9 @@ namespace RadioPad.Api.Controllers;
 public class DriftController : TenantedController
 {
     private readonly RadioPadDbContext _db;
-    private readonly ModelDriftDetectionService _driftService;
+    private readonly ModelDriftDetectionJob _driftService;
 
-    public DriftController(RadioPadDbContext db, ModelDriftDetectionService driftService)
+    public DriftController(RadioPadDbContext db, ModelDriftDetectionJob driftService)
     {
         _db = db;
         _driftService = driftService;

@@ -246,9 +246,9 @@ public class CriticalResultsTests : IClassFixture<RadioPadAppFactory>
             await client.GetAsync("/api/critical-results/overdue"));
         Assert.Contains(overdueBefore, c => c.Id == created.Id);
 
-        var sweeper = new CriticalResultEscalationService(
+        var sweeper = new RadioPad.Api.Jobs.CriticalResultEscalationJob(
             _factory.Services.GetRequiredService<IServiceScopeFactory>(),
-            NullLogger<CriticalResultEscalationService>.Instance);
+            NullLogger<RadioPad.Api.Jobs.CriticalResultEscalationJob>.Instance);
         var escalatedCount = await sweeper.ScanOnceAsync(CancellationToken.None);
         Assert.True(escalatedCount >= 1);
 
@@ -291,9 +291,9 @@ public class CriticalResultsTests : IClassFixture<RadioPadAppFactory>
             await db.SaveChangesAsync();
         }
 
-        var sweeper = new CriticalResultEscalationService(
+        var sweeper = new RadioPad.Api.Jobs.CriticalResultEscalationJob(
             _factory.Services.GetRequiredService<IServiceScopeFactory>(),
-            NullLogger<CriticalResultEscalationService>.Instance);
+            NullLogger<RadioPad.Api.Jobs.CriticalResultEscalationJob>.Instance);
         await sweeper.ScanOnceAsync(CancellationToken.None);
 
         // Already communicated: the loop moved, so the sweep must not touch it.

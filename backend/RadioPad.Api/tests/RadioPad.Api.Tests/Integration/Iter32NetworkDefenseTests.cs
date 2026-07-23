@@ -18,7 +18,7 @@ namespace RadioPad.Api.Tests.Integration;
 /// Iter-32 SEC-008 / SEC-011 — network defenses.
 /// Covers CIDR matching (IPv4 + IPv6) in <see cref="IpAllowlistMiddleware"/>,
 /// the <see cref="RateLimitMiddleware"/> 429 path, and the
-/// <see cref="AnomalyDetector"/>'s new <see cref="AuditAction.SecurityAlert"/>
+/// <see cref="RadioPad.Api.Jobs.AnomalyScanJob"/>'s new <see cref="AuditAction.SecurityAlert"/>
 /// emitters.
 /// </summary>
 [Collection(EnvironmentVariableCollection.Name)]
@@ -336,7 +336,7 @@ public class Iter32NetworkDefenseTests : IClassFixture<RadioPadAppFactory>
             }, default);
         }
 
-        var detector = ActivatorUtilities.CreateInstance<AnomalyDetector>(scope.ServiceProvider, new NullLogger<AnomalyDetector>());
+        var detector = ActivatorUtilities.CreateInstance<RadioPad.Api.Jobs.AnomalyScanJob>(scope.ServiceProvider, new NullLogger<RadioPad.Api.Jobs.AnomalyScanJob>());
         await detector.ScanOnceAsync(default);
 
         var alerts = await db.AuditEvents.AsNoTracking()
@@ -376,7 +376,7 @@ public class Iter32NetworkDefenseTests : IClassFixture<RadioPadAppFactory>
             }, default);
         }
 
-        var detector = ActivatorUtilities.CreateInstance<AnomalyDetector>(scope.ServiceProvider, new NullLogger<AnomalyDetector>());
+        var detector = ActivatorUtilities.CreateInstance<RadioPad.Api.Jobs.AnomalyScanJob>(scope.ServiceProvider, new NullLogger<RadioPad.Api.Jobs.AnomalyScanJob>());
         await detector.ScanOnceAsync(default);
 
         var alerts = await db.AuditEvents.AsNoTracking()
