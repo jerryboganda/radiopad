@@ -46,7 +46,8 @@
     "peerReview": "Revisión por pares",
     "settingsHub": "Configuración",
     "hotkeys": "Atajos",
-    "onDeviceModels": "Modelos en el dispositivo"
+    "onDeviceModels": "Modelos en el dispositivo",
+    "notifications": "Notificaciones"
   },
   "buttons": {
     "primary": {
@@ -123,7 +124,11 @@
     },
     "notifications": {
       "label": "Notificaciones",
-      "empty": "Estás al día."
+      "empty": "Estás al día.",
+      "viewAll": "Ver todas",
+      "thisSession": "Esta sesión",
+      "inbox": "Bandeja",
+      "unread": "No leída"
     }
   },
   "profile": {
@@ -131,5 +136,51 @@
     "language": "Idioma",
     "signOut": "Cerrar sesión",
     "signedOut": "Sesión cerrada"
+  },
+  "notifications": {
+    "title": "Notificaciones",
+    "subtitle": "Alertas, aprobaciones y resultados que requieren tu atención.",
+    "refresh": "Actualizar",
+    "recently": "ahora mismo",
+    "offline": "Mostrando notificaciones de {time} — reconectando…",
+    "filtersLabel": "Filtrar notificaciones",
+    "filterAll": "Todas",
+    "filterUnread": "No leídas",
+    "filterNeedsAck": "Requiere confirmación",
+    "bulkLabel": "Acciones en lote",
+    "selectedCount": "{count} seleccionadas",
+    "bulkMarkRead": "Marcar leídas",
+    "bulkAck": "Confirmar",
+    "clearSelection": "Limpiar",
+    "loading": "Cargando notificaciones…",
+    "errorTitle": "No se pudieron cargar las notificaciones",
+    "emptyTitle": "Estás al día",
+    "emptyDesc": "Las nuevas notificaciones aparecerán aquí.",
+    "selectRow": "Seleccionar notificación",
+    "unread": "No leída",
+    "ack": "Confirmar",
+    "ackConfirm": "Confirmar",
+    "acknowledged": "Confirmada",
+    "open": "Abrir",
+    "actionFailed": "Acción fallida",
+    "confirmTitle": "Confirmar acción en lote",
+    "confirmBody": "Algunas de las {count} notificaciones seleccionadas son clínicas o requieren confirmación. ¿Aplicar esta acción a todas?",
+    "cancel": "Cancelar",
+    "confirmProceed": "Aplicar",
+    "category": {
+      "aiJob": "Informe de IA",
+      "criticalResult": "Resultado crítico",
+      "peerReview": "Revisión por pares",
+      "rulebookApproval": "Reglas",
+      "templateApproval": "Plantilla",
+      "mention": "Mención",
+      "system": "Sistema",
+      "other": "Notificación"
+    },
+    "urgency": {
+      "info": "Información",
+      "warning": "Advertencia",
+      "critical": "Crítico"
+    }
   }
 }

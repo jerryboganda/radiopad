@@ -46,7 +46,8 @@
     "peerReview": "सहकर्मी समीक्षा",
     "settingsHub": "सेटिंग्स",
     "hotkeys": "शॉर्टकट",
-    "onDeviceModels": "डिवाइस पर मॉडल"
+    "onDeviceModels": "डिवाइस पर मॉडल",
+    "notifications": "सूचनाएँ"
   },
   "buttons": {
     "primary": {
@@ -123,7 +124,11 @@
     },
     "notifications": {
       "label": "सूचनाएँ",
-      "empty": "आप अप-टू-डेट हैं।"
+      "empty": "आप अप-टू-डेट हैं।",
+      "viewAll": "सभी देखें",
+      "thisSession": "यह सत्र",
+      "inbox": "इनबॉक्स",
+      "unread": "अपठित"
     }
   },
   "profile": {
@@ -131,5 +136,51 @@
     "language": "भाषा",
     "signOut": "साइन आउट",
     "signedOut": "साइन आउट किया"
+  },
+  "notifications": {
+    "title": "सूचनाएँ",
+    "subtitle": "चेतावनियाँ, अनुमोदन और परिणाम जिन पर आपके ध्यान की आवश्यकता है।",
+    "refresh": "ताज़ा करें",
+    "recently": "अभी",
+    "offline": "{time} तक की सूचनाएँ दिखाई जा रही हैं — पुनः कनेक्ट किया जा रहा है…",
+    "filtersLabel": "सूचनाएँ फ़िल्टर करें",
+    "filterAll": "सभी",
+    "filterUnread": "अपठित",
+    "filterNeedsAck": "पुष्टि आवश्यक",
+    "bulkLabel": "सामूहिक कार्रवाई",
+    "selectedCount": "{count} चयनित",
+    "bulkMarkRead": "पढ़ा हुआ चिह्नित करें",
+    "bulkAck": "पुष्टि करें",
+    "clearSelection": "साफ़ करें",
+    "loading": "सूचनाएँ लोड हो रही हैं…",
+    "errorTitle": "सूचनाएँ लोड नहीं हो सकीं",
+    "emptyTitle": "आप अप-टू-डेट हैं",
+    "emptyDesc": "नई सूचनाएँ यहाँ दिखाई देंगी।",
+    "selectRow": "सूचना चुनें",
+    "unread": "अपठित",
+    "ack": "पुष्टि करें",
+    "ackConfirm": "पुष्टि करें",
+    "acknowledged": "पुष्टि की गई",
+    "open": "खोलें",
+    "actionFailed": "कार्रवाई विफल",
+    "confirmTitle": "सामूहिक कार्रवाई की पुष्टि करें",
+    "confirmBody": "चयनित {count} सूचनाओं में से कुछ नैदानिक हैं या पुष्टि की आवश्यकता है। क्या यह कार्रवाई सभी पर लागू करें?",
+    "cancel": "रद्द करें",
+    "confirmProceed": "लागू करें",
+    "category": {
+      "aiJob": "एआई रिपोर्ट",
+      "criticalResult": "गंभीर परिणाम",
+      "peerReview": "सहकर्मी समीक्षा",
+      "rulebookApproval": "नियमपुस्तिका",
+      "templateApproval": "टेम्पलेट",
+      "mention": "उल्लेख",
+      "system": "सिस्टम",
+      "other": "सूचना"
+    },
+    "urgency": {
+      "info": "जानकारी",
+      "warning": "चेतावनी",
+      "critical": "गंभीर"
+    }
   }
 }

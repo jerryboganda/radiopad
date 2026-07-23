@@ -1142,6 +1142,203 @@
   .rp-jobs-popover { animation: none; }
 }
 
+/* -------- Notifications bell — two-section popover (NOTIF-001) ------- */
+/* Extends the .rp-bell family: a "This session" transient block above the
+   persistent server inbox. RC tokens only → both themes free. Unread server rows
+   never rely on colour alone (bold + dot + an sr-only "Unread"). */
+.rp-bell-section-title {
+  font: 600 10.5px/1.2 var(--sans);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--text-faint);
+  padding: 8px 8px 4px;
+}
+.rp-bell-row {
+  width: 100%;
+  text-align: left;
+  background: transparent;
+  border: none;
+  cursor: pointer;
+}
+.rp-bell-row:hover { background: var(--bg-subtle); }
+.rp-bell-row-head { display: flex; align-items: center; gap: 8px; }
+.rp-bell-item-cat {
+  font: 600 10.5px/1.3 var(--sans);
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+  color: var(--text-soft);
+}
+.rp-bell-row.tone-warn .rp-bell-item-cat { color: var(--amber); }
+.rp-bell-row.tone-danger .rp-bell-item-cat { color: var(--red); }
+.rp-bell-meta {
+  font: 500 11px/1 var(--sans);
+  color: var(--text-faint);
+  margin-left: auto;
+  font-variant-numeric: tabular-nums;
+}
+.rp-bell-item[data-unread="true"] .rp-bell-item-title { font-weight: 700; }
+.rp-bell-item[data-unread="true"] .rp-bell-item-title::before {
+  content: "";
+  display: inline-block;
+  width: 6px;
+  height: 6px;
+  margin-right: 6px;
+  border-radius: 50%;
+  background: var(--accent);
+  vertical-align: middle;
+}
+.rp-bell-footer {
+  display: flex;
+  justify-content: flex-end;
+  padding: 6px 6px 2px;
+  border-top: 1px solid var(--border-soft);
+  margin-top: 6px;
+}
+.rp-bell-viewall { font: 600 12px/1.2 var(--sans); color: var(--link); }
+
+/* -------- Notifications inbox page (.rp-inbox-*, NOTIF-001/010) ------ */
+/* Cloned from the .rp-jobs / .rp-bell families. RC tokens only, both themes free.
+   Urgency is carried by a left border-accent AND the row's StatusBadge text — never
+   colour alone. Unread rows: weight bump + var(--accent) dot + sr-only "Unread". */
+.rp-inbox-filters {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  align-items: center;
+  margin-bottom: 12px;
+}
+.rp-inbox-filter-sep {
+  width: 1px;
+  height: 18px;
+  background: var(--border-soft);
+  margin: 0 2px;
+}
+.rp-inbox-filter-chip {
+  padding: 4px 10px;
+  border-radius: var(--radius-pill);
+  border: 1px solid var(--border-soft);
+  background: var(--bg-subtle);
+  color: var(--text-muted);
+  font: 600 12px/1.2 var(--sans);
+  cursor: pointer;
+}
+.rp-inbox-filter-chip:hover { border-color: var(--border); color: var(--text); }
+.rp-inbox-filter-chip.is-active {
+  background: var(--bg-selected);
+  border-color: var(--accent);
+  color: var(--accent);
+}
+
+.rp-inbox-bulkbar {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 10px;
+  margin-bottom: 10px;
+  border: 1px solid var(--color-info-border);
+  background: var(--color-info-soft);
+  border-radius: var(--radius-control);
+}
+.rp-inbox-bulkbar-count {
+  font: 600 12.5px/1.2 var(--sans);
+  color: var(--text);
+  margin-right: auto;
+}
+.rp-inbox-bulkbar button { padding: 4px 12px; font-size: 12px; }
+
+.rp-inbox-list {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+.rp-inbox-item {
+  position: relative;
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  padding: 10px 12px;
+  border: 1px solid var(--border-soft);
+  border-left-width: 3px;
+  border-radius: var(--radius-control);
+  background: var(--bg-subtle);
+}
+.rp-inbox-item.tone-info { border-left-color: var(--color-info); }
+.rp-inbox-item.tone-warn { border-left-color: var(--color-warning); }
+.rp-inbox-item.tone-danger { border-left-color: var(--color-danger); }
+.rp-inbox-item[data-unread="true"] { background: var(--bg-elevated); }
+.rp-inbox-check { margin-top: 3px; flex-shrink: 0; }
+.rp-inbox-item-main {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+}
+.rp-inbox-item-head { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+.rp-inbox-badge {
+  font: 600 11px/1.3 var(--sans);
+  color: var(--text-soft);
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+}
+.rp-inbox-meta {
+  font: 500 11.5px/1 var(--sans);
+  color: var(--text-faint);
+  font-variant-numeric: tabular-nums;
+  margin-left: auto;
+}
+.rp-inbox-item-title { margin: 0; font: 500 13px/1.35 var(--sans); color: var(--text); }
+.rp-inbox-item[data-unread="true"] .rp-inbox-item-title { font-weight: 700; }
+.rp-inbox-item[data-unread="true"] .rp-inbox-item-title::before {
+  content: "";
+  display: inline-block;
+  width: 7px;
+  height: 7px;
+  margin-right: 7px;
+  border-radius: 50%;
+  background: var(--accent);
+  vertical-align: middle;
+}
+.rp-inbox-item-sub { margin: 0; font: 400 12px/1.4 var(--sans); color: var(--text-muted); }
+.rp-inbox-item-actions {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  flex-shrink: 0;
+}
+.rp-inbox-item-actions button { padding: 3px 10px; font-size: 12px; }
+.rp-inbox-open { font: 600 12px/1.2 var(--sans); color: var(--link); white-space: nowrap; }
+
+.rp-inbox-confirm-scrim {
+  position: fixed;
+  inset: 0;
+  z-index: calc(var(--rp-shell-z-topbar) + 20);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 20px;
+  background: var(--scrim);
+}
+.rp-inbox-confirm {
+  width: min(420px, 100%);
+  background: var(--bg-elevated);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-panel);
+  box-shadow: var(--shadow-md);
+  padding: 18px;
+  animation: rp-popover-in var(--anim-fast) var(--ease-pop) both;
+}
+.rp-inbox-confirm-title { margin: 0 0 6px; font: 700 15px/1.3 var(--sans); color: var(--text); }
+.rp-inbox-confirm-body { margin: 0 0 16px; font: 400 13px/1.5 var(--sans); color: var(--text-muted); }
+.rp-inbox-confirm-actions { display: flex; justify-content: flex-end; gap: 8px; }
+
+@media (prefers-reduced-motion: reduce) {
+  .rp-inbox-confirm { animation: none; }
+}
+
 /* Topbar variant of the profile menu: popover drops DOWN from the right. */
 .rp-profile-menu--topbar { position: relative; }
 .rp-profile-menu--topbar .rp-profile-trigger { width: auto; padding: 4px 8px; }

@@ -15,6 +15,7 @@ import DesktopStatusBanner from '@/components/DesktopStatusBanner';
 import PageTransition from '@/components/ui/PageTransition';
 import { ToastProvider } from '@/components/ui/ToastProvider';
 import JobsProvider from '@/components/jobs/JobsProvider';
+import NotificationsProvider from '@/components/notifications/NotificationsProvider';
 
 function ShellRoot({ children }: { children: ReactNode }) {
   const { collapsed } = useShell();
@@ -73,7 +74,12 @@ export default function AppShell({ children }: { children: ReactNode }) {
       <ShellProvider>
         <PageActionsProvider>
           <AuthGate>
-            <JobsProvider>{shell}</JobsProvider>
+            {/* NotificationsProvider is NOT desktop-gated — web admins have
+                inboxes too. It wraps the shell so the topbar bell always has the
+                context, on every surface (NOTIF-001). */}
+            <JobsProvider>
+              <NotificationsProvider>{shell}</NotificationsProvider>
+            </JobsProvider>
           </AuthGate>
         </PageActionsProvider>
       </ShellProvider>

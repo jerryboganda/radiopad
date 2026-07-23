@@ -46,7 +46,8 @@
     "peerReview": "Relecture par les pairs",
     "settingsHub": "Paramètres",
     "hotkeys": "Raccourcis",
-    "onDeviceModels": "Modèles sur l’appareil"
+    "onDeviceModels": "Modèles sur l’appareil",
+    "notifications": "Notifications"
   },
   "buttons": {
     "primary": {
@@ -123,7 +124,11 @@
     },
     "notifications": {
       "label": "Notifications",
-      "empty": "Vous êtes à jour."
+      "empty": "Vous êtes à jour.",
+      "viewAll": "Tout afficher",
+      "thisSession": "Cette session",
+      "inbox": "Boîte de réception",
+      "unread": "Non lue"
     }
   },
   "profile": {
@@ -131,5 +136,51 @@
     "language": "Langue",
     "signOut": "Se déconnecter",
     "signedOut": "Déconnecté"
+  },
+  "notifications": {
+    "title": "Notifications",
+    "subtitle": "Alertes, approbations et résultats qui requièrent votre attention.",
+    "refresh": "Actualiser",
+    "recently": "à l’instant",
+    "offline": "Affichage des notifications datées de {time} — reconnexion…",
+    "filtersLabel": "Filtrer les notifications",
+    "filterAll": "Toutes",
+    "filterUnread": "Non lues",
+    "filterNeedsAck": "Accusé requis",
+    "bulkLabel": "Actions groupées",
+    "selectedCount": "{count} sélectionnée(s)",
+    "bulkMarkRead": "Marquer comme lues",
+    "bulkAck": "Accuser réception",
+    "clearSelection": "Effacer",
+    "loading": "Chargement des notifications…",
+    "errorTitle": "Impossible de charger les notifications",
+    "emptyTitle": "Vous êtes à jour",
+    "emptyDesc": "Les nouvelles notifications apparaîtront ici.",
+    "selectRow": "Sélectionner la notification",
+    "unread": "Non lue",
+    "ack": "Accuser réception",
+    "ackConfirm": "Confirmer",
+    "acknowledged": "Accusé de réception",
+    "open": "Ouvrir",
+    "actionFailed": "Échec de l’action",
+    "confirmTitle": "Confirmer l’action groupée",
+    "confirmBody": "Certaines des {count} notifications sélectionnées sont cliniques ou nécessitent un accusé de réception. Appliquer cette action à toutes ?",
+    "cancel": "Annuler",
+    "confirmProceed": "Appliquer",
+    "category": {
+      "aiJob": "Rapport IA",
+      "criticalResult": "Résultat critique",
+      "peerReview": "Revue par les pairs",
+      "rulebookApproval": "Règles",
+      "templateApproval": "Modèle",
+      "mention": "Mention",
+      "system": "Système",
+      "other": "Notification"
+    },
+    "urgency": {
+      "info": "Info",
+      "warning": "Avertissement",
+      "critical": "Critique"
+    }
   }
 }

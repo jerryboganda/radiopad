@@ -46,7 +46,8 @@
     "peerReview": "Peer Review",
     "settingsHub": "Settings",
     "hotkeys": "Hotkeys",
-    "onDeviceModels": "On-device models"
+    "onDeviceModels": "On-device models",
+    "notifications": "Notifications"
   },
   "buttons": {
     "primary": {
@@ -123,7 +124,11 @@
     },
     "notifications": {
       "label": "Notifications",
-      "empty": "You're all caught up."
+      "empty": "You're all caught up.",
+      "viewAll": "View all",
+      "thisSession": "This session",
+      "inbox": "Inbox",
+      "unread": "Unread"
     }
   },
   "profile": {
@@ -131,5 +136,51 @@
     "language": "Language",
     "signOut": "Sign out",
     "signedOut": "Signed out"
+  },
+  "notifications": {
+    "title": "Notifications",
+    "subtitle": "Alerts, approvals, and results that need your attention.",
+    "refresh": "Refresh",
+    "recently": "just now",
+    "offline": "Showing notifications as of {time} — reconnecting…",
+    "filtersLabel": "Filter notifications",
+    "filterAll": "All",
+    "filterUnread": "Unread",
+    "filterNeedsAck": "Needs acknowledgement",
+    "bulkLabel": "Bulk actions",
+    "selectedCount": "{count} selected",
+    "bulkMarkRead": "Mark read",
+    "bulkAck": "Acknowledge",
+    "clearSelection": "Clear",
+    "loading": "Loading notifications…",
+    "errorTitle": "Couldn't load notifications",
+    "emptyTitle": "You're all caught up",
+    "emptyDesc": "New notifications will appear here.",
+    "selectRow": "Select notification",
+    "unread": "Unread",
+    "ack": "Acknowledge",
+    "ackConfirm": "Confirm",
+    "acknowledged": "Acknowledged",
+    "open": "Open",
+    "actionFailed": "Action failed",
+    "confirmTitle": "Confirm bulk action",
+    "confirmBody": "Some of the {count} selected notifications are clinical or require acknowledgement. Apply this action to all of them?",
+    "cancel": "Cancel",
+    "confirmProceed": "Apply",
+    "category": {
+      "aiJob": "AI report",
+      "criticalResult": "Critical result",
+      "peerReview": "Peer review",
+      "rulebookApproval": "Rulebook",
+      "templateApproval": "Template",
+      "mention": "Mention",
+      "system": "System",
+      "other": "Notification"
+    },
+    "urgency": {
+      "info": "Info",
+      "warning": "Warning",
+      "critical": "Critical"
+    }
   }
 }

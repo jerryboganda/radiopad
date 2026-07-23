@@ -46,7 +46,8 @@
     "peerReview": "Revisão por pares",
     "settingsHub": "Configurações",
     "hotkeys": "Atalhos",
-    "onDeviceModels": "Modelos no dispositivo"
+    "onDeviceModels": "Modelos no dispositivo",
+    "notifications": "Notificações"
   },
   "buttons": {
     "primary": {
@@ -123,7 +124,11 @@
     },
     "notifications": {
       "label": "Notificações",
-      "empty": "Você está em dia."
+      "empty": "Você está em dia.",
+      "viewAll": "Ver todas",
+      "thisSession": "Esta sessão",
+      "inbox": "Caixa de entrada",
+      "unread": "Não lida"
     }
   },
   "profile": {
@@ -131,5 +136,51 @@
     "language": "Idioma",
     "signOut": "Sair",
     "signedOut": "Desconectado"
+  },
+  "notifications": {
+    "title": "Notificações",
+    "subtitle": "Alertas, aprovações e resultados que exigem sua atenção.",
+    "refresh": "Atualizar",
+    "recently": "agora mesmo",
+    "offline": "Mostrando notificações de {time} — reconectando…",
+    "filtersLabel": "Filtrar notificações",
+    "filterAll": "Todas",
+    "filterUnread": "Não lidas",
+    "filterNeedsAck": "Requer confirmação",
+    "bulkLabel": "Ações em massa",
+    "selectedCount": "{count} selecionadas",
+    "bulkMarkRead": "Marcar como lidas",
+    "bulkAck": "Confirmar",
+    "clearSelection": "Limpar",
+    "loading": "Carregando notificações…",
+    "errorTitle": "Não foi possível carregar as notificações",
+    "emptyTitle": "Você está em dia",
+    "emptyDesc": "Novas notificações aparecerão aqui.",
+    "selectRow": "Selecionar notificação",
+    "unread": "Não lida",
+    "ack": "Confirmar",
+    "ackConfirm": "Confirmar",
+    "acknowledged": "Confirmada",
+    "open": "Abrir",
+    "actionFailed": "Ação falhou",
+    "confirmTitle": "Confirmar ação em massa",
+    "confirmBody": "Algumas das {count} notificações selecionadas são clínicas ou exigem confirmação. Aplicar esta ação a todas?",
+    "cancel": "Cancelar",
+    "confirmProceed": "Aplicar",
+    "category": {
+      "aiJob": "Relatório de IA",
+      "criticalResult": "Resultado crítico",
+      "peerReview": "Revisão por pares",
+      "rulebookApproval": "Regras",
+      "templateApproval": "Modelo",
+      "mention": "Menção",
+      "system": "Sistema",
+      "other": "Notificação"
+    },
+    "urgency": {
+      "info": "Informação",
+      "warning": "Aviso",
+      "critical": "Crítico"
+    }
   }
 }

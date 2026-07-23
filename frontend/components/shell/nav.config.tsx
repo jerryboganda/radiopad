@@ -10,7 +10,7 @@ import {
   FileInput, WifiOff, Scale, FlaskConical, ShieldCheck, Flag, CreditCard,
   Activity, Settings2, Fingerprint, Users, ScanLine, Bone, Cpu,
   LayoutDashboard, ListTodo, PenLine, Layers, Sparkles, Library, BadgeCheck,
-  GraduationCap, UsersRound, AlertTriangle,
+  GraduationCap, UsersRound, AlertTriangle, Bell,
 } from 'lucide-react';
 import type { PermissionKey } from '@/lib/permissions';
 import { UBAG_HUB_ROLES } from '@/lib/roles';
@@ -63,6 +63,7 @@ export const Icons: Record<string, NavIcon> = {
   findingsLibrary: Library,
   quality: BadgeCheck,
   peerReview: UsersRound,
+  notifications: Bell,
   reports: FileText,
   validation: ClipboardCheck,
   audit: ScrollText,
@@ -103,6 +104,9 @@ export const navGroups: NavGroup[] = [
       // PRD §14.15 — the open critical-communication loops are an actionable queue,
       // so they sit with the reporting flow rather than the read-only insight group.
       { href: '/critical-results', labelKey: 'criticalResults', icon: Icons.criticalResults, permission: 'critical_results.read' },
+      // NOTIF-001 — the personal notifications inbox. Desktop-only page (the inbox
+      // route ships only in the reporting product); web admins use the topbar bell.
+      { href: '/notifications', labelKey: 'notifications', icon: Icons.notifications, surfaces: ['desktop'] },
       { href: '/reports/compose', labelKey: 'composer', icon: Icons.composer, permission: 'reports.draft', matchPrefix: '/reports/view' },
       { href: '/templates', labelKey: 'templates', icon: Icons.templates, permission: 'templates.read' },
       { href: '/protocols', labelKey: 'protocols', icon: Icons.protocols },

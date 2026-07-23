@@ -46,7 +46,8 @@
     "peerReview": "Peer-Review",
     "settingsHub": "Einstellungen",
     "hotkeys": "Tastenkürzel",
-    "onDeviceModels": "Lokale Modelle"
+    "onDeviceModels": "Lokale Modelle",
+    "notifications": "Benachrichtigungen"
   },
   "buttons": {
     "primary": {
@@ -123,7 +124,11 @@
     },
     "notifications": {
       "label": "Benachrichtigungen",
-      "empty": "Alles erledigt."
+      "empty": "Alles erledigt.",
+      "viewAll": "Alle anzeigen",
+      "thisSession": "Diese Sitzung",
+      "inbox": "Posteingang",
+      "unread": "Ungelesen"
     }
   },
   "profile": {
@@ -131,5 +136,51 @@
     "language": "Sprache",
     "signOut": "Abmelden",
     "signedOut": "Abgemeldet"
+  },
+  "notifications": {
+    "title": "Benachrichtigungen",
+    "subtitle": "Warnungen, Freigaben und Ergebnisse, die Ihre Aufmerksamkeit erfordern.",
+    "refresh": "Aktualisieren",
+    "recently": "gerade eben",
+    "offline": "Benachrichtigungen vom Stand {time} — Verbindung wird wiederhergestellt…",
+    "filtersLabel": "Benachrichtigungen filtern",
+    "filterAll": "Alle",
+    "filterUnread": "Ungelesen",
+    "filterNeedsAck": "Bestätigung erforderlich",
+    "bulkLabel": "Sammelaktionen",
+    "selectedCount": "{count} ausgewählt",
+    "bulkMarkRead": "Als gelesen markieren",
+    "bulkAck": "Bestätigen",
+    "clearSelection": "Aufheben",
+    "loading": "Benachrichtigungen werden geladen…",
+    "errorTitle": "Benachrichtigungen konnten nicht geladen werden",
+    "emptyTitle": "Alles erledigt",
+    "emptyDesc": "Neue Benachrichtigungen erscheinen hier.",
+    "selectRow": "Benachrichtigung auswählen",
+    "unread": "Ungelesen",
+    "ack": "Bestätigen",
+    "ackConfirm": "Bestätigen",
+    "acknowledged": "Bestätigt",
+    "open": "Öffnen",
+    "actionFailed": "Aktion fehlgeschlagen",
+    "confirmTitle": "Sammelaktion bestätigen",
+    "confirmBody": "Einige der {count} ausgewählten Benachrichtigungen sind klinisch oder erfordern eine Bestätigung. Diese Aktion auf alle anwenden?",
+    "cancel": "Abbrechen",
+    "confirmProceed": "Anwenden",
+    "category": {
+      "aiJob": "KI-Bericht",
+      "criticalResult": "Kritischer Befund",
+      "peerReview": "Peer-Review",
+      "rulebookApproval": "Regelwerk",
+      "templateApproval": "Vorlage",
+      "mention": "Erwähnung",
+      "system": "System",
+      "other": "Benachrichtigung"
+    },
+    "urgency": {
+      "info": "Info",
+      "warning": "Warnung",
+      "critical": "Kritisch"
+    }
   }
 }

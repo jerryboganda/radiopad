@@ -6,6 +6,11 @@
  */
 
 import { SseParser, type SseEvent } from './sse';
+// NOTIF-001 — the wire shape lives in `lib/notifications.ts` (React-free model);
+// imported here type-only so the client and the reducer never drift. The reverse
+// edge does not exist (notifications.ts imports nothing from api.ts), so this is a
+// clean one-directional dependency, not a cycle.
+import type { NotificationItem } from './notifications';
 
 // Re-exported so `lib/events.ts` and other stream consumers get the parser's
 // event shape from the same place they get `connectEventStream`.
@@ -537,6 +542,24 @@ export type LocalGenerateResult = {
   provider: string;
   model: string;
   latencyMs: number;
+};
+
+/** NOTIF-001 wire responses. `NotificationItem` is defined in `lib/notifications.ts`
+ *  (the React-free model) and imported type-only above. */
+export type NotificationListResult = {
+  notifications: NotificationItem[];
+  /** Keyset cursor (CreatedAt ticks) for the next page; null on the last page. */
+  nextCursor?: string | null;
+};
+export type NotificationUnreadCount = { unread: number; unacked: number };
+export type NotificationBulkResult = { updated: number };
+export type NotificationPrefs = {
+  mutedCategoriesCsv: string;
+  dndStartMinutes?: number | null;
+  dndEndMinutes?: number | null;
+  dndTimeZone: string;
+  pushEnabled: boolean;
+  emailEnabled: boolean;
 };
 
 const AI_JOB_POLL_MS = 2_000;
@@ -1878,6 +1901,54 @@ export const api = {
    * `access_token` query param from this client.
    */
   events: { stream: connectEventStream },
+  /**
+   * NOTIF-001 inbox (durable notifications, 2026-07-23). Own-rows only — every
+   * endpoint is scoped to the caller by the backend; no extra read permission
+   * (an inbox is a signed-in right on every surface). `bulk`/`putPrefs` surface
+   * the backend's 400 `confirmation_required` / `mandatory_category` as the
+   * thrown `apiError` (`.kind` + `.body`), so the UI decides what to show.
+   */
+  notifications: {
+    list: (
+      params: {
+        unread?: boolean;
+        category?: string;
+        urgency?: string;
+        requiresAck?: boolean;
+        cursor?: string;
+        limit?: number;
+      } = {},
+    ): Promise<NotificationListResult> => {
+      const q = new URLSearchParams();
+      if (params.unread) q.set('unread', 'true');
+      if (params.category) q.set('category', params.category);
+      if (params.urgency) q.set('urgency', params.urgency);
+      if (params.requiresAck) q.set('requiresAck', 'true');
+      if (params.cursor) q.set('cursor', params.cursor);
+      if (params.limit != null) q.set('limit', String(params.limit));
+      const qs = q.toString();
+      return request<NotificationListResult>(`/api/notifications${qs ? `?${qs}` : ''}`);
+    },
+    unreadCount: (): Promise<NotificationUnreadCount> =>
+      request<NotificationUnreadCount>('/api/notifications/unread-count'),
+    markRead: (id: string): Promise<void> =>
+      request<void>(`/api/notifications/${id}/read`, { method: 'POST' }),
+    ack: (id: string): Promise<void> =>
+      request<void>(`/api/notifications/${id}/ack`, { method: 'POST' }),
+    bulk: (body: {
+      ids: string[];
+      action: 'read' | 'ack';
+      confirm: boolean;
+    }): Promise<NotificationBulkResult> =>
+      request<NotificationBulkResult>('/api/notifications/bulk', {
+        method: 'POST',
+        body: JSON.stringify(body),
+      }),
+    getPrefs: (): Promise<NotificationPrefs> =>
+      request<NotificationPrefs>('/api/notifications/prefs'),
+    putPrefs: (prefs: NotificationPrefs): Promise<void> =>
+      request<void>('/api/notifications/prefs', { method: 'PUT', body: JSON.stringify(prefs) }),
+  },
   rulebooks: {
     list: () => request<Rulebook[]>('/api/rulebooks'),
     get: (id: string) => request<Rulebook & { sourceYaml: string }>(`/api/rulebooks/${id}`),
