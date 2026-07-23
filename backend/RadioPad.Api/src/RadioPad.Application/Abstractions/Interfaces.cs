@@ -109,7 +109,38 @@ public sealed record AiCompletionRequest(
     /// llama.cpp adapters; other providers ignore it.
     /// </summary>
     public int? RepeatLastN { get; init; }
+
+    /// <summary>
+    /// AI-013 — optional token-stream sink. Adapters that support streaming switch to
+    /// stream mode ONLY when this is non-null and MUST invoke <see cref="IProgress{T}.Report"/>
+    /// synchronously, in arrival order, from their read loop (use
+    /// <see cref="SynchronousProgress{T}"/>, never <see cref="System.Progress{T}"/>). Adapters
+    /// that ignore it (UBAG, CLI, Bedrock, Vertex) compile and behave byte-identically.
+    /// </summary>
+    public IProgress<AiStreamChunk>? OnStream { get; init; }
+
+    /// <summary>
+    /// AI-013 re-attach seam — invoked once with the provider-side job id the moment it exists
+    /// (today: only the UBAG adapter, wired in PR-B4). Must not throw; must be cheap (callers
+    /// persist asynchronously). Null on every non-UBAG path.
+    /// </summary>
+    public Action<string>? OnProviderJobCreated { get; init; }
 }
+
+/// <summary>
+/// AI-013 — one incremental chunk of streamed model output. <see cref="OutputTokens"/> is the
+/// cumulative token (or chunk) count for the CURRENT provider attempt; it RESETS on failover
+/// (a retry against the next provider starts counting at ~1), which the registry's
+/// non-monotonic-token rule uses to discard the failed attempt's partial text.
+/// </summary>
+public sealed record AiStreamChunk(string Delta, int OutputTokens);
+
+/// <summary>
+/// AI-013 — the optional streaming/re-attach hooks threaded from the job coordinator through
+/// <see cref="Services.ReportingService"/> onto the <see cref="AiCompletionRequest"/>. A null
+/// value (the default for every non-job caller) leaves the request non-streaming.
+/// </summary>
+public sealed record AiRunHooks(IProgress<AiStreamChunk>? OnStream, Action<string>? OnProviderJobCreated);
 
 public interface IUbagClient
 {

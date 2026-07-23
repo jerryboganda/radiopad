@@ -49,8 +49,11 @@ public sealed class OpenAiDirectProvider : IAiProviderAdapter
         var client = _http.CreateClient("ai");
         client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", apiKey);
 
-        var body = OpenAiChatHelpers.BuildChatBody(model, request.SystemPrompt, request.UserPrompt, temperature: request.Temperature, outputSchema: request.OutputSchema);
-        var (text, pt, ctok, ms) = await OpenAiChatHelpers.SendChatAsync(client, url, body, AdapterId, cancellationToken);
+        var stream = request.OnStream is not null;
+        var body = OpenAiChatHelpers.BuildChatBody(model, request.SystemPrompt, request.UserPrompt, temperature: request.Temperature, outputSchema: request.OutputSchema, stream: stream);
+        var (text, pt, ctok, ms) = stream
+            ? await OpenAiChatHelpers.SendChatStreamingAsync(client, url, body, AdapterId, request.OnStream!, cancellationToken)
+            : await OpenAiChatHelpers.SendChatAsync(client, url, body, AdapterId, cancellationToken);
 
         return new AiResult(
             Text: text,

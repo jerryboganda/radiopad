@@ -68,13 +68,16 @@ public class ReportingService
     /// provider matches or the whole chain is exhausted.
     /// </summary>
     public async Task<(AiResult result, ProviderConfig provider)> RunAutoAsync(
-        Tenant tenant, User user, Report report, string mode, CancellationToken ct)
+        Tenant tenant, User user, Report report, string mode, CancellationToken ct, AiRunHooks? hooks = null)
     {
         if (_router is null)
             throw new InvalidOperationException("Auto-routing requested but no IProviderRouter is configured.");
         var ranked = await _router.SelectRankedAsync(tenant, ContainsPhi(report), ct);
+        // AI-013 — forward hooks through each failover attempt unchanged; the registry's
+        // non-monotonic-token reset rule discards a failed attempt's partial text, so no
+        // per-attempt wrapper is needed.
         var (result, provider) = await ProviderFailover.RunAsync(
-            ranked, p => RunAsync(tenant, user, report, p, mode, ct), _log, ct);
+            ranked, p => RunAsync(tenant, user, report, p, mode, ct, hooks), _log, ct);
         return (result, provider);
     }
 
@@ -84,7 +87,8 @@ public class ReportingService
     /// + usage ledger are always enforced.
     /// </summary>
     public async Task<AiResult> RunAsync(
-        Tenant tenant, User user, Report report, ProviderConfig provider, string mode, CancellationToken ct)
+        Tenant tenant, User user, Report report, ProviderConfig provider, string mode, CancellationToken ct,
+        AiRunHooks? hooks = null)
     {
         if (!SupportedModes.Contains(mode, StringComparer.OrdinalIgnoreCase))
             throw new ArgumentException($"Unknown AI mode '{mode}'. Supported: {string.Join(", ", SupportedModes)}.");
@@ -118,6 +122,9 @@ public class ReportingService
             // Iter-0b (RB-009 / AI-012) — bind rulebook provenance to the audit + usage trail.
             RulebookId = rulebookEntity?.Id,
             RulebookVersion = rulebookEntity?.Version,
+            // AI-013 — optional token-stream + re-attach hooks (null unless a job is streaming).
+            OnStream = hooks?.OnStream,
+            OnProviderJobCreated = hooks?.OnProviderJobCreated,
         }, ct);
     }
 
@@ -141,7 +148,8 @@ public class ReportingService
     /// enforced exactly as in <see cref="RunAsync"/>.
     /// </summary>
     public async Task<StructuredReportResult> GenerateStructuredAsync(
-        Tenant tenant, User user, Report report, ProviderConfig provider, CancellationToken ct)
+        Tenant tenant, User user, Report report, ProviderConfig provider, CancellationToken ct,
+        AiRunHooks? hooks = null)
     {
         // RB-010 — a non-Approved rulebook may not drive a production AI run unless
         // the tenant opts in to sandbox rulebooks.
@@ -170,6 +178,10 @@ public class ReportingService
         {
             RulebookId = rulebookEntity?.Id,
             RulebookVersion = rulebookEntity?.Version,
+            // AI-013 — stream the main whole-report body only. The GenerateMissingRecommendationsAsync
+            // backfill below deliberately stays non-streaming (a second text would interleave).
+            OnStream = hooks?.OnStream,
+            OnProviderJobCreated = hooks?.OnProviderJobCreated,
         }, ct);
 
         var sections = ReportSectionJson.Parse(result.Text);
@@ -421,13 +433,13 @@ public class ReportingService
     /// (<see cref="ProviderFailover"/>).
     /// </summary>
     public async Task<(StructuredReportResult result, ProviderConfig provider)> GenerateStructuredAutoAsync(
-        Tenant tenant, User user, Report report, CancellationToken ct)
+        Tenant tenant, User user, Report report, CancellationToken ct, AiRunHooks? hooks = null)
     {
         if (_router is null)
             throw new InvalidOperationException("Auto-routing requested but no IProviderRouter is configured.");
         var ranked = await _router.SelectRankedAsync(tenant, ContainsPhi(report), ct);
         var (result, provider) = await ProviderFailover.RunAsync(
-            ranked, p => GenerateStructuredAsync(tenant, user, report, p, ct), _log, ct);
+            ranked, p => GenerateStructuredAsync(tenant, user, report, p, ct, hooks), _log, ct);
         return (result, provider);
     }
 

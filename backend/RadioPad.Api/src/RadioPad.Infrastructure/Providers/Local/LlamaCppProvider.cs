@@ -1,8 +1,10 @@
 using System.Diagnostics;
 using System.Net.Http.Json;
+using System.Text;
 using System.Text.Json;
 using Microsoft.Extensions.Logging;
 using RadioPad.Application.Abstractions;
+using RadioPad.Application.Providers;
 using RadioPad.Application.Services;
 using RadioPad.Domain.Entities;
 using RadioPad.Domain.Enums;
@@ -103,6 +105,16 @@ public sealed class LlamaCppProvider : IAiProviderAdapter
         // Dedicated client (Program.cs "ai-local"): CPU-bound local inference needs minutes, not
         // the cloud-tuned "ai" client's ~60 s attempt budget, and must not share its circuit breaker.
         var client = _http.CreateClient("ai-local");
+
+        // AI-013 — when a streaming sink is attached, flip `stream` on (grammar / stop / repeat
+        // params all stay in the body and are honoured server-side during streaming) and consume
+        // the llama-server SSE. The non-stream branch below is untouched.
+        if (request.OnStream is not null)
+        {
+            body["stream"] = true;
+            return await CompleteStreamingAsync(client, url, body, request, p, managesEndpoint, cancellationToken);
+        }
+
         var sw = Stopwatch.StartNew();
         HttpResponseMessage resp;
         try
@@ -163,6 +175,101 @@ public sealed class LlamaCppProvider : IAiProviderAdapter
         {
             resp.Dispose();
         }
+    }
+
+    /// <summary>
+    /// AI-013 — llama-server streaming (<c>stream: true</c>) over SSE: each chunk is
+    /// <c>data: {"content":"…","stop":false,…}</c>; the final <c>stop: true</c> chunk carries
+    /// <c>tokens_evaluated</c> / <c>tokens_predicted</c> (top-level, or nested under
+    /// <c>timings</c> on some versions — top-level preferred). Reports each content piece with a
+    /// running chunk count; error mapping mirrors the non-stream path, and a mid-stream
+    /// cancellation surfaces as <see cref="OperationCanceledException"/>, not a transport error.
+    /// </summary>
+    private async Task<AiResult> CompleteStreamingAsync(
+        HttpClient client, string url, Dictionary<string, object?> body,
+        AiCompletionRequest request, ProviderConfig p, bool managesEndpoint, CancellationToken cancellationToken)
+    {
+        var sw = Stopwatch.StartNew();
+        HttpResponseMessage resp;
+        try
+        {
+            using var req = new HttpRequestMessage(HttpMethod.Post, url) { Content = JsonContent.Create(body) };
+            resp = await client.SendAsync(req, HttpCompletionOption.ResponseHeadersRead, cancellationToken);
+        }
+        catch (HttpRequestException hre)
+        {
+            sw.Stop();
+            var diagnosis = managesEndpoint ? $" {DiagnoseUnreachable(p)}" : "";
+            throw new ProviderTransportException($"{AdapterId}: HTTP transport failure: {hre.Message}.{diagnosis}", inner: hre);
+        }
+        catch (TaskCanceledException tce) when (!cancellationToken.IsCancellationRequested)
+        {
+            sw.Stop();
+            throw new ProviderTransportException($"{AdapterId}: request timed out after {sw.ElapsedMilliseconds} ms", inner: tce);
+        }
+
+        try
+        {
+            if (!resp.IsSuccessStatusCode)
+            {
+                var bodyText = await OpenAiChatHelpers.SafeReadAsync(resp, cancellationToken);
+                throw new ProviderTransportException(
+                    $"{AdapterId}: upstream returned HTTP {(int)resp.StatusCode} ({resp.ReasonPhrase}).",
+                    statusCode: (int)resp.StatusCode,
+                    responseBody: bodyText);
+            }
+
+            using var stream = await resp.Content.ReadAsStreamAsync(cancellationToken);
+            var sb = new StringBuilder();
+            var chunkCount = 0;
+            var pt = 0;
+            var ctok = 0;
+
+            await foreach (var (_, data) in SseStreamReader.ReadAsync(stream, cancellationToken))
+            {
+                using var doc = JsonDocument.Parse(data);
+                var root = doc.RootElement;
+                if (root.TryGetProperty("content", out var c) && c.ValueKind == JsonValueKind.String)
+                {
+                    var piece = c.GetString() ?? "";
+                    if (piece.Length > 0)
+                    {
+                        sb.Append(piece);
+                        chunkCount++;
+                        request.OnStream!.Report(new AiStreamChunk(piece, chunkCount));
+                    }
+                }
+                if (root.TryGetProperty("stop", out var stop) && stop.ValueKind == JsonValueKind.True)
+                {
+                    pt = ReadTokenCount(root, "tokens_evaluated");
+                    ctok = ReadTokenCount(root, "tokens_predicted");
+                }
+            }
+            sw.Stop();
+
+            return new AiResult(
+                Text: sb.ToString(),
+                Provider: p.Name,
+                Model: string.IsNullOrWhiteSpace(p.Model) ? "llama-cpp" : p.Model,
+                LatencyMs: (int)sw.ElapsedMilliseconds,
+                InputTokens: pt,
+                OutputTokens: ctok > 0 ? ctok : chunkCount,
+                PromptVersion: request.PromptVersion);
+        }
+        finally
+        {
+            resp.Dispose();
+        }
+    }
+
+    /// <summary>Reads a llama-server token count preferring the top-level field, falling back to
+    /// the same key under a <c>timings</c> object (present on newer llama-server builds).</summary>
+    private static int ReadTokenCount(JsonElement root, string name)
+    {
+        if (root.TryGetProperty(name, out var v) && v.ValueKind == JsonValueKind.Number) return v.GetInt32();
+        if (root.TryGetProperty("timings", out var timings) && timings.ValueKind == JsonValueKind.Object &&
+            timings.TryGetProperty(name, out var tv) && tv.ValueKind == JsonValueKind.Number) return tv.GetInt32();
+        return 0;
     }
 
     /// <summary>

@@ -1,5 +1,8 @@
+using System.Collections.Concurrent;
+using System.Text;
 using System.Threading.Channels;
 using Microsoft.EntityFrameworkCore;
+using RadioPad.Application.Abstractions;
 using RadioPad.Application.Governance;
 using RadioPad.Application.Services;
 using RadioPad.Domain.Entities;
@@ -33,13 +36,22 @@ public sealed class AiJobCoordinator
     private readonly IAiJobEventBus _bus;
     private readonly ILogger<AiJobCoordinator> _log;
 
+    // AI-013 — per-job streaming publish throttle (contract §3.6). The registry gets EVERY chunk
+    // (poll path); the bus is fed a coalesced subset so a fast stream never floods SSE subscribers.
+    // Entries are added lazily by OnStreamChunk and removed on terminal (flush-then-remove on
+    // success, remove-only on failure/cancel — a cancelled stream's partial text is discarded).
+    private readonly ConcurrentDictionary<Guid, StreamThrottle> _streamThrottle = new();
+    private readonly int _streamPublishMinIntervalMs;
+    private readonly int _streamPublishTokenBatch;
+
     public AiJobCoordinator(
         RadioPadDbContext db,
         AiJobRegistry registry,
         IServiceScopeFactory scopes,
         Channel<AiJobWork> channel,
         IAiJobEventBus bus,
-        ILogger<AiJobCoordinator> log)
+        ILogger<AiJobCoordinator> log,
+        IConfiguration? config = null)
     {
         _db = db;
         _registry = registry;
@@ -47,6 +59,20 @@ public sealed class AiJobCoordinator
         _channel = channel;
         _bus = bus;
         _log = log;
+        _streamPublishMinIntervalMs = config?.GetValue<int?>("AiJobs:StreamPublishMinIntervalMs") ?? 150;
+        _streamPublishTokenBatch = config?.GetValue<int?>("AiJobs:StreamPublishTokenBatch") ?? 20;
+        if (_streamPublishMinIntervalMs < 0) _streamPublishMinIntervalMs = 150;
+        if (_streamPublishTokenBatch < 1) _streamPublishTokenBatch = 20;
+    }
+
+    /// <summary>Mutable, lock-guarded per-job throttle state for the streaming bus publish.</summary>
+    private sealed class StreamThrottle
+    {
+        public readonly object Gate = new();
+        public readonly StringBuilder PendingDelta = new();
+        public long LastPublishTicks;
+        public int LastPublishedTokens;
+        public int LastSeenTokens;
     }
 
     // ── submit / retry / cancel — controller-invoked, request-scoped _db ──────────────────────────
@@ -301,18 +327,31 @@ public sealed class AiJobCoordinator
             _log.LogError(ex, "Async AI job {JobId} (tenant {TenantId}) failed unexpectedly", jobId, work.TenantId);
             await FailAsync(jobId, "Unexpected server error during AI generation.", "server_error");
         }
+        finally
+        {
+            // Drop any leftover streaming throttle state on every terminal path. The success
+            // paths already flushed+removed it via FlushStreamProgress; this is the safety net
+            // for the failure/cancel paths, where the partial text is intentionally discarded.
+            _streamThrottle.TryRemove(jobId, out _);
+        }
     }
+
+    /// <summary>AI-013 — the streaming hooks for a running job: every chunk drives
+    /// <see cref="OnStreamChunk"/>. OnProviderJobCreated stays null until PR-B4 wires it.</summary>
+    private AiRunHooks StreamHooksFor(AiJob row) =>
+        new(new SynchronousProgress<AiStreamChunk>(chunk => OnStreamChunk(row, chunk)), OnProviderJobCreated: null);
 
     private async Task RunAiAsync(
         RadioPadDbContext db, ReportingService reporting, AiJob row,
         Tenant tenant, User user, Report report, string mode, Guid? providerId, CancellationToken ct)
     {
+        var hooks = StreamHooksFor(row);
         object payload;
         if (providerId is { } pid && pid != Guid.Empty)
         {
             var provider = await db.Providers.FirstOrDefaultAsync(p => p.Id == pid && p.TenantId == row.TenantId, ct)
                 ?? throw new InvalidOperationException("provider_not_found");
-            var result = await reporting.RunAsync(tenant, user, report, provider, mode, ct);
+            var result = await reporting.RunAsync(tenant, user, report, provider, mode, ct, hooks);
             payload = new
             {
                 text = result.Text,
@@ -326,7 +365,7 @@ public sealed class AiJobCoordinator
         }
         else
         {
-            var (result, picked) = await reporting.RunAutoAsync(tenant, user, report, mode, ct);
+            var (result, picked) = await reporting.RunAutoAsync(tenant, user, report, mode, ct, hooks);
             payload = new
             {
                 text = result.Text,
@@ -340,6 +379,7 @@ public sealed class AiJobCoordinator
             };
         }
 
+        FlushStreamProgress(row); // emit any buffered partial delta before the terminal event
         _registry.Complete(row.Id, payload); // hot cache first
         await MarkTerminalOkDbAsync(row.Id, System.Text.Json.JsonSerializer.Serialize(payload));
     }
@@ -353,17 +393,18 @@ public sealed class AiJobCoordinator
         // endpoint could not hit this — a disconnect cancelled it). A stale
         // write-back would silently clobber authored medical text.
         var updatedAtAtSubmit = report.UpdatedAt;
+        var hooks = StreamHooksFor(row);
 
         ReportingService.StructuredReportResult result;
         if (providerId is { } pid && pid != Guid.Empty)
         {
             var provider = await db.Providers.FirstOrDefaultAsync(p => p.Id == pid && p.TenantId == row.TenantId, ct)
                 ?? throw new InvalidOperationException("provider_not_found");
-            result = await reporting.GenerateStructuredAsync(tenant, user, report, provider, ct);
+            result = await reporting.GenerateStructuredAsync(tenant, user, report, provider, ct, hooks);
         }
         else
         {
-            (result, _) = await reporting.GenerateStructuredAutoAsync(tenant, user, report, ct);
+            (result, _) = await reporting.GenerateStructuredAutoAsync(tenant, user, report, ct, hooks);
         }
 
         await db.Entry(report).ReloadAsync(ct);
@@ -372,11 +413,77 @@ public sealed class AiJobCoordinator
 
         await ApplyStructuredResultAsync(db, report, user, result, ct);
 
+        FlushStreamProgress(row); // emit any buffered partial delta before the terminal event
+
         // Mirror the pre-existing registry payload for a generate job (the report
         // itself) so the hot-path and DB-fallback poll bodies stay identical. No
         // ResultJson — the report row + its ReportVersion snapshot ARE the result.
         _registry.Complete(row.Id, report);
         await MarkTerminalOkDbAsync(row.Id, resultJson: null); // the report row + its ReportVersion ARE the result
+    }
+
+    // ── streaming (AI-013) ───────────────────────────────────────────────────────────────────────
+
+    /// <summary>
+    /// AI-013 — invoked SYNCHRONOUSLY, in arrival order, for every streamed chunk (via
+    /// <see cref="SynchronousProgress{T}"/>). Always feeds the registry (the poll path sees every
+    /// token); publishes to the bus only when throttled — at least
+    /// <c>AiJobs:StreamPublishMinIntervalMs</c> (default 150 ms) has elapsed OR
+    /// <c>AiJobs:StreamPublishTokenBatch</c> (default 20) new tokens have accumulated — coalescing
+    /// buffered deltas into one <c>partial</c> event. <c>Percent</c> is ALWAYS null (design §3.10:
+    /// n_predict/max_tokens is a ceiling, not a target, so there is no honest ratio).
+    /// </summary>
+    internal void OnStreamChunk(AiJob row, AiStreamChunk chunk)
+    {
+        _registry.UpdateProgress(row.Id, chunk.OutputTokens, percent: null, partialDelta: chunk.Delta);
+
+        var throttle = _streamThrottle.GetOrAdd(row.Id, static _ => new StreamThrottle());
+        bool publish;
+        string? delta = null;
+        lock (throttle.Gate)
+        {
+            throttle.LastSeenTokens = chunk.OutputTokens;
+            if (!string.IsNullOrEmpty(chunk.Delta))
+                throttle.PendingDelta.Append(chunk.Delta);
+
+            var nowTicks = Environment.TickCount64;
+            publish = (nowTicks - throttle.LastPublishTicks) >= _streamPublishMinIntervalMs
+                      || (chunk.OutputTokens - throttle.LastPublishedTokens) >= _streamPublishTokenBatch;
+            if (publish)
+            {
+                delta = throttle.PendingDelta.Length == 0 ? null : throttle.PendingDelta.ToString();
+                throttle.PendingDelta.Clear();
+                throttle.LastPublishTicks = nowTicks;
+                throttle.LastPublishedTokens = chunk.OutputTokens;
+            }
+        }
+
+        if (publish)
+            _bus.PublishProgress(new AiJobProgressEvent(
+                row.Id, row.TenantId, row.UserId, row.ReportId, row.Kind, row.Mode,
+                chunk.OutputTokens, null, delta));
+    }
+
+    /// <summary>
+    /// AI-013 — flushes any partial delta buffered since the last throttled publish as a final
+    /// <c>partial</c> event, then removes the throttle entry. Called immediately before a
+    /// SUCCESSFUL terminal so the last words of the stream are never lost behind the throttle.
+    /// </summary>
+    internal void FlushStreamProgress(AiJob row)
+    {
+        if (!_streamThrottle.TryRemove(row.Id, out var throttle)) return;
+        string? delta;
+        int tokens;
+        lock (throttle.Gate)
+        {
+            delta = throttle.PendingDelta.Length == 0 ? null : throttle.PendingDelta.ToString();
+            throttle.PendingDelta.Clear();
+            tokens = throttle.LastSeenTokens;
+        }
+        if (delta is not null)
+            _bus.PublishProgress(new AiJobProgressEvent(
+                row.Id, row.TenantId, row.UserId, row.ReportId, row.Kind, row.Mode,
+                tokens, null, delta));
     }
 
     // ── shared helpers ───────────────────────────────────────────────────────────────────────────

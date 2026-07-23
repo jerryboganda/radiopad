@@ -3,6 +3,7 @@ using System.Net.Http.Json;
 using System.Text.Json;
 using Microsoft.Extensions.DependencyInjection;
 using RadioPad.Domain.Entities;
+using RadioPad.Domain.Enums;
 using RadioPad.Infrastructure.Persistence;
 using Xunit;
 
@@ -148,6 +149,81 @@ public class AiJobEndpointsTests : IClassFixture<RadioPadAppFactory>
         Assert.Equal(HttpStatusCode.NotFound, resp.StatusCode);
         var doc = await JsonDocument.ParseAsync(await resp.Content.ReadAsStreamAsync());
         Assert.Equal("job_not_found", doc.RootElement.GetProperty("kind").GetString());
+    }
+
+    [Fact]
+    public async Task AiJob_WithMockStreaming_PollExposesProgressThenResult()
+    {
+        // A dedicated "mock-slow" provider spaces its 3 synthetic stream chunks out (60 ms each,
+        // MockAiAdapter) so the async job stays "running" long enough for a poll to observe live
+        // token progress before the terminal result lands. High cost keeps auto-routing from ever
+        // preferring it for the other tests sharing this factory.
+        Guid providerId;
+        using (var scope = _factory.Services.CreateScope())
+        {
+            var db = scope.ServiceProvider.GetRequiredService<RadioPadDbContext>();
+            var provider = new ProviderConfig
+            {
+                TenantId = _factory.SeedTenant.Id,
+                Name = "Mock Slow Stream",
+                Adapter = "mock",
+                Model = "mock-slow",
+                Compliance = ProviderComplianceClass.LocalOnly,
+                Enabled = true,
+                CostPerInputKToken = 999m,
+                CostPerOutputKToken = 999m,
+            };
+            db.Providers.Add(provider);
+            await db.SaveChangesAsync();
+            providerId = provider.Id;
+        }
+
+        using var client = _factory.CreateTenantClient();
+        var reportId = await CreateReportAsync(client);
+
+        var submit = await client.PostAsJsonAsync($"/api/reports/{reportId}/ai/jobs",
+            new { mode = "cleanup", providerId });
+        Assert.Equal(HttpStatusCode.Accepted, submit.StatusCode);
+        using var submitDoc = await JsonDocument.ParseAsync(await submit.Content.ReadAsStreamAsync());
+        var jobId = submitDoc.RootElement.GetProperty("jobId").GetGuid();
+
+        var sawProgress = false;
+        JsonElement terminal = default;
+        var haveTerminal = false;
+        var deadline = DateTime.UtcNow.AddSeconds(20);
+        while (DateTime.UtcNow < deadline)
+        {
+            using var poll = await client.GetAsync($"/api/reports/{reportId}/ai/jobs/{jobId}");
+            using var doc = await JsonDocument.ParseAsync(await poll.Content.ReadAsStreamAsync());
+            var root = doc.RootElement;
+            var status = root.GetProperty("status").GetString();
+
+            if (status == "running"
+                && root.TryGetProperty("progress", out var progress)
+                && progress.TryGetProperty("tokens", out var tokens)
+                && tokens.GetInt32() > 0)
+            {
+                sawProgress = true;
+                // Percent is always null on the streaming path → omitted (WhenWritingNull).
+                Assert.False(progress.TryGetProperty("percent", out _));
+            }
+
+            if (status is "ok" or "error" or "cancelled")
+            {
+                terminal = root.Clone();
+                haveTerminal = true;
+                break;
+            }
+            await Task.Delay(15);
+        }
+
+        Assert.True(sawProgress, "expected to observe streaming progress (tokens > 0) while the job was running");
+        Assert.True(haveTerminal, "job never reached a terminal state within the deadline");
+        Assert.Equal("ok", terminal.GetProperty("status").GetString());
+        // Terminal poll carries the AI result and no longer carries progress.
+        Assert.True(terminal.TryGetProperty("result", out var result));
+        Assert.True(result.TryGetProperty("text", out _));
+        Assert.False(terminal.TryGetProperty("progress", out _));
     }
 
     [Fact]

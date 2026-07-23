@@ -4,6 +4,7 @@ using System.Net.Http.Json;
 using System.Text;
 using System.Text.Json;
 using RadioPad.Application.Abstractions;
+using RadioPad.Application.Providers;
 using RadioPad.Application.Services;
 using RadioPad.Domain.ValueObjects;
 
@@ -23,7 +24,8 @@ public static class OpenAiChatHelpers
         string userPrompt,
         int? maxTokens = null,
         double temperature = AiCompletionRequest.DefaultTemperature,
-        string? outputSchema = null)
+        string? outputSchema = null,
+        bool stream = false)
     {
         var messages = new object[]
         {
@@ -33,10 +35,32 @@ public static class OpenAiChatHelpers
 
         // Iter-0b (AI-015 / RB-005) — when a rulebook binds a JSON Schema and it
         // parses, request structured output. A malformed schema is ignored
-        // (free text) rather than failing the run.
+        // (free text) rather than failing the run. AI-013 — json_schema + streaming
+        // is supported by OpenAI/Azure/vLLM, so the schema branch streams too.
         if (!string.IsNullOrWhiteSpace(outputSchema) &&
             TryParseSchema(outputSchema, out var schemaElement))
         {
+            // stream_options{include_usage:true} makes the server emit a final usage chunk
+            // with real prompt/completion token counts; a server that ignores it simply
+            // yields no usage and the caller falls back to counting chunks.
+            if (stream)
+            {
+                return new
+                {
+                    model,
+                    messages,
+                    temperature,
+                    max_tokens = maxTokens ?? 1024,
+                    stream = true,
+                    stream_options = new { include_usage = true },
+                    response_format = new
+                    {
+                        type = "json_schema",
+                        json_schema = new { name = "radiopad_structured_output", schema = schemaElement, strict = true },
+                    },
+                };
+            }
+
             return new
             {
                 model,
@@ -50,6 +74,19 @@ public static class OpenAiChatHelpers
                     type = "json_schema",
                     json_schema = new { name = "radiopad_structured_output", schema = schemaElement, strict = true },
                 },
+            };
+        }
+
+        if (stream)
+        {
+            return new
+            {
+                model,
+                messages,
+                temperature,
+                max_tokens = maxTokens ?? 1024,
+                stream = true,
+                stream_options = new { include_usage = true },
             };
         }
 
@@ -270,6 +307,95 @@ public static class OpenAiChatHelpers
 
             var (pt, ctok) = ParseUsage(root);
             return (text, pt, ctok, sw.ElapsedMilliseconds);
+        }
+        finally
+        {
+            resp.Dispose();
+        }
+    }
+
+    /// <summary>
+    /// AI-013 — streaming counterpart to <see cref="SendChatAsync"/>. Opens the response with
+    /// <see cref="HttpCompletionOption.ResponseHeadersRead"/>, parses the OpenAI-style SSE
+    /// (<c>choices[0].delta.content</c> pieces, skipping role-only/empty deltas), appends each to
+    /// the running text, and reports it through <paramref name="onStream"/> with a cumulative
+    /// chunk count. Token counts come from the final <c>usage</c> chunk (emitted when the server
+    /// honours <c>stream_options.include_usage</c>); a server that ignores it falls back to the
+    /// chunk count for completion tokens and 0 for prompt tokens. Error mapping is identical to
+    /// <see cref="SendChatAsync"/>; a mid-stream cancellation surfaces as
+    /// <see cref="OperationCanceledException"/>, never a transport error.
+    /// </summary>
+    public static async Task<(string text, int promptTokens, int completionTokens, long elapsedMs)>
+        SendChatStreamingAsync(HttpClient client, string url, object body, string adapterId,
+                               IProgress<AiStreamChunk> onStream, CancellationToken ct)
+    {
+        var sw = Stopwatch.StartNew();
+        HttpResponseMessage resp;
+        try
+        {
+            using var req = new HttpRequestMessage(HttpMethod.Post, url) { Content = JsonContent.Create(body) };
+            resp = await client.SendAsync(req, HttpCompletionOption.ResponseHeadersRead, ct);
+        }
+        catch (HttpRequestException hre)
+        {
+            sw.Stop();
+            throw new ProviderTransportException($"{adapterId}: HTTP transport failure: {hre.Message}", inner: hre);
+        }
+        catch (TaskCanceledException tce) when (!ct.IsCancellationRequested)
+        {
+            sw.Stop();
+            throw new ProviderTransportException($"{adapterId}: request timed out after {sw.ElapsedMilliseconds} ms", inner: tce);
+        }
+
+        try
+        {
+            if (!resp.IsSuccessStatusCode)
+            {
+                var bodyText = await SafeReadAsync(resp, ct);
+                throw new ProviderTransportException(
+                    $"{adapterId}: upstream returned HTTP {(int)resp.StatusCode} ({resp.ReasonPhrase}).",
+                    statusCode: (int)resp.StatusCode,
+                    responseBody: bodyText);
+            }
+
+            using var stream = await resp.Content.ReadAsStreamAsync(ct);
+            var sb = new StringBuilder();
+            var chunkCount = 0;
+            int? usagePrompt = null;
+            int? usageCompletion = null;
+
+            await foreach (var (_, data) in SseStreamReader.ReadAsync(stream, ct))
+            {
+                using var doc = JsonDocument.Parse(data);
+                var root = doc.RootElement;
+
+                // The final usage chunk (stream_options.include_usage) carries real counts.
+                if (root.TryGetProperty("usage", out var usage) && usage.ValueKind == JsonValueKind.Object)
+                {
+                    var (pt, comp) = ParseUsage(root);
+                    if (pt > 0 || comp > 0) { usagePrompt = pt; usageCompletion = comp; }
+                }
+
+                if (root.TryGetProperty("choices", out var choices) &&
+                    choices.ValueKind == JsonValueKind.Array &&
+                    choices.GetArrayLength() > 0 &&
+                    choices[0].TryGetProperty("delta", out var delta) &&
+                    delta.ValueKind == JsonValueKind.Object &&
+                    delta.TryGetProperty("content", out var content) &&
+                    content.ValueKind == JsonValueKind.String)
+                {
+                    var piece = content.GetString() ?? "";
+                    if (piece.Length > 0)
+                    {
+                        sb.Append(piece);
+                        chunkCount++;
+                        onStream.Report(new AiStreamChunk(piece, chunkCount));
+                    }
+                }
+            }
+            sw.Stop();
+
+            return (sb.ToString(), usagePrompt ?? 0, usageCompletion ?? chunkCount, sw.ElapsedMilliseconds);
         }
         finally
         {

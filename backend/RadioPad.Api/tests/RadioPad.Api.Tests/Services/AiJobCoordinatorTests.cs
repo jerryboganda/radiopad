@@ -1,8 +1,11 @@
+using System.Text;
 using System.Threading.Channels;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using RadioPad.Api.Services;
+using RadioPad.Application.Abstractions;
 using RadioPad.Domain.Entities;
 using RadioPad.Infrastructure.Persistence;
 using Xunit;
@@ -31,7 +34,17 @@ public sealed class AiJobCoordinatorTests : IDisposable
     {
         _user.TenantId = _tenant.Id;
 
+        // A very large publish interval isolates the streaming-throttle tests from wall-clock
+        // timing: only the token-batch threshold (default 20) drives a bus publish, so the publish
+        // count is bounded by the token count, never by how long the test loop happens to take.
+        var config = new ConfigurationBuilder().AddInMemoryCollection(new Dictionary<string, string?>
+        {
+            ["AiJobs:StreamPublishMinIntervalMs"] = "3600000",
+            ["AiJobs:StreamPublishTokenBatch"] = "20",
+        }).Build();
+
         var services = new ServiceCollection();
+        services.AddSingleton<IConfiguration>(config);
         services.AddDbContext<RadioPadDbContext>(o => o.UseSqlite($"Data Source={_dbPath}"));
         services.AddSingleton<AiJobRegistry>();
         services.AddSingleton(_channel);
@@ -341,6 +354,80 @@ public sealed class AiJobCoordinatorTests : IDisposable
             Assert.Contains(rows, r => r.Status == "error" && r.ErrorKind == "timeout"); // prior error untouched
             Assert.All(rows.Where(r => r.ErrorKind == "server_restart"), r => Assert.NotNull(r.CompletedAt));
         }
+    }
+
+    private AiJob StreamRow() => new()
+    {
+        TenantId = _tenant.Id, ReportId = Guid.NewGuid(), UserId = _user.Id, Kind = "ai", Mode = "cleanup",
+    };
+
+    [Fact]
+    public void OnStreamChunk_UpdatesRegistryEveryChunk_PublishesThrottled()
+    {
+        var registry = _sp.GetRequiredService<AiJobRegistry>();
+        using var scope = _sp.CreateScope();
+        var coord = Coordinator(scope);
+        var row = StreamRow();
+
+        var expected = new StringBuilder();
+        for (var i = 1; i <= 100; i++)
+        {
+            var delta = $"{i},";
+            expected.Append(delta);
+            coord.OnStreamChunk(row, new AiStreamChunk(delta, i));
+        }
+
+        // Registry sees EVERY chunk (poll path), regardless of bus throttling.
+        var progress = registry.ProgressOf(row.Id);
+        Assert.NotNull(progress);
+        Assert.Equal(100, progress!.Tokens);
+        Assert.Equal(expected.ToString(), progress.PartialText);
+
+        // Bus is throttled: far fewer than 100 publishes.
+        Assert.InRange(_bus.Progress.Count, 1, 50);
+
+        // The final buffered delta is flushed immediately before the terminal event, so no
+        // streamed text is ever lost behind the throttle — the union reconstructs the whole stream.
+        coord.FlushStreamProgress(row);
+        var reconstructed = string.Concat(_bus.Progress
+            .Where(p => p.PartialDelta is not null)
+            .Select(p => p.PartialDelta));
+        Assert.Equal(expected.ToString(), reconstructed);
+    }
+
+    [Fact]
+    public void OnStreamChunk_PercentAlwaysNull()
+    {
+        var registry = _sp.GetRequiredService<AiJobRegistry>();
+        using var scope = _sp.CreateScope();
+        var coord = Coordinator(scope);
+        var row = StreamRow();
+
+        for (var i = 1; i <= 40; i++)
+            coord.OnStreamChunk(row, new AiStreamChunk("x", i));
+        coord.FlushStreamProgress(row);
+
+        Assert.NotEmpty(_bus.Progress);
+        Assert.All(_bus.Progress, e => Assert.Null(e.Percent));
+    }
+
+    [Fact]
+    public void FailoverTokenReset_ClearsPartial()
+    {
+        // A provider-failover retry restarts token counting at ~1; the registry's non-monotonic
+        // rule discards the failed attempt's partial text so only the second attempt survives.
+        var registry = _sp.GetRequiredService<AiJobRegistry>();
+        using var scope = _sp.CreateScope();
+        var coord = Coordinator(scope);
+        var row = StreamRow();
+
+        coord.OnStreamChunk(row, new AiStreamChunk("A", 50)); // first attempt
+        coord.OnStreamChunk(row, new AiStreamChunk("B", 1));  // failover → non-monotonic token → reset
+
+        var progress = registry.ProgressOf(row.Id);
+        Assert.NotNull(progress);
+        Assert.Equal("B", progress!.PartialText);
+        Assert.Equal(1, progress.Tokens);
     }
 
     /// <summary>Fake bus that records what the coordinator publishes, so terminal fan-out

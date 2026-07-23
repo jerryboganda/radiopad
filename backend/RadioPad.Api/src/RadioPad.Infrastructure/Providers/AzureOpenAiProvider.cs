@@ -51,8 +51,11 @@ public sealed class AzureOpenAiProvider : IAiProviderAdapter
         client.DefaultRequestHeaders.Remove("api-key");
         client.DefaultRequestHeaders.Add("api-key", apiKey);
 
-        var body = OpenAiChatHelpers.BuildChatBody(deployment, request.SystemPrompt, request.UserPrompt, temperature: request.Temperature, outputSchema: request.OutputSchema);
-        var (text, pt, ctok, ms) = await OpenAiChatHelpers.SendChatAsync(client, url, body, AdapterId, cancellationToken);
+        var stream = request.OnStream is not null;
+        var body = OpenAiChatHelpers.BuildChatBody(deployment, request.SystemPrompt, request.UserPrompt, temperature: request.Temperature, outputSchema: request.OutputSchema, stream: stream);
+        var (text, pt, ctok, ms) = stream
+            ? await OpenAiChatHelpers.SendChatStreamingAsync(client, url, body, AdapterId, request.OnStream!, cancellationToken)
+            : await OpenAiChatHelpers.SendChatAsync(client, url, body, AdapterId, cancellationToken);
 
         return new AiResult(
             Text: text,
