@@ -95,3 +95,6 @@ frontend/types/
 
 # Local git worktrees (superpowers:using-git-worktrees fallback) — machine-local, never commit.
 .worktrees/
+
+# Subagent-driven-development progress ledger — machine-local scratch, never commit.
+.superpowers/
