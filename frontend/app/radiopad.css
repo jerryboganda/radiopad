@@ -390,6 +390,43 @@
 .rp-genbanner-preview { flex-basis: 100%; width: 100%; margin-top: 6px; }
 .rp-genbanner-dismiss { margin-left: 4px; }
 
+/* AI-013 live token-stream preview (FE-PR4). Wears the AI-blue family — the same
+   --ai tokens as .ai-mark — so it reads as AI content, paired with a reused
+   StatusBadge tone="ai" label + a "Not yet applied" note (never colour-alone).
+   Ephemeral: fed only by jobPartials, never persisted. Both themes free — every
+   value resolves through the RC token aliases (--color-ai-border / --ai-bg /
+   --mono / --text-muted / --text-faint / --radius-sm). NOTE: this component has
+   no animation, so there is nothing for prefers-reduced-motion to disable. */
+.rp-stream-preview {
+  border: 1px dashed var(--color-ai-border);
+  background: var(--ai-bg);
+  border-radius: var(--radius-sm);
+  padding: 8px 10px;
+  margin-top: 8px;
+}
+.rp-stream-preview-head {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-bottom: 6px;
+}
+.rp-stream-preview-note { font-size: 11px; color: var(--text-muted); }
+.rp-stream-preview-tokens {
+  margin-inline-start: auto;
+  font: 500 11px/1.2 var(--mono);
+  color: var(--text-faint);
+}
+.rp-stream-preview-body {
+  font: 400 12.5px/1.5 var(--mono);
+  color: var(--text-muted);
+  white-space: pre-wrap;
+  max-height: 170px;
+  overflow-y: auto;
+}
+.rp-stream-preview-foot { margin: 6px 0 0; font-size: 11px; color: var(--text-faint); }
+.rp-stream-preview-actions { display: flex; gap: 6px; margin-top: 6px; }
+
 /* ----------- /admin/billing dashboard helpers (locked tokens only) ------ */
 .rp-grid-3 { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px; }
 @media (max-width: 760px) {

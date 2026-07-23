@@ -428,6 +428,26 @@ preview with the streamed output. It replaces the old full-surface
 `GenerationOverlay` modal — the wizard no longer traps the user on a spinner;
 generation is submit-and-continue. RC tokens only.
 
+**Live token-stream preview (`.rp-stream-preview`, AI-013).** `AiStreamPreview`
+is the surface that fills the banner's live-output slot and also sits directly
+beneath the impression editor while a hosted `ai` job streams. It wears the
+AI-blue family — the same `--ai` tokens as `.ai-mark` (dashed `--color-ai-border`
+on `--ai-bg`) — with a reused `StatusBadge tone="ai"` "✨ Live preview" label and
+a "Not yet applied" note in `.rp-stream-preview-note`, so the AI meaning never
+rides on colour alone. `.rp-stream-preview-tokens` shows the honest `~N tokens`
+count; `.rp-stream-preview-body` (`--mono`, `pre-wrap`, capped ~9 lines,
+auto-scrolled to the tail) renders the streamed text and is `aria-hidden` — the
+single throttled provider live region already announces progress, so a second
+raw-token region here is deliberately avoided. The streamed text is **ephemeral**:
+it is read only from the off-reducer `jobPartials` store for display and is never
+written to `report` state or persisted — the sanctioned apply paths remain the
+only route AI text reaches the report. A `.rp-stream-preview-actions` footer
+carries Stop (while active, wired to `jobs.cancel`) and Regenerate (terminal
+error/cancelled and retryable, wired to `jobs.retry`); the `variant="local"`
+footnote flags that raw MedGemma output becomes structured sections only on
+completion. No animation, so nothing for `prefers-reduced-motion` to disable. RC
+tokens only.
+
 #### 3.1.1 In-page two-pane primitive (`.split`)
 
 `.split` defaults to `grid-template-columns: minmax(380px, 460px) 1fr` and is

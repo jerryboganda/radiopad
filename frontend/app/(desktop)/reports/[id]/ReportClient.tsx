@@ -6,7 +6,7 @@
 // All data flow, autosave, dictation, cross-check, AI job and validation
 // wiring predates this restyle and is preserved — the redesign only moved
 // the affordances into the RC anatomy.
-import { useEffect, useState, useCallback, useMemo, useRef, type ReactNode } from 'react';
+import { useEffect, useState, useCallback, useMemo, useRef, Fragment, type ReactNode } from 'react';
 import { useRouter } from 'next/navigation';
 import {
   api,
@@ -25,6 +25,8 @@ import {
 import { describeAiError } from '@/lib/aiErrors';
 import { useJobs, useJobsForReport } from '@/components/jobs/JobsProvider';
 import GenerationBanner from '@/components/reports/GenerationBanner';
+import AiStreamPreview from '@/components/reports/AiStreamPreview';
+import { jobPartials } from '@/lib/jobStream';
 import { useToast } from '@/components/ui/ToastProvider';
 import {
   canAutoApplyAiResult,
@@ -463,6 +465,9 @@ export default function ReportPage() {
   function markAppliedJob(jobId: string) {
     appliedJobsRef.current.add(jobId);
     try { jobs.markApplied(jobId); } catch { /* not tracked (deep-link, evicted) */ }
+    // AI-013 — the live-stream preview buffer has been consumed by the apply path;
+    // drop the ephemeral streamed text so it never lingers after the report update.
+    jobPartials.clear(jobId);
   }
 
   /** Apply a single generated impression, wearing `.ai-mark`, with an Undo snapshot. */
@@ -1384,6 +1389,22 @@ export default function ReportPage() {
     (j) => (j.kind === 'generate' || j.kind === 'local-generate') && isActiveStatus(j.status),
   );
 
+  // AI-013 — the active hosted `ai` job whose token stream is previewed beneath the
+  // impression editor. Scoped to modes that actually stream (impression/rewrite —
+  // B3 wires OnStream for the ReportingService.RunAsync/RunAutoAsync path); cleanup
+  // jobs (B5) run via IDictationCleanupService with hooks:null and never populate
+  // jobPartials, so including them here would mount an always-empty preview box.
+  // On `ok` the existing applyJobResult → canAutoApplyAiResult path owns
+  // applying/previewing; the preview unmounts as the job leaves the active set (and
+  // markAppliedJob clears its ephemeral buffer).
+  const streamingAiJob = reportJobs.find(
+    (j) =>
+      j.origin === 'hosted' &&
+      j.kind === 'ai' &&
+      (j.mode === 'impression' || j.mode === 'rewrite') &&
+      isActiveStatus(j.status),
+  );
+
   // AI activity rail: async jobs derived from the tracked list + the sync-only
   // ops (rewrite / cleanup / cross-check) that still log to `aiActivity`.
   const mergedActivity: AiActivityEntry[] = [
@@ -1545,6 +1566,16 @@ export default function ReportPage() {
             <GenerationBanner
               job={generatingJob}
               onDismiss={() => setDismissedGenBanner(generatingJob.id)}
+              onStop={() => { void jobs.cancel(generatingJob.id); }}
+              previewSlot={
+                <AiStreamPreview
+                  jobId={generatingJob.id}
+                  job={generatingJob}
+                  variant={generatingJob.kind === 'local-generate' ? 'local' : 'generate'}
+                  onStop={() => { void jobs.cancel(generatingJob.id); }}
+                  onRegenerate={() => { void jobs.retry(generatingJob.id); }}
+                />
+              }
             />
           )}
 
@@ -1832,8 +1863,8 @@ export default function ReportPage() {
               );
             }
             return (
+              <Fragment key={keyStr}>
               <SectionCard
-                key={keyStr}
                 sectionKey={keyStr}
                 title={SECTION_TITLES[keyStr] ?? label}
                 icon={SECTION_ICONS[keyStr]}
@@ -1912,6 +1943,16 @@ export default function ReportPage() {
                   )}
                 </div>
               </SectionCard>
+              {keyStr === 'impression' && streamingAiJob && (
+                <AiStreamPreview
+                  jobId={streamingAiJob.id}
+                  job={streamingAiJob}
+                  variant="impression"
+                  onStop={() => { void jobs.cancel(streamingAiJob.id); }}
+                  onRegenerate={() => { void jobs.retry(streamingAiJob.id); }}
+                />
+              )}
+              </Fragment>
             );
           })}
         </div>
