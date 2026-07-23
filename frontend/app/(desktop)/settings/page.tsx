@@ -69,172 +69,156 @@ export default function SettingsPage() {
         description="Personal preferences for this device — appearance, dictation, and shortcuts."
       />
 
-      {/* ── Appearance ─────────────────────────────────────────────── */}
-      <div className="rp-panel rp-anim-fade-in-up" style={{ marginBottom: 24 }}>
-        <div className="rp-panel-title">Appearance</div>
-        <p className="rp-page-sub" style={{ marginBottom: 12 }}>
-          Choose how RadioPad looks on this device. System follows your OS setting.
-        </p>
-        <div role="radiogroup" aria-label="Theme" style={{ display: 'flex', gap: 10, flexWrap: 'wrap' }}>
-          {THEME_OPTIONS.map(({ value, label, hint, icon: Icon }) => {
-            const active = themePref === value;
-            return (
-              <label
-                key={value}
-                className={`rp-card${active ? ' bg-accent-soft' : ''}`}
-                style={{
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: 10,
-                  padding: '12px 16px',
-                  cursor: 'pointer',
-                  minWidth: 180,
-                }}
-              >
-                <input
-                  type="radio"
-                  name="theme"
-                  value={value}
-                  checked={active}
-                  onChange={() => chooseTheme(value)}
-                />
-                <Icon size={16} strokeWidth={1.8} aria-hidden className={active ? 'text-accent' : 'text-ink-soft'} />
-                <span>
-                  <span style={{ display: 'block', fontWeight: 600 }}>{label}</span>
-                  <span className="rp-page-sub">{hint}</span>
-                </span>
-              </label>
-            );
-          })}
-        </div>
-      </div>
+      <div style={{ display: 'grid', gridTemplateColumns: 'minmax(0, 1.1fr) minmax(0, 1fr)', gap: 12 }}>
+        {/* ── Appearance ───────────────────────────────────────────── */}
+        <div className="rp-panel rp-anim-fade-in-up" style={{ marginBottom: 0, padding: 12 }}>
+          <div className="rp-panel-title" style={{ marginBottom: 8 }}>Appearance</div>
+          <div role="radiogroup" aria-label="Theme" style={{ display: 'flex', gap: 8 }}>
+            {THEME_OPTIONS.map(({ value, label, hint, icon: Icon }) => {
+              const active = themePref === value;
+              return (
+                <label
+                  key={value}
+                  title={hint}
+                  className={`rp-card${active ? ' bg-accent-soft' : ''}`}
+                  style={{
+                    flexDirection: 'row',
+                    flex: 1,
+                    alignItems: 'center',
+                    gap: 6,
+                    padding: '8px 10px',
+                    cursor: 'pointer',
+                  }}
+                >
+                  <input
+                    type="radio"
+                    name="theme"
+                    value={value}
+                    checked={active}
+                    onChange={() => chooseTheme(value)}
+                  />
+                  <Icon size={14} strokeWidth={1.8} aria-hidden className={active ? 'text-accent' : 'text-ink-soft'} />
+                  <span style={{ fontWeight: 600, fontSize: 13 }}>{label}</span>
+                </label>
+              );
+            })}
+          </div>
 
-      {/* ── Dictation ──────────────────────────────────────────────── */}
-      <div className="rp-panel rp-anim-fade-in-up" style={{ marginBottom: 24 }}>
-        <div className="rp-panel-title">
-          <Mic size={15} strokeWidth={1.8} aria-hidden style={{ verticalAlign: -2, marginRight: 6 }} />
-          Dictation
+          <div className="rp-panel-title" style={{ margin: '14px 0 8px' }}>More settings</div>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+            <Link
+              href="/settings/corrections"
+              className="rp-card"
+              style={{ flexDirection: 'row', alignItems: 'center', gap: 10, padding: '8px 10px', textDecoration: 'none' }}
+            >
+              <SpellCheck size={16} strokeWidth={1.8} aria-hidden className="text-accent" />
+              <span style={{ flex: 1, fontSize: 13, fontWeight: 600 }}>Dictation corrections</span>
+              <ArrowRight size={14} strokeWidth={1.8} aria-hidden className="text-ink-soft" />
+            </Link>
+
+            <Link
+              href="/settings/snippets"
+              className="rp-card"
+              style={{ flexDirection: 'row', alignItems: 'center', gap: 10, padding: '8px 10px', textDecoration: 'none' }}
+            >
+              <Type size={16} strokeWidth={1.8} aria-hidden className="text-accent" />
+              <span style={{ flex: 1, fontSize: 13, fontWeight: 600 }}>Snippets</span>
+              <ArrowRight size={14} strokeWidth={1.8} aria-hidden className="text-ink-soft" />
+            </Link>
+
+            <Link
+              href="/settings/hotkeys"
+              className="rp-card"
+              style={{ flexDirection: 'row', alignItems: 'center', gap: 10, padding: '8px 10px', textDecoration: 'none' }}
+            >
+              <Keyboard size={16} strokeWidth={1.8} aria-hidden className="text-accent" />
+              <span style={{ flex: 1, fontSize: 13, fontWeight: 600 }}>Hotkeys</span>
+              <ArrowRight size={14} strokeWidth={1.8} aria-hidden className="text-ink-soft" />
+            </Link>
+
+            <Link
+              href="/account/security"
+              className="rp-card"
+              style={{ flexDirection: 'row', alignItems: 'center', gap: 10, padding: '8px 10px', textDecoration: 'none' }}
+            >
+              <ShieldCheck size={16} strokeWidth={1.8} aria-hidden className="text-accent" />
+              <span style={{ flex: 1, fontSize: 13, fontWeight: 600 }}>Sign-in &amp; security</span>
+              <ArrowRight size={14} strokeWidth={1.8} aria-hidden className="text-ink-soft" />
+            </Link>
+          </div>
         </div>
 
-        <div className="section-block" style={{ marginBottom: 16 }}>
-          <label htmlFor="stt-mode">On-device engine mode</label>
-          <select
-            id="stt-mode"
-            className="rp-input"
-            style={{ maxWidth: 320 }}
-            value={sttMode}
-            onChange={(e) => setSttMode(e.target.value as SttMode)}
+        {/* ── Dictation ────────────────────────────────────────────── */}
+        <div className="rp-panel rp-anim-fade-in-up" style={{ marginBottom: 0, padding: 12 }}>
+          <div className="rp-panel-title" style={{ marginBottom: 8 }}>
+            <Mic size={14} strokeWidth={1.8} aria-hidden style={{ verticalAlign: -2, marginRight: 6 }} />
+            Dictation
+          </div>
+
+          <div className="section-block" style={{ marginBottom: 10 }}>
+            <label htmlFor="stt-mode">On-device engine mode</label>
+            <select
+              id="stt-mode"
+              className="rp-input"
+              value={sttMode}
+              onChange={(e) => setSttMode(e.target.value as SttMode)}
+            >
+              {STT_MODES.map((m) => (
+                <option key={m} value={m}>
+                  {sttModeLabel(m)}
+                </option>
+              ))}
+            </select>
+            <p className="rp-page-sub" style={{ marginTop: 4 }}>
+              Auto picks the best engine. Ensemble runs Parakeet and Windows Speech together and flags
+              words they disagree on.
+            </p>
+          </div>
+
+          <label style={{ display: 'flex', alignItems: 'flex-start', gap: 8, marginBottom: 8, cursor: 'pointer' }}>
+            <input
+              type="checkbox"
+              checked={crossCheck}
+              onChange={(e) => setCrossCheck(e.target.checked)}
+              style={{ marginTop: 3 }}
+            />
+            <span>
+              <span style={{ display: 'block', fontWeight: 600, fontSize: 13 }}>Show the Cross Check button</span>
+              <span className="rp-page-sub">
+                Keeps the session audio so you can re-run a dictation through the cross-check engines
+                and verify the wording.
+              </span>
+            </span>
+          </label>
+
+          <label
+            style={{
+              display: 'flex',
+              alignItems: 'flex-start',
+              gap: 8,
+              cursor: crossCheck ? 'pointer' : 'not-allowed',
+              opacity: crossCheck ? 1 : 0.55,
+            }}
           >
-            {STT_MODES.map((m) => (
-              <option key={m} value={m}>
-                {sttModeLabel(m)}
-              </option>
-            ))}
-          </select>
-          <p className="rp-page-sub" style={{ marginTop: 6 }}>
-            Auto picks the best engine. Ensemble runs Parakeet and Windows Speech together and flags
-            words they disagree on.
-          </p>
+            <input
+              type="checkbox"
+              checked={useUbag}
+              disabled={!crossCheck}
+              onChange={(e) => setUseUbag(e.target.checked)}
+              style={{ marginTop: 3 }}
+            />
+            <span>
+              <span style={{ display: 'block', fontWeight: 600, fontSize: 13 }}>
+                Route the medical review through UBAG{' '}
+                <Sparkles size={12} strokeWidth={1.8} aria-hidden style={{ verticalAlign: -2 }} className="text-ai" />
+              </span>
+              <span className="rp-page-sub">
+                Sends report text to a cloud AI service, so it stays off unless you opt in. You will be
+                asked to confirm the report contains no patient-identifying information each time.
+              </span>
+            </span>
+          </label>
         </div>
-
-        <label style={{ display: 'flex', alignItems: 'flex-start', gap: 10, marginBottom: 12, cursor: 'pointer' }}>
-          <input
-            type="checkbox"
-            checked={crossCheck}
-            onChange={(e) => setCrossCheck(e.target.checked)}
-            style={{ marginTop: 3 }}
-          />
-          <span>
-            <span style={{ display: 'block', fontWeight: 600 }}>Show the Cross Check button</span>
-            <span className="rp-page-sub">
-              Keeps the session audio so you can re-run a dictation through the cross-check engines
-              and verify the wording.
-            </span>
-          </span>
-        </label>
-
-        <label
-          style={{
-            display: 'flex',
-            alignItems: 'flex-start',
-            gap: 10,
-            cursor: crossCheck ? 'pointer' : 'not-allowed',
-            opacity: crossCheck ? 1 : 0.55,
-          }}
-        >
-          <input
-            type="checkbox"
-            checked={useUbag}
-            disabled={!crossCheck}
-            onChange={(e) => setUseUbag(e.target.checked)}
-            style={{ marginTop: 3 }}
-          />
-          <span>
-            <span style={{ display: 'block', fontWeight: 600 }}>
-              Route the medical review through UBAG{' '}
-              <Sparkles size={13} strokeWidth={1.8} aria-hidden style={{ verticalAlign: -2 }} className="text-ai" />
-            </span>
-            <span className="rp-page-sub">
-              Sends report text to a cloud AI service, so it stays off unless you opt in. You will be
-              asked to confirm the report contains no patient-identifying information each time.
-            </span>
-          </span>
-        </label>
-      </div>
-
-      {/* ── More settings ──────────────────────────────────────────── */}
-      <div className="rp-grid-2 rp-anim-fade-in-up">
-        <Link
-          href="/settings/corrections"
-          className="rp-card"
-          style={{ display: 'flex', alignItems: 'center', gap: 12, textDecoration: 'none' }}
-        >
-          <SpellCheck size={18} strokeWidth={1.8} aria-hidden className="text-accent" />
-          <span style={{ flex: 1 }}>
-            <span style={{ display: 'block', fontWeight: 600 }}>Dictation corrections</span>
-            <span className="rp-page-sub">Your personal spoken-word fixes, applied before formatting.</span>
-          </span>
-          <ArrowRight size={15} strokeWidth={1.8} aria-hidden className="text-ink-soft" />
-        </Link>
-
-        <Link
-          href="/settings/snippets"
-          className="rp-card"
-          style={{ display: 'flex', alignItems: 'center', gap: 12, textDecoration: 'none' }}
-        >
-          <Type size={18} strokeWidth={1.8} aria-hidden className="text-accent" />
-          <span style={{ flex: 1 }}>
-            <span style={{ display: 'block', fontWeight: 600 }}>Snippets</span>
-            <span className="rp-page-sub">Autotext shortcuts with tab-through fill-in fields.</span>
-          </span>
-          <ArrowRight size={15} strokeWidth={1.8} aria-hidden className="text-ink-soft" />
-        </Link>
-
-        <Link
-          href="/settings/hotkeys"
-          className="rp-card"
-          style={{ display: 'flex', alignItems: 'center', gap: 12, textDecoration: 'none' }}
-        >
-          <Keyboard size={18} strokeWidth={1.8} aria-hidden className="text-accent" />
-          <span style={{ flex: 1 }}>
-            <span style={{ display: 'block', fontWeight: 600 }}>Hotkeys</span>
-            <span className="rp-page-sub">Review and customize keyboard shortcuts.</span>
-          </span>
-          <ArrowRight size={15} strokeWidth={1.8} aria-hidden className="text-ink-soft" />
-        </Link>
-
-        <Link
-          href="/account/security"
-          className="rp-card"
-          style={{ display: 'flex', alignItems: 'center', gap: 12, textDecoration: 'none' }}
-        >
-          <ShieldCheck size={18} strokeWidth={1.8} aria-hidden className="text-accent" />
-          <span style={{ flex: 1 }}>
-            <span style={{ display: 'block', fontWeight: 600 }}>Sign-in &amp; security</span>
-            <span className="rp-page-sub">Password, two-factor codes, and biometric sign-in.</span>
-          </span>
-          <ArrowRight size={15} strokeWidth={1.8} aria-hidden className="text-ink-soft" />
-        </Link>
       </div>
     </Container>
   );
