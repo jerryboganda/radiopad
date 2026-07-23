@@ -38,11 +38,28 @@ public class PeerReviewController : TenantedController
 
     private readonly RadioPadDbContext _db;
     private readonly IAuditLog _audit;
+    private readonly INotificationProducer _producer;
+    private readonly ILogger<PeerReviewController> _log;
 
-    public PeerReviewController(RadioPadDbContext db, IAuditLog audit)
+    public PeerReviewController(
+        RadioPadDbContext db, IAuditLog audit, INotificationProducer producer, ILogger<PeerReviewController> log)
     {
         _db = db;
         _audit = audit;
+        _producer = producer;
+        _log = log;
+    }
+
+    private const string PeerReviewLink = "/peer-review";
+
+    /// <summary>
+    /// Runs a notification produce and swallows any failure (logged): a producer error must
+    /// NEVER fail the peer-review request that already committed + audited its state change.
+    /// </summary>
+    private async Task SafeNotifyAsync(string context, Func<Task> produce)
+    {
+        try { await produce(); }
+        catch (Exception ex) { _log.LogWarning(ex, "notification producer failed after {Context}", context); }
     }
 
     // ── Reviewer-facing reads ──────────────────────────────────────────────
@@ -162,6 +179,13 @@ public class PeerReviewController : TenantedController
         await _db.SaveChangesAsync(ct);
         await AuditAssignedAsync(tenant, user, review, ct);
 
+        // NOTIF-001 — the reviewer has a new case in their queue.
+        await SafeNotifyAsync("peer review assigned", () => _producer.CreateAsync(new NotificationDraft(
+            tenant.Id, review.ReviewerUserId, NotificationCategory.PeerReview, NotificationUrgency.Warning,
+            Title: "New peer review assigned", Body: "A signed report was assigned to you for peer review.",
+            LinkHref: PeerReviewLink, SourceKind: "peerReview", SourceId: review.Id,
+            RequiresAck: false, DedupeKey: $"pr-assign:{review.Id}"), ct));
+
         var projected = await ProjectAsync(tenant, user, new[] { review }, ct);
         return Ok(projected[0]);
     }
@@ -243,7 +267,15 @@ public class PeerReviewController : TenantedController
         {
             await _db.SaveChangesAsync(ct);
             foreach (var review in created)
+            {
                 await AuditAssignedAsync(tenant, user, review, ct);
+                // NOTIF-001 — one queue notification per sampled reviewer, deduped by review id.
+                await SafeNotifyAsync("peer review sampled", () => _producer.CreateAsync(new NotificationDraft(
+                    tenant.Id, review.ReviewerUserId, NotificationCategory.PeerReview, NotificationUrgency.Warning,
+                    Title: "New peer review assigned", Body: "A signed report was assigned to you for peer review.",
+                    LinkHref: PeerReviewLink, SourceKind: "peerReview", SourceId: review.Id,
+                    RequiresAck: false, DedupeKey: $"pr-assign:{review.Id}"), ct));
+            }
         }
 
         return Ok(new
@@ -362,6 +394,22 @@ public class PeerReviewController : TenantedController
             }),
         }, ct);
 
+        // NOTIF-001 — the original author has feedback to read. A discrepancy (score 2..4) is a
+        // Warning; a concur is Info. BLINDING (PR-002): while `review.Blinded` is set the author
+        // must not learn who reviewed them, so the author-facing Title/Body are wholly generic
+        // and NEVER carry the reviewer's name/email/id. Only the always-safe generic body is used
+        // while blinded; a reviewer descriptor is admissible ONLY once the review is unblinded.
+        // Proven by PeerReviewSubmit_Blinded_NoReviewerIdentityInTitleOrBody.
+        var submitBody = review.Blinded
+            ? "A peer review of your report was completed."
+            : "A completed peer review is ready for you to read.";
+        await SafeNotifyAsync("peer review submitted", () => _producer.CreateAsync(new NotificationDraft(
+            tenant.Id, review.OriginalAuthorUserId, NotificationCategory.PeerReview,
+            review.IsDiscrepancy ? NotificationUrgency.Warning : NotificationUrgency.Info,
+            Title: "Peer review completed", Body: submitBody,
+            LinkHref: PeerReviewLink, SourceKind: "peerReview", SourceId: review.Id,
+            RequiresAck: false, DedupeKey: $"pr-submit:{review.Id}"), ct));
+
         var projected = await ProjectAsync(tenant, user, new[] { review }, ct);
         return Ok(projected[0]);
     }
@@ -410,6 +458,20 @@ public class PeerReviewController : TenantedController
                 score = review.Score.ToString(),
             }),
         }, ct);
+
+        // NOTIF-001 — the reviewer whose score is contested, plus the programme managers who
+        // adjudicate (excluding the disputing author). No reviewer/author identity in the body.
+        await SafeNotifyAsync("peer review disputed (reviewer)", () => _producer.CreateAsync(new NotificationDraft(
+            tenant.Id, review.ReviewerUserId, NotificationCategory.PeerReview, NotificationUrgency.Warning,
+            Title: "Peer review disputed", Body: "A peer review you scored has been disputed.",
+            LinkHref: PeerReviewLink, SourceKind: "peerReview", SourceId: review.Id,
+            RequiresAck: false, DedupeKey: $"pr-dispute:{review.Id}"), ct));
+        await SafeNotifyAsync("peer review disputed (managers)", () => _producer.NotifyPermissionHoldersAsync(
+            tenant.Id, RbacPermission.PeerReviewManage, excludeUserId: user.Id,
+            uid => new NotificationDraft(
+                tenant.Id, uid, NotificationCategory.PeerReview, NotificationUrgency.Warning,
+                "Peer review disputed", "A completed peer review has been disputed.", PeerReviewLink,
+                "peerReview", review.Id, RequiresAck: false, DedupeKey: $"pr-dispute:{review.Id}"), ct));
 
         var projected = await ProjectAsync(tenant, user, new[] { review }, ct);
         return Ok(projected[0]);

@@ -1,6 +1,8 @@
 using System.Collections.Concurrent;
 using System.Text.Json;
+using Hangfire;
 using Microsoft.EntityFrameworkCore;
+using RadioPad.Api.Jobs;
 using RadioPad.Application.Abstractions;
 using RadioPad.Application.Security;
 using RadioPad.Domain.Entities;
@@ -180,6 +182,24 @@ public sealed class NotificationProducer : INotificationProducer, IHostedService
         }
     }
 
+    public async Task NotifyRoleAcrossTenantsAsync(
+        UserRole role, Func<Guid, Guid, NotificationDraft> draftFor, CancellationToken ct)
+    {
+        List<(Guid TenantId, Guid UserId)> recipients;
+        using (var scope = _scopeFactory.CreateScope())
+        {
+            var db = scope.ServiceProvider.GetRequiredService<RadioPadDbContext>();
+            var rows = await db.Users
+                .Where(u => u.IsActive && u.Role == role)
+                .Select(u => new { u.TenantId, u.Id })
+                .ToListAsync(CancellationToken.None);
+            recipients = rows.Select(r => (r.TenantId, r.Id)).ToList();
+        }
+
+        foreach (var (tenantId, userId) in recipients)
+            await CreateAsync(draftFor(tenantId, userId), ct);
+    }
+
     // ---- write path -------------------------------------------------------
 
     private async Task<Notification?> InsertAsync(NotificationDraft draft, CancellationToken ct)
@@ -268,6 +288,32 @@ public sealed class NotificationProducer : INotificationProducer, IHostedService
         }, writeCt);
 
         _bus.PublishNotification(new NotificationEvent(draft.TenantId, draft.UserId, NotificationView.Of(notification)));
+
+        // NOTIF-003/004 — out-of-app channel dispatch (push + email) is Critical-urgency
+        // ONLY, and runs on the Hangfire "critical" queue so a slow/failed sender never
+        // blocks the produce or the SSE. IBackgroundJobClient is resolved optionally: under
+        // Testing (no Hangfire) it is null and this is a no-op, exactly like the
+        // WebhookEnqueueingAuditLog decorator. Each delivery re-checks the recipient's
+        // NotificationPreference (PushEnabled/EmailEnabled) before sending. Never throws:
+        // an enqueue failure must not fail an already-persisted notification.
+        if (notification.Urgency == NotificationUrgency.Critical)
+        {
+            try
+            {
+                var jobs = scope.ServiceProvider.GetService<IBackgroundJobClient>();
+                if (jobs is not null)
+                {
+                    var id = notification.Id;
+                    jobs.Enqueue<NotificationChannelDispatchJob>(j => j.DeliverPushAsync(id, CancellationToken.None));
+                    jobs.Enqueue<NotificationChannelDispatchJob>(j => j.DeliverEmailAsync(id, CancellationToken.None));
+                }
+            }
+            catch (Exception ex)
+            {
+                _log.LogWarning(ex, "failed to enqueue notification channel dispatch for {NotificationId}", notification.Id);
+            }
+        }
+
         return notification;
     }
 

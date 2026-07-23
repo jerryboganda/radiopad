@@ -18,13 +18,43 @@ public class RulebooksController : TenantedController
     private readonly IRulebookStore _store;
     private readonly IAuditLog _audit;
     private readonly ReportValidator _validator;
+    private readonly INotificationProducer _producer;
+    private readonly ILogger<RulebooksController> _log;
 
-    public RulebooksController(RadioPadDbContext db, IRulebookStore store, IAuditLog audit, ReportValidator validator)
+    public RulebooksController(
+        RadioPadDbContext db, IRulebookStore store, IAuditLog audit, ReportValidator validator,
+        INotificationProducer producer, ILogger<RulebooksController> log)
     {
         _db = db;
         _store = store;
         _audit = audit;
         _validator = validator;
+        _producer = producer;
+        _log = log;
+    }
+
+    /// <summary>
+    /// Fans a RulebookApproval/Info notification to every RulebooksManage holder (excluding the
+    /// acting user). Wrapped + logged so a producer failure never fails the rulebook transition.
+    /// Rulebook.Owner is a free-text string, not a resolvable user — so only permission holders
+    /// are notified, never the "owner".
+    /// </summary>
+    private async Task NotifyRulebookManagersAsync(
+        Guid tenantId, Guid actorUserId, Guid rulebookRowId, string title, string dedupeKey, CancellationToken ct)
+    {
+        try
+        {
+            await _producer.NotifyPermissionHoldersAsync(
+                tenantId, RbacPermission.RulebooksManage, excludeUserId: actorUserId,
+                uid => new NotificationDraft(
+                    tenantId, uid, NotificationCategory.RulebookApproval, NotificationUrgency.Info,
+                    title, "A validation rulebook changed status.", "/rulebooks",
+                    "rulebook", rulebookRowId, RequiresAck: false, DedupeKey: dedupeKey), ct);
+        }
+        catch (Exception ex)
+        {
+            _log.LogWarning(ex, "rulebook manager notification fan-out failed for {RulebookRowId}", rulebookRowId);
+        }
     }
 
     [HttpGet]
@@ -143,6 +173,7 @@ public class RulebooksController : TenantedController
             Action = AuditAction.RulebookApproved,
             DetailsJson = System.Text.Json.JsonSerializer.Serialize(new { rb.Id, rb.RulebookId, rb.Version }),
         }, ct);
+        await NotifyRulebookManagersAsync(tenant.Id, user.Id, rb.Id, "Rulebook approved", $"rb-approve:{rb.Id}", ct);
         return Ok(rb);
     }
 
@@ -164,6 +195,7 @@ public class RulebooksController : TenantedController
             Action = AuditAction.RulebookDeprecated,
             DetailsJson = System.Text.Json.JsonSerializer.Serialize(new { rb.Id, rb.RulebookId, rb.Version }),
         }, ct);
+        await NotifyRulebookManagersAsync(tenant.Id, user.Id, rb.Id, "Rulebook deprecated", $"rb-deprecate:{rb.Id}", ct);
         return Ok(rb);
     }
 
@@ -219,6 +251,7 @@ public class RulebooksController : TenantedController
                 newVersion = copy.Version,
             }),
         }, ct);
+        await NotifyRulebookManagersAsync(tenant.Id, user.Id, copy.Id, "Rulebook rolled back", $"rb-rollback:{copy.Id}", ct);
         return Ok(copy);
     }
 }

@@ -16,7 +16,21 @@ public class TemplatesController : TenantedController
 {
     private readonly RadioPadDbContext _db;
     private readonly IAuditLog _audit;
-    public TemplatesController(RadioPadDbContext db, IAuditLog audit) { _db = db; _audit = audit; }
+    private readonly INotificationProducer _producer;
+    private readonly ILogger<TemplatesController> _log;
+    public TemplatesController(
+        RadioPadDbContext db, IAuditLog audit, INotificationProducer producer, ILogger<TemplatesController> log)
+    { _db = db; _audit = audit; _producer = producer; _log = log; }
+
+    /// <summary>
+    /// Runs a notification produce and swallows any failure (logged): a producer error must
+    /// NEVER fail the template request that already committed + audited its state change.
+    /// </summary>
+    private async Task SafeNotifyAsync(string context, Func<Task> produce)
+    {
+        try { await produce(); }
+        catch (Exception ex) { _log.LogWarning(ex, "notification producer failed after {Context}", context); }
+    }
 
     [HttpGet]
     public async Task<IActionResult> List(CancellationToken ct)
@@ -90,6 +104,33 @@ public class TemplatesController : TenantedController
                 variant = t.Variant.ToString(),
             }),
         }, ct);
+
+        // NOTIF-001 — tell whoever submitted this template for review that it was approved. The
+        // submitter is recovered from the most recent TemplateSubmittedForReview audit row for
+        // this template (matched on the row-id guid embedded in DetailsJson). If none is found
+        // (e.g. it was approved without a prior review submission) we fall back to the
+        // TemplatesManage holders so the approval is still surfaced somewhere.
+        var rowIdString = t.Id.ToString();
+        var submitterId = await _db.AuditEvents.AsNoTracking()
+            .Where(a => a.TenantId == tenant.Id
+                        && a.Action == AuditAction.TemplateSubmittedForReview
+                        && a.DetailsJson.Contains(rowIdString))
+            .OrderByDescending(a => a.CreatedAt)
+            .Select(a => a.UserId)
+            .FirstOrDefaultAsync(ct);
+        if (submitterId is Guid sid)
+            await SafeNotifyAsync("template approved (submitter)", () => _producer.CreateAsync(new NotificationDraft(
+                tenant.Id, sid, NotificationCategory.TemplateApproval, NotificationUrgency.Info,
+                Title: "Template approved", Body: "A template you submitted for review was approved.",
+                LinkHref: "/templates", SourceKind: "template", SourceId: t.Id,
+                RequiresAck: false, DedupeKey: $"tmpl-approve:{t.Id}"), ct));
+        else
+            await SafeNotifyAsync("template approved (managers)", () => _producer.NotifyPermissionHoldersAsync(
+                tenant.Id, RbacPermission.TemplatesManage, excludeUserId: user.Id,
+                uid => new NotificationDraft(
+                    tenant.Id, uid, NotificationCategory.TemplateApproval, NotificationUrgency.Info,
+                    "Template approved", "A report template was approved.", "/templates",
+                    "template", t.Id, RequiresAck: false, DedupeKey: $"tmpl-approve:{t.Id}"), ct));
         return Ok(t);
     }
 
@@ -118,6 +159,14 @@ public class TemplatesController : TenantedController
             Action = AuditAction.TemplateSubmittedForReview,
             DetailsJson = System.Text.Json.JsonSerializer.Serialize(new { templateId = t.TemplateId, rowId = t.Id }),
         }, ct);
+
+        // NOTIF-001 — a template is waiting on the approvers (excluding the submitter).
+        await SafeNotifyAsync("template submitted for review", () => _producer.NotifyPermissionHoldersAsync(
+            tenant.Id, RbacPermission.TemplatesApprove, excludeUserId: user.Id,
+            uid => new NotificationDraft(
+                tenant.Id, uid, NotificationCategory.TemplateApproval, NotificationUrgency.Info,
+                "Template submitted for review", "A report template is waiting for your review.", "/templates",
+                "template", t.Id, RequiresAck: false, DedupeKey: $"tmpl-submit:{t.Id}"), ct));
         return Ok(t);
     }
 

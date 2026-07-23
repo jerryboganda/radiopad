@@ -428,6 +428,10 @@ builder.Services.AddSingleton<RadioPad.Api.Jobs.AuditExportRollupJob>();
 builder.Services.AddSingleton<RadioPad.Api.Jobs.WebhookDispatchJob>();
 builder.Services.AddSingleton<RadioPad.Api.Jobs.AiCostRollupJob>();
 builder.Services.AddSingleton<RadioPad.Api.Jobs.OrphanedDraftCleanupJob>();
+// PR-N4 — notification channel dispatch (push + email). Enqueue-only on the critical
+// queue by NotificationProducer for Critical-urgency notifications; a singleton for the
+// same reason as the others (holds only IServiceScopeFactory + logger, own scope per run).
+builder.Services.AddSingleton<RadioPad.Api.Jobs.NotificationChannelDispatchJob>();
 
 // Async AI generation jobs (durable job platform). The unbounded channel is the
 // hand-off between the request-scoped coordinator (writer) and the hosted runner

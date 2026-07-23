@@ -839,6 +839,33 @@ and both failed with a message blaming a missing download — so prefer an hones
 
 ---
 
+### 4.12 Notifications — channels & PHI tiers (NOTIF-004)
+
+RadioPad delivers one notification across several surfaces, and each surface has a **strict PHI
+ceiling** — never let a title/body beyond its tier leak:
+
+| Surface | Title | Body |
+| --- | --- | --- |
+| **In-app** inbox row / SSE (authed, audited) | in-app headline | may carry modality / body-part / `FindingSummary`-class descriptor |
+| **OS toast / mobile push / email** | generic category phrase | AT MOST modality + body-part — **never** the FindingSummary, accession, patient name, or MRN |
+| **Webhook** | — | ids + category only, no title/body |
+
+Urgency colour follows the validation map (Info→blue, Warning→amber, Critical→red) and is always
+paired with a text label, never hue-only. The desktop OS toast (`ShellBridge.tsx`) reuses the
+job-terminal away-gate + permission flow and builds its body from the PHI-min tier
+(`notificationToastBody`).
+
+**Desktop toast click-through is a documented platform limitation, not a deferral.**
+tauri-plugin-notification v2's Actions / click-activation API is **mobile-only** (iOS/Android) —
+Windows desktop exposes no click callback, so clicking a toast only performs the OS-default window
+activation (verified against `v2.tauri.app/plugin/notification`, 2026-07-23). Fallback is focus +
+bell: on window focus / `visibilitychange`→visible after any toast, the notifications provider
+refreshes the unread-count so the bell badge is accurate, and the toast's `LinkHref` target is one
+bell-click away. Backend delivery mechanics live in
+[queues-jobs.md](../03-architecture/queues-jobs.md#notification-channels-pr-n4).
+
+---
+
 ## 5. Iconography
 
 Use inline SVG only (lucide-react or bespoke 1.5px-stroke icons inheriting

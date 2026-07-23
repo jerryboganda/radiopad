@@ -103,6 +103,49 @@ public sealed class CriticalResultEscalationJob
                 c.TenantId, c.Id, c.Criticality, c.DueAt);
         }
 
+        // NOTIF-001 (PR-N4) — ring the author + the tenant's critical-results managers for each
+        // just-escalated row. DedupeKey `crit-esc:{id}` is idempotent across sweep re-runs AND
+        // shared with the manual escalate path, so a result escalated more than once notifies at
+        // most once per recipient. A producer failure must never fail the sweep — wrapped + logged.
+        var producer = scope.ServiceProvider.GetService<INotificationProducer>();
+        if (producer is not null)
+        {
+            var reportIds = overdue.Select(c => c.ReportId).Distinct().ToList();
+            var authorByReport = await db.Reports
+                .Where(r => reportIds.Contains(r.Id))
+                .Select(r => new { r.Id, r.TenantId, r.CreatedByUserId })
+                .ToListAsync(ct);
+
+            foreach (var c in overdue)
+            {
+                var authorId = authorByReport
+                    .FirstOrDefault(r => r.Id == c.ReportId && r.TenantId == c.TenantId)?.CreatedByUserId;
+                var dedupe = $"crit-esc:{c.Id}";
+                var href = $"/reports/view?id={c.ReportId}";
+                try
+                {
+                    if (authorId is Guid aid)
+                        await producer.CreateAsync(new NotificationDraft(
+                            c.TenantId, aid, NotificationCategory.CriticalResult, NotificationUrgency.Critical,
+                            Title: "Critical result escalated", Body: c.FindingSummary,
+                            LinkHref: href, SourceKind: "criticalResult", SourceId: c.Id,
+                            RequiresAck: true, DedupeKey: dedupe), ct);
+
+                    await producer.NotifyPermissionHoldersAsync(
+                        c.TenantId, RbacPermission.CriticalResultsManage, excludeUserId: null,
+                        uid => new NotificationDraft(
+                            c.TenantId, uid, NotificationCategory.CriticalResult, NotificationUrgency.Critical,
+                            "Critical result escalated", c.FindingSummary, href,
+                            "criticalResult", c.Id, RequiresAck: true, DedupeKey: dedupe), ct);
+                }
+                catch (Exception ex)
+                {
+                    _log.LogWarning(ex,
+                        "notification fan-out failed for escalated critical result {CriticalResultId}", c.Id);
+                }
+            }
+        }
+
         return overdue.Count;
     }
 }

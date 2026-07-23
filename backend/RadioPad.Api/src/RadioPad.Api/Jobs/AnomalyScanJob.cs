@@ -39,9 +39,12 @@ public sealed class AnomalyScanJob
     private readonly IServiceScopeFactory _scopeFactory;
     private readonly ILogger<AnomalyScanJob> _log;
     private readonly IHttpClientFactory _http;
+    private readonly INotificationProducer _producer;
 
-    public AnomalyScanJob(IServiceScopeFactory scopeFactory, ILogger<AnomalyScanJob> log, IHttpClientFactory http)
-    { _scopeFactory = scopeFactory; _log = log; _http = http; }
+    public AnomalyScanJob(
+        IServiceScopeFactory scopeFactory, ILogger<AnomalyScanJob> log, IHttpClientFactory http,
+        INotificationProducer producer)
+    { _scopeFactory = scopeFactory; _log = log; _http = http; _producer = producer; }
 
     /// <summary>
     /// Hangfire recurring entry point. Delegates to <see cref="ScanOnceAsync"/>;
@@ -232,6 +235,24 @@ public sealed class AnomalyScanJob
             DetailsJson = detailsJson,
         }, ct);
         _log.Log(level, "Anomaly detected: tenant={TenantId} kind={Kind} action={Action}", tenantId, kind, action);
+
+        // NOTIF-001 (PR-N4) — surface the anomaly in-app to the tenant's SecurityManage holders.
+        // Deduped per (tenant, kind, hour) so a persistent burst across minute passes does not
+        // spam the inbox. A producer failure must never fail the scan — wrapped + logged.
+        try
+        {
+            await _producer.NotifyPermissionHoldersAsync(
+                tenantId, RbacPermission.SecurityManage, excludeUserId: null,
+                uid => new NotificationDraft(
+                    tenantId, uid, NotificationCategory.System, NotificationUrgency.Warning,
+                    "Security anomaly detected", "A security anomaly was detected and needs review.",
+                    "/admin/security", "system", null, RequiresAck: false,
+                    DedupeKey: $"anomaly:{tenantId:N}:{kind}:{DateTimeOffset.UtcNow:yyyyMMddHH}"), ct);
+        }
+        catch (Exception ex)
+        {
+            _log.LogWarning(ex, "anomaly notification fan-out failed for tenant {TenantId} kind {Kind}", tenantId, kind);
+        }
 
         var url = Environment.GetEnvironmentVariable("RADIOPAD_SECURITY_WEBHOOK_URL")
             ?? Environment.GetEnvironmentVariable("RADIOPAD_ANOMALY_WEBHOOK_URL");

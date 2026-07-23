@@ -1,6 +1,7 @@
 using System.Collections.Concurrent;
 using Microsoft.Extensions.Logging;
 using RadioPad.Application.Abstractions;
+using RadioPad.Domain.Enums;
 
 namespace RadioPad.Infrastructure.Providers.Ubag;
 
@@ -22,15 +23,21 @@ public sealed class UbagOperatorAlertService
 
     private readonly IEmailSender _email;
     private readonly ILogger<UbagOperatorAlertService> _log;
+    private readonly INotificationProducer? _producer;
     private readonly ConcurrentDictionary<string, DateTimeOffset> _loggedOutSince = new(StringComparer.OrdinalIgnoreCase);
     private readonly ConcurrentDictionary<string, DateTimeOffset> _lastEmailByTarget = new(StringComparer.OrdinalIgnoreCase);
     private DateTimeOffset? _gatewayUnreachableSince;
     private DateTimeOffset _lastUnreachableWarn = DateTimeOffset.MinValue;
 
-    public UbagOperatorAlertService(IEmailSender email, ILogger<UbagOperatorAlertService> log)
+    // NOTIF-001 (PR-N4): the in-app producer is OPTIONAL so the existing unit tests that
+    // `new UbagOperatorAlertService(email, log)` keep compiling and stay notification-free; DI
+    // (AddSingleton) supplies the real producer, adding the ItAdmin in-app fan-out.
+    public UbagOperatorAlertService(
+        IEmailSender email, ILogger<UbagOperatorAlertService> log, INotificationProducer? producer = null)
     {
         _email = email;
         _log = log;
+        _producer = producer;
     }
 
     /// <summary>Targets currently logged out, with when the sweep first saw it.</summary>
@@ -154,6 +161,29 @@ public sealed class UbagOperatorAlertService
         if (now - last < EmailThrottle) return;
         if (!_lastEmailByTarget.TryAdd(targetId, now) && !_lastEmailByTarget.TryUpdate(targetId, now, last))
             return; // another sweep won the race — its email suffices
+
+        // NOTIF-001 (PR-N4) — mirror the operator email as an in-app System/Warning to every
+        // ItAdmin across all tenants (a shared-gateway outage affects them all). Tenant-less by
+        // nature, so it uses the platform-scoped fan-out rather than a tenant NotifyPermissionHolders.
+        // Deduped per target per day, matching the once-per-day email cadence. Fired regardless of
+        // whether the operator email env var is set. Never breaks the sweep — wrapped + logged.
+        if (_producer is not null)
+        {
+            try
+            {
+                await _producer.NotifyRoleAcrossTenantsAsync(
+                    UserRole.ItAdmin,
+                    (tenantId, userId) => new NotificationDraft(
+                        tenantId, userId, NotificationCategory.System, NotificationUrgency.Warning,
+                        subject.Replace("[RadioPad] ", ""), "Open the UBAG admin page to resolve.",
+                        "/admin/ubag", "system", null, RequiresAck: false,
+                        DedupeKey: $"ubag:{targetId}:{now:yyyyMMdd}"), ct);
+            }
+            catch (Exception ex)
+            {
+                _log.LogWarning(ex, "UBAG operator in-app notification fan-out failed for target {Target}", targetId);
+            }
+        }
 
         var to = Environment.GetEnvironmentVariable(OperatorEmailEnvVar);
         if (string.IsNullOrWhiteSpace(to))

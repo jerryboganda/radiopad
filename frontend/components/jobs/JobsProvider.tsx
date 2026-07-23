@@ -203,7 +203,7 @@ export default function JobsProvider({ children }: { children: ReactNode }) {
         notify({ title: `${label} cancelled`, detail: descriptor, tone: 'info' });
         setAnnouncement(`${label} cancelled.`);
       }
-      // PHI-minimised event for the later Tauri OS-notification listener
+      // PHI-minimised event (NOTIF-004) for the later Tauri OS-notification listener
       // (Phase 7): modality/bodyPart/kind only — never accession or identifiers.
       if (typeof window !== 'undefined') {
         window.dispatchEvent(

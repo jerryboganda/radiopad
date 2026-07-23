@@ -31,11 +31,16 @@ public class CriticalResultsController : TenantedController
 {
     private readonly RadioPadDbContext _db;
     private readonly IAuditLog _audit;
+    private readonly INotificationProducer _producer;
+    private readonly ILogger<CriticalResultsController> _log;
 
-    public CriticalResultsController(RadioPadDbContext db, IAuditLog audit)
+    public CriticalResultsController(
+        RadioPadDbContext db, IAuditLog audit, INotificationProducer producer, ILogger<CriticalResultsController> log)
     {
         _db = db;
         _audit = audit;
+        _producer = producer;
+        _log = log;
     }
 
     public record CreateCriticalResultDto(
@@ -200,9 +205,12 @@ public class CriticalResultsController : TenantedController
 
         // Tenant isolation: the report must belong to the resolved tenant. A report
         // id from another tenant is indistinguishable from one that does not exist.
-        var reportExists = await _db.Reports
-            .AnyAsync(r => r.TenantId == tenant.Id && r.Id == dto.ReportId, ct);
-        if (!reportExists)
+        // Fetch the author in the same round-trip so we can notify them below.
+        var authorId = await _db.Reports
+            .Where(r => r.TenantId == tenant.Id && r.Id == dto.ReportId)
+            .Select(r => (Guid?)r.CreatedByUserId)
+            .FirstOrDefaultAsync(ct);
+        if (authorId is null)
             return NotFound(new { error = "Report not found.", kind = "report_not_found" });
 
         var now = DateTimeOffset.UtcNow;
@@ -230,6 +238,16 @@ public class CriticalResultsController : TenantedController
             criticality = entity.Criticality.ToString(),
             dueAt = entity.DueAt,
         }, ct);
+
+        // NOTIF-001 — tell the report author (skip self-logging). Critical + RequiresAck so it
+        // sits at the top of the inbox until they close the loop. In-app Body may carry the
+        // FindingSummary (authed tier); push/email strip it (NotificationChannelDispatchJob).
+        if (authorId.Value != user.Id)
+            await SafeNotifyAsync("critical result created", () => _producer.CreateAsync(new NotificationDraft(
+                tenant.Id, authorId.Value, NotificationCategory.CriticalResult, NotificationUrgency.Critical,
+                Title: "Critical result on your report", Body: entity.FindingSummary,
+                LinkHref: ReportHref(entity.ReportId), SourceKind: "criticalResult", SourceId: entity.Id,
+                RequiresAck: true, DedupeKey: $"crit-create:{entity.Id}"), ct));
 
         return Ok(ToDto(entity, now));
     }
@@ -311,6 +329,15 @@ public class CriticalResultsController : TenantedController
             acknowledgedBy = entity.AcknowledgedBy,
         }, ct);
 
+        // NOTIF-001 — close the loop for the author (Info, no ack needed).
+        var ackAuthorId = await ReportAuthorAsync(tenant.Id, entity.ReportId, ct);
+        if (ackAuthorId is Guid ackAid && ackAid != user.Id)
+            await SafeNotifyAsync("critical result acknowledged", () => _producer.CreateAsync(new NotificationDraft(
+                tenant.Id, ackAid, NotificationCategory.CriticalResult, NotificationUrgency.Info,
+                Title: "Critical result acknowledged", Body: entity.FindingSummary,
+                LinkHref: ReportHref(entity.ReportId), SourceKind: "criticalResult", SourceId: entity.Id,
+                RequiresAck: false, DedupeKey: $"crit-ack:{entity.Id}"), ct));
+
         return Ok(ToDto(entity, now));
     }
 
@@ -342,6 +369,23 @@ public class CriticalResultsController : TenantedController
             reason = "manual",
             dueAt = entity.DueAt,
         }, ct);
+
+        // NOTIF-001 — escalate rings the author AND the critical-results managers (excluding the
+        // actor). DedupeKey `crit-esc:{id}` is shared with the overdue sweep so a manual escalate
+        // and a sweep escalation of the same result never double-fire.
+        var escAuthorId = await ReportAuthorAsync(tenant.Id, entity.ReportId, ct);
+        if (escAuthorId is Guid escAid && escAid != user.Id)
+            await SafeNotifyAsync("critical result escalated (author)", () => _producer.CreateAsync(new NotificationDraft(
+                tenant.Id, escAid, NotificationCategory.CriticalResult, NotificationUrgency.Critical,
+                Title: "Critical result escalated", Body: entity.FindingSummary,
+                LinkHref: ReportHref(entity.ReportId), SourceKind: "criticalResult", SourceId: entity.Id,
+                RequiresAck: true, DedupeKey: $"crit-esc:{entity.Id}"), ct));
+        await SafeNotifyAsync("critical result escalated (managers)", () => _producer.NotifyPermissionHoldersAsync(
+            tenant.Id, RbacPermission.CriticalResultsManage, excludeUserId: user.Id,
+            uid => new NotificationDraft(
+                tenant.Id, uid, NotificationCategory.CriticalResult, NotificationUrgency.Critical,
+                "Critical result escalated", entity.FindingSummary, ReportHref(entity.ReportId),
+                "criticalResult", entity.Id, RequiresAck: true, DedupeKey: $"crit-esc:{entity.Id}"), ct));
 
         return Ok(ToDto(entity, now));
     }
@@ -379,6 +423,23 @@ public class CriticalResultsController : TenantedController
 
     private Task<CriticalResult?> FindInTenantAsync(Guid tenantId, Guid id, CancellationToken ct) =>
         _db.CriticalResults.FirstOrDefaultAsync(c => c.TenantId == tenantId && c.Id == id, ct);
+
+    private static string ReportHref(Guid reportId) => $"/reports/view?id={reportId}";
+
+    private async Task<Guid?> ReportAuthorAsync(Guid tenantId, Guid reportId, CancellationToken ct) =>
+        await _db.Reports.Where(r => r.TenantId == tenantId && r.Id == reportId)
+            .Select(r => (Guid?)r.CreatedByUserId)
+            .FirstOrDefaultAsync(ct);
+
+    /// <summary>
+    /// Runs a notification produce and swallows any failure (logged): a producer error must
+    /// NEVER fail the workflow request that already committed + audited its state change.
+    /// </summary>
+    private async Task SafeNotifyAsync(string context, Func<Task> produce)
+    {
+        try { await produce(); }
+        catch (Exception ex) { _log.LogWarning(ex, "notification producer failed after {Context}", context); }
+    }
 
     private static string AppendNote(string existing, string? note, User user, DateTimeOffset at)
     {

@@ -423,6 +423,16 @@ public interface INotificationProducer
     /// <see cref="NotificationDraft"/> is built per recipient by <paramref name="draftFor"/>.</summary>
     Task NotifyPermissionHoldersAsync(Guid tenantId, RbacPermission permission, Guid? excludeUserId,
         Func<Guid, NotificationDraft> draftFor, CancellationToken ct);
+
+    /// <summary>
+    /// Platform-scoped fan-out — every active user in <paramref name="role"/> across
+    /// ALL tenants. For tenant-less system notices (e.g. the UBAG operator alert,
+    /// whose condition affects every tenant on the shared gateway) that cannot use
+    /// the tenant-scoped <see cref="NotifyPermissionHoldersAsync"/>. One
+    /// <see cref="NotificationDraft"/> is built per recipient by
+    /// <paramref name="draftFor"/>, which receives that recipient's (tenantId, userId).
+    /// </summary>
+    Task NotifyRoleAcrossTenantsAsync(UserRole role, Func<Guid, Guid, NotificationDraft> draftFor, CancellationToken ct);
 }
 
 /// <summary>

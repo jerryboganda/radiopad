@@ -74,6 +74,57 @@ All run on the `maintenance` queue. `ModelDriftDetectionJob` also keeps `GetStat
 | `SiemPushService` | 5s near-real-time flush with a stateful cursor + in-loop backoff |
 | `UbagProviderDiscoveryHostedService` | 5-min loop, but its ~8s-after-boot first pass is startup-seed-critical |
 
+## Notification channels (PR-N4)
+
+`NotificationChannelDispatchJob` (`RadioPad.Api.Jobs`, `[Queue("critical")]`, enqueue-only) fans a
+single **Critical-urgency** notification out to its out-of-app channels. `NotificationProducer.InsertAsync`
+enqueues two jobs — `DeliverPushAsync` + `DeliverEmailAsync` — after the SSE publish, but ONLY when
+`Urgency == Critical` and only via an optionally-resolved `IBackgroundJobClient` (a no-op under Testing,
+exactly like the webhook decorator). Each delivery re-checks the recipient's `NotificationPreference`
+(`PushEnabled` / `EmailEnabled`, defaulting to the entity defaults — push on, email off) before sending.
+
+**PHI tiers (NOTIF-004)** — enforced by the shared `NotificationPhiTier` helper so no channel over-shares:
+
+| Tier | Title | Body |
+| --- | --- | --- |
+| In-app row (authed, audited) | in-app headline | may carry modality / body-part / **FindingSummary**-class descriptor |
+| OS toast / mobile push / email | generic category phrase | AT MOST modality + body-part — **never** FindingSummary, accession, name, MRN |
+| Webhook (`WebhookDispatchJob`) | — | ids + category only, no Title/Body |
+
+Because a `Notification` row carries no *structured* modality/body-part column (only the free-text in-app
+Body, which may itself be a FindingSummary), the push/email-safe body collapses to a generic category
+phrase — the conservative floor of "at most modality+body-part".
+
+**Retry:** a not-configured push sender (`PushNotConfiguredException`, or no sender registered for the
+device platform) is a CONFIG error, not transient — it audits `NotificationDeliveryFailed` and does NOT
+re-throw, so the global jittered-retry filter never burns retries on it. A transport error is allowed to
+throw so the retry filter re-runs the delivery. Email is best-effort (a false/failed send logs, never throws).
+
+**Not built here:** **SMS** — no sender exists in the codebase; the per-`Platform` switch inside
+`DeliverPushAsync` (via `PushSenderRegistry`) is the documented seam for a future `ISmsSender`. **SIEM** —
+nothing to dispatch; the `NotificationCreated` / `NotificationDeliveryFailed` audit rows are already
+streamed by `SiemPushService` (NOTIF-008).
+
+**Producer wiring (PR-N4)** — the call sites that produce notifications after their state change + audit
+(all wrapped so a producer failure never fails the request/job): critical-result create / escalate (manual
++ overdue sweep, deduped by `crit-esc:{id}`) / acknowledge; peer-review assign / sample / submit (author-
+facing, blinding-safe — never names a blinded reviewer) / dispute; rulebook approve / deprecate / rollback
+(→ `RulebooksManage` holders); template submit-for-review (→ `TemplatesApprove`) / approve (→ the submitter,
+mined from the latest `TemplateSubmittedForReview` audit); and the system notices — `UbagOperatorAlertService`
+(ItAdmin across all tenants, via `INotificationProducer.NotifyRoleAcrossTenantsAsync`) and `AnomalyScanJob`
+(→ `SecurityManage` holders).
+
+### Desktop notification click-through (verified platform limitation)
+
+Clicking an OS toast on **Windows desktop** performs only the OS-default window activation — there is no
+click-through / deep-link callback. This is a documented platform LIMITATION, not a deferral:
+tauri-plugin-notification v2's Actions / click-activation API is **mobile-only** (iOS/Android) — verified
+against `v2.tauri.app/plugin/notification` (2026-07-23). Fallback: focus + bell. On window focus /
+`visibilitychange`→visible after any toast, PR-N5's `NotificationsProvider` refreshes the unread-count so the
+bell badge is accurate the instant the user arrives; the toast's `LinkHref` target is then one bell-click
+away. Future seam: were the plugin to ship desktop activation (or we adopt a WinRT-toast fork), the handler
+is `navigate to notification.LinkHref` (the `?aiJob=` deep-link machinery already exists).
+
 ## Planned jobs
 
 | Job | Trigger | Purpose |
