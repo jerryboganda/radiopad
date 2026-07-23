@@ -1,8 +1,8 @@
 # Queues & Background Jobs
 
-**Status:** Two job subsystems shipped — async AI generation (durable rows + SSE) and the Hangfire cron platform (PR-N1)  ·  **Owner:** Engineering  ·  **Last Updated:** 2026-07-23
+**Status:** Fully shipped — async AI generation (durable rows + SSE + streaming + UBAG re-attach + per-tenant fairness), the Hangfire cron platform (5 migrated crons + 4 new maintenance jobs), and the NOTIF-001 notification pipeline (producers + channels + inbox)  ·  **Owner:** Engineering  ·  **Last Updated:** 2026-07-23
 
-Most operations remain synchronous on the request thread. Two exceptions run on job platforms: **async AI report generation** (a first-class durable subsystem, below) and **cron-shaped background work**, which as of PR-N1 runs on **Hangfire** (below). The "Planned jobs" table lists the four new jobs still to be built on top of that platform (PR-N2).
+Most operations remain synchronous on the request thread. Two exceptions run on job platforms: **async AI report generation** (a first-class durable subsystem, below) and **cron-shaped background work**, which runs on **Hangfire** (below). Every job named in this document is shipped — nothing here is a roadmap.
 
 ## Shipped: durable AI generation jobs
 
@@ -11,6 +11,7 @@ Impression/rewrite (`kind = "ai"`), whole-report (`kind = "generate"`), dictatio
 - **Durable row:** one `AiJobs` row per attempt (`RadioPad.Domain.Entities.AiJob`; migration `20260723090000_AddAiJobs`). Status vocabulary `queued | running | ok | error | cancelled`. Indexed by `(TenantId, UserId, CreatedAt)`, `(TenantId, ReportId, Status)`, `(Status, CompletedAt)`.
 - **Hot cache:** the in-memory `AiJobRegistry` serves the ~2s poll from memory so a poll never touches the DB. `AiJobCoordinator` writes through **registry-first, DB-second** on every transition; a crash between the two leaves a `running` row that boot recovery marks `server_restart` — the safe direction (never a phantom success).
 - **Runner:** `AiJobCoordinator.SubmitAsync` writes a `queued` row and enqueues an `AiJobWork` onto an unbounded `Channel<AiJobWork>`. The hosted `AiJobRunner` (`BackgroundService`) dequeues with bounded parallelism (`AiJobs:MaxConcurrency`, default 4). Each job runs under a per-job CTS = linked(`ApplicationStopping`) + safety timeout (`AiJobs:SafetyTimeoutSeconds`, default 600) + a registry-registered cancel signal.
+- **Per-tenant fairness (PR-B2):** a `ConcurrentDictionary<Guid, SemaphoreSlim>` gate per tenant (created lazily, never disposed), capped at `AiJobs:PerTenantMaxConcurrency` (default 2, clamped to `1..MaxConcurrency`). Gates acquire **tenant-first, then global** — never the reverse, which is load-bearing: acquiring the global gate first would let a flooding tenant's excess jobs sit holding global slots while blocked on their own per-tenant cap, reintroducing the exact starvation the gate exists to prevent. A single flooding tenant can occupy at most `PerTenantMaxConcurrency` of the `MaxConcurrency` global slots, leaving the rest for everyone else. The dequeue thread never waits on either gate — each dequeued item spawns its own dispatch task immediately, so one saturated tenant never head-of-line-blocks another tenant's job sitting behind it in the channel; `CancelAfter(SafetyTimeoutSeconds)` starts only after both gates are held, so time spent queued behind a busy tenant is never charged against the job's own safety budget.
 - **Single-flight:** at most one non-terminal job per `(tenant, report, kind, mode)` — a duplicate submit attaches to the active one (DB query is authoritative; the registry gives a fast in-memory short-circuit).
 - **Cancel:** queued → immediate `cancelled` (never dequeued, zero provider cost); running → `CancelRequested` + fire the CTS. UBAG additionally best-effort cancels the gateway job on the created job id before the `OperationCanceledException` propagates.
 - **Retry:** only from `error`/`cancelled`, always a **new** row (`Attempt+1`, `RetryOfJobId` set) — never resurrects the old one, and re-runs the regulated-feature gate so it cannot be bypassed via retry. The retry copies the prior row's `InputJson` so an input-carrying kind re-runs on the same input. A `crosscheck` retry whose `InputJson` has been retention-swept (24h) can no longer be reconstructed → `409 { kind: "job_input_expired" }`; a swept `ai`+`cleanup` retry degrades to the legacy generic single-text path rather than hard-failing (the row alone can't distinguish a swept input-carrying cleanup from a legacy input-less one, and legacy retries must keep working).
@@ -28,7 +29,7 @@ Impression/rewrite (`kind = "ai"`), whole-report (`kind = "generate"`), dictatio
 
 ## Shipped: Hangfire cron platform (PR-N1)
 
-Cron-shaped background work runs on **Hangfire** (single-process, in-C#, on the same database). Bootstrap lives in `RadioPad.Api.Jobs.HangfireSetup` (`AddRadioPadHangfire` / `UseRadioPadRecurringJobs`); the job classes live in `RadioPad.Api.Jobs.*Job`.
+Cron-shaped background work runs on **Hangfire** (single-process, in-C#, on the same database). Bootstrap lives in `RadioPad.Api.Jobs.HangfireSetup` (`AddRadioPadHangfire` / `UseRadioPadRecurringJobs`); the job classes live in `RadioPad.Api.Jobs.*Job`. **Queue-engine choice:** the PRD names candidate stacks (NATS / River) as options to evaluate; this architecture doc and the shipped implementation standardize on Hangfire — it stays in C#, needs no extra infrastructure process, and reuses the same database connection EF Core already has open (Postgres in prod, InMemory on SQLite/desktop). Alternatives considered and not taken: Quartz.NET, MassTransit (introduces RabbitMQ — heavier, only justified if multi-process scheduling becomes a requirement).
 
 ### Storage matrix
 
@@ -73,6 +74,15 @@ All run on the `maintenance` queue. `ModelDriftDetectionJob` also keeps `GetStat
 | `AvailabilityMonitorService` | seconds-level probe + in-memory 5-minute sliding-window state (Hangfire's 1-min granularity + stateless instances would change semantics) |
 | `SiemPushService` | 5s near-real-time flush with a stateful cursor + in-loop backoff |
 | `UbagProviderDiscoveryHostedService` | 5-min loop, but its ~8s-after-boot first pass is startup-seed-critical |
+
+## Shipped: maintenance & cost/audit cron jobs (PR-N2)
+
+Four new Hangfire recurring jobs (`RadioPad.Api.Jobs`, all on the `maintenance` queue, all idempotent by natural key so a retry or a missed InMemory schedule after a restart is never harmful) plus one migration (`20260724090001_AddCronPlatformTables`: `TenantWebhookEndpoints`, `AiUsageRollups`, `AuditExportBundles`, `Report.ArchivedAt`, `Tenant.DraftAutoArchiveDays`, `Tenant.CriticalNotificationCategoriesCsv`):
+
+- **`AuditExportRollupJob`** (`0 2 * * *`, 02:00 UTC daily) — per-tenant fan-out producing a signed, SIEM-shaped export bundle: one PHI-minimized JSONL line per audit event (`id, tenantId, userId, reportId, action, actionCode, createdAt, integrityHash` — `DetailsJson` is deliberately never included) plus an HMAC-SHA256 signature over the bundle body, keyed by `AuditExport:SigningKey` (unset → the bundle is stored unsigned, logged, never blocked). Idempotent by `(TenantId, Date)` — a re-run upserts the same `AuditExportBundle` row in place. Retrieved via `GET /api/audit/exports` (list) and `GET /api/audit/exports?date=YYYY-MM-DD` (full bundle).
+- **`WebhookDispatchJob`** (`[Queue("default")]`, enqueue-only — not itself scheduled) — delivers ONE audit event to ONE tenant webhook endpoint. Enqueued by `WebhookEnqueueingAuditLog`, a decorator over `IAuditLog` that appends the row first (through the real `EfAuditLog`, stamping id + integrity chain), then best-effort enqueues one job per active, audit-subscribed `TenantWebhookEndpoint`. Payload is PHI-minimized (`id, action, tenantId, createdAt, integrityChain` — never `DetailsJson`, Title, or Body), signed `X-RadioPad-Signature: sha256=<hmac-hex>` (HMAC-SHA256 over the UTF-8 body, keyed by the endpoint's own secret). An endpoint auto-disables (`DisabledAt` set, `Active = false`, an `AuditAction.WebhookEndpointDisabled` row appended) at **20 consecutive failures** — delivery is then abandoned rather than retried forever against a dead receiver.
+- **`AiCostRollupJob`** (`30 1 * * *`, 01:30 UTC daily — before the audit export, after the day's traffic) — aggregates `AiRequests` grouped by `(TenantId, Provider, Model)` into a per-day `AiUsageRollup` upsert keyed by the 4-tuple `(TenantId, Date, Provider, Model)`. Retrieved via `GET /api/usage/ai-rollup?from=&to=` (defaults to the last 30 days).
+- **`OrphanedDraftCleanupJob`** (`0 3 * * 0`, 03:00 UTC every Sunday) — **opt-in per tenant** via `Tenant.DraftAutoArchiveDays > 0` (0/unset = never runs for that tenant). Sets `Report.ArchivedAt` only — the report `Status` enum is deliberately untouched, so this is additive/reversible, never a state-machine transition. Capped at 500 reports/tenant/run (`MaxPerTenantPerRun`); naturally idempotent (`ArchivedAt == null` is part of the selection filter, so an already-archived draft is simply skipped next run). Worklist queries add `?archived=` (`false` = today's default view, `true` = the recovery view); `PATCH /api/reports/{id}/unarchive` clears `ArchivedAt` to restore a draft. Every archive appends an `AuditAction.ReportDraftArchived` row.
 
 ## Notification channels (PR-N4)
 
@@ -125,34 +135,46 @@ bell badge is accurate the instant the user arrives; the toast's `LinkHref` targ
 away. Future seam: were the plugin to ship desktop activation (or we adopt a WinRT-toast fork), the handler
 is `navigate to notification.LinkHref` (the `?aiJob=` deep-link machinery already exists).
 
-## Planned jobs
+## Config keys (all read-with-default; unset = the default shown)
 
-| Job | Trigger | Purpose |
+| Key | Default | Governs |
 | --- | --- | --- |
-| Audit export rollup | Cron daily | Produce a signed JSON-Lines bundle for the tenant. |
-| Webhook dispatcher | After audit append | POST event to tenant webhook endpoints. |
-| AI cost rollup | Cron daily | Aggregate token counts per tenant for billing. |
-| Rulebook golden retest | Push to `main` | Run all rulebook golden suites in CI (already in CI, not a runtime job). |
-| Cleanup of orphaned drafts | Cron weekly | Archive drafts not touched in N days (configurable per tenant). |
+| `AiJobs:MaxConcurrency` | 4 | Global cap on concurrently-running AI jobs (`AiJobRunner`) |
+| `AiJobs:PerTenantMaxConcurrency` | 2 | Per-tenant cap within the global one (PR-B2 fairness), clamped `1..MaxConcurrency` |
+| `AiJobs:SafetyTimeoutSeconds` | 600 | Per-job hard CTS timeout, starts after both fairness gates are held |
+| `AiJobs:SseKeepAliveSeconds` | 15 | `: keep-alive` comment cadence on `/api/events/stream` |
+| `AiJobs:SseSubscriberBuffer` | 64 | Per-subscriber bounded drop-oldest channel depth on the SSE bus |
+| `AiJobs:StreamPublishMinIntervalMs` | 150 | Min time between coalesced `progress`/`partial` bus publishes while a token stream is running |
+| `AiJobs:StreamPublishTokenBatch` | 20 | Min new tokens between the same coalesced publishes (whichever threshold trips first) |
+| `AiJobs:PartialBufferMaxChars` | 262144 | Registry partial-text tail cap per active job |
+| `AiJobs:ReattachTimeoutSeconds` | 300 | Budget for a detached UBAG re-attach poll before falling back to `server_restart` |
+| `AiJobs:ReattachPollSeconds` | 2 | Re-attach poll cadence (mirrors the live UBAG poll) |
+| `AuditExport:SigningKey` | unset | HMAC-SHA256 key for daily audit export bundles; unset → bundles are stored unsigned |
+| `RADIOPAD_DRIFT_CHECK_INTERVAL_HOURS` | 6 | `ModelDriftDetectionJob` cron interval, clamped `1..24` |
 
-## Queue choice (decided: Hangfire)
+## Frontend consumption
 
-- **Hangfire** is the shipped engine for in-process background jobs as of PR-N1 — it stays in C# and uses the same database (Postgres in prod, InMemory on SQLite/desktop). The PRD names candidate stacks (NATS / River); the architecture doc + implementation standardize on Hangfire single-process.
-- Alternatives considered and not taken: Quartz.NET, MassTransit (introduces RabbitMQ — heavier, only if multi-process scheduling is required).
+The Next.js frontend is a first-class consumer of everything above, not just the report-editor sync
+endpoints:
 
-## Retry rules
+- **`lib/sse.ts` + `lib/events.ts`** — the incremental SSE parser and the ref-counted `EventStreamManager`
+  singleton (`hostedEvents`) that opens `GET /api/events/stream` via `fetch()`/`ReadableStream` (never
+  `EventSource` — it cannot send the bearer/`X-RadioPad-*` headers this app authenticates with), with
+  jittered reconnect backoff and a 45s silence-abort.
+- **`components/jobs/JobsProvider.tsx`** — the single shared tracked-job list + poll ticker. Pauses hosted
+  polling while the SSE stream is healthy (local/sidecar jobs keep polling — no local stream yet); a
+  first-terminal-wins reducer makes duplicate delivery across SSE + poll + reconnect-rehydrate safe by
+  construction. `trackExternal(job)` registers a job created OUTSIDE the normal `submit()` path — used by
+  the cross-check audio half (a direct sidecar multipart call) and the hosted review half it triggers.
+- **Cross-check (FE-PR6)** is a two-job pattern, not one: a LOCAL sidecar job (audio/ASR re-run, polled via
+  a dedicated `api.reports.crossCheckStatus` branch in `pollOne` — a different endpoint than
+  `local-generate` jobs) triggers a HOSTED review job on success (`api.reports.submitCrossCheckJob`). Both
+  are suggestion sets only — `frontend/lib/dictation/crossCheckJob.ts` holds the pure poll-patch mapping and
+  the two-job → badge-state derivation; corrections are merged and handed to the SAME per-item Accept/Reject
+  panel the report editor already had, never bulk/auto-applied.
+- **`components/notifications/NotificationsProvider.tsx`** subscribes directly to the same `hostedEvents`
+  singleton for `notification` events (typed, not a re-dispatched window event) and falls back to a 60s
+  unread-count poll while the stream is down.
 
-- Default: exponential backoff, max 5 attempts, jittered.
-- Idempotency required — every job uses `auditEventId` or `tenantId+date` as a natural key.
-- Failed jobs land in a dead-letter queue (DLQ) after the final attempt.
-
-## DLQ strategy
-
-- DLQ visible in the admin UI (Phase 3).
-- Operators can inspect the payload (with PHI redacted) and re-queue.
-- DLQ items older than 30 days are purged after a manual review.
-
-## Scheduling
-
-- Cron expressions stored per-tenant for tenant-specific jobs (e.g. cleanup window).
-- Server-wide jobs (audit export rollup) run on a single leader pod (Phase 3 leader election).
+See [design.md](../02-design/design.md) for the visual/interaction spec (`.rp-jobs-*`, `.rp-stream-preview`,
+`.rp-inbox-*`) and [PROGRESS.md](../../PROGRESS.md) for the full PR-by-PR build log.

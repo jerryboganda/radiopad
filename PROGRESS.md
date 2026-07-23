@@ -4,6 +4,132 @@
 
 ---
 
+## Deferred-items completion: async job platform (SSE, Hangfire, UBAG re-attach, fairness, AI-013 streaming, cleanup + cross-check as jobs, NOTIF-001 inbox) — 17 PRs, 6 waves (2026-07-23)
+
+The operator ordered **100% implementation of seven items deferred** when the durable async-AI-job
+platform first shipped (v0.1.111, `70a992a`): (1) SSE push, (2) a Hangfire cron platform + migrating the
+existing cron-shaped `BackgroundService`s onto it, (3) UBAG job re-attach after a restart, (4) per-tenant
+runner fairness, (5) full AI-013 token streaming (stop/regenerate, live preview), (6) dictation-cleanup +
+cross-check migrated to durable jobs, (7) a NOTIF-001 notifications inbox with full producer wiring. A
+consolidated plan (shared contracts A–F + 7 seam reconciliations overriding three parallel-agent domain
+design docs where they disagreed) was executed PR-by-PR across 6 waves, each implemented, diff-reviewed,
+committed, and pushed individually — CI is the evidence, never watched locally per the GitHub-Actions rule.
+
+**Shipped (16 PRs before this entry, each independently reviewed by reading the diff — several caught real
+issues this way: a stale-doc backend route, a dead-code middleware class, a component gate that would have
+shown an empty box for non-streaming jobs):**
+
+```
+B1  SSE event bus + /api/events/stream + registry progress
+B2  Per-tenant runner fairness
+N1  Hangfire cron platform + migrate 5 BackgroundServices                    (own entry below)
+B3  AI-013 token streaming (backend, stream-capable providers)
+B4  UBAG gateway re-attach after restart
+N2  Audit export rollup, webhook dispatch, AI cost rollup, orphaned-draft cleanup jobs
+B5  Dictation-cleanup + cross-check as durable job kinds (backend)          (own entry below)
+B6  Sidecar local-generation token streaming + local events SSE
+N3  NOTIF-001 core (entity, producer, controller)
+N4  Full notification producer wiring + delivery channels
+FE1 SSE client parser + EventStreamManager + api.ts primitives
+FE2 JobsProvider consumes the SSE stream
+FE3 Widget + banner progress UI
+FE4 Live token preview + Stop/Regenerate in the report editor
+FE5 Dictation-cleanup migrated to a durable async job (frontend)
+N5  Notifications inbox frontend (provider, bell, /notifications page)
+```
+
+`B1`/`N1`/`B5` (and the earlier `70a992a` base) already have their own detailed entries in this file
+(above and below); the rest are summarized here rather than duplicated.
+
+### This entry: FE6 (cross-check frontend migration) + N6 (docs + release)
+
+**FE6 — Cross-check migration to the durable job pattern.** The last remaining sync-poll surface: "Cross
+Check" used to run a client-side `for (let i=0;i<150;i++) await sleep(800)` poll loop against the sidecar,
+then a single blocking hosted review call. Replaced with the SAME two-tracked-jobs pattern the rest of the
+platform uses:
+
+- **Local audio/ASR job** (`kind:'crosscheck', origin:'local'`) — the existing sidecar multipart submit
+  (`api.reports.crossCheck`) is unchanged, but instead of the poll loop it's registered via a NEW
+  `JobsContextValue.trackExternal(job)` (pure bookkeeping — dispatches `ADD` + kicks the shared ticker, no
+  network call, since the sidecar already assigned the id). `JobsProvider.pollOne` gained a dedicated
+  branch for `origin:'local' && kind:'crosscheck'` calling `api.reports.crossCheckStatus` — a DIFFERENT
+  sidecar endpoint than `local-generate` jobs, so routing it through the existing `api.localGenerate.jobStatus`
+  branch would have 404'd. No Cancel button for this job in the widget (the sidecar has no cancel endpoint
+  for it) — `JobsIndicator` suppresses it specifically for `crosscheck && local`.
+- **Hosted LLM review job** (`kind:'crosscheck', origin:'hosted'`) — submitted (`api.reports.submitCrossCheckJob`,
+  wired but unused since FE1) only once the audio half settles `ok`; a new `handleCrossCheckAudioOk` fetches
+  the retained ASR corrections, submits the review, and tracks it too. `applyJobResult` gained an
+  `effectiveKind` re-derivation (mirrors how it already re-derives `mode` from the fetched detail — the
+  `?aiJob=` deep-link can't otherwise distinguish a hosted `crosscheck` review job from a plain `ai` job by
+  the query param alone, since both now share it) and a `crosscheck && origin:'hosted'` branch that merges
+  `[...asr, ...llm]` into the SAME per-section `corrections` state the existing Accept/Reject panel already
+  renders — full replace per run (matching the pre-migration sync behaviour byte-for-byte), never a bulk or
+  auto-apply. A review-submit or review-job failure falls back to the ASR-only suggestions rather than
+  silently dropping the medical-accuracy pass.
+- **Code-review hardening (before commit):** an independent review caught a real bug in the first draft — the
+  audio→review sequencing context lived only in `ReportClient`-scoped refs, which reset on ordinary in-app
+  navigation away and back (worklist ↔ report), even though the tracked `Job` rows themselves persist in the
+  app-root `JobsProvider`. That silently (a) stranded the hand-off if the audio job finished while the report
+  page was unmounted — the review would simply never be submitted — and (b) on a later reopen, replayed the
+  corrections merge with the ASR-only half missing (which can carry `severity:'safety'` items) and any
+  already-accepted/rejected LLM suggestions resurrected. Fixed by moving that bookkeeping into a new
+  module-level `lib/dictation/crossCheckSession.ts` (mirrors the established `jobPartials` cross-mount-survives
+  pattern; atomic `claimReviewSubmit` makes the hand-off idempotent), having the review-merge mark the job
+  `applied` (so a remount's `job.applied` check — not a ref — stops a replay), and adding a same-report
+  active-run guard in `runCrossCheck` (a second submit while one is in flight could otherwise reset the
+  in-flight job's visible status via `trackExternal`'s merge-by-id ADD).
+- **`CrossCheckBadge`'s status/stage is now DERIVED** each render from the two tracked jobs
+  (`lib/dictation/crossCheckJob.ts`'s `deriveCrossCheckBadge`, `latestCrossCheckJob`) instead of a scattered
+  `setXc(...)` thread through the old imperative flow; `jobKindLabel` labels `crosscheck` jobs by ORIGIN, not
+  mode ("Cross-check (audio)" / "Cross-check (review)") since a hosted crosscheck job's `mode` is the
+  normalized section key, never a fixed literal — the old `case 'crosscheck'` inside the `ai`-mode switch was
+  actually unreachable/wrong code, since `kind==='crosscheck'` never fell into that switch to begin with.
+  `openReportHref` now deep-links only the hosted review half.
+- **Tests:** `__tests__/crossCheckJobs.test.ts` (30 cases — poll-patch mapping, the full badge state-transition
+  matrix incl. the audio/review `cancelled` branches, job selection, origin labels, deep-link rule, and the
+  new `crossCheckSession` store's atomicity/round-trip behaviour) + 3 new `JobsProvider` integration cases
+  (`trackExternal` + the dedicated poll branch, using the REAL provider) + 2 new `JobsIndicator` cases (Cancel
+  suppressed for the local audio job, still offered for the hosted review job). All 148 tests across the 11
+  job/cross-check-adjacent test files pass, including `reportGenerateFlush.test.tsx`, which renders the
+  actual `ReportClient.tsx` end-to-end.
+
+**N6 — Docs + release.** `docs/03-architecture/queues-jobs.md` rewritten into one coherent "Fully shipped"
+document: added the previously-undocumented PR-B2 (per-tenant fairness) and PR-N2 (audit export rollup /
+webhook dispatch / AI cost rollup / orphaned-draft cleanup) sections verified against the actual source
+(exact cron strings, config keys, thresholds — not just the pre-implementation plan); deleted four stale
+pre-Hangfire sections (`Planned jobs`, `Queue choice`, `Retry rules`, `DLQ strategy`, `Scheduling`) that
+contradicted the shipped sections above them; added a consolidated config-keys table and a "Frontend
+consumption" pointer. `docs/02-design/design.md` had a duplicate `### 4.12` heading (two unrelated sections
+both numbered 4.12) — renumbered the notifications one to `4.18` and added `4.19 Notifications inbox`
+(the bell's two-section layout, `.rp-inbox-*` filter/row/bulk-bar/confirm classes, the NOTIF-010 four-state
+trio-plus-stale-banner). This PROGRESS.md entry + the traceability table below.
+
+### NOTIF-001..011 traceability (PRD §requirements → what shipped)
+
+| Req | PRD requirement | Status |
+| --- | --- | --- |
+| NOTIF-001 | Unified inbox: critical results, peer review, rulebook/template approvals, incidents, mentions, system notices | **Shipped** for every category except `Mention` — reserved in the enum, no producer wired yet (no @mention feature exists to wire it to). |
+| NOTIF-002 | Categorized by urgency; explicit ack where applicable; never colour alone | **Shipped** — every urgency/category pairs a tone with a text label (bell, widget, inbox row). |
+| NOTIF-003 | Tenant policy controls channels: in-app/desktop/mobile push/email/SMS/webhook/SIEM | **6 of 7 shipped** (in-app, desktop OS toast, mobile push, email, webhook, SIEM-via-existing-audit-stream). SMS has no sender in the codebase — documented seam in `PushSenderRegistry`'s per-platform switch, not built. |
+| NOTIF-004 | PHI minimized by channel; non-PHI lock-screen/email previews | **Shipped** — `NotificationPhiTier` enforces the 3-tier ceiling (in-app / OS-toast-and-push-and-email / webhook). |
+| NOTIF-005 | Tasks: owner, due date, escalation, evidence, comments, audit, completion | **Not in this effort's scope** — a distinct Tasks feature, not one of the 7 deferred items ordered. |
+| NOTIF-006 | Approval queues: single/sequential/parallel/quorum/dual-control policies | **Not in this effort's scope** — rulebook/template approval notifications were wired (NOTIF-001), but the underlying multi-policy approval-queue engine itself was not built here. |
+| NOTIF-007 | DND respected except tenant-defined critical classes, with escalation | **Shipped** — DND suppresses dispatch channels only, never the inbox row/SSE; critical bypasses. |
+| NOTIF-008 | Delivery/open/ack/failure/escalation events audited | **Shipped** — Created/Ack/DeliveryFailed/Bulk always audited; Read audited only for Critical/RequiresAck rows. |
+| NOTIF-009 | Non-critical prefs configurable without muting mandatory safety/security notices | **Shipped** — critical categories are never suppressible via preferences. |
+| NOTIF-010 | Clear empty/offline/failed-delivery/stale states | **Shipped** — Skeleton/EmptyState/ErrorState + an amber stale/offline banner (stream down AND offline-or->2min-stale). |
+| NOTIF-011 | Bulk actions permission-controlled + confirmation for clinical/compliance rows | **Shipped** — server 400 `confirmation_required` + `CriticalResultsRead` gate for bulk-acking critical rows; client mirrors the same predicate to avoid surprising the radiologist, but the server is the source of truth. |
+
+(NOTIF-012, SLO monitoring of critical-notification latency/ack per tenant/channel, is PRD-listed but was
+not part of the 7 deferred items and was not built.)
+
+- **Config keys:** consolidated in [docs/03-architecture/queues-jobs.md#config-keys](docs/03-architecture/queues-jobs.md) — not repeated here.
+- **Scope:** backend + frontend, extensively touching both `frontend/` and `desktop/`-adjacent code across
+  all 17 PRs → **`pnpm release:desktop` required (DESK-001)**, run at the end of this entry's session; push
+  and stop, operator monitors CI.
+
+---
+
 ## Dictation-cleanup + cross-check as durable job kinds — PR-B5 (2026-07-23)
 
 Backend-only. Makes the two previously-synchronous AI passes (dictation cleanup, cross-check

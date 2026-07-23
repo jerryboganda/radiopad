@@ -394,7 +394,9 @@ count badge (`.rp-jobs-badge`, tone `active` → `--color-ai`, `success` →
 finished. The `role="dialog"` popover (`.rp-jobs-popover`, cloned from
 `.rp-bell-popover`) lists one `.rp-jobs-item` per job — tinted by the semantic
 families (Blocker/fail → red, cancelled → amber, running → blue, ready → green)
-— with a per-status action set (Cancel / Retry / Open report / Dismiss) and a
+— with a per-status action set (Cancel / Retry / Open report / Dismiss — the
+cross-check audio job is the one exception, since the sidecar has no cancel
+endpoint for it) and a
 "Clear finished" footer. Each active row carries a slim `.rp-jobs-progress`
 bar — an AI-toned (`--ai-bg` track, `--color-ai` fill) size override of the
 shared `.rp-progress` primitive (§3.10): determinate (`aria-valuenow` + inline
@@ -859,7 +861,7 @@ and both failed with a message blaming a missing download — so prefer an hones
 
 ---
 
-### 4.12 Notifications — channels & PHI tiers (NOTIF-004)
+### 4.18 Notifications — channels & PHI tiers (NOTIF-004)
 
 RadioPad delivers one notification across several surfaces, and each surface has a **strict PHI
 ceiling** — never let a title/body beyond its tier leak:
@@ -883,6 +885,38 @@ bell: on window focus / `visibilitychange`→visible after any toast, the notifi
 refreshes the unread-count so the bell badge is accurate, and the toast's `LinkHref` target is one
 bell-click away. Backend delivery mechanics live in
 [queues-jobs.md](../03-architecture/queues-jobs.md#notification-channels-pr-n4).
+
+### 4.19 Notifications inbox (NOTIF-001, NOTIF-010, NOTIF-011)
+
+The bell (`NotificationsBell`, in every surface's topbar) renders two stacked sections from the SAME
+`lib/notifications.ts` reducer: a session-only **"This session"** block (transient `rp-notify` job/system
+toasts, capped at 5, cleared on reload) above the server-backed rows (persisted, `unreadTotal`-badged).
+"View all" opens the full **`/notifications`** inbox page — desktop reporting-product surface only
+(`RADIOPAD_SURFACE` route group; web admins keep the bell popover, since they have no report-editor
+workflow to return to from a deep link).
+
+The inbox page (`.rp-inbox-*`, cloned from the `.rp-jobs-*` / `.rp-bell-popover` families — RC tokens only,
+both themes free) is a filtered list, not a feed:
+
+- **Filter chips** (`.rp-inbox-filter-chip`, `.is-active` on the selected one) for category, urgency,
+  unread-only, and needs-acknowledgement — separated by a `.rp-inbox-filter-sep` divider.
+- **Row** (`.rp-inbox-item`): a `border-left` urgency accent (`tone-info`/`tone-warn`/`tone-danger` →
+  the same Info/Warning/Critical map as validation severities) PLUS the row's `StatusBadge` text label —
+  urgency is never colour-only. An unread row (`[data-unread="true"]`) gets a background lift, a bold
+  title, AND a small `--accent` dot prepended to the title — never a dot alone (screen-reader text carries
+  "Unread" too). Each row carries a relative timestamp (`.rp-inbox-meta`), an inline two-step Acknowledge
+  control on `RequiresAck` rows, and a checkbox (`.rp-inbox-check`) for multi-select.
+- **Bulk action bar** (`.rp-inbox-bulkbar`, info-toned) appears once ≥1 row is selected. **NOTIF-011:**
+  selecting ANY `CriticalResult` / `System` / `RequiresAck` row and firing a bulk action opens a
+  confirmation dialog (`.rp-inbox-confirm-scrim` + `.rp-inbox-confirm`) that mirrors the server's own
+  confirmation predicate exactly — the client never lets a bulk-ack of a critical row surprise the
+  radiologist with a 400, but the server re-checks regardless (a race that slips past the client dialog
+  still gets `confirmation_required` back and re-opens it).
+- **NOTIF-010 states** (the standard trio, §4.16): `<Skeleton />` while
+  the filtered list is loading, `<EmptyState />` when a filter combination yields zero rows, `<ErrorState
+  onRetry />` on a fetch failure, PLUS a fourth amber **stale/offline banner** — shown only when the SSE
+  stream is down AND (the browser is offline OR the last good fetch is > 2 minutes old) — so a radiologist
+  never mistakes a quietly-disconnected inbox for "you're all caught up."
 
 ---
 
