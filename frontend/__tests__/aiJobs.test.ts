@@ -60,6 +60,16 @@ describe('api.reports async-job primitives', () => {
     expect(JSON.parse(String(init.body))).toEqual({ providerId: 'p1' });
   });
 
+  it('submitCrossCheckJob POSTs the text/section/useUbag to the crosscheck review jobs endpoint', async () => {
+    const fn = mockFetch({ jobId: 'xc1' }, 202);
+    const out = await api.reports.submitCrossCheckJob('r7', { text: 'liver lesion', sectionKey: 'findings', useUbag: true });
+    const { url, init } = lastCall(fn);
+    expect(url).toBe('/api/reports/r7/crosscheck/review/jobs');
+    expect(init.method).toBe('POST');
+    expect(JSON.parse(String(init.body))).toEqual({ text: 'liver lesion', sectionKey: 'findings', useUbag: true });
+    expect(out).toEqual({ jobId: 'xc1' });
+  });
+
   it('aiJobStatus GETs the report-scoped poll path', async () => {
     const fn = mockFetch({ jobId: 'j1', kind: 'ai', mode: 'impression', status: 'ok', elapsedMs: 12, result: { text: 'x' }, error: null, errorKind: null });
     const env = await api.reports.aiJobStatus<{ text: string }>('r1', 'j1');

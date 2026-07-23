@@ -5,6 +5,12 @@
  * configured in `next.config.ts`.
  */
 
+import { SseParser, type SseEvent } from './sse';
+
+// Re-exported so `lib/events.ts` and other stream consumers get the parser's
+// event shape from the same place they get `connectEventStream`.
+export type { SseEvent } from './sse';
+
 /** On-device STT engine mode selectable from the dictation overlay. */
 export type SttMode = 'auto' | 'single' | 'ensemble';
 
@@ -442,8 +448,17 @@ async function request<T>(path: string, init?: RequestInit): Promise<T> {
 export type JobStatus = 'queued' | 'running' | 'ok' | 'error' | 'cancelled';
 
 /** Which generation path a job belongs to. `local-generate` runs on the desktop
- *  sidecar; `ai`/`generate` run in the hosted API. */
-export type JobKind = 'ai' | 'generate' | 'local-generate';
+ *  sidecar; `ai`/`generate` run in the hosted API; `crosscheck` is the durable
+ *  cross-check review kind (2026-07-23 async-job platform). */
+export type JobKind = 'ai' | 'generate' | 'local-generate' | 'crosscheck';
+
+/** Live per-job progress from the registry/bus (durable async-job platform,
+ *  2026-07-23). `tokens` is the cumulative output-token count for the current
+ *  attempt (always honest). `percent` is present ONLY when the server computed a
+ *  real ratio (design §3.10 — indeterminate everywhere in v1, so it is null/absent
+ *  on every current path); never fabricated. Omitted server-side via
+ *  `WhenWritingNull`, so it is absent on old backends. */
+export type JobProgress = { tokens: number; percent?: number | null };
 
 /** Envelope returned by GET /api/reports/{id}/ai/jobs/{jobId} (and the desktop
  *  sidecar's parity endpoint). Exported so the durable JobsProvider can share the
@@ -457,6 +472,9 @@ export type AiJobEnvelope<T> = {
   result: T | null;
   error: string | null;
   errorKind: string | null;
+  /** Live progress while `status === 'running'` (absent once terminal / on old
+   *  backends). See {@link JobProgress}. */
+  progress?: JobProgress | null;
 };
 
 /** Tenant-scoped report descriptor the unified jobs list projects for the widget.
@@ -485,10 +503,14 @@ export type JobSummary = {
   startedAt: string | null;
   completedAt: string | null;
   elapsedMs: number;
+  /** Live progress for active rows (durable async-job platform, 2026-07-23);
+   *  absent once terminal and on old backends. See {@link JobProgress}. */
+  progress?: JobProgress | null;
 };
 
 /** A row from GET /api/jobs/{id} — a JobSummary plus the retained `result`
- *  payload (held 24 h server-side; null once evicted). */
+ *  payload (held 24 h server-side; null once evicted). Inherits the optional
+ *  `progress` field from JobSummary. */
 export type JobDetail<T = unknown> = JobSummary & {
   result: T | null;
 };
@@ -553,6 +575,117 @@ function submitGenerateJobRequest(
     method: 'POST',
     body: JSON.stringify(body),
   });
+}
+
+/**
+ * POST /api/reports/{id}/crosscheck/review/jobs — submit the async cross-check
+ * medical-review job (durable async-job platform, 2026-07-23). Mirrors
+ * `submitAiJobRequest`/`submitGenerateJobRequest` exactly (same header/credential
+ * plumbing and error shape via `request`). Returns the job id immediately; poll
+ * with `api.jobs.get`.
+ */
+function submitCrossCheckJobRequest(
+  reportId: string,
+  body: { text: string; sectionKey?: string; useUbag?: boolean },
+): Promise<{ jobId: string }> {
+  return request<{ jobId: string }>(`/api/reports/${reportId}/crosscheck/review/jobs`, {
+    method: 'POST',
+    body: JSON.stringify(body),
+  });
+}
+
+/** Options for {@link connectEventStream} — the low-level SSE connector. */
+export interface EventStreamConnectOpts {
+  /** Aborting this signal ends the stream and resolves the connect promise cleanly. */
+  signal: AbortSignal;
+  /** Invoked for every complete SSE event (job/progress/partial/notification). */
+  onEvent: (e: SseEvent) => void;
+  /** Invoked for every `:`-prefixed keep-alive comment — the liveness heartbeat. */
+  onComment?: () => void;
+  /** Absolute base override for the desktop sidecar stream; default = `apiBase()`. */
+  baseOverride?: string;
+  /** Stream path; default `/api/events/stream`. */
+  path?: string;
+}
+
+/**
+ * Open `GET {base}{path}` as a Server-Sent-Events stream (durable async-job
+ * platform, 2026-07-23). Uses `fetch()` + `ReadableStream` (never `EventSource`,
+ * which cannot send the bearer + `X-RadioPad-*` headers this app authenticates
+ * with) and feeds chunks into an {@link SseParser}.
+ *
+ * Auth/credentials mirror the rest of `api.ts` exactly: the same
+ * `applyAuthHeader`/`applyTenantHeaders`, `credentials` via `requestCredentials`.
+ * On a 401/403 it makes ONE silent re-auth attempt via
+ * `hydrateAuthTokenFromSecureStore` and retries once (mirroring
+ * `fetchWithAuthRetry`); if it still fails it throws the `apiError` (with
+ * `.status` attached) so the caller's manager can tell an auth failure from a
+ * transport failure.
+ *
+ * Single-shot connect — deliberately bypasses `fetchOnce`'s desktop boot-retry:
+ * the `EventStreamManager` owns backoff. Resolves cleanly when the stream ends
+ * (server closed) or `signal` aborts; rejects with the `apiError` on an
+ * HTTP-level failure or a transport error.
+ *
+ * IMPORTANT: never appends `?access_token=` — this app always sends real
+ * headers; that query param exists server-side only for other (non-fetch) clients.
+ */
+async function connectEventStream(opts: EventStreamConnectOpts): Promise<void> {
+  const base = opts.baseOverride ?? (await apiBase());
+  const path = opts.path ?? '/api/events/stream';
+  const url = `${base}${path}`;
+
+  const open = (): Promise<Response> => {
+    const headers = new Headers();
+    headers.set('Accept', 'text/event-stream');
+    applyTenantHeaders(headers);
+    applyAuthHeader(headers);
+    return fetch(url, {
+      method: 'GET',
+      headers,
+      credentials: requestCredentials(base),
+      signal: opts.signal,
+    });
+  };
+
+  try {
+    let res = await open();
+    // One silent re-auth attempt, mirroring fetchWithAuthRetry's single retry.
+    if (
+      (res.status === 401 || res.status === 403) &&
+      !cachedAuthToken &&
+      (await hydrateAuthTokenFromSecureStore())
+    ) {
+      res = await open();
+    }
+    if (!res.ok) {
+      throw await apiError(res); // carries .status — the manager keys auth-error off 401/403
+    }
+    const body = res.body;
+    if (!body) return; // no readable stream → treat as an immediate clean end
+
+    const parser = new SseParser(opts.onEvent, opts.onComment);
+    const reader = body.getReader();
+    try {
+      for (;;) {
+        const { done, value } = await reader.read();
+        if (done) break; // server closed the stream
+        if (value) parser.feed(value);
+      }
+    } finally {
+      try {
+        reader.releaseLock();
+      } catch {
+        /* already released when the underlying stream was aborted */
+      }
+    }
+  } catch (e) {
+    // A caller-initiated abort resolves cleanly; every other failure propagates
+    // (HTTP apiError with .status, or a transport TypeError) so the manager can
+    // decide between auth-error and a scheduled reconnect.
+    if (opts.signal.aborted) return;
+    throw e;
+  }
 }
 
 /** GET /api/reports/{id}/ai/jobs/{jobId} — poll one async job. Both `ai` and
@@ -1429,6 +1562,16 @@ export const api = {
       id: string,
       body: { providerId?: string } = {},
     ): Promise<{ jobId: string }> => submitGenerateJobRequest(id, body),
+    /**
+     * Submit the async cross-check medical-review job (durable async-job
+     * platform, 2026-07-23). Returns the job id immediately; poll via
+     * `api.jobs.get`. The audio half stays on the loopback sidecar
+     * (`crossCheck`/`crossCheckStatus`); this is the hosted review half.
+     */
+    submitCrossCheckJob: (
+      id: string,
+      body: { text: string; sectionKey?: string; useUbag?: boolean },
+    ): Promise<{ jobId: string }> => submitCrossCheckJobRequest(id, body),
     aiJobStatus: <T>(id: string, jobId: string): Promise<AiJobEnvelope<T>> =>
       aiJobStatusRequest<T>(id, jobId),
     prior: (id: string) =>
@@ -1697,6 +1840,15 @@ export const api = {
     retry: (id: string) =>
       request<{ jobId: string }>(`/api/jobs/${id}/retry`, { method: 'POST' }),
   },
+  /**
+   * Real-time server-push (durable async-job platform, 2026-07-23). `stream`
+   * opens the SSE endpoint and drives an {@link SseParser}; the ref-counted
+   * `EventStreamManager` (`lib/events.ts`) owns backoff/liveness and fans the
+   * decoded events out to the JobsProvider (and, later, the notifications
+   * provider). Bearer + tenant headers ride the standard `fetch` path — no
+   * `access_token` query param from this client.
+   */
+  events: { stream: connectEventStream },
   rulebooks: {
     list: () => request<Rulebook[]>('/api/rulebooks'),
     get: (id: string) => request<Rulebook & { sourceYaml: string }>(`/api/rulebooks/${id}`),
