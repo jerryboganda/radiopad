@@ -11,9 +11,11 @@ import {
   jobsReducer,
   nextPollDelay,
   openReportHref,
+  progressPatch,
   seedToJob,
   specMode,
   stageLabel,
+  summaryPatch,
   summaryToJob,
   visibleJobs,
   type Job,
@@ -261,5 +263,84 @@ describe('wire → Job mappers', () => {
       elapsedMs: 1_000, result: null, error: null, errorKind: null, stage: 'model-loading' as const,
     };
     expect(envelopePatch(local, env).stage).toBe('model-loading');
+  });
+
+  it('envelopePatch carries live progress for an active envelope, drops it once terminal', () => {
+    const running = makeJob({ status: 'running' });
+    const active: AiJobEnvelope<unknown> = {
+      jobId: 'j1', kind: 'ai', mode: 'impression', status: 'running', elapsedMs: 500,
+      result: null, error: null, errorKind: null, progress: { tokens: 12, percent: null },
+    };
+    expect(envelopePatch(running, active).progress).toEqual({ tokens: 12, percent: undefined });
+    const done: AiJobEnvelope<unknown> = { ...active, status: 'ok', progress: { tokens: 40 } };
+    expect(envelopePatch(running, done).progress).toBeUndefined();
+  });
+});
+
+describe('progress patches (bus + reducer)', () => {
+  it('UPDATE applies a progress patch to an active job', () => {
+    let s = stateWith(makeJob({ status: 'running' }));
+    s = jobsReducer(s, { type: 'UPDATE', id: 'j1', patch: progressPatch({ tokens: 42 }) });
+    expect(s.jobs[0].progress).toEqual({ tokens: 42, percent: undefined });
+    expect(s.jobs[0].status).toBe('running');
+  });
+
+  it('UPDATE no-ops a progress patch that arrives after the job is terminal (first-terminal-wins)', () => {
+    let s = stateWith(makeJob({ status: 'ok' }));
+    s = jobsReducer(s, { type: 'UPDATE', id: 'j1', patch: progressPatch({ tokens: 99 }) });
+    expect(s.jobs[0].progress).toBeUndefined();
+    expect(s.jobs[0].status).toBe('ok');
+  });
+
+  it('progressPatch keeps a real percent but omits a null/undefined one', () => {
+    expect(progressPatch({ tokens: 10 }).progress).toEqual({ tokens: 10, percent: undefined });
+    expect(progressPatch({ tokens: 10, percent: null }).progress).toEqual({ tokens: 10, percent: undefined });
+    expect(progressPatch({ tokens: 10, percent: 0.5 }).progress).toEqual({ tokens: 10, percent: 0.5 });
+  });
+});
+
+describe('summaryPatch (bus job event / unified detail)', () => {
+  function activeSummary(overrides: Partial<JobSummary> = {}): JobSummary {
+    return {
+      jobId: 'j5', kind: 'ai', mode: 'impression', status: 'running', errorKind: null, error: null,
+      attempt: 1, retryOfJobId: null, reportId: 'r3',
+      report: { accession: 'A', modality: 'CT', bodyPart: 'Abdomen', status: 'Draft' },
+      createdAt: new Date(1000).toISOString(), startedAt: null, completedAt: null, elapsedMs: 0,
+      progress: { tokens: 7, percent: null },
+      ...overrides,
+    };
+  }
+
+  it('an unknown-active SSE job event ADDs a Job equivalent to summaryToJob', () => {
+    const summary = activeSummary();
+    const s = jobsReducer(initialJobsState(), { type: 'ADD', job: summaryToJob(summary, 'hosted') });
+    expect(s.jobs[0]).toMatchObject({
+      id: 'j5', status: 'running', reportId: 'r3', progress: { tokens: 7, percent: undefined },
+    });
+    expect(s.jobs[0].report?.bodyPart).toBe('Abdomen');
+  });
+
+  it('maps server fields (status/report/progress) onto a known active row', () => {
+    const patch = summaryPatch(makeJob({ id: 'j5', status: 'queued' }), activeSummary());
+    expect(patch.status).toBe('running');
+    expect(patch.report?.bodyPart).toBe('Abdomen');
+    expect(patch.progress).toEqual({ tokens: 7, percent: undefined });
+  });
+
+  it('stamps completedAt and drops progress on a terminal summary', () => {
+    const patch = summaryPatch(
+      makeJob({ status: 'running' }),
+      activeSummary({ status: 'ok', progress: { tokens: 100 } }),
+    );
+    expect(patch.status).toBe('ok');
+    expect(patch.completedAt).toBeGreaterThan(0);
+    expect(patch.progress).toBeUndefined();
+  });
+
+  it('summaryToJob copies progress for active rows and drops it once terminal', () => {
+    expect(summaryToJob(activeSummary({ status: 'running', progress: { tokens: 3 } }), 'hosted').progress)
+      .toEqual({ tokens: 3, percent: undefined });
+    expect(summaryToJob(activeSummary({ status: 'ok', progress: { tokens: 3 } }), 'hosted').progress)
+      .toBeUndefined();
   });
 });

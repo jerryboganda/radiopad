@@ -17,6 +17,36 @@ const m = vi.hoisted(() => ({
   localList: vi.fn(),
 }));
 
+// Controllable stand-in for the shared `hostedEvents` SSE singleton so tests can
+// drive events + status transitions without any network. `subscribe`/`onStatus`
+// capture the provider's callbacks; the helpers invoke them.
+const ev = vi.hoisted(() => {
+  const cbs: { evt: ((e: unknown) => void) | null; st: ((s: string) => void) | null } = {
+    evt: null,
+    st: null,
+  };
+  return {
+    subscribe: vi.fn((fn: (e: unknown) => void) => {
+      cbs.evt = fn;
+      return () => {
+        if (cbs.evt === fn) cbs.evt = null;
+      };
+    }),
+    onStatus: vi.fn((fn: (s: string) => void) => {
+      cbs.st = fn;
+      return () => {
+        if (cbs.st === fn) cbs.st = null;
+      };
+    }),
+    emit: (e: unknown) => cbs.evt?.(e),
+    setStatus: (s: string) => cbs.st?.(s),
+    reset: () => {
+      cbs.evt = null;
+      cbs.st = null;
+    },
+  };
+});
+
 vi.mock('next/navigation', () => ({ useRouter: () => ({ push: vi.fn() }) }));
 vi.mock('@/lib/api', () => ({
   isTransientPollError: (e: { status?: number; kind?: string }) =>
@@ -27,10 +57,16 @@ vi.mock('@/lib/api', () => ({
     localGenerate: { submitJob: m.localSubmit, jobStatus: m.localStatus, listJobs: m.localList, cancelJob: vi.fn() },
   },
 }));
+vi.mock('@/lib/events', () => ({
+  hostedEvents: { subscribe: ev.subscribe, onStatus: ev.onStatus },
+  createLocalEvents: () => ({ subscribe: () => () => {}, onStatus: () => () => {} }),
+}));
 
 import JobsProvider, { useJobs } from '@/components/jobs/JobsProvider';
 import { ToastProvider } from '@/components/ui/ToastProvider';
+import { jobPartials } from '@/lib/jobStream';
 import type { JobSubmitSpec } from '@/lib/jobs';
+import type { JobSummary } from '@/lib/api';
 
 function Harness() {
   const { jobs, submit } = useJobs();
@@ -78,6 +114,7 @@ function onTerminal(e: Event) {
 
 beforeEach(() => {
   terminalEvents = [];
+  ev.reset();
   window.addEventListener('radiopad:job-terminal', onTerminal);
   m.list.mockResolvedValue({ jobs: [] });
   m.localList.mockResolvedValue({ jobs: [] });
@@ -144,6 +181,171 @@ describe('JobsProvider — shared ticker', () => {
     expect(screen.getByTestId('job').textContent).toBe('l1:error:sidecar_restart');
     expect(terminalEvents).toHaveLength(1);
     expect(terminalEvents[0].detail).toMatchObject({ status: 'error', kind: 'local-generate' });
+  });
+});
+
+function summary(jobId: string, status: string, extra: Partial<JobSummary> = {}): JobSummary {
+  return {
+    jobId,
+    kind: 'generate',
+    mode: 'generate',
+    status: status as JobSummary['status'],
+    errorKind: null,
+    error: null,
+    attempt: 1,
+    retryOfJobId: null,
+    reportId: 'r2',
+    report: null,
+    createdAt: new Date(1_000).toISOString(),
+    startedAt: null,
+    completedAt: status === 'ok' ? new Date().toISOString() : null,
+    elapsedMs: 1_000,
+    ...extra,
+  };
+}
+
+describe('JobsProvider — SSE stream integration', () => {
+  it('pauses hosted polling while the stream status is open', async () => {
+    vi.useFakeTimers();
+    m.list.mockResolvedValue({ jobs: [summary('j2', 'running')] });
+    m.get.mockResolvedValue(detail('running', { jobId: 'j2', reportId: 'r2', report: null }));
+
+    renderApp();
+    // Let the mount rehydration paint j2 (a poll timer is now armed at 300ms).
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(1);
+    });
+    // Open the stream BEFORE the first poll fires → hosted jobs are pushed, not polled.
+    await act(async () => {
+      ev.setStatus('open');
+    });
+    const getCallsAtOpen = m.get.mock.calls.length;
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(5_000);
+    });
+    expect(m.get.mock.calls.length).toBe(getCallsAtOpen);
+  });
+
+  it('resumes hosted polling when the stream transitions from open to down', async () => {
+    vi.useFakeTimers();
+    m.list.mockResolvedValue({ jobs: [summary('j2', 'running')] });
+    m.get.mockResolvedValue(detail('running', { jobId: 'j2', reportId: 'r2', report: null }));
+
+    renderApp();
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(1);
+    });
+    await act(async () => {
+      ev.setStatus('open');
+    });
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(2_000);
+    });
+    const before = m.get.mock.calls.length; // paused → no polls
+    await act(async () => {
+      ev.setStatus('down');
+    });
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(400);
+    });
+    expect(m.get.mock.calls.length).toBeGreaterThan(before);
+  });
+
+  it('re-hydrates via api.jobs.list on each transition to open (reconnect resume)', async () => {
+    vi.useFakeTimers();
+    m.list.mockResolvedValue({ jobs: [] });
+
+    renderApp();
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(1);
+    });
+    const afterMount = m.list.mock.calls.length; // 1 (mount hydration)
+    await act(async () => {
+      ev.setStatus('open');
+    });
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(1);
+    });
+    expect(m.list.mock.calls.length).toBe(afterMount + 1);
+    // A redundant 'open' with no intervening transition does not re-list.
+    await act(async () => {
+      ev.setStatus('open');
+    });
+    expect(m.list.mock.calls.length).toBe(afterMount + 1);
+  });
+
+  it('fires the terminal side effect exactly once for a job settled via SSE then re-seen', async () => {
+    vi.useFakeTimers();
+    m.list.mockResolvedValue({ jobs: [summary('j2', 'running')] });
+
+    renderApp();
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(1);
+    });
+    await act(async () => {
+      ev.emit({ type: 'job', data: summary('j2', 'ok') });
+    });
+    expect(terminalEvents).toHaveLength(1);
+    // A stray duplicate terminal (e.g. an in-flight poll landing after) is dropped.
+    await act(async () => {
+      ev.emit({ type: 'job', data: summary('j2', 'ok') });
+    });
+    expect(terminalEvents).toHaveLength(1);
+  });
+
+  it('auth-error stream status clears all tracked jobs (same as a 401 poll)', async () => {
+    vi.useFakeTimers();
+    m.list.mockResolvedValue({ jobs: [summary('j2', 'running')] });
+
+    renderApp();
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(1);
+    });
+    expect(screen.getAllByTestId('job').length).toBeGreaterThan(0);
+    await act(async () => {
+      ev.setStatus('auth-error');
+    });
+    expect(screen.queryAllByTestId('job')).toHaveLength(0);
+  });
+
+  it('ADDs an unknown ACTIVE job from SSE (cross-window) but ignores an unknown TERMINAL one', async () => {
+    vi.useFakeTimers();
+    m.list.mockResolvedValue({ jobs: [] });
+    // Open the stream so the freshly-ADDed active job is pushed, not polled.
+    renderApp();
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(1);
+    });
+    await act(async () => {
+      ev.setStatus('open');
+    });
+    await act(async () => {
+      ev.emit({ type: 'job', data: summary('jx', 'running') });
+    });
+    let ids = screen.getAllByTestId('job').map((n) => n.textContent?.split(':')[0]);
+    expect(ids).toContain('jx');
+    await act(async () => {
+      ev.emit({ type: 'job', data: summary('jy', 'ok') });
+    });
+    ids = screen.getAllByTestId('job').map((n) => n.textContent?.split(':')[0]);
+    expect(ids).not.toContain('jy');
+    expect(m.get).not.toHaveBeenCalled(); // stream open → no polling of the pushed job
+  });
+
+  it('routes partial events to jobPartials.append and never into the reducer', async () => {
+    vi.useFakeTimers();
+    m.list.mockResolvedValue({ jobs: [] });
+    const appendSpy = vi.spyOn(jobPartials, 'append');
+
+    renderApp();
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(1);
+    });
+    await act(async () => {
+      ev.emit({ type: 'partial', data: { jobId: 'jz', delta: 'Hello', tokens: 2 } });
+    });
+    expect(appendSpy).toHaveBeenCalledWith('jz', 'Hello', 2);
+    expect(screen.queryAllByTestId('job')).toHaveLength(0); // no reducer row from a partial
   });
 });
 

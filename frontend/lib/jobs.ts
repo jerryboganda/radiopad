@@ -50,6 +50,10 @@ export interface Job {
   status: JobStatus;
   /** Local-origin only — sidecar pipeline stage. */
   stage?: 'queued' | 'model-loading' | 'generating';
+  /** Live progress from the registry/bus (active jobs only; never persisted to
+   *  localStorage). `percent` is present ONLY when the server computed a real
+   *  ratio (design §3.10 — indeterminate on every current path); never faked. */
+  progress?: { tokens: number; percent?: number };
   createdAt: number;
   startedAt?: number;
   completedAt?: number;
@@ -285,6 +289,10 @@ export function summaryToJob(summary: JobSummary, origin: JobOrigin): Job {
     errorKind: summary.errorKind ?? undefined,
     attempt: summary.attempt ?? 1,
     retryOfJobId: summary.retryOfJobId ?? undefined,
+    progress:
+      summary.progress && !terminal
+        ? { tokens: summary.progress.tokens, percent: summary.progress.percent ?? undefined }
+        : undefined,
     dismissed: false,
     seen: false,
     notified: terminal,
@@ -332,6 +340,48 @@ export function envelopePatch<T>(
   }
   if (isTerminalStatus(env.status) && job.completedAt == null) {
     patch.completedAt = Date.now();
+  }
+  if (env.progress && isActiveStatus(env.status)) {
+    patch.progress = { tokens: env.progress.tokens, percent: env.progress.percent ?? undefined };
+  }
+  return patch;
+}
+
+/**
+ * Patch from a bus `progress` event (durable async-job platform). The caller
+ * (JobsProvider) checks the job is known + active before dispatching; the
+ * reducer's first-terminal-wins guard is the backstop that makes a late or
+ * duplicate progress patch on an already-terminal job a no-op.
+ */
+export function progressPatch(ev: { tokens: number; percent?: number | null }): Partial<Job> {
+  return { progress: { tokens: ev.tokens, percent: ev.percent ?? undefined } };
+}
+
+/**
+ * Build an UPDATE patch from a `JobSummary` — the shape of both the unified
+ * `GET /api/jobs/{id}` detail (a superset) and a bus `job` event. Carries only
+ * server-owned fields; the reducer preserves the client lifecycle flags
+ * (seen / notified / dismissed / applied) and its first-terminal-wins guard
+ * drops a stray patch on a settled job. `job` supplies the fallbacks for a
+ * backend that omits `startedAt` / `completedAt`.
+ */
+export function summaryPatch(job: Job, s: JobSummary): Partial<Job> {
+  const patch: Partial<Job> = { status: s.status };
+  if (s.error != null) patch.error = s.error;
+  if (s.errorKind != null) patch.errorKind = s.errorKind;
+  if (s.report) {
+    patch.report = {
+      accession: s.report.accession,
+      modality: s.report.modality,
+      bodyPart: s.report.bodyPart,
+    };
+  }
+  if (s.startedAt) patch.startedAt = Date.parse(s.startedAt);
+  else if (job.startedAt == null && s.elapsedMs) patch.startedAt = Date.now() - s.elapsedMs;
+  if (s.completedAt) patch.completedAt = Date.parse(s.completedAt);
+  else if (isTerminalStatus(s.status) && job.completedAt == null) patch.completedAt = Date.now();
+  if (s.progress && isActiveStatus(s.status)) {
+    patch.progress = { tokens: s.progress.tokens, percent: s.progress.percent ?? undefined };
   }
   return patch;
 }

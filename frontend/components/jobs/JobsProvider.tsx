@@ -32,6 +32,8 @@ import { useRouter } from 'next/navigation';
 import { api, isTransientPollError } from '@/lib/api';
 import { describeAiError } from '@/lib/aiErrors';
 import { isDesktopSurface } from '@/lib/surface';
+import { hostedEvents, type AppEvent } from '@/lib/events';
+import { jobPartials } from '@/lib/jobStream';
 import { useToast } from '@/components/ui/ToastProvider';
 import { notify } from '@/components/shell/NotificationsBell';
 import {
@@ -47,8 +49,10 @@ import {
   jobsReducer,
   nextPollDelay,
   openReportHref,
+  progressPatch,
   seedToJob,
   specMode,
+  summaryPatch,
   summaryToJob,
   visibleJobs,
   type Job,
@@ -149,6 +153,12 @@ export default function JobsProvider({ children }: { children: ReactNode }) {
   // (before rehydration reads the seed) — otherwise it would delete the very seed
   // we are about to load.
   const didRehydrate = useRef(false);
+  // Stream coverage: while a stream is healthy, its origin's jobs are pushed (not
+  // polled). `streamHealthyRef` = the hosted SSE stream; `localStreamHealthyRef`
+  // = the sidecar's local SSE (not yet wired this PR — stays false so local jobs
+  // keep polling exactly as today).
+  const streamHealthyRef = useRef(false);
+  const localStreamHealthyRef = useRef(false);
 
   // --- keep localStorage seed in sync with local-origin jobs -----------------
   useEffect(() => {
@@ -254,7 +264,9 @@ export default function JobsProvider({ children }: { children: ReactNode }) {
       try {
         const detail = await api.jobs.get(job.id);
         pollPathRef.current.set(job.id, 'jobs');
-        dispatch({ type: 'UPDATE', id: job.id, patch: detailPatch(job, detail) });
+        // `JobDetail` is a `JobSummary` superset — the shared mapper handles both
+        // it and the bus `job` event, so the poll and push paths stay identical.
+        dispatch({ type: 'UPDATE', id: job.id, patch: summaryPatch(job, detail) });
         return;
       } catch (e) {
         if (isAuthError(e)) throw e;
@@ -280,10 +292,23 @@ export default function JobsProvider({ children }: { children: ReactNode }) {
     }
   }, []);
 
+  // A job is polled only while its origin's push stream is NOT healthy — hosted
+  // jobs are excluded when the hosted SSE stream is up, local jobs when the
+  // sidecar stream is up (never, this PR). Everything the stream doesn't cover
+  // keeps polling, so a dropped stream degrades to the poll fallback, never
+  // breaks.
+  const needsPoll = useCallback(
+    (j: Job): boolean =>
+      isActiveStatus(j.status) &&
+      !j.dismissed &&
+      (j.origin === 'local' ? !localStreamHealthyRef.current : !streamHealthyRef.current),
+    [],
+  );
+
   const runTick = useCallback(async () => {
     timerRef.current = null;
     if (tickingRef.current) return;
-    const active = stateRef.current.jobs.filter((j) => isActiveStatus(j.status) && !j.dismissed);
+    const active = stateRef.current.jobs.filter(needsPoll);
     if (active.length === 0) {
       delayRef.current = JOB_FIRST_POLL_MS;
       return; // idle — no timer running
@@ -301,9 +326,7 @@ export default function JobsProvider({ children }: { children: ReactNode }) {
       return;
     }
 
-    const stillActive = stateRef.current.jobs.some(
-      (j) => isActiveStatus(j.status) && !j.dismissed,
-    );
+    const stillActive = stateRef.current.jobs.some(needsPoll);
     if (!stillActive) {
       delayRef.current = JOB_FIRST_POLL_MS;
       return; // back to idle
@@ -314,7 +337,7 @@ export default function JobsProvider({ children }: { children: ReactNode }) {
     );
     clearTimer();
     timerRef.current = setTimeout(() => void runTick(), delayRef.current);
-  }, [pollOne, clearTimer]);
+  }, [pollOne, clearTimer, needsPoll]);
 
   const kickTicker = useCallback(() => {
     delayRef.current = JOB_FIRST_POLL_MS;
@@ -356,6 +379,21 @@ export default function JobsProvider({ children }: { children: ReactNode }) {
     };
   }, [clearTimer]);
 
+  // Hosted server truth (durable jobs table). Merged (never replaces) so client
+  // lifecycle flags survive. Shared by the mount rehydration AND the stream's
+  // reconnect resume (decision 2 — no Last-Event-ID; re-list on every `open`).
+  // 404 until JobsController lands = "none". Never throws into the render tree.
+  const hydrateHosted = useCallback(async (): Promise<void> => {
+    try {
+      const { jobs } = await api.jobs.list({ active: true, limit: 20 });
+      if (mountedRef.current && Array.isArray(jobs)) {
+        dispatch({ type: 'HYDRATE', jobs: jobs.map((s) => summaryToJob(s, 'hosted')) });
+      }
+    } catch (e) {
+      if (!isNotFound(e)) console.warn('[jobs] hosted rehydration failed', e);
+    }
+  }, []);
+
   // --- rehydration on mount --------------------------------------------------
   useEffect(() => {
     if (!isDesktopSurface) return;
@@ -370,19 +408,9 @@ export default function JobsProvider({ children }: { children: ReactNode }) {
       dispatch({ type: 'HYDRATE', jobs: seed.map(seedToJob) });
     }
 
-    // 2. Server truth (durable table) — 404 until JobsController lands = "none".
+    // 2. Server truth (durable table) — identical code path to the stream resume.
     void (async () => {
-      try {
-        const { jobs } = await api.jobs.list({ active: true, limit: 20 });
-        if (!cancelled && Array.isArray(jobs)) {
-          dispatch({ type: 'HYDRATE', jobs: jobs.map((s) => summaryToJob(s, 'hosted')) });
-        }
-      } catch (e) {
-        if (!isNotFound(e)) {
-          // Swallow — never throw into the render tree. Log for diagnostics.
-          console.warn('[jobs] hosted rehydration failed', e);
-        }
-      }
+      await hydrateHosted();
       // 3. Sidecar local jobs (desktop/Tauri only).
       if (isTauriRuntime()) {
         try {
@@ -398,6 +426,81 @@ export default function JobsProvider({ children }: { children: ReactNode }) {
 
     return () => {
       cancelled = true;
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  // --- server-push (SSE) consumer --------------------------------------------
+  // The FIRST subscriber to the shared hosted event stream. Reads `stateRef` so
+  // it never closes over a stale job list. No dispatch for `partial` (decision
+  // 4) — that text lives in the module-level `jobPartials` store, off the reducer.
+  const onAppEvent = useCallback((e: AppEvent) => {
+    switch (e.type) {
+      case 'job': {
+        const s = e.data;
+        const known = stateRef.current.jobs.find((j) => j.id === s.jobId);
+        if (known) {
+          dispatch({ type: 'UPDATE', id: s.jobId, patch: summaryPatch(known, s) });
+        } else if (isActiveStatus(s.status)) {
+          // Cross-window tracking for free — the server already filtered to this
+          // tenant+user. Unknown TERMINAL events are ignored (nothing to settle;
+          // avoids toast spam for another window's history).
+          dispatch({ type: 'ADD', job: summaryToJob(s, 'hosted') });
+        }
+        return;
+      }
+      case 'progress': {
+        const ev = e.data;
+        const known = stateRef.current.jobs.find((j) => j.id === ev.jobId);
+        // Known + active only; the first-terminal-wins guard would drop it anyway,
+        // but skipping the dispatch avoids churning a settled row.
+        if (known && isActiveStatus(known.status)) {
+          dispatch({ type: 'UPDATE', id: ev.jobId, patch: progressPatch(ev) });
+        }
+        return;
+      }
+      case 'partial':
+        // Always append — the `job` ADD may arrive later in the same batch. Off
+        // the reducer entirely (decision 4).
+        jobPartials.append(e.data.jobId, e.data.delta, e.data.tokens);
+        return;
+      case 'notification':
+        // A future NotificationsProvider consumes these from the same singleton.
+        return;
+    }
+  }, []);
+
+  // Subscribe to the hosted stream (desktop only). Pauses hosted polling while
+  // the stream is healthy and resumes it — re-hydrating — on every reconnect.
+  useEffect(() => {
+    if (!isDesktopSurface) return;
+    const offEvt = hostedEvents.subscribe(onAppEvent);
+    const offSt = hostedEvents.onStatus((s) => {
+      const healthy = s === 'open';
+      const was = streamHealthyRef.current;
+      streamHealthyRef.current = healthy;
+      if (s === 'auth-error') {
+        // Session gone — same handling as a 401 poll error.
+        clearTimer();
+        dispatch({ type: 'CLEAR_ALL' });
+        return;
+      }
+      if (healthy !== was) {
+        // Transition either way → one immediate, dup-safe poll round. On
+        // healthy→true this doubles as the reconnect resume: re-run the identical
+        // hosted hydration the mount effect uses (decision 2 — no Last-Event-ID).
+        if (healthy) void hydrateHosted();
+        kickTicker();
+      }
+    });
+    // TODO(FE-PR2, sidecar): when `isTauriRuntime()`, also subscribe a
+    // `createLocalEvents(localSttBase())` instance here and flip
+    // `localStreamHealthyRef` on its status so local jobs pause polling too. Until
+    // the sidecar local-SSE endpoint ships, `localStreamHealthyRef` stays false
+    // and local jobs keep polling every 2s (silent fallback — zero coupling).
+    return () => {
+      offEvt();
+      offSt();
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
@@ -573,30 +676,6 @@ export default function JobsProvider({ children }: { children: ReactNode }) {
       </div>
     </JobsContext.Provider>
   );
-}
-
-// ---------------------------------------------------------------------------
-// Hosted `JobDetail` → patch (kept local: it needs the api `JobDetail` shape)
-// ---------------------------------------------------------------------------
-function detailPatch(
-  job: Job,
-  detail: Awaited<ReturnType<typeof api.jobs.get>>,
-): Partial<Job> {
-  const patch: Partial<Job> = { status: detail.status };
-  if (detail.error != null) patch.error = detail.error;
-  if (detail.errorKind != null) patch.errorKind = detail.errorKind;
-  if (detail.report) {
-    patch.report = {
-      accession: detail.report.accession,
-      modality: detail.report.modality,
-      bodyPart: detail.report.bodyPart,
-    };
-  }
-  if (detail.startedAt) patch.startedAt = Date.parse(detail.startedAt);
-  else if (job.startedAt == null && detail.elapsedMs) patch.startedAt = Date.now() - detail.elapsedMs;
-  if (detail.completedAt) patch.completedAt = Date.parse(detail.completedAt);
-  else if (isTerminalStatus(detail.status) && job.completedAt == null) patch.completedAt = Date.now();
-  return patch;
 }
 
 // ---------------------------------------------------------------------------
