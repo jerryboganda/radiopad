@@ -100,11 +100,19 @@ public sealed class RetentionSweepJob
         var aiResultCutoff = DateTimeOffset.UtcNow.AddHours(-24);
         var aiRowCutoff = DateTimeOffset.UtcNow.AddDays(-30);
 
+        // PR-B5 — InputJson (raw dictation / cross-check text on the input-carrying kinds) is the
+        // same clinical-text-at-rest class as ResultJson, so it is shed on the same 24h cadence in
+        // the same SetProperty chain. Consequence (deliberate): a cleanup/cross-check job older than
+        // 24h can no longer be retried, because the raw input needed to re-run it is gone. The Where
+        // also matches rows that carry InputJson but never produced a ResultJson (e.g. a failed
+        // cleanup job) so their input is not left behind.
         var aiResultsCleared = await db.AiJobs
             .Where(j => j.Status != "queued" && j.Status != "running"
-                        && j.ResultJson != null
+                        && (j.ResultJson != null || j.InputJson != null)
                         && j.CompletedAt != null && j.CompletedAt < aiResultCutoff)
-            .ExecuteUpdateAsync(s => s.SetProperty(j => j.ResultJson, (string?)null), ct);
+            .ExecuteUpdateAsync(s => s
+                .SetProperty(j => j.ResultJson, (string?)null)
+                .SetProperty(j => j.InputJson, (string?)null), ct);
 
         var aiJobsDeleted = await db.AiJobs
             .Where(j => j.CompletedAt != null && j.CompletedAt < aiRowCutoff)
@@ -112,7 +120,7 @@ public sealed class RetentionSweepJob
 
         if (aiResultsCleared > 0 || aiJobsDeleted > 0)
             _log.LogInformation(
-                "Retention sweep: AI jobs — cleared {Cleared} result payload(s) (>24h), deleted {Deleted} row(s) (>30d)",
+                "Retention sweep: AI jobs — cleared {Cleared} result/input payload(s) (>24h), deleted {Deleted} row(s) (>30d)",
                 aiResultsCleared, aiJobsDeleted);
 
         // PR-N2 — signed audit-export bundles are retained 90 days (a global housekeeping pass,

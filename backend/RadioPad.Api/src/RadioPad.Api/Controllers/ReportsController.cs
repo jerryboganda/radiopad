@@ -1534,6 +1534,80 @@ public class ReportsController : TenantedController
     }
 
     /// <summary>
+    /// PR-B5 — durable-job sibling of <see cref="DictationCleanup"/>. Runs the dictation cleanup
+    /// pipeline as a restart-surviving async job (Kind <c>ai</c>, Mode <c>cleanup</c>) instead of a
+    /// blocking request, so a reload or server restart never loses track of it. RBAC parity with the
+    /// sync route (<see cref="UserRole.Radiologist"/> / <see cref="UserRole.MedicalDirector"/> — NOT
+    /// the ReportsEdit permission). The raw dictation is persisted in <c>AiJob.InputJson</c> so a
+    /// Retry can re-run it. The result is a suggestion set in ResultJson — the job NEVER writes the
+    /// report; the preview/accept gate stays entirely client-side. The sync route stays live so old
+    /// desktop builds keep working.
+    /// </summary>
+    [HttpPost("{id:guid}/dictation/cleanup/jobs")]
+    [Microsoft.AspNetCore.RateLimiting.EnableRateLimiting("ai")]
+    public async Task<IActionResult> DictationCleanupJob(
+        Guid id,
+        [FromBody] DictationCleanupDto dto,
+        CancellationToken ct)
+    {
+        var (tenant, user) = await ResolveContextAsync(_db, ct);
+        var deny = RequireRole(user, UserRole.Radiologist, UserRole.MedicalDirector);
+        if (deny is not null) return deny;
+        var report = await _db.Reports.FirstOrDefaultAsync(r => r.Id == id && r.TenantId == tenant.Id, ct);
+        if (report is null) return NotFound();
+        if (string.IsNullOrWhiteSpace(dto.RawDictation))
+            return BadRequest(new { error = "rawDictation is required.", kind = "validation" });
+
+        // Single-flight: one live cleanup per report attaches rather than stacks.
+        if (_aiJobs.TryGetRunning(tenant.Id, id, "ai", "cleanup", out var running))
+            return Accepted(new { jobId = running.Id, status = running.Status });
+
+        var inputJson = System.Text.Json.JsonSerializer.Serialize(new { rawDictation = dto.RawDictation });
+        var (jobId, status, _) = await _coordinator.SubmitAsync(
+            tenant, user, id, "ai", "cleanup", null, ct, inputJson: inputJson);
+        return Accepted(new { jobId, status });
+    }
+
+    /// <summary>
+    /// PR-B5 — durable-job sibling of <see cref="CrossCheckReview"/>. Runs the LLM medical-accuracy
+    /// review as a restart-surviving async job (Kind <c>crosscheck</c>, Mode = the normalized section
+    /// key, or <c>report</c> when none). Per-section single-flight: two different sections cross-check
+    /// concurrently; a second submit of the SAME section attaches. RBAC parity + InputJson handling
+    /// mirror <see cref="DictationCleanupJob"/>. Corrections are a suggestion set in ResultJson —
+    /// never written to the report. The sync route stays live.
+    /// </summary>
+    [HttpPost("{id:guid}/crosscheck/review/jobs")]
+    [Microsoft.AspNetCore.RateLimiting.EnableRateLimiting("ai")]
+    public async Task<IActionResult> CrossCheckReviewJob(
+        Guid id,
+        [FromBody] CrossCheckReviewDto dto,
+        CancellationToken ct)
+    {
+        var (tenant, user) = await ResolveContextAsync(_db, ct);
+        var deny = RequireRole(user, UserRole.Radiologist, UserRole.MedicalDirector);
+        if (deny is not null) return deny;
+        var report = await _db.Reports.FirstOrDefaultAsync(r => r.Id == id && r.TenantId == tenant.Id, ct);
+        if (report is null) return NotFound();
+        if (string.IsNullOrWhiteSpace(dto.Text))
+            return BadRequest(new { error = "text is required.", kind = "validation" });
+
+        // Mode scopes the single-flight to the section, so distinct sections run concurrently.
+        var mode = dto.SectionKey?.Trim().ToLowerInvariant() is { Length: > 0 } s ? s : "report";
+        if (_aiJobs.TryGetRunning(tenant.Id, id, "crosscheck", mode, out var running))
+            return Accepted(new { jobId = running.Id, status = running.Status });
+
+        var inputJson = System.Text.Json.JsonSerializer.Serialize(new
+        {
+            text = dto.Text,
+            sectionKey = dto.SectionKey,
+            useUbag = dto.UseUbag,
+        });
+        var (jobId, status, _) = await _coordinator.SubmitAsync(
+            tenant, user, id, "crosscheck", mode, null, ct, inputJson: inputJson);
+        return Accepted(new { jobId, status });
+    }
+
+    /// <summary>
     /// Phase B (dictation transcription) — accepts a dictation audio file
     /// (multipart form, field <c>audio</c>) and returns a free-text transcript
     /// scraped via the UBAG <c>medical_transcription</c> flow. Mirrors

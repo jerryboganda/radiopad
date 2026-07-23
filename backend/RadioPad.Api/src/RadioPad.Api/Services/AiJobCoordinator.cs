@@ -95,13 +95,15 @@ public sealed class AiJobCoordinator
     /// already-validated tuple.
     /// </summary>
     public async Task<(Guid jobId, string status, bool alreadyExisting)> SubmitAsync(
-        Tenant tenant, User user, Guid reportId, string kind, string mode, Guid? providerId, CancellationToken ct)
+        Tenant tenant, User user, Guid reportId, string kind, string mode, Guid? providerId, CancellationToken ct,
+        string? inputJson = null)
     {
         var existing = await FindActiveAsync(tenant.Id, reportId, kind, mode, ct);
         if (existing is not null)
             return (existing.Id, existing.Status, true);
 
-        var job = await CreateAndEnqueueAsync(tenant.Id, user.Id, reportId, kind, mode, providerId, attempt: 1, retryOf: null, ct);
+        var job = await CreateAndEnqueueAsync(
+            tenant.Id, user.Id, reportId, kind, mode, providerId, attempt: 1, retryOf: null, ct, inputJson);
         return (job.Id, job.Status, false);
     }
 
@@ -120,13 +122,29 @@ public sealed class AiJobCoordinator
 
         await EnforceGatingAsync(tenant.Id, prior.Kind, prior.Mode, prior.ProviderId, ct);
 
+        // PR-B5 — input-carrying kinds can only be re-run while their InputJson survives; the
+        // retention sweep nulls it 24h after completion (same clinical-text-at-rest class as
+        // ResultJson), after which the raw input is unrecoverable. A crosscheck job ALWAYS carries
+        // input, so a swept one is not retryable → 409 job_input_expired. An ai+cleanup row carries
+        // input only when submitted via the dedicated /dictation/cleanup/jobs route; a legacy
+        // /ai/jobs cleanup never did and re-runs the generic single-text path, so it must NOT hard-
+        // fail here — hence the input-present clause below is tautologically skipped once swept,
+        // leaving the legacy retry path intact.
+        var inputJson = prior.InputJson;
+        var requiresInput = string.Equals(prior.Kind, "crosscheck", StringComparison.Ordinal)
+            || (string.Equals(prior.Kind, "ai", StringComparison.Ordinal)
+                && string.Equals(prior.Mode, "cleanup", StringComparison.Ordinal)
+                && inputJson is not null);
+        if (requiresInput && string.IsNullOrEmpty(inputJson))
+            throw new InvalidOperationException("job_input_expired");
+
         // A manual re-submit may have raced this retry — attach rather than stack.
         var existing = await FindActiveAsync(tenant.Id, prior.ReportId, prior.Kind, prior.Mode, ct);
         if (existing is not null) return existing.Id;
 
         var job = await CreateAndEnqueueAsync(
             tenant.Id, user.Id, prior.ReportId, prior.Kind, prior.Mode, prior.ProviderId,
-            attempt: prior.Attempt + 1, retryOf: prior.Id, ct);
+            attempt: prior.Attempt + 1, retryOf: prior.Id, ct, inputJson);
         return job.Id;
     }
 
@@ -282,6 +300,14 @@ public sealed class AiJobCoordinator
 
             if (string.Equals(work.Kind, "generate", StringComparison.Ordinal))
                 await RunGenerateAsync(db, reporting, row, tenant, user, report, work.ProviderId, ct);
+            else if (string.Equals(work.Kind, "crosscheck", StringComparison.Ordinal))
+                await RunCrossCheckAsync(scope, db, row, tenant, report, work.InputJson, ct);
+            else if (string.Equals(work.Kind, "ai", StringComparison.Ordinal)
+                     && string.Equals(work.Mode, "cleanup", StringComparison.Ordinal)
+                     && !string.IsNullOrEmpty(work.InputJson))
+                // PR-B5 — the InputJson-presence guard keeps the legacy generic mode=cleanup path
+                // (submittable via /ai/jobs with no input) on RunAiAsync, byte-identical.
+                await RunCleanupAsync(scope, row, tenant, user, report, work.InputJson, ct);
             else
                 await RunAiAsync(db, reporting, row, tenant, user, report, work.Mode, work.ProviderId, ct);
         }
@@ -392,6 +418,102 @@ public sealed class AiJobCoordinator
         }
 
         FlushStreamProgress(row); // emit any buffered partial delta before the terminal event
+        _registry.Complete(row.Id, payload); // hot cache first
+        await MarkTerminalOkDbAsync(row.Id, System.Text.Json.JsonSerializer.Serialize(payload));
+    }
+
+    // PR-B5 — input payloads are round-tripped with Web defaults (camelCase, case-insensitive) so
+    // they bind regardless of the anonymous-object member casing the submit endpoints serialize with.
+    private static readonly System.Text.Json.JsonSerializerOptions InputJsonOptions =
+        new(System.Text.Json.JsonSerializerDefaults.Web);
+
+    private sealed record CleanupInput(string? RawDictation);
+    private sealed record CrossCheckInput(string? Text, string? SectionKey, bool UseUbag);
+
+    /// <summary>
+    /// PR-B5 — durable dictation-cleanup run. Resolves <see cref="IDictationCleanupService"/> from
+    /// the run scope and mirrors the sync <c>POST /dictation/cleanup</c> envelope exactly, so the
+    /// poll/widget render identically. The result is a SUGGESTION SET only: nothing here writes the
+    /// report — the preview/accept gate stays entirely client-side. Streaming hooks are deliberately
+    /// not wired (short structured output; the widget shows an indeterminate ring). Inherits
+    /// RunAsync's catch ladder (ProviderPolicyException → provider_policy, transport, quota, cancel/
+    /// timeout).
+    /// </summary>
+    private async Task RunCleanupAsync(
+        IServiceScope scope, AiJob row,
+        Tenant tenant, User user, Report report, string inputJson, CancellationToken ct)
+    {
+        var input = System.Text.Json.JsonSerializer.Deserialize<CleanupInput>(inputJson, InputJsonOptions)
+            ?? new CleanupInput(null);
+        var service = scope.ServiceProvider.GetRequiredService<IDictationCleanupService>();
+        var result = await service.CleanupAsync(tenant, user, report, input.RawDictation ?? string.Empty, ct);
+
+        object payload = new
+        {
+            cleanedSections = new
+            {
+                indication = result.Indication,
+                technique = result.Technique,
+                findings = result.Findings,
+                impression = result.Impression,
+                recommendations = result.Recommendations,
+            },
+            provider = result.Provider,
+            model = result.Model,
+            latencyMs = result.LatencyMs,
+            promptVersion = result.PromptVersion,
+        };
+        _registry.Complete(row.Id, payload); // hot cache first
+        await MarkTerminalOkDbAsync(row.Id, System.Text.Json.JsonSerializer.Serialize(payload));
+    }
+
+    /// <summary>
+    /// PR-B5 — durable cross-check medical-review run. Deserializes <c>{ text, sectionKey, useUbag }</c>;
+    /// when <c>useUbag</c> is set it re-resolves the forced UBAG provider with the same query as the
+    /// sync <c>POST /crosscheck/review</c> (so a since-disabled UBAG provider naturally falls back to
+    /// the router, matching sync behaviour). Mirrors the sync correction envelope exactly. Corrections
+    /// are SUGGESTIONS only — never persisted to the report. Inherits RunAsync's catch ladder.
+    /// </summary>
+    private async Task RunCrossCheckAsync(
+        IServiceScope scope, RadioPadDbContext db, AiJob row,
+        Tenant tenant, Report report, string? inputJson, CancellationToken ct)
+    {
+        var input = System.Text.Json.JsonSerializer.Deserialize<CrossCheckInput>(
+            string.IsNullOrEmpty(inputJson) ? "{}" : inputJson, InputJsonOptions)
+            ?? new CrossCheckInput(null, null, false);
+
+        RadioPad.Domain.Entities.ProviderConfig? forced = null;
+        if (input.UseUbag)
+        {
+            forced = await db.Providers.FirstOrDefaultAsync(
+                p => p.TenantId == row.TenantId
+                     && p.Enabled
+                     && p.Adapter == RadioPad.Infrastructure.Providers.Ubag.UbagProviderAdapter.AdapterId, ct);
+        }
+
+        var service = scope.ServiceProvider.GetRequiredService<ICrossCheckReviewService>();
+        var result = await service.ReviewAsync(tenant, report, input.Text ?? string.Empty, input.SectionKey, forced, ct);
+
+        object payload = new
+        {
+            provider = result.Provider,
+            model = result.Model,
+            latencyMs = result.LatencyMs,
+            corrections = result.Corrections.Select(c => new
+            {
+                id = c.Id,
+                sectionKey = c.SectionKey,
+                originalText = c.OriginalText,
+                correctedText = c.CorrectedText,
+                startOffset = c.StartOffset,
+                endOffset = c.EndOffset,
+                reason = c.Reason,
+                category = c.Category,
+                source = c.Source,
+                confidence = c.Confidence,
+                severity = c.Severity,
+            }).ToList(),
+        };
         _registry.Complete(row.Id, payload); // hot cache first
         await MarkTerminalOkDbAsync(row.Id, System.Text.Json.JsonSerializer.Serialize(payload));
     }
@@ -706,7 +828,7 @@ public sealed class AiJobCoordinator
 
     private async Task<AiJob> CreateAndEnqueueAsync(
         Guid tenantId, Guid userId, Guid reportId, string kind, string mode, Guid? providerId,
-        int attempt, Guid? retryOf, CancellationToken ct)
+        int attempt, Guid? retryOf, CancellationToken ct, string? inputJson = null)
     {
         var job = new AiJob
         {
@@ -719,11 +841,12 @@ public sealed class AiJobCoordinator
             Status = "queued",
             Attempt = attempt,
             RetryOfJobId = retryOf,
+            InputJson = inputJson,
         };
         _db.AiJobs.Add(job);
         await _db.SaveChangesAsync(ct);
 
-        var work = new AiJobWork(job.Id, tenantId, userId, reportId, kind, mode, providerId);
+        var work = new AiJobWork(job.Id, tenantId, userId, reportId, kind, mode, providerId, inputJson);
         if (!_channel.Writer.TryWrite(work))
         {
             // Unbounded channel — TryWrite only fails if the writer is completed

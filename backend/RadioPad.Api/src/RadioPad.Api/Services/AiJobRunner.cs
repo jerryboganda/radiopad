@@ -3,7 +3,11 @@ using System.Threading.Channels;
 
 namespace RadioPad.Api.Services;
 
-/// <summary>One unit of durable AI-job work handed from the coordinator's submit path to the runner.</summary>
+/// <summary>One unit of durable AI-job work handed from the coordinator's submit path to the runner.
+/// <para>PR-B5 — <paramref name="InputJson"/> carries the request payload for the input-carrying
+/// kinds (cleanup raw dictation / cross-check text). Positional-with-default so every existing
+/// construction keeps compiling; null for the input-less kinds (generate, the legacy generic ai
+/// modes).</para></summary>
 public sealed record AiJobWork(
     Guid JobId,
     Guid TenantId,
@@ -11,7 +15,8 @@ public sealed record AiJobWork(
     Guid ReportId,
     string Kind,
     string Mode,
-    Guid? ProviderId);
+    Guid? ProviderId,
+    string? InputJson = null);
 
 /// <summary>
 /// Hosted consumer of the durable AI-job queue. Replaces the submit endpoints' old

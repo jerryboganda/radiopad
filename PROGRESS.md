@@ -4,6 +4,42 @@
 
 ---
 
+## Dictation-cleanup + cross-check as durable job kinds — PR-B5 (2026-07-23)
+
+Backend-only. Makes the two previously-synchronous AI passes (dictation cleanup, cross-check
+medical review) restart-surviving durable jobs, alongside the existing `ai`/`generate` kinds.
+Wire-additive; the sync endpoints stay live for old desktop builds. Docs:
+`docs/03-architecture/queues-jobs.md`, `docs/03-architecture/api-reference.md`.
+
+- **New column + migration:** `AiJob.InputJson` (`Entities.cs`) — the request payload for the
+  input-carrying kinds (cleanup `{ rawDictation }`, cross-check `{ text, sectionKey, useUbag }`).
+  Same clinical-text-at-rest class as `ResultJson`, never returned by any API, needed so Retry
+  can re-run. Hand-written migration `20260724100000_AddAiJobInput` (copies the `AddAiJobs`
+  pattern; picked up by `EnsureCreated` test schemas automatically).
+- **Retention:** `RetentionSweepJob`'s 24h block now nulls `InputJson` in the SAME `ExecuteUpdate`
+  chain as `ResultJson` (and its `Where` also matches input-only rows). Consequence: a
+  cleanup/cross-check job older than 24h is no longer reconstructable.
+- **Coordinator:** `AiJobWork` + `CreateAndEnqueueAsync` + `SubmitAsync` carry an optional trailing
+  `inputJson` (existing constructions/callers untouched). `RunAsync` dispatch routes `crosscheck`
+  → `RunCrossCheckAsync` and `ai`+`cleanup`+**has-input** → `RunCleanupAsync` (the presence guard
+  keeps the legacy input-less `mode=cleanup` on the generic `RunAiAsync` path byte-identical).
+  Both new runners resolve `IDictationCleanupService`/`ICrossCheckReviewService` from the run scope
+  and produce ResultJson envelopes byte-identical to the sync endpoints; neither writes the report
+  (suggestion sets only — the preview/accept gate stays client-side). `RetryAsync` copies the prior
+  `InputJson`; a `crosscheck` retry whose input was swept throws `job_input_expired`.
+- **Endpoints:** `POST /api/reports/{id}/dictation/cleanup/jobs` and `.../crosscheck/review/jobs`
+  (`ReportsController`) — RBAC parity with the sync routes (`Radiologist`/`MedicalDirector`, not
+  `ReportsEdit`), `ai` rate limit, registry single-flight (cross-check **per section**: `mode` =
+  normalized `sectionKey` or `report`), `202 { jobId, status }`. `JobsController.Retry` maps
+  `job_input_expired` → `409 { kind: "job_input_expired" }`. Poll/list projection unchanged
+  (kind-agnostic; `InputJson` never serialized).
+- **Did NOT touch** `Program.cs` (no new DI — the services + coordinator are already registered)
+  or `LocalGeneration*` (parallel PR).
+- **Tests:** `Integration/CleanupCrossCheckJobsTests` — submit/run/poll envelopes for both kinds,
+  RBAC-parity denial, cleanup + per-section cross-check single-flight, UBAG-fallback-to-router,
+  retry input-reuse, `409 job_input_expired`, 24h `InputJson` null-out, legacy `mode=cleanup`
+  regression, and boot-recovery `server_restart` sweep of a running cleanup row.
+
 ## Hangfire cron platform bootstrap + BackgroundService migration — PR-N1 (2026-07-23)
 
 Cron-shaped background work now runs on **Hangfire** (single-process, in-C#, same database).

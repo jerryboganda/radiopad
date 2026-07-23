@@ -1325,6 +1325,14 @@ public class AiJob : Entity
     /// duplicate clinical text into a second store). Cleared 24h after completion by RetentionWorker.</summary>
     public string? ResultJson { get; set; }
 
+    /// <summary>PR-B5 — request payload for the input-carrying job kinds: the raw dictation for an
+    /// <c>ai</c>+<c>cleanup</c> job (<c>{ rawDictation }</c>), or <c>{ text, sectionKey, useUbag }</c>
+    /// for a <c>crosscheck</c> job. Needed so <c>POST /api/jobs/{id}/retry</c> can re-run the job.
+    /// Same clinical-text-at-rest class as <see cref="ResultJson"/> — nulled 24h after completion by
+    /// the retention sweep, after which the job is no longer retryable — and NEVER serialized into any
+    /// API response (the client already holds the raw input it submitted).</summary>
+    public string? InputJson { get; set; }
+
     public string? Error { get; set; }
 
     /// <summary>Stable machine-readable failure reason: not_found, report_modified, quota_exceeded,

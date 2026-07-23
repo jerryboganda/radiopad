@@ -284,6 +284,17 @@ public class JobsController : TenantedController
                 kind = "job_not_retryable",
             });
         }
+        // PR-B5 — the raw input needed to re-run a cleanup/cross-check job is retained only 24h
+        // (same clinical-text-at-rest class as the result), after which the job can no longer be
+        // reconstructed from the durable row.
+        catch (InvalidOperationException ioe) when (ioe.Message == "job_input_expired")
+        {
+            return Conflict(new
+            {
+                error = "The job's input has expired (retained 24 h); run it again from the report.",
+                kind = "job_input_expired",
+            });
+        }
         // Gating is re-applied inside RetryAsync (it must not drift from submit). Map its
         // typed failures to the same shapes the submit endpoints emit rather than leaking
         // a raw 500 to the client.
