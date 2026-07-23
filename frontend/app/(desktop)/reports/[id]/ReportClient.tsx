@@ -228,6 +228,11 @@ export default function ReportPage() {
   const [voiceCommandMode, setVoiceCommandMode] = useState(false);
   const [dictating, setDictating] = useState(false);
   const [voiceCommandPills, setVoiceCommandPills] = useState<Array<{ id: number; command: VoiceCommand }>>([]);
+  // Re-entrancy guard for `executeDesktopCommand`'s AI voice commands — a
+  // ref, not state, since it's a pure dispatch guard (each callee already
+  // owns its own visible busy indicator: runRewrite -> rewriteBusy,
+  // validate() -> validationState, runAi -> the tracked-job busy state).
+  const desktopCommandBusyRef = useRef(false);
   const [inspectorTab, setInspectorTab] = useState<InspectorTab>('checklist');
   const [leftCollapsed, setLeftCollapsed] = useState(false);
   // RC-04 validation lifecycle.
@@ -1256,13 +1261,14 @@ export default function ReportPage() {
       case 'open_sign': setShowSignSend(true); return;
       default: break;
     }
-    setAiBusy(true);
+    if (desktopCommandBusyRef.current) return; // an AI voice command is already in flight
+    desktopCommandBusyRef.current = true;
     setError(null);
     try {
       switch (command) {
         case 'generate_impression':
           await runAi('impression');
-          return; // runAi handles setAiBusy
+          return; // runAi manages its own tracked-job busy state
         case 'make_concise':
           await runRewrite('concise');
           break;
@@ -1284,7 +1290,7 @@ export default function ReportPage() {
     } catch (e) {
       setError((e as Error).message);
     } finally {
-      setAiBusy(false);
+      desktopCommandBusyRef.current = false;
     }
   }
 
