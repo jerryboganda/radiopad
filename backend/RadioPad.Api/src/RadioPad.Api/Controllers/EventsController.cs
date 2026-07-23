@@ -1,6 +1,3 @@
-using System.Text.Json;
-using System.Text.Json.Serialization;
-using Microsoft.AspNetCore.Http.Features;
 using Microsoft.AspNetCore.Mvc;
 using RadioPad.Api.Services;
 using RadioPad.Infrastructure.Persistence;
@@ -27,14 +24,6 @@ namespace RadioPad.Api.Controllers;
 [Route("api/events")]
 public sealed class EventsController : TenantedController
 {
-    // Manual SSE writes bypass MVC's configured JSON options, so mirror them here
-    // (Program.cs: camelCase + omit-when-null) or the wire shape would diverge.
-    private static readonly JsonSerializerOptions SseJson = new()
-    {
-        PropertyNamingPolicy = JsonNamingPolicy.CamelCase,
-        DefaultIgnoreCondition = JsonIgnoreCondition.WhenWritingNull,
-    };
-
     private readonly RadioPadDbContext _db;
     private readonly IAiJobEventBus _bus;
     private readonly IHostApplicationLifetime _lifetime;
@@ -61,11 +50,7 @@ public sealed class EventsController : TenantedController
         // a webview EventSource authenticates via ?access_token= (see RadioPadBearerMiddleware).
         var (tenant, user) = await ResolveContextAsync(_db, ct);
 
-        Response.Headers["Content-Type"] = "text/event-stream; charset=utf-8";
-        Response.Headers["Cache-Control"] = "no-cache";
-        // Defeat proxy (nginx) and Kestrel response buffering that would coalesce events.
-        Response.Headers["X-Accel-Buffering"] = "no";
-        HttpContext.Features.Get<IHttpResponseBodyFeature>()?.DisableBuffering();
+        SseWriter.PrepareResponse(Response);
 
         var keepAlive = TimeSpan.FromSeconds(Math.Max(1, _config.GetValue<int?>("AiJobs:SseKeepAliveSeconds") ?? 15));
 
@@ -84,14 +69,13 @@ public sealed class EventsController : TenantedController
                 try
                 {
                     var evt = await sub.Reader.ReadAsync(readTimeout.Token);
-                    await WriteEventAsync(evt, linked.Token);
+                    await SseWriter.WriteEventAsync(Response, evt.EventType, evt.Payload, linked.Token);
                 }
                 catch (OperationCanceledException) when (!linked.IsCancellationRequested)
                 {
                     // No event within the keep-alive window — emit an SSE comment to keep
                     // idle proxies/Kestrel MinResponseDataRate from dropping the connection.
-                    await Response.WriteAsync(": keep-alive\n\n", linked.Token);
-                    await Response.Body.FlushAsync(linked.Token);
+                    await SseWriter.WriteKeepAliveAsync(Response, linked.Token);
                 }
             }
         }
@@ -103,12 +87,5 @@ public sealed class EventsController : TenantedController
         {
             // Any write failure means the client is gone; exit and let `using sub` unsubscribe.
         }
-    }
-
-    private async Task WriteEventAsync(AiJobBusEvent evt, CancellationToken ct)
-    {
-        var json = JsonSerializer.Serialize(evt.Payload, SseJson);
-        await Response.WriteAsync($"event: {evt.EventType}\ndata: {json}\n\n", ct);
-        await Response.Body.FlushAsync(ct);
     }
 }

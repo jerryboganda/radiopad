@@ -61,17 +61,27 @@ public sealed class LocalGenerationController : ControllerBase
     private readonly AiJobRegistry _registry;
     private readonly LocalGenerationJobRunner _runner;
     private readonly ILogger<LocalGenerationController> _log;
+    // Optional so the existing direct-construction unit tests (LocalGenerationControllerTests) keep
+    // compiling unchanged; DI always supplies both (they are always registered). Used only by the
+    // /events SSE loop — ApplicationStopping ends the loop on graceful shutdown, config carries the
+    // keep-alive interval (shared AiJobs:SseKeepAliveSeconds, default 15).
+    private readonly IHostApplicationLifetime? _lifetime;
+    private readonly IConfiguration? _config;
 
     public LocalGenerationController(
         IEnumerable<IAiProviderAdapter> adapters,
         AiJobRegistry registry,
         LocalGenerationJobRunner runner,
-        ILogger<LocalGenerationController> log)
+        ILogger<LocalGenerationController> log,
+        IHostApplicationLifetime? lifetime = null,
+        IConfiguration? config = null)
     {
         _adapters = adapters.ToList();
         _registry = registry;
         _runner = runner;
         _log = log;
+        _lifetime = lifetime;
+        _config = config;
     }
 
     // Registry identity for this tenant-less, single-user, loopback-only path: there is no tenant
@@ -209,7 +219,7 @@ public sealed class LocalGenerationController : ControllerBase
     /// this workstation), so no tenant/registry lookup. Shared by the sync endpoint and the async job
     /// runner so both paths build the byte-identical request (prompt, GBNF grammar, repeat penalty).
     /// </summary>
-    internal static AiCompletionRequest BuildCompletionRequest(GenerateReportDto dto)
+    internal static AiCompletionRequest BuildCompletionRequest(GenerateReportDto dto, IProgress<AiStreamChunk>? onStream = null)
     {
         var provider = new ProviderConfig
         {
@@ -232,6 +242,10 @@ public sealed class LocalGenerationController : ControllerBase
             // Empirically tuned against the real model — see class remarks for what was tried and why.
             RepeatPenalty = 1.1,
             RepeatLastN = 256,
+            // AI-013 — when the async job runner passes a sink, LlamaCppProvider streams the /completion
+            // response and reports each token chunk here (grammar/stop/repeat_penalty are all honoured
+            // server-side during streaming). The sync /report endpoint passes null → unchanged behaviour.
+            OnStream = onStream,
         };
     }
 
@@ -351,6 +365,13 @@ public sealed class LocalGenerationController : ControllerBase
                 kind = "job_not_found",
             });
 
+        // Live streamed progress for a running job. This path is loopback-only (127.0.0.1 bind + the
+        // bearer-middleware whitelist), so PHI never leaves the workstation — including the raw partial
+        // model text in the poll body is safe and lets the desktop preview render live even without the
+        // SSE stream. Omitted (WhenWritingNull) once terminal. Tokens only; percent is always null (a
+        // fake bar — see BuildCompletionRequest / design §3.10), so it is not exposed.
+        var progress = job.Status == "running" ? _registry.ProgressOf(jobId) : null;
+
         return Ok(new
         {
             jobId = job.Id,
@@ -362,6 +383,8 @@ public sealed class LocalGenerationController : ControllerBase
             error = job.Error,
             errorKind = job.ErrorKind,
             stage = StageOf(job),
+            progress = progress is { } p ? new { tokens = p.Tokens } : null,
+            partial = progress?.PartialText,
         });
     }
 
@@ -424,6 +447,155 @@ public sealed class LocalGenerationController : ControllerBase
 
         _registry.TryRequestCancel(jobId);
         return Accepted(new { jobId = job.Id, status = "running", cancelRequested = true });
+    }
+
+    /// <summary>
+    /// Single loopback-only Server-Sent-Events stream over ALL of this sidecar's on-device generation
+    /// jobs (there is only ever the tenant-less <c>Guid.Empty</c> working set). Matches the desktop's
+    /// one-SSE-manager-per-origin model — the frontend opens ONE stream for the sidecar, not one per
+    /// job. No event bus is needed on this path: it is a registry-poll loop (100 ms) that, for each
+    /// active job, emits <c>progress</c> (on token-count change) and <c>partial</c> (the newly streamed
+    /// text) events for the delta since the last send, a poll-envelope-shaped <c>job</c> event
+    /// (<c>{jobId,status,error,errorKind,stage}</c>) once a job goes terminal or vanishes from the
+    /// registry, and a <c>: keep-alive</c> comment when idle. PHI stays on-device (127.0.0.1 bind + the
+    /// RadioPadBearerMiddleware whitelist), so streaming raw partial model output here is safe.
+    ///
+    /// <para>Gated exactly like the sibling job endpoints — a hosted build stays inert (503
+    /// <c>stt_unavailable</c>). Returns <see cref="Task"/> and writes the SSE body manually with the
+    /// same hygiene as <see cref="EventsController"/> (via the shared <see cref="SseWriter"/>: headers +
+    /// DisableBuffering, a linked CTS on RequestAborted + ApplicationStopping, manual camelCase +
+    /// omit-null JSON).</para>
+    /// </summary>
+    [HttpGet("events")]
+    public async Task Events(CancellationToken ct)
+    {
+        // Gate like the siblings, but inline — this action returns Task and owns the response body, so
+        // it cannot return SttGate()'s IActionResult. Must run BEFORE any SSE header/body is written.
+        if (!LocalSttModels.IsEnabled())
+        {
+            Response.StatusCode = StatusCodes.Status503ServiceUnavailable;
+            await Response.WriteAsJsonAsync(
+                new { error = "On-device generation is only available in the RadioPad desktop app.", kind = "stt_unavailable" }, ct);
+            return;
+        }
+
+        SseWriter.PrepareResponse(Response);
+
+        var keepAlive = TimeSpan.FromSeconds(Math.Max(1, _config?.GetValue<int?>("AiJobs:SseKeepAliveSeconds") ?? 15));
+        var pollInterval = TimeSpan.FromMilliseconds(100);
+
+        // Client abort AND graceful shutdown both end the loop; on ApplicationStopping the connection
+        // closes cleanly so SSE never holds Kestrel shutdown hostage.
+        using var linked = CancellationTokenSource.CreateLinkedTokenSource(
+            HttpContext.RequestAborted, _lifetime?.ApplicationStopping ?? CancellationToken.None, ct);
+        var token = linked.Token;
+
+        // Per-job send cursors: the token count and partial length already emitted, so each poll sends
+        // only the delta. `terminated` remembers jobs whose terminal `job` event was already sent (so it
+        // fires exactly once); `seen` remembers every job observed so one that later vanishes from the
+        // registry (evicted before its terminal snapshot was caught) still owes a terminal `job` event.
+        var lastTokens = new Dictionary<Guid, int>();
+        var lastPartialLen = new Dictionary<Guid, int>();
+        var terminated = new HashSet<Guid>();
+        var seen = new HashSet<Guid>();
+        var lastActivity = DateTimeOffset.UtcNow;
+
+        try
+        {
+            while (!token.IsCancellationRequested)
+            {
+                var wrote = false;
+                var jobs = _registry.ListForUser(Guid.Empty, Guid.Empty);
+                var live = new HashSet<Guid>();
+
+                foreach (var job in jobs)
+                {
+                    if (job.Kind != JobKind) continue;
+                    live.Add(job.Id);
+                    seen.Add(job.Id);
+
+                    if (job.Status == "running")
+                    {
+                        var prog = _registry.ProgressOf(job.Id);
+                        if (prog is null) continue;
+
+                        if (prog.Tokens != lastTokens.GetValueOrDefault(job.Id))
+                        {
+                            lastTokens[job.Id] = prog.Tokens;
+                            await SseWriter.WriteEventAsync(Response, "progress",
+                                new { jobId = job.Id, tokens = prog.Tokens }, token);
+                            wrote = true;
+                        }
+
+                        var full = prog.PartialText ?? "";
+                        var prevLen = lastPartialLen.GetValueOrDefault(job.Id);
+                        // A shorter buffer than last time = the registry's failover-reset cleared it
+                        // (never happens on-device — a single provider — but stay correct): resend whole.
+                        if (full.Length < prevLen) prevLen = 0;
+                        if (full.Length > prevLen)
+                        {
+                            lastPartialLen[job.Id] = full.Length;
+                            await SseWriter.WriteEventAsync(Response, "partial",
+                                new { jobId = job.Id, delta = full[prevLen..] }, token);
+                            wrote = true;
+                        }
+                    }
+                    else if (terminated.Add(job.Id))
+                    {
+                        await SseWriter.WriteEventAsync(Response, "job", new
+                        {
+                            jobId = job.Id,
+                            status = job.Status,
+                            error = job.Error,
+                            errorKind = job.ErrorKind,
+                            stage = StageOf(job),
+                        }, token);
+                        wrote = true;
+                        lastTokens.Remove(job.Id);
+                        lastPartialLen.Remove(job.Id);
+                    }
+                }
+
+                // A job seen active earlier that has vanished from the registry (evicted before its
+                // terminal snapshot was observed) still owes the client a terminal `job` event so its
+                // reducer can close it out.
+                foreach (var goneId in seen)
+                {
+                    if (live.Contains(goneId) || !terminated.Add(goneId)) continue;
+                    await SseWriter.WriteEventAsync(Response, "job", new
+                    {
+                        jobId = goneId,
+                        status = "error",
+                        error = "The on-device generation job is no longer available.",
+                        errorKind = "job_not_found",
+                    }, token);
+                    wrote = true;
+                    lastTokens.Remove(goneId);
+                    lastPartialLen.Remove(goneId);
+                }
+
+                var now = DateTimeOffset.UtcNow;
+                if (wrote)
+                {
+                    lastActivity = now;
+                }
+                else if (now - lastActivity >= keepAlive)
+                {
+                    await SseWriter.WriteKeepAliveAsync(Response, token);
+                    lastActivity = now;
+                }
+
+                await Task.Delay(pollInterval, token);
+            }
+        }
+        catch (OperationCanceledException)
+        {
+            // Client aborted or the app is stopping — clean close.
+        }
+        catch (Exception)
+        {
+            // Any write failure means the client is gone; exit.
+        }
     }
 
     /// <summary>Live stage for a job: the runner's tracked stage while active, else null once terminal

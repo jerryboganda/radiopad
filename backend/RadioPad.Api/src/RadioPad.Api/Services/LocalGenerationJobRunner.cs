@@ -112,7 +112,26 @@ public sealed class LocalGenerationJobRunner
                 }
 
                 using var stageTracking = BeginStageTracking(jobId, ct);
-                var result = await llama.CompleteAsync(LocalGenerationController.BuildCompletionRequest(dto), ct);
+
+                // AI-013 — feed the llama-server token stream into the registry's progress side-map so
+                // the poll (and the /events SSE) can expose live token counts + partial text for the
+                // desktop preview. SynchronousProgress invokes inline in arrival order (never
+                // System.Progress, which posts to the ThreadPool and can reorder chunks). Percent stays
+                // null: n_predict=1024 is a ceiling MedGemma rarely reaches, so tokens/n_predict would
+                // be a fake bar (design §3.10) — honest indeterminate progress instead.
+                var onStream = new SynchronousProgress<AiStreamChunk>(chunk =>
+                {
+                    // The first streamed token is itself a strong "generating" signal — flip the stage
+                    // even if the /health watcher missed the model-loading→generating transition.
+                    // Advance-only (TryUpdate matches ONLY while still model-loading), so it is a no-op
+                    // on every later chunk and never regresses a stage the watcher already moved.
+                    _stages.TryUpdate(jobId, StageGenerating, StageModelLoading);
+                    _registry.UpdateProgress(jobId, chunk.OutputTokens, percent: null, partialDelta: chunk.Delta);
+                });
+
+                var result = await llama.CompleteAsync(LocalGenerationController.BuildCompletionRequest(dto, onStream), ct);
+                // Structured-section post-processing still runs at end-of-stream, unchanged: the
+                // streamed partials are a live preview; BuildSections parses the complete model text.
                 _registry.Complete(jobId, LocalGenerationController.BuildSections(result));
             }
             finally
