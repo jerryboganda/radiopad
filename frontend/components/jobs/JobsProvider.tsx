@@ -60,6 +60,7 @@ import {
   type JobSubmitSpec,
   type LocalJobSeed,
 } from '@/lib/jobs';
+import { crossCheckPollPatch } from '@/lib/dictation/crossCheckJob';
 
 const JobsContext = createContext<JobsContextValue | null>(null);
 
@@ -244,6 +245,24 @@ export default function JobsProvider({ children }: { children: ReactNode }) {
 
   const pollOne = useCallback(async (job: Job): Promise<void> => {
     if (job.origin === 'local') {
+      if (job.kind === 'crosscheck') {
+        // The cross-check audio/ASR half lives on a DIFFERENT sidecar endpoint
+        // (`/api/stt/crosscheck/{id}`) than local-generate jobs
+        // (`/api/local-generation/jobs/{id}`) — a dedicated branch, not
+        // `api.localGenerate.jobStatus`, which would 404 for this job id.
+        try {
+          const s = await api.reports.crossCheckStatus(job.reportId, job.id);
+          dispatch({ type: 'UPDATE', id: job.id, patch: crossCheckPollPatch(job, s) });
+        } catch (e) {
+          if (isAuthError(e)) throw e;
+          if (isTransientPollError(e)) return; // keep polling — the job runs on
+          // Sidecar registry is in-memory by doctrine — a 404 (or any
+          // deterministic failure) after a restart means the in-flight
+          // cross-check is gone.
+          dispatch({ type: 'UPDATE', id: job.id, patch: { status: 'error', errorKind: 'sidecar_restart' } });
+        }
+        return;
+      }
       try {
         const env = await api.localGenerate.jobStatus(job.id);
         dispatch({ type: 'UPDATE', id: job.id, patch: envelopePatch(job, env) });
@@ -654,6 +673,19 @@ export default function JobsProvider({ children }: { children: ReactNode }) {
   const markSeen = useCallback(() => dispatch({ type: 'MARK_SEEN' }), []);
   const markApplied = useCallback((jobId: string) => dispatch({ type: 'MARK_APPLIED', id: jobId }), []);
 
+  // Register a job created OUTSIDE submit() — the cross-check audio half (a
+  // direct sidecar multipart call) and the hosted review half it triggers.
+  // Pure bookkeeping: the server already assigned the id, so this only adds
+  // the row and kicks the shared ticker (no network call, no dedupe — each
+  // cross-check run gets its own tracked pair by design).
+  const trackExternal = useCallback(
+    (job: Job) => {
+      dispatch({ type: 'ADD', job });
+      kickTicker();
+    },
+    [kickTicker],
+  );
+
   const canRetry = useCallback((job: Job): boolean => {
     if (job.status !== 'error' && job.status !== 'cancelled') return false;
     return job.origin === 'hosted' || localSpecs.current.has(job.id);
@@ -663,6 +695,7 @@ export default function JobsProvider({ children }: { children: ReactNode }) {
     () => ({
       jobs: visibleJobs(state),
       submit,
+      trackExternal,
       cancel,
       retry,
       dismiss,
@@ -671,7 +704,7 @@ export default function JobsProvider({ children }: { children: ReactNode }) {
       markApplied,
       canRetry,
     }),
-    [state, submit, cancel, retry, dismiss, clearFinished, markSeen, markApplied, canRetry],
+    [state, submit, trackExternal, cancel, retry, dismiss, clearFinished, markSeen, markApplied, canRetry],
   );
 
   return (

@@ -37,6 +37,7 @@ function ctx(jobs: Job[], over: Partial<JobsContextValue> = {}): JobsContextValu
   return {
     jobs,
     submit: vi.fn(),
+    trackExternal: vi.fn(),
     cancel: vi.fn(),
     retry: vi.fn(),
     dismiss: vi.fn(),
@@ -112,6 +113,25 @@ describe('JobsIndicator — popover rows & actions', () => {
     act(() => fireEvent.click(screen.getByRole('button')));
     expect(screen.queryByText('Cancel')).toBeNull();
     expect(screen.getByText('Cancelling…')).toBeInTheDocument();
+  });
+
+  it('hides Cancel for a running LOCAL cross-check (audio/ASR) job — the sidecar has no cancel endpoint for it', () => {
+    h.value = ctx([job({ id: 'xc-audio', kind: 'crosscheck', origin: 'local', mode: 'findings', status: 'running' })]);
+    render(<JobsIndicator />);
+    act(() => fireEvent.click(screen.getByRole('button')));
+    expect(screen.queryByText('Cancel')).toBeNull();
+  });
+
+  it('still offers Cancel for a running HOSTED cross-check (review) job — a normal durable job', () => {
+    const cancel = vi.fn();
+    h.value = ctx(
+      [job({ id: 'xc-review', kind: 'crosscheck', origin: 'hosted', mode: 'findings', status: 'running' })],
+      { cancel },
+    );
+    render(<JobsIndicator />);
+    act(() => fireEvent.click(screen.getByRole('button')));
+    fireEvent.click(screen.getByText('Cancel'));
+    expect(cancel).toHaveBeenCalledWith('xc-review');
   });
 
   it('an ok row offers Open report and routes with the aiJob hint', () => {

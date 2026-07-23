@@ -44,6 +44,8 @@ import {
 import { getSessionAudio } from '@/lib/dictation/audioBuffer';
 import { isUseUbagEnabled } from '@/lib/dictation/crossCheckPrefs';
 import { anchorCorrections, applyCorrection } from '@/lib/dictation/anchorCorrections';
+import { crossCheckSession } from '@/lib/dictation/crossCheckSession';
+import { deriveCrossCheckBadge, latestCrossCheckJob } from '@/lib/dictation/crossCheckJob';
 import CrossCheckBadge from '@/components/dictation/CrossCheckBadge';
 import CompanionHostPanel from '@/components/companion/CompanionHostPanel';
 import CriticalResultPanel from '@/components/critical/CriticalResultPanel';
@@ -194,10 +196,13 @@ export default function ReportPage() {
   // RC-03 Undo — pre-AI text snapshots per section, captured whenever an AI
   // action overwrites a section so "Undo" can restore what the model replaced.
   const [aiUndo, setAiUndo] = useState<Record<string, string>>({});
-  // Cross-check suggestions keyed by section, plus the processing-badge state.
+  // Cross-check suggestions keyed by section. The processing-badge state is
+  // DERIVED from the two tracked jobs (audio + review) each render — see
+  // `xcAudioJob`/`xcReviewJob`/`xcBadge` near the JSX — never a manual setXc.
   const [corrections, setCorrections] = useState<Record<string, CrossCheckCorrection[]>>({});
-  const [xc, setXc] = useState<{ status: 'running' | 'completed' | 'failed'; stage: string } | null>(null);
-  // Guards runCrossCheck against concurrent invocation (button + voice command).
+  // Guards runCrossCheck against concurrent invocation (button + voice command)
+  // while the audio-half SUBMIT itself is in flight (the sidecar multipart call
+  // has no server-side dedupe of its own, unlike jobs.submit()).
   const xcBusyRef = useRef(false);
   const [providerId, setProviderId] = useState<string>('');
   const [error, setError] = useState<string | null>(null);
@@ -280,6 +285,12 @@ export default function ReportPage() {
   const cleanupActivityRef = useRef<Map<string, number>>(new Map());
   // Cleanup terminals already handled — fire-once (mirrors seenActiveRef's shape).
   const cleanupHandledRef = useRef<Set<string>>(new Set());
+  // Cross-check (FE-PR6): fire-once guard for THIS mount's terminal handling —
+  // the module-level `crossCheckSession` (lib/dictation/crossCheckSession.ts)
+  // is the CROSS-MOUNT source of truth for the submit context / retained ASR
+  // corrections / activity-rail id (a component ref alone does not survive an
+  // in-app navigate-away-and-back, even though the tracked Job rows do).
+  const xcHandledRef = useRef<Set<string>>(new Set());
   // Jobs whose result we have already applied/handled (a terminal decision has
   // been reached — never re-fetch or re-apply).
   const appliedJobsRef = useRef<Set<string>>(new Set());
@@ -569,6 +580,39 @@ export default function ReportPage() {
   const expiredToast = () =>
     toast({ tone: 'info', title: 'Result expired', message: 'This AI result is no longer available — run it again.' });
 
+  /**
+   * Merge the hosted review's LLM corrections with the retained ASR set from
+   * its paired audio half — never auto-applied; both land in the SAME
+   * per-section `corrections` state the existing Accept/Reject panel already
+   * renders (full replace, matching the pre-migration sync flow: one cross-check
+   * run's suggestions supersede the prior run's for that section). Reads the
+   * ASR set from the cross-mount `crossCheckSession` store (see that module's
+   * doc comment) so a reopen after an in-app navigate-away-and-back still finds
+   * it — a per-component ref would not. Marks the job APPLIED (`markAppliedJob`,
+   * not just the local fire-once ref): once this has run, there is nothing left
+   * to gain by re-fetching the same durable result, and re-running it would
+   * replay a merge whose ASR half is only available once, so it must never
+   * happen twice for the same job (code-review finding — a stale reopen was
+   * silently dropping ASR corrections, which can carry `severity: 'safety'`).
+   */
+  function applyCrossCheckReviewResult(
+    jobId: string,
+    result: { corrections?: CrossCheckCorrection[] } | null,
+    mode: string | undefined,
+  ) {
+    const info = crossCheckSession.takeAsr(jobId);
+    const sectionKey = info?.sectionKey || mode || 'report';
+    const asr = info?.corrections ?? [];
+    const llm = result?.corrections ?? [];
+    setCorrections({ [sectionKey]: [...asr, ...llm] });
+    markAppliedJob(jobId);
+    const actId = crossCheckSession.getActivity(jobId);
+    if (actId != null) {
+      patchActivity(actId, { status: 'completed' });
+      crossCheckSession.clearActivity(jobId);
+    }
+  }
+
   /** Fetch a finished job's retained result and apply it — auto when the target
    *  is unchanged since submit, else via a non-destructive preview. Called both
    *  from the live-completion effect and the ?aiJob=/?localJob= deep-link. Owns
@@ -583,6 +627,10 @@ export default function ReportPage() {
       // Dispatch keys off the FETCHED detail's mode (decision #9) — the deep-link
       // only knows the jobId, so cleanup vs impression is decided post-fetch.
       let mode: string | undefined = modeHint;
+      // Likewise keys off the FETCHED kind where available — the ?aiJob= deep
+      // link can't tell an `ai` job from a hosted `crosscheck` review job apart
+      // by the query param alone (reconciliation #3 reuses `?aiJob=` for both).
+      let effectiveKind: JobKind = kind;
       try {
         if (origin === 'local') {
           const env = await api.localGenerate.jobStatus(jobId);
@@ -591,11 +639,13 @@ export default function ReportPage() {
           try {
             const detail = await api.jobs.get(jobId);
             status = detail.status; result = detail.result; mode = detail.mode ?? mode;
+            effectiveKind = detail.kind ?? effectiveKind;
           } catch (e) {
             if (isNotFoundError(e)) throw e;
             // Unified engine unavailable/evicted → the proven report-scoped poll.
             const env = await api.reports.aiJobStatus(reportRef.current!.id, jobId);
             status = env.status; result = env.result; mode = env.mode ?? mode;
+            effectiveKind = env.kind ?? effectiveKind;
           }
         }
       } catch (e) {
@@ -610,7 +660,7 @@ export default function ReportPage() {
       if (status && status !== 'ok') return;
       if (result == null) { appliedJobsRef.current.add(jobId); expiredToast(); return; }
 
-      if (kind === 'local-generate') {
+      if (effectiveKind === 'local-generate') {
         const cs = result as LocalGenerateResult;
         // Whole-report apply — only auto-apply onto a pristine editor.
         if (dirtyRef.current) {
@@ -620,6 +670,11 @@ export default function ReportPage() {
         }
         await applyLocalSections(cs);
         markAppliedJob(jobId);
+      } else if (effectiveKind === 'crosscheck' && origin === 'hosted') {
+        // Hosted medical-review half — a suggestion set merged with the
+        // retained ASR corrections; NEVER writes the report (accept/reject
+        // gates in the corrections panel own that).
+        applyCrossCheckReviewResult(jobId, result as { corrections?: CrossCheckCorrection[] }, mode);
       } else if (mode === 'cleanup') {
         // Dictation cleanup — a suggestion set; apply-or-preview (never partial).
         await applyCleanupResult(jobId, result as CleanupJobResult);
@@ -700,6 +755,12 @@ export default function ReportPage() {
         // Cleanup terminals (ok/error/cancelled) are owned by the dedicated effect
         // below — it emits the cleanup overlay and resolves the activity entry.
         continue;
+      } else if (job.kind === 'crosscheck') {
+        // Both halves are owned by the dedicated cross-check terminal effect
+        // below (mirrors the cleanup carve-out) — it needs the LOCAL/HOSTED
+        // distinction this generic effect doesn't make (the local audio half
+        // must never be routed through applyJobResult's hosted-shaped fetch).
+        continue;
       } else {
         // applyJobResult owns its own idempotency (applied/dispatched guards).
         void applyJobResult(job.id, job.origin, job.kind);
@@ -740,6 +801,125 @@ export default function ReportPage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [reportJobs, report]);
 
+  /**
+   * Audio half settled `ok` — fetch its retained ASR corrections, then submit
+   * the hosted LLM medical-review job on the SAME transcript and track it too
+   * (its terminal is owned by `applyJobResult`, wired through the effect
+   * below). A submit failure here surfaces the ASR-only suggestions
+   * immediately — a medical review that never started is reported, not hidden.
+   *
+   * Reads/claims through `crossCheckSession` (module-level, cross-mount) rather
+   * than a component ref: if the radiologist navigated away from this report
+   * while the audio job was still running and it finished while unmounted, a
+   * fresh mount's effect calls this again — the per-mount alternative would
+   * have no submit-time context left and the hand-off would silently never
+   * happen. `claimReviewSubmit` makes the hand-off itself idempotent so a
+   * duplicate call (this mount re-ticking, or a theoretical second mount)
+   * can never double-submit the review.
+   */
+  async function handleCrossCheckAudioOk(audioJob: Job) {
+    const current = reportRef.current;
+    const info = crossCheckSession.get(audioJob.id);
+    if (!current || !info) return; // not a run this browser session ever submitted
+    if (!crossCheckSession.claimReviewSubmit(audioJob.id)) return; // already handed off
+    let asr: CrossCheckCorrection[] = [];
+    try {
+      const s = await api.reports.crossCheckStatus(current.id, audioJob.id);
+      asr = s.corrections ?? [];
+    } catch {
+      // best-effort — proceed with an empty ASR set rather than blocking the review
+    }
+    const actId = crossCheckSession.getActivity(audioJob.id);
+    try {
+      const { jobId: reviewJobId } = await api.reports.submitCrossCheckJob(current.id, {
+        text: info.transcript,
+        sectionKey: info.sectionKey,
+        useUbag: info.useUbag,
+      });
+      crossCheckSession.setAsr(reviewJobId, { sectionKey: info.sectionKey, corrections: asr });
+      if (actId != null) crossCheckSession.setActivity(reviewJobId, actId);
+      jobs.trackExternal({
+        id: reviewJobId,
+        origin: 'hosted',
+        kind: 'crosscheck',
+        mode: info.sectionKey || 'report',
+        reportId: current.id,
+        report: reportInfo(),
+        status: 'queued',
+        createdAt: Date.now(),
+        attempt: 1,
+        dismissed: false,
+        seen: false,
+        notified: false,
+      });
+      // Non-blocking from here — the review's ok/error/cancelled all flow from
+      // the tracked job (the cross-check terminal effect below owns the rest).
+    } catch {
+      // The review submit itself failed (provider/network) — surface asr-only
+      // immediately since there is no review job to track/settle later.
+      setCorrections({ [info.sectionKey]: asr });
+      setError('Medical review unavailable — showing engine-only suggestions.');
+      if (actId != null) patchActivity(actId, { status: 'completed', error: 'Medical review unavailable' });
+    }
+  }
+
+  /**
+   * Cross-check terminal handling (durable async-job platform, FE-PR6). Two
+   * job halves: the local sidecar audio/ASR job and, once it succeeds, the
+   * hosted LLM medical-review job it triggers. Owned here exclusively — the
+   * generic completion effect above skips `crosscheck` kind jobs entirely.
+   * Neither half is a partial apply: results only ever populate the
+   * `corrections` panel state for individual accept/reject; the report is
+   * never written directly by either half. `xcHandledRef` is a per-mount
+   * fire-once guard (avoids reprocessing on every poll tick); `job.applied`
+   * (persisted on the shared tracked Job, not a component ref) is the
+   * CROSS-MOUNT guard that stops a remount from replaying an already-surfaced
+   * review — see `crossCheckSession`'s doc comment for why a ref alone isn't
+   * enough here.
+   */
+  useEffect(() => {
+    if (!report) return;
+    for (const job of reportJobs) {
+      if (job.kind !== 'crosscheck') continue;
+      if (isActiveStatus(job.status)) continue;
+      if (xcHandledRef.current.has(job.id)) continue;
+      xcHandledRef.current.add(job.id);
+
+      if (job.origin === 'local') {
+        if (job.status === 'ok') {
+          void handleCrossCheckAudioOk(job);
+        } else {
+          const actId = crossCheckSession.getActivity(job.id);
+          const cancelled = job.status === 'cancelled';
+          const msg = cancelled ? 'Cross-check cancelled.' : (describeAiError(job.errorKind, job.error) || 'Cross-check failed.');
+          if (!cancelled) setError(msg);
+          if (actId != null) patchActivity(actId, { status: 'failed', error: cancelled ? 'Cancelled' : msg });
+        }
+      } else if (job.applied) {
+        // Already surfaced (possibly in an earlier mount) — never replay a
+        // merge whose ASR half is only available once.
+        continue;
+      } else if (job.status === 'ok') {
+        // Hosted review half, settled ok — applyJobResult fetches the result
+        // and (seeing kind='crosscheck') routes to applyCrossCheckReviewResult.
+        void applyJobResult(job.id, 'hosted', 'crosscheck', job.mode);
+      } else {
+        // Submit succeeded but the job itself later failed/was cancelled
+        // server-side — fall back to the retained ASR-only corrections.
+        const info = crossCheckSession.takeAsr(job.id);
+        const actId = crossCheckSession.getActivity(job.id);
+        if (info) {
+          setCorrections({ [info.sectionKey]: info.corrections });
+        }
+        if (actId != null) {
+          patchActivity(actId, { status: 'completed', error: 'Medical review unavailable' });
+          crossCheckSession.clearActivity(job.id);
+        }
+      }
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [reportJobs, report]);
+
   // Deep-link path: apply the ?aiJob=/?localJob= result once the report is loaded
   // (opened from the widget after the job finished elsewhere). Strip the param so
   // a manual refresh cannot re-apply. A still-running deep-link job is left for
@@ -757,8 +937,11 @@ export default function ReportPage() {
       url.searchParams.delete('localJob');
       window.history.replaceState({}, '', url.toString());
     }
-    // The widget only emits ?aiJob= for `ai` results and ?localJob= for local
-    // drafts (generate jobs persist server-side and need no deep-link apply).
+    // The widget emits ?aiJob= for `ai` results AND hosted `crosscheck` review
+    // results (reconciliation #3 — both share the param; applyJobResult's
+    // fetched `detail.kind` distinguishes them), ?localJob= for local drafts
+    // (generate jobs persist server-side and need no deep-link apply; the
+    // crosscheck LOCAL audio half never deep-links — see `openReportHref`).
     void applyJobResult(jobId, localJob ? 'local' : 'hosted', localJob ? 'local-generate' : 'ai');
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [report?.id]);
@@ -1199,17 +1382,36 @@ export default function ReportPage() {
   }
 
   /**
-   * Manual Cross Check (triggered by the dictation overlay's button). Re-runs the
-   * retained dictation audio through the on-device engines (sidecar, ROVER), then
-   * a hosted LLM medical-accuracy review, and surfaces the merged suggestions as
-   * inline highlights + a review panel. Non-blocking: a badge polls in the corner.
+   * Manual Cross Check (triggered by the dictation overlay's button + the
+   * `radiopad:cross-check` voice command). Submit-and-continue (durable
+   * async-job platform, FE-PR6): the retained dictation audio is submitted as
+   * a tracked LOCAL sidecar job (re-runs the on-device engines); once it
+   * settles, `handleCrossCheckAudioOk` (wired through the terminal effect
+   * above) fetches its corrections, submits the hosted LLM medical-review job,
+   * and tracks that too. Non-blocking: a badge derived from the two tracked
+   * jobs (`deriveCrossCheckBadge`) polls in the corner; neither half writes the
+   * report — corrections are individually accepted/rejected in the existing
+   * panel.
    */
   async function runCrossCheck() {
     const current = reportRef.current;
     if (!current) return;
-    // Re-entrancy guard: a second invocation (button + voice command) while a
-    // run is in flight would interleave state updates.
+    // Re-entrancy guard: a second invocation (button + voice command) while the
+    // audio-half SUBMIT itself is in flight would double-post the same retained
+    // audio (the sidecar multipart call has no dedupe of its own).
     if (xcBusyRef.current) return;
+    // A run is already in flight (either half still active) — refuse a second
+    // one rather than let it interleave with the first (code-review finding:
+    // a second submit's `trackExternal` ADD can reset the in-flight job's
+    // client-visible status). The badge already reflects the active run.
+    const activeAudio = latestCrossCheckJob(reportJobs, current.id, 'local');
+    const activeReview = latestCrossCheckJob(reportJobs, current.id, 'hosted');
+    if (
+      (activeAudio && isActiveStatus(activeAudio.status)) ||
+      (activeReview && isActiveStatus(activeReview.status))
+    ) {
+      return;
+    }
     const sess = getSessionAudio(current.id);
     if (!sess) {
       setError('Record a dictation with the HQ button first, then Cross Check.');
@@ -1217,7 +1419,6 @@ export default function ReportPage() {
     }
     xcBusyRef.current = true;
     setError(null);
-    setXc({ status: 'running', stage: 're-running engines' });
     const actId = logActivity('Cross-check', sess.sectionKey);
     try {
       const useUbag = isUseUbagEnabled();
@@ -1226,49 +1427,28 @@ export default function ReportPage() {
         sectionKey: sess.sectionKey,
         useUbag,
       });
-
-      // Poll the on-device ASR cross-check job (~2 min budget). A poll budget
-      // that runs dry is a TIMEOUT, not "no changes" — report it as a failure
-      // so the radiologist never mistakes an unfinished QA pass for a clean one.
-      let asr: CrossCheckCorrection[] = [];
-      let asrDone = false;
-      for (let i = 0; i < 150; i++) {
-        await new Promise((r) => setTimeout(r, 800));
-        const s = await api.reports.crossCheckStatus(current.id, jobId);
-        setXc({ status: s.status === 'completed' || s.status === 'failed' ? s.status : 'running', stage: s.stage });
-        if (s.status === 'completed') { asr = s.corrections ?? []; asrDone = true; break; }
-        if (s.status === 'failed') throw new Error(s.error || 'cross-check failed');
-      }
-      if (!asrDone) throw new Error('Cross-check timed out — the engines did not finish. Try again.');
-
-      // Hosted LLM medical-accuracy review on the same base text (best-effort,
-      // but its absence is SURFACED in the result badge rather than silent).
-      let llm: CrossCheckCorrection[] = [];
-      let reviewFailed = false;
-      setXc({ status: 'running', stage: 'medical review' });
-      try {
-        const r = await api.reports.crossCheckReview(current.id, {
-          text: sess.transcript,
-          sectionKey: sess.sectionKey,
-          useUbag,
-        });
-        llm = r.corrections ?? [];
-      } catch {
-        reviewFailed = true;
-      }
-
-      const merged = [...asr, ...llm];
-      setCorrections({ [sess.sectionKey]: merged });
-      const summary = merged.length ? `${merged.length} suggestion${merged.length === 1 ? '' : 's'}` : 'no changes';
-      setXc({
-        status: 'completed',
-        stage: reviewFailed ? `${summary} · medical review unavailable` : summary,
+      crossCheckSession.start(jobId, { transcript: sess.transcript, sectionKey: sess.sectionKey, useUbag });
+      crossCheckSession.setActivity(jobId, actId);
+      jobs.trackExternal({
+        id: jobId,
+        origin: 'local',
+        kind: 'crosscheck',
+        mode: sess.sectionKey || 'report',
+        reportId: current.id,
+        report: reportInfo(),
+        status: 'queued',
+        createdAt: Date.now(),
+        attempt: 1,
+        dismissed: false,
+        seen: false,
+        notified: false,
       });
-      patchActivity(actId, { status: 'completed' });
+      // Non-blocking from here — progress/error/ok all flow from the tracked
+      // job (the cross-check terminal effect owns the rest of the sequence).
     } catch (e) {
-      setError((e as Error).message);
-      setXc({ status: 'failed', stage: 'cross-check failed' });
-      patchActivity(actId, { status: 'failed', error: (e as Error).message });
+      const msg = (e as Error).message || 'Cross-check failed.';
+      setError(msg);
+      patchActivity(actId, { status: 'failed', error: msg });
     } finally {
       xcBusyRef.current = false;
     }
@@ -1520,6 +1700,15 @@ export default function ReportPage() {
       .filter((j) => j.kind === 'ai' || j.kind === 'generate' || j.kind === 'local-generate')
       .map(jobToActivityEntry),
   ];
+
+  // Cross-check (FE-PR6): the processing badge's status/stage is DERIVED from
+  // the two tracked jobs for the current run — never a manual setState thread
+  // through the imperative flow (deriveCrossCheckBadge is a pure function of
+  // exactly this input).
+  const xcAudioJob = latestCrossCheckJob(reportJobs, id ?? '', 'local');
+  const xcReviewJob = latestCrossCheckJob(reportJobs, id ?? '', 'hosted');
+  const xcCorrectionsCount = Object.values(corrections).reduce((n, list) => n + list.length, 0);
+  const xcBadge = deriveCrossCheckBadge(xcAudioJob, xcReviewJob, xcCorrectionsCount);
 
   // The template editor's per-section "req" checkbox was persisted into sectionsJson and then read
   // by nothing — a template author could mark Findings required and a report could be signed with
@@ -2121,8 +2310,15 @@ export default function ReportPage() {
         />
       </div>
 
-      {xc && (
-        <CrossCheckBadge status={xc.status} stage={xc.stage} onDismiss={() => setXc(null)} />
+      {xcBadge && (
+        <CrossCheckBadge
+          status={xcBadge.status}
+          stage={xcBadge.stage}
+          onDismiss={() => {
+            if (xcAudioJob) jobs.dismiss(xcAudioJob.id);
+            if (xcReviewJob) jobs.dismiss(xcReviewJob.id);
+          }}
+        />
       )}
 
       <ProvenanceModal

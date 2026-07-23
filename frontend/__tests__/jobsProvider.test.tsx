@@ -15,6 +15,7 @@ const m = vi.hoisted(() => ({
   localSubmit: vi.fn(),
   localStatus: vi.fn(),
   localList: vi.fn(),
+  crossCheckStatus: vi.fn(),
 }));
 
 // Controllable stand-in for the shared `hostedEvents` SSE singleton so tests can
@@ -53,7 +54,12 @@ vi.mock('@/lib/api', () => ({
     e?.kind === 'network' || [408, 429, 500, 502, 503, 504].includes(e?.status ?? 0),
   api: {
     jobs: { list: m.list, get: m.get, cancel: vi.fn(), retry: m.retry },
-    reports: { submitAiJob: vi.fn(), submitGenerateJob: m.submitGenerate, aiJobStatus: m.aiJobStatus },
+    reports: {
+      submitAiJob: vi.fn(),
+      submitGenerateJob: m.submitGenerate,
+      aiJobStatus: m.aiJobStatus,
+      crossCheckStatus: m.crossCheckStatus,
+    },
     localGenerate: { submitJob: m.localSubmit, jobStatus: m.localStatus, listJobs: m.localList, cancelJob: vi.fn() },
   },
 }));
@@ -69,7 +75,7 @@ import type { JobSubmitSpec } from '@/lib/jobs';
 import type { JobSummary } from '@/lib/api';
 
 function Harness() {
-  const { jobs, submit } = useJobs();
+  const { jobs, submit, trackExternal } = useJobs();
   const gen: JobSubmitSpec = { origin: 'hosted', kind: 'generate', reportId: 'r1' };
   const local: JobSubmitSpec = {
     origin: 'local',
@@ -81,6 +87,25 @@ function Harness() {
     <div>
       <button onClick={() => void submit(gen)}>gen</button>
       <button onClick={() => void submit(local)}>local</button>
+      <button
+        onClick={() =>
+          trackExternal({
+            id: 'xc1',
+            origin: 'local',
+            kind: 'crosscheck',
+            mode: 'findings',
+            reportId: 'r5',
+            status: 'queued',
+            createdAt: Date.now(),
+            attempt: 1,
+            dismissed: false,
+            seen: false,
+            notified: false,
+          })
+        }
+      >
+        trackXc
+      </button>
       {jobs.map((j) => (
         <span key={j.id} data-testid="job">{`${j.id}:${j.status}:${j.errorKind ?? ''}`}</span>
       ))}
@@ -380,3 +405,59 @@ describe('JobsProvider — rehydration', () => {
     });
   });
 });
+
+// FE-PR6 — cross-check migration. The audio half is registered via
+// `trackExternal` (bypassing submit()'s network+dedupe path entirely — the
+// sidecar multipart call already happened by the time ReportClient calls
+// this), and polled through a DEDICATED branch (`api.reports.crossCheckStatus`)
+// distinct from every other local job (`api.localGenerate.jobStatus`).
+describe('JobsProvider — cross-check external tracking (FE-PR6)', () => {
+  it('trackExternal adds the row with no network call, then the ticker polls it via crossCheckStatus', async () => {
+    vi.useFakeTimers();
+    m.crossCheckStatus.mockResolvedValue({ jobId: 'xc1', status: 'running', stage: 'reconciling engines' });
+
+    renderApp();
+    await act(async () => {
+      screen.getByText('trackXc').click();
+    });
+    // Added synchronously (no await submit()) — no network call has happened yet.
+    expect(screen.getByTestId('job').textContent).toBe('xc1:queued:');
+    expect(m.crossCheckStatus).not.toHaveBeenCalled();
+
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(300);
+    });
+    expect(m.crossCheckStatus).toHaveBeenCalledWith('r5', 'xc1');
+    expect(m.localStatus).not.toHaveBeenCalled(); // the dedicated branch, never localGenerate.jobStatus
+    expect(screen.getByTestId('job').textContent).toBe('xc1:running:');
+  });
+
+  it('maps a "completed" cross-check status to the tracked job going "ok"', async () => {
+    vi.useFakeTimers();
+    m.crossCheckStatus.mockResolvedValue({ jobId: 'xc1', status: 'completed', stage: 'done', corrections: [] });
+
+    renderApp();
+    await act(async () => {
+      screen.getByText('trackXc').click();
+    });
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(300);
+    });
+    expect(screen.getByTestId('job').textContent).toBe('xc1:ok:');
+  });
+
+  it('a 404 on the cross-check poll marks the job sidecar_restart (registry is in-memory, same as local-generate)', async () => {
+    vi.useFakeTimers();
+    m.crossCheckStatus.mockRejectedValue(Object.assign(new Error('gone'), { status: 404 }));
+
+    renderApp();
+    await act(async () => {
+      screen.getByText('trackXc').click();
+    });
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(300);
+    });
+    expect(screen.getByTestId('job').textContent).toBe('xc1:error:sidecar_restart');
+  });
+});
+

@@ -246,7 +246,11 @@ function JobRow({
           <span className="rp-jobs-tokens">~{job.progress.tokens} tokens</span>
         ) : null}
         <div className="rp-jobs-item-actions">
-          {active && !job.cancelRequested && (
+          {/* The cross-check audio/ASR half has no sidecar cancel endpoint
+              (it's a re-run of retained audio, not a cancellable generation) —
+              never offer Cancel for it. The hosted review half is a normal
+              durable job and keeps the generic Cancel affordance. */}
+          {active && !job.cancelRequested && !(job.kind === 'crosscheck' && job.origin === 'local') && (
             <button type="button" className="subtle" onClick={onCancel}>
               Cancel
             </button>

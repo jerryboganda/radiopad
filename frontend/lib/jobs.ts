@@ -48,8 +48,12 @@ export interface Job {
   reportId: string;
   report?: JobReportInfo;
   status: JobStatus;
-  /** Local-origin only — sidecar pipeline stage. */
-  stage?: 'queued' | 'model-loading' | 'generating';
+  /** Local-origin only. Local-generate: the fixed sidecar pipeline stage
+   *  (`stageLabel` maps these three to copy). Cross-check audio job: the
+   *  sidecar's raw engine-stage string passed straight through instead —
+   *  `CrossCheckBadge` reads it directly (see `crossCheckPollPatch`), so the
+   *  type is a plain string rather than the narrower three-literal union. */
+  stage?: 'queued' | 'model-loading' | 'generating' | string;
   /** Live progress from the registry/bus (active jobs only; never persisted to
    *  localStorage). `percent` is present ONLY when the server computed a real
    *  ratio (design §3.10 — indeterminate on every current path); never faked. */
@@ -119,6 +123,16 @@ export interface JobsContextValue {
   /** Visible jobs (non-dismissed), newest first. */
   jobs: Job[];
   submit: (spec: JobSubmitSpec) => Promise<string>;
+  /**
+   * Register a job created OUTSIDE `submit()` so the shared ticker polls it and
+   * the widget/report page track it like any other job. Needed by the
+   * cross-check audio half (a direct sidecar multipart call, not a
+   * `JobSubmitSpec` path) and the hosted review half it triggers — the caller
+   * builds the full `Job` row itself (the server already assigned the id, so
+   * this is pure bookkeeping, never a network call). Bypasses `submit()`'s
+   * single-flight dedupe by design: each cross-check run gets its own pair.
+   */
+  trackExternal: (job: Job) => void;
   cancel: (jobId: string) => Promise<void>;
   retry: (jobId: string) => Promise<string | null>;
   dismiss: (jobId: string) => void;
@@ -179,10 +193,16 @@ export function specMode(spec: JobSubmitSpec): string {
 // GenerationOverlay.tsx, which are not routed through next-intl)
 // ---------------------------------------------------------------------------
 
-/** Human label for a job's kind+mode: "Draft generation" / "Impression" / … */
-export function jobKindLabel(job: Pick<Job, 'kind' | 'mode'>): string {
+/** Human label for a job's kind+mode: "Draft generation" / "Impression" / …
+ *  Cross-check is labeled by ORIGIN, not mode (reconciliation #3 — hosted
+ *  crosscheck jobs use `mode = normalized sectionKey || "report"`, not a fixed
+ *  literal, so mode can't drive the label the way it does for `ai` jobs). */
+export function jobKindLabel(job: Pick<Job, 'kind' | 'mode' | 'origin'>): string {
   if (job.kind === 'generate') return 'Draft generation';
   if (job.kind === 'local-generate') return 'Local draft (MedGemma)';
+  if (job.kind === 'crosscheck') {
+    return job.origin === 'local' ? 'Cross-check (audio)' : 'Cross-check (review)';
+  }
   // kind === 'ai'
   switch (job.mode) {
     case 'impression':
@@ -191,8 +211,6 @@ export function jobKindLabel(job: Pick<Job, 'kind' | 'mode'>): string {
       return 'Rewrite';
     case 'cleanup':
       return 'Dictation cleanup';
-    case 'crosscheck':
-      return 'Cross-check';
     default:
       return job.mode
         ? `AI · ${job.mode.charAt(0).toUpperCase()}${job.mode.slice(1)}`
@@ -227,13 +245,22 @@ export function stageLabel(stage: Job['stage']): string | null {
  * "Open report" destination for a finished job. Carries the apply-hint param a
  * later report-page wave consumes: `?aiJob=` for an unapplied `ai` result, or
  * `?localJob=` for an unapplied local draft. `reportHref` already emits
- * `?id=<id>`, so these append with `&`.
+ * `?id=<id>`, so these append with `&`. Cross-check is special-cased first
+ * (reconciliation #3): only the HOSTED review half deep-links (into the
+ * corrections panel, via the same `?aiJob=` param `applyJobResult`'s fetched
+ * `detail.kind` then routes correctly) — the LOCAL audio half is a raw ASR
+ * pass with nothing to apply on its own, so it never deep-links.
  */
 export function openReportHref(job: Job): string {
   let href = reportHref(job.reportId);
   if (!job.applied) {
-    if (job.kind === 'ai') href += `&aiJob=${encodeURIComponent(job.id)}`;
-    else if (job.origin === 'local') href += `&localJob=${encodeURIComponent(job.id)}`;
+    if (job.kind === 'crosscheck') {
+      if (job.origin === 'hosted') href += `&aiJob=${encodeURIComponent(job.id)}`;
+    } else if (job.kind === 'ai') {
+      href += `&aiJob=${encodeURIComponent(job.id)}`;
+    } else if (job.origin === 'local') {
+      href += `&localJob=${encodeURIComponent(job.id)}`;
+    }
   }
   return href;
 }
