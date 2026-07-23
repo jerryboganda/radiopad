@@ -196,6 +196,13 @@ function JobRow({
   const tone = toneForStatus(job.status);
   const stage = job.origin === 'local' ? stageLabel(job.stage) : null;
   const elapsed = active ? formatElapsed(now - (job.startedAt ?? job.createdAt)) : null;
+  // Determinate only with a real ratio; the coordinator sends null in v1 (a token
+  // ceiling is not a target — design §3.10 bans faked percentages), so this is
+  // null for every real job today and the bar renders indeterminate. Never invent one.
+  const pct =
+    job.progress?.percent != null
+      ? Math.min(100, Math.max(0, Math.round(job.progress.percent)))
+      : null;
 
   let sub: string | null;
   if (job.status === 'error') sub = describeAiError(job.errorKind, job.error);
@@ -217,8 +224,27 @@ function JobRow({
         <span className={`rp-jobs-status tone-${tone}`}>{statusText(job)}</span>
       </div>
       {sub && <span className="rp-jobs-item-sub">{sub}</span>}
+      {active && (
+        <div
+          className="rp-progress rp-jobs-progress"
+          role="progressbar"
+          aria-label={`${jobKindLabel(job)} progress`}
+          aria-valuenow={pct ?? undefined}
+          aria-valuemin={pct != null ? 0 : undefined}
+          aria-valuemax={pct != null ? 100 : undefined}
+          data-indeterminate={pct != null ? undefined : 'true'}
+        >
+          <span
+            className="rp-progress-fill"
+            style={pct != null ? { width: `${pct}%` } : undefined}
+          />
+        </div>
+      )}
       <div className="rp-jobs-item-foot">
         {elapsed && <span className="rp-jobs-item-meta">{elapsed}</span>}
+        {job.progress?.tokens ? (
+          <span className="rp-jobs-tokens">~{job.progress.tokens} tokens</span>
+        ) : null}
         <div className="rp-jobs-item-actions">
           {active && !job.cancelRequested && (
             <button type="button" className="subtle" onClick={onCancel}>

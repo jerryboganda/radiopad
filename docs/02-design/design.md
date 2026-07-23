@@ -395,11 +395,20 @@ finished. The `role="dialog"` popover (`.rp-jobs-popover`, cloned from
 `.rp-bell-popover`) lists one `.rp-jobs-item` per job — tinted by the semantic
 families (Blocker/fail → red, cancelled → amber, running → blue, ready → green)
 — with a per-status action set (Cancel / Retry / Open report / Dismiss) and a
-"Clear finished" footer. Outside-click + `Escape` close it (same pattern as the
-bell); terminal transitions are announced through a visually-hidden
-`aria-live="polite"` region in `JobsProvider`. `prefers-reduced-motion` swaps
-the spinner rotation for an opacity pulse (`rp-jobs-pulse`) and drops the
-popover animation. RC tokens only — both themes come for free.
+"Clear finished" footer. Each active row carries a slim `.rp-jobs-progress`
+bar — an AI-toned (`--ai-bg` track, `--color-ai` fill) size override of the
+shared `.rp-progress` primitive (§3.10): determinate (`aria-valuenow` + inline
+`width%`) only when the server reports a real ratio, otherwise
+`data-indeterminate="true"` (the honest v1 default — a token ceiling is not a
+target, so no percentage is faked). The live token count renders beside the
+elapsed timer as `.rp-jobs-tokens` (`~N tokens`, `--mono`/`--text-faint`); the
+row's status text/badge — never the bar's colour alone — carries the state.
+Outside-click + `Escape` close it (same pattern as the bell); terminal
+transitions are announced through a visually-hidden `aria-live="polite"` region
+in `JobsProvider`. `prefers-reduced-motion` swaps the spinner rotation for an
+opacity pulse (`rp-jobs-pulse`), drops the popover animation, and (via the
+primitive) freezes the indeterminate bar at a static fill. RC tokens only —
+both themes come for free.
 
 **In-editor generation banner (`.rp-genbanner`, report editor only).** A slim,
 non-modal, dismissible banner (`GenerationBanner`, built on `.banner.ai` so the
@@ -410,9 +419,14 @@ mid-generation (submitted from the New Report wizard, the AI bar, or elsewhere).
 It carries a `.rp-spinner`, a "Generating draft…" label, the sidecar `stage`
 text for local jobs, and a `.rp-genbanner-timer` elapsed clock (`--mono`), and
 reads the SAME tracked `Job` the topbar widget does so the two never disagree.
-It replaces the old full-surface `GenerationOverlay` modal — the wizard no
-longer traps the user on a spinner; generation is submit-and-continue. RC
-tokens only.
+Once tokens stream it shows the same `~N tokens` count (`.rp-genbanner-tokens`)
+beside the timer. An optional `.rp-genbanner-stop` control (shown only while the
+job is active and no cancel is yet in flight) and an opt-in `.rp-genbanner-preview`
+slot — collapsed behind a "Show live output" toggle so the banner stays slim —
+are plumbed as props; the caller wires Stop to `jobs.cancel` and fills the
+preview with the streamed output. It replaces the old full-surface
+`GenerationOverlay` modal — the wizard no longer traps the user on a spinner;
+generation is submit-and-continue. RC tokens only.
 
 #### 3.1.1 In-page two-pane primitive (`.split`)
 

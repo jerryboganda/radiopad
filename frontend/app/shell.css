@@ -1107,6 +1107,22 @@
   animation: rp-jobs-pulse 1.4s ease-in-out infinite;
 }
 
+/* AI-toned size/tone override of the shared .rp-progress primitive (radiopad.css,
+   design.md §3.10) — the sweep + reduced-motion behaviour is inherited from the
+   primitive, not redefined here. Never conveys status by colour alone: the row's
+   status text/badge carries the state. */
+.rp-jobs-progress {
+  height: 4px;
+  margin: 4px 0 2px;
+  background: var(--ai-bg);
+  border: 1px solid var(--color-ai-border);
+}
+.rp-jobs-progress .rp-progress-fill {
+  background: var(--color-ai);
+  transition: width var(--anim-fast) linear;
+}
+.rp-jobs-tokens { font: 500 11px/1.2 var(--mono); color: var(--text-faint); }
+
 .rp-jobs-footer { display: flex; justify-content: flex-end; padding: 6px 4px 2px; border-top: 1px solid var(--border-soft); margin-top: 6px; }
 
 .rp-jobs-toast { display: inline-flex; align-items: center; gap: 8px; flex-wrap: wrap; }

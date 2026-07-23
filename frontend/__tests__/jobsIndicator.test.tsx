@@ -167,6 +167,48 @@ describe('JobsIndicator — popover rows & actions', () => {
   });
 });
 
+describe('JobsIndicator — progress row & token count', () => {
+  it('renders a determinate progressbar with aria-valuenow when a real percent is present', () => {
+    h.value = ctx([job({ id: 'a', status: 'running', progress: { tokens: 200, percent: 42.6 } })]);
+    const { container } = render(<JobsIndicator />);
+    act(() => fireEvent.click(screen.getByRole('button')));
+    const bar = container.querySelector('.rp-jobs-progress');
+    expect(bar).not.toBeNull();
+    expect(bar?.getAttribute('role')).toBe('progressbar');
+    expect(bar?.getAttribute('aria-valuenow')).toBe('43'); // rounded, clamped 0..100
+    expect(bar?.hasAttribute('data-indeterminate')).toBe(false);
+    const fill = bar?.querySelector('.rp-progress-fill') as HTMLElement;
+    expect(fill.style.width).toBe('43%');
+  });
+
+  it('renders an indeterminate progressbar (no aria-valuenow) when there is no percent — the realistic v1 case', () => {
+    h.value = ctx([job({ id: 'a', status: 'running', progress: { tokens: 412 } })]);
+    const { container } = render(<JobsIndicator />);
+    act(() => fireEvent.click(screen.getByRole('button')));
+    const bar = container.querySelector('.rp-jobs-progress');
+    expect(bar).not.toBeNull();
+    expect(bar?.getAttribute('data-indeterminate')).toBe('true');
+    expect(bar?.hasAttribute('aria-valuenow')).toBe(false);
+    // No inline width is forged for an indeterminate bar — the primitive sweeps it.
+    const fill = bar?.querySelector('.rp-progress-fill') as HTMLElement;
+    expect(fill.style.width).toBe('');
+  });
+
+  it('shows the streamed token count next to the elapsed timer', () => {
+    h.value = ctx([job({ id: 'a', status: 'running', progress: { tokens: 412 } })]);
+    render(<JobsIndicator />);
+    act(() => fireEvent.click(screen.getByRole('button')));
+    expect(screen.getByText('~412 tokens')).toBeInTheDocument();
+  });
+
+  it('renders no progress row for a terminal job', () => {
+    h.value = ctx([job({ id: 'a', status: 'ok', seen: false })]);
+    const { container } = render(<JobsIndicator />);
+    act(() => fireEvent.click(screen.getByRole('button')));
+    expect(container.querySelector('.rp-jobs-progress')).toBeNull();
+  });
+});
+
 describe('JobsIndicator — close behaviour', () => {
   it('closes on Escape', () => {
     h.value = ctx([job({ id: 'a', status: 'running' })]);

@@ -77,4 +77,45 @@ describe('GenerationBanner', () => {
     render(<GenerationBanner job={job()} />);
     expect(screen.queryByRole('button', { name: /dismiss/i })).not.toBeInTheDocument();
   });
+
+  it('shows the streamed token count next to the elapsed timer', () => {
+    render(<GenerationBanner job={job({ progress: { tokens: 412 } })} />);
+    expect(screen.getByText('~412 tokens')).toBeInTheDocument();
+  });
+
+  it('omits the token count until tokens have streamed', () => {
+    render(<GenerationBanner job={job()} />);
+    expect(screen.queryByText(/tokens/i)).not.toBeInTheDocument();
+  });
+
+  it('renders a Stop button that calls onStop', () => {
+    const onStop = vi.fn();
+    render(<GenerationBanner job={job({ status: 'running' })} onStop={onStop} />);
+    fireEvent.click(screen.getByRole('button', { name: /stop/i }));
+    expect(onStop).toHaveBeenCalledTimes(1);
+  });
+
+  it('hides Stop once a cancel has already been requested', () => {
+    render(
+      <GenerationBanner job={job({ status: 'running', cancelRequested: true })} onStop={vi.fn()} />,
+    );
+    expect(screen.queryByRole('button', { name: /stop/i })).not.toBeInTheDocument();
+  });
+
+  it('omits Stop when no onStop handler is supplied', () => {
+    render(<GenerationBanner job={job({ status: 'running' })} />);
+    expect(screen.queryByRole('button', { name: /stop/i })).not.toBeInTheDocument();
+  });
+
+  it('reveals the preview slot only after the toggle is clicked (collapsed by default)', () => {
+    render(<GenerationBanner job={job()} previewSlot={<div>live-output-body</div>} />);
+    expect(screen.queryByText('live-output-body')).not.toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: /show live output/i }));
+    expect(screen.getByText('live-output-body')).toBeInTheDocument();
+  });
+
+  it('does not render a preview toggle when no previewSlot is supplied', () => {
+    render(<GenerationBanner job={job()} />);
+    expect(screen.queryByRole('button', { name: /live output/i })).not.toBeInTheDocument();
+  });
 });

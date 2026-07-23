@@ -371,6 +371,7 @@
 .rp-genbanner {
   display: flex;
   align-items: center;
+  flex-wrap: wrap;
   gap: 10px;
 }
 .rp-genbanner-label { font-weight: 600; }
@@ -380,6 +381,13 @@
   font-family: var(--mono);
   font-size: 12px;
 }
+/* Streamed token count, sat just right of the elapsed timer (mono/faint, matches
+   the widget's .rp-jobs-tokens). Only shows once real tokens have streamed. */
+.rp-genbanner-tokens { font: 500 11px/1.2 var(--mono); color: var(--text-faint); }
+.rp-genbanner-stop { margin-inline-start: 4px; }
+.rp-genbanner-preview-toggle { display: inline-flex; align-items: center; gap: 4px; }
+/* Opt-in live-output slot wraps onto its own full-width line below the slim row. */
+.rp-genbanner-preview { flex-basis: 100%; width: 100%; margin-top: 6px; }
 .rp-genbanner-dismiss { margin-left: 4px; }
 
 /* ----------- /admin/billing dashboard helpers (locked tokens only) ------ */
