@@ -176,6 +176,10 @@ builder.Services.AddSingleton<RadioPad.Infrastructure.Providers.Ubag.UbagOperato
 // and client disconnects, so it runs detached from the HTTP request. Singleton:
 // poll requests arrive on different scopes than the submit.
 builder.Services.AddSingleton<RadioPad.Api.Services.AiJobRegistry>();
+// In-process fan-out bus for the SSE stream (PR-B1): terminal job transitions,
+// streamed progress/partials, and notifications. Singleton — SSE connections
+// subscribe on their own request scopes, publishers push from the runner's scopes.
+builder.Services.AddSingleton<RadioPad.Api.Services.IAiJobEventBus, RadioPad.Api.Services.AiJobEventBus>();
 // Companion relay (desktop↔phone). The registry holds live relay sockets in
 // memory (process-local, single instance); the session service manages the
 // durable pairing record.

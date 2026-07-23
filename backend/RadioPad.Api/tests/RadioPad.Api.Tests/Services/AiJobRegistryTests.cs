@@ -1,3 +1,4 @@
+using Microsoft.Extensions.Configuration;
 using RadioPad.Api.Services;
 using Xunit;
 
@@ -177,5 +178,80 @@ public class AiJobRegistryTests
 
         Assert.True(reg.TryGet(first.Id, out var survived));
         Assert.Equal("ok", survived.Status);
+    }
+
+    // ── progress side-map (PR-B1) ─────────────────────────────────────────────────────
+
+    [Fact]
+    public void UpdateProgress_AppendsDeltaAndCounts()
+    {
+        var reg = new AiJobRegistry();
+        var job = NewJob(reg);
+
+        reg.UpdateProgress(job.Id, tokens: 3, percent: null, partialDelta: "Impression: ");
+        reg.UpdateProgress(job.Id, tokens: 7, percent: null, partialDelta: "no acute findings.");
+
+        var p = reg.ProgressOf(job.Id);
+        Assert.NotNull(p);
+        Assert.Equal(7, p!.Tokens);
+        Assert.Null(p.Percent); // indeterminate in v1
+        Assert.Equal("Impression: no acute findings.", p.PartialText);
+    }
+
+    [Fact]
+    public void ProgressOf_UnknownId_IsNull()
+    {
+        var reg = new AiJobRegistry();
+        Assert.Null(reg.ProgressOf(Guid.NewGuid()));
+    }
+
+    [Fact]
+    public void UpdateProgress_NonMonotonicTokensResetsBuffer()
+    {
+        // Failover-reset rule: a provider-failover retry restarts token counting at ~1,
+        // which must discard the failed attempt's partial text rather than concatenate it.
+        var reg = new AiJobRegistry();
+        var job = NewJob(reg);
+
+        reg.UpdateProgress(job.Id, tokens: 50, percent: null, partialDelta: "FIRST attempt text");
+        reg.UpdateProgress(job.Id, tokens: 1, percent: null, partialDelta: "second ");
+        reg.UpdateProgress(job.Id, tokens: 2, percent: null, partialDelta: "attempt");
+
+        var p = reg.ProgressOf(job.Id);
+        Assert.NotNull(p);
+        Assert.Equal(2, p!.Tokens);
+        Assert.Equal("second attempt", p.PartialText); // first attempt's text gone
+    }
+
+    [Fact]
+    public void Terminal_ClearsProgress()
+    {
+        var reg = new AiJobRegistry();
+        var job = NewJob(reg);
+        reg.UpdateProgress(job.Id, tokens: 4, percent: null, partialDelta: "partial");
+
+        reg.Complete(job.Id, new { text = "done" });
+
+        Assert.Null(reg.ProgressOf(job.Id)); // partial/progress is meaningless once terminal
+    }
+
+    [Fact]
+    public void UpdateProgress_CapsPartialBuffer()
+    {
+        // Buffer is capped at AiJobs:PartialBufferMaxChars, keeping the TAIL (the preview
+        // shows the end of the stream). Configure a tiny cap to exercise it cheaply.
+        var config = new ConfigurationBuilder()
+            .AddInMemoryCollection(new Dictionary<string, string?> { ["AiJobs:PartialBufferMaxChars"] = "8" })
+            .Build();
+        var reg = new AiJobRegistry(config);
+        var job = NewJob(reg);
+
+        reg.UpdateProgress(job.Id, tokens: 1, percent: null, partialDelta: "abcdef");
+        reg.UpdateProgress(job.Id, tokens: 2, percent: null, partialDelta: "ghijkl"); // total 12 > cap 8
+
+        var p = reg.ProgressOf(job.Id);
+        Assert.NotNull(p);
+        Assert.Equal(8, p!.PartialText!.Length);
+        Assert.Equal("efghijkl", p.PartialText); // tail kept, head dropped
     }
 }

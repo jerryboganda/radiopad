@@ -22,6 +22,15 @@ public sealed class PerfBudgetMiddleware
 
     public async Task InvokeAsync(HttpContext ctx)
     {
+        // The SSE stream (PR-B1) is a single request held open for hours; recording its
+        // duration would drop one enormous sample into the route histogram and skew any
+        // global P95 rollup. Skip instrumentation for it — it never resembles a normal request.
+        if (ctx.Request.Path.StartsWithSegments("/api/events/stream"))
+        {
+            await _next(ctx);
+            return;
+        }
+
         var sw = Stopwatch.StartNew();
         try
         {

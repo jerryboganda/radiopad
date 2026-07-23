@@ -1,4 +1,5 @@
 using System.Collections.Concurrent;
+using System.Text;
 
 namespace RadioPad.Api.Services;
 
@@ -43,7 +44,16 @@ public sealed class AiJobRegistry
         string? ErrorKind,
         DateTimeOffset? CompletedAt);
 
+    /// <summary>
+    /// A running job's live progress (contract D): cumulative output tokens, an
+    /// (always-null-in-v1) determinate percent, and the accumulated partial text.
+    /// Progress lives ONLY here (never on the durable <c>AiJobs</c> row) and is lost on
+    /// eviction/restart by design.
+    /// </summary>
+    public sealed record AiJobProgress(int Tokens, double? Percent, string? PartialText);
+
     private const int MaxJobs = 500;
+    private const int DefaultPartialBufferMaxChars = 262144;
     private static readonly TimeSpan TerminalRetention = TimeSpan.FromMinutes(15);
     // A running job is only evicted after this window — a backstop against
     // leaked entries if a background task dies without reporting (should not
@@ -65,6 +75,21 @@ public sealed class AiJobRegistry
     // OperationCanceledException.
     private readonly ConcurrentDictionary<Guid, CancellationTokenSource> _cancelSources = new();
     private readonly ConcurrentDictionary<Guid, byte> _cancelRequested = new();
+
+    // Progress/partial side map — token counts + streamed partial text for running
+    // jobs. Kept off the immutable AiJobState snapshot (progress mutates far more often
+    // than the state record transitions) and off the durable row entirely (contract D).
+    private readonly ConcurrentDictionary<Guid, ProgressBox> _progress = new();
+    private readonly int _partialBufferMaxChars;
+
+    /// <param name="config">Optional — supplies <c>AiJobs:PartialBufferMaxChars</c>
+    /// (default 262144). Null (the parameterless test path) uses the default.</param>
+    public AiJobRegistry(IConfiguration? config = null)
+    {
+        var max = config?.GetValue<int?>("AiJobs:PartialBufferMaxChars") ?? DefaultPartialBufferMaxChars;
+        if (max < 1) max = DefaultPartialBufferMaxChars;
+        _partialBufferMaxChars = max;
+    }
 
     public AiJobState Create(Guid tenantId, Guid reportId, Guid userId, string kind, string mode)
     {
@@ -168,6 +193,27 @@ public sealed class AiJobRegistry
 
     public void Fail(Guid id, string error, string errorKind) => Terminal(id, "error", null, error, errorKind);
 
+    /// <summary>
+    /// Records one streamed progress tick for a running job: bumps the cumulative token
+    /// count and, when <paramref name="partialDelta"/> is non-null, appends it to the
+    /// partial-text buffer (capped at <c>AiJobs:PartialBufferMaxChars</c>, keeping the
+    /// TAIL — the preview UI shows the end of the stream anyway).
+    ///
+    /// <para><b>Failover-reset rule:</b> a NON-MONOTONIC token count
+    /// (<paramref name="tokens"/> &lt; the current count) means a provider-failover retry
+    /// restarted token counting at ~1, so the buffer is cleared first — this is how the
+    /// failed attempt's partial text is discarded without a separate signal.</para>
+    /// </summary>
+    public void UpdateProgress(Guid id, int tokens, double? percent, string? partialDelta)
+    {
+        var box = _progress.GetOrAdd(id, static _ => new ProgressBox());
+        box.Update(tokens, percent, partialDelta, _partialBufferMaxChars);
+    }
+
+    /// <summary>The live progress for a job, or null if it has no hot progress entry.</summary>
+    public AiJobProgress? ProgressOf(Guid id) =>
+        _progress.TryGetValue(id, out var box) ? box.Snapshot() : null;
+
     private void Terminal(Guid id, string status, object? payload, string? error, string? kind)
     {
         // Only running → terminal is legal; a second completion (e.g. safety
@@ -177,6 +223,7 @@ public sealed class AiJobRegistry
         _jobs.TryUpdate(id, next, cur);
         _cancelSources.TryRemove(id, out _);
         _cancelRequested.TryRemove(id, out _);
+        _progress.TryRemove(id, out _); // partial/progress is meaningless once terminal
     }
 
     /// <summary>Lazy eviction on submit: drop old terminal jobs, cap the table.</summary>
@@ -195,6 +242,7 @@ public sealed class AiJobRegistry
                 // clean these up itself — a leaked entry here is a leaked CTS.
                 _cancelSources.TryRemove(id, out _);
                 _cancelRequested.TryRemove(id, out _);
+                _progress.TryRemove(id, out _);
             }
         }
         if (_jobs.Count <= MaxJobs) return;
@@ -208,6 +256,45 @@ public sealed class AiJobRegistry
             .Take(_jobs.Count - MaxJobs))
         {
             _jobs.TryRemove(job.Id, out _);
+            _progress.TryRemove(job.Id, out _);
+        }
+    }
+
+    /// <summary>Mutable, lock-guarded holder for one job's live progress. A tick from a
+    /// streaming read loop mutates in place rather than swapping an immutable record —
+    /// progress updates arrive far more often than state transitions.</summary>
+    private sealed class ProgressBox
+    {
+        private readonly object _lock = new();
+        private readonly StringBuilder _buffer = new();
+        private int _tokens;
+        private double? _percent;
+
+        public void Update(int tokens, double? percent, string? partialDelta, int maxChars)
+        {
+            lock (_lock)
+            {
+                // Non-monotonic tokens = a provider-failover retry restarted counting at
+                // ~1 → discard the failed attempt's text before accepting the new one.
+                if (tokens < _tokens)
+                    _buffer.Clear();
+                _tokens = tokens;
+                _percent = percent;
+                if (!string.IsNullOrEmpty(partialDelta))
+                {
+                    _buffer.Append(partialDelta);
+                    if (_buffer.Length > maxChars)
+                        _buffer.Remove(0, _buffer.Length - maxChars); // keep the tail
+                }
+            }
+        }
+
+        public AiJobProgress Snapshot()
+        {
+            lock (_lock)
+            {
+                return new AiJobProgress(_tokens, _percent, _buffer.Length == 0 ? null : _buffer.ToString());
+            }
         }
     }
 }

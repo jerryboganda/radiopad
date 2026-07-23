@@ -869,6 +869,10 @@ public class ReportsController : TenantedController
                 status = job.Status,
                 elapsedMs = (long)((job.CompletedAt ?? DateTimeOffset.UtcNow) - job.CreatedAt).TotalMilliseconds,
                 result = job.Status == "ok" ? job.Payload : null,
+                // PR-B1 (additive): live token/partial progress for a running job, hot-cache
+                // only. Omitted (WhenWritingNull) for non-running jobs and when no progress
+                // has been recorded — old clients are unaffected.
+                progress = ProgressShape(job.Status, jobId),
                 error = job.Error,
                 errorKind = job.ErrorKind,
             });
@@ -907,6 +911,9 @@ public class ReportsController : TenantedController
                 status = row.Status,
                 elapsedMs = (long)((row.CompletedAt ?? DateTimeOffset.UtcNow) - row.CreatedAt).TotalMilliseconds,
                 result,
+                // Progress is hot-cache-only; the DB fallback (registry miss = evicted or
+                // restarted) never carries it. Always null → omitted (WhenWritingNull).
+                progress = (object?)null,
                 error = row.Error,
                 errorKind = row.ErrorKind,
             });
@@ -917,6 +924,17 @@ public class ReportsController : TenantedController
             error = "AI job not found — the server may have restarted mid-generation. Please try again.",
             kind = "job_not_found",
         });
+    }
+
+    /// <summary>PR-B1 — the additive <c>progress</c> field for a poll envelope:
+    /// <c>{ tokens, percent }</c> from the registry hot cache when the job is running and
+    /// has recorded progress, else null (omitted by WhenWritingNull). <c>percent</c> is
+    /// itself null on every streaming path in v1.</summary>
+    private object? ProgressShape(string status, Guid jobId)
+    {
+        if (status != "running") return null;
+        var p = _aiJobs.ProgressOf(jobId);
+        return p is null ? null : new { tokens = p.Tokens, percent = p.Percent };
     }
 
     [HttpPost("{id:guid}/acknowledge")]

@@ -23,6 +23,7 @@ public sealed class AiJobCoordinatorTests : IDisposable
     private readonly string _dbPath = Path.Combine(Path.GetTempPath(), $"radiopad-coord-{Guid.NewGuid():N}.db");
     private readonly ServiceProvider _sp;
     private readonly Channel<AiJobWork> _channel = Channel.CreateUnbounded<AiJobWork>();
+    private readonly RecordingBus _bus = new();
     private readonly Tenant _tenant = new() { Slug = "coord", DisplayName = "Coord" };
     private readonly User _user = new() { Email = "coord@radiopad.local", DisplayName = "Coord" };
 
@@ -34,6 +35,7 @@ public sealed class AiJobCoordinatorTests : IDisposable
         services.AddDbContext<RadioPadDbContext>(o => o.UseSqlite($"Data Source={_dbPath}"));
         services.AddSingleton<AiJobRegistry>();
         services.AddSingleton(_channel);
+        services.AddSingleton<IAiJobEventBus>(_bus);
         services.AddScoped<AiJobCoordinator>();
         services.AddLogging();
         _sp = services.BuildServiceProvider();
@@ -291,6 +293,28 @@ public sealed class AiJobCoordinatorTests : IDisposable
     }
 
     [Fact]
+    public async Task MarkTerminal_PublishesToBus()
+    {
+        // Every terminal durable transition now fans out through IAiJobEventBus (the
+        // OnTerminal event was deleted). Cancelling a queued job is the deterministic
+        // terminal path with no runner/provider in the loop.
+        var reportId = Guid.NewGuid();
+        using var scope = _sp.CreateScope();
+        var coord = Coordinator(scope);
+
+        var submitted = await coord.SubmitAsync(_tenant, _user, reportId, "generate", "generate", null, default);
+        _bus.Terminals.Clear();
+
+        var (changed, status) = await coord.RequestCancelAsync(_tenant.Id, submitted.jobId, default);
+        Assert.True(changed);
+        Assert.Equal("cancelled", status);
+
+        var published = Assert.Single(_bus.Terminals);
+        Assert.Equal(submitted.jobId, published.Id);
+        Assert.Equal("cancelled", published.Status);
+    }
+
+    [Fact]
     public async Task BootRecovery_MarksQueuedAndRunning_ServerRestart_LeavingTerminalRowsAlone()
     {
         var reportId = Guid.NewGuid();
@@ -317,5 +341,18 @@ public sealed class AiJobCoordinatorTests : IDisposable
             Assert.Contains(rows, r => r.Status == "error" && r.ErrorKind == "timeout"); // prior error untouched
             Assert.All(rows.Where(r => r.ErrorKind == "server_restart"), r => Assert.NotNull(r.CompletedAt));
         }
+    }
+
+    /// <summary>Fake bus that records what the coordinator publishes, so terminal fan-out
+    /// can be asserted without a live SSE subscriber.</summary>
+    private sealed class RecordingBus : IAiJobEventBus
+    {
+        public List<AiJob> Terminals { get; } = new();
+        public List<AiJobProgressEvent> Progress { get; } = new();
+
+        public void PublishTerminal(AiJob job) => Terminals.Add(job);
+        public void PublishProgress(AiJobProgressEvent evt) => Progress.Add(evt);
+        public void PublishNotification(NotificationEvent evt) { }
+        public IAiJobEventSubscription Subscribe(Guid? tenantId, Guid? userId) => throw new NotSupportedException();
     }
 }

@@ -38,6 +38,22 @@ public sealed class RadioPadBearerMiddleware
         var token = !string.IsNullOrWhiteSpace(bearer) ? bearer : cookieBearer;
         var tokenFromCookie = string.IsNullOrWhiteSpace(bearer) && !string.IsNullOrWhiteSpace(cookieBearer);
 
+        // PR-B1 SSE bearer-in-URL fallback. A browser EventSource cannot send an
+        // Authorization header, so the desktop webview opens the stream with
+        // ?access_token=. This is deliberately RESTRICTED to exactly GET
+        // /api/events/stream (bearer-in-URL must never generalize) and only when no
+        // header/cookie bearer is present; the token still flows through the identical
+        // HMAC + AuthSession validation below. Mirrors the /ws/companion precedent
+        // (CompanionRelayEndpoint reads the same query param for the same reason).
+        // First-party clients use fetch()+ReadableStream with real headers and never
+        // hit this branch.
+        if (string.IsNullOrWhiteSpace(token)
+            && HttpMethods.IsGet(ctx.Request.Method)
+            && ctx.Request.Path.Equals("/api/events/stream", StringComparison.OrdinalIgnoreCase))
+        {
+            token = ctx.Request.Query["access_token"].FirstOrDefault();
+        }
+
         if (!string.IsNullOrWhiteSpace(token) && token.StartsWith("rp_", StringComparison.Ordinal))
         {
             var slug = ctx.Request.Headers["X-RadioPad-Tenant"].FirstOrDefault();

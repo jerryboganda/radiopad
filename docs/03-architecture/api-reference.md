@@ -63,7 +63,7 @@ Controller-handled provider policy failures return 403 `kind:"provider_policy"`.
 | POST   | `/api/reports/{id}/ai`          | Body `{ mode: "impression" \| "cleanup" \| "draft" \| "concise" \| "formal" \| "patient_friendly" \| "referring_summary", providerId? }`; omitted `providerId` uses auto-routing. **Rate-limited** (`ai` policy: 60/min/tenant). Synchronous — holds the connection for the whole provider call; kept for older desktop builds. New clients use the async job pair below. |
 | POST   | `/api/reports/{id}/ai/jobs`     | Async variant of `/ai` (2026-07-12): same body/validation, returns `202 { jobId, status:"running" }` immediately. Generation runs detached from the connection — a dropped client no longer cancels it. **Rate-limited** (`ai`). |
 | POST   | `/api/reports/{id}/generate/jobs` | Async variant of `/generate`: returns `202 { jobId }`; on completion the poll's `result` is the updated `Report` (sections adopted + version snapshot, like the sync endpoint). **Rate-limited** (`ai`). |
-| GET    | `/api/reports/{id}/ai/jobs/{jobId}` | Poll a job (both kinds): `{ jobId, kind, mode, status: "running"\|"ok"\|"error", elapsedMs, result?, error?, errorKind? }`. Fast request; NOT `ai`-rate-limited. 404 `kind:"job_not_found"` after a server restart (jobs are in-memory; results retained ~15 min). |
+| GET    | `/api/reports/{id}/ai/jobs/{jobId}` | Poll a job (both kinds): `{ jobId, kind, mode, status: "running"\|"ok"\|"error", elapsedMs, result?, error?, errorKind?, progress? }`. `progress = { tokens, percent }` is present only while `status == "running"` (hot-cache only, omitted otherwise; `percent` is null in v1). Fast request; NOT `ai`-rate-limited. 404 `kind:"job_not_found"` after a server restart (jobs are in-memory; results retained ~15 min). |
 | POST   | `/api/reports/{id}/acknowledge` | Mark as Acknowledged. Blocked with 409 `kind:"validation_blockers"` when strict validation has any `Blocker`. |
 | GET    | `/api/reports/{id}/export/text` | Plain-text export. `preview=true` is draft-safe and does not audit/export; final export requires Acknowledged/Exported. |
 | GET    | `/api/reports/{id}/export/json` | Structured JSON report export. Requires Acknowledged/Exported and audits `ReportExported`. |
@@ -75,6 +75,12 @@ Controller-handled provider policy failures return 403 `kind:"provider_policy"`.
 | POST   | `/api/reports/{id}/sign`        | Iter-30. Body `{ role: "Primary"\|"CoSigner"\|"Addendum", note? }`. First signature must be `Primary`; non-Primary roles require an existing Primary. SHA-256 hashed. Audited as `ReportSigned`. |
 | POST   | `/api/reports/{id}/addendum`    | Iter-30. Body `{ body }`. Requires existing Primary signature. Creates a new `ReportVersion` with `isAddendum=true`. Audited as `ReportAddendumAppended`. |
 | GET    | `/api/reports/{id}/signatures`  | List signatures for a report (oldest first). |
+
+## Events (Server-Sent Events, PR-B1)
+
+| Method | Path | Description |
+| --- | --- | --- |
+| GET    | `/api/events/stream` | One long-lived SSE connection per signed-in client (replaces the jobs-widget poll). Emits `event: job` (terminal JobSummary patch), `event: progress` (`{ jobId, tokens, percent }`), `event: partial` (`{ jobId, delta }` — streamed model text), and `event: notification`. **User-scoped:** job/progress/partial events are delivered only to the job's own tenant+user (PHI-bearing partials never fan out tenant-wide). Auth only, no extra permission gate; NOT `ai`-rate-limited and exempt from the perf-budget histogram. Keep-alive comments every `AiJobs:SseKeepAliveSeconds` (default 15). First-party clients send real headers via `fetch()`+`ReadableStream`; a browser `EventSource` (webview edge case) may pass `?access_token=<bearer>` — honoured **only** on this exact GET route, mirroring `/ws/companion`. |
 
 ## Rulebooks
 

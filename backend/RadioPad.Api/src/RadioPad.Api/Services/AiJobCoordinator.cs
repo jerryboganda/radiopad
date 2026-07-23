@@ -30,6 +30,7 @@ public sealed class AiJobCoordinator
     private readonly AiJobRegistry _registry;
     private readonly IServiceScopeFactory _scopes;
     private readonly Channel<AiJobWork> _channel;
+    private readonly IAiJobEventBus _bus;
     private readonly ILogger<AiJobCoordinator> _log;
 
     public AiJobCoordinator(
@@ -37,21 +38,16 @@ public sealed class AiJobCoordinator
         AiJobRegistry registry,
         IServiceScopeFactory scopes,
         Channel<AiJobWork> channel,
+        IAiJobEventBus bus,
         ILogger<AiJobCoordinator> log)
     {
         _db = db;
         _registry = registry;
         _scopes = scopes;
         _channel = channel;
+        _bus = bus;
         _log = log;
     }
-
-    /// <summary>
-    /// Best-effort seam for the future NOTIF-001 inbox — raised after every terminal
-    /// durable write. Nothing subscribes today; a throwing subscriber must never
-    /// break a job, so raises are swallowed.
-    /// </summary>
-    public event Action<AiJob>? OnTerminal;
 
     // ── submit / retry / cancel — controller-invoked, request-scoped _db ──────────────────────────
 
@@ -136,7 +132,7 @@ public sealed class AiJobCoordinator
                 return await ReRequestCancelAsync(tenantId, jobId, ct);
             }
             _registry.Cancel(jobId); // no-op unless a hot entry somehow exists
-            RaiseTerminal(row);
+            _bus.PublishTerminal(row);
             return (true, "cancelled");
         }
 
@@ -482,7 +478,7 @@ public sealed class AiJobCoordinator
                 // above — first-terminal-wins, so this write correctly loses.
                 return;
             }
-            RaiseTerminal(row);
+            _bus.PublishTerminal(row);
         }
         catch (Exception ex)
         {
@@ -525,20 +521,12 @@ public sealed class AiJobCoordinator
                 // though the generation itself actually succeeded underneath it.
                 return;
             }
-            RaiseTerminal(row);
+            _bus.PublishTerminal(row);
         }
         catch (Exception ex)
         {
             _log.LogError(ex, "Failed to persist ok state for AI job {JobId}", jobId);
         }
-    }
-
-    private void RaiseTerminal(AiJob job)
-    {
-        var handler = OnTerminal;
-        if (handler is null) return;
-        try { handler(job); }
-        catch (Exception ex) { _log.LogError(ex, "OnTerminal subscriber threw for AI job {JobId}", job.Id); }
     }
 
     internal static async Task<(Tenant tenant, User user, Report report)> LoadJobContextAsync(

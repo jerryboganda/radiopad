@@ -28,12 +28,14 @@ public class JobsController : TenantedController
 {
     private readonly RadioPadDbContext _db;
     private readonly AiJobCoordinator _coordinator;
+    private readonly AiJobRegistry _registry;
     private readonly IAuditLog _audit;
 
-    public JobsController(RadioPadDbContext db, AiJobCoordinator coordinator, IAuditLog audit)
+    public JobsController(RadioPadDbContext db, AiJobCoordinator coordinator, AiJobRegistry registry, IAuditLog audit)
     {
         _db = db;
         _coordinator = coordinator;
+        _registry = registry;
         _audit = audit;
     }
 
@@ -165,7 +167,21 @@ public class JobsController : TenantedController
             completedAt = row.CompletedAt,
             elapsedMs = Elapsed(row.CreatedAt, row.CompletedAt),
             result,
+            // PR-B1 (additive): live token/partial progress for a running job, from the
+            // registry hot cache. Omitted (WhenWritingNull) otherwise. List stays light —
+            // no progress there. Old clients are unaffected.
+            progress = ProgressShape(row.Status, row.Id),
         });
+    }
+
+    /// <summary>PR-B1 — the additive <c>progress</c> field: <c>{ tokens, percent }</c> from
+    /// the registry hot cache when the job is running and has recorded progress, else null
+    /// (omitted by WhenWritingNull). <c>percent</c> is itself null on every streaming path in v1.</summary>
+    private object? ProgressShape(string status, Guid jobId)
+    {
+        if (status != "running") return null;
+        var p = _registry.ProgressOf(jobId);
+        return p is null ? null : new { tokens = p.Tokens, percent = p.Percent };
     }
 
     /// <summary>
