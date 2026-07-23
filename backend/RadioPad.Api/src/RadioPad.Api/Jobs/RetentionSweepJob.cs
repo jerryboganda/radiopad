@@ -114,5 +114,15 @@ public sealed class RetentionSweepJob
             _log.LogInformation(
                 "Retention sweep: AI jobs — cleared {Cleared} result payload(s) (>24h), deleted {Deleted} row(s) (>30d)",
                 aiResultsCleared, aiJobsDeleted);
+
+        // PR-N2 — signed audit-export bundles are retained 90 days (a global housekeeping pass,
+        // not subject to per-tenant retention policy). Pruned by CreatedAt so the cutoff is
+        // robust regardless of the exported day.
+        var exportCutoff = DateTimeOffset.UtcNow.AddDays(-90);
+        var exportsDeleted = await db.AuditExportBundles
+            .Where(b => b.CreatedAt < exportCutoff)
+            .ExecuteDeleteAsync(ct);
+        if (exportsDeleted > 0)
+            _log.LogInformation("Retention sweep: deleted {Deleted} audit-export bundle(s) (>90d)", exportsDeleted);
     }
 }

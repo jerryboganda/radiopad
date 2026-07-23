@@ -348,6 +348,19 @@ public enum AuditAction
     /// <c>POST /api/jobs/{id}/retry</c>. Details link the new job id to the one it retried
     /// (<c>retryOfJobId</c>); no clinical text is echoed into the audit trail.</summary>
     AiJobRetried = 122,
+    /// <summary>PR-N2 — an outbound tenant webhook endpoint was auto-disabled after
+    /// crossing the consecutive-failure threshold (20). Details record the endpoint id
+    /// and the failure count; never the target URL body or any delivered payload.</summary>
+    WebhookEndpointDisabled = 123,
+    /// <summary>PR-N2 — the weekly orphaned-draft cleanup job archived a stale Draft
+    /// report (opt-in per tenant via <see cref="Entities.Tenant.DraftAutoArchiveDays"/>).
+    /// Sets <see cref="Entities.Report.ArchivedAt"/> only; the status enum is untouched.
+    /// Details record the report id, last-touched timestamp, and threshold — never report text.</summary>
+    ReportDraftArchived = 124,
+    /// <summary>PR-N2 — the daily audit-export rollup produced a signed, PHI-minimized
+    /// JSONL bundle of a tenant's prior-day audit chain. Details record the date, event
+    /// count, and body SHA-256; never <c>DetailsJson</c> or any clinical text.</summary>
+    AuditExportBundleCreated = 125,
 }
 
 /// <summary>

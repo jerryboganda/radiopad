@@ -39,6 +39,19 @@ public class Tenant : Entity
     /// the policy is explicit and a future tenant could relax it.
     /// </summary>
     public bool RequireMfa { get; set; } = true;
+    /// <summary>
+    /// PR-N2 — opt-in stale-draft auto-archive window in days. 0 (default) disables the
+    /// weekly <c>OrphanedDraftCleanupJob</c> for this tenant; when &gt; 0, Draft reports
+    /// untouched for longer than this many days are soft-archived (see
+    /// <see cref="Report.ArchivedAt"/>).
+    /// </summary>
+    public int DraftAutoArchiveDays { get; set; } = 0;
+    /// <summary>
+    /// PR-N2 — CSV of notification categories this tenant treats as critical (default
+    /// <c>"CriticalResult"</c>). Reserved for the later notification producers; carried on
+    /// the tenant so the platform tables land together.
+    /// </summary>
+    public string CriticalNotificationCategoriesCsv { get; set; } = "CriticalResult";
     public List<User> Users { get; set; } = new();
     public List<ProviderConfig> Providers { get; set; } = new();
 }
@@ -406,6 +419,16 @@ public class Report : Entity
 
     /// <summary>Iter-0a — first-class structured measurements (lesion-ready, cross-study linkable).</summary>
     public List<ReportMeasurement> Measurements { get; set; } = new();
+
+    /// <summary>
+    /// PR-N2 — soft-archive marker for the weekly orphaned-draft cleanup job
+    /// (<c>OrphanedDraftCleanupJob</c>). Non-null means the draft was archived out of
+    /// the active worklist after going stale for longer than the tenant's opt-in
+    /// <see cref="Tenant.DraftAutoArchiveDays"/> window. The <see cref="Status"/> enum is
+    /// deliberately NOT touched (no new state, no wire break); worklist queries simply add
+    /// <c>ArchivedAt == null</c> and an <c>archived=true</c> recovery filter unarchives it.
+    /// </summary>
+    public DateTimeOffset? ArchivedAt { get; set; }
 }
 
 public class ReportVersion : Entity
@@ -591,6 +614,70 @@ public class AuditEvent : Entity
     public string DetailsJson { get; set; } = "{}";
     /// <summary>Append-only enforcement: this is a hash of (Id|Action|DetailsJson|prev).</summary>
     public string IntegrityChain { get; set; } = "";
+}
+
+/// <summary>
+/// PR-N2 — an outbound tenant webhook endpoint. Delivery is fanned out by
+/// <c>WebhookDispatchJob</c>; every payload is PHI-minimized (ids/action/timestamps/
+/// integrity hash only — never <c>DetailsJson</c> or clinical text) and signed with
+/// <c>X-RadioPad-Signature: sha256=&lt;hex&gt;</c> HMAC over the raw body using
+/// <see cref="Secret"/> (the same convention as <c>TenantSettings.FhirWebhookSecret</c>;
+/// the column is AES-256-GCM encrypted at rest and is write-only over the API).
+/// After 20 consecutive delivery failures the endpoint auto-disables (<see cref="DisabledAt"/>
+/// set, <see cref="Active"/> false, audited <c>WebhookEndpointDisabled</c>).
+/// </summary>
+public class TenantWebhookEndpoint : Entity
+{
+    public Guid TenantId { get; set; }
+    /// <summary>Absolute HTTPS URL the PHI-minimized payload is POSTed to.</summary>
+    public string Url { get; set; } = "";
+    /// <summary>HMAC signing secret (encrypted at rest; never returned by the API).</summary>
+    public string Secret { get; set; } = "";
+    /// <summary>CSV of subscribed event kinds, e.g. <c>"audit"</c> or <c>"audit,notification"</c>.</summary>
+    public string EventsCsv { get; set; } = "audit";
+    public bool Active { get; set; } = true;
+    /// <summary>Consecutive delivery failures; reset to 0 on the next 2xx.</summary>
+    public int FailureCount { get; set; }
+    /// <summary>Set when the endpoint auto-disabled after crossing the failure threshold.</summary>
+    public DateTimeOffset? DisabledAt { get; set; }
+}
+
+/// <summary>
+/// PR-N2 — a daily per-(tenant, provider, model) aggregate of <see cref="AiRequest"/>
+/// counts and token sums, produced by <c>AiCostRollupJob</c>. Preserves billing counts
+/// past the retention worker's purge of the raw <see cref="AiRequest"/> rows. Idempotent:
+/// the (TenantId, Date, Provider, Model) tuple is unique and re-runs upsert in place.
+/// </summary>
+public class AiUsageRollup : Entity
+{
+    public Guid TenantId { get; set; }
+    /// <summary>The UTC calendar day the requests were made.</summary>
+    public DateOnly Date { get; set; }
+    public string Provider { get; set; } = "";
+    public string Model { get; set; } = "";
+    public int RequestCount { get; set; }
+    public long InputTokens { get; set; }
+    public long OutputTokens { get; set; }
+}
+
+/// <summary>
+/// PR-N2 — a signed, PHI-minimized JSONL snapshot of one UTC day's audit chain for a
+/// tenant, produced by <c>AuditExportRollupJob</c>. <see cref="ContentJsonl"/> is the same
+/// PHI-minimized line shape as <c>AuditController.Siem</c> (ids/action/timestamps/integrity
+/// hash — never <c>DetailsJson</c>) plus a trailing manifest line, optionally signed with
+/// HMAC-SHA256 via the <c>AuditExport:SigningKey</c> config key. Idempotent by (TenantId,
+/// Date); retained 90 days (pruned by <c>RetentionSweepJob</c>).
+/// </summary>
+public class AuditExportBundle : Entity
+{
+    public Guid TenantId { get; set; }
+    /// <summary>The exported UTC calendar day.</summary>
+    public DateOnly Date { get; set; }
+    /// <summary>PHI-minimized JSONL body + trailing manifest line.</summary>
+    public string ContentJsonl { get; set; } = "";
+    /// <summary>HMAC-SHA256 hex signature over <see cref="ContentJsonl"/>; null when no signing key is configured.</summary>
+    public string? Signature { get; set; }
+    public int EventCount { get; set; }
 }
 
 /// <summary>

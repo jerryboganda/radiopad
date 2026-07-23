@@ -117,6 +117,7 @@ public class ReportsController : TenantedController
         [FromQuery] string? modality,
         [FromQuery] ReportStatus? status,
         [FromQuery] string? q,
+        [FromQuery] bool archived = false,
         [FromQuery] int skip = 0,
         [FromQuery] int take = 100,
         CancellationToken ct = default)
@@ -128,6 +129,11 @@ public class ReportsController : TenantedController
         skip = Math.Max(0, skip);
 
         var query = _db.Reports.Where(r => r.TenantId == tenant.Id);
+        // PR-N2 — the worklist hides soft-archived drafts by default; `archived=true` surfaces
+        // exactly the archived set for recovery (unarchive via PATCH /reports/{id}/unarchive).
+        query = archived
+            ? query.Where(r => r.ArchivedAt != null)
+            : query.Where(r => r.ArchivedAt == null);
         if (!string.IsNullOrWhiteSpace(modality))
             query = query.Where(r => r.Study.Modality == modality);
         if (status is not null)
@@ -314,8 +320,31 @@ public class ReportsController : TenantedController
             serviceRequestRef = report.ServiceRequestRef,
             createdAt = report.CreatedAt,
             updatedAt = report.UpdatedAt,
+            archivedAt = report.ArchivedAt,
             signatures,
         });
+    }
+
+    /// <summary>
+    /// PR-N2 — recover a soft-archived draft: clears <see cref="Report.ArchivedAt"/> and
+    /// refreshes <see cref="Report.UpdatedAt"/> so the report re-enters the active worklist
+    /// with a fresh staleness window. Restricted to <see cref="RbacPermission.ReportsEdit"/>.
+    /// </summary>
+    [HttpPatch("{id:guid}/unarchive")]
+    public async Task<IActionResult> Unarchive(Guid id, CancellationToken ct)
+    {
+        var (tenant, user) = await ResolveContextAsync(_db, ct);
+        var deny = RequirePermission(user, RbacPermission.ReportsEdit);
+        if (deny is not null) return deny;
+        var report = await _db.Reports.FirstOrDefaultAsync(r => r.Id == id && r.TenantId == tenant.Id, ct);
+        if (report is null) return NotFound();
+        if (report.ArchivedAt is not null)
+        {
+            report.ArchivedAt = null;
+            report.UpdatedAt = DateTimeOffset.UtcNow;
+            await _db.SaveChangesAsync(ct);
+        }
+        return Ok(new { report.Id, archivedAt = report.ArchivedAt });
     }
 
     public record PatchReportDto(

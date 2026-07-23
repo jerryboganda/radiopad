@@ -79,6 +79,15 @@ public class RadioPadDbContext : DbContext
     /// <summary>Durable AI generation jobs — the restart-surviving counterpart to AiJobRegistry.</summary>
     public DbSet<AiJob> AiJobs => Set<AiJob>();
 
+    /// <summary>PR-N2 — outbound tenant webhook endpoints (WebhookDispatchJob targets).</summary>
+    public DbSet<TenantWebhookEndpoint> TenantWebhookEndpoints => Set<TenantWebhookEndpoint>();
+
+    /// <summary>PR-N2 — daily per-(tenant, provider, model) AI usage rollups (AiCostRollupJob).</summary>
+    public DbSet<AiUsageRollup> AiUsageRollups => Set<AiUsageRollup>();
+
+    /// <summary>PR-N2 — signed daily audit-export bundles (AuditExportRollupJob).</summary>
+    public DbSet<AuditExportBundle> AuditExportBundles => Set<AuditExportBundle>();
+
     protected override void OnModelCreating(ModelBuilder b)
     {
         b.Entity<Tenant>().HasIndex(x => x.Slug).IsUnique();
@@ -185,6 +194,13 @@ public class RadioPadDbContext : DbContext
         // silently overwriting the winner's outcome.
         b.Entity<AiJob>().Property(x => x.Status).IsConcurrencyToken();
 
+        // PR-N2 — cron platform tables. Outbound webhook endpoints are scanned per tenant
+        // by the audit-append decorator; usage + audit-export rollups carry a unique
+        // idempotency key so a re-run upserts in place rather than duplicating.
+        b.Entity<TenantWebhookEndpoint>().HasIndex(x => x.TenantId);
+        b.Entity<AiUsageRollup>().HasIndex(x => new { x.TenantId, x.Date, x.Provider, x.Model }).IsUnique();
+        b.Entity<AuditExportBundle>().HasIndex(x => new { x.TenantId, x.Date }).IsUnique();
+
         b.Entity<Report>().OwnsOne(x => x.Study);
         b.Entity<Report>().HasMany(x => x.Versions).WithOne().HasForeignKey(v => v.ReportId);
         b.Entity<Report>().HasMany(x => x.Signatures).WithOne().HasForeignKey(s => s.ReportId);
@@ -226,6 +242,8 @@ public class RadioPadDbContext : DbContext
         b.Entity<TenantSettings>().Property(s => s.DicomWebBearerSecret).HasConversion(enc);
         b.Entity<TenantSettings>().Property(s => s.ScimBearerSecret).HasConversion(enc);
         b.Entity<ProviderConfig>().Property(p => p.ApiKeySecretRef).HasConversion(enc);
+        // PR-N2 — outbound webhook HMAC secret is encrypted at rest and write-only over the API.
+        b.Entity<TenantWebhookEndpoint>().Property(w => w.Secret).HasConversion(enc);
 
         ConfigureSqliteDateTimeOffsetConverters(b);
     }

@@ -124,5 +124,21 @@ public static class HangfireSetup
         RecurringJob.AddOrUpdate<ModelDriftDetectionJob>(
             "model-drift-detection", QueueMaintenance,
             j => j.RunRecurringAsync(CancellationToken.None), $"0 */{driftHours} * * *");
+
+        // PR-N2 — the three recurring cron-platform jobs. (WebhookDispatchJob is enqueue-only,
+        // so it is NOT registered here.) Audit-export rollup fans out per tenant at 02:00 UTC;
+        // AI cost rollup aggregates the prior day at 01:30 UTC (before retention can purge it);
+        // orphaned-draft cleanup runs weekly on Sunday at 03:00 UTC.
+        RecurringJob.AddOrUpdate<AuditExportRollupJob>(
+            "audit-export-rollup", QueueMaintenance,
+            j => j.RunRecurringAsync(CancellationToken.None), "0 2 * * *");
+
+        RecurringJob.AddOrUpdate<AiCostRollupJob>(
+            "ai-cost-rollup", QueueMaintenance,
+            j => j.RunRecurringAsync(CancellationToken.None), "30 1 * * *");
+
+        RecurringJob.AddOrUpdate<OrphanedDraftCleanupJob>(
+            "orphaned-draft-cleanup", QueueMaintenance,
+            j => j.RunRecurringAsync(CancellationToken.None), "0 3 * * 0");
     }
 }

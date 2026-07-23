@@ -800,6 +800,53 @@ public class AuditController : TenantedController
         return File(System.Text.Encoding.UTF8.GetBytes(sb.ToString()),
             "text/plain", $"radiopad-audit-{tenant.Slug}.cef");
     }
+
+    /// <summary>
+    /// PR-N2 — read the signed daily audit-export bundles produced by
+    /// <c>AuditExportRollupJob</c>. With <paramref name="date"/> set, returns that day's full
+    /// PHI-minimized JSONL body + signature; without it, lists available bundles' metadata
+    /// (no body). Restricted to IT / compliance roles via <see cref="RbacPermission.AuditExport"/>.
+    /// </summary>
+    [HttpGet("exports")]
+    public async Task<IActionResult> Exports([FromQuery] DateOnly? date, CancellationToken ct = default)
+    {
+        var (tenant, user) = await ResolveContextAsync(_db, ct);
+        var deny = RequirePermission(user, RbacPermission.AuditExport);
+        if (deny is not null) return deny;
+
+        if (date is { } d)
+        {
+            var bundle = await _db.AuditExportBundles
+                .AsNoTracking()
+                .FirstOrDefaultAsync(b => b.TenantId == tenant.Id && b.Date == d, ct);
+            if (bundle is null)
+                return NotFound(new { kind = "not_found", error = "No audit export bundle for that date." });
+            return Ok(new
+            {
+                date = bundle.Date,
+                eventCount = bundle.EventCount,
+                signature = bundle.Signature,
+                signed = bundle.Signature is not null,
+                createdAt = bundle.CreatedAt,
+                contentJsonl = bundle.ContentJsonl,
+            });
+        }
+
+        var list = await _db.AuditExportBundles
+            .AsNoTracking()
+            .Where(b => b.TenantId == tenant.Id)
+            .OrderByDescending(b => b.Date)
+            .Take(400)
+            .Select(b => new
+            {
+                date = b.Date,
+                eventCount = b.EventCount,
+                signed = b.Signature != null,
+                createdAt = b.CreatedAt,
+            })
+            .ToListAsync(ct);
+        return Ok(new { exports = list });
+    }
 }
 
 [ApiController]
@@ -935,6 +982,36 @@ public class UsageController : TenantedController
                 activeUsers,
             },
         });
+    }
+
+    /// <summary>
+    /// PR-N2 — read the daily per-(provider, model) AI usage rollups produced by
+    /// <c>AiCostRollupJob</c>. Preserves billing counts even after the retention worker purges
+    /// the raw <c>AiRequests</c>. Tenant-scoped; window defaults to the last 30 days.
+    /// </summary>
+    [HttpGet("ai-rollup")]
+    public async Task<IActionResult> AiRollup(
+        [FromQuery] DateOnly? from,
+        [FromQuery] DateOnly? to,
+        CancellationToken ct = default)
+    {
+        var (tenant, _) = await ResolveContextAsync(_db, ct);
+        var f = from ?? DateOnly.FromDateTime(DateTime.UtcNow.Date.AddDays(-30));
+        var t = to ?? DateOnly.FromDateTime(DateTime.UtcNow.Date);
+        var rollups = await _db.AiUsageRollups
+            .Where(r => r.TenantId == tenant.Id && r.Date >= f && r.Date <= t)
+            .OrderBy(r => r.Date).ThenBy(r => r.Provider).ThenBy(r => r.Model)
+            .Select(r => new
+            {
+                date = r.Date,
+                provider = r.Provider,
+                model = r.Model,
+                requestCount = r.RequestCount,
+                inputTokens = r.InputTokens,
+                outputTokens = r.OutputTokens,
+            })
+            .ToListAsync(ct);
+        return Ok(new { window = new { from = f, to = t }, rollups });
     }
 }
 
@@ -1895,5 +1972,105 @@ public class TenantSettingsController : TenantedController
                 error = $"{ex.GetType().Name}: {ex.Message}",
             });
         }
+    }
+
+    // PR-N2 — outbound tenant webhook endpoint CRUD (WebhookDispatchJob targets). Restricted
+    // to TenantSettingsManage; the HMAC signing secret is write-only — it is never returned in
+    // any response (only a `secretConfigured` boolean is surfaced).
+
+    public record SaveWebhookDto(string? Url, string? EventsCsv, string? Secret, bool? Active);
+
+    [HttpGet("webhooks")]
+    public async Task<IActionResult> ListWebhooks(CancellationToken ct)
+    {
+        var (tenant, user) = await ResolveContextAsync(_db, ct);
+        var deny = RequirePermission(user, RbacPermission.TenantSettingsManage);
+        if (deny is not null) return deny;
+        var rows = await _db.TenantWebhookEndpoints
+            .Where(e => e.TenantId == tenant.Id)
+            .OrderBy(e => e.CreatedAt)
+            .Select(e => new
+            {
+                e.Id,
+                e.Url,
+                e.EventsCsv,
+                e.Active,
+                e.FailureCount,
+                e.DisabledAt,
+                e.CreatedAt,
+                e.UpdatedAt,
+                secretConfigured = e.Secret != null && e.Secret != "",
+            })
+            .ToListAsync(ct);
+        return Ok(rows);
+    }
+
+    [HttpPost("webhooks")]
+    public async Task<IActionResult> CreateWebhook([FromBody] SaveWebhookDto dto, CancellationToken ct)
+    {
+        var (tenant, user) = await ResolveContextAsync(_db, ct);
+        var deny = RequirePermission(user, RbacPermission.TenantSettingsManage);
+        if (deny is not null) return deny;
+        if (string.IsNullOrWhiteSpace(dto.Url) || !Uri.TryCreate(dto.Url, UriKind.Absolute, out _))
+            return BadRequest(new { kind = "validation", error = "url must be an absolute URL." });
+
+        var ep = new TenantWebhookEndpoint
+        {
+            TenantId = tenant.Id,
+            Url = dto.Url.Trim(),
+            EventsCsv = string.IsNullOrWhiteSpace(dto.EventsCsv) ? "audit" : dto.EventsCsv.Trim(),
+            Secret = dto.Secret ?? "",
+            Active = dto.Active ?? true,
+        };
+        _db.TenantWebhookEndpoints.Add(ep);
+        await _db.SaveChangesAsync(ct);
+        return Ok(new { ep.Id });
+    }
+
+    [HttpPatch("webhooks/{id:guid}")]
+    public async Task<IActionResult> UpdateWebhook(Guid id, [FromBody] SaveWebhookDto dto, CancellationToken ct)
+    {
+        var (tenant, user) = await ResolveContextAsync(_db, ct);
+        var deny = RequirePermission(user, RbacPermission.TenantSettingsManage);
+        if (deny is not null) return deny;
+        var ep = await _db.TenantWebhookEndpoints.FirstOrDefaultAsync(e => e.Id == id && e.TenantId == tenant.Id, ct);
+        if (ep is null) return NotFound();
+
+        if (!string.IsNullOrWhiteSpace(dto.Url))
+        {
+            if (!Uri.TryCreate(dto.Url, UriKind.Absolute, out _))
+                return BadRequest(new { kind = "validation", error = "url must be an absolute URL." });
+            ep.Url = dto.Url.Trim();
+        }
+        if (dto.EventsCsv is not null)
+            ep.EventsCsv = string.IsNullOrWhiteSpace(dto.EventsCsv) ? "audit" : dto.EventsCsv.Trim();
+        // Secret is write-only: update only when a value is sent (empty string clears it).
+        if (dto.Secret is not null) ep.Secret = dto.Secret;
+        if (dto.Active is not null)
+        {
+            ep.Active = dto.Active.Value;
+            // Re-enabling a previously auto-disabled endpoint resets its failure bookkeeping.
+            if (dto.Active.Value)
+            {
+                ep.DisabledAt = null;
+                ep.FailureCount = 0;
+            }
+        }
+        ep.UpdatedAt = DateTimeOffset.UtcNow;
+        await _db.SaveChangesAsync(ct);
+        return Ok(new { ep.Id });
+    }
+
+    [HttpDelete("webhooks/{id:guid}")]
+    public async Task<IActionResult> DeleteWebhook(Guid id, CancellationToken ct)
+    {
+        var (tenant, user) = await ResolveContextAsync(_db, ct);
+        var deny = RequirePermission(user, RbacPermission.TenantSettingsManage);
+        if (deny is not null) return deny;
+        var ep = await _db.TenantWebhookEndpoints.FirstOrDefaultAsync(e => e.Id == id && e.TenantId == tenant.Id, ct);
+        if (ep is null) return NotFound();
+        _db.TenantWebhookEndpoints.Remove(ep);
+        await _db.SaveChangesAsync(ct);
+        return Ok(new { deleted = true });
     }
 }

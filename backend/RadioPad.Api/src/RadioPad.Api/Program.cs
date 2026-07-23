@@ -211,7 +211,17 @@ builder.Services.AddScoped<RadioPad.Infrastructure.Providers.Ubag.UbagProviderDi
 if (!builder.Environment.IsEnvironment("Testing"))
     builder.Services.AddHostedService<RadioPad.Infrastructure.Providers.Ubag.UbagProviderDiscoveryHostedService>();
 
-builder.Services.AddScoped<IAuditLog, EfAuditLog>();
+// PR-N2 — the audit log is decorated so an append fans out to any active, audit-subscribed
+// outbound webhook endpoint (WebhookDispatchJob). The decorator forwards to the real
+// EfAuditLog first, then enqueues via Hangfire's IBackgroundJobClient. IBackgroundJobClient is
+// resolved with GetService so the decorator is a no-op enqueue under Testing (no Hangfire).
+builder.Services.AddScoped<EfAuditLog>();
+builder.Services.AddScoped<IAuditLog>(sp => new RadioPad.Api.Services.WebhookEnqueueingAuditLog(
+    sp.GetRequiredService<EfAuditLog>(),
+    sp.GetRequiredService<RadioPadDbContext>(),
+    sp.GetRequiredService<Microsoft.Extensions.Caching.Memory.IMemoryCache>(),
+    sp.GetService<Hangfire.IBackgroundJobClient>(),
+    sp.GetRequiredService<ILogger<RadioPad.Api.Services.WebhookEnqueueingAuditLog>>()));
 builder.Services.AddSingleton<RadioPad.Application.Security.IPermissionService, RadioPad.Application.Security.RolePermissionService>();
 builder.Services.AddScoped<RadioPad.Api.Auth.LockoutPolicy>();
 builder.Services.AddScoped<IRulebookStore, EfRulebookStore>();
@@ -394,6 +404,16 @@ builder.Services.AddSingleton<RadioPad.Api.Jobs.CriticalResultEscalationJob>();
 builder.Services.AddSingleton<RadioPad.Api.Jobs.AnomalyScanJob>();
 builder.Services.AddSingleton<RadioPad.Api.Jobs.OAuthRefreshRotationJob>();
 builder.Services.AddSingleton<RadioPad.Api.Jobs.ModelDriftDetectionJob>();
+
+// PR-N2 — the four planned cron-platform jobs. Registered unconditionally (even under
+// Testing, where no Hangfire server runs) so tests resolve and invoke their unit methods
+// directly. Each holds only IServiceScopeFactory (+ logger) and opens its own scope per pass,
+// so a singleton lifetime is safe. The three recurring ones are scheduled in
+// UseRadioPadRecurringJobs; WebhookDispatchJob is enqueue-only (default queue).
+builder.Services.AddSingleton<RadioPad.Api.Jobs.AuditExportRollupJob>();
+builder.Services.AddSingleton<RadioPad.Api.Jobs.WebhookDispatchJob>();
+builder.Services.AddSingleton<RadioPad.Api.Jobs.AiCostRollupJob>();
+builder.Services.AddSingleton<RadioPad.Api.Jobs.OrphanedDraftCleanupJob>();
 
 // Async AI generation jobs (durable job platform). The unbounded channel is the
 // hand-off between the request-scoped coordinator (writer) and the hosted runner
