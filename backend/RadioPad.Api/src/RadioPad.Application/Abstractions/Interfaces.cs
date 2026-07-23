@@ -1,5 +1,6 @@
 using RadioPad.Application.Stt;
 using RadioPad.Domain.Entities;
+using RadioPad.Domain.Enums;
 using RadioPad.Domain.ValueObjects;
 
 namespace RadioPad.Application.Abstractions;
@@ -384,6 +385,44 @@ public interface IAuditLog
     /// (PRD §13.2 audit-completeness, AUTH-006 tamper-evident logging).
     /// </summary>
     Task<AuditChainVerification> VerifyChainAsync(Guid tenantId, CancellationToken cancellationToken = default);
+}
+
+/// <summary>
+/// NOTIF-001 — the immutable request to produce one in-app notification for a
+/// single recipient. <see cref="Title"/> / <see cref="Body"/> are the in-app tier
+/// of NOTIF-004 (may carry a modality/body-part-class descriptor, never raw
+/// clinical narrative/findings/accession). <see cref="DedupeKey"/>, when set,
+/// makes the produce idempotent — a second draft with the same key for the same
+/// recipient is dropped.
+/// </summary>
+public sealed record NotificationDraft(
+    Guid TenantId, Guid UserId, NotificationCategory Category, NotificationUrgency Urgency,
+    string Title, string Body, string? LinkHref = null,
+    string? SourceKind = null, Guid? SourceId = null,
+    bool RequiresAck = false, string? DedupeKey = null);
+
+/// <summary>
+/// NOTIF-001 — produces in-app notifications. The single implementation
+/// (<c>NotificationProducer</c>) is a singleton hosted service that also drains
+/// terminal AI-job bus events into AiJob-category notifications. Producing a
+/// notification writes the inbox row (own scope, uncancelled write), audits
+/// <see cref="AuditAction.NotificationCreated"/> (workflow metadata only — never
+/// Title/Body), and publishes it to the SSE bus for live delivery. Muted
+/// categories (non-critical only), a per-recipient storm cap, and DedupeKeys can
+/// all cause a produce to return <c>null</c>.
+/// </summary>
+public interface INotificationProducer
+{
+    /// <summary>Creates one notification. Returns <c>null</c> when the draft was
+    /// deduped, muted (non-critical), or coalesced by the storm guard.</summary>
+    Task<Notification?> CreateAsync(NotificationDraft draft, CancellationToken ct);
+
+    /// <summary>Fans a notification out to every active user in the tenant whose role
+    /// grants <paramref name="permission"/> (resolved via <c>RolePermissionMap</c>),
+    /// excluding <paramref name="excludeUserId"/> (typically the acting user). One
+    /// <see cref="NotificationDraft"/> is built per recipient by <paramref name="draftFor"/>.</summary>
+    Task NotifyPermissionHoldersAsync(Guid tenantId, RbacPermission permission, Guid? excludeUserId,
+        Func<Guid, NotificationDraft> draftFor, CancellationToken ct);
 }
 
 /// <summary>

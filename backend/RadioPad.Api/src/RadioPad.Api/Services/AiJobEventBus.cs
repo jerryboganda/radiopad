@@ -110,6 +110,12 @@ public sealed class AiJobEventBus : IAiJobEventBus
         var payload = new
         {
             jobId = job.Id,
+            // tenantId/userId are additive over the pure JobSummary shape: the SSE client
+            // already filters by tenant+user server-side and ignores unknown fields, while the
+            // NOTIF producer's firehose subscription needs them to route the derived
+            // AiJob-category notification to the owning recipient (PR-N3).
+            tenantId = job.TenantId,
+            userId = job.UserId,
             kind = job.Kind,
             mode = job.Mode,
             status = job.Status,

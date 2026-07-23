@@ -194,6 +194,20 @@ builder.Services.AddSingleton<RadioPad.Api.Services.AiJobRegistry>();
 // streamed progress/partials, and notifications. Singleton — SSE connections
 // subscribe on their own request scopes, publishers push from the runner's scopes.
 builder.Services.AddSingleton<RadioPad.Api.Services.IAiJobEventBus, RadioPad.Api.Services.AiJobEventBus>();
+// NOTIF-001 — the notification producer is one object registered three ways: the
+// INotificationProducer that workflow call sites invoke, and the IHostedService whose
+// firehose bus subscription drains terminal AI-job events into AiJob notifications.
+builder.Services.AddSingleton<RadioPad.Api.Services.NotificationProducer>();
+builder.Services.AddSingleton<RadioPad.Application.Abstractions.INotificationProducer>(
+    sp => sp.GetRequiredService<RadioPad.Api.Services.NotificationProducer>());
+// The firehose bus subscription is skipped under Testing (like the Ubag discovery + seed
+// services) so it never holds an open subscription that per-fixture SSE tests assert away,
+// nor produces AiJob notifications that would perturb unrelated integration fixtures. The
+// INotificationProducer itself stays registered so controllers/wiring resolve it, and the
+// producer is exercised directly in NotificationProducerTests.
+if (!builder.Environment.IsEnvironment("Testing"))
+    builder.Services.AddHostedService(
+        sp => sp.GetRequiredService<RadioPad.Api.Services.NotificationProducer>());
 // Companion relay (desktop↔phone). The registry holds live relay sockets in
 // memory (process-local, single instance); the session service manages the
 // durable pairing record.

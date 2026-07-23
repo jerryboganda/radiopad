@@ -1362,6 +1362,67 @@ public class AiJob : Entity
 }
 
 /// <summary>
+/// NOTIF-001 — one in-app notification row destined for a single recipient
+/// (<see cref="UserId"/>). Persisted per-recipient (fan-out at creation time) so
+/// the inbox, unread-count, and read/ack state are all a simple own-rows query.
+///
+/// PHI posture (NOTIF-004): <see cref="Title"/> / <see cref="Body"/> are the
+/// authenticated in-app tier — they may carry a modality/body-part-class
+/// descriptor but NEVER raw clinical narrative, findings, or an accession. The
+/// audit trail (<see cref="Enums.AuditAction.NotificationCreated"/>) records
+/// workflow metadata only and never echoes Title/Body.
+/// </summary>
+public class Notification : Entity
+{
+    public Guid TenantId { get; set; }
+    /// <summary>The recipient. Every notification is single-recipient.</summary>
+    public Guid UserId { get; set; }
+    public NotificationCategory Category { get; set; }
+    public NotificationUrgency Urgency { get; set; }
+    /// <summary>In-app-safe headline; never raw clinical narrative.</summary>
+    public string Title { get; set; } = "";
+    /// <summary>In-app tier of NOTIF-004 (may carry modality/body-part class); never findings/accession.</summary>
+    public string Body { get; set; } = "";
+    /// <summary>App-relative deep link, e.g. <c>/reports/view?id=…&amp;aiJob=…</c>.</summary>
+    public string? LinkHref { get; set; }
+    /// <summary>"aiJob" | "criticalResult" | "peerReview" | "rulebook" | "template" | "system".</summary>
+    public string? SourceKind { get; set; }
+    public Guid? SourceId { get; set; }
+    public bool RequiresAck { get; set; }
+    public DateTimeOffset? ReadAt { get; set; }
+    public DateTimeOffset? AcknowledgedAt { get; set; }
+    /// <summary>Always == <see cref="UserId"/> today; the column anticipates future delegated ack.</summary>
+    public Guid? AcknowledgedByUserId { get; set; }
+    /// <summary>Idempotency key — a unique filtered index collapses duplicate producer events.</summary>
+    public string? DedupeKey { get; set; }
+}
+
+/// <summary>
+/// NOTIF-001 — one row per (tenant, user) capturing a recipient's notification
+/// preferences: muted categories (NOTIF-009 — critical classes may never be
+/// muted), a Do-Not-Disturb window (NOTIF-007 — suppresses push/OS-toast/email
+/// dispatch only, never the inbox row + SSE), and per-channel opt-ins.
+/// </summary>
+public class NotificationPreference : Entity
+{
+    public Guid TenantId { get; set; }
+    public Guid UserId { get; set; }
+    /// <summary>CSV of muted <see cref="NotificationCategory"/> names; the prefs PUT rejects
+    /// muting any category in the tenant's critical-class list (NOTIF-009).</summary>
+    public string MutedCategoriesCsv { get; set; } = "";
+    /// <summary>Local-time DND window start, minutes-of-day [0..1440). Null disables DND.</summary>
+    public int? DndStartMinutes { get; set; }
+    /// <summary>Local-time DND window end, minutes-of-day (0..1440]. Null disables DND.</summary>
+    public int? DndEndMinutes { get; set; }
+    /// <summary>IANA/Windows time-zone id the DND window is evaluated in; empty means UTC.</summary>
+    public string DndTimeZone { get; set; } = "";
+    /// <summary>Push dispatch opt-in (Critical urgency only regardless — PR-N4).</summary>
+    public bool PushEnabled { get; set; } = true;
+    /// <summary>Email dispatch opt-in (Critical urgency only regardless — PR-N4).</summary>
+    public bool EmailEnabled { get; set; } = false;
+}
+
+/// <summary>
 /// PRD §14.13 (PR-001..010) — one RADPEER-aligned peer-review assignment of a
 /// signed report to a second radiologist. Never a clinical decision system: the
 /// score is a quality benchmark, it does not change the report and it never

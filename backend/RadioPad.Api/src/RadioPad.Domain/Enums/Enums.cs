@@ -174,6 +174,35 @@ public enum RbacPermission
     TeachingCasesManage = 321,
 }
 
+/// <summary>
+/// NOTIF-001 — the source subsystem of an in-app notification. Persisted as an
+/// int (like <see cref="AuditAction"/>); never renumber. <see cref="Mention"/> is
+/// reserved — no @-mention feature ships yet, but the category + producer API are
+/// ready so a future module needs no schema change.
+/// </summary>
+public enum NotificationCategory
+{
+    AiJob = 0,
+    CriticalResult = 1,
+    PeerReview = 2,
+    RulebookApproval = 3,
+    TemplateApproval = 4,
+    /// <summary>Reserved — no @-mention feature exists yet.</summary>
+    Mention = 5,
+    System = 6,
+}
+
+/// <summary>
+/// NOTIF-002 — notification severity. The UI maps Info→blue, Warning→amber,
+/// Critical→red, ALWAYS paired with a text label (never colour alone).
+/// </summary>
+public enum NotificationUrgency
+{
+    Info = 0,
+    Warning = 1,
+    Critical = 2,
+}
+
 public enum AuditAction
 {
     AiRequest = 0,
@@ -361,6 +390,22 @@ public enum AuditAction
     /// JSONL bundle of a tenant's prior-day audit chain. Details record the date, event
     /// count, and body SHA-256; never <c>DetailsJson</c> or any clinical text.</summary>
     AuditExportBundleCreated = 125,
+    /// <summary>NOTIF-001 (NOTIF-008) — an in-app notification was created for a recipient.
+    /// Details record the notification id, category, urgency, requiresAck flag, source
+    /// kind/id, and any DND-suppressed channels — never the notification Title or Body text.</summary>
+    NotificationCreated = 126,
+    /// <summary>NOTIF-001 (NOTIF-008) — a notification was marked read. Audited only for
+    /// <c>RequiresAck</c> or <c>Critical</c> rows; for routine rows <c>ReadAt</c> is the record.</summary>
+    NotificationRead = 127,
+    /// <summary>NOTIF-001 (NOTIF-008) — a <c>RequiresAck</c> notification was acknowledged.
+    /// Always audited (the ack SLO evidence). Details record the notification id + category only.</summary>
+    NotificationAcknowledged = 128,
+    /// <summary>NOTIF-001 (NOTIF-008) — a channel delivery (push/email/webhook) failed. Reserved
+    /// for the PR-N4 channel dispatch jobs; Details record the notification id + channel + reason.</summary>
+    NotificationDeliveryFailed = 129,
+    /// <summary>NOTIF-001 (NOTIF-008, NOTIF-011) — a bulk read/ack action ran over a set of the
+    /// caller's own notifications. Details record the action and the affected ids/count.</summary>
+    NotificationBulkAction = 130,
 }
 
 /// <summary>

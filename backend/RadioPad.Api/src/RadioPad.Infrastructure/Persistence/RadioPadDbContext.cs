@@ -88,6 +88,12 @@ public class RadioPadDbContext : DbContext
     /// <summary>PR-N2 — signed daily audit-export bundles (AuditExportRollupJob).</summary>
     public DbSet<AuditExportBundle> AuditExportBundles => Set<AuditExportBundle>();
 
+    /// <summary>NOTIF-001 — per-recipient in-app notification rows (NotificationProducer).</summary>
+    public DbSet<Notification> Notifications => Set<Notification>();
+
+    /// <summary>NOTIF-001 — one row per (tenant, user) of notification preferences.</summary>
+    public DbSet<NotificationPreference> NotificationPreferences => Set<NotificationPreference>();
+
     protected override void OnModelCreating(ModelBuilder b)
     {
         b.Entity<Tenant>().HasIndex(x => x.Slug).IsUnique();
@@ -200,6 +206,19 @@ public class RadioPadDbContext : DbContext
         b.Entity<TenantWebhookEndpoint>().HasIndex(x => x.TenantId);
         b.Entity<AiUsageRollup>().HasIndex(x => new { x.TenantId, x.Date, x.Provider, x.Model }).IsUnique();
         b.Entity<AuditExportBundle>().HasIndex(x => new { x.TenantId, x.Date }).IsUnique();
+
+        // NOTIF-001 — the inbox scans by (tenant, user) filtered on unread/recency; the
+        // unique filtered DedupeKey index collapses duplicate producer events (escalation
+        // storms, retried bus deliveries) into one row. The filter matches the hand-written
+        // 20260724110000_AddNotifications migration; on SQLite NULL DedupeKeys are distinct,
+        // so unkeyed notifications never collide.
+        b.Entity<Notification>().HasIndex(x => new { x.TenantId, x.UserId, x.ReadAt });
+        b.Entity<Notification>().HasIndex(x => new { x.TenantId, x.UserId, x.CreatedAt });
+        b.Entity<Notification>()
+            .HasIndex(x => new { x.TenantId, x.UserId, x.DedupeKey })
+            .IsUnique()
+            .HasFilter("DedupeKey IS NOT NULL");
+        b.Entity<NotificationPreference>().HasIndex(x => new { x.TenantId, x.UserId }).IsUnique();
 
         b.Entity<Report>().OwnsOne(x => x.Study);
         b.Entity<Report>().HasMany(x => x.Versions).WithOne().HasForeignKey(v => v.ReportId);

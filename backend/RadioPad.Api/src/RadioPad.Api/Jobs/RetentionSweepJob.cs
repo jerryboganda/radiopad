@@ -132,5 +132,25 @@ public sealed class RetentionSweepJob
             .ExecuteDeleteAsync(ct);
         if (exportsDeleted > 0)
             _log.LogInformation("Retention sweep: deleted {Deleted} audit-export bundle(s) (>90d)", exportsDeleted);
+
+        // NOTIF-001 — inbox pruning (a global housekeeping pass, not per-tenant policy).
+        // Read routine notifications age out after 90 days; acknowledged RequiresAck rows
+        // after 180 days. UNACKED RequiresAck rows are NEVER auto-deleted — they are the
+        // ack-SLO evidence and must persist until a human acknowledges them.
+        var notifReadCutoff = DateTimeOffset.UtcNow.AddDays(-90);
+        var notifAckedCutoff = DateTimeOffset.UtcNow.AddDays(-180);
+
+        var readPurged = await db.Notifications
+            .Where(n => !n.RequiresAck && n.ReadAt != null && n.ReadAt < notifReadCutoff)
+            .ExecuteDeleteAsync(ct);
+
+        var ackedPurged = await db.Notifications
+            .Where(n => n.RequiresAck && n.AcknowledgedAt != null && n.AcknowledgedAt < notifAckedCutoff)
+            .ExecuteDeleteAsync(ct);
+
+        if (readPurged > 0 || ackedPurged > 0)
+            _log.LogInformation(
+                "Retention sweep: notifications — deleted {Read} read (>90d), {Acked} acknowledged (>180d)",
+                readPurged, ackedPurged);
     }
 }
