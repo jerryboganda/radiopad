@@ -35,10 +35,7 @@ public class ConsultantOutputRetryHardeningTests
         const string nonCompliant = """
             {"indication":"i","technique":"t","findings":"The kidneys are normal.","impression":"Calc.","recommendations":"None."}
             """;
-        const string compliant = """
-            {"indication":"i","technique":"t","findings":"KIDNEYS:\n• Normal.","impression":"1. Normal study.","recommendations":"None."}
-            """;
-        var gw = new SequencedGateway(nonCompliant, compliant);
+        var gw = new SequencedGateway(nonCompliant, CompliantGenerateJson);
         var svc = new ReportingService(gw, new StubRulebookStore(null), new NoAudit(), new ReportValidator(),
             NullLogger<ReportingService>.Instance);
         var provider = Provider();
@@ -50,17 +47,33 @@ public class ConsultantOutputRetryHardeningTests
         Assert.All(gw.Requests, r => Assert.Equal(provider.Id, r.Provider.Id));
         Assert.Contains("FORMAT CORRECTION REQUIRED", gw.Requests[1].UserPrompt);
         Assert.Contains("heading", gw.Requests[1].UserPrompt);
-        Assert.Equal("KIDNEYS:\n• Normal.", result.Findings);
-        Assert.Equal("1. Normal study.", result.Impression);
+        Assert.Equal("KIDNEYS:\n• Normal in size and contour.\n\nLIVER AND SPLEEN:\n• Normal in morphology.", result.Findings);
+        Assert.Equal("1. No acute abdominal abnormality.", result.Impression);
+    }
+
+    [Fact]
+    public async Task Generate_Retries_When_Findings_Review_Only_One_Anatomy_Group()
+    {
+        // Perfectly formatted, hedge-free, numbered — but a single anatomy group is not the
+        // mandated systematic review, so the depth check must catch it (the "shallow but
+        // well-formatted" lighter-web-model failure the layout regex alone cannot see).
+        const string shallow = """
+            {"indication":"i","technique":"t","findings":"KIDNEYS:\n• Normal in size and contour.","impression":"1. No acute abnormality.","recommendations":"None."}
+            """;
+        var gw = new SequencedGateway(shallow, CompliantGenerateJson);
+        var svc = new ReportingService(gw, new StubRulebookStore(null), new NoAudit(), new ReportValidator(),
+            NullLogger<ReportingService>.Instance);
+
+        await svc.GenerateStructuredAsync(Tenant(), User(), Report(), Provider(), default);
+
+        Assert.Equal(2, gw.Requests.Count);
+        Assert.Contains("anatomy/system group", gw.Requests[1].UserPrompt);
     }
 
     [Fact]
     public async Task Generate_Does_Not_Retry_When_The_First_Attempt_Is_Already_Compliant()
     {
-        const string compliant = """
-            {"indication":"i","technique":"t","findings":"KIDNEYS:\n• Normal.","impression":"1. Normal study.","recommendations":"None."}
-            """;
-        var gw = new SequencedGateway(compliant);
+        var gw = new SequencedGateway(CompliantGenerateJson);
         var svc = new ReportingService(gw, new StubRulebookStore(null), new NoAudit(), new ReportValidator(),
             NullLogger<ReportingService>.Instance);
 
@@ -93,7 +106,7 @@ public class ConsultantOutputRetryHardeningTests
     public async Task Rewrite_Retries_The_Same_Provider_Once_When_The_First_Attempt_Is_Noncompliant()
     {
         var nonCompliant = RewriteBody(findings: "The kidneys are normal.", impression: "Calc.");
-        var compliant = RewriteBody(findings: "KIDNEYS:\n• Normal.", impression: "1. Normal study.");
+        var compliant = RewriteBody(findings: "KIDNEYS:\n• Normal in size and contour.", impression: "1. No acute abnormality.");
         var gw = new SequencedGateway(nonCompliant, compliant);
         var svc = new ReportRewriteService(gw);
         var provider = Provider();
@@ -105,6 +118,22 @@ public class ConsultantOutputRetryHardeningTests
         Assert.All(gw.Requests, r => Assert.Equal(provider.Id, r.Provider.Id));
         Assert.Contains("FORMAT CORRECTION REQUIRED", gw.Requests[1].UserPrompt);
         Assert.Equal(compliant, result.Text);
+    }
+
+    [Fact]
+    public async Task Rewrite_Single_Anatomy_Group_Is_Accepted_Without_Retry()
+    {
+        // The systematic-coverage floor is generation-only: a rewrite may never ADD structures
+        // the source report did not mention (no-fabrication contract), so a single-group rewrite
+        // is legitimate and must NOT burn a retry chasing coverage the model is forbidden to add.
+        var singleGroup = RewriteBody(findings: "KIDNEYS:\n• Normal in size and contour.", impression: "1. No acute abnormality.");
+        var gw = new SequencedGateway(singleGroup);
+        var svc = new ReportRewriteService(gw);
+
+        await svc.RewriteAsync(
+            Tenant(), Report(), Provider(), ReportRewriteMode.Concise, sections: null, instruction: null, ct: default);
+
+        Assert.Single(gw.Requests);
     }
 
     [Fact]
@@ -128,7 +157,7 @@ public class ConsultantOutputRetryHardeningTests
         var nonCompliant = RewriteBody(findings: "The kidneys are normal.", impression: "Calc.");
         // The retry response fabricates a brand-new measurement not in the source report — the
         // layout-retry hardening must not bypass the pre-existing §5.3 no-fabrication guard.
-        var compliantButFabricated = RewriteBody(findings: "KIDNEYS:\n• A new 9.9 cm mass.", impression: "1. Mass.");
+        var compliantButFabricated = RewriteBody(findings: "KIDNEYS:\n• A new 9.9 cm mass.", impression: "1. Indeterminate renal mass.");
         var gw = new SequencedGateway(nonCompliant, compliantButFabricated);
         var svc = new ReportRewriteService(gw);
 
@@ -143,11 +172,16 @@ public class ConsultantOutputRetryHardeningTests
 
     // ---- harness --------------------------------------------------------------------------
 
-    private static string RewriteBody(string findings, string impression) => $$"""
-        Modality: CT
-        Body part: KUB
-        Indication: Suspected urolithiasis.
+    /// <summary>Genuinely compliant under the FULL generation check: two anatomy groups (coverage),
+    /// heading+bullet layout, a numbered ≥3-word impression, and no banned hedging terms.</summary>
+    private const string CompliantGenerateJson = """
+        {"indication":"i","technique":"t","findings":"KIDNEYS:\n• Normal in size and contour.\n\nLIVER AND SPLEEN:\n• Normal in morphology.","impression":"1. No acute abdominal abnormality.","recommendations":"None."}
+        """;
 
+    /// <summary>Shaped like a REAL rewrite response — the report sections only, exactly as the
+    /// prompt's output contract demands ("plain text with the same section headings"), with no
+    /// prompt scaffolding (metadata header, INSTRUCTION trailer) leaking into it.</summary>
+    private static string RewriteBody(string findings, string impression) => $$"""
         INDICATION:
         Suspected urolithiasis.
 
@@ -156,8 +190,6 @@ public class ConsultantOutputRetryHardeningTests
 
         IMPRESSION:
         {{impression}}
-
-        INSTRUCTION: Rewrite the report under the rules in the system prompt. Output the rewritten report as plain text with the same section headings. Do not sign the report.
         """;
 
     private static Tenant Tenant() => new() { Id = Guid.NewGuid(), Slug = "t1", DisplayName = "T1" };

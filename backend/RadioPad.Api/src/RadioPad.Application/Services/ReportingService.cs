@@ -225,7 +225,7 @@ public class ReportingService
             }, ct);
 
             shaped = ShapeStructuredResult(result.Text, result.Provider, result.Model, result.LatencyMs, result.PromptVersion);
-            var violations = ConsultantOutputCompliance.Check(shaped.Findings, shaped.Impression);
+            var violations = ConsultantOutputCompliance.CheckForGeneration(shaped.Findings, shaped.Impression);
             if (violations.Count == 0 || attempt >= ConsultantOutputCompliance.MaxAttempts)
             {
                 if (violations.Count > 0)

@@ -101,7 +101,7 @@ public sealed class ReportRewriteService : IReportRewriteService
 
             if (!checkLayout) break;
 
-            var layoutViolations = ConsultantOutputCompliance.Check(
+            var layoutViolations = ConsultantOutputCompliance.CheckForRewrite(
                 ExtractRewrittenSection(result.Text, "FINDINGS"),
                 ExtractRewrittenSection(result.Text, "IMPRESSION"));
             if (layoutViolations.Count == 0 || attempt >= ConsultantOutputCompliance.MaxAttempts)
