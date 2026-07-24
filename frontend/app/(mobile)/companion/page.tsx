@@ -18,7 +18,7 @@
  * `.rp-page-sub`, `.banner`, `.primary`, `.ghost`, `.subtle`, `.rp-input`.
  */
 
-import { useCallback, useEffect, useRef, useState, type ComponentType } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import {
   ArrowRight,
   ChevronLeft,
@@ -36,6 +36,7 @@ import {
   Undo2,
   Wand2,
   Wifi,
+  type LucideIcon,
 } from 'lucide-react';
 import { api, setActiveAuthToken, setCompanionBase } from '@/lib/api';
 import { setAuthToken } from '@/lib/secureAuth';
@@ -119,7 +120,7 @@ function deviceName(): string {
   return 'RadioPad companion';
 }
 
-const REMOTE_COMMANDS: Array<{ command: CompanionCommand; label: string; icon: ComponentType<{ size?: number }> }> = [
+const REMOTE_COMMANDS: Array<{ command: CompanionCommand; label: string; icon: LucideIcon }> = [
   { command: 'prev_section', label: 'Prev', icon: ChevronLeft },
   { command: 'next_section', label: 'Next', icon: ChevronRight },
   { command: 'jump_findings', label: 'Findings', icon: FileSearch },
