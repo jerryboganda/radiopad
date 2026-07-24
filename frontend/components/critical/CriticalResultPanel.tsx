@@ -33,6 +33,37 @@ import { usePermissions } from '@/lib/permissions';
 import { TableSkeleton } from '@/components/ui/Skeleton';
 import EmptyState from '@/components/ui/EmptyState';
 import ErrorState from '@/components/ui/ErrorState';
+import { X } from 'lucide-react';
+
+/**
+ * Per-report dismissal of this panel. Only ~10% of reports ever get a critical
+ * result, so on the other 90% the panel is pure vertical noise above the
+ * section cards — hiding it is a real decluttering win.
+ *
+ * Stored per report id, so dismissing it on one report never hides it on
+ * another. Reads are guarded because localStorage throws in private-mode
+ * Safari and is absent during SSR.
+ */
+const DISMISS_KEY_PREFIX = 'radiopad.criticalPanel.dismissed.';
+
+function readDismissed(reportId: string): boolean {
+  if (typeof window === 'undefined') return false;
+  try {
+    return window.localStorage.getItem(DISMISS_KEY_PREFIX + reportId) === '1';
+  } catch {
+    return false;
+  }
+}
+
+function writeDismissed(reportId: string, value: boolean): void {
+  if (typeof window === 'undefined') return;
+  try {
+    if (value) window.localStorage.setItem(DISMISS_KEY_PREFIX + reportId, '1');
+    else window.localStorage.removeItem(DISMISS_KEY_PREFIX + reportId);
+  } catch {
+    /* dismissal is a convenience — never break the panel over storage */
+  }
+}
 
 const CRITICALITY_OPTIONS: CriticalityLevel[] = ['Red', 'Orange', 'Yellow'];
 const METHOD_OPTIONS: CriticalCommunicationMethod[] = [
@@ -80,6 +111,14 @@ export default function CriticalResultPanel({ reportId }: CriticalResultPanelPro
   const [communicatingId, setCommunicatingId] = useState<string | null>(null);
   const [communicatedTo, setCommunicatedTo] = useState('');
   const [method, setMethod] = useState<CriticalCommunicationMethod>('Phone');
+
+  // Read on mount rather than in the initial useState value: localStorage is
+  // unavailable during SSR, and seeding state from it directly would make the
+  // server and first client render disagree (hydration mismatch).
+  const [dismissed, setDismissed] = useState(false);
+  useEffect(() => {
+    setDismissed(readDismissed(reportId));
+  }, [reportId]);
 
   // Keep the countdown honest without re-fetching.
   const [now, setNow] = useState(() => Date.now());
@@ -160,9 +199,28 @@ export default function CriticalResultPanel({ reportId }: CriticalResultPanelPro
     setMethod('Phone');
   }
 
+  // Dismissal hides the panel ONLY while the report has nothing logged. A
+  // report that already has a critical result keeps showing it no matter what
+  // was dismissed: those rows carry an open communication loop (who was told,
+  // whether they read back) and a stale dismissal must never be able to hide
+  // clinical state that still needs closing. `loading`/`err` also keep the
+  // panel up so a dismissal can't silently swallow a failed fetch.
+  if (dismissed && !loading && !err && items.length === 0) return null;
+
   return (
     <div className="rp-panel" aria-live="polite" aria-busy={loading}>
-      <div className="rp-panel-title">Critical results</div>
+      <div className="rp-critpanel-head">
+        <div className="rp-panel-title">Critical results</div>
+        <button
+          type="button"
+          className="rp-critpanel-dismiss"
+          onClick={() => { setDismissed(true); writeDismissed(reportId, true); }}
+          aria-label="Hide critical results for this report"
+          title="Hide for this report"
+        >
+          <X size={15} aria-hidden />
+        </button>
+      </div>
       <p className="rp-page-sub" style={{ marginBottom: 12 }}>
         Log a critical finding, record who you told and how, and capture their read-back. RadioPad
         never contacts anyone for you.

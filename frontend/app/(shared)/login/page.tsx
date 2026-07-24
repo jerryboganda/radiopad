@@ -104,7 +104,19 @@ function LoginContent() {
     if (result.user) localStorage.setItem(LS_USER, result.user);
     if (result.token) {
       const nativeSecure = await isAuthTokenSecure().catch(() => false);
-      if (nativeSecure || devLoginEnabled) await setAuthToken(result.token);
+      // `setActiveAuthToken` alone is an in-memory cache that dies on reload.
+      // Without one of these branches the browser re-renders the login screen
+      // after every refresh, because nothing was ever written for
+      // `hydrateAuthTokenFromSecureStore()` to read back.
+      //
+      // Desktop/mobile persist to OS secure storage (`nativeSecure`). A plain
+      // browser only has the localStorage fallback, which is NOT secure
+      // storage — a token there is readable by any XSS on the origin — so it
+      // is limited to development builds, where the alternative is signing in
+      // again on every hot reload. Production web builds are unchanged and
+      // still keep the token in memory only.
+      const isDevBuild = (publicEnv('NODE_ENV') ?? BUILD_NODE_ENV) !== 'production';
+      if (nativeSecure || devLoginEnabled || isDevBuild) await setAuthToken(result.token);
       setActiveAuthToken(result.token);
     }
   }

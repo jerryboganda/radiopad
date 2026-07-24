@@ -26,6 +26,8 @@ export interface ExportPanelProps {
   /** Validation result summary (when validation has been run). */
   validated: boolean;
   blockers: number;
+  /** Tenant's `RequireZeroBlockers`; defaults to strict when not supplied. */
+  enforceBlockers?: boolean;
   warnings: number;
   onOpenValidation: () => void;
   /** Existing download path — must reject on failure. */
@@ -44,7 +46,9 @@ export default function ExportPanel(p: ExportPanelProps) {
   const [fmt, setFmt] = useState<ExportFormat>('pdf');
   const [delivery, setDelivery] = useState<DeliveryState>({ status: 'idle' });
 
-  const gateBlocked = p.blockers > 0;
+  // Respect the tenant's RequireZeroBlockers: when the organization has turned
+  // the gate off server-side, blockers are shown but do not stop the export.
+  const gateBlocked = (p.enforceBlockers ?? true) && p.blockers > 0;
   const disabled = !p.canExport || !p.exportAllowed || gateBlocked || delivery.status === 'sending';
 
   async function run(selected: ExportFormat) {

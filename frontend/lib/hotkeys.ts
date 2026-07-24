@@ -240,6 +240,12 @@ export function normalizeBinding(binding: string): string {
  * recording" should check `e.key` before calling.)
  */
 export function bindingFromKeyboardEvent(e: KeyboardEvent): string | null {
+  // `KeyboardEvent.key` is typed as always-present but is genuinely absent on
+  // some events reaching a global listener (IME composition, and synthetic
+  // events dispatched by extensions or tests). Without this guard
+  // `normalizeKeyToken` did `undefined.trim()` and threw an uncaught
+  // TypeError out of the document keydown handler on every such keystroke.
+  if (typeof e.key !== 'string') return null;
   if (e.key === 'Control' || e.key === 'Shift' || e.key === 'Alt' || e.key === 'Meta') {
     return null;
   }

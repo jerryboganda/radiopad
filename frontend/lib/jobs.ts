@@ -119,6 +119,27 @@ export interface JobsContextValue {
   /** Visible jobs (non-dismissed), newest first. */
   jobs: Job[];
   submit: (spec: JobSubmitSpec) => Promise<string>;
+  /** Track a job created OUTSIDE `submit()` (e.g. the Cross Check audio half,
+   *  submitted via the sidecar multipart, and its hosted review half). The generic
+   *  seam for externally-submitted work: it dispatches the same `ADD` action and
+   *  kicks the shared ticker, defaulting the client lifecycle flags exactly as the
+   *  reducer does for every other path. */
+  trackExternal: (job: Omit<Job, 'dismissed' | 'seen' | 'notified' | 'attempt'> & { attempt?: number }) => void;
+  /**
+   * Logs an AI action that has NO server-side job to poll — Rewrite/Regenerate
+   * runs as one synchronous request/response, not a durable job id. Added
+   * directly in its terminal state (never `queued`/`running`) so it can never
+   * enter the poll ticker, while still getting the same toast + notification-
+   * bell + AI-jobs-panel treatment as an async job finishing.
+   */
+  logSyncResult: (spec: {
+    mode: string;
+    reportId: string;
+    report?: JobReportInfo;
+    status: 'ok' | 'error';
+    error?: string;
+    errorKind?: string;
+  }) => void;
   cancel: (jobId: string) => Promise<void>;
   retry: (jobId: string) => Promise<string | null>;
   dismiss: (jobId: string) => void;
@@ -180,9 +201,15 @@ export function specMode(spec: JobSubmitSpec): string {
 // ---------------------------------------------------------------------------
 
 /** Human label for a job's kind+mode: "Draft generation" / "Impression" / … */
-export function jobKindLabel(job: Pick<Job, 'kind' | 'mode'>): string {
+export function jobKindLabel(job: Pick<Job, 'kind' | 'mode'> & { origin?: JobOrigin }): string {
   if (job.kind === 'generate') return 'Draft generation';
   if (job.kind === 'local-generate') return 'Local draft (MedGemma)';
+  // Cross-check is a first-class kind (durable async-job platform): the audio half
+  // runs locally on the sidecar, the medical review half runs hosted. Label by
+  // ORIGIN — the widget then reads "Cross-check (audio)" vs "Cross-check (review)".
+  if (job.kind === 'crosscheck') {
+    return job.origin === 'local' ? 'Cross-check (audio)' : 'Cross-check (review)';
+  }
   // kind === 'ai'
   switch (job.mode) {
     case 'impression':
@@ -191,8 +218,6 @@ export function jobKindLabel(job: Pick<Job, 'kind' | 'mode'>): string {
       return 'Rewrite';
     case 'cleanup':
       return 'Dictation cleanup';
-    case 'crosscheck':
-      return 'Cross-check';
     default:
       return job.mode
         ? `AI · ${job.mode.charAt(0).toUpperCase()}${job.mode.slice(1)}`
@@ -232,8 +257,15 @@ export function stageLabel(stage: Job['stage']): string | null {
 export function openReportHref(job: Job): string {
   let href = reportHref(job.reportId);
   if (!job.applied) {
-    if (job.kind === 'ai') href += `&aiJob=${encodeURIComponent(job.id)}`;
-    else if (job.origin === 'local') href += `&localJob=${encodeURIComponent(job.id)}`;
+    // `?aiJob=` opens the report-page apply flow for an `ai` result AND for a
+    // hosted `crosscheck` review job (its corrections populate the panel). The
+    // local `crosscheck` audio half carries NO deep-link — its result is only an
+    // input to the review half, consumed in-session (marked applied).
+    if (job.kind === 'ai' || (job.kind === 'crosscheck' && job.origin === 'hosted')) {
+      href += `&aiJob=${encodeURIComponent(job.id)}`;
+    } else if (job.origin === 'local' && job.kind === 'local-generate') {
+      href += `&localJob=${encodeURIComponent(job.id)}`;
+    }
   }
   return href;
 }

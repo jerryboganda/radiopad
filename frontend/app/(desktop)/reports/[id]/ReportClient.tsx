@@ -67,6 +67,8 @@ import {
   SECTION_FIELD_MAP,
   REWRITE_MODES,
   REWRITABLE_KEYS,
+  FULL_REPORT_KEYS,
+  parseFullReportRewrite,
   normalizeScaffold,
   statusLabel,
   statusTone,
@@ -98,12 +100,19 @@ import {
 
 type RewriteState = {
   mode: RewriteMode;
-  section: keyof Report;
+  section: keyof Report | 'full';
   original: string;
   proposed: string;
   diff: boolean;
   /** F12 — §5.3 fabrication findings on a custom rewrite (flagged before accept). */
   violations?: import('@/lib/api').RewriteViolation[];
+  /**
+   * Full-report mode only: the rewrite parsed back out per section. Empty
+   * when the model's response didn't carry recognizable section headings —
+   * Accept must refuse rather than guess where the text goes.
+   */
+  sections?: Partial<Record<keyof Report, string>>;
+  originalSections?: Partial<Record<keyof Report, string>>;
 };
 
 /**
@@ -167,6 +176,12 @@ const SECTION_ICONS: Record<string, ReactNode> = {
   recommendations: <Lightbulb size={14} />,
 };
 
+/** Severity tint for the jump-to flash — the locked Blocker/Warning/Info map. */
+type FlashTone = 'blocker' | 'warning' | 'info';
+/** Long enough to find the section by eye, short enough not to nag. Must stay
+ *  in step with the `rp-section-flash` animation length in radiopad.css. */
+const FLASH_MS = 6000;
+
 export default function ReportPage() {
   const router = useRouter();
   // RBAC mirror — hide editing/signing/exporting affordances a read-only viewer
@@ -205,9 +220,17 @@ export default function ReportPage() {
   const [savedAt, setSavedAt] = useState<number | null>(null);
   const [saveError, setSaveError] = useState<string | null>(null);
   const [rewriteOpen, setRewriteOpen] = useState(false);
-  const [rewriteSection, setRewriteSection] = useState<keyof Report>('impression');
+  const [rewriteSection, setRewriteSection] = useState<keyof Report | 'full'>('impression');
+  /** Per-rewrite provider override. Empty string = use the report's own `providerId`. */
+  const [rewriteProviderId, setRewriteProviderId] = useState<string>('');
   const [rewriteBusy, setRewriteBusy] = useState(false);
   const [rewriteDraft, setRewriteDraft] = useState<RewriteState | null>(null);
+  // The rewrite popover closes the instant a mode/Regenerate is clicked, and the
+  // preview panel renders well below the ribbon — without this, a completed
+  // rewrite reads as "nothing happened" exactly like the earlier sign-off bug.
+  useEffect(() => {
+    if (rewriteDraft) rewritePreviewRef.current?.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+  }, [rewriteDraft]);
   const [signatures, setSignatures] = useState<ReportSignature[]>([]);
   const [signBusy, setSignBusy] = useState(false);
   const [signNote, setSignNote] = useState('');
@@ -219,10 +242,78 @@ export default function ReportPage() {
   const [showPrior, setShowPrior] = useState(false);
   const [showDictationDraft, setShowDictationDraft] = useState(false);
   const [showSignSend, setShowSignSend] = useState(false);
+  const [pairOpen, setPairOpen] = useState(false);
+  /**
+   * Whether unresolved Blockers should stop acknowledge/export in the UI.
+   * Mirrors the tenant's `RequireZeroBlockers`, which the API enforces on
+   * acknowledge — without reading it here the buttons stayed disabled even
+   * for an organization that had deliberately turned the gate off, and the
+   * client was stricter than the server for no reason.
+   *
+   * Defaults to `true` so the strict behaviour holds while the setting is
+   * still loading (and if it fails to load) — never the permissive one.
+   */
+  const [enforceBlockers, setEnforceBlockers] = useState(true);
+  useEffect(() => {
+    let cancelled = false;
+    api.tenant.settings.get()
+      .then((s) => { if (!cancelled) setEnforceBlockers(s.validation.requireZeroBlockers); })
+      .catch(() => { /* stay strict on failure */ });
+    return () => { cancelled = true; };
+  }, []);
+
+  // RC-04 jump-to flash. Held as state so it survives SectionCard re-renders.
+  const [flash, setFlash] = useState<{ section: string; tone: FlashTone } | null>(null);
+  const flashTimerRef = useRef<number | null>(null);
+  useEffect(() => () => {
+    if (flashTimerRef.current !== null) window.clearTimeout(flashTimerRef.current);
+  }, []);
+
+  // Per-report hiding of optional, usually-blank section cards (currently just
+  // Comparison). Read after mount — localStorage is absent during SSR, and
+  // seeding useState from it would desync the first client render.
+  const [hiddenSections, setHiddenSections] = useState<Record<string, boolean>>({});
+  useEffect(() => {
+    if (!id) return;
+    try {
+      const raw = window.localStorage.getItem(`radiopad.hiddenSections.${id}`);
+      setHiddenSections(raw ? (JSON.parse(raw) as Record<string, boolean>) : {});
+    } catch {
+      setHiddenSections({});
+    }
+  }, [id]);
+  const hideSection = useCallback((sectionKey: string) => {
+    setHiddenSections((prev) => {
+      const next = { ...prev, [sectionKey]: true };
+      try {
+        window.localStorage.setItem(`radiopad.hiddenSections.${id}`, JSON.stringify(next));
+      } catch {
+        /* hiding is a convenience — never break the editor over storage */
+      }
+      return next;
+    });
+  }, [id]);
+  // Both toggled panels can render off the bottom of a tall report page (Sign
+  // & Send sits below several other conditional panels; the phone-pairing
+  // panel sits even lower). Without an explicit scroll, clicking the ribbon
+  // button reads as "nothing happened" — see the Sign-off ribbon bug report.
+  const signSendPanelRef = useRef<HTMLDivElement | null>(null);
+  const pairPanelRef = useRef<HTMLDivElement | null>(null);
+  const inspectorRef = useRef<HTMLDivElement | null>(null);
+  const rewritePreviewRef = useRef<HTMLDivElement | null>(null);
+  useEffect(() => {
+    if (showSignSend) signSendPanelRef.current?.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+  }, [showSignSend]);
+  useEffect(() => {
+    if (pairOpen) pairPanelRef.current?.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+  }, [pairOpen]);
   const [voiceCommandMode, setVoiceCommandMode] = useState(false);
   const [dictating, setDictating] = useState(false);
   const [voiceCommandPills, setVoiceCommandPills] = useState<Array<{ id: number; command: VoiceCommand }>>([]);
   const [inspectorTab, setInspectorTab] = useState<InspectorTab>('checklist');
+  useEffect(() => {
+    if (inspectorTab === 'signoff') inspectorRef.current?.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+  }, [inspectorTab]);
   const [leftCollapsed, setLeftCollapsed] = useState(false);
   // RC-04 validation lifecycle.
   const [validationState, setValidationState] = useState<'idle' | 'running' | 'done' | 'error'>('idle');
@@ -762,7 +853,7 @@ export default function ReportPage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [report?.id]);
 
-  async function runRewrite(mode: RewriteMode, sectionOverride?: keyof Report, instruction?: string) {
+  async function runRewrite(mode: RewriteMode, sectionOverride?: keyof Report | 'full', instruction?: string) {
     if (!report) return;
     const section = sectionOverride ?? rewriteSection;
     if (sectionOverride) setRewriteSection(sectionOverride);
@@ -770,31 +861,62 @@ export default function ReportPage() {
     setRewriteBusy(true);
     setError(null);
     const modeLabel = REWRITE_MODES.find((m) => m.mode === mode)?.label ?? mode;
-    const sectionLabel = SECTIONS.find((s) => s.key === section)?.label ?? String(section);
-    const providerName = providers.find((x) => x.id === providerId)?.name;
+    const isFull = section === 'full';
+    const sectionLabel = isFull ? 'Full report' : (SECTIONS.find((s) => s.key === section)?.label ?? String(section));
+    // A rewrite can be run through a different provider than the report's own
+    // default, via the popover's Provider selector — empty means "use providerId".
+    const activeProviderId = rewriteProviderId || providerId;
+    const providerName = providers.find((x) => x.id === activeProviderId)?.name;
     const actId = logActivity(`Rewrite (${modeLabel})`, sectionLabel);
     try {
-      const original = String((report as Record<string, unknown>)[section as string] ?? '');
-      const result = await api.reports.rewrite(report.id, {
-        mode,
-        sections: [section as string],
-        providerId: providerId || undefined,
-        instruction,
-      });
-      setRewriteDraft({
-        mode,
-        section,
-        original,
-        proposed: result.text,
-        diff: false,
-        violations: result.violations ?? [],
-      });
+      if (isFull) {
+        const originalSections: Partial<Record<keyof Report, string>> = {};
+        for (const key of FULL_REPORT_KEYS) originalSections[key] = String((report as Record<string, unknown>)[key] ?? '');
+        const result = await api.reports.rewrite(report.id, {
+          mode,
+          sections: null,
+          providerId: activeProviderId || undefined,
+          instruction,
+        });
+        setRewriteDraft({
+          mode,
+          section: 'full',
+          original: Object.values(originalSections).join('\n\n'),
+          proposed: result.text,
+          sections: parseFullReportRewrite(result.text),
+          originalSections,
+          diff: false,
+          violations: result.violations ?? [],
+        });
+      } else {
+        const original = String((report as Record<string, unknown>)[section as string] ?? '');
+        const result = await api.reports.rewrite(report.id, {
+          mode,
+          sections: [section as string],
+          providerId: activeProviderId || undefined,
+          instruction,
+        });
+        setRewriteDraft({
+          mode,
+          section,
+          original,
+          proposed: result.text,
+          diff: false,
+          violations: result.violations ?? [],
+        });
+      }
       patchActivity(actId, { status: 'completed', provider: providerName });
+      // Rewrite has no server-side job id to poll (one awaited request, already
+      // resolved) — logged directly in its terminal state so it still shows up
+      // in the notifications bell AND the AI-jobs (sparkles) panel, same as any
+      // async generation finishing.
+      jobs.logSyncResult({ mode: 'rewrite', reportId: report.id, report: reportInfo(), status: 'ok' });
     } catch (e) {
       const err = e as { body?: { error?: string }; message: string };
       const msg = err.body?.error || err.message;
       setError(msg);
       patchActivity(actId, { status: 'failed', error: msg, provider: providerName });
+      jobs.logSyncResult({ mode: 'rewrite', reportId: report.id, report: reportInfo(), status: 'error', error: msg });
     } finally {
       setRewriteBusy(false);
     }
@@ -802,6 +924,26 @@ export default function ReportPage() {
 
   async function acceptRewrite() {
     if (!report || !rewriteDraft) return;
+    if (rewriteDraft.section === 'full') {
+      const parsed = rewriteDraft.sections;
+      if (!parsed || Object.keys(parsed).length === 0) {
+        // The model's response didn't carry recognizable section headings — applying it
+        // would mean guessing which field the text belongs in, so refuse instead.
+        setError('Could not split the rewritten text back into report sections, so nothing was applied. Try again, or rewrite one section at a time.');
+        return;
+      }
+      const nextUndo = { ...aiUndoRef.current };
+      const nextHighlights = { ...aiHighlightsRef.current };
+      for (const key of Object.keys(parsed) as (keyof Report)[]) {
+        nextUndo[key as string] = rewriteDraft.originalSections?.[key] ?? String((report as Record<string, unknown>)[key] ?? '');
+        nextHighlights[key as string] = true;
+      }
+      setAiUndo(nextUndo);
+      setAiHighlights(nextHighlights);
+      await update({ ...parsed, aiHighlightsJson: JSON.stringify(nextHighlights) } as Partial<Report>);
+      setRewriteDraft(null);
+      return;
+    }
     const key = rewriteDraft.section;
     // Snapshot the replaced text so Undo can restore it (RC-03).
     setAiUndo((prev) => ({ ...prev, [key as string]: rewriteDraft.original }));
@@ -856,10 +998,35 @@ export default function ReportPage() {
     }
   }
 
-  /** RC-04 jump-to link — scrolls the linked section card into view. */
-  function jumpToSection(section: string) {
-    const el = document.querySelector(`[data-section="${section.toLowerCase()}"]`);
+  /**
+   * RC-04 jump-to link — scrolls the linked section card into view AND flashes
+   * it in the finding's severity colour for ~6s, so the radiologist can see
+   * which whole section the finding refers to rather than guessing after the
+   * scroll stops. Severity→colour follows the locked mapping (Blocker→red,
+   * Warning→amber, Info/Style→blue).
+   *
+   * The flash is React state, not a classList poke on the DOM node: SectionCard
+   * rebuilds its className from props, so a directly-added class would be wiped
+   * the next time that card re-rendered (they re-render constantly here — every
+   * keystroke flows through `update`).
+   */
+  function jumpToSection(section: string, severity?: string) {
+    const key = section.toLowerCase();
+    const el = document.querySelector(`[data-section="${key}"]`);
     if (el) el.scrollIntoView({ behavior: 'smooth', block: 'start' });
+
+    const sev = (severity ?? '').toLowerCase();
+    const tone: FlashTone = sev.startsWith('block') ? 'blocker' : sev.startsWith('warn') ? 'warning' : 'info';
+    if (flashTimerRef.current !== null) window.clearTimeout(flashTimerRef.current);
+    // Re-mount the animation when the same section is clicked twice: drop the
+    // flash for a frame first, otherwise the CSS animation is already running
+    // and re-applying an identical class does nothing visible.
+    setFlash(null);
+    window.requestAnimationFrame(() => setFlash({ section: key, tone }));
+    flashTimerRef.current = window.setTimeout(() => {
+      setFlash(null);
+      flashTimerRef.current = null;
+    }, FLASH_MS);
   }
 
   // Scaffold-swap — keep the report body in sync with the bound template. The
@@ -1015,11 +1182,22 @@ export default function ReportPage() {
   async function acknowledge() {
     if (!report) return;
     if (!confirm('Acknowledge this AI-assisted draft? AI text will be marked as reviewed.')) return;
-    const next = await api.reports.acknowledge(report.id);
-    setAiHighlights({});
-    setAiUndo({});
-    await update({ aiHighlightsJson: '{}' });
-    setReport(next);
+    // BUG FIX: this previously had no try/catch. The server re-checks blockers
+    // fresh on every acknowledge call (client-side `blockers` can be stale),
+    // so a 409 here is routine, not exceptional — but with no .catch, the
+    // rejection was silently swallowed as an unhandled promise rejection and
+    // the ribbon button looked like it did nothing.
+    setError(null);
+    try {
+      const next = await api.reports.acknowledge(report.id);
+      setAiHighlights({});
+      setAiUndo({});
+      await update({ aiHighlightsJson: '{}' });
+      setReport(next);
+    } catch (ex) {
+      const e = ex as { body?: { error?: string }; message?: string };
+      setError(e.body?.error || e.message || 'Could not acknowledge this report.');
+    }
   }
 
   /**
@@ -1685,7 +1863,7 @@ export default function ReportPage() {
               label: SECTIONS.find((s) => s.key === k)?.label ?? (k as string),
             }))}
             rewriteSection={rewriteSection as string}
-            onRewriteSectionChange={(k) => setRewriteSection(k as keyof Report)}
+            onRewriteSectionChange={(k) => setRewriteSection(k as keyof Report | 'full')}
             onRewrite={(mode, instruction) => { void runRewrite(mode, undefined, instruction); }}
             rewriteBusy={rewriteBusy}
             rewriteOpen={rewriteOpen}
@@ -1693,17 +1871,25 @@ export default function ReportPage() {
             stylePanelOpen={stylePanelOpen}
             onToggleStylePanel={() => setStylePanelOpen((v) => !v)}
             providerId={providerId}
+            providers={providers.filter((x) => x.enabled).map((x) => ({ id: x.id, name: x.name }))}
+            rewriteProviderId={rewriteProviderId}
+            onRewriteProviderChange={setRewriteProviderId}
             canSign={canSign}
             canExport={canExport}
             showSignSend={showSignSend}
             onToggleSignSend={() => setShowSignSend((v) => !v)}
             blockers={blockers}
+            enforceBlockers={enforceBlockers}
             onAcknowledge={acknowledge}
             primarySigned={primarySigned}
             onOpenSignoff={() => setInspectorTab('signoff')}
+            pairOpen={pairOpen}
+            onTogglePair={() => setPairOpen((v) => !v)}
           />
 
-          <CompanionHostPanel />
+          <div ref={pairPanelRef}>
+            <CompanionHostPanel open={pairOpen} />
+          </div>
 
           {/* PRD §14.15 (CR-001..010) — critical-results communication loop for
               this report: log the finding, record the call, capture the
@@ -1754,7 +1940,11 @@ export default function ReportPage() {
 
           {showPrior && <PriorComparePanel reportId={report.id} />}
 
-          {showSignSend && canSign && canExport && <SignAndSendButton reportId={report.id} />}
+          {showSignSend && canSign && canExport && (
+            <div ref={signSendPanelRef}>
+              <SignAndSendButton reportId={report.id} />
+            </div>
+          )}
 
           {showDictationDraft && (
             <DictationDraftPanel
@@ -1781,14 +1971,20 @@ export default function ReportPage() {
           )}
 
           {rewriteDraft && (
-            <div className="rp-panel">
+            <div className="rp-panel" ref={rewritePreviewRef}>
               <div className="rp-panel-title">
                 Rewrite preview · <code>{rewriteDraft.mode}</code>
                 <span className="badge ai">✨ generated</span>
               </div>
               <p className="rp-page-sub">
-                Section: <code>{String(rewriteDraft.section)}</code>
+                Section: <code>{rewriteDraft.section === 'full' ? 'Full report' : String(rewriteDraft.section)}</code>
               </p>
+              {rewriteDraft.section === 'full' && (!rewriteDraft.sections || Object.keys(rewriteDraft.sections).length === 0) && (
+                <div role="alert" className="text-warning" style={{ marginTop: 4, marginBottom: 8, fontSize: 13 }}>
+                  Couldn&apos;t match this response back to report sections — Accept is disabled. Reject and try again,
+                  or rewrite one section at a time instead.
+                </div>
+              )}
               {rewriteDraft.diff ? (
                 <div className="rp-rewrite-diff">
                   <div>
@@ -1818,7 +2014,13 @@ export default function ReportPage() {
                 </div>
               )}
               <div className="rp-toolbar rp-mt-sm">
-                <button className="primary" onClick={acceptRewrite}>Accept</button>
+                <button
+                  className="primary"
+                  disabled={rewriteDraft.section === 'full' && (!rewriteDraft.sections || Object.keys(rewriteDraft.sections).length === 0)}
+                  onClick={acceptRewrite}
+                >
+                  Accept
+                </button>
                 <button className="ghost" onClick={() => setRewriteDraft(null)}>Reject</button>
                 <button
                   className="subtle"
@@ -1902,6 +2104,19 @@ export default function ReportPage() {
 
           {SECTIONS.map(({ key, label, cls }) => {
             const keyStr = key as string;
+            // Only Comparison is dismissible. Findings/Impression are where the
+            // radiologist types — hiding those would remove the ability to
+            // write the report at all — and the rest carry required content.
+            const dismissible = keyStr === 'comparison';
+            const sectionText = String((report as unknown as Record<string, unknown>)[keyStr] ?? '').trim();
+            // Blank-only, deliberately: `comparison` IS serialized into the HL7
+            // ORU and FHIR exports, so hiding a section that still holds text
+            // would send content to the RIS the radiologist can no longer see —
+            // precisely the defect documented in reportShared.tsx. If text ever
+            // lands here (typed, dictated, or inserted by the prior-compare
+            // panel) the card reappears on its own.
+            const canHideThis = dismissible && sectionText === '';
+            if (canHideThis && hiddenSections[keyStr]) return null;
             const generated = Boolean(aiHighlights[keyStr]);
             const rewritable = REWRITABLE_KEYS.includes(key);
             const menuItems: SectionCardMenuItem[] = [];
@@ -1938,6 +2153,8 @@ export default function ReportPage() {
                 icon={SECTION_ICONS[keyStr]}
                 generated={generated}
                 menuItems={menuItems}
+                flash={flash?.section === keyStr ? flash.tone : undefined}
+                onDismiss={canHideThis ? () => hideSection(keyStr) : undefined}
                 actions={
                   canEdit && generated ? (
                     <>
@@ -2025,6 +2242,7 @@ export default function ReportPage() {
           })}
         </div>
 
+        <div ref={inspectorRef}>
         <ReportInspector
           tab={inspectorTab}
           onTabChange={setInspectorTab}
@@ -2036,6 +2254,7 @@ export default function ReportPage() {
           findings={findings}
           qualityScore={qualityScore}
           blockers={blockers}
+          enforceBlockers={enforceBlockers}
           validationState={validationState}
           validationError={validationError}
           lastValidatedAt={lastValidatedAt}
@@ -2076,6 +2295,7 @@ export default function ReportPage() {
           onAddCoSigner={addCoSigner}
           onSubmitAddendum={submitAddendum}
         />
+        </div>
       </div>
 
       {xc && (

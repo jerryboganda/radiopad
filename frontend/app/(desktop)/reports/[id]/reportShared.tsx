@@ -52,6 +52,46 @@ export const REWRITE_MODES: Array<{ mode: RewriteMode; label: string; hint: stri
 
 export const REWRITABLE_KEYS: Array<keyof Report> = ['findings', 'impression', 'recommendations'];
 
+// The full set of sections the backend's rewrite prompt includes when no
+// `sections` whitelist is sent (ReportRewriteService.BuildPrompt) — used for
+// the ribbon's "Full report" rewrite option, distinct from REWRITABLE_KEYS
+// which only covers the single-section pickers.
+export const FULL_REPORT_KEYS: Array<keyof Report> = [
+  'indication', 'technique', 'comparison', 'findings', 'impression', 'recommendations',
+];
+
+const FULL_REPORT_HEADING_TO_KEY: Record<string, keyof Report> = {
+  INDICATION: 'indication',
+  TECHNIQUE: 'technique',
+  COMPARISON: 'comparison',
+  FINDINGS: 'findings',
+  IMPRESSION: 'impression',
+  RECOMMENDATIONS: 'recommendations',
+};
+
+/**
+ * Splits a full-report rewrite response back into per-section text. The
+ * backend prompts the model to "output the rewritten report as plain text
+ * with the same section headings" (HEADING:\n...) — this parses that back
+ * out. Returns an empty object if no recognizable headings are found, so
+ * callers can detect a parse failure and refuse to apply a guess.
+ */
+export function parseFullReportRewrite(text: string): Partial<Record<keyof Report, string>> {
+  const headings = Object.keys(FULL_REPORT_HEADING_TO_KEY);
+  const pattern = new RegExp(`(?:^|\\n)(${headings.join('|')}):[ \\t]*\\n`, 'gi');
+  const matches = [...text.matchAll(pattern)];
+  const out: Partial<Record<keyof Report, string>> = {};
+  for (let i = 0; i < matches.length; i++) {
+    const m = matches[i];
+    const heading = m[1].toUpperCase();
+    const start = m.index! + m[0].length;
+    const end = i + 1 < matches.length ? matches[i + 1].index! : text.length;
+    const key = FULL_REPORT_HEADING_TO_KEY[heading];
+    if (key) out[key] = text.slice(start, end).trim();
+  }
+  return out;
+}
+
 export function statusLabel(s: Report['status']): string {
   if (typeof s === 'string') return s;
   return ['Draft', 'Validated', 'Acknowledged', 'Exported'][s] ?? String(s);

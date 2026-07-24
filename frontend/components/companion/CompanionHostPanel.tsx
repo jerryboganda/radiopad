@@ -11,6 +11,10 @@
  *
  * Desktop-only (mounted from ReportClient). The relay is the cloud host; the
  * phone reaches it by code.
+ *
+ * `open` is controlled by the caller (the composer ribbon's "Pair phone"
+ * button) rather than owned internally, so the same toggle that opens this
+ * panel also drives the ribbon button's `aria-expanded`/active state.
  */
 
 import { useCallback, useEffect, useRef, useState } from 'react';
@@ -57,8 +61,7 @@ function hostDeviceName(): string {
   return 'RadioPad desktop';
 }
 
-export default function CompanionHostPanel() {
-  const [open, setOpen] = useState(false);
+export default function CompanionHostPanel({ open }: { open: boolean }) {
   const [phase, setPhase] = useState<Phase>('idle');
   const [code, setCode] = useState<string>('');
   const [qr, setQr] = useState<string>('');
@@ -388,20 +391,11 @@ export default function CompanionHostPanel() {
     setError(null); // per-phrase / readiness errors die with the session
   }, [teardown]);
 
+  if (!open) return null;
+
   return (
     <div className="rp-companion-host">
-      <button
-        type="button"
-        className="ghost"
-        aria-expanded={open}
-        onClick={() => setOpen((o) => !o)}
-        title="Pair your phone as a dictation companion"
-      >
-        📱 Pair phone
-      </button>
-
-      {open && (
-        <div className="rp-panel rp-companion-host-panel" role="dialog" aria-label="Phone companion">
+      <div className="rp-panel rp-companion-host-panel" role="dialog" aria-label="Phone companion">
           {error && <div className="banner danger" role="alert">{error}</div>}
 
           {phase === 'idle' || phase === 'error' ? (
@@ -462,8 +456,7 @@ export default function CompanionHostPanel() {
               <button className="ghost" type="button" onClick={stop}>Unpair</button>
             </>
           )}
-        </div>
-      )}
+      </div>
     </div>
   );
 }

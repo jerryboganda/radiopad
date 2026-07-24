@@ -141,6 +141,18 @@ input, textarea, select {
   width: 100%;
   transition: border-color 120ms ease, box-shadow 120ms ease;
 }
+/* Checkboxes and radios are not text fields: the `width: 100%` above stretched
+   them across their flex row, which pushed every adjacent label to the far
+   right and made checkbox rows read as two disconnected columns. (The one-off
+   `.skill-radio input { width: auto }` further down was an earlier local patch
+   for this same bug.) */
+input[type="checkbox"],
+input[type="radio"] {
+  width: auto;
+  flex: 0 0 auto;
+  padding: 0;
+}
+
 input::placeholder, textarea::placeholder { color: var(--text-faint); }
 input:focus, textarea:focus, select:focus {
   outline: none;

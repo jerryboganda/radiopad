@@ -649,6 +649,56 @@ export default function JobsProvider({ children }: { children: ReactNode }) {
     [kickTicker],
   );
 
+  // Seam for work tracked OUTSIDE submit() but which DOES have a real,
+  // pollable server-side job id (e.g. Cross Check's sidecar-submitted audio
+  // half). Kicks the ticker only when the job actually needs polling.
+  const trackExternal = useCallback(
+    (job: Omit<Job, 'dismissed' | 'seen' | 'notified' | 'attempt'> & { attempt?: number }) => {
+      const full: Job = { ...job, attempt: job.attempt ?? 1, dismissed: false, seen: false, notified: false };
+      dispatch({ type: 'ADD', job: full });
+      if (isActiveStatus(full.status)) kickTicker();
+    },
+    [kickTicker],
+  );
+
+  // Rewrite/Regenerate have no server job id at all — one awaited request,
+  // already resolved by the time the caller logs it. Added directly in its
+  // terminal state so `needsPoll` never selects it (isActiveStatus is false),
+  // while the existing "unnotified terminal job" effect still fires the same
+  // toast + notifications-bell entry + AI-jobs-panel row as any async job.
+  const logSyncResult = useCallback(
+    (spec: {
+      mode: string;
+      reportId: string;
+      report?: Job['report'];
+      status: 'ok' | 'error';
+      error?: string;
+      errorKind?: string;
+    }) => {
+      const now = Date.now();
+      const job: Job = {
+        id: `sync-${now}-${Math.random().toString(36).slice(2, 8)}`,
+        origin: 'hosted',
+        kind: 'ai',
+        mode: spec.mode,
+        reportId: spec.reportId,
+        report: spec.report,
+        status: spec.status,
+        createdAt: now,
+        startedAt: now,
+        completedAt: now,
+        error: spec.error,
+        errorKind: spec.errorKind,
+        attempt: 1,
+        dismissed: false,
+        seen: false,
+        notified: false,
+      };
+      dispatch({ type: 'ADD', job });
+    },
+    [],
+  );
+
   const dismiss = useCallback((jobId: string) => dispatch({ type: 'DISMISS', id: jobId }), []);
   const clearFinished = useCallback(() => dispatch({ type: 'CLEAR_FINISHED' }), []);
   const markSeen = useCallback(() => dispatch({ type: 'MARK_SEEN' }), []);
@@ -663,6 +713,8 @@ export default function JobsProvider({ children }: { children: ReactNode }) {
     () => ({
       jobs: visibleJobs(state),
       submit,
+      trackExternal,
+      logSyncResult,
       cancel,
       retry,
       dismiss,
@@ -671,7 +723,19 @@ export default function JobsProvider({ children }: { children: ReactNode }) {
       markApplied,
       canRetry,
     }),
-    [state, submit, cancel, retry, dismiss, clearFinished, markSeen, markApplied, canRetry],
+    [
+      state,
+      submit,
+      trackExternal,
+      logSyncResult,
+      cancel,
+      retry,
+      dismiss,
+      clearFinished,
+      markSeen,
+      markApplied,
+      canRetry,
+    ],
   );
 
   return (

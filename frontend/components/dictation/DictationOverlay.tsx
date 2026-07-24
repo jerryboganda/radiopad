@@ -12,9 +12,14 @@
 // service and works — it is the highly-accurate "Microsoft Edge Speech" engine
 // surfaced in the On-Device Models manager. When it is unavailable (older runtime
 // / no recognizer), the mic is disabled and the radiologist uses the "HQ" button,
-// which records and transcribes through the bundled on-device sidecar engine
-// (Windows Speech / Parakeet). The "Fix" button asks the host page to
-// clean the dictation into medical phrasing via UBAG.
+// which records and transcribes through the bundled on-device sidecar engine.
+// Decision D2 (backend/.../Providers/Local/LocalSttSettings.cs): the sidecar's
+// DEFAULT primary is Google MedASR (radiology-tuned Conformer-CTC), not
+// Parakeet — Parakeet is the general-purpose, user-promotable fallback. The
+// ensemble's engine-pick order also puts MedASR ahead of Parakeet so a fresh
+// install never silently favors Parakeet by registration order. The "Fix"
+// button asks the host page to clean the dictation into medical phrasing via
+// UBAG.
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { startFocusTracking, getLastFocusedEditable } from '@/lib/dictation/focusTracker';

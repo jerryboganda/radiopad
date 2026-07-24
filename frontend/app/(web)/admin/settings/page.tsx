@@ -78,6 +78,8 @@ export default function SettingsPage() {
         dicomWebBaseUrl: s.dicomWeb.baseUrl,
         dicomWebBearerSecret: dicomBearer || null,
         cmkKeyRef: cmkKeyRef || null,
+        requireZeroBlockers: s.validation.requireZeroBlockers,
+        warnAsBlocker: s.validation.warnAsBlocker,
       });
       setIngestSecret('');
       setDicomBearer('');
@@ -86,7 +88,15 @@ export default function SettingsPage() {
       setS(fresh);
       setInfo('Your changes were saved.');
     } catch (e) {
-      setError((e as Error).message);
+      // A bare "API 403 Forbidden" tells the user nothing they can act on.
+      // Saving here needs `tenant_settings.manage`, which only ReportingAdmin,
+      // MedicalDirector and ItAdmin hold — name them, so the reader knows this
+      // is a role problem and exactly who can do it, not a broken page.
+      setError(
+        isAuthError(e)
+          ? 'Your account isn’t allowed to change workspace settings. This needs the "Manage tenant settings" permission, held by the Reporting admin, Medical director, and IT admin roles — ask one of them, or have an administrator change your role.'
+          : (e as Error).message,
+      );
     } finally {
       setSaving(false);
     }
@@ -196,6 +206,50 @@ export default function SettingsPage() {
 
       <div className="rp-page-grid">
         <div className="rp-page-main rp-stagger">
+          {/* ---------- Validation gate ----------
+              Backed by TenantSettings.RequireZeroBlockers, which the API
+              already enforces on acknowledge/sign (ReportsController). The
+              setting existed server-side with no way to change it from the
+              app, so the only route was a direct API call. */}
+          <div className="rp-panel rp-anim-fade-in-up">
+            <div className="rp-panel-title">Validation gate</div>
+            <p className="rp-page-sub">
+              By default a report with unresolved <strong>Blocker</strong>{' '}findings can&apos;t be
+              acknowledged or signed. Turning this off lets a radiologist proceed anyway. Findings
+              are still detected and still shown truthfully on the report — this only controls
+              whether they stop the sign-off, and every acknowledgement remains in the audit log.
+            </p>
+
+            <label className="rp-field rp-row">
+              <input
+                type="checkbox"
+                checked={s.validation.requireZeroBlockers}
+                onChange={(e) =>
+                  setS({ ...s, validation: { ...s.validation, requireZeroBlockers: e.target.checked } })
+                }
+              />
+              <span style={{ marginLeft: 8 }}>Require zero blockers before acknowledging or signing</span>
+            </label>
+
+            {!s.validation.requireZeroBlockers && (
+              <div className="banner warn" role="status">
+                Blockers will no longer stop sign-off for this organization. Reports can be signed
+                with unresolved required-section and safety findings.
+              </div>
+            )}
+
+            <label className="rp-field rp-row">
+              <input
+                type="checkbox"
+                checked={s.validation.warnAsBlocker}
+                onChange={(e) =>
+                  setS({ ...s, validation: { ...s.validation, warnAsBlocker: e.target.checked } })
+                }
+              />
+              <span style={{ marginLeft: 8 }}>Treat Warnings as Blockers too (stricter)</span>
+            </label>
+          </div>
+
           {/* ---------- AI safety ---------- */}
           <div className="rp-panel rp-anim-fade-in-up">
             <div className="rp-panel-title">AI safety check</div>

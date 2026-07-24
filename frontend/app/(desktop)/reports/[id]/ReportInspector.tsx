@@ -43,12 +43,15 @@ export interface ReportInspectorProps {
   findings: ValidationFinding[];
   qualityScore: number | null;
   blockers: number;
+  /** Tenant's `RequireZeroBlockers` — gates the export button. */
+  enforceBlockers: boolean;
   validationState: 'idle' | 'running' | 'done' | 'error';
   validationError: string | null;
   lastValidatedAt: Date | null;
   canValidate: boolean;
   onValidate: () => void;
-  onJumpToSection: (section: string) => void;
+  /** `severity` tints the flash the target section plays on arrival (RC-04). */
+  onJumpToSection: (section: string, severity?: string) => void;
 
   // AI activity (RC-06)
   aiActivity: AiActivityEntry[];
@@ -135,6 +138,7 @@ export default function ReportInspector(p: ReportInspectorProps) {
             exportBlockedReason={p.exportTitle}
             validated={p.validationState === 'done'}
             blockers={p.blockers}
+            enforceBlockers={p.enforceBlockers}
             warnings={groupBySeverity(p.findings).warning.length}
             onOpenValidation={() => {
               p.onTabChange('validation');
@@ -295,7 +299,7 @@ function ValidationPanel(p: ReportInspectorProps) {
                       <button
                         type="button"
                         className="rp-valpanel-jump"
-                        onClick={() => p.onJumpToSection(f.section as string)}
+                        onClick={() => p.onJumpToSection(f.section as string, sev)}
                       >
                         <CornerDownRight size={11} aria-hidden /> Jump to {f.section}
                       </button>
