@@ -379,7 +379,9 @@
   gap: var(--space-4);
   white-space: nowrap;
 }
-.rp-reports-delete {
+/* Scoped under the actions cell so this wins over globals' `:is(button, a).ghost`
+   (specificity 0,1,1) without needing !important. */
+.rp-reports-actions .rp-reports-delete {
   display: inline-flex;
   align-items: center;
   gap: 5px;
@@ -387,12 +389,12 @@
   background: var(--red-bg);
   border-color: var(--red-border);
 }
-.rp-reports-delete:hover:not(:disabled) {
+.rp-reports-actions .rp-reports-delete:hover:not(:disabled) {
   color: var(--accent-fg);
   background: var(--red);
   border-color: var(--red);
 }
-.rp-reports-delete:disabled { opacity: 0.6; cursor: default; }
+.rp-reports-actions .rp-reports-delete:disabled { opacity: 0.6; cursor: default; }
 
 /* -------- Inline banners ------------------------------------------ */
 .banner {
