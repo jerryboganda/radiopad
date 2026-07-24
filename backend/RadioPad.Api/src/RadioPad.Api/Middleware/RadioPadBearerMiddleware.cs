@@ -176,6 +176,17 @@ public sealed class RadioPadBearerMiddleware
         // exists. The MFA controller still requires a verified identity or a
         // signed mfa-setup ticket, so anonymous reachability is safe here.
         path.StartsWithSegments("/api/auth/mfa") ||
+        // AUTH-001 passkey / Windows Hello SIGN-IN runs pre-session on the login
+        // screen (no bearer yet) — the same "second factor before a token" case as
+        // /api/auth/mfa above. Only the two sign-in ceremonies are anonymous:
+        // `signin-options` hands out a single-use challenge + the user's allowed
+        // credential ids, and `signin` verifies the assertion signature (the thing
+        // that actually authenticates) with lockout counting. `register` /
+        // `register-options` enroll a credential for the CURRENT user and MUST stay
+        // behind the gate, so match these two segments exactly rather than the whole
+        // /api/auth/webauthn prefix.
+        path.StartsWithSegments("/api/auth/webauthn/signin-options") ||
+        path.StartsWithSegments("/api/auth/webauthn/signin") ||
         // Operator org bootstrap — runs before any tenant/admin exists and is
         // gated by the RADIOPAD_BOOTSTRAP_SECRET header inside the controller.
         path.StartsWithSegments("/api/admin/bootstrap-org") ||

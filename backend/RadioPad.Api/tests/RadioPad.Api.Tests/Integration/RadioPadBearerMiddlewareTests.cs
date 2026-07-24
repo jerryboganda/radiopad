@@ -64,6 +64,11 @@ public sealed class RadioPadBearerMiddlewareTests
     [InlineData("/api/auth/mfa/login")]
     [InlineData("/api/auth/mfa/enroll")]
     [InlineData("/api/auth/mfa/verify")]
+    // AUTH-001 passkey sign-in ceremonies run pre-session on the login screen.
+    // The assertion signature (verified in the controller, lockout-counted) is
+    // what authenticates; register/register-options stay gated above.
+    [InlineData("/api/auth/webauthn/signin-options")]
+    [InlineData("/api/auth/webauthn/signin")]
     [InlineData("/api/admin/bootstrap-org")]
     public async Task Production_Allows_Login_Bootstrap_And_Webhook_Routes(string path)
     {
