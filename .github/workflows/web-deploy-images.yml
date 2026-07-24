@@ -1,15 +1,26 @@
 name: web-deploy-images
 
 # Builds the production web + api + marketing Docker images in GitHub Actions
-# (NOT on the CPU-capped VPS) and uploads them as a single saved-image artifact.
-# The VPS then `gh run download`s the artifact and `docker load`s it — no
-# registry and no package-scope credentials required (the VPS gh token only
-# has `repo`).
+# (NOT on the CPU-capped VPS), uploads them as a single saved-image artifact,
+# then ships that artifact straight to the VPS over SSH and reloads compose —
+# no registry, no package-scope credentials, no manual step on a green run.
 #
-# Deploy flow on the VPS after a green run:
+# The `deploy` job needs three repo secrets (VPS_HOST, VPS_DEPLOY_USER,
+# VPS_DEPLOY_SSH_KEY) pointed at a dedicated, least-privilege deploy user (in
+# the `docker` group, NOT root) — see deploy/vps/README-deploy-user.md for the
+# one-time VPS-side setup. Until those secrets exist the job is skipped (not
+# failed), so this file is safe to merge before the VPS side is provisioned.
+#
+# Manual fallback (secrets not yet set, or a run needs a human to re-drive it):
 #   gh run download <run_id> --repo jerryboganda/radiopad -n radiopad-images -D /tmp/rpimg
 #   gunzip -c /tmp/rpimg/radiopad-images.tar.gz | docker load
-#   cd /opt/radiopad && docker compose up -d        # compose uses image: + pull_policy: never
+#   cd /opt/docker/radiopad && docker compose up -d   # compose uses image: + pull_policy: never
+#
+# (Verified against the live VPS 2026-07-24 — /opt/radiopad, referenced in
+# deploy/vps/README.md and this file's prior revision, does not exist on the
+# actual production host; the real compose project is /opt/docker/radiopad,
+# no -f/--env-file needed since docker-compose.yml + .secrets.env live there
+# directly. That README predates the current layout.)
 
 on:
   push:
@@ -59,3 +70,55 @@ jobs:
           path: radiopad-images.tar.gz
           retention-days: 7
           compression-level: 0 # already gzipped
+
+  deploy:
+    needs: build
+    runs-on: ubuntu-latest
+    if: github.ref == 'refs/heads/main' && github.event_name != 'pull_request'
+    # Skips cleanly (not a failure) until the VPS deploy secrets are provisioned.
+    environment:
+      name: production
+    concurrency:
+      group: web-deploy-vps
+      cancel-in-progress: false
+    steps:
+      - name: Skip until deploy secrets exist
+        id: gate
+        run: |
+          if [ -z "${{ secrets.VPS_HOST }}" ] || [ -z "${{ secrets.VPS_DEPLOY_USER }}" ] || [ -z "${{ secrets.VPS_DEPLOY_SSH_KEY }}" ]; then
+            echo "ready=false" >> "$GITHUB_OUTPUT"
+            echo "::notice::VPS_HOST / VPS_DEPLOY_USER / VPS_DEPLOY_SSH_KEY not set — skipping automated deploy. Use the manual fallback in this file's header comment."
+          else
+            echo "ready=true" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Download images artifact
+        if: steps.gate.outputs.ready == 'true'
+        uses: actions/download-artifact@v4
+        with:
+          name: radiopad-images
+
+      - name: Configure deploy key
+        if: steps.gate.outputs.ready == 'true'
+        run: |
+          mkdir -p ~/.ssh
+          printf '%s\n' "${{ secrets.VPS_DEPLOY_SSH_KEY }}" > ~/.ssh/deploy_key
+          chmod 600 ~/.ssh/deploy_key
+          ssh-keyscan -H "${{ secrets.VPS_HOST }}" >> ~/.ssh/known_hosts
+
+      # Ship the gzipped tar straight to the VPS (skips the gh-artifact-download
+      # hop the manual fallback needs) then load + restart in one SSH round trip.
+      - name: Ship image + reload compose
+        if: steps.gate.outputs.ready == 'true'
+        run: |
+          set -euo pipefail
+          scp -i ~/.ssh/deploy_key radiopad-images.tar.gz \
+            "${{ secrets.VPS_DEPLOY_USER }}@${{ secrets.VPS_HOST }}:/tmp/radiopad-images.tar.gz"
+          ssh -i ~/.ssh/deploy_key "${{ secrets.VPS_DEPLOY_USER }}@${{ secrets.VPS_HOST }}" '
+            set -euo pipefail
+            gunzip -c /tmp/radiopad-images.tar.gz | docker load
+            rm -f /tmp/radiopad-images.tar.gz
+            cd /opt/docker/radiopad
+            docker compose up -d
+            docker image prune -f
+          '
