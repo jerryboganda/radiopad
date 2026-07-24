@@ -384,10 +384,13 @@
   align-items: center;
   gap: 5px;
   color: var(--red);
-}
-.rp-reports-delete:hover:not(:disabled) {
   background: var(--red-bg);
   border-color: var(--red-border);
+}
+.rp-reports-delete:hover:not(:disabled) {
+  color: var(--accent-fg);
+  background: var(--red);
+  border-color: var(--red);
 }
 .rp-reports-delete:disabled { opacity: 0.6; cursor: default; }
 
