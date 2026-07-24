@@ -244,20 +244,12 @@ public class ReportingService
                 ? ov
                 : rulebook?.PromptBlocks.GetValueOrDefault(key);
 
-        var system = Resolve("system")
-            ?? "You are a senior consultant radiologist with subspecialty fellowship training and more than thirty " +
-               "years of reporting experience in a tertiary-care academic centre, drafting a formal diagnostic report " +
-               "for the referring clinician. Write in polished, grammatically complete clinical sentences, organised " +
-               "under the heading-and-bullet layout specified in the report requirements. The dictated positive findings " +
-               "are authoritative: preserve every measurement, laterality, attenuation, signal-intensity, or echogenicity " +
-               "descriptor, and negation exactly, and never omit or contradict them. Never invent a positive finding, and " +
-               "do not introduce diagnoses or urgency unsupported by the dictated findings. Provide the standard systematic " +
-               "review of all anatomy covered by this examination — including normal descriptions and pertinent negatives — " +
-               "exactly as a senior consultant would: a structure not mentioned in the dictation but routinely assessed on " +
-               "this examination is reported with its expected normal appearance, qualified wherever the technique limits its " +
-               "evaluation (for example, \"normal in morphology within the limits of a non-contrast examination\"). Your entire " +
-               "reply must be a single JSON object exactly as specified at the end of the message; the complete report lives " +
-               "inside the JSON string values, and nothing is written outside the object.";
+        // Option 1 (consultant-everywhere): the consultant doctrine is ALWAYS the base
+        // system prompt; a rulebook/tenant `system` block now refines it as modality
+        // guidance instead of REPLACING it. The old `Resolve("system") ?? default`
+        // let every shipped rulebook clobber the doctrine with a weaker paragraph —
+        // the dominant cause of junior-grade output. See ConsultantReportDoctrine.
+        var system = ConsultantReportDoctrine.Lead(ConsultantReportDoctrine.GenerationSystem, Resolve("system"));
 
         // Prefer a rulebook-authored `generate` block, then a consultant-grade
         // default. NOTE: the older `draft` block is deliberately NOT a fallback
@@ -470,10 +462,15 @@ public class ReportingService
                 ? ov
                 : rulebook?.PromptBlocks.GetValueOrDefault(key);
 
-        var system = Resolve("system")
-            ?? "You are assisting a board-certified radiologist drafting a structured radiology report. " +
-               "Never invent findings. Always preserve laterality and measurements. " +
-               "Output only the requested section. Do not sign the report.";
+        // Option 1 (consultant-everywhere): the consultant doctrine always leads and a
+        // rulebook/tenant `system` block refines it — it can no longer replace it. The
+        // patient-facing / one-paragraph modes take the fidelity core only, so their
+        // deliberately non-consultant format survives; every other mode takes the full
+        // consultant style + layout + impression doctrine. See ConsultantReportDoctrine.
+        var baseDoctrine = mode.ToLowerInvariant() is "patient_friendly" or "referring_summary"
+            ? ConsultantReportDoctrine.Fidelity
+            : ConsultantReportDoctrine.RewriteStyle;
+        var system = ConsultantReportDoctrine.Lead(baseDoctrine, Resolve("system"));
 
         // Mode-specific instructions: prefer the rulebook's named prompt block, fall back to a
         // hard-coded clinically conservative default. Keep these instructions stable across

@@ -97,6 +97,30 @@ public class ConsultantGradeGeneratePromptTests
         Assert.Contains("REPORT REQUIREMENTS", user);
     }
 
+    [Fact]
+    public async Task Rulebook_System_Block_Refines_But_Never_Clobbers_The_Consultant_Doctrine()
+    {
+        // Option 1 (consultant-everywhere): a rulebook that authors its own (weaker)
+        // `system` block must NOT replace the consultant doctrine — the doctrine leads
+        // and the rulebook text is appended as modality refinement. ALL 114 shipped
+        // rulebooks author a `system` block, so this is the production path, and its
+        // clobber was the dominant cause of "basic" reports.
+        var terseSystem = "You are assisting with a CT KUB report. Keep it brief.";
+        var (gw, svc) = Build(rulebookYaml: RulebookWithSystem(terseSystem));
+
+        await svc.GenerateStructuredAsync(Tenant(), User(), Report(withRulebook: true), Provider(), default);
+
+        var sys = Squish(gw.Captured!.SystemPrompt);
+
+        // The consultant doctrine survives in full...
+        Assert.Contains("senior consultant radiologist", sys);
+        Assert.Contains("systematic review", sys);
+        Assert.Contains("pertinent negatives", sys);
+        // ...and the rulebook's own guidance is appended as refinement, not dropped.
+        Assert.Contains("Keep it brief", sys);
+        Assert.Contains("Modality-specific guidance", sys);
+    }
+
     // ---- harness -----------------------------------------------------------
 
     private static (CapturingGateway, ReportingService) Build(string? rulebookYaml = null)
@@ -152,6 +176,21 @@ public class ConsultantGradeGeneratePromptTests
         prompt_blocks:
           system: "You are a senior consultant radiologist."
           generate: "{generate}"
+        """;
+
+    private static string RulebookWithSystem(string system) => $"""
+        rulebook_id: ct_kub_test
+        name: CT KUB Test
+        version: 1.1.0
+        owner: it
+        status: approved
+        applies_to:
+          modalities: [CT]
+          body_parts: [KUB]
+        required_sections: []
+        rules: []
+        prompt_blocks:
+          system: "{system}"
         """;
 
     private sealed class CapturingGateway : IAiGateway

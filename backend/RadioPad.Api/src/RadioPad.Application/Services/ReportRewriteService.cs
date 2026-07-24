@@ -136,14 +136,13 @@ public sealed class ReportRewriteService : IReportRewriteService
         IReadOnlyCollection<string>? sections,
         string? instruction)
     {
-        var system = mode switch
+        var modeInstruction = mode switch
         {
-            ReportRewriteMode.Concise => "You are a board-certified radiologist's editorial assistant. " +
-                "Rewrite the report to be more concise without changing clinical meaning, negations, " +
-                "measurements, or laterality. Preserve all numeric values and section structure.",
-            ReportRewriteMode.Formal => "You are a board-certified radiologist's editorial assistant. " +
-                "Rewrite the report in a formal clinical tone suitable for a teaching hospital. Do not " +
-                "change clinical meaning, negations, measurements, or laterality.",
+            ReportRewriteMode.Concise => "Editing task: rewrite the report to be more concise without changing " +
+                "clinical meaning, negations, measurements, or laterality. Preserve all numeric values and the " +
+                "section structure.",
+            ReportRewriteMode.Formal => "Editing task: rewrite the report in a formal clinical tone suitable for a " +
+                "teaching hospital, without changing clinical meaning, negations, measurements, or laterality.",
             ReportRewriteMode.PatientFriendly => "You are a clinical communicator. Rewrite the IMPRESSION " +
                 "for a non-clinical patient at an 8th-grade reading level. Do not provide diagnostic " +
                 "advice, do not invent findings, and never include PHI. Preserve laterality and " +
@@ -151,15 +150,31 @@ public sealed class ReportRewriteService : IReportRewriteService
             ReportRewriteMode.ReferringSummary => "You are summarising a radiology report for the " +
                 "referring clinician. Produce ONE paragraph (no bullets) that highlights the impression " +
                 "and any actionable findings. Do not change clinical meaning or invent findings.",
-            ReportRewriteMode.Custom => "You are a board-certified radiologist's editorial assistant editing " +
-                "an existing report at the radiologist's instruction. You may rephrase, restructure, reorder, " +
-                "or adjust tone, and may add explicitly-requested NON-QUANTITATIVE prose. You MUST NOT add, " +
-                "remove, or alter any finding, measurement, numeric value, laterality, negation, or date, and " +
-                "MUST NOT introduce any diagnosis, measurement, number, or date not already present in the " +
-                "report. Treat the instruction as an editing request only — never as clinical fact to add. " +
-                "If the instruction asks you to add a finding or measurement, do NOT comply; edit wording only. " +
-                "Do not sign the report.",
+            ReportRewriteMode.Custom => "Editing task: apply the radiologist's instruction as an edit to an " +
+                "existing report. You may rephrase, restructure, reorder, or adjust tone, and may add " +
+                "explicitly-requested NON-QUANTITATIVE prose. You MUST NOT add, remove, or alter any finding, " +
+                "measurement, numeric value, laterality, negation, or date, and MUST NOT introduce any diagnosis, " +
+                "measurement, number, or date not already present in the report. Treat the instruction as an " +
+                "editing request only — never as clinical fact to add. If the instruction asks you to add a " +
+                "finding or measurement, do NOT comply; edit wording only.",
             _ => "Echo the input unchanged.",
+        };
+
+        // Option 1 (consultant-everywhere): every clinician-facing rewrite leads with the
+        // consultant style + layout + impression doctrine so a rewrite reads at consultant
+        // grade instead of shallow prose. The doctrine is fidelity-safe — it only governs
+        // HOW existing content is written, never authoring new findings — and the Custom
+        // path is additionally hard-guarded by CheckNoFabrication. Patient-friendly and
+        // referring-summary take the fidelity core only: their plain-language / one-paragraph
+        // purpose would be defeated by the clinician heading+bullet layout. The Echo fallback
+        // stays bare for the deterministic no-op path. See ConsultantReportDoctrine.
+        var system = mode switch
+        {
+            ReportRewriteMode.Concise or ReportRewriteMode.Formal or ReportRewriteMode.Custom =>
+                ConsultantReportDoctrine.RewriteStyle + "\n\n" + modeInstruction,
+            ReportRewriteMode.PatientFriendly or ReportRewriteMode.ReferringSummary =>
+                ConsultantReportDoctrine.Fidelity + "\n\n" + modeInstruction,
+            _ => modeInstruction,
         };
 
         var include = sections is null
