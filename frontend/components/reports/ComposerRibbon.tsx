@@ -223,7 +223,6 @@ export default function ComposerRibbon(p: ComposerRibbonProps) {
   }, [rewriteOpen, setRewriteOpen]);
 
   const busy = (a: RibbonAction) => p.activeActions.includes(a);
-  const scopeLabel = p.sections.find((s) => s.key === p.rewriteSection)?.label ?? p.rewriteSection;
   const showSignoffGroup = p.canEdit || p.canSign;
 
   return (
@@ -420,9 +419,6 @@ export default function ComposerRibbon(p: ComposerRibbonProps) {
             onClick={p.onToggleStylePanel}
           />
 
-          <span className="rp-composer-ribbon-scope" title="Section the rewrite actions apply to">
-            Scope: {scopeLabel}
-          </span>
         </RibbonGroup>
       )}
 
