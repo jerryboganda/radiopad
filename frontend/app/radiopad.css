@@ -363,6 +363,34 @@
 .rp-table th { font-size: 11px; text-transform: uppercase; letter-spacing: 0.06em; color: var(--text-muted); font-weight: 600; }
 .rp-table tr:hover td { background: var(--bg-subtle); }
 
+/* -------- Reports worklist: date filter + row actions ------------- */
+.rp-reports-filter {
+  display: flex;
+  align-items: flex-end;
+  gap: var(--space-3);
+  flex-wrap: wrap;
+  margin-bottom: var(--space-4);
+}
+.rp-reports-filter .section-block { margin: 0; }
+.rp-reports-actions {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: var(--space-4);
+  white-space: nowrap;
+}
+.rp-reports-delete {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  color: var(--red);
+}
+.rp-reports-delete:hover:not(:disabled) {
+  background: var(--red-bg);
+  border-color: var(--red-border);
+}
+.rp-reports-delete:disabled { opacity: 0.6; cursor: default; }
+
 /* -------- Inline banners ------------------------------------------ */
 .banner {
   padding: 10px 14px;

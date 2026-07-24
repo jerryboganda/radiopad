@@ -347,6 +347,38 @@ public class ReportsController : TenantedController
         return Ok(new { report.Id, archivedAt = report.ArchivedAt });
     }
 
+    /// <summary>
+    /// Soft-delete a report: sets <see cref="Report.ArchivedAt"/> so it drops out of the
+    /// default worklist (the <c>archived=true</c> filter surfaces it again, and PATCH
+    /// <c>/{id}/unarchive</c> recovers it). RadioPad never hard-deletes a clinical record —
+    /// this mirrors the background <c>OrphanedDraftCleanupJob</c> archive and keeps the
+    /// append-only audit trail intact. Restricted to <see cref="RbacPermission.ReportsEdit"/>.
+    /// </summary>
+    [HttpPatch("{id:guid}/archive")]
+    public async Task<IActionResult> Archive(Guid id, CancellationToken ct)
+    {
+        var (tenant, user) = await ResolveContextAsync(_db, ct);
+        var deny = RequirePermission(user, RbacPermission.ReportsEdit);
+        if (deny is not null) return deny;
+        var report = await _db.Reports.FirstOrDefaultAsync(r => r.Id == id && r.TenantId == tenant.Id, ct);
+        if (report is null) return NotFound();
+        if (report.ArchivedAt is null)
+        {
+            report.ArchivedAt = DateTimeOffset.UtcNow;
+            report.UpdatedAt = report.ArchivedAt.Value;
+            await _db.SaveChangesAsync(ct);
+            await _audit.AppendAsync(new AuditEvent
+            {
+                TenantId = tenant.Id,
+                UserId = user.Id,
+                Action = AuditAction.ReportDraftArchived,
+                ReportId = report.Id,
+                DetailsJson = System.Text.Json.JsonSerializer.Serialize(new { mode = "manual", status = report.Status.ToString() }),
+            }, ct);
+        }
+        return Ok(new { report.Id, archivedAt = report.ArchivedAt });
+    }
+
     public record PatchReportDto(
         string? Indication, string? Technique, string? Comparison,
         string? Findings, string? Impression, string? Recommendations,
