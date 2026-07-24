@@ -406,6 +406,12 @@ public enum AuditAction
     /// <summary>NOTIF-001 (NOTIF-008, NOTIF-011) — a bulk read/ack action ran over a set of the
     /// caller's own notifications. Details record the action and the affected ids/count.</summary>
     NotificationBulkAction = 130,
+    /// <summary>A report was PERMANENTLY hard-deleted from the worklist (operator-directed —
+    /// the row and its cascade children are removed, unlike the reversible
+    /// <see cref="ReportDraftArchived"/>). This append-only audit row is written BEFORE the
+    /// delete and survives it (AuditEvent.ReportId is nullable). Details record the report id,
+    /// accession, status, modality, and body part — never report text.</summary>
+    ReportHardDeleted = 131,
 }
 
 /// <summary>

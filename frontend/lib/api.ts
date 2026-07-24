@@ -1472,13 +1472,12 @@ export const api = {
   reports: {
     list: () => request<Report[]>('/api/reports'),
     /**
-     * Soft-delete (archive) a report so it drops out of the default worklist.
-     * RadioPad never hard-deletes a clinical record — the backend sets
-     * `ArchivedAt` (recoverable via the `archived=true` filter / unarchive) and
-     * appends a `ReportDraftArchived` audit row. Restricted to ReportsEdit.
+     * PERMANENTLY hard-delete a report. The backend removes the row and its
+     * cascade/loose children for good and writes an append-only `ReportHardDeleted`
+     * audit row first (which survives the delete). Restricted to ReportsEdit.
      */
-    archive: (id: string) =>
-      request<{ id: string; archivedAt: string | null }>(`/api/reports/${id}/archive`, { method: 'PATCH' }),
+    delete: (id: string) =>
+      request<void>(`/api/reports/${id}`, { method: 'DELETE' }),
     listPaged: (params: { modality?: string; status?: number; q?: string; skip?: number; take?: number } = {}) => {
       const sp = new URLSearchParams();
       if (params.modality) sp.set('modality', params.modality);

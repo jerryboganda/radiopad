@@ -52,13 +52,13 @@ export default function ReportsPage() {
   async function handleDelete(r: Report) {
     const accession = r.study.accessionNumber || 'this report';
     if (!window.confirm(
-      `Delete report ${accession}?\n\nIt will be removed from your worklist. This is a reversible archive — the clinical record and audit trail are preserved and it can be recovered by an admin.`,
+      `Permanently delete report ${accession}?\n\nThis cannot be undone — the report and all of its data are removed for good. An audit-log entry is kept recording the deletion.`,
     )) return;
     setDeletingId(r.id);
     try {
-      await api.reports.archive(r.id);
+      await api.reports.delete(r.id);
       setReports((prev) => prev.filter((x) => x.id !== r.id));
-      toast({ tone: 'success', title: 'Report deleted', message: `${accession} was removed from your worklist.` });
+      toast({ tone: 'success', title: 'Report deleted', message: `${accession} was permanently deleted.` });
     } catch (e) {
       toast({ tone: 'danger', title: 'Could not delete report', message: (e as { message?: string })?.message || 'Please try again.' });
     } finally {
