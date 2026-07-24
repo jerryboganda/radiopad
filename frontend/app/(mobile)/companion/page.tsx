@@ -18,14 +18,24 @@
  * `.rp-page-sub`, `.banner`, `.primary`, `.ghost`, `.subtle`, `.rp-input`.
  */
 
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useRef, useState, type ComponentType } from 'react';
 import {
   ArrowRight,
+  ChevronLeft,
   ChevronRight,
+  ClipboardCheck,
+  CornerDownLeft,
+  FileSearch,
   HelpCircle,
+  Keyboard,
   Link2,
+  LogOut,
+  Mic,
   QrCode,
   ShieldCheck,
+  Undo2,
+  Wand2,
+  Wifi,
 } from 'lucide-react';
 import { api, setActiveAuthToken, setCompanionBase } from '@/lib/api';
 import { setAuthToken } from '@/lib/secureAuth';
@@ -109,13 +119,13 @@ function deviceName(): string {
   return 'RadioPad companion';
 }
 
-const REMOTE_COMMANDS: Array<{ command: CompanionCommand; label: string }> = [
-  { command: 'prev_section', label: '‹ Prev' },
-  { command: 'next_section', label: 'Next ›' },
-  { command: 'jump_findings', label: 'Findings' },
-  { command: 'jump_impression', label: 'Impression' },
-  { command: 'new_line', label: '↵ New line' },
-  { command: 'undo', label: '⤺ Undo' },
+const REMOTE_COMMANDS: Array<{ command: CompanionCommand; label: string; icon: ComponentType<{ size?: number }> }> = [
+  { command: 'prev_section', label: 'Prev', icon: ChevronLeft },
+  { command: 'next_section', label: 'Next', icon: ChevronRight },
+  { command: 'jump_findings', label: 'Findings', icon: FileSearch },
+  { command: 'jump_impression', label: 'Impression', icon: ClipboardCheck },
+  { command: 'new_line', label: 'New line', icon: CornerDownLeft },
+  { command: 'undo', label: 'Undo', icon: Undo2 },
 ];
 
 type Phase = 'pair' | 'connecting' | 'live' | 'ended';
@@ -610,33 +620,41 @@ export default function MobileCompanionPage() {
   }
 
   // phase === 'live'
+  const linkTone = link === 'connected' ? 'tone-green' : link === 'failed' ? 'tone-red' : 'tone-amber';
+  const linkText = link === 'connected' ? 'Connected over Wi‑Fi' : link === 'failed' ? 'Wi‑Fi link failed' : 'Connecting…';
   return (
     <div className="rp-comp-screen">
       <CompanionTopbar />
-      <div className="rp-mobile">
-        <h1 className="rp-page-title">Dictating to {hostName || 'desktop'}</h1>
-        <p className="rp-page-sub">
-          {section ? <>Active section: <strong>{section}</strong></> : 'Tap the mic and speak — your voice is transcribed on the desktop.'}
-        </p>
+      <div className="rp-comp-body">
+        <div className="rp-comp-live-status">
+          <span className={`rp-comp-dot ${linkTone}`} aria-hidden />
+          <span className="rp-comp-live-status-text">
+            <span className="rp-comp-live-status-host">Dictating to {hostName || 'desktop'}</span>
+            <span className="rp-comp-live-status-sub">
+              {inputMode === 'voice' ? linkText : 'Keyboard voice · works on any connection'}
+              {section && <> · Section: <strong>{section}</strong></>}
+            </span>
+          </span>
+        </div>
 
-        {error && <div className="banner warn" role="alert">{error}</div>}
+        {error && <div className="banner warn" role="alert" style={{ marginBottom: 14 }}>{error}</div>}
 
-        <div className="rp-companion-remote" role="group" aria-label="Dictation mode">
+        <div className="rp-comp-segment" role="group" aria-label="Dictation mode">
           <button
-            className={inputMode === 'voice' ? 'primary' : 'ghost'}
+            className={`rp-comp-segment-btn${inputMode === 'voice' ? ' active' : ''}`}
             type="button"
             aria-pressed={inputMode === 'voice'}
             onClick={() => switchMode('voice')}
           >
-            Wi‑Fi mic
+            <Wifi size={15} aria-hidden /> Wi‑Fi mic
           </button>
           <button
-            className={inputMode === 'type' ? 'primary' : 'ghost'}
+            className={`rp-comp-segment-btn${inputMode === 'type' ? ' active' : ''}`}
             type="button"
             aria-pressed={inputMode === 'type'}
             onClick={() => switchMode('type')}
           >
-            Keyboard voice
+            <Keyboard size={15} aria-hidden /> Keyboard voice
           </button>
         </div>
 
@@ -650,21 +668,31 @@ export default function MobileCompanionPage() {
               )}
             </div>
           ) : (
-            <button
-              className={`rp-mic-btn${recording ? ' recording is-live' : ''}`}
-              type="button"
-              aria-pressed={recording}
-              onClick={toggleMic}
-            >
-              {recording ? (speaking ? 'Listening…' : 'Mic on — tap to stop') : 'Tap to dictate'}
-            </button>
+            <div className="rp-comp-orb-wrap">
+              <button
+                className={`rp-comp-orb${recording ? ' recording' : ''}`}
+                type="button"
+                aria-pressed={recording}
+                onClick={toggleMic}
+              >
+                <span className="rp-comp-orb-ring" aria-hidden />
+                <span className="rp-comp-orb-ring" aria-hidden />
+                <Mic size={40} aria-hidden />
+              </button>
+              <span className="rp-comp-orb-label">
+                {recording ? (speaking ? 'Listening…' : 'Mic on — tap to stop') : 'Tap to dictate'}
+              </span>
+            </div>
           )
         ) : (
-          <>
-            <p className="rp-page-sub">
-              Tap the box, then press the <strong>mic key on your keyboard</strong> (Gboard voice
-              typing). Words appear on the desktop as you speak; a short pause inserts them.
-            </p>
+          <div className="rp-comp-type-card">
+            <div className="rp-comp-type-hint">
+              <Keyboard size={16} aria-hidden />
+              <span>
+                Tap the box, then press the <strong>mic key on your keyboard</strong> (Gboard voice
+                typing). Words appear on the desktop as you speak; a short pause inserts them.
+              </span>
+            </div>
             <textarea
               className="rp-input"
               rows={5}
@@ -693,37 +721,45 @@ export default function MobileCompanionPage() {
               type="button"
               onClick={insertTypedNow}
               disabled={!typedText.trim()}
+              style={{ width: '100%', marginTop: 12 }}
             >
               Insert into report now
             </button>
             {lastInserted && !typedText && (
-              <p className="rp-page-sub" role="status" aria-live="polite">
+              <p className="rp-comp-type-inserted" role="status" aria-live="polite">
                 Inserted: “{lastInserted.length > 90 ? `${lastInserted.slice(0, 90)}…` : lastInserted}”
               </p>
             )}
-          </>
+          </div>
         )}
 
-        <div className="rp-companion-remote" role="group" aria-label="Remote controls">
-          {REMOTE_COMMANDS.map((c) => (
-            <button key={c.command} className="ghost" type="button" onClick={() => sendCommand(c.command)}>
-              {c.label}
-            </button>
-          ))}
+        <div className="rp-comp-remote-grid" role="group" aria-label="Remote controls">
+          {REMOTE_COMMANDS.map((c) => {
+            const Icon = c.icon;
+            return (
+              <button key={c.command} className="rp-comp-chip" type="button" onClick={() => sendCommand(c.command)}>
+                <Icon size={17} aria-hidden />
+                {c.label}
+              </button>
+            );
+          })}
         </div>
 
-        <button
-          className="primary-ghost"
-          type="button"
-          onClick={() => sendCommand('generate_impression')}
-          style={{ width: '100%' }}
-        >
-          ✨ Generate impression (AI)
-        </button>
+        <div className="rp-comp-live-actions">
+          <button
+            className="primary-ghost rp-comp-ai-btn"
+            type="button"
+            onClick={() => sendCommand('generate_impression')}
+          >
+            <Wand2 size={16} aria-hidden />
+            Generate impression (AI)
+          </button>
 
-        <button className="subtle" type="button" onClick={() => { teardown(); setPhase('ended'); }}>
-          End session
-        </button>
+          <button className="subtle rp-comp-end" type="button" onClick={() => { teardown(); setPhase('ended'); }}>
+            <LogOut size={14} aria-hidden style={{ marginRight: 6, verticalAlign: -2 }} />
+            End session
+          </button>
+        </div>
       </div>
     </div>
   );

@@ -1294,6 +1294,132 @@
   animation: rp-fade-in-up var(--anim-base, 0.35s) var(--ease-out, ease-out) 0.35s both;
 }
 
+/* ---- Live dictation screen — the companion's main working screen -
+   Shares .rp-comp-screen / .rp-comp-topbar with the pairing entrance
+   (CompanionTopbar) so the whole app reads as one product. ---------- */
+.rp-comp-live-status {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 12px 14px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  background: var(--bg-panel);
+  box-shadow: var(--shadow-xs);
+  margin-bottom: 16px;
+}
+.rp-comp-live-status-text { display: flex; flex-direction: column; gap: 2px; min-width: 0; flex: 1 1 auto; }
+.rp-comp-live-status-host { font: 600 14px/1.3 var(--sans); color: var(--text-strong); }
+.rp-comp-live-status-sub { font: 400 12.5px/1.4 var(--sans); color: var(--text-muted); }
+.rp-comp-live-status-sub strong { color: var(--text); font-weight: 600; }
+
+.rp-comp-dot {
+  width: 9px;
+  height: 9px;
+  border-radius: 50%;
+  flex: 0 0 auto;
+  background: var(--text-soft);
+}
+.rp-comp-dot.tone-green { background: var(--green); animation: rp-mic-pulse 1.8s var(--ease-out, ease-out) infinite; }
+.rp-comp-dot.tone-amber { background: var(--amber); animation: rp-pulse-soft 1.4s var(--ease-in-out, ease-in-out) infinite; }
+.rp-comp-dot.tone-red { background: var(--red); }
+
+/* Two-way segmented switch (Wi-Fi mic / Keyboard voice). */
+.rp-comp-segment {
+  display: flex;
+  gap: 3px;
+  padding: 3px;
+  border-radius: var(--radius-pill);
+  background: var(--bg-subtle);
+  border: 1px solid var(--border);
+  margin-bottom: 18px;
+}
+.rp-comp-segment-btn {
+  flex: 1 1 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 7px;
+  padding: 9px 10px;
+  border: 0;
+  border-radius: var(--radius-pill);
+  background: transparent;
+  color: var(--text-muted);
+  font: 600 13px/1 var(--sans);
+  cursor: pointer;
+}
+.rp-comp-segment-btn.active {
+  background: var(--bg-panel);
+  color: var(--text-strong);
+  box-shadow: var(--shadow-sm);
+}
+
+/* Big circular mic "orb" — the phone's primary control. */
+.rp-comp-orb-wrap { display: flex; flex-direction: column; align-items: center; gap: 14px; padding: 22px 0 26px; }
+.rp-comp-orb {
+  position: relative;
+  width: 148px;
+  height: 148px;
+  border-radius: 50%;
+  border: 0;
+  cursor: pointer;
+  display: grid;
+  place-items: center;
+  background: var(--accent-tint);
+  color: var(--accent);
+  box-shadow: var(--shadow-md);
+}
+.rp-comp-orb.recording { background: var(--green-bg); color: var(--green); }
+.rp-comp-orb-ring {
+  position: absolute;
+  inset: 0;
+  border-radius: 50%;
+  border: 1.5px solid var(--green);
+  opacity: 0;
+}
+.rp-comp-orb.recording .rp-comp-orb-ring { animation: rp-comp-splash-ring 2s var(--ease-out, ease-out) infinite; }
+.rp-comp-orb.recording .rp-comp-orb-ring:nth-child(2) { animation-delay: 0.65s; }
+.rp-comp-orb-label { font: 600 14.5px/1.3 var(--sans); color: var(--text-strong); }
+
+.rp-comp-type-card {
+  padding: 16px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  background: var(--bg-panel);
+  box-shadow: var(--shadow-xs);
+  margin-bottom: 16px;
+}
+.rp-comp-type-hint { display: flex; align-items: flex-start; gap: 10px; margin-bottom: 12px; color: var(--text-muted); font: 400 13px/1.5 var(--sans); }
+.rp-comp-type-hint svg { flex: 0 0 auto; margin-top: 1px; color: var(--accent); }
+.rp-comp-type-inserted { margin: 10px 0 0; font: 400 12.5px/1.5 var(--sans); color: var(--text-muted); }
+
+.rp-comp-remote-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 8px;
+  margin: 4px 0 18px;
+}
+.rp-comp-chip {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+  padding: 12px 6px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: var(--bg-panel);
+  color: var(--text);
+  cursor: pointer;
+  font: 500 11.5px/1.2 var(--sans);
+  text-align: center;
+}
+.rp-comp-chip:hover { background: var(--bg-subtle); }
+.rp-comp-chip svg { color: var(--text-soft); }
+
+.rp-comp-live-actions { display: flex; flex-direction: column; gap: 10px; }
+.rp-comp-ai-btn { display: flex; align-items: center; justify-content: center; gap: 8px; width: 100%; }
+.rp-comp-end { margin-top: 4px; align-self: center; }
+
 /* ============================================================
    Dictation overlay — global floating mic that replaces the old
    full-screen /mobile/dictate navigation. Fixed bottom-right, above
