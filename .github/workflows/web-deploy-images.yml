@@ -38,9 +38,15 @@ on:
       - '.github/workflows/web-deploy-images.yml'
   workflow_dispatch:
 
+# Serialize runs on the same ref but NEVER cancel one in flight: this workflow
+# both builds AND deploys to production, so a quick follow-up push must not abort
+# a build/deploy mid-way (that is how the DELETE-report backend change silently
+# never reached prod and every authenticated DELETE returned 405 — the run was
+# cancelled by the next push before its deploy job ran). Queuing serially costs a
+# few CI minutes; losing a production deploy costs a broken feature.
 concurrency:
   group: web-deploy-images-${{ github.ref }}
-  cancel-in-progress: true
+  cancel-in-progress: false
 
 jobs:
   build:
