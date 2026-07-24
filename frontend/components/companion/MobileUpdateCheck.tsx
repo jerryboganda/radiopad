@@ -11,6 +11,7 @@
  */
 
 import { useCallback, useState } from 'react';
+import { DownloadCloud, RefreshCw } from 'lucide-react';
 import { isMobileSurface } from '@/lib/surface';
 import {
   checkMobileUpdate,
@@ -54,6 +55,7 @@ export default function MobileUpdateCheck() {
           target="_blank"
           rel="noreferrer"
         >
+          <DownloadCloud size={15} aria-hidden style={{ marginRight: 6, verticalAlign: -3 }} />
           {info.downloadUrl ? 'Download & install' : 'Open release page'}
         </a>
       </div>
@@ -69,6 +71,7 @@ export default function MobileUpdateCheck() {
   return (
     <div className="rp-mobile-update">
       <button className="subtle" type="button" onClick={check} disabled={phase === 'checking'}>
+        <RefreshCw size={13} aria-hidden style={{ marginRight: 6, verticalAlign: -2 }} className={phase === 'checking' ? 'rp-motion-spin' : undefined} />
         {label}
       </button>
     </div>

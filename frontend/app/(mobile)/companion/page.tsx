@@ -19,6 +19,14 @@
  */
 
 import { useCallback, useEffect, useRef, useState } from 'react';
+import {
+  ArrowRight,
+  ChevronRight,
+  HelpCircle,
+  Link2,
+  QrCode,
+  ShieldCheck,
+} from 'lucide-react';
 import { api, setActiveAuthToken, setCompanionBase } from '@/lib/api';
 import { setAuthToken } from '@/lib/secureAuth';
 import {
@@ -34,6 +42,63 @@ import { createRtcPeer, type RtcPeer } from '@/lib/companionRtc';
 import { createTypeDictationStreamer, type TypeDictationStreamer } from '@/lib/companionTypeDictation';
 import { formatDictation } from '@/lib/dictation/medicalFormat';
 import MobileUpdateCheck from '@/components/companion/MobileUpdateCheck';
+import CompanionSplash from '@/components/companion/CompanionSplash';
+import ThemeToggle from '@/components/ui/ThemeToggle';
+
+/** Decorative phone-scanning-QR mark for the pairing hero. Purely
+ * illustrative (aria-hidden by its caller) — hand-built SVG in the same
+ * isometric-plate style as AuthScaffold's ShowcaseMark, sized for a
+ * light card background instead of the dark auth aside. */
+function PairIllustration() {
+  return (
+    <svg viewBox="0 0 300 200" fill="none" xmlns="http://www.w3.org/2000/svg">
+      <defs>
+        <linearGradient id="comp-illus-plate" x1="0" y1="0" x2="1" y2="1">
+          <stop offset="0" stopColor="#5cb0ff" />
+          <stop offset="1" stopColor="#1f6fb8" />
+        </linearGradient>
+      </defs>
+      {/* laptop, back layer */}
+      <rect x="18" y="60" width="150" height="98" rx="10" fill="var(--bg-panel)" stroke="var(--border)" strokeWidth="1.5" />
+      <rect x="30" y="72" width="126" height="74" rx="4" fill="var(--bg-subtle)" />
+      <rect x="44" y="86" width="98" height="98" rx="10" fill="url(#comp-illus-plate)" opacity="0.14" />
+      {[0, 1, 2].map((i) => (
+        <rect key={i} x={58 + i * 4} y={100 + i * 4} width={70 - i * 8} height={70 - i * 8} rx={4} fill="none" stroke="url(#comp-illus-plate)" strokeWidth="1.4" opacity={0.35 + i * 0.15} />
+      ))}
+      <rect x="10" y="158" width="166" height="8" rx="3" fill="var(--border)" />
+      {/* phone, front layer */}
+      <g transform="translate(150 20)">
+        <rect x="0" y="0" width="112" height="168" rx="20" fill="var(--bg-panel)" stroke="var(--border)" strokeWidth="1.5" />
+        <rect x="7" y="9" width="98" height="150" rx="12" fill="var(--bg-subtle)" />
+        <rect x="24" y="26" width="64" height="64" rx="8" fill="#ffffff" stroke="url(#comp-illus-plate)" strokeWidth="2" />
+        {[16, 30, 44, 58, 72].map((x, i) => (
+          <rect key={x} x={x} y={40} width="4" height={i % 2 === 0 ? 36 : 24} fill="url(#comp-illus-plate)" opacity="0.85" />
+        ))}
+        <rect x="34" y="104" width="44" height="6" rx="3" fill="var(--border)" />
+        <rect x="34" y="116" width="30" height="6" rx="3" fill="var(--border)" />
+        <circle cx="56" cy="146" r="9" fill="none" stroke="var(--accent)" strokeWidth="2" />
+      </g>
+      {/* connecting signal arcs */}
+      <path d="M120 46 Q136 40 148 46" stroke="var(--accent)" strokeWidth="2" strokeLinecap="round" opacity="0.55" />
+      <path d="M116 56 Q136 46 152 56" stroke="var(--accent)" strokeWidth="2" strokeLinecap="round" opacity="0.35" />
+    </svg>
+  );
+}
+
+function CompanionTopbar() {
+  return (
+    <div className="rp-comp-topbar">
+      <div className="rp-comp-brand">
+        <span className="brand-mark" aria-hidden><span className="brand-mark-letter">R</span></span>
+        <span className="rp-comp-brand-text">
+          <span className="rp-comp-brand-name">RadioPad</span>
+          <span className="rp-comp-brand-kicker">AI-assisted radiology reporting</span>
+        </span>
+      </div>
+      <ThemeToggle />
+    </div>
+  );
+}
 
 function deviceName(): string {
   if (typeof navigator === 'undefined') return 'RadioPad phone';
@@ -71,6 +136,7 @@ export default function MobileCompanionPage() {
   const [pairing, setPairing] = useState(false);
   const [scanning, setScanning] = useState(false);
   const [showPaste, setShowPaste] = useState(false);
+  const [showHelp, setShowHelp] = useState(false);
   const [pasteText, setPasteText] = useState('');
   const [error, setError] = useState<string | null>(null);
   const [hostName, setHostName] = useState<string>('');
@@ -404,191 +470,261 @@ export default function MobileCompanionPage() {
   if (phase === 'pair' || phase === 'connecting') {
     const busy = pairing || phase === 'connecting';
     return (
-      <div className="rp-mobile">
-        <h1 className="rp-page-title">Pair with desktop</h1>
-        <p className="rp-page-sub">
-          Open a report on your RadioPad desktop, choose <strong>Pair phone</strong>, then
-          <strong> scan the QR</strong> shown there. Your phone becomes a wireless dictation mic for
-          that report — no sign-in needed.
-        </p>
-        {error && <div className="banner warn" role="alert">{error}</div>}
+      <div className="rp-comp-screen">
+        <CompanionSplash />
+        <CompanionTopbar />
+        <div className="rp-comp-body rp-stagger">
+          {scanning ? (
+            <>
+              <div className="rp-comp-hero">
+                <h1 className="rp-comp-title">Point at the QR</h1>
+                <p className="rp-comp-sub">Center the desktop&rsquo;s pairing QR code in the frame.</p>
+              </div>
+              <div className="rp-comp-scanwrap">
+                {/* eslint-disable-next-line jsx-a11y/media-has-caption */}
+                <video ref={videoRef} playsInline muted />
+                <div className="rp-comp-scan-frame" aria-hidden>
+                  <span /><span /><span /><span />
+                  <div className="rp-comp-scan-laser" />
+                </div>
+              </div>
+              {error && <div className="banner warn" role="alert" style={{ marginTop: 14 }}>{error}</div>}
+              <div className="rp-comp-actions" style={{ marginTop: 16 }}>
+                <button className="ghost" type="button" onClick={stopScan}>Cancel</button>
+              </div>
+            </>
+          ) : (
+            <>
+              <div className="rp-comp-hero">
+                <h1 className="rp-comp-title">
+                  Connect to
+                  <span className="rp-comp-title-accent">your desktop</span>
+                </h1>
+                <p className="rp-comp-sub">
+                  Pair with the RadioPad desktop app to turn your phone into a wireless dictation
+                  microphone for fast, accurate reporting.
+                </p>
+              </div>
 
-        {scanning ? (
-          <>
-            {/* eslint-disable-next-line jsx-a11y/media-has-caption */}
-            <video
-              ref={videoRef}
-              playsInline
-              muted
-              style={{ width: '100%', maxHeight: '60vh', borderRadius: 12, background: '#000', objectFit: 'cover' }}
-            />
-            <p className="rp-page-sub" style={{ textAlign: 'center' }}>Point the camera at the desktop QR…</p>
-            <button className="ghost" type="button" onClick={stopScan}>Cancel</button>
-          </>
-        ) : (
-          <>
-            <button className="primary" type="button" onClick={startScan} disabled={busy}>
-              {phase === 'connecting' ? 'Connecting…' : pairing ? 'Pairing…' : 'Scan QR to pair'}
-            </button>
-            <button
-              className="subtle"
-              type="button"
-              onClick={() => { setShowPaste((v) => !v); setError(null); }}
-              disabled={busy}
-            >
-              Can’t scan? Paste pairing link
-            </button>
-            {showPaste && (
-              <>
-                <textarea
-                  className="rp-input"
-                  rows={3}
-                  placeholder="Paste the pairing link shown under the desktop QR"
-                  aria-label="Pairing link"
-                  value={pasteText}
-                  onChange={(e) => setPasteText(e.target.value)}
-                  disabled={busy}
-                  style={{ width: '100%', fontFamily: 'monospace', fontSize: '0.85rem' }}
-                />
-                <button className="primary" type="button" onClick={pairFromPaste} disabled={busy || !pasteText.trim()}>
-                  Pair from link
+              <div className="rp-comp-illus" aria-hidden><PairIllustration /></div>
+
+              <div className="rp-comp-card">
+                <span className="rp-comp-card-icon"><Link2 size={20} aria-hidden /></span>
+                <span className="rp-comp-card-text">
+                  <span className="rp-comp-card-title">Secure pairing</span>
+                  <p className="rp-comp-card-sub">Scan the QR code shown in RadioPad on your desktop. No sign-in required.</p>
+                  <span className="rp-comp-badge"><ShieldCheck size={12} aria-hidden /> Encrypted &amp; private</span>
+                </span>
+              </div>
+
+              {error && <div className="banner warn" role="alert" style={{ marginBottom: 14 }}>{error}</div>}
+
+              <div className="rp-comp-actions">
+                <button className="primary rp-auth-submit" type="button" onClick={startScan} disabled={busy}>
+                  <QrCode className="rp-auth-submit-lead" size={18} aria-hidden />
+                  <span>{phase === 'connecting' ? 'Connecting…' : pairing ? 'Pairing…' : 'Scan QR to pair'}</span>
+                  <ArrowRight className="rp-auth-submit-trail" size={18} aria-hidden />
                 </button>
-              </>
-            )}
-          </>
-        )}
 
-        {!scanning && <MobileUpdateCheck />}
+                <button
+                  type="button"
+                  className="rp-auth-method"
+                  onClick={() => { setShowPaste((v) => !v); setError(null); }}
+                  disabled={busy}
+                >
+                  <span className="rp-auth-method-icon tone-blue"><Link2 size={19} aria-hidden /></span>
+                  <span className="rp-auth-method-text">
+                    <span className="rp-auth-method-title">Paste pairing link</span>
+                    <span className="rp-auth-method-sub">Can&rsquo;t scan? Enter the link from your desktop</span>
+                  </span>
+                  <ChevronRight className="rp-auth-method-chev" size={18} aria-hidden />
+                </button>
+
+                {showPaste && (
+                  <>
+                    <textarea
+                      className="rp-input"
+                      rows={3}
+                      placeholder="Paste the pairing link shown under the desktop QR"
+                      aria-label="Pairing link"
+                      value={pasteText}
+                      onChange={(e) => setPasteText(e.target.value)}
+                      disabled={busy}
+                      style={{ width: '100%', fontFamily: 'monospace', fontSize: '0.85rem' }}
+                    />
+                    <button className="primary" type="button" onClick={pairFromPaste} disabled={busy || !pasteText.trim()}>
+                      Pair from link
+                    </button>
+                  </>
+                )}
+
+                <button type="button" className="rp-auth-method" onClick={() => setShowHelp((v) => !v)}>
+                  <span className="rp-auth-method-icon tone-purple"><HelpCircle size={19} aria-hidden /></span>
+                  <span className="rp-auth-method-text">
+                    <span className="rp-auth-method-title">Need help?</span>
+                    <span className="rp-auth-method-sub">How pairing works</span>
+                  </span>
+                  <ChevronRight className="rp-auth-method-chev" size={18} aria-hidden />
+                </button>
+                {showHelp && (
+                  <p className="rp-comp-sub">
+                    Open a report on your RadioPad desktop, choose <strong>Pair phone</strong>, then scan
+                    the QR shown there. Your phone becomes a wireless dictation mic for that report.
+                  </p>
+                )}
+              </div>
+
+              <div className="rp-comp-footer"><MobileUpdateCheck /></div>
+            </>
+          )}
+        </div>
       </div>
     );
   }
 
   if (phase === 'ended') {
     return (
-      <div className="rp-mobile">
-        <h1 className="rp-page-title">Session ended</h1>
-        <p className="rp-page-sub">The desktop session closed. Scan again to keep dictating.</p>
-        <button className="primary" type="button" onClick={() => { setPhase('pair'); setPasteText(''); setError(null); }}>
-          Pair again
-        </button>
-        <MobileUpdateCheck />
+      <div className="rp-comp-screen">
+        <CompanionSplash />
+        <CompanionTopbar />
+        <div className="rp-comp-body rp-stagger">
+          <div className="rp-comp-hero">
+            <h1 className="rp-comp-title">Session ended</h1>
+            <p className="rp-comp-sub">The desktop session closed. Scan again to keep dictating.</p>
+          </div>
+          <div className="rp-comp-actions">
+            <button
+              className="primary rp-auth-submit"
+              type="button"
+              onClick={() => { setPhase('pair'); setPasteText(''); setError(null); }}
+            >
+              <QrCode className="rp-auth-submit-lead" size={18} aria-hidden />
+              <span>Pair again</span>
+              <ArrowRight className="rp-auth-submit-trail" size={18} aria-hidden />
+            </button>
+          </div>
+          <div className="rp-comp-footer"><MobileUpdateCheck /></div>
+        </div>
       </div>
     );
   }
 
   // phase === 'live'
   return (
-    <div className="rp-mobile">
-      <h1 className="rp-page-title">Dictating to {hostName || 'desktop'}</h1>
-      <p className="rp-page-sub">
-        {section ? <>Active section: <strong>{section}</strong></> : 'Tap the mic and speak — your voice is transcribed on the desktop.'}
-      </p>
+    <div className="rp-comp-screen">
+      <CompanionTopbar />
+      <div className="rp-mobile">
+        <h1 className="rp-page-title">Dictating to {hostName || 'desktop'}</h1>
+        <p className="rp-page-sub">
+          {section ? <>Active section: <strong>{section}</strong></> : 'Tap the mic and speak — your voice is transcribed on the desktop.'}
+        </p>
 
-      {error && <div className="banner warn" role="alert">{error}</div>}
+        {error && <div className="banner warn" role="alert">{error}</div>}
 
-      <div className="rp-companion-remote" role="group" aria-label="Dictation mode">
-        <button
-          className={inputMode === 'voice' ? 'primary' : 'ghost'}
-          type="button"
-          aria-pressed={inputMode === 'voice'}
-          onClick={() => switchMode('voice')}
-        >
-          Wi‑Fi mic
-        </button>
-        <button
-          className={inputMode === 'type' ? 'primary' : 'ghost'}
-          type="button"
-          aria-pressed={inputMode === 'type'}
-          onClick={() => switchMode('type')}
-        >
-          Keyboard voice
-        </button>
-      </div>
+        <div className="rp-companion-remote" role="group" aria-label="Dictation mode">
+          <button
+            className={inputMode === 'voice' ? 'primary' : 'ghost'}
+            type="button"
+            aria-pressed={inputMode === 'voice'}
+            onClick={() => switchMode('voice')}
+          >
+            Wi‑Fi mic
+          </button>
+          <button
+            className={inputMode === 'type' ? 'primary' : 'ghost'}
+            type="button"
+            aria-pressed={inputMode === 'type'}
+            onClick={() => switchMode('type')}
+          >
+            Keyboard voice
+          </button>
+        </div>
 
-      {inputMode === 'voice' ? (
-        link !== 'connected' ? (
-          <div className="banner" role="status">
-            {link === 'failed' ? (
-              <>Couldn’t reach your desktop over Wi‑Fi. Make sure both are on the <strong>same network</strong> and tap <strong>Retry</strong> on the desktop — or switch to <strong>Keyboard voice</strong> above, which works on any connection.</>
-            ) : (
-              <>Connecting to your desktop over Wi‑Fi…</>
-            )}
-          </div>
+        {inputMode === 'voice' ? (
+          link !== 'connected' ? (
+            <div className="banner" role="status">
+              {link === 'failed' ? (
+                <>Couldn’t reach your desktop over Wi‑Fi. Make sure both are on the <strong>same network</strong> and tap <strong>Retry</strong> on the desktop — or switch to <strong>Keyboard voice</strong> above, which works on any connection.</>
+              ) : (
+                <>Connecting to your desktop over Wi‑Fi…</>
+              )}
+            </div>
+          ) : (
+            <button
+              className={`rp-mic-btn${recording ? ' recording is-live' : ''}`}
+              type="button"
+              aria-pressed={recording}
+              onClick={toggleMic}
+            >
+              {recording ? (speaking ? 'Listening…' : 'Mic on — tap to stop') : 'Tap to dictate'}
+            </button>
+          )
         ) : (
-          <button
-            className={`rp-mic-btn${recording ? ' recording is-live' : ''}`}
-            type="button"
-            aria-pressed={recording}
-            onClick={toggleMic}
-          >
-            {recording ? (speaking ? 'Listening…' : 'Mic on — tap to stop') : 'Tap to dictate'}
-          </button>
-        )
-      ) : (
-        <>
-          <p className="rp-page-sub">
-            Tap the box, then press the <strong>mic key on your keyboard</strong> (Gboard voice
-            typing). Words appear on the desktop as you speak; a short pause inserts them.
-          </p>
-          <textarea
-            className="rp-input"
-            rows={5}
-            placeholder="Tap here, then press the mic on your keyboard…"
-            aria-label="Dictation text"
-            value={typedText}
-            onChange={(e) => onTypedChange(e.target.value)}
-            onFocus={() => sendCommand('ptt_start')}
-            onBlur={() => {
-              // Commit whatever is pending (existing streamer only — blur after a
-              // session ended must not resurrect a fresh streamer) and close the
-              // desktop "Listening" state.
-              composingRef.current = false;
-              typeStreamerRef.current?.commit();
-              sendCommand('ptt_stop');
-            }}
-            onCompositionStart={() => { composingRef.current = true; }}
-            onCompositionEnd={() => { composingRef.current = false; }}
-            autoCapitalize="sentences"
-            autoComplete="off"
-            spellCheck
-            style={{ width: '100%', fontSize: '1.05rem', lineHeight: 1.45 }}
-          />
-          <button
-            className="primary"
-            type="button"
-            onClick={insertTypedNow}
-            disabled={!typedText.trim()}
-          >
-            Insert into report now
-          </button>
-          {lastInserted && !typedText && (
-            <p className="rp-page-sub" role="status" aria-live="polite">
-              Inserted: “{lastInserted.length > 90 ? `${lastInserted.slice(0, 90)}…` : lastInserted}”
+          <>
+            <p className="rp-page-sub">
+              Tap the box, then press the <strong>mic key on your keyboard</strong> (Gboard voice
+              typing). Words appear on the desktop as you speak; a short pause inserts them.
             </p>
-          )}
-        </>
-      )}
+            <textarea
+              className="rp-input"
+              rows={5}
+              placeholder="Tap here, then press the mic on your keyboard…"
+              aria-label="Dictation text"
+              value={typedText}
+              onChange={(e) => onTypedChange(e.target.value)}
+              onFocus={() => sendCommand('ptt_start')}
+              onBlur={() => {
+                // Commit whatever is pending (existing streamer only — blur after a
+                // session ended must not resurrect a fresh streamer) and close the
+                // desktop "Listening" state.
+                composingRef.current = false;
+                typeStreamerRef.current?.commit();
+                sendCommand('ptt_stop');
+              }}
+              onCompositionStart={() => { composingRef.current = true; }}
+              onCompositionEnd={() => { composingRef.current = false; }}
+              autoCapitalize="sentences"
+              autoComplete="off"
+              spellCheck
+              style={{ width: '100%', fontSize: '1.05rem', lineHeight: 1.45 }}
+            />
+            <button
+              className="primary"
+              type="button"
+              onClick={insertTypedNow}
+              disabled={!typedText.trim()}
+            >
+              Insert into report now
+            </button>
+            {lastInserted && !typedText && (
+              <p className="rp-page-sub" role="status" aria-live="polite">
+                Inserted: “{lastInserted.length > 90 ? `${lastInserted.slice(0, 90)}…` : lastInserted}”
+              </p>
+            )}
+          </>
+        )}
 
-      <div className="rp-companion-remote" role="group" aria-label="Remote controls">
-        {REMOTE_COMMANDS.map((c) => (
-          <button key={c.command} className="ghost" type="button" onClick={() => sendCommand(c.command)}>
-            {c.label}
-          </button>
-        ))}
+        <div className="rp-companion-remote" role="group" aria-label="Remote controls">
+          {REMOTE_COMMANDS.map((c) => (
+            <button key={c.command} className="ghost" type="button" onClick={() => sendCommand(c.command)}>
+              {c.label}
+            </button>
+          ))}
+        </div>
+
+        <button
+          className="primary-ghost"
+          type="button"
+          onClick={() => sendCommand('generate_impression')}
+          style={{ width: '100%' }}
+        >
+          ✨ Generate impression (AI)
+        </button>
+
+        <button className="subtle" type="button" onClick={() => { teardown(); setPhase('ended'); }}>
+          End session
+        </button>
       </div>
-
-      <button
-        className="primary-ghost"
-        type="button"
-        onClick={() => sendCommand('generate_impression')}
-        style={{ width: '100%' }}
-      >
-        ✨ Generate impression (AI)
-      </button>
-
-      <button className="subtle" type="button" onClick={() => { teardown(); setPhase('ended'); }}>
-        End session
-      </button>
     </div>
   );
 }
