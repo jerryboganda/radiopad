@@ -1013,7 +1013,35 @@
 .rp-jobs { position: relative; }
 .rp-jobs-btn { position: relative; }
 
-/* Spinner ring shown around the icon while any job is queued/running. */
+/* --- Live "AI is working" treatment -------------------------------------
+   While any job is queued/running the icon button becomes unmistakably alive:
+   an AI-tinted face, a breathing halo that radiates outward, a sweeping ring,
+   and a gently shimmering sparkle. All four are driven by the same --color-ai
+   family, so light and dark resolve for free, and all four collapse to a single
+   calm opacity pulse under prefers-reduced-motion (see the block below). */
+.rp-jobs-btn.is-active {
+  color: var(--color-ai);
+  background: var(--color-ai-soft);
+  border-color: var(--color-ai-border);
+}
+/* Breathing halo. A pseudo-element (not box-shadow on the button) so it can
+   scale past the button box without nudging topbar layout. */
+.rp-jobs-btn.is-active::after {
+  content: '';
+  position: absolute;
+  inset: -2px;
+  border-radius: inherit;
+  border: 1px solid var(--color-ai);
+  opacity: 0;
+  animation: rp-jobs-halo 2s ease-out infinite;
+  pointer-events: none;
+}
+/* The sparkle itself breathes in step with the halo. */
+.rp-jobs-btn.is-active > svg {
+  animation: rp-jobs-shimmer 2s ease-in-out infinite;
+}
+
+/* Sweeping ring shown around the icon while any job is queued/running. */
 .rp-jobs-ring {
   position: absolute;
   inset: 4px;
@@ -1022,6 +1050,16 @@
   border-top-color: var(--color-ai);
   animation: rp-spin 0.9s linear infinite;
   pointer-events: none;
+}
+
+@keyframes rp-jobs-halo {
+  0% { transform: scale(1); opacity: 0.55; }
+  70% { transform: scale(1.45); opacity: 0; }
+  100% { transform: scale(1.45); opacity: 0; }
+}
+@keyframes rp-jobs-shimmer {
+  0%, 100% { opacity: 1; transform: scale(1); }
+  50% { opacity: 0.72; transform: scale(1.12); }
 }
 .rp-jobs-badge {
   position: absolute;
@@ -1035,7 +1073,14 @@
   text-align: center;
   color: var(--accent-fg);
 }
-.rp-jobs-badge.tone-active { background: var(--color-ai); }
+.rp-jobs-badge.tone-active {
+  background: var(--color-ai);
+  animation: rp-jobs-badge-pop 2s ease-in-out infinite;
+}
+@keyframes rp-jobs-badge-pop {
+  0%, 100% { transform: scale(1); }
+  50% { transform: scale(1.18); }
+}
 .rp-jobs-badge.tone-success { background: var(--color-success); }
 .rp-jobs-badge.tone-danger { background: var(--color-danger); }
 
@@ -1139,6 +1184,12 @@
     animation: rp-jobs-pulse 1.4s ease-in-out infinite;
     border-top-color: var(--color-ai);
   }
+  /* Keep the AI-tinted face (a static, motion-free "working" cue) but drop the
+     halo, shimmer, and badge pop entirely — motion is the accessibility issue,
+     colour is not. */
+  .rp-jobs-btn.is-active::after { animation: none; opacity: 0; }
+  .rp-jobs-btn.is-active > svg,
+  .rp-jobs-badge.tone-active { animation: none; }
   .rp-jobs-popover { animation: none; }
 }
 

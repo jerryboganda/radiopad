@@ -72,6 +72,13 @@ export interface Job {
   notified: boolean;
   /** A cancel was requested; hides the Cancel button until the poll confirms. */
   cancelRequested?: boolean;
+  /**
+   * Client-side in-flight work with NO server job id to poll (Rewrite/Regenerate:
+   * one awaited request). Tracked so the indicator animates while it runs, but
+   * excluded from the poll ticker, Cancel, and Retry — there is nothing to
+   * poll, cancel, or resubmit.
+   */
+  sync?: boolean;
 }
 
 /**
@@ -126,11 +133,26 @@ export interface JobsContextValue {
    *  reducer does for every other path. */
   trackExternal: (job: Omit<Job, 'dismissed' | 'seen' | 'notified' | 'attempt'> & { attempt?: number }) => void;
   /**
-   * Logs an AI action that has NO server-side job to poll — Rewrite/Regenerate
-   * runs as one synchronous request/response, not a durable job id. Added
-   * directly in its terminal state (never `queued`/`running`) so it can never
-   * enter the poll ticker, while still getting the same toast + notification-
-   * bell + AI-jobs-panel treatment as an async job finishing.
+   * Start tracking an AI action that has NO server-side job to poll —
+   * Rewrite/Regenerate runs as one awaited request/response, not a durable job
+   * id. Adds a `running` row (flagged `sync`, so the poll ticker, Cancel, and
+   * Retry all skip it) purely so the indicator animates and the panel shows the
+   * work while it is in flight. Returns the client job id — pass it to
+   * `settleSync` in a `finally` so a row can never be stranded as "running".
+   */
+  beginSync: (spec: { mode: string; reportId: string; report?: JobReportInfo }) => string;
+  /**
+   * Settle a `beginSync` row into its terminal state, firing the same toast +
+   * notification-bell + AI-jobs-panel treatment as an async job finishing.
+   */
+  settleSync: (
+    jobId: string,
+    result: { status: 'ok' | 'error'; error?: string; errorKind?: string },
+  ) => void;
+  /**
+   * One-shot convenience for an action that already finished: adds the row
+   * directly in its terminal state (never `queued`/`running`). Equivalent to a
+   * `beginSync` + immediate `settleSync`.
    */
   logSyncResult: (spec: {
     mode: string;

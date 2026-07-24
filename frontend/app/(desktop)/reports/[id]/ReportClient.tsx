@@ -868,6 +868,12 @@ export default function ReportPage() {
     const activeProviderId = rewriteProviderId || providerId;
     const providerName = providers.find((x) => x.id === activeProviderId)?.name;
     const actId = logActivity(`Rewrite (${modeLabel})`, sectionLabel);
+    // Rewrite has no server-side job id to poll (one awaited request), so track it
+    // as a client-side `sync` job: opened BEFORE the request so the top-right AI
+    // indicator animates for the whole time it is running, and settled in
+    // `finally` so it can never be stranded as "running".
+    const syncJobId = jobs.beginSync({ mode: 'rewrite', reportId: report.id, report: reportInfo() });
+    let syncResult: { status: 'ok' | 'error'; error?: string } = { status: 'ok' };
     try {
       if (isFull) {
         const originalSections: Partial<Record<keyof Report, string>> = {};
@@ -906,18 +912,16 @@ export default function ReportPage() {
         });
       }
       patchActivity(actId, { status: 'completed', provider: providerName });
-      // Rewrite has no server-side job id to poll (one awaited request, already
-      // resolved) — logged directly in its terminal state so it still shows up
-      // in the notifications bell AND the AI-jobs (sparkles) panel, same as any
-      // async generation finishing.
-      jobs.logSyncResult({ mode: 'rewrite', reportId: report.id, report: reportInfo(), status: 'ok' });
     } catch (e) {
       const err = e as { body?: { error?: string }; message: string };
       const msg = err.body?.error || err.message;
       setError(msg);
       patchActivity(actId, { status: 'failed', error: msg, provider: providerName });
-      jobs.logSyncResult({ mode: 'rewrite', reportId: report.id, report: reportInfo(), status: 'error', error: msg });
+      syncResult = { status: 'error', error: msg };
     } finally {
+      // Settling fires the same toast + notifications-bell entry + AI-jobs panel
+      // row as any async generation finishing.
+      jobs.settleSync(syncJobId, syncResult);
       setRewriteBusy(false);
     }
   }

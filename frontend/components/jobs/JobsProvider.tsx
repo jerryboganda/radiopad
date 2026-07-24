@@ -301,6 +301,9 @@ export default function JobsProvider({ children }: { children: ReactNode }) {
     (j: Job): boolean =>
       isActiveStatus(j.status) &&
       !j.dismissed &&
+      // `sync` rows are client-side in-flight work with no server job id —
+      // polling one would 404 and settle it as `lost` mid-request.
+      !j.sync &&
       (j.origin === 'local' ? !localStreamHealthyRef.current : !streamHealthyRef.current),
     [],
   );
@@ -349,26 +352,24 @@ export default function JobsProvider({ children }: { children: ReactNode }) {
   // (covers hydration and any state change that (re)introduces active work).
   useEffect(() => {
     if (!isDesktopSurface) return;
-    const hasActive = state.jobs.some((j) => isActiveStatus(j.status) && !j.dismissed);
+    const hasActive = state.jobs.some(needsPoll);
     if (hasActive && timerRef.current == null && !tickingRef.current) {
       timerRef.current = setTimeout(() => void runTick(), delayRef.current);
     }
-  }, [state.jobs, runTick]);
+  }, [state.jobs, runTick, needsPoll]);
 
   // Poll promptly when the tab returns to the foreground.
   useEffect(() => {
     if (!isDesktopSurface || typeof document === 'undefined') return;
     const onVis = () => {
       if (!document.hidden) {
-        const hasActive = stateRef.current.jobs.some(
-          (j) => isActiveStatus(j.status) && !j.dismissed,
-        );
+        const hasActive = stateRef.current.jobs.some(needsPoll);
         if (hasActive) kickTicker();
       }
     };
     document.addEventListener('visibilitychange', onVis);
     return () => document.removeEventListener('visibilitychange', onVis);
-  }, [kickTicker]);
+  }, [kickTicker, needsPoll]);
 
   // Stop the timer on unmount, and stop any in-flight tick from rescheduling.
   useEffect(() => {
@@ -568,6 +569,8 @@ export default function JobsProvider({ children }: { children: ReactNode }) {
     async (jobId: string): Promise<void> => {
       const job = stateRef.current.jobs.find((j) => j.id === jobId);
       if (!job || !isActiveStatus(job.status)) return;
+      // No server job id behind a `sync` row — nothing to cancel.
+      if (job.sync) return;
       dispatch({ type: 'CANCEL_REQUESTED', id: jobId });
       try {
         const res =
@@ -661,11 +664,57 @@ export default function JobsProvider({ children }: { children: ReactNode }) {
     [kickTicker],
   );
 
-  // Rewrite/Regenerate have no server job id at all — one awaited request,
-  // already resolved by the time the caller logs it. Added directly in its
-  // terminal state so `needsPoll` never selects it (isActiveStatus is false),
-  // while the existing "unnotified terminal job" effect still fires the same
-  // toast + notifications-bell entry + AI-jobs-panel row as any async job.
+  // Rewrite/Regenerate have no server job id at all — one awaited request. The
+  // row is added `running` (flagged `sync`, so `needsPoll` skips it — polling a
+  // client-only id would 404 and settle it as `lost` mid-request) purely so the
+  // indicator animates and the panel shows the work while it is in flight.
+  const beginSync = useCallback(
+    (spec: { mode: string; reportId: string; report?: Job['report'] }): string => {
+      const now = Date.now();
+      const id = `sync-${now}-${Math.random().toString(36).slice(2, 8)}`;
+      dispatch({
+        type: 'ADD',
+        job: {
+          id,
+          origin: 'hosted',
+          kind: 'ai',
+          mode: spec.mode,
+          reportId: spec.reportId,
+          report: spec.report,
+          status: 'running',
+          createdAt: now,
+          startedAt: now,
+          attempt: 1,
+          sync: true,
+          dismissed: false,
+          seen: false,
+          notified: false,
+        },
+      });
+      return id;
+    },
+    [],
+  );
+
+  // Settling to a terminal status lets the existing "unnotified terminal job"
+  // effect fire the same toast + notifications-bell entry as any async job.
+  const settleSync = useCallback(
+    (jobId: string, result: { status: 'ok' | 'error'; error?: string; errorKind?: string }) => {
+      dispatch({
+        type: 'UPDATE',
+        id: jobId,
+        patch: {
+          status: result.status,
+          completedAt: Date.now(),
+          error: result.error,
+          errorKind: result.errorKind,
+        },
+      });
+    },
+    [],
+  );
+
+  // One-shot for work that already finished: begin + settle in the same tick.
   const logSyncResult = useCallback(
     (spec: {
       mode: string;
@@ -675,28 +724,10 @@ export default function JobsProvider({ children }: { children: ReactNode }) {
       error?: string;
       errorKind?: string;
     }) => {
-      const now = Date.now();
-      const job: Job = {
-        id: `sync-${now}-${Math.random().toString(36).slice(2, 8)}`,
-        origin: 'hosted',
-        kind: 'ai',
-        mode: spec.mode,
-        reportId: spec.reportId,
-        report: spec.report,
-        status: spec.status,
-        createdAt: now,
-        startedAt: now,
-        completedAt: now,
-        error: spec.error,
-        errorKind: spec.errorKind,
-        attempt: 1,
-        dismissed: false,
-        seen: false,
-        notified: false,
-      };
-      dispatch({ type: 'ADD', job });
+      const id = beginSync({ mode: spec.mode, reportId: spec.reportId, report: spec.report });
+      settleSync(id, { status: spec.status, error: spec.error, errorKind: spec.errorKind });
     },
-    [],
+    [beginSync, settleSync],
   );
 
   const dismiss = useCallback((jobId: string) => dispatch({ type: 'DISMISS', id: jobId }), []);
@@ -706,6 +737,8 @@ export default function JobsProvider({ children }: { children: ReactNode }) {
 
   const canRetry = useCallback((job: Job): boolean => {
     if (job.status !== 'error' && job.status !== 'cancelled') return false;
+    // A `sync` row has no server job to re-submit — the caller owns the retry.
+    if (job.sync) return false;
     return job.origin === 'hosted' || localSpecs.current.has(job.id);
   }, []);
 
@@ -714,6 +747,8 @@ export default function JobsProvider({ children }: { children: ReactNode }) {
       jobs: visibleJobs(state),
       submit,
       trackExternal,
+      beginSync,
+      settleSync,
       logSyncResult,
       cancel,
       retry,
@@ -727,6 +762,8 @@ export default function JobsProvider({ children }: { children: ReactNode }) {
       state,
       submit,
       trackExternal,
+      beginSync,
+      settleSync,
       logSyncResult,
       cancel,
       retry,

@@ -246,7 +246,7 @@ function JobRow({
           <span className="rp-jobs-tokens">~{job.progress.tokens} tokens</span>
         ) : null}
         <div className="rp-jobs-item-actions">
-          {active && !job.cancelRequested && (
+          {active && !job.cancelRequested && !job.sync && (
             <button type="button" className="subtle" onClick={onCancel}>
               Cancel
             </button>
