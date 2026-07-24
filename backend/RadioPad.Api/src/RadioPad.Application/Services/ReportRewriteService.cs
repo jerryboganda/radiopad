@@ -1,3 +1,4 @@
+using System.Text.RegularExpressions;
 using RadioPad.Application.Abstractions;
 using RadioPad.Application.Dictation;
 using RadioPad.Domain.Entities;
@@ -76,12 +77,41 @@ public sealed class ReportRewriteService : IReportRewriteService
     {
         var (system, body) = BuildPrompt(report, mode, sections, instruction);
         var containsPhi = ReportingService.ContainsPhi(report) || ReportingService.ContainsPhiText(system, body);
-        var result = await _gateway.RouteAsync(tenant, new AiCompletionRequest(
-            Provider: provider,
-            SystemPrompt: system,
-            UserPrompt: body,
-            PromptVersion: PromptVersion,
-            ContainsPhi: containsPhi), ct);
+
+        // Hardening for UBAG's browser-automation Gemini session (deliberately RadioPad's ONLY
+        // report-writing provider — never substituted for a pinned API model, here or anywhere).
+        // The clinician-facing modes carry the consultant layout doctrine (ConsultantReportDoctrine
+        // .RewriteStyle), but the model has no pinned version, so compliance varies run to run.
+        // Deterministically check the rewritten FINDINGS/IMPRESSION sections and, on a violation,
+        // re-ask the SAME provider once more with the exact violations spelled out — see
+        // ConsultantOutputCompliance. PatientFriendly/ReferringSummary are deliberately excluded:
+        // their plain-language / one-paragraph output is never in the heading+bullet layout.
+        var checkLayout = mode is ReportRewriteMode.Concise or ReportRewriteMode.Formal or ReportRewriteMode.Custom;
+        AiResult result;
+        var attemptBody = body;
+        var attempt = 1;
+        while (true)
+        {
+            result = await _gateway.RouteAsync(tenant, new AiCompletionRequest(
+                Provider: provider,
+                SystemPrompt: system,
+                UserPrompt: attemptBody,
+                PromptVersion: PromptVersion,
+                ContainsPhi: containsPhi), ct);
+
+            if (!checkLayout) break;
+
+            var layoutViolations = ConsultantOutputCompliance.Check(
+                ExtractRewrittenSection(result.Text, "FINDINGS"),
+                ExtractRewrittenSection(result.Text, "IMPRESSION"));
+            if (layoutViolations.Count == 0 || attempt >= ConsultantOutputCompliance.MaxAttempts)
+                break;
+
+            attemptBody = body + ConsultantOutputCompliance.BuildReinforcement(layoutViolations,
+                "Output the edited report as plain text with the same section headings — do not switch to " +
+                "JSON, drop a heading, or omit any section that was in the original.");
+            attempt++;
+        }
 
         // F12 — the free-text Custom mode is the only path where the model acts on an arbitrary
         // instruction, so its output is hard-guarded by the §5.3 fabrication check: any measurement,
@@ -93,6 +123,23 @@ public sealed class ReportRewriteService : IReportRewriteService
 
         return new ReportRewriteResult(
             result.Text, result.Provider, result.Model, result.LatencyMs, result.PromptVersion, mode, violations);
+    }
+
+    /// <summary>
+    /// Pulls a named section's body out of a rewrite's plain-text output (the "HEADING:\n...\n\n"
+    /// shape the rewrite prompt itself specifies — see <see cref="Append"/>). Returns null when the
+    /// heading is absent, which the compliance check treats as "nothing to validate" rather than a
+    /// violation — a section the radiologist didn't include in the rewrite request is expected to
+    /// be missing from the output.
+    /// </summary>
+    private static string? ExtractRewrittenSection(string? text, string heading)
+    {
+        if (string.IsNullOrEmpty(text)) return null;
+        var match = Regex.Match(
+            text,
+            $@"^{heading}:\s*\n(?<body>.*?)(?=\n[A-Z][A-Z ]*:\s*\n|\z)",
+            RegexOptions.Multiline | RegexOptions.Singleline);
+        return match.Success ? match.Groups["body"].Value.Trim() : null;
     }
 
     /// <summary>§5.3 fabrication guard for a rewrite: reject any measurement/number/date the rewrite

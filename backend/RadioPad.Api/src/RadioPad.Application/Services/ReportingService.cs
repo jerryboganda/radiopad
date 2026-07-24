@@ -194,22 +194,57 @@ public class ReportingService
         var (system, _, userPrompt) = BuildStructuredPrompt(report, rulebook, overrides);
 
         var containsPhi = ContainsPhi(report) || ContainsPhiText(system, userPrompt);
-        var result = await _gateway.RouteAsync(tenant, new AiCompletionRequest(
-            Provider: provider,
-            SystemPrompt: system,
-            UserPrompt: userPrompt,
-            PromptVersion: PromptVersion,
-            ContainsPhi: containsPhi)
-        {
-            RulebookId = rulebookEntity?.Id,
-            RulebookVersion = rulebookEntity?.Version,
-            // AI-013 — stream the main whole-report body only. The GenerateMissingRecommendationsAsync
-            // backfill below deliberately stays non-streaming (a second text would interleave).
-            OnStream = hooks?.OnStream,
-            OnProviderJobCreated = hooks?.OnProviderJobCreated,
-        }, ct);
 
-        var shaped = ShapeStructuredResult(result.Text, result.Provider, result.Model, result.LatencyMs, result.PromptVersion);
+        // Hardening for UBAG's browser-automation Gemini session (deliberately RadioPad's ONLY
+        // report-writing provider — no pinned API model is ever substituted in): the model has no
+        // pinned version, so its adherence to the mandatory heading+bullet FINDINGS / numbered
+        // IMPRESSION layout varies run to run. Deterministically check the response and, on a
+        // violation, re-ask the SAME provider once more with the exact violations spelled out
+        // before shipping anything to the radiologist. See ConsultantOutputCompliance.
+        AiResult result;
+        StructuredReportResult shaped;
+        var attemptPrompt = userPrompt;
+        var attempt = 1;
+        while (true)
+        {
+            result = await _gateway.RouteAsync(tenant, new AiCompletionRequest(
+                Provider: provider,
+                SystemPrompt: system,
+                UserPrompt: attemptPrompt,
+                PromptVersion: PromptVersion,
+                ContainsPhi: containsPhi)
+            {
+                RulebookId = rulebookEntity?.Id,
+                RulebookVersion = rulebookEntity?.Version,
+                // AI-013 — stream the main whole-report body only, and only on the first attempt: a
+                // compliance retry re-issues the whole call, and re-streaming it into the same sink
+                // would look like the draft restarting mid-flight. The GenerateMissingRecommendationsAsync
+                // backfill below deliberately stays non-streaming (a second text would interleave).
+                OnStream = attempt == 1 ? hooks?.OnStream : null,
+                OnProviderJobCreated = hooks?.OnProviderJobCreated,
+            }, ct);
+
+            shaped = ShapeStructuredResult(result.Text, result.Provider, result.Model, result.LatencyMs, result.PromptVersion);
+            var violations = ConsultantOutputCompliance.Check(shaped.Findings, shaped.Impression);
+            if (violations.Count == 0 || attempt >= ConsultantOutputCompliance.MaxAttempts)
+            {
+                if (violations.Count > 0)
+                    _log.LogWarning(
+                        "Consultant-doctrine layout violation persisted after {Attempts} attempt(s) via {Provider}; " +
+                        "shipping the best available draft rather than blocking the clinical workflow: {Violations}",
+                        attempt, provider.Name, string.Join(" | ", violations));
+                break;
+            }
+
+            _log.LogWarning(
+                "Consultant-doctrine layout violation on generate attempt {Attempt}/{Max} via {Provider}; retrying " +
+                "the same provider with the violations spelled out: {Violations}",
+                attempt, ConsultantOutputCompliance.MaxAttempts, provider.Name, string.Join(" | ", violations));
+            attemptPrompt = userPrompt + ConsultantOutputCompliance.BuildReinforcement(violations,
+                "Return ONLY the raw JSON object in the schema already specified — no code fence, no prose outside it.");
+            attempt++;
+        }
+
         if (shaped.Recommendations.Length == 0)
         {
             var sections = ReportSectionJson.Parse(result.Text);
