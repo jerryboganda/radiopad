@@ -21,7 +21,7 @@ function baseProps(onRewrite: (mode: RewriteMode, instruction?: string) => void)
     showDictationDraft: false,
     onToggleFormatDraft: vi.fn(),
     canEdit: true,
-    busyAction: null,
+    activeActions: [],
     onGenerateDraft: vi.fn(),
     onGenerateImpression: vi.fn(),
     rewriteModes: [{ mode: 'concise', label: 'Concise', hint: 'shorter' }],

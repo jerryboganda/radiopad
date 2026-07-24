@@ -10,6 +10,7 @@ using RadioPad.Api.Controllers;
 using RadioPad.Api.Services;
 using RadioPad.Api.Tests.Providers;
 using RadioPad.Application.Abstractions;
+using RadioPad.Domain.ValueObjects;
 using RadioPad.Infrastructure.Providers.Local;
 using Xunit;
 

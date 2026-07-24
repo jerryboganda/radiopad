@@ -37,6 +37,10 @@ function ctx(jobs: Job[], over: Partial<JobsContextValue> = {}): JobsContextValu
   return {
     jobs,
     submit: vi.fn(),
+    trackExternal: vi.fn(),
+    beginSync: vi.fn(() => 'sync1'),
+    settleSync: vi.fn(),
+    logSyncResult: vi.fn(),
     cancel: vi.fn(),
     retry: vi.fn(),
     dismiss: vi.fn(),
