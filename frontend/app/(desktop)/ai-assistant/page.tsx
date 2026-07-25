@@ -1,21 +1,29 @@
 'use client';
 
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import Link from 'next/link';
 import {
   ArrowRight,
   BookOpenCheck,
+  Bot,
   Check,
+  CheckCircle2,
+  Clock,
+  Cloud,
+  Cpu,
   FileText,
-  Mic,
+  MoreHorizontal,
   RefreshCw,
+  Settings2,
   ShieldCheck,
   Sparkles,
+  TrendingUp,
+  Users,
   Wand2,
+  XCircle,
 } from 'lucide-react';
 import { api, COMPLIANCE_LABELS, type Provider } from '@/lib/api';
 import Container from '@/components/shell/Container';
-import PageHeader from '@/components/shell/PageHeader';
 import { TableSkeleton } from '@/components/ui/Skeleton';
 import EmptyState from '@/components/ui/EmptyState';
 import ErrorState from '@/components/ui/ErrorState';
@@ -25,28 +33,10 @@ import { useCrossCheckEnabled, useUseUbag } from '@/lib/dictation/crossCheckPref
 import type { SttMode } from '@/lib/api';
 
 /**
- * AI Assistant hub — one place to see the models the workspace can use,
- * what the AI has been doing lately, and the personal dictation /
- * cross-check preferences (same controls as the profile menu).
+ * AI Assistant hub — the models the workspace can use, what the AI has been
+ * doing lately, and the personal dictation / cross-check preferences (the same
+ * controls as the profile menu), with an at-a-glance summary on top.
  */
-export default function AiAssistantPage() {
-  return (
-    <Container>
-      <PageHeader
-        title="AI Assistant"
-        description="Your AI models, recent AI activity, and dictation preferences — all in one place."
-      />
-      <ProvidersPanel />
-      {/* Full-width stacked panels — a 50/50 split cramped the activity table and
-          the dictation controls; each panel is a self-spacing .rp-panel. */}
-      <RecentActivityPanel />
-      <DictationSettingsPanel />
-      <QuickLinksPanel />
-    </Container>
-  );
-}
-
-/* ── (a) AI providers ─────────────────────────────────────────────────── */
 
 // Same tone mapping as the admin models page: compliance class → badge tone.
 const COMPLIANCE_BADGE: Record<number, string> = {
@@ -58,20 +48,48 @@ const COMPLIANCE_BADGE: Record<number, string> = {
 };
 
 type HealthResult = 'checking' | 'healthy' | 'down';
+type Health = Record<string, { state: HealthResult; note?: string }>;
 
 function statusFromError(e: unknown): number | null {
   const s = (e as { status?: unknown }).status;
   return typeof s === 'number' ? s : null;
 }
 
-function ProvidersPanel() {
+/** Coarse provider family, used only to pick the card's icon and tint. */
+function providerKind(adapter: string): 'local' | 'ubag' | 'cloud' {
+  const a = adapter.toLowerCase();
+  if (a.includes('ubag')) return 'ubag';
+  if (a.includes('llama') || a.includes('local') || a.includes('onnx') || a.includes('gguf'))
+    return 'local';
+  return 'cloud';
+}
+
+/**
+ * A neutral glyph per provider family. Deliberately not vendor logos — shipping
+ * third-party marks in the bundle is a licensing question we do not need to open.
+ */
+function providerIcon(adapter: string) {
+  const a = adapter.toLowerCase();
+  if (providerKind(adapter) === 'local') return Cpu;
+  if (a.includes('gemini')) return Sparkles;
+  if (a.includes('chatgpt') || a.includes('openai') || a.includes('gpt')) return Bot;
+  if (a.includes('deepseek')) return Cloud;
+  return Cloud;
+}
+
+export default function AiAssistantPage() {
   const [providers, setProviders] = useState<Provider[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [noAccess, setNoAccess] = useState(false);
-  const [health, setHealth] = useState<Record<string, { state: HealthResult; note?: string }>>({});
+  const [health, setHealth] = useState<Health>({});
   // The radiologist's own default engine — personal, not an admin setting.
   const [preferredId, setPreferredId] = usePreferredProviderId();
+
+  const [events, setEvents] = useState<AuditEvent[]>([]);
+  const [eventsLoading, setEventsLoading] = useState(true);
+  const [eventsError, setEventsError] = useState<string | null>(null);
+  const [eventsNoAccess, setEventsNoAccess] = useState(false);
 
   const probe = useCallback((rows: Provider[]) => {
     const enabled = rows.filter((p) => p.enabled);
@@ -97,7 +115,7 @@ function ProvidersPanel() {
     }
   }, []);
 
-  const load = useCallback(() => {
+  const loadProviders = useCallback(() => {
     setLoading(true);
     setError(null);
     setNoAccess(false);
@@ -114,26 +132,169 @@ function ProvidersPanel() {
       .finally(() => setLoading(false));
   }, [probe]);
 
+  const loadEvents = useCallback(() => {
+    setEventsLoading(true);
+    setEventsError(null);
+    setEventsNoAccess(false);
+    api.audit
+      .query({ take: 200 })
+      .then((rows) => setEvents((rows as AuditEvent[]).filter(isAiEvent)))
+      .catch((e: Error) => {
+        if (statusFromError(e) === 403) setEventsNoAccess(true);
+        else setEventsError(e.message);
+      })
+      .finally(() => setEventsLoading(false));
+  }, []);
+
   useEffect(() => {
-    load();
-  }, [load]);
+    loadProviders();
+    loadEvents();
+  }, [loadProviders, loadEvents]);
+
+  const reachableCount = useMemo(
+    () => providers.filter((p) => p.enabled && health[p.id]?.state === 'healthy').length,
+    [providers, health],
+  );
+
+  const todayCount = useMemo(() => {
+    const today = new Date().toDateString();
+    return events.filter((e) => new Date(e.createdAt).toDateString() === today).length;
+  }, [events]);
+
+  const defaultCount = preferredId && providers.some((p) => p.id === preferredId) ? 1 : 0;
+
+  return (
+    <Container>
+      <div className="rp-ai-hero">
+        <div className="rp-ai-hero-main">
+          <div className="rp-ai-hero-icon" aria-hidden>
+            <Sparkles size={26} strokeWidth={1.6} />
+          </div>
+          <div className="rp-ai-hero-text">
+            <h1 className="rp-page-title">AI Assistant</h1>
+            <p className="rp-page-sub">
+              Your AI models, recent activity, and dictation preferences — all in one place.
+            </p>
+          </div>
+        </div>
+        <div className="rp-ai-hero-actions">
+          <button
+            type="button"
+            className="ghost"
+            onClick={() => {
+              probe(providers);
+              loadEvents();
+            }}
+            disabled={loading || providers.length === 0}
+          >
+            <RefreshCw size={14} strokeWidth={1.8} aria-hidden /> Re-check health
+          </button>
+        </div>
+      </div>
+
+      <div className="rp-ai-stats">
+        <StatCard kind="providers" icon={Users} value={providers.length} label="Providers" />
+        <StatCard kind="default" icon={CheckCircle2} value={defaultCount} label="Default engine" />
+        <StatCard kind="reachable" icon={Cloud} value={reachableCount} label="Reachable" />
+        <StatCard
+          kind="activity"
+          icon={TrendingUp}
+          value={todayCount}
+          label="Recent activity today"
+        />
+      </div>
+
+      <ProvidersPanel
+        providers={providers}
+        health={health}
+        loading={loading}
+        error={error}
+        noAccess={noAccess}
+        preferredId={preferredId}
+        onSetPreferred={setPreferredId}
+        onRetry={loadProviders}
+        onProbeOne={(p) => probe([p])}
+      />
+
+      <div className="rp-ai-cols">
+        <RecentActivityPanel
+          events={events}
+          loading={eventsLoading}
+          error={eventsError}
+          noAccess={eventsNoAccess}
+          onRetry={loadEvents}
+        />
+        <DictationSettingsPanel />
+      </div>
+
+      <QuickLinksPanel />
+    </Container>
+  );
+}
+
+function StatCard({
+  kind,
+  icon: Icon,
+  value,
+  label,
+}: {
+  kind: string;
+  icon: typeof Users;
+  value: number;
+  label: string;
+}) {
+  return (
+    <div className="rp-ai-stat">
+      <div className={`rp-ai-stat-icon ${kind}`} aria-hidden>
+        <Icon size={19} strokeWidth={1.8} />
+      </div>
+      <div className="rp-ai-stat-body">
+        <div className="rp-ai-stat-value">{value}</div>
+        <div className="rp-ai-stat-label">{label}</div>
+      </div>
+    </div>
+  );
+}
+
+/* ── (a) AI providers ─────────────────────────────────────────────────── */
+
+/** How many provider cards the strip shows before "View all providers". */
+const PROVIDER_PREVIEW = 5;
+
+function ProvidersPanel({
+  providers,
+  health,
+  loading,
+  error,
+  noAccess,
+  preferredId,
+  onSetPreferred,
+  onRetry,
+  onProbeOne,
+}: {
+  providers: Provider[];
+  health: Health;
+  loading: boolean;
+  error: string | null;
+  noAccess: boolean;
+  preferredId: string;
+  onSetPreferred: (id: string) => void;
+  onRetry: () => void;
+  onProbeOne: (p: Provider) => void;
+}) {
+  const [showAll, setShowAll] = useState(false);
+  const visible = showAll ? providers : providers.slice(0, PROVIDER_PREVIEW);
 
   return (
     <div className="rp-panel rp-anim-fade-in-up" aria-live="polite" aria-busy={loading}>
-      <div className="rp-row" style={{ justifyContent: 'space-between', alignItems: 'baseline' }}>
+      <div className="rp-ai-panel-head">
         <div className="rp-panel-title">AI providers</div>
-        {!loading && !noAccess && providers.length > 0 && (
-          <button className="subtle" onClick={() => probe(providers)}>
-            <RefreshCw size={13} strokeWidth={1.8} aria-hidden /> Re-check health
+        {!loading && !noAccess && providers.length > PROVIDER_PREVIEW && (
+          <button type="button" className="rp-ai-link" onClick={() => setShowAll((v) => !v)}>
+            {showAll ? 'Show fewer' : `View all providers (${providers.length})`}
           </button>
         )}
       </div>
-      {!loading && !noAccess && providers.length > 0 && (
-        <p className="rp-page-sub" style={{ marginTop: 0 }}>
-          Pick the engine your reports use — a cloud provider, UBAG, or an on-device model.
-          This is your personal default; you can still switch per report in the editor.
-        </p>
-      )}
 
       {loading ? (
         <TableSkeleton rows={3} cols={3} />
@@ -144,63 +305,132 @@ function ProvidersPanel() {
           description="You don't have permission to view the model list here. The AI features on your reports keep working as usual."
         />
       ) : error ? (
-        <ErrorState title="Couldn't load AI providers" message={error} onRetry={load} />
+        <ErrorState title="Couldn't load AI providers" message={error} onRetry={onRetry} />
       ) : providers.length === 0 ? (
         <EmptyState
           title="No AI models configured yet"
           description="Ask a workspace administrator to add a model before using AI drafting."
         />
       ) : (
-        <div className="rp-card-grid">
-          {providers.map((p) => {
-            const h = p.enabled ? health[p.id] : undefined;
-            return (
-              <div key={p.id} className="rp-card">
-                <div className="rp-card-head">
-                  <p className="rp-card-title">{p.name}</p>
-                  <HealthBadge enabled={p.enabled} health={h} />
-                </div>
-                <p className="rp-card-meta">
-                  {p.adapter}
-                  {p.model ? ` · ${p.model}` : ''}
-                </p>
-                <div className="rp-row" style={{ gap: 6, flexWrap: 'wrap' }}>
-                  <span className={`badge ${COMPLIANCE_BADGE[p.compliance] ?? ''}`}>
-                    {COMPLIANCE_LABELS[p.compliance] ?? 'Unknown'}
-                  </span>
-                  {p.retentionLabel && <span className="badge">{p.retentionLabel}</span>}
-                </div>
-                {h?.state === 'down' && h.note && (
-                  <p className="rp-card-meta" style={{ marginTop: 4 }}>{h.note}</p>
-                )}
-                {p.enabled && (
-                  <div className="rp-row" style={{ marginTop: 8 }}>
-                    {preferredId === p.id ? (
-                      <button
-                        className="subtle"
-                        aria-pressed="true"
-                        title="This is your default engine. Click to clear and fall back to the workspace default."
-                        onClick={() => setPreferredId('')}
-                      >
-                        <Check size={13} strokeWidth={2} aria-hidden /> My default engine
-                      </button>
-                    ) : (
-                      <button
-                        className="subtle"
-                        aria-pressed="false"
-                        title="New reports will start on this engine (you can still switch per report)"
-                        onClick={() => setPreferredId(p.id)}
-                      >
-                        Set as my default
-                      </button>
-                    )}
-                  </div>
-                )}
-              </div>
-            );
-          })}
+        <div className="rp-ai-providers">
+          {visible.map((p) => (
+            <ProviderCard
+              key={p.id}
+              provider={p}
+              health={p.enabled ? health[p.id] : undefined}
+              isDefault={preferredId === p.id}
+              onSetPreferred={onSetPreferred}
+              onProbe={() => onProbeOne(p)}
+            />
+          ))}
         </div>
       )}
+    </div>
+  );
+}
+
+function ProviderCard({
+  provider: p,
+  health: h,
+  isDefault,
+  onSetPreferred,
+  onProbe,
+}: {
+  provider: Provider;
+  health?: { state: HealthResult; note?: string };
+  isDefault: boolean;
+  onSetPreferred: (id: string) => void;
+  onProbe: () => void;
+}) {
+  const [menuOpen, setMenuOpen] = useState(false);
+  const Icon = providerIcon(p.adapter);
+  const kind = providerKind(p.adapter);
+
+  return (
+    <div className={`rp-ai-provider${isDefault ? ' is-default' : ''}`}>
+      <div className="rp-ai-provider-head">
+        <div className="rp-ai-provider-icon" data-kind={kind} aria-hidden>
+          <Icon size={16} strokeWidth={1.8} />
+        </div>
+        <div style={{ minWidth: 0 }}>
+          <p className="rp-ai-provider-name">{p.name}</p>
+          <div className="rp-ai-provider-sub">
+            {p.adapter}
+            {p.model ? ` · ${p.model}` : ''}
+          </div>
+        </div>
+        <div className="rp-ai-provider-menu">
+          <button
+            type="button"
+            className="ghost"
+            onClick={() => setMenuOpen((v) => !v)}
+            aria-expanded={menuOpen}
+            aria-label={`More actions for ${p.name}`}
+          >
+            <MoreHorizontal size={15} strokeWidth={1.8} aria-hidden />
+          </button>
+          {menuOpen && (
+            <div className="rp-ai-provider-menu-list" role="menu">
+              <button
+                type="button"
+                role="menuitem"
+                onClick={() => {
+                  setMenuOpen(false);
+                  onProbe();
+                }}
+                disabled={!p.enabled}
+              >
+                Re-check this provider
+              </button>
+              {isDefault && (
+                <button
+                  type="button"
+                  role="menuitem"
+                  onClick={() => {
+                    setMenuOpen(false);
+                    onSetPreferred('');
+                  }}
+                >
+                  Clear my default
+                </button>
+              )}
+            </div>
+          )}
+        </div>
+      </div>
+
+      <div className="rp-row" style={{ gap: 6, flexWrap: 'wrap' }}>
+        <HealthBadge enabled={p.enabled} health={h} />
+        <span className={`badge ${COMPLIANCE_BADGE[p.compliance] ?? ''}`}>
+          {COMPLIANCE_LABELS[p.compliance] ?? 'Unknown'}
+        </span>
+        {p.retentionLabel && <span className="badge">{p.retentionLabel}</span>}
+      </div>
+
+      {h?.state === 'down' && h.note && <p className="rp-ai-provider-note">{h.note}</p>}
+
+      {p.enabled &&
+        (isDefault ? (
+          <button
+            type="button"
+            className="primary-ghost rp-ai-provider-btn"
+            aria-pressed="true"
+            title="This is your default engine. Click to clear and fall back to the workspace default."
+            onClick={() => onSetPreferred('')}
+          >
+            <Check size={14} strokeWidth={2} aria-hidden /> My default engine
+          </button>
+        ) : (
+          <button
+            type="button"
+            className="ghost rp-ai-provider-btn"
+            aria-pressed="false"
+            title="New reports will start on this engine (you can still switch per report)"
+            onClick={() => onSetPreferred(p.id)}
+          >
+            Set as default
+          </button>
+        ))}
     </div>
   );
 }
@@ -212,12 +442,10 @@ function HealthBadge({
   enabled: boolean;
   health?: { state: HealthResult; note?: string };
 }) {
-  if (!enabled) return <span className="status-badge" data-tone="muted">Off</span>;
-  if (!health || health.state === 'checking')
-    return <span className="status-badge" data-tone="review">Checking</span>;
-  if (health.state === 'healthy')
-    return <span className="status-badge" data-tone="ready">Healthy</span>;
-  return <span className="status-badge" data-tone="blocked">Unreachable</span>;
+  if (!enabled) return <span className="badge">Off</span>;
+  if (!health || health.state === 'checking') return <span className="badge warn">Checking</span>;
+  if (health.state === 'healthy') return <span className="badge ok">Reachable</span>;
+  return <span className="badge danger">Unreachable</span>;
 }
 
 /* ── (b) Recent AI activity ───────────────────────────────────────────── */
@@ -229,6 +457,27 @@ type AuditEvent = {
   action: number | string;
   detailsJson: string;
   createdAt: string;
+};
+
+/**
+ * The subset of `detailsJson` keys the AI paths actually write (AiGateway,
+ * ReportsLifecycleController rewrite, UbagController). Everything the activity
+ * table shows comes from here — nothing is invented.
+ */
+type AiDetails = {
+  provider?: string;
+  adapter?: string;
+  model?: string;
+  kind?: string;
+  eventType?: string;
+  target?: string;
+  mode?: string;
+  sections?: string[];
+  status?: string;
+  reason?: string;
+  message?: string;
+  error?: string;
+  latencyMs?: number;
 };
 
 // Numeric action codes that are AI-related (see the Activity log page map).
@@ -250,10 +499,22 @@ const AI_ACTION_TONE: Record<number, string> = {
 
 const AI_STRING_TOKENS = ['airequest', 'airesponse', 'providerblocked', 'providerconfigured', 'policyviolation', 'sandbox', 'prompt'];
 
+const ACTIVITY_LIMIT = 8;
+
 function isAiEvent(e: AuditEvent): boolean {
   if (typeof e.action === 'number') return e.action in AI_ACTION_LABEL;
   const a = String(e.action).toLowerCase();
   return AI_STRING_TOKENS.some((t) => a.includes(t));
+}
+
+function parseDetails(json: string): AiDetails {
+  if (!json) return {};
+  try {
+    const parsed = JSON.parse(json) as unknown;
+    return parsed && typeof parsed === 'object' ? (parsed as AiDetails) : {};
+  } catch {
+    return {};
+  }
 }
 
 function actionLabel(action: number | string): string {
@@ -269,47 +530,91 @@ function actionTone(action: number | string): string {
   return 'info';
 }
 
-function detailsSnippet(json: string): string {
-  if (!json) return '';
-  const flat = json.replace(/\s+/g, ' ').trim();
-  return flat.length > 90 ? `${flat.slice(0, 90)}…` : flat;
+/**
+ * The event chip. A rewrite and a cross-check are both audited as generic
+ * AI request/response rows, so the specific kind has to come out of the
+ * details payload — `kind` for rewrites, `eventType` for UBAG cross-checks.
+ */
+function eventLabel(e: AuditEvent, d: AiDetails): string {
+  if (d.kind === 'rewrite') return 'Rewrite';
+  const et = (d.eventType ?? '').toLowerCase();
+  if (et.includes('cross')) return 'Cross-check';
+  if (et.includes('compare')) return 'Compare';
+  return actionLabel(e.action);
 }
 
-function RecentActivityPanel() {
-  const [events, setEvents] = useState<AuditEvent[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
-  const [noAccess, setNoAccess] = useState(false);
+function eventTone(e: AuditEvent, d: AiDetails): string {
+  if (d.kind === 'rewrite') return 'warn';
+  if ((d.eventType ?? '').toLowerCase().includes('cross')) return 'ai';
+  return actionTone(e.action);
+}
 
-  const load = useCallback(() => {
-    setLoading(true);
-    setError(null);
-    setNoAccess(false);
-    api.audit
-      .query({ take: 200 })
-      .then((rows) => setEvents((rows as AuditEvent[]).filter(isAiEvent).slice(0, 15)))
-      .catch((e: Error) => {
-        if (statusFromError(e) === 403) setNoAccess(true);
-        else setError(e.message);
-      })
-      .finally(() => setLoading(false));
-  }, []);
+/** A one-line human description built only from keys the audit row actually has. */
+function detailsText(d: AiDetails): string {
+  if (d.reason) return d.reason;
+  if (d.message) return d.message;
+  if (d.kind === 'rewrite') {
+    const mode = d.mode ? `${d.mode} rewrite` : 'Section rewrite';
+    return d.sections?.length ? `${mode} · ${d.sections.join(', ')}` : mode;
+  }
+  if (d.eventType) return d.target ? `${d.eventType} · ${d.target}` : d.eventType;
+  const bits: string[] = [];
+  if (d.model) bits.push(d.model);
+  if (typeof d.latencyMs === 'number') bits.push(`${d.latencyMs} ms`);
+  return bits.join(' · ');
+}
 
-  useEffect(() => {
-    load();
-  }, [load]);
+/**
+ * Outcome for the Status column. UBAG rows carry an explicit `status`;
+ * everything else is inferred from the audit action, and an AI *request* is
+ * reported as "Sent" rather than "Success" — the request row is written before
+ * the call returns, so it does not know the outcome.
+ */
+function outcome(e: AuditEvent, d: AiDetails): { label: string; tone: 'ok' | 'warn' | 'bad' | 'muted' } {
+  if (d.status) {
+    const s = d.status.toLowerCase();
+    if (s === 'ok' || s === 'success' || s === 'completed') return { label: 'Success', tone: 'ok' };
+    if (s === 'blocked') return { label: 'Blocked', tone: 'warn' };
+    if (s === 'error' || s === 'failed') return { label: 'Failed', tone: 'bad' };
+    return { label: d.status, tone: 'muted' };
+  }
+  const a = typeof e.action === 'number' ? e.action : -1;
+  if (a === 1) return { label: 'Success', tone: 'ok' };
+  if (a === 5) return { label: 'Blocked', tone: 'warn' };
+  if (a === 9) return { label: 'Failed', tone: 'bad' };
+  if (a === 0) return { label: 'Sent', tone: 'muted' };
+  return { label: '—', tone: 'muted' };
+}
+
+function RecentActivityPanel({
+  events,
+  loading,
+  error,
+  noAccess,
+  onRetry,
+}: {
+  events: AuditEvent[];
+  loading: boolean;
+  error: string | null;
+  noAccess: boolean;
+  onRetry: () => void;
+}) {
+  const rows = events.slice(0, ACTIVITY_LIMIT);
 
   return (
     <div className="rp-panel rp-anim-fade-in-up" aria-live="polite" aria-busy={loading}>
-      <div className="rp-row" style={{ justifyContent: 'space-between', alignItems: 'baseline' }}>
-        <div className="rp-panel-title">Recent AI activity</div>
-        <Link className="subtle" href="/audit" style={{ textDecoration: 'none' }}>
-          Full activity log
+      <div className="rp-ai-panel-head">
+        <div className="rp-ai-panel-title-row">
+          <Clock size={15} strokeWidth={1.8} aria-hidden />
+          <div className="rp-panel-title">Recent AI activity</div>
+        </div>
+        <Link className="rp-ai-link" href="/audit">
+          View full activity log
         </Link>
       </div>
 
       {loading ? (
-        <TableSkeleton rows={5} cols={3} />
+        <TableSkeleton rows={5} cols={4} />
       ) : noAccess ? (
         <EmptyState
           icon={<ShieldCheck size={18} strokeWidth={1.6} aria-hidden />}
@@ -317,8 +622,8 @@ function RecentActivityPanel() {
           description="You don't have permission to view workspace activity. Ask an administrator if you need access."
         />
       ) : error ? (
-        <ErrorState title="Couldn't load AI activity" message={error} onRetry={load} />
-      ) : events.length === 0 ? (
+        <ErrorState title="Couldn't load AI activity" message={error} onRetry={onRetry} />
+      ) : rows.length === 0 ? (
         <EmptyState
           icon={<Sparkles size={18} strokeWidth={1.6} aria-hidden />}
           title="No AI activity yet"
@@ -329,21 +634,40 @@ function RecentActivityPanel() {
           <table className="rp-table">
             <thead>
               <tr>
-                <th>When</th>
+                <th>Time</th>
                 <th>Event</th>
-                <th>Details</th>
+                <th>Provider</th>
+                <th>Action / Details</th>
+                <th>Status</th>
               </tr>
             </thead>
             <tbody>
-              {events.map((e) => (
-                <tr key={e.id}>
-                  <td style={{ whiteSpace: 'nowrap' }}>{new Date(e.createdAt).toLocaleString()}</td>
-                  <td>
-                    <span className={`badge ${actionTone(e.action)}`}>{actionLabel(e.action)}</span>
-                  </td>
-                  <td className="rp-faint">{detailsSnippet(e.detailsJson) || '—'}</td>
-                </tr>
-              ))}
+              {rows.map((e) => {
+                const d = parseDetails(e.detailsJson);
+                const o = outcome(e, d);
+                return (
+                  <tr key={e.id}>
+                    <td style={{ whiteSpace: 'nowrap' }}>
+                      {new Date(e.createdAt).toLocaleString()}
+                    </td>
+                    <td>
+                      <span className={`badge ${eventTone(e, d)}`}>{eventLabel(e, d)}</span>
+                    </td>
+                    <td style={{ whiteSpace: 'nowrap' }}>{d.provider ?? '—'}</td>
+                    <td className="rp-faint">{detailsText(d) || '—'}</td>
+                    <td>
+                      <span className="rp-ai-activity-status" data-tone={o.tone}>
+                        {o.tone === 'ok' ? (
+                          <CheckCircle2 size={13} strokeWidth={2} aria-hidden />
+                        ) : o.tone === 'bad' ? (
+                          <XCircle size={13} strokeWidth={2} aria-hidden />
+                        ) : null}
+                        {o.label}
+                      </span>
+                    </td>
+                  </tr>
+                );
+              })}
             </tbody>
           </table>
         </div>
@@ -370,22 +694,37 @@ function SettingRow({
   control: React.ReactNode;
 }) {
   return (
-    <div
-      className="rp-row"
-      style={{
-        justifyContent: 'space-between',
-        alignItems: 'flex-start',
-        gap: 16,
-        padding: '12px 0',
-        borderTop: '1px solid var(--border-soft)',
-      }}
-    >
-      <div style={{ minWidth: 0 }}>
-        <div className="text-ink" style={{ fontWeight: 600, fontSize: 14 }}>{label}</div>
-        <p className="rp-page-sub" style={{ margin: '2px 0 0' }}>{description}</p>
+    <div className="rp-ai-setting">
+      <div className="rp-ai-setting-text">
+        <div className="rp-ai-setting-label">{label}</div>
+        <p className="rp-ai-setting-desc">{description}</p>
       </div>
-      <div style={{ flexShrink: 0 }}>{control}</div>
+      <div className="rp-ai-setting-control">{control}</div>
     </div>
+  );
+}
+
+function Switch({
+  checked,
+  disabled,
+  onChange,
+  label,
+}: {
+  checked: boolean;
+  disabled?: boolean;
+  onChange: (next: boolean) => void;
+  label: string;
+}) {
+  return (
+    <button
+      type="button"
+      role="switch"
+      aria-checked={checked}
+      aria-label={label}
+      disabled={disabled}
+      className="rp-ai-switch"
+      onClick={() => onChange(!checked)}
+    />
   );
 }
 
@@ -396,23 +735,22 @@ function DictationSettingsPanel() {
 
   return (
     <div className="rp-panel rp-anim-fade-in-up">
-      <div className="rp-row" style={{ gap: 8, alignItems: 'baseline' }}>
-        <Mic size={15} strokeWidth={1.8} aria-hidden />
-        <div className="rp-panel-title" style={{ marginBottom: 0 }}>Dictation &amp; cross-check</div>
+      <div className="rp-ai-panel-head">
+        <div className="rp-ai-panel-title-row">
+          <Settings2 size={15} strokeWidth={1.8} aria-hidden />
+          <div className="rp-panel-title">Dictation &amp; cross-check preferences</div>
+        </div>
       </div>
-      <p className="rp-page-sub" style={{ marginTop: 4 }}>
-        These are your personal preferences — the same ones in the profile menu.
-      </p>
 
       <SettingRow
         label="Speech recognition mode"
-        description="Auto picks the best on-device setup for your machine. Dual engine runs two engines at once for extra accuracy (uses more CPU and RAM)."
+        description="Auto picks the best on-device setup for your machine."
         control={
-          <div className="rp-row" style={{ gap: 6, flexWrap: 'wrap' }}>
+          <div className="rp-ai-segmented" role="group" aria-label="Speech recognition mode">
             {STT_MODES.map((m) => (
               <button
                 key={m}
-                className={`ghost${mode === m ? ' active' : ''}`}
+                type="button"
                 onClick={() => setMode(m)}
                 aria-pressed={mode === m}
               >
@@ -425,47 +763,34 @@ function DictationSettingsPanel() {
 
       <SettingRow
         label="Dual-engine cross-check"
-        description="Cross-check each dictation with a second on-device engine and flag disagreements for review."
+        description="Cross-check each dictation with a second on-device engine."
         control={
-          <label className="rp-row" style={{ gap: 8, cursor: 'pointer' }}>
-            <input
-              type="checkbox"
-              checked={mode === 'ensemble'}
-              onChange={(e) => setMode(e.target.checked ? 'ensemble' : 'single')}
-            />
-            <span className="rp-page-sub">{mode === 'ensemble' ? 'On' : 'Off'}</span>
-          </label>
+          <Switch
+            checked={mode === 'ensemble'}
+            onChange={(next) => setMode(next ? 'ensemble' : 'single')}
+            label="Dual-engine cross-check"
+          />
         }
       />
 
       <SettingRow
-        label="Manual Cross Check"
-        description="Show a Cross Check button that re-runs a dictation through extra engines plus a medical-AI review, highlighting suggested corrections."
+        label="Manual cross check"
+        description="Re-run a dictation through extra engines and highlight suggestions."
         control={
-          <label className="rp-row" style={{ gap: 8, cursor: 'pointer' }}>
-            <input
-              type="checkbox"
-              checked={ccEnabled}
-              onChange={(e) => setCcEnabled(e.target.checked)}
-            />
-            <span className="rp-page-sub">{ccEnabled ? 'On' : 'Off'}</span>
-          </label>
+          <Switch checked={ccEnabled} onChange={setCcEnabled} label="Manual cross check" />
         }
       />
 
       <SettingRow
         label="Cross Check via UBAG (no PHI)"
-        description="Also route the medical-accuracy review through the UBAG cloud AI. Only use on text with no patient-identifying information."
+        description="Route the medical-accuracy review through the UBAG cloud AI."
         control={
-          <label className="rp-row" style={{ gap: 8, cursor: ccEnabled ? 'pointer' : 'not-allowed' }}>
-            <input
-              type="checkbox"
-              checked={ccUbag}
-              disabled={!ccEnabled}
-              onChange={(e) => setCcUbag(e.target.checked)}
-            />
-            <span className="rp-page-sub">{ccUbag ? 'On' : 'Off'}</span>
-          </label>
+          <Switch
+            checked={ccUbag}
+            disabled={!ccEnabled}
+            onChange={setCcUbag}
+            label="Cross check via UBAG"
+          />
         }
       />
     </div>
@@ -499,17 +824,17 @@ function QuickLinksPanel() {
   return (
     <div className="rp-panel rp-anim-fade-in-up">
       <div className="rp-panel-title">Build with AI</div>
-      <div className="rp-card-grid">
+      <div className="rp-ai-links">
         {QUICK_LINKS.map(({ href, title, description, icon: Icon }) => (
-          <Link key={href} href={href} className="rp-card" style={{ textDecoration: 'none' }}>
-            <div className="rp-card-head">
-              <p className="rp-card-title rp-row" style={{ gap: 8 }}>
-                <Icon size={15} strokeWidth={1.8} aria-hidden />
-                {title}
-              </p>
-              <ArrowRight size={15} strokeWidth={1.8} aria-hidden className="text-ink-soft" />
+          <Link key={href} href={href} className="rp-ai-link-card">
+            <div className="rp-ai-link-icon" aria-hidden>
+              <Icon size={20} strokeWidth={1.7} />
             </div>
-            <p className="rp-card-meta">{description}</p>
+            <div className="rp-ai-link-body">
+              <p className="rp-ai-link-title">{title}</p>
+              <p className="rp-ai-link-desc">{description}</p>
+            </div>
+            <ArrowRight size={16} strokeWidth={1.8} aria-hidden className="rp-ai-link-arrow" />
           </Link>
         ))}
       </div>

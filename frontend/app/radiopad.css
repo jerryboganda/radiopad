@@ -4926,3 +4926,261 @@
   font: 400 13px/1.5 var(--sans);
 }
 .rp-fl-modal-foot { display: flex; align-items: center; justify-content: flex-end; gap: 8px; margin-top: 6px; }
+
+/* ---------------------------------------------------------------------------
+   AI Assistant (/ai-assistant)
+   Hub layout: hero + at-a-glance stats, a provider strip, then activity and
+   dictation preferences side by side. Page-scoped .rp-ai-* so the shared panel
+   and card classes stay unchanged elsewhere.
+   ------------------------------------------------------------------------- */
+.rp-ai-hero {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 16px;
+  margin-bottom: 20px;
+}
+.rp-ai-hero-main { display: flex; align-items: flex-start; gap: 16px; min-width: 0; }
+.rp-ai-hero-icon {
+  flex: 0 0 auto;
+  display: grid;
+  place-items: center;
+  width: 56px;
+  height: 56px;
+  border-radius: var(--radius-lg);
+  background: var(--accent-tint);
+  color: var(--accent);
+}
+.rp-ai-hero-text { flex: 1 1 auto; min-width: 0; }
+.rp-ai-hero-actions { flex: 0 0 auto; }
+
+.rp-ai-stats {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 14px;
+  margin-bottom: 20px;
+}
+@media (max-width: 1080px) { .rp-ai-stats { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+@media (max-width: 560px) { .rp-ai-stats { grid-template-columns: minmax(0, 1fr); } }
+.rp-ai-stat {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  padding: 16px 18px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  background: var(--bg-panel);
+}
+.rp-ai-stat-icon {
+  flex: 0 0 auto;
+  display: grid;
+  place-items: center;
+  width: 40px;
+  height: 40px;
+  border-radius: 50%;
+}
+.rp-ai-stat-icon.providers { background: var(--blue-bg); color: var(--blue); }
+.rp-ai-stat-icon.default { background: var(--green-bg); color: var(--green); }
+.rp-ai-stat-icon.reachable { background: var(--green-bg); color: var(--green); }
+.rp-ai-stat-icon.activity { background: var(--purple-bg); color: var(--purple); }
+.rp-ai-stat-body { min-width: 0; }
+.rp-ai-stat-value { font: 700 22px/1.2 var(--font-display); color: var(--text-strong); }
+.rp-ai-stat-label { font: 500 12.5px/1.3 var(--sans); color: var(--text-muted); }
+
+.rp-ai-panel-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 14px;
+}
+.rp-ai-panel-head .rp-panel-title { margin-bottom: 0; }
+.rp-ai-panel-title-row { display: flex; align-items: center; gap: 8px; min-width: 0; color: var(--text-muted); }
+.rp-ai-link {
+  border: 0;
+  background: transparent;
+  padding: 0;
+  color: var(--link);
+  font: 500 13px/1.3 var(--sans);
+  text-decoration: none;
+  cursor: pointer;
+}
+.rp-ai-link:hover { text-decoration: underline; }
+
+.rp-ai-providers {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  gap: 14px;
+}
+.rp-ai-provider {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: 14px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  background: var(--bg-panel);
+}
+/* The user's own default engine is outlined, not just labelled -- the label
+   alone is easy to miss in a row of five otherwise-identical cards. */
+.rp-ai-provider.is-default {
+  border-color: var(--accent);
+  box-shadow: 0 0 0 3px var(--accent-soft);
+}
+.rp-ai-provider-head { display: flex; align-items: flex-start; gap: 10px; }
+.rp-ai-provider-icon {
+  flex: 0 0 auto;
+  display: grid;
+  place-items: center;
+  width: 30px;
+  height: 30px;
+  border-radius: 8px;
+  background: var(--accent-tint);
+  color: var(--accent);
+}
+.rp-ai-provider-icon[data-kind="local"] { background: var(--bg-subtle); color: var(--text-muted); }
+.rp-ai-provider-icon[data-kind="ubag"] { background: var(--ai-bg); color: var(--ai); }
+.rp-ai-provider-name { font: 600 13.5px/1.35 var(--sans); color: var(--text-strong); margin: 0; }
+.rp-ai-provider-sub { font: 400 12px/1.4 var(--sans); color: var(--text-muted); }
+.rp-ai-provider-note { font: 400 12px/1.4 var(--sans); color: var(--text-faint); }
+.rp-ai-provider-menu { position: relative; margin-left: auto; flex: 0 0 auto; }
+.rp-ai-provider-menu-list {
+  position: absolute;
+  right: 0;
+  top: calc(100% + 4px);
+  z-index: 20;
+  min-width: 180px;
+  padding: 4px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: var(--bg-panel);
+  box-shadow: var(--shadow-md);
+}
+.rp-ai-provider-menu-list button {
+  display: block;
+  width: 100%;
+  text-align: left;
+  padding: 7px 10px;
+  border: 0;
+  border-radius: var(--radius-sm);
+  background: transparent;
+  color: var(--text);
+  font: 400 13px/1.3 var(--sans);
+  cursor: pointer;
+}
+.rp-ai-provider-menu-list button:hover { background: var(--bg-subtle); }
+.rp-ai-provider-btn { width: 100%; justify-content: center; margin-top: auto; }
+
+.rp-ai-cols {
+  display: grid;
+  grid-template-columns: minmax(0, 1.32fr) minmax(0, 1fr);
+  gap: 16px;
+  align-items: start;
+}
+@media (max-width: 1080px) { .rp-ai-cols { grid-template-columns: minmax(0, 1fr); } }
+
+.rp-ai-activity-status { display: inline-flex; align-items: center; gap: 5px; white-space: nowrap; }
+.rp-ai-activity-status[data-tone="ok"] { color: var(--green); }
+.rp-ai-activity-status[data-tone="warn"] { color: var(--amber); }
+.rp-ai-activity-status[data-tone="bad"] { color: var(--red); }
+.rp-ai-activity-status[data-tone="muted"] { color: var(--text-faint); }
+
+/* Segmented control for the speech-recognition mode -- one visually selected
+   option, so it reads as a choice rather than three independent buttons. */
+.rp-ai-segmented {
+  display: inline-flex;
+  padding: 3px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: var(--bg-subtle);
+  gap: 3px;
+}
+.rp-ai-segmented button {
+  border: 0;
+  border-radius: calc(var(--radius) - 3px);
+  padding: 6px 12px;
+  background: transparent;
+  color: var(--text-muted);
+  font: 500 12.5px/1.2 var(--sans);
+  white-space: nowrap;
+  cursor: pointer;
+}
+.rp-ai-segmented button:hover { color: var(--text); }
+.rp-ai-segmented button[aria-pressed="true"] {
+  background: var(--accent);
+  color: var(--accent-fg);
+}
+
+.rp-ai-setting {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 14px 0;
+  border-top: 1px solid var(--border-soft);
+}
+.rp-ai-setting:first-of-type { border-top: 0; }
+.rp-ai-setting-text { min-width: 0; }
+.rp-ai-setting-label { font: 600 13.5px/1.35 var(--sans); color: var(--text-strong); }
+.rp-ai-setting-desc { font: 400 12px/1.45 var(--sans); color: var(--text-muted); margin: 2px 0 0; }
+.rp-ai-setting-control { flex: 0 0 auto; }
+
+/* Switch: the knob position carries the state as well as the fill, so it is
+   readable without relying on colour. */
+.rp-ai-switch {
+  position: relative;
+  flex: 0 0 auto;
+  width: 40px;
+  height: 22px;
+  padding: 0;
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  background: var(--bg-subtle);
+  cursor: pointer;
+  transition: background 0.15s ease, border-color 0.15s ease;
+}
+.rp-ai-switch::after {
+  content: "";
+  position: absolute;
+  top: 2px;
+  left: 2px;
+  width: 16px;
+  height: 16px;
+  border-radius: 50%;
+  background: var(--bg-panel);
+  box-shadow: var(--shadow-sm);
+  transition: transform 0.15s ease;
+}
+.rp-ai-switch[aria-checked="true"] { background: var(--accent); border-color: var(--accent); }
+.rp-ai-switch[aria-checked="true"]::after { transform: translateX(18px); }
+.rp-ai-switch:disabled { opacity: 0.5; cursor: not-allowed; }
+.rp-ai-switch:focus-visible { outline: none; box-shadow: 0 0 0 3px var(--accent-soft); }
+
+.rp-ai-links { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 14px; }
+@media (max-width: 900px) { .rp-ai-links { grid-template-columns: minmax(0, 1fr); } }
+.rp-ai-link-card {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  padding: 16px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  background: var(--bg-panel);
+  text-decoration: none;
+  color: inherit;
+}
+.rp-ai-link-card:hover { border-color: var(--border-strong); box-shadow: var(--shadow-md); }
+.rp-ai-link-icon {
+  flex: 0 0 auto;
+  display: grid;
+  place-items: center;
+  width: 44px;
+  height: 44px;
+  border-radius: var(--radius);
+  background: var(--accent-tint);
+  color: var(--accent);
+}
+.rp-ai-link-body { flex: 1 1 auto; min-width: 0; }
+.rp-ai-link-title { font: 600 14px/1.3 var(--sans); color: var(--text-strong); margin: 0; }
+.rp-ai-link-desc { font: 400 12px/1.45 var(--sans); color: var(--text-muted); margin: 2px 0 0; }
+.rp-ai-link-arrow { flex: 0 0 auto; color: var(--text-faint); }
