@@ -433,7 +433,9 @@ export default function ReportsPage() {
                     <td><span className="badge">{r.study.modality}</span></td>
                     <td>{r.study.bodyPart}</td>
                     <td><StatusBadge tone={reportStatusTone(r.status)}>{statusLabel(r.status)}</StatusBadge></td>
-                    <td className="muted">{new Date(r.updatedAt).toLocaleString()}</td>
+                    <td className="muted rp-reports-updated">
+                      {new Date(r.updatedAt).toLocaleString()}
+                    </td>
                     <td className="muted">{radiologistName(r)}</td>
                     <td className="rp-reports-actions">
                       <Link href={reportHref(r.id)}>Open →</Link>

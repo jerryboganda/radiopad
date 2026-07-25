@@ -568,6 +568,13 @@
   gap: 6px;
   white-space: nowrap;
 }
+/* Stops the row compressing its buttons below their content width. (The icon
+   sitting inline with the label is handled by the button variants in
+   globals.css, not here.) */
+.rp-reports-actions > * { flex: 0 0 auto; }
+/* Timestamps and column headings read badly broken mid-value. */
+.rp-reports-updated { white-space: nowrap; }
+.rp-reports-table th { white-space: nowrap; }
 /* Scoped under the actions cell / bulk bar so this wins over globals' `:is(button,
    a).ghost` (specificity 0,1,1) without needing !important. */
 .rp-reports-actions .rp-reports-delete,
@@ -1515,7 +1522,10 @@
   line-height: 1.5;
 }
 .rp-term-disclaimer svg { flex: 0 0 auto; margin-top: 1px; }
-.rp-help-title svg { vertical-align: -2px; margin-right: 4px; }
+/* Same preflight `svg { display: block }` trap as the button variants — an icon
+   in this heading claims its own line unless the heading is a flex row. */
+.rp-help-title { display: flex; align-items: center; gap: 6px; }
+.rp-help-title svg { flex: 0 0 auto; }
 
 /* ============================================================
    Iter-36 — Mobile workflows (Capacitor + responsive web).

@@ -50,11 +50,21 @@ a.primary, a.primary-ghost, a.ghost, a.subtle {
   transition: background var(--transition-fast), border-color var(--transition-fast),
     color var(--transition-fast), box-shadow var(--transition-fast), transform var(--transition-fast);
 }
-a.primary, a.primary-ghost, a.ghost, a.subtle {
+/* Tailwind preflight sets `svg { display: block }`, so an icon inside a button
+   that is not itself a flex container takes its own line and the label drops
+   underneath it. The anchor variants have always been inline-flex; the button
+   variants were not, which is why `<button class="ghost"><Icon /> Preview</button>`
+   rendered stacked while the identical `<a>` rendered inline. Both now match. */
+:is(button, a).primary,
+:is(button, a).primary-ghost,
+:is(button, a).ghost,
+:is(button, a).subtle {
   display: inline-flex;
   align-items: center;
   justify-content: center;
   gap: 6px;
+}
+a.primary, a.primary-ghost, a.ghost, a.subtle {
   text-decoration: none;
 }
 button:hover:not(:disabled),

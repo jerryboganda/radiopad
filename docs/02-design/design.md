@@ -474,6 +474,22 @@ not be used as the application root — `.rp-shell` is canonical.
 | `.subtle` | Subtle filled surface |
 | `.icon-btn` | Icon-only, square padding |
 
+All four variants are `display: inline-flex; align-items: center;
+justify-content: center; gap: 6px` on **both** `<button>` and `<a>`, so an icon
+placed beside a label sits inline with it:
+
+```tsx
+<button className="ghost"><Eye size={14} strokeWidth={1.8} aria-hidden /> Preview</button>
+```
+
+This is load-bearing, not cosmetic. Tailwind's preflight sets
+`svg { display: block }`, so an icon inside a button that is *not* a flex
+container claims its own line and pushes the label underneath it. Until this was
+fixed the anchor variants were inline-flex and the button variants were not, so
+the same markup rendered inline as a link and stacked as a button. Do not remove
+the `display` declaration from these variants, and do not "fix" a stacked icon
+button by wrapping the icon in a span.
+
 Disabled state is `opacity: 0.5; cursor: not-allowed`. Focus ring is
 `2px solid var(--color-focus-ring)` with `2px` offset (global
 `:focus-visible` rule in `tokens.css`).
