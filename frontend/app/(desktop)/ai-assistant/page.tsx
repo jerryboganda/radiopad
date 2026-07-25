@@ -163,6 +163,11 @@ export default function AiAssistantPage() {
 
   const defaultCount = preferredId && providers.some((p) => p.id === preferredId) ? 1 : 0;
 
+  const providerNames = useMemo(
+    () => Object.fromEntries(providers.map((p) => [p.id, p.name])),
+    [providers],
+  );
+
   return (
     <Container>
       <div className="rp-ai-hero">
@@ -219,6 +224,7 @@ export default function AiAssistantPage() {
       <div className="rp-ai-cols">
         <RecentActivityPanel
           events={events}
+          providerNames={providerNames}
           loading={eventsLoading}
           error={eventsError}
           noAccess={eventsNoAccess}
@@ -353,8 +359,10 @@ function ProviderCard({
           <Icon size={16} strokeWidth={1.8} />
         </div>
         <div style={{ minWidth: 0 }}>
-          <p className="rp-ai-provider-name">{p.name}</p>
-          <div className="rp-ai-provider-sub">
+          <p className="rp-ai-provider-name" title={p.name}>
+            {p.name}
+          </p>
+          <div className="rp-ai-provider-sub" title={p.model ? `${p.adapter} · ${p.model}` : p.adapter}>
             {p.adapter}
             {p.model ? ` · ${p.model}` : ''}
           </div>
@@ -399,7 +407,7 @@ function ProviderCard({
         </div>
       </div>
 
-      <div className="rp-row" style={{ gap: 6, flexWrap: 'wrap' }}>
+      <div className="rp-row rp-ai-provider-badges" style={{ gap: 6, flexWrap: 'wrap' }}>
         <HealthBadge enabled={p.enabled} health={h} />
         <span className={`badge ${COMPLIANCE_BADGE[p.compliance] ?? ''}`}>
           {COMPLIANCE_LABELS[p.compliance] ?? 'Unknown'}
@@ -466,6 +474,8 @@ type AuditEvent = {
  */
 type AiDetails = {
   provider?: string;
+  /** The rewrite path audits the provider by id rather than by name. */
+  providerId?: string;
   adapter?: string;
   model?: string;
   kind?: string;
@@ -586,14 +596,27 @@ function outcome(e: AuditEvent, d: AiDetails): { label: string; tone: 'ok' | 'wa
   return { label: '—', tone: 'muted' };
 }
 
+/** Compact stamp ("Jul 24, 11:25 PM") — the full one is on the cell's title. */
+function activityTime(iso: string): string {
+  return new Date(iso).toLocaleString(undefined, {
+    month: 'short',
+    day: 'numeric',
+    hour: 'numeric',
+    minute: '2-digit',
+  });
+}
+
 function RecentActivityPanel({
   events,
+  providerNames,
   loading,
   error,
   noAccess,
   onRetry,
 }: {
   events: AuditEvent[];
+  /** id → display name, so rows that audit only a providerId still name it. */
+  providerNames: Record<string, string>;
   loading: boolean;
   error: string | null;
   noAccess: boolean;
@@ -630,7 +653,7 @@ function RecentActivityPanel({
           description="AI requests, responses, and policy decisions will show up here as you work."
         />
       ) : (
-        <div className="table-wrap">
+        <div className="table-wrap rp-ai-activity-wrap">
           <table className="rp-table">
             <thead>
               <tr>
@@ -647,14 +670,16 @@ function RecentActivityPanel({
                 const o = outcome(e, d);
                 return (
                   <tr key={e.id}>
-                    <td style={{ whiteSpace: 'nowrap' }}>
-                      {new Date(e.createdAt).toLocaleString()}
+                    <td className="rp-ai-activity-time" title={new Date(e.createdAt).toLocaleString()}>
+                      {activityTime(e.createdAt)}
                     </td>
                     <td>
                       <span className={`badge ${eventTone(e, d)}`}>{eventLabel(e, d)}</span>
                     </td>
-                    <td style={{ whiteSpace: 'nowrap' }}>{d.provider ?? '—'}</td>
-                    <td className="rp-faint">{detailsText(d) || '—'}</td>
+                    <td className="rp-ai-activity-provider">
+                      {d.provider ?? (d.providerId ? providerNames[d.providerId] : undefined) ?? '—'}
+                    </td>
+                    <td className="rp-faint rp-ai-activity-details">{detailsText(d) || '—'}</td>
                     <td>
                       <span className="rp-ai-activity-status" data-tone={o.tone}>
                         {o.tone === 'ok' ? (
@@ -688,13 +713,16 @@ function SettingRow({
   label,
   description,
   control,
+  stack,
 }: {
   label: string;
   description: string;
   control: React.ReactNode;
+  /** Set for controls too wide to sit beside the label (the segmented control). */
+  stack?: boolean;
 }) {
   return (
-    <div className="rp-ai-setting">
+    <div className="rp-ai-setting" data-layout={stack ? 'stack' : undefined}>
       <div className="rp-ai-setting-text">
         <div className="rp-ai-setting-label">{label}</div>
         <p className="rp-ai-setting-desc">{description}</p>
@@ -743,6 +771,7 @@ function DictationSettingsPanel() {
       </div>
 
       <SettingRow
+        stack
         label="Speech recognition mode"
         description="Auto picks the best on-device setup for your machine."
         control={
