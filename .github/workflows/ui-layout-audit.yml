@@ -1,0 +1,124 @@
+name: ui-layout-audit
+
+# Renders every route and fails on layout breakage a build cannot see:
+# an icon stacked above its label, a table amputated by an overflow:clip
+# wrapper, a page that scrolls sideways, or text crushed into a
+# one-word-per-line column. See frontend/e2e/layout-audit.spec.ts for the
+# rationale and docs/02-design/design.md for the sanctioned fixes.
+#
+# Runs on frontend changes only — this is a UI check, and the backend is
+# started purely so the pages have real data to lay out.
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'frontend/**'
+      - '.github/workflows/ui-layout-audit.yml'
+  pull_request:
+    paths:
+      - 'frontend/**'
+      - '.github/workflows/ui-layout-audit.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ui-layout-audit-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  audit:
+    runs-on: ubuntu-latest
+    # `next dev` compiles each route on first visit, and the audit is the first
+    # visitor to ~60 of them. Most of the wall-clock is that one-time compile.
+    timeout-minutes: 35
+    env:
+      RADIOPAD_BIND: 'http://127.0.0.1:7457'
+      RADIOPAD_AI_PROVIDER: 'Mock'
+      RADIOPAD_DB: 'Data Source=layout-audit.db'
+      ASPNETCORE_ENVIRONMENT: 'Testing'
+      RADIOPAD_DEV_SEED: '1'
+      # Deliberately NOT setting RADIOPAD_REQUIRE_AUTH: with it unset the API
+      # answers /api/tenant/me, so AuthGate lets the audit reach the real pages
+      # instead of bouncing every route to /login and auditing nothing.
+      NEXT_TELEMETRY_DISABLED: '1'
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '8.0.x'
+
+      - uses: pnpm/action-setup@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'pnpm'
+
+      - name: Build backend
+        working-directory: backend/RadioPad.Api
+        run: |
+          dotnet restore
+          dotnet build --configuration Release --no-restore
+
+      - name: Start backend
+        working-directory: backend/RadioPad.Api
+        run: |
+          nohup dotnet run --project src/RadioPad.Api --configuration Release --no-build \
+            > "$RUNNER_TEMP/backend.log" 2>&1 &
+          echo "BACKEND_PID=$!" >> "$GITHUB_ENV"
+
+      - name: Wait for /api/health
+        run: |
+          for i in $(seq 1 60); do
+            if curl -fs http://127.0.0.1:7457/api/health >/dev/null; then
+              echo "backend up"; exit 0
+            fi
+            sleep 2
+          done
+          echo "backend never became healthy"; tail -n 200 "$RUNNER_TEMP/backend.log"; exit 1
+
+      # pnpm workspace: the lockfile lives at the repo root, so install runs
+      # there and the frontend is addressed with --filter.
+      - name: Install deps
+        run: pnpm install --frozen-lockfile
+
+      - name: Install Chromium for Playwright
+        run: pnpm --filter @radiopad/frontend exec playwright install --with-deps chromium
+
+      - name: Start frontend
+        run: |
+          nohup pnpm --filter @radiopad/frontend dev > "$RUNNER_TEMP/frontend.log" 2>&1 &
+          echo "FRONTEND_PID=$!" >> "$GITHUB_ENV"
+
+      - name: Wait for the dev server
+        run: |
+          for i in $(seq 1 90); do
+            if curl -fs http://127.0.0.1:3000/login/ >/dev/null; then
+              echo "frontend up"; exit 0
+            fi
+            sleep 2
+          done
+          echo "frontend never came up"; tail -n 200 "$RUNNER_TEMP/frontend.log"; exit 1
+
+      - name: Run layout audit
+        run: pnpm --filter @radiopad/frontend test:layout
+
+      - name: Upload failure screenshots
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: layout-audit-failures
+          path: frontend/test-results/
+          if-no-files-found: ignore
+          retention-days: 7
+
+      - name: Server logs on failure
+        if: failure()
+        run: |
+          echo '--- backend ---';  tail -n 200 "$RUNNER_TEMP/backend.log"  || true
+          echo '--- frontend ---'; tail -n 200 "$RUNNER_TEMP/frontend.log" || true

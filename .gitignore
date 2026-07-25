@@ -98,3 +98,8 @@ frontend/types/
 
 # Subagent-driven-development progress ledger — machine-local scratch, never commit.
 .superpowers/
+
+# Playwright layout-audit output (see frontend/e2e/layout-audit.spec.ts)
+frontend/test-results/
+frontend/playwright-report/
+frontend/blob-report/
