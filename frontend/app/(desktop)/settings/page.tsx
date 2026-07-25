@@ -210,7 +210,7 @@ export default function SettingsPage() {
             <span>
               <span style={{ display: 'block', fontWeight: 600, fontSize: 13 }}>
                 Route the medical review through UBAG{' '}
-                <Sparkles size={12} strokeWidth={1.8} aria-hidden style={{ verticalAlign: -2 }} className="text-ai" />
+                <Sparkles size={12} strokeWidth={1.8} aria-hidden className="rp-inline-icon text-ai" />
               </span>
               <span className="rp-page-sub">
                 Sends report text to a cloud AI service, so it stays off unless you opt in. You will be

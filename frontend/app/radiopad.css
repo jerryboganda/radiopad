@@ -575,6 +575,9 @@
 /* Timestamps and column headings read badly broken mid-value. */
 .rp-reports-updated { white-space: nowrap; }
 .rp-reports-table th { white-space: nowrap; }
+/* A full display name ("Dr. Faisal Radiologist Account") collapses to one word
+   per line once this column drops under ~110px. */
+.rp-reports-author { min-width: 150px; }
 /* Scoped under the actions cell / bulk bar so this wins over globals' `:is(button,
    a).ghost` (specificity 0,1,1) without needing !important. */
 .rp-reports-actions .rp-reports-delete,
@@ -1526,6 +1529,11 @@
    in this heading claims its own line unless the heading is a flex row. */
 .rp-help-title { display: flex; align-items: center; gap: 6px; }
 .rp-help-title svg { flex: 0 0 auto; }
+
+/* For an icon that belongs *inside* a run of text (a trailing "✨" after a
+   label, say) rather than beside it. A flex container is wrong there because it
+   would break the text run; this restores the inline flow preflight removes. */
+.rp-inline-icon { display: inline-block; vertical-align: -2px; }
 
 /* ============================================================
    Iter-36 — Mobile workflows (Capacitor + responsive web).
@@ -5249,3 +5257,26 @@
 .rp-ai-link-title { font: 600 14px/1.3 var(--sans); color: var(--text-strong); margin: 0; }
 .rp-ai-link-desc { font: 400 12px/1.45 var(--sans); color: var(--text-muted); margin: 2px 0 0; }
 .rp-ai-link-arrow { flex: 0 0 auto; color: var(--text-faint); }
+
+/* ---------------------------------------------------------------------------
+   Hotkey customization (/settings/hotkeys)
+   The shortcut tables carry five columns (Action, Category, Default, Current
+   binding, Status) and need roughly 520px to render without breaking values
+   mid-word. Two of them side by side only fit on a genuinely wide viewport, so
+   below that they stack full-width instead of each being crushed — in a
+   half-width panel the Action column collapses to one word per line.
+   ------------------------------------------------------------------------- */
+.rp-hk-groups {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+}
+@media (max-width: 1599px) {
+  .rp-hk-groups { grid-template-columns: minmax(0, 1fr); }
+}
+/* Safety net: the shared .table-wrap is `overflow: clip`, which amputates the
+   last columns with no scrollbar if the panel is ever narrower than the table. */
+.rp-hk-groups .table-wrap,
+.rp-hk-table-wrap { overflow-x: auto; }
+.rp-hk-groups .data-table { min-width: 520px; }
+.rp-hk-groups .data-table th { white-space: nowrap; }

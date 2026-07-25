@@ -336,8 +336,10 @@ export default function HotkeysPage() {
         </div>
       ) : (
         <>
-          {/* ── Grouped shortcut tables, two columns ─────────────── */}
-          <div className="rp-grid-2">
+          {/* ── Grouped shortcut tables. Two columns only on a genuinely wide
+              viewport: these are five-column tables, and in a half-width panel
+              the Action column collapses to one word per line. ───────────── */}
+          <div className="rp-hk-groups">
             {liveGroups.map((group) => (
               <div key={group.category} className="rp-panel rp-anim-fade-in-up">
                 <div className="rp-panel-title">

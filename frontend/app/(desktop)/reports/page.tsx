@@ -436,7 +436,7 @@ export default function ReportsPage() {
                     <td className="muted rp-reports-updated">
                       {new Date(r.updatedAt).toLocaleString()}
                     </td>
-                    <td className="muted">{radiologistName(r)}</td>
+                    <td className="muted rp-reports-author">{radiologistName(r)}</td>
                     <td className="rp-reports-actions">
                       <Link href={reportHref(r.id)}>Open →</Link>
                       <button type="button" className="ghost" onClick={() => setPreviewId(r.id)}>
