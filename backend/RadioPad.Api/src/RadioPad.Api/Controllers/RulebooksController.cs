@@ -62,12 +62,56 @@ public class RulebooksController : TenantedController
     {
         var (tenant, _) = await ResolveContextAsync(_db, ct);
         var items = await _store.ListAsync(tenant.Id, ct);
+        var rulebookIds = items.Select(r => r.RulebookId).Distinct().ToArray();
+
+        // GOV — real per-card counts, not decoration. Tests = golden-case count of the
+        // MOST RECENT ValidationPack for this rulebook id (summing every historical pack
+        // would double-count cases superseded by a later version and overstate coverage).
+        // Templates = an approximate modality+bodyPart overlap — ReportTemplate has no
+        // direct foreign key to Rulebook, only the same applies-to shape, so this can
+        // over/undercount relative to what a curator actually intended to pair.
+        var packs = await _db.ValidationPacks
+            .Where(p => p.TenantId == tenant.Id && rulebookIds.Contains(p.RulebookId))
+            .Select(p => new { p.RulebookId, p.GoldenCasesJson, p.CreatedAt })
+            .ToListAsync(ct);
+        var testsCountByRulebookId = packs
+            .GroupBy(p => p.RulebookId)
+            .ToDictionary(
+                g => g.Key,
+                g => CountGoldenCases(g.OrderByDescending(p => p.CreatedAt).First().GoldenCasesJson));
+
+        var templates = await _db.Templates
+            .Where(t => t.TenantId == tenant.Id)
+            .Select(t => new { t.Modality, t.BodyPart })
+            .ToListAsync(ct);
+
         return Ok(items.Select(r => new
         {
             r.Id, r.RulebookId, r.Name, r.Version, r.Owner, r.Status,
             r.AppliesToModalities, r.AppliesToBodyParts, r.UpdatedAt,
+            TestsCount = testsCountByRulebookId.GetValueOrDefault(r.RulebookId, 0),
+            TemplatesCount = templates.Count(t =>
+                SplitCsv(r.AppliesToModalities).Contains(t.Modality, StringComparer.OrdinalIgnoreCase)
+                && SplitCsv(r.AppliesToBodyParts).Contains(t.BodyPart, StringComparer.OrdinalIgnoreCase)),
         }));
     }
+
+    private static int CountGoldenCases(string goldenCasesJson)
+    {
+        try
+        {
+            using var doc = System.Text.Json.JsonDocument.Parse(goldenCasesJson);
+            return doc.RootElement.ValueKind == System.Text.Json.JsonValueKind.Array
+                ? doc.RootElement.GetArrayLength() : 0;
+        }
+        catch (System.Text.Json.JsonException)
+        {
+            return 0;
+        }
+    }
+
+    private static string[] SplitCsv(string csv) =>
+        (csv ?? "").Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
 
     [HttpGet("{id:guid}")]
     public async Task<IActionResult> Get(Guid id, CancellationToken ct)

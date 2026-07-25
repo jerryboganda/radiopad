@@ -971,6 +971,10 @@ export type Rulebook = {
   appliesToBodyParts: string;
   /** Iter-34 GOV-001 — last edit timestamp. The rulebooks list endpoint emits this; absent on legacy stores. */
   updatedAt?: string;
+  /** GOV — golden-case count of the most recent ValidationPack for this rulebook id. List endpoint only. */
+  testsCount?: number;
+  /** GOV — approximate modality+bodyPart overlap with tenant templates (no direct FK). List endpoint only. */
+  templatesCount?: number;
 };
 
 export type ReportTemplate = {
