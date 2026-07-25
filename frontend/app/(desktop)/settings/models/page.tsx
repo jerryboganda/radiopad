@@ -16,23 +16,28 @@
  */
 
 import Link from 'next/link';
-import { ArrowLeft, HardDriveDownload } from 'lucide-react';
+import { ArrowLeft, Cpu } from 'lucide-react';
 import Container from '@/components/shell/Container';
-import PageHeader from '@/components/shell/PageHeader';
 import OnDeviceModels from '@/components/models/OnDeviceModels';
 
 export default function DesktopOnDeviceModelsPage() {
   return (
     <Container>
-      <PageHeader
-        title={<><HardDriveDownload aria-hidden size={20} /> On-device models</>}
-        description="Speech-to-text and the optional offline report formatter, running entirely on this workstation. Audio and dictation never leave the machine."
-        secondaryActions={
-          <Link href="/settings" className="ghost">
-            <ArrowLeft aria-hidden size={16} /> Settings
-          </Link>
-        }
-      />
+      <div className="rp-model-hero">
+        <span className="rp-model-hero-icon" aria-hidden>
+          <Cpu size={26} strokeWidth={1.8} />
+        </span>
+        <div className="rp-model-hero-text">
+          <h1 className="rp-page-title">On-device models</h1>
+          <p className="rp-page-sub">
+            Run dictation and optional offline report formatting directly on this workstation.
+            Audio and dictation never leave the machine.
+          </p>
+        </div>
+        <Link href="/settings" className="ghost rp-model-hero-back">
+          <ArrowLeft aria-hidden size={16} /> Settings
+        </Link>
+      </div>
       <OnDeviceModels />
     </Container>
   );

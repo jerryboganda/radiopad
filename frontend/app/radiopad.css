@@ -3998,6 +3998,25 @@
    These classes exist to keep each link visible and separately addressable.
    ──────────────────────────────────────────────────────────────────────────── */
 
+.rp-model-hero {
+  display: flex;
+  align-items: flex-start;
+  gap: 16px;
+  margin-bottom: 20px;
+}
+.rp-model-hero-icon {
+  flex: 0 0 auto;
+  display: grid;
+  place-items: center;
+  width: 56px;
+  height: 56px;
+  border-radius: var(--radius-lg);
+  background: var(--accent-tint);
+  color: var(--accent);
+}
+.rp-model-hero-text { flex: 1 1 auto; min-width: 0; }
+.rp-model-hero-back { flex: 0 0 auto; margin-top: 2px; }
+
 .rp-model-section { margin-bottom: 20px; }
 
 .rp-model-section-head {
@@ -4026,20 +4045,43 @@
 
 .rp-model-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(340px, 1fr));
-  gap: 12px;
+  grid-template-columns: repeat(auto-fill, minmax(420px, 1fr));
+  gap: 16px;
 }
 @media (max-width: 720px) {
   .rp-model-grid { grid-template-columns: minmax(0, 1fr); }
+  .rp-model-card[data-kind='Orchestrator'] { flex-direction: column; }
+  .rp-model-card[data-kind='Orchestrator'] .rp-model-chain { flex: none; }
 }
+
+/* -------- Top summary row (N installed / N ready / Offline-capable) ----- */
+.rp-model-summary {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-bottom: 20px;
+}
+.rp-model-summary-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 5px 12px;
+  border-radius: var(--radius-pill);
+  border: 1px solid var(--blue-border);
+  background: var(--blue-bg);
+  color: var(--blue);
+  font-size: 12.5px;
+  font-weight: 500;
+}
+.rp-model-summary-pill.ok { border-color: var(--green-border); background: var(--green-bg); color: var(--green); }
 
 .rp-model-card {
   display: flex;
   flex-direction: column;
   gap: 10px;
-  padding: 14px;
+  padding: 16px;
   border: 1px solid var(--border);
-  border-radius: var(--radius);
+  border-radius: var(--radius-lg);
   background: var(--bg-panel);
   box-shadow: var(--shadow-xs);
 }
@@ -4052,10 +4094,24 @@
    explicit reason line, per the accessibility rule in design.md §7. */
 .rp-model-card[data-state='failed'] { border-color: var(--red-border); }
 
+/* Orchestrator cards (MedGemma) pair their content with the runtime-chain
+   panel side by side, matching the rest of the platform's icon+body split. */
+.rp-model-card[data-kind='Orchestrator'] {
+  flex-direction: row;
+  align-items: stretch;
+}
+.rp-model-card-main {
+  flex: 1 1 auto;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
 .rp-model-card-head {
   display: flex;
   align-items: flex-start;
-  gap: 10px;
+  gap: 14px;
 }
 
 .rp-model-icon {
@@ -4063,18 +4119,19 @@
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  width: 34px;
-  height: 34px;
-  border-radius: var(--radius-sm, 6px);
+  width: 72px;
+  height: 72px;
+  border-radius: var(--radius-lg);
   background: var(--bg-subtle);
   color: var(--text-muted);
 }
 .rp-model-icon[data-kind='Orchestrator'] { background: var(--ai-bg); color: var(--ai); }
 .rp-model-icon[data-kind='Stt'] { background: var(--blue-bg); color: var(--blue); }
+.rp-model-icon[data-kind='Tts'] { background: var(--blue-bg); color: var(--blue); }
 
 .rp-model-headings { min-width: 0; flex: 1; }
 .rp-model-title {
-  font-size: 14px;
+  font-size: 15.5px;
   font-weight: 600;
   color: var(--text-strong);
   line-height: 1.3;
@@ -4106,17 +4163,25 @@
 .rp-model-chain {
   display: flex;
   flex-direction: column;
-  gap: 4px;
-  padding: 8px 10px;
+  gap: 10px;
+  padding: 12px 14px;
   border: 1px solid var(--border-soft);
-  border-radius: var(--radius-sm, 6px);
+  border-radius: var(--radius);
   background: var(--bg-subtle);
+}
+/* Inside an orchestrator card this becomes the right-hand status panel,
+   matching the icon+body / side-panel split used elsewhere on the platform. */
+.rp-model-card[data-kind='Orchestrator'] .rp-model-chain {
+  flex: 0 0 260px;
+  align-self: stretch;
+  justify-content: center;
+  margin: 0;
 }
 .rp-model-chain-step {
   display: flex;
   align-items: center;
-  gap: 7px;
-  font-size: 12px;
+  gap: 8px;
+  font-size: 12.5px;
   color: var(--text-muted);
 }
 .rp-model-chain-step[data-ok='true'] { color: var(--text); }

@@ -7,12 +7,14 @@ import {
   CircleDashed,
   Download,
   Mic,
+  Package,
   Play,
   RotateCcw,
   Server,
   Sparkles,
   Trash2,
   Volume2,
+  WifiOff,
 } from 'lucide-react';
 import {
   api,
@@ -142,6 +144,8 @@ export default function OnDeviceModels() {
       })).filter((g) => g.items.length > 0),
     [models],
   );
+  const installedCount = models.filter((m) => !m.placeholder && m.downloaded).length;
+  const readyCount = models.filter(isReady).length;
 
   if (loading && models.length === 0) return <TableSkeleton rows={3} cols={3} />;
   if (error && models.length === 0)
@@ -164,6 +168,20 @@ export default function OnDeviceModels() {
         </div>
       )}
       {error && models.length > 0 && <div className="banner warn">{error}</div>}
+
+      {models.length > 0 && (
+        <div className="rp-model-summary">
+          <span className="rp-model-summary-pill">
+            <Package aria-hidden size={14} /> {installedCount} installed
+          </span>
+          <span className="rp-model-summary-pill ok">
+            <CircleCheck aria-hidden size={14} /> {readyCount} ready
+          </span>
+          <span className="rp-model-summary-pill">
+            <WifiOff aria-hidden size={14} /> Offline-capable
+          </span>
+        </div>
+      )}
 
       {grouped.map((g) => {
         const SectionIcon = KIND_ICON[g.kind];
@@ -458,12 +476,14 @@ function ModelCard({
   return (
     <div
       className="rp-model-card"
+      data-kind={model.kind}
       data-selected={model.isPrimary || registered ? 'true' : 'false'}
       data-state={cardState}
     >
+      <div className="rp-model-card-main">
       <div className="rp-model-card-head">
         <span className="rp-model-icon" data-kind={model.kind}>
-          <KindIcon aria-hidden size={17} />
+          <KindIcon aria-hidden size={32} />
         </span>
         <div className="rp-model-headings">
           <div className="rp-model-title">{model.displayName}</div>
@@ -485,8 +505,6 @@ function ModelCard({
           {model.note}
         </p>
       )}
-
-      {orchestrator && model.downloaded && <RuntimeChain model={model} />}
 
       {inProgress && <ProgressRow model={model} />}
 
@@ -625,6 +643,9 @@ function ModelCard({
           {msg.text}
         </p>
       )}
+      </div>
+
+      {orchestrator && model.downloaded && <RuntimeChain model={model} />}
 
       {testOpen && (
         <TestResultModal
