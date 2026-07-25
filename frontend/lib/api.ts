@@ -930,6 +930,8 @@ function sttUnavailableError(): Error {
 export type Report = {
   id: string;
   tenantId: string;
+  /** Present on the wire but not previously typed; used to resolve the Radiologist column via api.reports.authors(). */
+  createdByUserId?: string;
   status: 'Draft' | 'Validated' | 'Acknowledged' | 'Exported' | number;
   rulebookId: string | null;
   templateId: string | null;
@@ -1498,16 +1500,44 @@ export const api = {
      */
     delete: (id: string) =>
       request<void>(`/api/reports/${id}`, { method: 'DELETE' }),
-    listPaged: (params: { modality?: string; status?: number; q?: string; skip?: number; take?: number } = {}) => {
+    listPaged: (params: {
+      modality?: string;
+      bodyPart?: string;
+      status?: number;
+      q?: string;
+      updatedFrom?: string;
+      updatedTo?: string;
+      sortBy?: 'updatedAt' | 'accession' | 'modality' | 'status';
+      sortDir?: 'asc' | 'desc';
+      skip?: number;
+      take?: number;
+    } = {}) => {
       const sp = new URLSearchParams();
       if (params.modality) sp.set('modality', params.modality);
+      if (params.bodyPart) sp.set('bodyPart', params.bodyPart);
       if (params.status !== undefined && params.status !== null) sp.set('status', String(params.status));
       if (params.q) sp.set('q', params.q);
+      if (params.updatedFrom) sp.set('updatedFrom', params.updatedFrom);
+      if (params.updatedTo) sp.set('updatedTo', params.updatedTo);
+      if (params.sortBy) sp.set('sortBy', params.sortBy);
+      if (params.sortDir) sp.set('sortDir', params.sortDir);
       if (params.skip !== undefined) sp.set('skip', String(params.skip));
       if (params.take !== undefined) sp.set('take', String(params.take));
       const qs = sp.toString();
       return requestPaged<Report>(`/api/reports${qs ? '?' + qs : ''}`);
     },
+    /** AUTH-009-adjacent — this worklist's own summary counts + 14-day sparkline trend
+     *  (UpdatedAt-bucketed activity per status, not a transition-moment log). */
+    stats: () =>
+      request<{
+        total: number;
+        validated: number;
+        acknowledged: number;
+        exported: number;
+        trend: { total: number[]; validated: number[]; acknowledged: number[]; exported: number[] };
+      }>('/api/reports/stats'),
+    /** Report-author display names for this tenant, keyed by user id. */
+    authors: () => request<Record<string, string>>('/api/reports/authors'),
     /**
      * Every matching report, paged until the server's total is satisfied.
      *

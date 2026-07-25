@@ -482,25 +482,96 @@
 .rp-table th { font-size: 11px; text-transform: uppercase; letter-spacing: 0.06em; color: var(--text-muted); font-weight: 600; }
 .rp-table tr:hover td { background: var(--bg-subtle); }
 
-/* -------- Reports worklist: date filter + row actions ------------- */
-.rp-reports-filter {
+/* -------- Reports worklist (page-scoped: no other page uses rp-reports-*) - */
+.rp-reports-hero {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 16px;
+  margin-bottom: 20px;
+}
+
+.rp-reports-stats {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  gap: 12px;
+  margin-bottom: 20px;
+}
+.rp-reports-stat {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 14px 16px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  background: var(--bg-panel);
+  box-shadow: var(--shadow-xs);
+}
+.rp-reports-stat-icon {
+  flex: 0 0 auto;
+  display: grid;
+  place-items: center;
+  width: 40px;
+  height: 40px;
+  border-radius: var(--radius);
+}
+.rp-reports-stat-icon.total { background: var(--blue-bg); color: var(--blue); }
+.rp-reports-stat-icon.validated { background: var(--blue-bg); color: var(--blue); }
+.rp-reports-stat-icon.acknowledged { background: var(--green-bg); color: var(--green); }
+.rp-reports-stat-icon.exported { background: var(--ai-bg); color: var(--ai); }
+.rp-reports-stat-body { flex: 1 1 auto; min-width: 0; }
+.rp-reports-stat-value { font: 700 20px/1.2 var(--font-display); color: var(--text-strong); }
+.rp-reports-stat-label { font: 500 12px/1.3 var(--sans); color: var(--text-muted); }
+.rp-reports-stat-sub { font: 400 11px/1.3 var(--sans); color: var(--text-faint); }
+.rp-reports-stat-spark { flex: 0 0 auto; }
+.rp-reports-stat-spark.total { color: var(--blue); }
+.rp-reports-stat-spark.validated { color: var(--blue); }
+.rp-reports-stat-spark.acknowledged { color: var(--green); }
+.rp-reports-stat-spark.exported { color: var(--ai); }
+
+.rp-reports-toolbar {
   display: flex;
   align-items: flex-end;
-  gap: var(--space-3);
+  gap: 12px;
   flex-wrap: wrap;
-  margin-bottom: var(--space-4);
+  margin-bottom: 16px;
 }
-.rp-reports-filter .section-block { margin: 0; }
+.rp-reports-toolbar .rp-search { flex: 1 1 220px; }
+.rp-reports-field {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  font: 500 11px/1.2 var(--sans);
+  color: var(--text-muted);
+}
+.rp-reports-field select,
+.rp-reports-field input { min-width: 120px; }
+.rp-reports-sort { display: flex; gap: 6px; }
+
+.rp-reports-bulkbar {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 8px 12px;
+  margin-bottom: 12px;
+  border: 1px solid var(--accent);
+  border-radius: var(--radius);
+  background: var(--accent-tint);
+  font: 500 13px/1.3 var(--sans);
+  color: var(--text);
+}
+
 .rp-reports-actions {
   display: flex;
   align-items: center;
   justify-content: flex-end;
-  gap: var(--space-4);
+  gap: 6px;
   white-space: nowrap;
 }
-/* Scoped under the actions cell so this wins over globals' `:is(button, a).ghost`
-   (specificity 0,1,1) without needing !important. */
-.rp-reports-actions .rp-reports-delete {
+/* Scoped under the actions cell / bulk bar so this wins over globals' `:is(button,
+   a).ghost` (specificity 0,1,1) without needing !important. */
+.rp-reports-actions .rp-reports-delete,
+.rp-reports-bulkbar .rp-reports-delete {
   display: inline-flex;
   align-items: center;
   gap: 5px;
@@ -508,12 +579,78 @@
   background: var(--red-bg);
   border-color: var(--red-border);
 }
-.rp-reports-actions .rp-reports-delete:hover:not(:disabled) {
+.rp-reports-actions .rp-reports-delete:hover:not(:disabled),
+.rp-reports-bulkbar .rp-reports-delete:hover:not(:disabled) {
   color: var(--accent-fg);
   background: var(--red);
   border-color: var(--red);
 }
 .rp-reports-actions .rp-reports-delete:disabled { opacity: 0.6; cursor: default; }
+
+.rp-reports-menu { position: relative; display: inline-flex; }
+.rp-reports-menu-list {
+  position: absolute;
+  right: 0;
+  top: calc(100% + 4px);
+  z-index: 5;
+  min-width: 140px;
+  padding: 4px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: var(--bg-panel);
+  box-shadow: var(--shadow-md);
+}
+.rp-reports-menu-list a,
+.rp-reports-menu-list button {
+  display: block;
+  width: 100%;
+  text-align: left;
+  padding: 7px 10px;
+  border: 0;
+  background: transparent;
+  border-radius: var(--radius-sm);
+  font: 400 13px/1.3 var(--sans);
+  color: var(--text);
+  text-decoration: none;
+}
+.rp-reports-menu-list a:hover,
+.rp-reports-menu-list button:hover { background: var(--bg-subtle); }
+
+.rp-reports-pagination {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  flex-wrap: wrap;
+  padding-top: 12px;
+  margin-top: 4px;
+  border-top: 1px solid var(--border-soft);
+}
+.rp-reports-pagesize { display: flex; align-items: center; gap: 8px; font: 400 12.5px/1 var(--sans); color: var(--text-muted); }
+.rp-reports-pagesize select { width: auto; min-width: 56px; }
+.rp-reports-pages { display: flex; align-items: center; gap: 4px; }
+
+.rp-reports-preview-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 50;
+  display: grid;
+  place-items: center;
+  background: var(--scrim);
+  padding: 24px;
+}
+.rp-reports-preview {
+  width: 100%;
+  max-width: 560px;
+  max-height: 80vh;
+  overflow-y: auto;
+  margin: 0;
+}
+.rp-reports-preview-head { display: flex; align-items: center; justify-content: space-between; margin-bottom: 10px; }
+.rp-reports-preview-meta { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; margin-bottom: 12px; font-size: 13px; color: var(--text-muted); }
+.rp-reports-preview-section { margin-bottom: 12px; }
+.rp-reports-preview-section h4 { font: 600 11px/1.3 var(--sans); text-transform: uppercase; letter-spacing: 0.04em; color: var(--text-faint); margin: 0 0 4px; }
+.rp-reports-preview-section p { font: 400 13.5px/1.5 var(--sans); color: var(--text); margin: 0; white-space: pre-wrap; }
 
 /* -------- Inline banners ------------------------------------------ */
 .banner {

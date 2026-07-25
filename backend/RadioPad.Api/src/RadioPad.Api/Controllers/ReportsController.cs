@@ -115,8 +115,13 @@ public class ReportsController : TenantedController
     [HttpGet]
     public async Task<IActionResult> List(
         [FromQuery] string? modality,
+        [FromQuery] string? bodyPart,
         [FromQuery] ReportStatus? status,
         [FromQuery] string? q,
+        [FromQuery] DateTimeOffset? updatedFrom,
+        [FromQuery] DateTimeOffset? updatedTo,
+        [FromQuery] string? sortBy = "updatedAt",
+        [FromQuery] string? sortDir = "desc",
         [FromQuery] bool archived = false,
         [FromQuery] int skip = 0,
         [FromQuery] int take = 100,
@@ -136,8 +141,14 @@ public class ReportsController : TenantedController
             : query.Where(r => r.ArchivedAt == null);
         if (!string.IsNullOrWhiteSpace(modality))
             query = query.Where(r => r.Study.Modality == modality);
+        if (!string.IsNullOrWhiteSpace(bodyPart))
+            query = query.Where(r => r.Study.BodyPart == bodyPart);
         if (status is not null)
             query = query.Where(r => r.Status == status);
+        if (updatedFrom is not null)
+            query = query.Where(r => r.UpdatedAt >= updatedFrom);
+        if (updatedTo is not null)
+            query = query.Where(r => r.UpdatedAt <= updatedTo);
         if (!string.IsNullOrWhiteSpace(q))
         {
             var needle = q.Trim();
@@ -148,12 +159,88 @@ public class ReportsController : TenantedController
         }
 
         var total = await query.CountAsync(ct);
+        var ascending = string.Equals(sortDir, "asc", StringComparison.OrdinalIgnoreCase);
+        query = (sortBy?.ToLowerInvariant()) switch
+        {
+            "accession" => ascending ? query.OrderBy(r => r.Study.AccessionNumber) : query.OrderByDescending(r => r.Study.AccessionNumber),
+            "modality" => ascending ? query.OrderBy(r => r.Study.Modality) : query.OrderByDescending(r => r.Study.Modality),
+            "status" => ascending ? query.OrderBy(r => r.Status) : query.OrderByDescending(r => r.Status),
+            _ => ascending ? query.OrderBy(r => r.UpdatedAt) : query.OrderByDescending(r => r.UpdatedAt),
+        };
         var items = await query
-            .OrderByDescending(r => r.UpdatedAt)
             .Skip(skip).Take(take)
             .ToListAsync(ct);
         Response.Headers["X-Total-Count"] = total.ToString();
         return Ok(items);
+    }
+
+    /// <summary>
+    /// AUTH-009-adjacent — this worklist's own summary counts + a 14-day sparkline of
+    /// UPDATE activity per status (not a "moment of transition" event log; Report has no
+    /// per-status timestamp history, so this buckets by UpdatedAt as the closest real
+    /// signal available without a new audit-query buildout).
+    /// </summary>
+    [HttpGet("stats")]
+    public async Task<IActionResult> Stats(CancellationToken ct)
+    {
+        var (tenant, user) = await ResolveContextAsync(_db, ct);
+        var deny = RequirePermission(user, RbacPermission.ReportsRead);
+        if (deny is not null) return deny;
+
+        var all = await _db.Reports
+            .Where(r => r.TenantId == tenant.Id && r.ArchivedAt == null)
+            .Select(r => new { r.Status, r.UpdatedAt })
+            .ToListAsync(ct);
+
+        var total = all.Count;
+        var validated = all.Count(r => r.Status == ReportStatus.Validated);
+        var acknowledged = all.Count(r => r.Status == ReportStatus.Acknowledged);
+        var exported = all.Count(r => r.Status == ReportStatus.Exported);
+
+        const int trendDays = 14;
+        var today = DateTimeOffset.UtcNow.UtcDateTime.Date;
+        var buckets = Enumerable.Range(0, trendDays).Select(i => today.AddDays(-(trendDays - 1 - i))).ToArray();
+
+        int[] TrendFor(Func<ReportStatus, bool> matches) =>
+            buckets.Select(day => all.Count(r => matches(r.Status) && r.UpdatedAt.UtcDateTime.Date == day)).ToArray();
+
+        return Ok(new
+        {
+            total,
+            validated,
+            acknowledged,
+            exported,
+            trend = new
+            {
+                total = TrendFor(_ => true),
+                validated = TrendFor(s => s == ReportStatus.Validated),
+                acknowledged = TrendFor(s => s == ReportStatus.Acknowledged),
+                exported = TrendFor(s => s == ReportStatus.Exported),
+            },
+        });
+    }
+
+    /// <summary>
+    /// Report-author display names for this tenant, keyed by user id. Gated on
+    /// ReportsRead (not UsersRead) — resolving the name of someone who authored a
+    /// report the caller can already see is not a user-management action, and
+    /// requiring UsersRead would silently blank the Radiologist column for any
+    /// radiologist without that (typically admin-only) permission.
+    /// </summary>
+    [HttpGet("authors")]
+    public async Task<IActionResult> Authors(CancellationToken ct)
+    {
+        var (tenant, user) = await ResolveContextAsync(_db, ct);
+        var deny = RequirePermission(user, RbacPermission.ReportsRead);
+        if (deny is not null) return deny;
+
+        var names = await _db.Users
+            .Where(u => u.TenantId == tenant.Id)
+            .Select(u => new { u.Id, u.DisplayName, u.Email })
+            .ToListAsync(ct);
+        return Ok(names.ToDictionary(
+            n => n.Id.ToString(),
+            n => string.IsNullOrWhiteSpace(n.DisplayName) ? n.Email : n.DisplayName));
     }
 
     [HttpPost]
