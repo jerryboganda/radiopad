@@ -486,7 +486,10 @@ public class AuthController : TenantedController
                 s.ExpiresAt,
                 s.RevokedAt,
                 s.RevocationReason,
-                true))
+                true,
+                s.DeviceCategory,
+                s.DeviceDetail,
+                s.IpAddress))
             .FirstOrDefaultAsync(ct);
 
         return Ok(new
@@ -513,7 +516,10 @@ public class AuthController : TenantedController
                 s.ExpiresAt,
                 s.RevokedAt,
                 s.RevocationReason,
-                currentHash != null && s.TokenHash == currentHash))
+                currentHash != null && s.TokenHash == currentHash,
+                s.DeviceCategory,
+                s.DeviceDetail,
+                s.IpAddress))
             .ToListAsync(ct);
 
         return Ok(new { sessions });
@@ -625,7 +631,11 @@ public class AuthController : TenantedController
         DateTimeOffset ExpiresAt,
         DateTimeOffset? RevokedAt,
         string RevocationReason,
-        bool IsCurrent);
+        bool IsCurrent,
+        // AUTH-009 — null on sessions issued before these columns existed.
+        string? DeviceCategory,
+        string? DeviceDetail,
+        string? IpAddress);
 
     private async Task<OpenIdConnectConfiguration> GetOidcConfigurationAsync(string authority, CancellationToken ct)
     {

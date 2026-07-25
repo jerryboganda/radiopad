@@ -81,9 +81,20 @@ public static class EnterpriseIdentityBridge
                 "DeviceFingerprintHash" TEXT NOT NULL,
                 "IpHash" TEXT NOT NULL,
                 "UserAgentHash" TEXT NOT NULL,
-                "SessionEpochAtIssue" INTEGER NOT NULL
+                "SessionEpochAtIssue" INTEGER NOT NULL,
+                "DeviceCategory" TEXT NULL,
+                "DeviceDetail" TEXT NULL,
+                "IpAddress" TEXT NULL
             );
             """, ct);
+        // AUTH-009 — the three columns above were added after this table was already
+        // live in production; CREATE TABLE IF NOT EXISTS is a no-op there, so add
+        // them explicitly for existing databases. Guarded by pragma_table_info
+        // (not a bare try/catch on "duplicate column") to stay a real no-op on
+        // repeat startups rather than an ignored exception every time.
+        await AddColumnIfMissingAsync(db, "AuthSessions", "DeviceCategory", "TEXT NULL", ct);
+        await AddColumnIfMissingAsync(db, "AuthSessions", "DeviceDetail", "TEXT NULL", ct);
+        await AddColumnIfMissingAsync(db, "AuthSessions", "IpAddress", "TEXT NULL", ct);
 
         await db.Database.ExecuteSqlRawAsync("""CREATE INDEX IF NOT EXISTS "IX_GlobalUsers_NormalizedEmail" ON "GlobalUsers" ("NormalizedEmail");""", ct);
         await db.Database.ExecuteSqlRawAsync("""CREATE UNIQUE INDEX IF NOT EXISTS "IX_ExternalIdentities_ProviderKey_Issuer_Subject" ON "ExternalIdentities" ("ProviderKey", "Issuer", "Subject");""", ct);
@@ -99,6 +110,23 @@ public static class EnterpriseIdentityBridge
         await db.Database.ExecuteSqlRawAsync("""CREATE UNIQUE INDEX IF NOT EXISTS "IX_MagicLinks_TokenHash" ON "MagicLinks" ("TokenHash");""", ct);
         await db.Database.ExecuteSqlRawAsync("""CREATE UNIQUE INDEX IF NOT EXISTS "IX_DeviceAuth_DeviceCodeHash" ON "DeviceAuth" ("DeviceCodeHash");""", ct);
         await db.Database.ExecuteSqlRawAsync("""CREATE UNIQUE INDEX IF NOT EXISTS "IX_DeviceAuth_UserCode" ON "DeviceAuth" ("UserCode");""", ct);
+    }
+
+    /// <summary>
+    /// Idempotent `ALTER TABLE ADD COLUMN` for SQLite — table/column names here are
+    /// always call-site literals (never external input), so string interpolation
+    /// into the SQL is safe. Checked via pragma_table_info rather than a bare
+    /// try/catch on "duplicate column" so a repeat startup is a real no-op, not a
+    /// swallowed exception on every boot.
+    /// </summary>
+    private static async Task AddColumnIfMissingAsync(
+        RadioPadDbContext db, string table, string column, string columnDefinition, CancellationToken ct)
+    {
+        var exists = await db.Database
+            .SqlQueryRaw<string>($"SELECT name FROM pragma_table_info('{table}') WHERE name = '{column}'")
+            .AnyAsync(ct);
+        if (exists) return;
+        await db.Database.ExecuteSqlRawAsync($"""ALTER TABLE "{table}" ADD COLUMN "{column}" {columnDefinition};""", ct);
     }
 
     public static async Task EnsureForAllUsersAsync(RadioPadDbContext db, CancellationToken ct)
@@ -179,6 +207,7 @@ public static class EnterpriseIdentityBridge
 
         var membership = await EnsureMembershipForUserAsync(db, user, ct);
         var now = DateTimeOffset.UtcNow;
+        var (deviceCategory, deviceDetail) = UserAgentLabel.Parse(userAgent);
         var session = new AuthSession
         {
             GlobalUserId = membership.GlobalUserId,
@@ -193,6 +222,9 @@ public static class EnterpriseIdentityBridge
             IpHash = HashOptional(ip),
             UserAgentHash = HashOptional(userAgent),
             SessionEpochAtIssue = user.SessionEpoch,
+            DeviceCategory = deviceCategory,
+            DeviceDetail = deviceDetail,
+            IpAddress = string.IsNullOrWhiteSpace(ip) ? null : ip.Trim(),
         };
         db.AuthSessions.Add(session);
         try

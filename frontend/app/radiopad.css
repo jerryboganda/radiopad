@@ -114,6 +114,125 @@
   flex-wrap: wrap;
 }
 
+/* -------- Account & Security page (AUTH-001/003/009) --------------- */
+.rp-security-hero {
+  display: flex;
+  align-items: flex-start;
+  gap: 16px;
+  margin-bottom: 20px;
+}
+.rp-security-hero-icon {
+  flex: 0 0 auto;
+  display: grid;
+  place-items: center;
+  width: 56px;
+  height: 56px;
+  border-radius: 50%;
+  background: var(--accent-tint);
+  color: var(--accent);
+  box-shadow: 0 0 0 6px var(--accent-soft);
+}
+
+.rp-security-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 16px;
+  align-items: stretch;
+}
+@media (max-width: 900px) {
+  .rp-security-grid { grid-template-columns: 1fr; }
+}
+
+.rp-security-card { display: flex; flex-direction: column; }
+.rp-security-card-head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 12px;
+}
+.rp-security-card-head .rp-panel-title { margin-bottom: 0; }
+
+.rp-security-split {
+  display: flex;
+  gap: 20px;
+  align-items: flex-start;
+  flex: 1 1 auto;
+}
+.rp-security-split-body { flex: 1 1 auto; min-width: 0; }
+
+.rp-security-illustration {
+  flex: 0 0 auto;
+  display: grid;
+  place-items: center;
+  width: 96px;
+  height: 96px;
+  border-radius: var(--radius-lg);
+  background: var(--accent-tint);
+  color: var(--accent);
+}
+.rp-security-illustration.sm { width: 44px; height: 44px; border-radius: var(--radius); }
+
+.rp-security-checklist {
+  list-style: none;
+  margin: 10px 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.rp-security-checklist li {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 13px;
+  color: var(--text);
+}
+.rp-security-checklist svg { flex: 0 0 auto; color: var(--green); }
+
+.rp-security-empty {
+  flex: 1 1 auto;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+  gap: 6px;
+  padding: 8px 12px;
+}
+.rp-security-empty .rp-security-illustration { margin-bottom: 6px; }
+.rp-security-empty-title { font-size: 14px; font-weight: 600; color: var(--text-strong); margin: 0; }
+.rp-security-empty .rp-page-sub { max-width: 30ch; }
+.rp-security-empty button { margin-top: 4px; }
+
+.rp-security-method-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+}
+.rp-security-method-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 12px 0;
+  border-top: 1px solid var(--border-soft);
+}
+.rp-security-method-row:first-child { border-top: 0; padding-top: 0; }
+.rp-security-method-row:last-child { padding-bottom: 0; }
+.rp-security-method-text { flex: 1 1 auto; min-width: 0; }
+.rp-security-method-text strong { display: block; font-size: 13.5px; color: var(--text-strong); }
+.rp-security-method-text p { margin: 2px 0 0; }
+.rp-security-method-row button.icon-btn {
+  flex: 0 0 auto;
+  background: transparent;
+  border-color: transparent;
+  color: var(--text-muted);
+}
+
+.rp-security-sessions-more { margin-top: 12px; }
+
 /* Section block — label + control, used everywhere in forms. */
 .section-block { margin-bottom: 14px; }
 .section-block label {

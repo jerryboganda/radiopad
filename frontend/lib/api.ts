@@ -1311,6 +1311,20 @@ export type WebAuthnCredentialRow = {
   lastUsedAt: string | null;
 };
 
+/** AUTH-009 — one of the caller's own auth sessions (GET /api/auth/sessions). */
+export type AuthSessionRow = {
+  id: string;
+  method: string;
+  issuedAt: string;
+  expiresAt: string;
+  revokedAt: string | null;
+  revocationReason: string;
+  isCurrent: boolean;
+  deviceCategory: string | null;
+  deviceDetail: string | null;
+  ipAddress: string | null;
+};
+
 /** Iter-32 MCP-001..007 — admin registry row. `status` is `0=Submitted | 1=Approved | 2=Blocked`. */
 export type McpToolRow = {
   id: string;
@@ -2789,6 +2803,12 @@ export const api = {
       request<WebAuthnCredentialRow[]>('/api/auth/webauthn/credentials'),
     webAuthnDeleteCredential: (id: string) =>
       request<void>(`/api/auth/webauthn/credentials/${encodeURIComponent(id)}`, { method: 'DELETE' }),
+    /** AUTH-009 — the caller's own active sessions, newest first. DeviceCategory/
+     *  DeviceDetail/IpAddress are null on sessions issued before those columns
+     *  existed; the Settings security page falls back to "Unknown device" / "—". */
+    sessions: () => request<{ sessions: AuthSessionRow[] }>('/api/auth/sessions'),
+    revokeSession: (id: string) =>
+      request<{ ok: boolean; revoked: boolean }>(`/api/auth/sessions/${encodeURIComponent(id)}/revoke`, { method: 'POST' }),
     webAuthnRegisterOptions: (label?: string) =>
       request<{
         rp: { id: string; name: string };

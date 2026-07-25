@@ -182,6 +182,19 @@ public class AuthSession : Entity
     public string IpHash { get; set; } = "";
     public string UserAgentHash { get; set; } = "";
     public int SessionEpochAtIssue { get; set; }
+
+    /// <summary>
+    /// AUTH-009 — coarse device category parsed from the User-Agent at issue time
+    /// (e.g. "Windows Desktop", "iOS device"), for the account owner's own
+    /// "Active sessions" list. Plaintext by design (unlike <see cref="UserAgentHash"/>,
+    /// which exists for fraud/lockout signal, not display) — null on sessions issued
+    /// before this field existed.
+    /// </summary>
+    public string? DeviceCategory { get; set; }
+    /// <summary>Browser + OS detail line paired with <see cref="DeviceCategory"/>, e.g. "Chrome 126 on Windows".</summary>
+    public string? DeviceDetail { get; set; }
+    /// <summary>Plaintext IP the session was issued from, for the account owner's own session list. Unlike <see cref="IpHash"/>, not used for any security decision.</summary>
+    public string? IpAddress { get; set; }
 }
 
 public class ProviderConfig : Entity
