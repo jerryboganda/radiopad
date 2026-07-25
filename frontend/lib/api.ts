@@ -996,6 +996,37 @@ export type ReportTemplate = {
   approvedAt?: string | null;
 };
 
+/**
+ * Findings Library — a hand-authored reusable snippet. The tenant-scoped
+ * counterpart to the phrases the library derives from `ReportTemplate`, with the
+ * same `sectionsJson` shape so both render through one code path.
+ */
+export type Snippet = {
+  id: string;
+  name: string;
+  modality: string;
+  bodyPart: string;
+  /** Free-text grouping, shown as a filter chip alongside template subspecialties. */
+  category: string;
+  /** JSON array of `{ id, label, text }`. */
+  sectionsJson: string;
+  createdByUserId: string;
+  createdAt: string;
+  updatedAt: string;
+};
+
+/** Findings Library — loose reference to either a template group or a snippet. */
+export type LibraryRef = {
+  entityType: 'template' | 'snippet';
+  entityKey: string;
+};
+
+/** Findings Library — a library item the caller has pulled into a draft before. */
+export type LibraryRecentUse = LibraryRef & {
+  lastUsedAt: string;
+  useCount: number;
+};
+
 /** Iter-36 — admin-managed catalog row (Modality or BodyPart), tenant-scoped. */
 export type CatalogItem = {
   id: string;
@@ -2306,6 +2337,56 @@ export const api = {
         byUser: Array<{ userId: string; count: number }>;
         byModality: Array<{ modality: string; count: number }>;
       }>(`/api/templates/${id}/usage`),
+  },
+  /**
+   * Findings Library — custom snippets plus the two per-user overlays (stars and
+   * the "used in report" trail) that apply to both snippets and template-derived
+   * groups. Reads are open to every tenant member; a snippet may only be edited
+   * or deleted by its author or a reporting administrator.
+   */
+  findingsLibrary: {
+    listSnippets: () => request<Snippet[]>('/api/findings-library/snippets'),
+    saveSnippet: (body: {
+      id?: string;
+      name: string;
+      modality?: string;
+      bodyPart?: string;
+      category?: string;
+      sectionsJson?: string;
+    }) =>
+      request<Snippet>('/api/findings-library/snippets', {
+        method: 'POST',
+        body: JSON.stringify(body),
+      }),
+    deleteSnippet: (id: string) =>
+      request<void>(`/api/findings-library/snippets/${id}`, { method: 'DELETE' }),
+    /** Bulk create. The client parses the uploaded file; the server never sniffs formats. */
+    importSnippets: (snippets: Array<{
+      name: string;
+      modality?: string;
+      bodyPart?: string;
+      category?: string;
+      sectionsJson?: string;
+    }>) =>
+      request<{ imported: number; skipped: string[]; items: Snippet[] }>(
+        '/api/findings-library/snippets/import',
+        { method: 'POST', body: JSON.stringify({ snippets }) },
+      ),
+    favorites: () => request<LibraryRef[]>('/api/findings-library/favorites'),
+    toggleFavorite: (body: LibraryRef & { favorite: boolean }) =>
+      request<LibraryRef & { favorite: boolean }>('/api/findings-library/favorites', {
+        method: 'POST',
+        body: JSON.stringify(body),
+      }),
+    recent: (limit?: number) =>
+      request<LibraryRecentUse[]>(
+        `/api/findings-library/recent${limit ? `?limit=${limit}` : ''}`,
+      ),
+    recordUse: (body: LibraryRef) =>
+      request<void>('/api/findings-library/recent', {
+        method: 'POST',
+        body: JSON.stringify(body),
+      }),
   },
   /**
    * Iter-36 — admin-managed imaging-modality catalog (tenant-scoped). Reads are

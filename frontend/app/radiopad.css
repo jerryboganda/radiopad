@@ -4681,3 +4681,248 @@
     opacity: 0.5;
   }
 }
+
+/* ---------------------------------------------------------------------------
+   Findings Library (/findings-library)
+   Two-column reading surface: a filtered list of reusable phrasing on the left,
+   a counts + tips rail on the right. Page-scoped so the shared card/chip classes
+   keep working unchanged on Rulebooks and Reports.
+   ------------------------------------------------------------------------- */
+.rp-fl-hero {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 16px;
+  margin-bottom: 20px;
+}
+.rp-fl-hero-main { display: flex; align-items: flex-start; gap: 16px; min-width: 0; }
+.rp-fl-hero-icon {
+  flex: 0 0 auto;
+  display: grid;
+  place-items: center;
+  width: 56px;
+  height: 56px;
+  border-radius: var(--radius-lg);
+  background: var(--accent-tint);
+  color: var(--accent);
+}
+.rp-fl-hero-text { flex: 1 1 auto; min-width: 0; }
+.rp-fl-hero-actions { flex: 0 0 auto; display: flex; gap: 8px; }
+
+.rp-fl-layout {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 280px;
+  gap: 20px;
+  align-items: start;
+}
+@media (max-width: 1080px) {
+  .rp-fl-layout { grid-template-columns: minmax(0, 1fr); }
+}
+
+.rp-fl-toolbar { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; margin-bottom: 12px; }
+.rp-fl-toolbar .rp-search { flex: 1 1 240px; max-width: none; }
+.rp-fl-select {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  height: 34px;
+  padding: 0 10px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: var(--bg-panel);
+  color: var(--text-muted);
+}
+.rp-fl-select select {
+  border: 0;
+  background: transparent;
+  color: var(--text);
+  font: 400 13px/1.4 var(--sans);
+  outline: none;
+}
+
+.rp-fl-chips { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 14px; }
+.rp-fl-chip {
+  height: 28px;
+  padding: 0 12px;
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  background: var(--bg-panel);
+  color: var(--text-muted);
+  font: 500 12.5px/1 var(--sans);
+  cursor: pointer;
+}
+.rp-fl-chip:hover { border-color: var(--border-strong); color: var(--text); }
+.rp-fl-chip.active {
+  background: var(--accent);
+  border-color: var(--accent);
+  color: var(--accent-fg);
+}
+
+.rp-fl-count { font: 400 12.5px/1 var(--sans); color: var(--text-muted); margin-left: auto; }
+
+.rp-fl-list { display: flex; flex-direction: column; gap: 14px; }
+.rp-fl-item { display: flex; flex-direction: column; gap: 10px; cursor: default; }
+.rp-fl-item-head { display: flex; align-items: flex-start; gap: 10px; }
+.rp-fl-item-title { font: 600 15px/1.3 var(--sans); color: var(--text-strong); margin: 0; }
+.rp-fl-item-sub { font: 400 12px/1.4 var(--sans); color: var(--text-muted); }
+.rp-fl-item-tools { margin-left: auto; display: flex; align-items: center; gap: 4px; flex: 0 0 auto; }
+
+/* The star is a colour + fill change, never colour alone — an unstarred item is
+   an outline, a starred one is filled and amber. */
+.rp-fl-star {
+  display: inline-grid;
+  place-items: center;
+  width: 30px;
+  height: 30px;
+  border: 1px solid transparent;
+  border-radius: var(--radius);
+  background: transparent;
+  color: var(--text-faint);
+  cursor: pointer;
+}
+.rp-fl-star:hover { background: var(--bg-subtle); color: var(--text-muted); }
+.rp-fl-star.on { color: var(--amber); }
+
+.rp-fl-source {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  height: 20px;
+  padding: 0 8px;
+  border-radius: 999px;
+  font: 600 10.5px/1 var(--sans);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+.rp-fl-source.template { background: var(--blue-bg); color: var(--blue); border: 1px solid var(--blue-border); }
+.rp-fl-source.snippet { background: var(--ai-bg); color: var(--ai); border: 1px solid var(--ai-border); }
+
+.rp-fl-phrases { margin: 0; padding: 0; list-style: none; display: flex; flex-direction: column; }
+.rp-fl-phrase {
+  display: flex;
+  gap: 12px;
+  align-items: flex-start;
+  padding: 10px 0;
+  border-bottom: 1px solid var(--border);
+}
+.rp-fl-phrase:last-child { border-bottom: 0; }
+.rp-fl-phrase-body { flex: 1 1 auto; min-width: 0; }
+.rp-fl-phrase-label {
+  font: 600 10.5px/1.3 var(--sans);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--text-faint);
+  margin-bottom: 4px;
+}
+.rp-fl-phrase-text {
+  font: 400 13px/1.55 var(--sans);
+  color: var(--text);
+  margin: 0;
+  white-space: pre-wrap;
+  overflow-wrap: break-word;
+}
+.rp-fl-phrase-actions { flex: 0 0 auto; display: flex; gap: 6px; }
+
+.rp-fl-item-foot { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+.rp-fl-item-foot .rp-fl-used { font: 400 11.5px/1 var(--sans); color: var(--text-faint); margin-left: auto; }
+
+.rp-fl-menu { position: relative; display: inline-flex; }
+.rp-fl-menu-list {
+  position: absolute;
+  right: 0;
+  top: calc(100% + 4px);
+  z-index: 20;
+  min-width: 160px;
+  padding: 4px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: var(--bg-panel);
+  box-shadow: var(--shadow-md);
+}
+.rp-fl-menu-list button {
+  display: block;
+  width: 100%;
+  text-align: left;
+  padding: 7px 10px;
+  border: 0;
+  border-radius: var(--radius-sm);
+  background: transparent;
+  color: var(--text);
+  font: 400 13px/1.3 var(--sans);
+  cursor: pointer;
+}
+.rp-fl-menu-list button:hover { background: var(--bg-subtle); }
+.rp-fl-menu-list button.danger { color: var(--red); }
+
+.rp-fl-rail { display: flex; flex-direction: column; gap: 14px; }
+.rp-fl-rail-title {
+  font: 600 11px/1.3 var(--sans);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--text-faint);
+  margin: 0 0 10px;
+}
+.rp-fl-rail-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  padding: 8px 10px;
+  border: 1px solid transparent;
+  border-radius: var(--radius);
+  background: transparent;
+  color: var(--text);
+  font: 400 13px/1.3 var(--sans);
+  text-align: left;
+  cursor: pointer;
+}
+.rp-fl-rail-row:hover { background: var(--bg-subtle); }
+.rp-fl-rail-row.active { background: var(--bg-selected); border-color: var(--accent); color: var(--text-strong); }
+.rp-fl-rail-row .rp-fl-rail-count { margin-left: auto; font: 600 12px/1 var(--sans); color: var(--text-muted); }
+
+.rp-fl-pagination {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  flex-wrap: wrap;
+  margin-top: 16px;
+}
+.rp-fl-pages { display: flex; align-items: center; gap: 4px; }
+
+.rp-fl-modal-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 50;
+  display: grid;
+  place-items: center;
+  background: var(--scrim);
+  padding: 24px;
+}
+.rp-fl-modal {
+  width: 100%;
+  max-width: 620px;
+  max-height: 84vh;
+  overflow-y: auto;
+  margin: 0;
+}
+.rp-fl-modal-head { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-bottom: 14px; }
+.rp-fl-modal-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; margin-bottom: 14px; }
+@media (max-width: 560px) {
+  .rp-fl-modal-grid { grid-template-columns: minmax(0, 1fr); }
+}
+.rp-fl-field { display: flex; flex-direction: column; gap: 4px; }
+.rp-fl-field > label {
+  font: 600 11px/1.3 var(--sans);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--text-faint);
+}
+.rp-fl-section { margin-bottom: 10px; }
+.rp-fl-section textarea {
+  width: 100%;
+  min-height: 64px;
+  resize: vertical;
+  font: 400 13px/1.5 var(--sans);
+}
+.rp-fl-modal-foot { display: flex; align-items: center; justify-content: flex-end; gap: 8px; margin-top: 6px; }

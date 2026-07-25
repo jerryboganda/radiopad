@@ -76,6 +76,15 @@ public class RadioPadDbContext : DbContext
     /// <summary>PRD RPT-021 — tenant / subspecialty shared autotext macros.</summary>
     public DbSet<SharedMacro> SharedMacros => Set<SharedMacro>();
 
+    /// <summary>Findings Library — user-authored reusable snippets. Schema bootstrapped by FindingsLibrarySchema.</summary>
+    public DbSet<Snippet> Snippets => Set<Snippet>();
+
+    /// <summary>Findings Library — per-user stars over templates and snippets.</summary>
+    public DbSet<LibraryFavorite> LibraryFavorites => Set<LibraryFavorite>();
+
+    /// <summary>Findings Library — append-only "used in report" events.</summary>
+    public DbSet<LibraryRecentUse> LibraryRecentUses => Set<LibraryRecentUse>();
+
     /// <summary>Durable AI generation jobs — the restart-surviving counterpart to AiJobRegistry.</summary>
     public DbSet<AiJob> AiJobs => Set<AiJob>();
 

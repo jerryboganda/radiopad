@@ -766,6 +766,9 @@ if (!app.Environment.IsEnvironment("Testing"))
     // before seeding or serving traffic, since both DevSeed and the runtime
     // sign-in path (RecordAuthSessionAsync) query these tables.
     await EnterpriseIdentityBridge.EnsureSchemaAsync(db, default);
+    // Same story for the Findings Library tables (Snippets / LibraryFavorites /
+    // LibraryRecentUses) — created here rather than by a migration.
+    await FindingsLibrarySchema.EnsureSchemaAsync(db, default);
     if (app.Environment.IsDevelopment() || Environment.GetEnvironmentVariable("RADIOPAD_DEV_SEED") == "1")
     {
         // Prefer the app-relative bundle layout (the Tauri desktop ships rulebooks/

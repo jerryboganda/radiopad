@@ -1553,3 +1553,51 @@ public class TeachingCase : Entity
     /// <summary>TF-008 — read counter, incremented on each detail fetch by a non-author.</summary>
     public int ViewCount { get; set; }
 }
+
+/// <summary>
+/// Findings Library — a user-authored reusable finding/impression snippet, the
+/// hand-written counterpart to the phrases derived from <see cref="ReportTemplate"/>.
+/// Unlike a template it is never attached to a study type by the engine; it exists
+/// purely to be copied into a draft by a radiologist.
+/// </summary>
+public class Snippet : Entity
+{
+    public Guid TenantId { get; set; }
+    /// <summary>Author. Snippets are tenant-visible, not private — this is provenance, not an ACL.</summary>
+    public Guid CreatedByUserId { get; set; }
+    public string Name { get; set; } = "";
+    public string Modality { get; set; } = "";
+    public string BodyPart { get; set; } = "";
+    /// <summary>Free-text grouping shown as a filter chip alongside template subspecialties (e.g. "Neuro", "Chest").</summary>
+    public string? Category { get; set; }
+    /// <summary>JSON array of <c>{ id, label, text }</c> — mirrors <see cref="ReportTemplate.SectionsJson"/>.</summary>
+    public string SectionsJson { get; set; } = "[]";
+}
+
+/// <summary>
+/// Findings Library — a per-user star on either a template-derived group or a
+/// custom snippet. <see cref="EntityType"/> is "template" or "snippet";
+/// <see cref="EntityKey"/> is the corresponding row id. Kept as a loose key
+/// rather than two nullable FKs so the same table serves both without a
+/// migration when a third library source appears.
+/// </summary>
+public class LibraryFavorite : Entity
+{
+    public Guid TenantId { get; set; }
+    public Guid UserId { get; set; }
+    public string EntityType { get; set; } = "";
+    public string EntityKey { get; set; } = "";
+}
+
+/// <summary>
+/// Findings Library — an append-only "used in report" event, powering the
+/// Recently used sidebar count and the "recent" sort. One row per use;
+/// the read path groups by <see cref="EntityKey"/> and takes the newest.
+/// </summary>
+public class LibraryRecentUse : Entity
+{
+    public Guid TenantId { get; set; }
+    public Guid UserId { get; set; }
+    public string EntityType { get; set; } = "";
+    public string EntityKey { get; set; } = "";
+}

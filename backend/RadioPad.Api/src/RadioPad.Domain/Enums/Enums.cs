@@ -412,6 +412,12 @@ public enum AuditAction
     /// delete and survives it (AuditEvent.ReportId is nullable). Details record the report id,
     /// accession, status, modality, and body part — never report text.</summary>
     ReportHardDeleted = 131,
+
+    /// <summary>Findings Library — a custom snippet was created, updated, deleted, or imported.
+    /// Details record the snippet id, name, modality/body part and which action ran. Snippets are
+    /// clinical boilerplate authored by radiologists, so the body itself is never audited — only
+    /// the fact that the shared library changed and who changed it.</summary>
+    SnippetChanged = 132,
 }
 
 /// <summary>
