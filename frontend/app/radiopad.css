@@ -4577,8 +4577,13 @@
   color: var(--text-strong);
   line-height: 1.3;
 }
+/* Shrink-to-fit, not block: as a block this <code> stretched to the full column
+   width and its inherited background rendered as a long grey bar trailing off
+   past the id. inline-block keeps the background hugging the text while still
+   allowing a long id to wrap. */
 .rp-model-id {
-  display: block;
+  display: inline-block;
+  max-width: 100%;
   margin-top: 2px;
   font-family: var(--font-mono, ui-monospace, monospace);
   font-size: 11px;
