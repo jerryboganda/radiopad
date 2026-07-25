@@ -166,6 +166,7 @@ export default function UsageDashboardPage() {
 
       <div className="rp-panel rp-anim-fade-in-up">
         <div className="rp-panel-title">Month by month</div>
+        <div className="rp-table-scroll">
         <table className="rp-table">
           <thead>
             <tr>
@@ -197,6 +198,7 @@ export default function UsageDashboardPage() {
             ))}
           </tbody>
         </table>
+        </div>
       </div>
 
       {rows.some((r) => r.ai && r.ai.byProvider.length > 0) && (
@@ -206,6 +208,7 @@ export default function UsageDashboardPage() {
             const last = rows[rows.length - 1];
             if (!last?.ai) return <p className="rp-page-sub">No AI activity.</p>;
             return (
+              <div className="rp-table-scroll">
               <table className="rp-table">
                 <thead>
                   <tr>
@@ -240,6 +243,7 @@ export default function UsageDashboardPage() {
                   ))}
                 </tbody>
               </table>
+              </div>
             );
           })()}
         </details>

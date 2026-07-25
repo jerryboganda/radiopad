@@ -593,6 +593,14 @@ in pages:
   `.metric-card-value` / `.metric-card-label` — KPI tiles.
 - `.table-wrap` + `.data-table` — bordered panel table (uppercase `th` on
   `--bg-subtle`, row hover).
+- `.rp-table-scroll` — horizontal scroll container for a wide table. **Wrap any
+  table that can outgrow its container in this.** Two opposite failure modes make
+  it necessary, and neither raises an error or logs anything: a bare `.rp-table`
+  wider than the viewport drags the whole *page* sideways, while `.table-wrap` is
+  `overflow: clip` and silently amputates the last columns with no scrollbar. The
+  class carries a `min-width` on its table so the table scrolls rather than
+  compressing cells into one-word-per-line columns. If a specific column still
+  collapses, give that cell a `min-width` too (see `.rp-providers-name`).
 - `.tab-list` / `.tab-button` (`[aria-selected]` → accent fill).
 - `.view-panel`, `.list-panel`, `.empty-state`, `.masthead`,
   `.source-pill` / `.section-kicker`.

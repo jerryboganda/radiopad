@@ -207,7 +207,7 @@ export default function ProvidersPage() {
             action={<button className="ghost" onClick={newProvider}>Add model</button>}
           />
         ) : (
-          <div style={{ overflowX: 'auto' }}>
+          <div className="rp-table-scroll">
           <table className="rp-table">
             <thead>
               <tr>
@@ -224,7 +224,7 @@ export default function ProvidersPage() {
             <tbody>
               {items.map((p) => (
                 <tr key={p.id}>
-                  <td>{p.name}</td>
+                  <td className="rp-providers-name">{p.name}</td>
                   <td>{p.adapter}</td>
                   <td>{p.model || <span className="rp-faint">(default)</span>}</td>
                   <td>

@@ -477,6 +477,19 @@
 .badge.danger { background: var(--red-bg);    border-color: var(--red-border);    color: var(--red); }
 
 /* -------- Tables (used by audit / report list) -------------------- */
+/* Horizontal scroll container for a wide table.
+   Two opposite failure modes make this necessary, and neither raises an error:
+   a bare .rp-table wider than the viewport drags the whole PAGE sideways, while
+   the shared .table-wrap is `overflow: clip` and amputates the last columns
+   with no scrollbar at all. Wrap any table that can exceed its container in
+   this instead of either. */
+.rp-table-scroll { overflow-x: auto; }
+.rp-table-scroll > .rp-table { min-width: 520px; }
+/* Provider display names run long ("MedGemma 1.5 4B (Q4_K_M) — on-device report
+   formatter"). Without a floor the browser hands this column ~99px and the name
+   becomes one word per line; with it the table simply scrolls instead. */
+.rp-providers-name { min-width: 190px; }
+
 .rp-table { width: 100%; border-collapse: collapse; }
 .rp-table th, .rp-table td { text-align: left; padding: 10px 12px; border-bottom: 1px solid var(--border-soft); font-size: 13px; }
 .rp-table th { font-size: 11px; text-transform: uppercase; letter-spacing: 0.06em; color: var(--text-muted); font-weight: 600; }
