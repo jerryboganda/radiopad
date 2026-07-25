@@ -556,7 +556,6 @@
   font: 400 13.5px/1.45 var(--sans);
   color: var(--text-muted);
   margin: 0;
-  max-width: 72ch;
 }
 
 .rp-page-actions {
