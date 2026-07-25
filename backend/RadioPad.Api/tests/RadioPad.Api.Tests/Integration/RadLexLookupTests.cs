@@ -16,8 +16,12 @@ public class RadLexLookupTests : IClassFixture<RadioPadAppFactory>
         var resp = await client.GetAsync("/api/terminology/radlex/search?q=lung&take=5");
         Assert.Equal(HttpStatusCode.OK, resp.StatusCode);
         var doc = await JsonDocument.ParseAsync(await resp.Content.ReadAsStreamAsync());
-        Assert.True(doc.RootElement.GetArrayLength() >= 1);
-        var first = doc.RootElement[0];
+        var total = doc.RootElement.GetProperty("total").GetInt32();
+        var hits = doc.RootElement.GetProperty("hits");
+        Assert.True(total >= 1);
+        Assert.True(hits.GetArrayLength() >= 1);
+        Assert.True(hits.GetArrayLength() <= total);
+        var first = hits[0];
         Assert.True(first.TryGetProperty("rid", out _));
         Assert.True(first.TryGetProperty("preferredLabel", out _));
     }

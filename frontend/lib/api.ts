@@ -1219,6 +1219,8 @@ export type RadLexHit = {
   preferredName: string;
   synonyms?: string[] | null;
   definition?: string | null;
+  /** Coarse RadLex bucket: "anatomy" | "finding" | "modality" | "technique" | "qualifier". */
+  category?: string | null;
 };
 
 // Backend wire shape for /api/terminology/radlex/search.
@@ -3075,19 +3077,23 @@ export const api = {
     },
   },
   terminology: {
-    radlexSearch: async (q: string, take = 20): Promise<RadLexHit[]> => {
+    radlexSearch: async (q: string, take = 20): Promise<{ total: number; hits: RadLexHit[] }> => {
       const sp = new URLSearchParams();
       sp.set('q', q);
       sp.set('take', String(take));
-      const wire = await request<RadLexHitWire[]>(
+      const wire = await request<{ total: number; hits: RadLexHitWire[] }>(
         `/api/terminology/radlex/search?${sp.toString()}`,
       );
-      return wire.map((w) => ({
-        code: w.rid,
-        preferredName: w.preferredLabel,
-        synonyms: w.synonyms ?? [],
-        definition: null,
-      }));
+      return {
+        total: wire.total,
+        hits: wire.hits.map((w) => ({
+          code: w.rid,
+          preferredName: w.preferredLabel,
+          synonyms: w.synonyms ?? [],
+          definition: null,
+          category: w.category ?? null,
+        })),
+      };
     },
     rads: async (system: string): Promise<RadsEntry[]> => {
       const sys = await request<RadsSystemWire>(

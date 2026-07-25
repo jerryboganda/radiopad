@@ -3005,13 +3005,17 @@ ull`` clears the override and the UI falls back to
           schema: { type: integer, default: 20, maximum: 100 }
       responses:
         '200':
-          description: Matching concepts.
+          description: Matching concepts, plus the total match count before the `take` cap.
           content:
             application/json:
               schema:
-                type: array
-                items:
-                  $ref: '#/components/schemas/RadLexConcept'
+                type: object
+                properties:
+                  total: { type: integer }
+                  hits:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/RadLexConcept'
         '400': { description: q is required. }
   /api/terminology/radlex/CodeSystem:
     get:

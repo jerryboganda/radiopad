@@ -1086,6 +1086,177 @@
   box-shadow: var(--shadow-xs);
 }
 
+/* -------- Terminology page (page-scoped: do not reuse .rp-tabs/.rp-tab,
+   those are shared with prompts/rulebooks and must stay untouched) ------ */
+.rp-term-hero {
+  display: flex;
+  align-items: flex-start;
+  gap: 16px;
+  margin-bottom: 20px;
+}
+.rp-term-hero-icon {
+  flex: 0 0 auto;
+  display: grid;
+  place-items: center;
+  width: 56px;
+  height: 56px;
+  border-radius: var(--radius-lg);
+  background: var(--accent-tint);
+  color: var(--accent);
+}
+.rp-term-hero-text { flex: 1 1 auto; min-width: 0; }
+
+.rp-term-tabs {
+  display: flex;
+  gap: 20px;
+  border-bottom: 1px solid var(--border);
+  margin-bottom: 16px;
+}
+.rp-term-tab {
+  appearance: none;
+  background: transparent;
+  border: 0;
+  border-bottom: 2px solid transparent;
+  padding: 10px 2px;
+  margin-bottom: -1px;
+  font: 600 13.5px/1 var(--sans);
+  color: var(--text-muted);
+  cursor: pointer;
+}
+.rp-term-tab:hover { color: var(--text); }
+.rp-term-tab.active { color: var(--accent); border-bottom-color: var(--accent); }
+
+.rp-term-toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 16px;
+}
+.rp-term-search {
+  flex: 1 1 260px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 12px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: var(--bg-panel);
+  color: var(--text-faint);
+}
+.rp-term-search input {
+  flex: 1 1 auto;
+  border: 0;
+  background: transparent;
+  color: var(--text);
+  font: 400 13.5px/1.4 var(--sans);
+  outline: none;
+}
+.rp-term-search kbd {
+  flex: 0 0 auto;
+  font: 500 11px/1 var(--sans);
+  color: var(--text-faint);
+  background: var(--bg-subtle);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  padding: 2px 6px;
+}
+.rp-term-select {
+  flex: 0 0 auto;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 7px 10px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: var(--bg-panel);
+  color: var(--text-muted);
+}
+.rp-term-select.sm { padding: 4px 8px; }
+.rp-term-select select {
+  border: 0;
+  background: transparent;
+  color: var(--text);
+  font: 400 13px/1.4 var(--sans);
+  outline: none;
+}
+.rp-term-chips { display: flex; flex-wrap: wrap; gap: 6px; }
+.rp-term-chip {
+  appearance: none;
+  padding: 7px 14px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-pill);
+  background: var(--bg-panel);
+  color: var(--text);
+  font: 500 12.5px/1 var(--sans);
+  cursor: pointer;
+}
+.rp-term-chip:hover { background: var(--bg-subtle); }
+.rp-term-chip.active { background: var(--accent-tint); border-color: var(--accent); color: var(--accent); }
+
+.rp-term-error {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  padding: 14px 16px;
+  margin-bottom: 16px;
+  border: 1px solid var(--amber-border);
+  border-radius: var(--radius);
+  background: var(--amber-bg);
+  color: var(--amber);
+}
+.rp-term-error-text { flex: 1 1 auto; display: flex; flex-direction: column; gap: 2px; color: var(--text); }
+.rp-term-error-text strong { color: var(--text-strong); font-size: 13.5px; }
+.rp-term-error-text span { font-size: 12.5px; color: var(--text-muted); }
+.rp-term-error-actions { flex: 0 0 auto; display: flex; gap: 8px; }
+
+.rp-term-results-head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 12px;
+}
+.rp-term-results-meta { flex: 0 0 auto; display: flex; align-items: center; gap: 10px; }
+.rp-term-empty { padding: 24px 0; text-align: center; }
+
+.rp-term-table td { vertical-align: top; }
+.rp-term-code {
+  appearance: none;
+  background: transparent;
+  border: 0;
+  padding: 0;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  color: var(--link);
+  font: 500 12.5px/1.4 var(--font-mono, ui-monospace, monospace);
+  cursor: pointer;
+}
+.rp-term-code:hover { text-decoration: underline; }
+.rp-term-view-all { text-align: center; margin-top: 12px; }
+
+.rp-term-tips { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 12px; }
+.rp-term-tips li { display: flex; align-items: flex-start; gap: 10px; }
+.rp-term-tips li svg { flex: 0 0 auto; margin-top: 2px; color: var(--accent); }
+.rp-term-tips li strong { display: block; font-size: 12.5px; color: var(--text-strong); }
+.rp-term-tips li p { margin: 2px 0 0; font-size: 12px; color: var(--text-muted); line-height: 1.5; }
+
+.rp-term-disclaimer {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  padding: 12px 14px;
+  border: 1px solid var(--border-soft);
+  border-radius: var(--radius);
+  background: var(--bg-subtle);
+  color: var(--text-muted);
+  font-size: 12px;
+  line-height: 1.5;
+}
+.rp-term-disclaimer svg { flex: 0 0 auto; margin-top: 1px; }
+.rp-help-title svg { vertical-align: -2px; margin-right: 4px; }
+
 /* ============================================================
    Iter-36 — Mobile workflows (Capacitor + responsive web).
   Mobile pages (`/mobile/dictate?reportId=...`, `/mobile/reports/edit?reportId=...`,

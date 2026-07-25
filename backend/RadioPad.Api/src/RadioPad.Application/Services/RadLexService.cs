@@ -27,6 +27,11 @@ public interface IRadLexService
     /// (shortest first) for deterministic ranking.</summary>
     IReadOnlyList<RadLexConcept> Search(string prefix, int take = 20);
 
+    /// <summary>Count of concepts <see cref="Search"/> would match for this prefix,
+    /// before the <c>take</c> cap — so the UI can show "N of TOTAL" honestly instead
+    /// of implying the page size is the whole result set.</summary>
+    int CountMatches(string prefix);
+
     /// <summary>Total concept count (used by the FHIR CodeSystem stub).</summary>
     int Count { get; }
 
@@ -73,7 +78,16 @@ public sealed class RadLexService : IRadLexService
         return null;
     }
 
-    public IReadOnlyList<RadLexConcept> Search(string prefix, int take = 20)
+    public IReadOnlyList<RadLexConcept> Search(string prefix, int take = 20) =>
+        MatchAll(prefix)
+            .OrderBy(c => c.PreferredLabel.Length)
+            .ThenBy(c => c.PreferredLabel, StringComparer.OrdinalIgnoreCase)
+            .Take(Math.Clamp(take, 1, 200))
+            .ToList();
+
+    public int CountMatches(string prefix) => MatchAll(prefix).Count;
+
+    private IReadOnlyList<RadLexConcept> MatchAll(string prefix)
     {
         if (string.IsNullOrWhiteSpace(prefix)) return Array.Empty<RadLexConcept>();
         var p = prefix.Trim();
@@ -90,11 +104,7 @@ public sealed class RadLexService : IRadLexService
                 hits.Add(c);
             }
         }
-        return hits
-            .OrderBy(c => c.PreferredLabel.Length)
-            .ThenBy(c => c.PreferredLabel, StringComparer.OrdinalIgnoreCase)
-            .Take(Math.Clamp(take, 1, 200))
-            .ToList();
+        return hits;
     }
 
     private static List<RadLexConcept> LoadFromYaml(string path)

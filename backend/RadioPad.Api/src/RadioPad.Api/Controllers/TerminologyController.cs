@@ -34,13 +34,17 @@ public class TerminologyController : TenantedController
         if (string.IsNullOrWhiteSpace(q))
             return BadRequest(new { error = "Query parameter 'q' is required.", kind = "validation" });
         var hits = _radlex.Search(q, take);
-        return Ok(hits.Select(c => new
+        return Ok(new
         {
-            rid = c.Rid,
-            preferredLabel = c.PreferredLabel,
-            synonyms = c.Synonyms,
-            category = c.Category,
-        }));
+            total = _radlex.CountMatches(q),
+            hits = hits.Select(c => new
+            {
+                rid = c.Rid,
+                preferredLabel = c.PreferredLabel,
+                synonyms = c.Synonyms,
+                category = c.Category,
+            }),
+        });
     }
 
     /// <summary>STD-001 — minimal FHIR R4 CodeSystem resource for RadLex®.</summary>
