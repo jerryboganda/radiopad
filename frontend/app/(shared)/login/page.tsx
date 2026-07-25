@@ -241,8 +241,11 @@ function LoginContent() {
     resetTransient();
     try {
       const result = await signInWithPasskey({ tenant: tenant.trim(), user: user.trim() });
-      localStorage.setItem(LS_TENANT, tenant.trim());
-      localStorage.setItem(LS_USER, user.trim());
+      // Persist the server's canonical casing (matching submitPassword/verifyEnrollment),
+      // not the raw typed values — a casing drift here made the MFA status check 404
+      // against the DB's stored email/tenant on a later visit.
+      localStorage.setItem(LS_TENANT, result.tenant ?? tenant.trim());
+      localStorage.setItem(LS_USER, result.user ?? user.trim());
       await finishLogin(result);
     } catch (ex) {
       const e2 = ex as { body?: { error?: string }; message?: string; name?: string };

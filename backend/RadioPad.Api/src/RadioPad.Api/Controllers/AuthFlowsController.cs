@@ -206,7 +206,13 @@ public class MfaController : ControllerBase
     {
         var t = await _db.Tenants.FirstOrDefaultAsync(x => x.Slug == slug, ct);
         if (t is null) return (null, null);
-        var u = await _db.Users.FirstOrDefaultAsync(x => x.TenantId == t.Id && x.Email == email, ct);
+        // Case-insensitive, matching AuthorizeBody's OrdinalIgnoreCase identity check above:
+        // a case-sensitive match here made Status/Enroll/Verify/Login 404 whenever the
+        // caller's email casing (e.g. from localStorage/query string) drifted from the
+        // stored casing, which surfaced as "already enrolled" accounts being told to
+        // set up TOTP again.
+        var emailLower = email.ToLowerInvariant();
+        var u = await _db.Users.FirstOrDefaultAsync(x => x.TenantId == t.Id && x.Email.ToLower() == emailLower, ct);
         return (u, t);
     }
 
