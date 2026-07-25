@@ -63,6 +63,15 @@ builder.Services.AddDbContext<RadioPadDbContext>(opt =>
     else
     {
         opt.UseSqlite(conn);
+        // SqliteConnectionStringBuilder.DefaultTimeout defaults to 30s, but that setting does
+        // not translate into libSQL's sqlite3_busy_timeout the way it appears to — this app was
+        // observing near-instant "database is locked" failures (single-digit ms) rather than a
+        // multi-second wait, which is only possible if no busy handler is actually registered.
+        // PRAGMA busy_timeout on every connection open is the unambiguous, driver-independent fix:
+        // a writer blocked by another connection's lock (HTTP request vs. the background
+        // AiJobCoordinator runner, Hangfire's in-memory sweeper, etc.) waits and retries instead of
+        // failing immediately. See RadioPad.Api.Services.SqliteBusyTimeoutInterceptor.
+        opt.AddInterceptors(new RadioPad.Api.Services.SqliteBusyTimeoutInterceptor());
     }
 });
 
