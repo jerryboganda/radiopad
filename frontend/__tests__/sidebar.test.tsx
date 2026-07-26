@@ -19,7 +19,9 @@ const LOCKED_GROUPS: ReadonlyArray<{ key: string; hrefs: string[] }> = [
   // a primary surface that falls out of the nav is unreachable, not merely unstyled.
   // NOTIF-001 — the personal notifications inbox, added to the workspace group
   // 2026-07-23 (nav.config.tsx) without updating this locked list at the time.
-  { key: 'workspace', hrefs: ['/dashboard', '/worklist', '/critical-results', '/notifications', '/reports/compose', '/templates', '/protocols', '/ai-assistant', '/findings-library'] },
+  // RPT-030 — /report-templates (the output-document designer) added 2026-07-26,
+  // right after /templates.
+  { key: 'workspace', hrefs: ['/dashboard', '/worklist', '/critical-results', '/notifications', '/reports/compose', '/templates', '/report-templates', '/protocols', '/ai-assistant', '/findings-library'] },
   { key: 'insights', hrefs: ['/reports', '/analytics', '/quality', '/peer-review', '/validation', '/audit'] },
   { key: 'library', hrefs: ['/rulebooks', '/modalities', '/body-parts', '/prompts', '/marketplace', '/terminology', '/teaching'] },
   { key: 'integrations', hrefs: ['/providers', '/admin/ubag', '/admin/pacs', '/admin/fhir-import', '/offline'] },

@@ -1738,12 +1738,15 @@ public class TenantSettingsController : TenantedController
 {
     private readonly RadioPadDbContext _db;
     private readonly RadioPad.Application.Services.Kms.IKmsResolver _kms;
+    private readonly IAuditLog _audit;
     public TenantSettingsController(
         RadioPadDbContext db,
-        RadioPad.Application.Services.Kms.IKmsResolver kms)
+        RadioPad.Application.Services.Kms.IKmsResolver kms,
+        IAuditLog audit)
     {
         _db = db;
         _kms = kms;
+        _audit = audit;
     }
 
     [HttpGet]
@@ -1822,6 +1825,11 @@ public class TenantSettingsController : TenantedController
                 requireZeroBlockers = s.RequireZeroBlockers,
                 warnAsBlocker = s.WarnAsBlocker,
             },
+            // Report Templates (RPT-030) — the tenant admin's suggested output-document design.
+            reportLayouts = new
+            {
+                recommendedId = s.RecommendedReportLayoutId,
+            },
         });
     }
 
@@ -1846,7 +1854,10 @@ public class TenantSettingsController : TenantedController
         bool? CmkVerified = null,
         // Iter-31 RPT-012 / AI-007 — validation strictness toggles.
         bool? RequireZeroBlockers = null,
-        bool? WarnAsBlocker = null);
+        bool? WarnAsBlocker = null,
+        // Report Templates (RPT-030) — recommended ReportLayout id. null = unchanged,
+        // "" = clear, otherwise must be a Guid of a layout that exists in this tenant.
+        string? RecommendedReportLayoutId = null);
 
     [HttpPost]
     public async Task<IActionResult> Save([FromBody] SaveTenantSettingsDto dto, CancellationToken ct)
@@ -1862,6 +1873,30 @@ public class TenantSettingsController : TenantedController
             return BadRequest(new { error = "severity must be Info|Warning|Blocker.", kind = "validation" });
         if (dto.IpAllowlistJson is not null && !ValidateIpAllowlistJson(dto.IpAllowlistJson, out var ipAllowlistError))
             return BadRequest(new { error = ipAllowlistError, kind = "validation" });
+
+        // Report Templates (RPT-030) — null = unchanged, "" = clear, else must be a
+        // Guid of a layout that exists in this tenant.
+        string? recommendedLayoutAction = null;
+        Guid? recommendedLayoutId = null;
+        if (dto.RecommendedReportLayoutId is not null)
+        {
+            if (dto.RecommendedReportLayoutId.Length == 0)
+            {
+                recommendedLayoutAction = "recommended_cleared";
+            }
+            else if (Guid.TryParse(dto.RecommendedReportLayoutId, out var recId))
+            {
+                var exists = await _db.ReportLayouts.AnyAsync(r => r.Id == recId && r.TenantId == tenant.Id, ct);
+                if (!exists)
+                    return BadRequest(new { error = "recommendedReportLayoutId does not refer to a layout in this tenant.", kind = "validation" });
+                recommendedLayoutId = recId;
+                recommendedLayoutAction = "recommended_set";
+            }
+            else
+            {
+                return BadRequest(new { error = "recommendedReportLayoutId must be a valid layout id or empty.", kind = "validation" });
+            }
+        }
 
         var s = await _db.TenantSettings.FirstOrDefaultAsync(x => x.TenantId == tenant.Id, ct);
         if (s is null)
@@ -1902,8 +1937,25 @@ public class TenantSettingsController : TenantedController
         // Iter-31 RPT-012 / AI-007 — strictness toggles.
         if (dto.RequireZeroBlockers is not null) s.RequireZeroBlockers = dto.RequireZeroBlockers.Value;
         if (dto.WarnAsBlocker is not null) s.WarnAsBlocker = dto.WarnAsBlocker.Value;
+        if (recommendedLayoutAction is not null) s.RecommendedReportLayoutId = recommendedLayoutId;
         s.UpdatedAt = DateTimeOffset.UtcNow;
         await _db.SaveChangesAsync(ct);
+
+        if (recommendedLayoutAction is not null)
+        {
+            await _audit.AppendAsync(new AuditEvent
+            {
+                TenantId = tenant.Id,
+                UserId = user.Id,
+                Action = AuditAction.ReportLayoutChanged,
+                DetailsJson = System.Text.Json.JsonSerializer.Serialize(new
+                {
+                    layoutId = recommendedLayoutId,
+                    action = recommendedLayoutAction,
+                }),
+            }, ct);
+        }
+
         return Ok(new { s.Id });
     }
 

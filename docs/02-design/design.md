@@ -936,6 +936,42 @@ bell-click away. Backend delivery mechanics live in
 
 ---
 
+### 4.18 Report Templates — gallery + designer (`.rp-rl-*`, RPT-030)
+
+`/report-templates` (gallery) and `/report-templates/designer` — a per-radiologist
+visual designer for the exported PDF/DOCX output document. Distinct from
+`/templates` (clinical section-content scaffolding — unrelated feature, same
+sidebar group).
+
+- **`LayoutPaper`** (`components/reportLayouts/LayoutPaper.tsx`) is the single pure-React
+  renderer used by the gallery card thumbnails, the preset picker, and the designer
+  canvas — one block-rendering implementation, three call sites. It renders the
+  fictional `SAMPLE_REPORT` (`lib/reportLayouts/sampleReport.ts`), never real patient data.
+- **The paper itself is intentionally token-free.** Like `.document-preview`, the
+  exported document is a fixed, theme-independent print surface — `LayoutPaper`'s
+  inline styles (white background, dark ink, the pinned accent hex map in
+  `lib/reportLayouts/accents.ts`) deliberately do not follow the `--color-*` token
+  contract, because the document must look the same regardless of the app's
+  light/dark session theme. Everything AROUND the paper (gallery cards, dialogs,
+  toolbar, inspector) uses tokens as normal.
+- **`.rp-rl-canvas-scroll` (`overflow: auto`) is mandatory**, not a nicety — a
+  true-size Letter/A4 page (612–792px) is exactly the shape that trips the CI
+  layout-regression audit's `page-overflow-x` check (§3.2) without its own
+  scroll container. Never remove it or render `LayoutPaper` directly into an
+  unconstrained parent on the designer page.
+- **Designer chassis** extends the two-pane `.split.rp-editor-split` idiom (§4.10)
+  to three columns via `.rp-rl-designer-grid` (palette rail · canvas · inspector),
+  collapsing to two then one column below 1279px / 899px. Block reorder reuses
+  the exact `.rp-drag-handle` / `.rp-drag-active` / `.rp-drop-zone` pattern from
+  the rulebook editor (§4.10), not a new drag library.
+- **The mandatory "Powered by RadioPad" branding footer has no editable field
+  anywhere** — `LayoutPaper` renders it unconditionally from
+  `BRANDING_FOOTER_TEXT` (`lib/reportLayouts/accents.ts`), mirroring the
+  server's `ReportLayoutBranding.FooterText`. There is deliberately no prop or
+  schema field that could suppress it.
+
+---
+
 ## 5. Iconography
 
 Use inline SVG only (lucide-react or bespoke 1.5px-stroke icons inheriting

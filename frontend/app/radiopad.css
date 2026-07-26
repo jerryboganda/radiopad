@@ -5293,3 +5293,226 @@
 .rp-hk-table-wrap { overflow-x: auto; }
 .rp-hk-groups .data-table { min-width: 520px; }
 .rp-hk-groups .data-table th { white-space: nowrap; }
+
+/* ---------------------------------------------------------------------------
+   Report Templates (RPT-030) — /report-templates gallery + designer.
+   The exported document itself (LayoutPaper) is a fixed, theme-independent
+   print surface — like .document-preview, it deliberately renders white/dark
+   ink regardless of the app theme, so its own colours are inline styles, not
+   tokens. Everything AROUND the paper (chrome, panels, dialogs) uses tokens
+   as normal. See docs/02-design/design.md §3.2 for the .rp-table-scroll /
+   canvas-scroll rationale — a fixed-width page is exactly the shape that
+   trips the CI layout-regression audit without its own overflow:auto parent.
+   ------------------------------------------------------------------------- */
+
+/* Gallery */
+.rp-rl-gallery {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
+  gap: 16px;
+}
+.rp-rl-card { display: flex; flex-direction: column; padding: 0; overflow: hidden; }
+.rp-rl-card-preview {
+  display: block;
+  width: 100%;
+  padding: 16px;
+  border: none;
+  border-bottom: 1px solid var(--border-soft);
+  background: var(--bg-subtle);
+  cursor: pointer;
+  display: flex;
+  justify-content: center;
+}
+.rp-rl-card-preview-broken {
+  display: grid;
+  place-items: center;
+  height: 140px;
+  color: var(--text-faint);
+  font-size: 12px;
+}
+.rp-rl-card-body { padding: 14px 16px 16px; display: flex; flex-direction: column; gap: 4px; }
+.rp-rl-card-badges { flex-wrap: wrap; gap: 6px; min-height: 20px; }
+.rp-rl-card-name { font: 600 14px/1.3 var(--sans); color: var(--text-strong); }
+.rp-rl-card-meta { font-size: 11.5px; color: var(--text-faint); }
+.rp-rl-card-desc { font-size: 12.5px; color: var(--text-muted); margin-top: 2px; }
+.rp-rl-card-actions { margin-top: 10px; align-items: center; }
+.rp-rl-card-menu { position: relative; margin-left: auto; }
+.rp-rl-card-menu-list {
+  position: absolute;
+  right: 0;
+  top: calc(100% + 4px);
+  z-index: 5;
+  min-width: 180px;
+  background: var(--bg-panel);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  box-shadow: var(--shadow-md);
+  display: flex;
+  flex-direction: column;
+  padding: 4px;
+}
+.rp-rl-card-menu-list button {
+  text-align: left;
+  padding: 8px 10px;
+  border: none;
+  background: transparent;
+  border-radius: var(--radius-sm);
+  font-size: 13px;
+  color: var(--text);
+  cursor: pointer;
+}
+.rp-rl-card-menu-list button:hover { background: var(--bg-subtle); }
+.rp-rl-card-menu-list button:disabled { color: var(--text-faint); cursor: not-allowed; }
+.rp-rl-card-menu-danger { color: var(--red); }
+
+/* Preset picker dialog */
+.rp-rl-dialog-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 40;
+  background: var(--scrim);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 24px;
+}
+.rp-rl-dialog { width: min(920px, 100%); max-height: 86vh; overflow-y: auto; }
+.rp-rl-dialog-head { align-items: center; margin-bottom: 4px; }
+.rp-rl-preset-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+  gap: 14px;
+  margin-top: 14px;
+}
+.rp-rl-preset-card {
+  border: 1px solid var(--border-soft);
+  border-radius: var(--radius);
+  padding: 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  background: var(--bg-subtle);
+}
+.rp-rl-preset-preview { display: flex; justify-content: center; padding: 8px; background: var(--bg-panel); border-radius: var(--radius-sm); }
+.rp-rl-preset-name { font: 600 13.5px/1.3 var(--sans); color: var(--text-strong); }
+.rp-rl-preset-desc { font-size: 12px; color: var(--text-muted); flex: 1; }
+
+/* The paper surface + interactive block affordances (designer canvas only) */
+.rp-rl-paper-wrap { position: relative; }
+.rp-rl-paper {
+  box-shadow: 0 1px 3px rgba(15, 23, 42, 0.12), 0 8px 24px rgba(15, 23, 42, 0.08);
+  border-radius: 2px;
+}
+.rp-rl-block { border-radius: 3px; transition: box-shadow var(--transition-fast); }
+.rp-rl-block.interactive { cursor: pointer; }
+.rp-rl-block.interactive:hover { box-shadow: 0 0 0 1px rgba(37, 99, 235, 0.35); }
+.rp-rl-block.selected { box-shadow: 0 0 0 2px #2563eb; }
+
+/* Designer chassis: three zones — palette rail | canvas | inspector.
+   Extends the two-pane .split.rp-editor-split idiom (radiopad.css) to three
+   columns for this page only. */
+.rp-rl-toolbar { display: flex; flex-direction: column; gap: 8px; }
+.rp-rl-toolbar-warning { margin-bottom: 4px; }
+.rp-rl-toolbar-row { align-items: center; flex-wrap: wrap; justify-content: space-between; }
+.rp-rl-toolbar-name { display: flex; flex-direction: column; gap: 4px; flex: 1 1 320px; min-width: 220px; }
+.rp-rl-name-input {
+  width: 100%;
+  box-sizing: border-box;
+  font: 600 15px/1.3 var(--sans);
+  color: var(--text-strong);
+  border: 1px solid transparent;
+  background: transparent;
+  padding: 4px 6px;
+  border-radius: var(--radius-sm);
+}
+.rp-rl-name-input:hover, .rp-rl-name-input:focus { border-color: var(--border); background: var(--bg-panel); }
+.rp-rl-desc-input {
+  width: 100%;
+  box-sizing: border-box;
+  font-size: 12px;
+  color: var(--text-muted);
+  border: 1px solid transparent;
+  background: transparent;
+  padding: 2px 6px;
+  border-radius: var(--radius-sm);
+}
+.rp-rl-desc-input:hover, .rp-rl-desc-input:focus { border-color: var(--border-soft); background: var(--bg-panel); }
+.rp-rl-zoom { align-items: center; gap: 4px; padding: 0 4px; }
+.rp-rl-zoom-value { font-size: 12px; color: var(--text-muted); min-width: 38px; text-align: center; }
+
+.rp-rl-designer-grid {
+  display: grid;
+  grid-template-columns: 240px minmax(0, 1fr) 300px;
+  gap: 16px;
+  align-items: start;
+  margin-top: 12px;
+}
+@media (max-width: 1279px) {
+  .rp-rl-designer-grid { grid-template-columns: 220px minmax(0, 1fr); }
+  .rp-rl-inspector { grid-column: 1 / -1; }
+}
+@media (max-width: 899px) {
+  .rp-rl-designer-grid { grid-template-columns: minmax(0, 1fr); }
+  .rp-rl-palette, .rp-rl-inspector { grid-column: 1 / -1; }
+}
+
+.rp-rl-palette, .rp-rl-inspector { position: sticky; top: 12px; max-height: calc(100vh - 160px); overflow-y: auto; }
+.rp-rl-palette-list { display: flex; flex-direction: column; margin-bottom: 8px; }
+.rp-rl-palette-row {
+  align-items: center;
+  padding: 7px 6px;
+  border-bottom: 1px solid var(--border-soft);
+  cursor: grab;
+  border-radius: var(--radius-sm);
+}
+.rp-rl-palette-row:hover { background: var(--bg-subtle); }
+.rp-rl-palette-row.selected { background: var(--accent-tint); }
+.rp-rl-palette-row-label { flex: 1; font-size: 12.5px; color: var(--text); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.rp-rl-palette-add { display: flex; flex-direction: column; gap: 4px; }
+.rp-rl-palette-add button { justify-content: flex-start; }
+
+/* The overflow:auto wrapper is mandatory — see the block comment at the top
+   of this section and frontend/e2e/layout-audit.spec.ts (page-overflow-x). */
+.rp-rl-canvas-scroll {
+  overflow: auto;
+  background: var(--bg-subtle);
+  border: 1px solid var(--border-soft);
+  border-radius: var(--radius);
+  padding: 24px;
+  min-height: 480px;
+  display: flex;
+  justify-content: center;
+}
+.rp-rl-canvas-inner { flex: 0 0 auto; }
+
+.rp-rl-fields { display: flex; flex-direction: column; gap: 10px; }
+.rp-rl-field { display: flex; flex-direction: column; gap: 4px; font-size: 12.5px; color: var(--text-muted); }
+.rp-rl-field > input[type="text"],
+.rp-rl-field > input[type="number"],
+.rp-rl-field > select,
+.rp-rl-field > textarea {
+  width: 100%;
+  box-sizing: border-box;
+  font-size: 13px;
+  color: var(--text);
+  font-family: inherit;
+}
+.rp-rl-field-row { flex-direction: row; align-items: center; gap: 8px; font-size: 13px; color: var(--text); }
+.rp-rl-field-row input[type="checkbox"] { width: 15px; height: 15px; }
+.rp-rl-field-error { color: var(--red); font-size: 11.5px; margin: 0; }
+.rp-rl-checklist { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 4px 10px; }
+.rp-rl-branding-note {
+  display: flex;
+  align-items: flex-start;
+  gap: 6px;
+  font-size: 11px;
+  color: var(--text-faint);
+  background: var(--bg-subtle);
+  border-radius: var(--radius-sm);
+  padding: 8px 10px;
+  margin-top: 4px;
+}
+
+/* ExportPanel — Report Templates layout selector (components/reports/ExportPanel.tsx) */
+.rp-exportpanel-layout { display: flex; flex-direction: column; gap: 4px; margin: 4px 0 12px; }
+.rp-exportpanel-layout select { width: 100%; }

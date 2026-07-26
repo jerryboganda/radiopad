@@ -1544,27 +1544,28 @@ export default function ReportPage() {
     await saveDownload(new Blob([text], { type: 'text/plain' }), `${report.study.accessionNumber || report.id}.txt`);
   }
 
-  async function exportPdf() {
+  async function exportPdf(layoutId?: string) {
     if (!report) return;
-    const blob = await api.reports.exportPdf(report.id);
+    const blob = await api.reports.exportPdf(report.id, layoutId);
     await saveDownload(blob, `${report.study.accessionNumber || report.id}.pdf`);
   }
 
-  async function exportDocx() {
+  async function exportDocx(layoutId?: string) {
     if (!report) return;
-    const blob = await api.reports.exportDocx(report.id);
+    const blob = await api.reports.exportDocx(report.id, layoutId);
     await saveDownload(blob, `${report.study.accessionNumber || report.id}.docx`);
   }
 
   /** RC-09 — the Export panel drives Sending / Delivered / Failed off this
-   * promise; failures reject with a friendly message. */
-  async function runExport(fmt: ExportFormat): Promise<void> {
+   * promise; failures reject with a friendly message. `layoutId` (RPT-030)
+   * only applies to pdf/docx — see ExportPanel's Layout selector. */
+  async function runExport(fmt: ExportFormat, layoutId?: string): Promise<void> {
     try {
       if (fmt === 'text') await exportText();
       else if (fmt === 'json') await exportJson();
       else if (fmt === 'fhir') await exportFhir();
-      else if (fmt === 'pdf') await exportPdf();
-      else if (fmt === 'docx') await exportDocx();
+      else if (fmt === 'pdf') await exportPdf(layoutId);
+      else if (fmt === 'docx') await exportDocx(layoutId);
     } catch (e) {
       const err = e as { body?: { error?: string; detail?: string }; message?: string };
       throw new Error(err.body?.error || err.body?.detail || err.message || `Could not export ${fmt.toUpperCase()}.`);

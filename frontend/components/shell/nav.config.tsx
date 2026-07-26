@@ -10,7 +10,7 @@ import {
   FileInput, WifiOff, Scale, FlaskConical, ShieldCheck, Flag, CreditCard,
   Activity, Settings2, Fingerprint, Users, ScanLine, Bone, Cpu,
   LayoutDashboard, ListTodo, PenLine, Layers, Sparkles, Library, BadgeCheck,
-  GraduationCap, UsersRound, AlertTriangle, Bell,
+  GraduationCap, UsersRound, AlertTriangle, Bell, FileStack,
 } from 'lucide-react';
 import type { PermissionKey } from '@/lib/permissions';
 import { UBAG_HUB_ROLES } from '@/lib/roles';
@@ -70,6 +70,7 @@ export const Icons: Record<string, NavIcon> = {
   analytics: BarChart3,
   rulebooks: BookOpen,
   templates: LayoutTemplate,
+  reportTemplates: FileStack,
   prompts: MessageSquareText,
   marketplace: Store,
   terminology: BookText,
@@ -109,6 +110,9 @@ export const navGroups: NavGroup[] = [
       { href: '/notifications', labelKey: 'notifications', icon: Icons.notifications, surfaces: ['desktop'] },
       { href: '/reports/compose', labelKey: 'composer', icon: Icons.composer, permission: 'reports.draft', matchPrefix: '/reports/view' },
       { href: '/templates', labelKey: 'templates', icon: Icons.templates, permission: 'templates.read' },
+      // RPT-030 — per-radiologist output-document designer. Distinct from
+      // /templates above (clinical section-content scaffolding, not layout).
+      { href: '/report-templates', labelKey: 'reportTemplates', icon: Icons.reportTemplates, permission: 'templates.read' },
       { href: '/protocols', labelKey: 'protocols', icon: Icons.protocols },
       { href: '/ai-assistant', labelKey: 'aiAssistant', icon: Icons.aiAssistant },
       { href: '/findings-library', labelKey: 'findingsLibrary', icon: Icons.findingsLibrary, permission: 'templates.read' },

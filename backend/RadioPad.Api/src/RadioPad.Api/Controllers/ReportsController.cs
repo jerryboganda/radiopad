@@ -1,6 +1,7 @@
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using RadioPad.Api.Auth;
+using RadioPad.Api.Services.ReportLayouts;
 using RadioPad.Application.Abstractions;
 using RadioPad.Application.Security;
 using RadioPad.Application.Services;
@@ -92,19 +93,22 @@ public class ReportsController : TenantedController
     private readonly IAuditLog _audit;
     private readonly Services.AiJobRegistry _aiJobs;
     private readonly Services.AiJobCoordinator _coordinator;
+    private readonly ILogger<ReportsController> _logger;
 
     public ReportsController(
         RadioPadDbContext db,
         ReportingService reporting,
         IAuditLog audit,
         Services.AiJobRegistry aiJobs,
-        Services.AiJobCoordinator coordinator)
+        Services.AiJobCoordinator coordinator,
+        ILogger<ReportsController> logger)
     {
         _db = db;
         _reporting = reporting;
         _audit = audit;
         _aiJobs = aiJobs;
         _coordinator = coordinator;
+        _logger = logger;
     }
 
     public record CreateReportDto(
@@ -1206,9 +1210,14 @@ public class ReportsController : TenantedController
         return Content(text, "text/plain");
     }
 
-    /// <summary>PRD RPT-011 — PDF export via QuestPDF. Subject to RPT-012 gating.</summary>
+    /// <summary>
+    /// PRD RPT-011 / RPT-030 — PDF export via QuestPDF. Subject to RPT-012 gating.
+    /// <paramref name="layoutId"/> selects a Report Templates design — see
+    /// <see cref="ResolveExportLayoutAsync"/> for resolution order; omitted or
+    /// unresolvable falls back to the frozen legacy Classic layout.
+    /// </summary>
     [HttpGet("{id:guid}/export/pdf")]
-    public async Task<IActionResult> ExportPdf(Guid id, CancellationToken ct = default)
+    public async Task<IActionResult> ExportPdf(Guid id, [FromQuery] string? layoutId, CancellationToken ct = default)
     {
         var (tenant, user) = await ResolveContextAsync(_db, ct);
         var deny = RequirePermission(user, RbacPermission.ReportsExport);
@@ -1217,14 +1226,23 @@ public class ReportsController : TenantedController
         if (report is null) return NotFound();
         var gate = RequireAcknowledgedForExport(report, "PDF");
         if (gate is not null) return gate;
-        var bytes = Services.ReportDocumentRenderer.RenderPdf(report, tenant);
+        var (layout, layoutError) = await ResolveExportLayoutAsync(tenant, user, layoutId, ct);
+        if (layoutError is not null) return layoutError;
+        var bytes = layout is null
+            ? Services.ReportDocumentRenderer.RenderPdf(report, tenant)
+            : Services.ReportDocumentRenderer.RenderPdf(report, tenant, layout);
         await MarkExportedAsync(tenant, user, report, "pdf", ct);
         return File(bytes, "application/pdf", $"report-{report.Study.AccessionNumber}.pdf");
     }
 
-    /// <summary>PRD RPT-011 — DOCX export via OpenXML SDK. Subject to RPT-012 gating.</summary>
+    /// <summary>
+    /// PRD RPT-011 / RPT-030 — DOCX export via OpenXML SDK. Subject to RPT-012 gating.
+    /// <paramref name="layoutId"/> selects a Report Templates design — see
+    /// <see cref="ResolveExportLayoutAsync"/> for resolution order; omitted or
+    /// unresolvable falls back to the frozen legacy Classic layout.
+    /// </summary>
     [HttpGet("{id:guid}/export/docx")]
-    public async Task<IActionResult> ExportDocx(Guid id, CancellationToken ct = default)
+    public async Task<IActionResult> ExportDocx(Guid id, [FromQuery] string? layoutId, CancellationToken ct = default)
     {
         var (tenant, user) = await ResolveContextAsync(_db, ct);
         var deny = RequirePermission(user, RbacPermission.ReportsExport);
@@ -1233,11 +1251,75 @@ public class ReportsController : TenantedController
         if (report is null) return NotFound();
         var gate = RequireAcknowledgedForExport(report, "DOCX");
         if (gate is not null) return gate;
-        var bytes = Services.ReportDocumentRenderer.RenderDocx(report, tenant);
+        var (layout, layoutError) = await ResolveExportLayoutAsync(tenant, user, layoutId, ct);
+        if (layoutError is not null) return layoutError;
+        var bytes = layout is null
+            ? Services.ReportDocumentRenderer.RenderDocx(report, tenant)
+            : Services.ReportDocumentRenderer.RenderDocx(report, tenant, layout);
         await MarkExportedAsync(tenant, user, report, "docx", ct);
         return File(bytes,
             "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
             $"report-{report.Study.AccessionNumber}.docx");
+    }
+
+    /// <summary>
+    /// Report Templates (RPT-030) — resolves which <see cref="ReportLayoutModel"/> (if
+    /// any) an export should use. Resolution order: explicit <c>layoutId="classic"</c>
+    /// forces the legacy layout; an explicit Guid must belong to this tenant (400
+    /// otherwise); absent an explicit choice, the caller's own default, then the
+    /// tenant's recommended layout, then the legacy layout. A stored row that fails to
+    /// parse (future schema, corrupted JSON) is logged and treated as unresolved — an
+    /// export must never fail because a saved layout went stale.
+    /// </summary>
+    private async Task<(ReportLayoutModel? Layout, IActionResult? Error)> ResolveExportLayoutAsync(
+        Tenant tenant, User user, string? layoutId, CancellationToken ct)
+    {
+        if (!string.IsNullOrWhiteSpace(layoutId))
+        {
+            if (string.Equals(layoutId, "classic", StringComparison.OrdinalIgnoreCase))
+            {
+                return (null, null);
+            }
+            if (!Guid.TryParse(layoutId, out var explicitId))
+            {
+                return (null, BadRequest(new { error = "layoutId must be a valid layout id or \"classic\".", kind = "validation" }));
+            }
+            var explicitRow = await _db.ReportLayouts.FirstOrDefaultAsync(r => r.Id == explicitId && r.TenantId == tenant.Id, ct);
+            if (explicitRow is null)
+            {
+                return (null, BadRequest(new { error = "layoutId does not refer to a layout in this tenant.", kind = "validation" }));
+            }
+            return (ParseLayoutOrFallback(explicitRow), null);
+        }
+
+        var userDefault = await _db.ReportLayoutUserDefaults
+            .FirstOrDefaultAsync(d => d.TenantId == tenant.Id && d.UserId == user.Id, ct);
+        if (userDefault is not null)
+        {
+            var row = await _db.ReportLayouts.FirstOrDefaultAsync(r => r.Id == userDefault.ReportLayoutId && r.TenantId == tenant.Id, ct);
+            if (row is not null) return (ParseLayoutOrFallback(row), null);
+        }
+
+        var settings = await _db.TenantSettings.FirstOrDefaultAsync(s => s.TenantId == tenant.Id, ct);
+        if (settings?.RecommendedReportLayoutId is { } recommendedId)
+        {
+            var row = await _db.ReportLayouts.FirstOrDefaultAsync(r => r.Id == recommendedId && r.TenantId == tenant.Id, ct);
+            if (row is not null) return (ParseLayoutOrFallback(row), null);
+        }
+
+        return (null, null);
+    }
+
+    private ReportLayoutModel? ParseLayoutOrFallback(ReportLayout row)
+    {
+        if (ReportLayoutParser.TryParse(row.LayoutJson, out var model, out var errors))
+        {
+            return model;
+        }
+        _logger.LogWarning(
+            "ReportLayout {LayoutId} failed to parse ({Errors}); falling back to the legacy Classic export.",
+            row.Id, string.Join("; ", errors));
+        return null;
     }
 
     /// <summary>PRD §19.1 / Beta — HL7 v2.5 ORU^R01 export. Subject to RPT-012 gating.</summary>

@@ -5,8 +5,10 @@
 // states. Destinations are the REAL export paths this build ships: local
 // file downloads (the existing export endpoints) and the RIS clipboard copy.
 // No fake PACS/FHIR-gateway destinations are invented.
-import { useState, type ReactNode } from 'react';
+import { useEffect, useState, type ReactNode } from 'react';
 import { HardDriveDownload, ClipboardCopy, ShieldCheck, ShieldAlert, AlertTriangle, CheckCircle2 } from 'lucide-react';
+import { api } from '@/lib/api';
+import { getLastExportLayoutId, setLastExportLayoutId } from '@/lib/reportLayouts/prefs';
 
 export type ExportFormat = 'text' | 'json' | 'fhir' | 'pdf' | 'docx';
 
@@ -30,8 +32,13 @@ export interface ExportPanelProps {
   enforceBlockers?: boolean;
   warnings: number;
   onOpenValidation: () => void;
-  /** Existing download path — must reject on failure. */
-  onExport: (fmt: ExportFormat) => Promise<void>;
+  /**
+   * Report Templates (RPT-030) — for pdf/docx, `layoutId` is "" (server
+   * resolves: caller default -> tenant recommended -> Classic), "classic"
+   * (force the legacy layout), or a saved `ReportLayout` id. Every other
+   * format ignores it (they are BuildNarrative-aligned by design).
+   */
+  onExport: (fmt: ExportFormat, layoutId?: string) => Promise<void>;
   /** Slot for the existing Copy-for-RIS control. */
   risSlot?: ReactNode;
 }
@@ -46,6 +53,38 @@ export default function ExportPanel(p: ExportPanelProps) {
   const [fmt, setFmt] = useState<ExportFormat>('pdf');
   const [delivery, setDelivery] = useState<DeliveryState>({ status: 'idle' });
 
+  // Report Templates (RPT-030) — layout choice only matters for pdf/docx;
+  // lazy-loaded the first time either is selected so every other export stays cheap.
+  const [layoutId, setLayoutId] = useState('');
+  const [layoutOptions, setLayoutOptions] = useState<{
+    items: Array<{ id: string; name: string }>;
+    recommendedId: string | null;
+    myDefaultId: string | null;
+  } | null>(null);
+
+  useEffect(() => {
+    if (fmt !== 'pdf' && fmt !== 'docx') return;
+    if (layoutOptions) return;
+    api.reportLayouts.list()
+      .then((res) => {
+        setLayoutOptions({
+          items: res.items.map((i) => ({ id: i.id, name: i.name })),
+          recommendedId: res.recommendedId,
+          myDefaultId: res.myDefaultId,
+        });
+        const remembered = getLastExportLayoutId();
+        if (remembered && (remembered === 'classic' || res.items.some((i) => i.id === remembered))) {
+          setLayoutId(remembered);
+        }
+      })
+      .catch(() => setLayoutOptions({ items: [], recommendedId: null, myDefaultId: null }));
+  }, [fmt, layoutOptions]);
+
+  function handleLayoutChange(next: string) {
+    setLayoutId(next);
+    setLastExportLayoutId(next || null);
+  }
+
   // Respect the tenant's RequireZeroBlockers: when the organization has turned
   // the gate off server-side, blockers are shown but do not stop the export.
   const gateBlocked = (p.enforceBlockers ?? true) && p.blockers > 0;
@@ -54,7 +93,8 @@ export default function ExportPanel(p: ExportPanelProps) {
   async function run(selected: ExportFormat) {
     setDelivery({ status: 'sending', fmt: selected });
     try {
-      await p.onExport(selected);
+      const useLayout = selected === 'pdf' || selected === 'docx';
+      await p.onExport(selected, useLayout && layoutId ? layoutId : undefined);
       setDelivery({ status: 'delivered', fmt: selected });
     } catch (e) {
       setDelivery({
@@ -119,6 +159,31 @@ export default function ExportPanel(p: ExportPanelProps) {
           </button>
         ))}
       </div>
+
+      {(fmt === 'pdf' || fmt === 'docx') && (
+        <div className="rp-exportpanel-layout">
+          <label htmlFor="rp-export-layout" className="rp-panel-title" style={{ marginBottom: 4 }}>
+            Layout
+          </label>
+          <select
+            id="rp-export-layout"
+            value={layoutId}
+            onChange={(e) => handleLayoutChange(e.target.value)}
+          >
+            <option value="">
+              Automatic{layoutOptions?.myDefaultId ? ' (your default)' : layoutOptions?.recommendedId ? ' (team recommendation)' : ' (Classic)'}
+            </option>
+            <option value="classic">Classic (RadioPad default)</option>
+            {layoutOptions?.items.map((item) => (
+              <option key={item.id} value={item.id}>
+                {item.name}
+                {item.id === layoutOptions.myDefaultId ? ' — my default' : ''}
+                {item.id === layoutOptions.recommendedId ? ' — recommended' : ''}
+              </option>
+            ))}
+          </select>
+        </div>
+      )}
 
       {/* 3 — Validation gate */}
       {gateBlocked ? (

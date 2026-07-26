@@ -805,13 +805,15 @@ async function requestPaged<T>(path: string): Promise<{ items: T[]; total: numbe
   return { items, total };
 }
 
-async function requestBlob(path: string): Promise<Blob> {
-  const headers = new Headers();
+async function requestBlob(path: string, init?: RequestInit): Promise<Blob> {
+  const headers = new Headers(init?.headers || {});
+  if (init?.body && !headers.has('Content-Type')) headers.set('Content-Type', 'application/json');
   applyTenantHeaders(headers);
   applyAuthHeader(headers);
   const base = await apiBase();
   const res = await fetchWithAuthRetry(`${base}${path}`, {
-    credentials: requestCredentials(base),
+    ...init,
+    credentials: requestCredentials(base, init?.credentials),
   }, headers);
   if (!res.ok) {
     throw await apiError(res);
@@ -994,6 +996,31 @@ export type ReportTemplate = {
   status?: number;
   /** Iter-34 GOV-001 — set when an admin approves the template. */
   approvedAt?: string | null;
+};
+
+/**
+ * Report Templates (RPT-030) — a radiologist-authored visual design for the
+ * exported PDF/DOCX output document. Distinct from `ReportTemplate` above,
+ * which governs clinical section *content* scaffolding, not document
+ * presentation. `layoutJson` is the `ReportLayoutJson` shape defined in
+ * `lib/reportLayouts/schema.ts` — validated both here and server-side.
+ */
+export type ReportLayout = {
+  id: string;
+  name: string;
+  description?: string | null;
+  layoutJson: string;
+  schemaVersion: number;
+  createdByUserId: string;
+  createdByName: string;
+  createdAt: string;
+  updatedAt: string;
+};
+
+export type ReportLayoutListResponse = {
+  items: ReportLayout[];
+  recommendedId: string | null;
+  myDefaultId: string | null;
 };
 
 /**
@@ -1725,8 +1752,13 @@ export const api = {
       request<string>(
         `/api/reports/${id}/export/text${opts?.preview ? '?preview=true' : ''}`,
       ),
-    exportPdf: (id: string) => requestBlob(`/api/reports/${id}/export/pdf`),
-    exportDocx: (id: string) => requestBlob(`/api/reports/${id}/export/docx`),
+    // Report Templates (RPT-030) — layoutId selects a saved design; "classic"
+    // forces the legacy layout; omitted resolves caller default -> tenant
+    // recommended -> legacy server-side (see ReportsController.ResolveExportLayoutAsync).
+    exportPdf: (id: string, layoutId?: string) =>
+      requestBlob(`/api/reports/${id}/export/pdf${layoutId ? `?layoutId=${encodeURIComponent(layoutId)}` : ''}`),
+    exportDocx: (id: string, layoutId?: string) =>
+      requestBlob(`/api/reports/${id}/export/docx${layoutId ? `?layoutId=${encodeURIComponent(layoutId)}` : ''}`),
     exportHl7: (id: string) => requestBlob(`/api/reports/${id}/export/hl7`),
     /**
      * F8 — one-command "Sign & Send": validate → Primary sign-off → acknowledge → export, chaining
@@ -2339,6 +2371,31 @@ export const api = {
       }>(`/api/templates/${id}/usage`),
   },
   /**
+   * Report Templates (RPT-030) — radiologist-authored output-document designs.
+   * Reads are open to every tenant member (a shared gallery, like Findings
+   * Library); a layout may only be edited/deleted by its author or a reporting
+   * administrator. `setDefault` is the caller's own per-device-independent
+   * default; the tenant's recommended layout is set via `api.tenant.settings.save`.
+   */
+  reportLayouts: {
+    list: () => request<ReportLayoutListResponse>('/api/report-layouts'),
+    get: (id: string) => request<ReportLayout>(`/api/report-layouts/${id}`),
+    create: (body: { name: string; description?: string; layoutJson: string }) =>
+      request<ReportLayout>('/api/report-layouts', { method: 'POST', body: JSON.stringify(body) }),
+    update: (id: string, body: { name: string; description?: string; layoutJson: string }) =>
+      request<ReportLayout>(`/api/report-layouts/${id}`, { method: 'PUT', body: JSON.stringify(body) }),
+    remove: (id: string) => request<void>(`/api/report-layouts/${id}`, { method: 'DELETE' }),
+    setDefault: (layoutId: string | null) =>
+      request<{ layoutId: string | null }>('/api/report-layouts/default', {
+        method: 'PUT',
+        body: JSON.stringify({ layoutId }),
+      }),
+    previewPdf: (layoutJson: string) =>
+      requestBlob('/api/report-layouts/preview/pdf', { method: 'POST', body: JSON.stringify({ layoutJson }) }),
+    previewDocx: (layoutJson: string) =>
+      requestBlob('/api/report-layouts/preview/docx', { method: 'POST', body: JSON.stringify({ layoutJson }) }),
+  },
+  /**
    * Findings Library — custom snippets plus the two per-user overlays (stars and
    * the "used in report" trail) that apply to both snippets and template-derived
    * groups. Reads are open to every tenant member; a snippet may only be edited
@@ -2653,6 +2710,10 @@ export const api = {
             requireZeroBlockers: boolean;
             warnAsBlocker: boolean;
           };
+          // Report Templates (RPT-030) — the tenant admin's suggested output-document design.
+          reportLayouts: {
+            recommendedId: string | null;
+          };
         }>('/api/tenant/settings'),
       save: (body: {
         hallucinationDetectionEnabled?: boolean;
@@ -2674,6 +2735,8 @@ export const api = {
         cmkVerified?: boolean | null;
         requireZeroBlockers?: boolean | null;
         warnAsBlocker?: boolean | null;
+        // Report Templates (RPT-030) — null = unchanged, "" = clear, else a ReportLayout id.
+        recommendedReportLayoutId?: string | null;
       }) =>
         request<{ id: string }>('/api/tenant/settings', {
           method: 'POST',

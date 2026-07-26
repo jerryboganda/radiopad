@@ -418,6 +418,11 @@ public enum AuditAction
     /// clinical boilerplate authored by radiologists, so the body itself is never audited — only
     /// the fact that the shared library changed and who changed it.</summary>
     SnippetChanged = 132,
+    /// <summary>Report Templates (RPT-030) — a <c>ReportLayout</c> row was created, updated, deleted, or a
+    /// caller's default / the tenant's recommended pointer changed. Details record the layout id, name,
+    /// and which sub-action ran ("created" | "updated" | "deleted" | "default_set" | "default_cleared" |
+    /// "recommended_set" | "recommended_cleared"). The LayoutJson body itself is never audited.</summary>
+    ReportLayoutChanged = 133,
 }
 
 /// <summary>

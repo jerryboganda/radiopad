@@ -920,6 +920,15 @@ public class TenantSettings : Entity
     /// translated.
     /// </summary>
     public string Locale { get; set; } = "en";
+
+    /// <summary>
+    /// Report Templates (RPT-030) — the tenant admin's suggested
+    /// <see cref="ReportLayout"/> for the team's exported PDF/DOCX documents.
+    /// Purely advisory: it is the last fallback in export layout resolution,
+    /// behind an explicit <c>layoutId</c> query param and the caller's own
+    /// <see cref="ReportLayoutUserDefault"/>. Null = no recommendation.
+    /// </summary>
+    public Guid? RecommendedReportLayoutId { get; set; }
 }
 
 /// <summary>
@@ -1600,4 +1609,41 @@ public class LibraryRecentUse : Entity
     public Guid UserId { get; set; }
     public string EntityType { get; set; } = "";
     public string EntityKey { get; set; } = "";
+}
+
+/// <summary>
+/// Report Templates (RPT-030) — a radiologist-authored visual design for the
+/// exported PDF/DOCX report document (page setup, letterhead/logo, section
+/// order and styling, signature block). Distinct from <see cref="ReportTemplate"/>,
+/// which governs clinical section *content* scaffolding, not document
+/// presentation. Tenant-visible like <see cref="Snippet"/> (provenance, not
+/// an ACL) so a colleague can duplicate a good design and a tenant admin can
+/// recommend any teammate's layout via <see cref="TenantSettings.RecommendedReportLayoutId"/>.
+/// <see cref="LayoutJson"/> is validated server-side by ReportLayoutParser —
+/// see <see cref="SchemaVersion"/> for the schema this row was written under.
+/// The mandatory "Powered by RadioPad" branding footer is never part of this
+/// JSON; renderers append it unconditionally from server-side constants.
+/// </summary>
+public class ReportLayout : Entity
+{
+    public Guid TenantId { get; set; }
+    public Guid CreatedByUserId { get; set; }
+    public string Name { get; set; } = "";
+    public string? Description { get; set; }
+    /// <summary>Serialized <c>ReportLayoutJson</c> — see ReportLayoutParser. Capped at 256 KiB.</summary>
+    public string LayoutJson { get; set; } = "{}";
+    public int SchemaVersion { get; set; } = 1;
+}
+
+/// <summary>
+/// Report Templates (RPT-030) — a caller's personal default <see cref="ReportLayout"/>
+/// for their own exports, one row per (tenant, user). Kept as a dedicated row
+/// rather than a column on <see cref="User"/> so clearing it, or cascading a
+/// delete of the referenced layout, never needs to touch the Users table.
+/// </summary>
+public class ReportLayoutUserDefault : Entity
+{
+    public Guid TenantId { get; set; }
+    public Guid UserId { get; set; }
+    public Guid ReportLayoutId { get; set; }
 }
