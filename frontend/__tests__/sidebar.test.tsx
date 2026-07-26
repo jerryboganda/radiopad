@@ -17,7 +17,9 @@ const LOCKED_GROUPS: ReadonlyArray<{ key: string; hrefs: string[] }> = [
   // '/critical-results', '/peer-review' and '/teaching' are the PowerScribe/Dragon parity
   // modules added 2026-07-20; they are pinned here for the same reason as every other route —
   // a primary surface that falls out of the nav is unreachable, not merely unstyled.
-  { key: 'workspace', hrefs: ['/dashboard', '/worklist', '/critical-results', '/reports/compose', '/templates', '/protocols', '/ai-assistant', '/findings-library'] },
+  // NOTIF-001 — the personal notifications inbox, added to the workspace group
+  // 2026-07-23 (nav.config.tsx) without updating this locked list at the time.
+  { key: 'workspace', hrefs: ['/dashboard', '/worklist', '/critical-results', '/notifications', '/reports/compose', '/templates', '/protocols', '/ai-assistant', '/findings-library'] },
   { key: 'insights', hrefs: ['/reports', '/analytics', '/quality', '/peer-review', '/validation', '/audit'] },
   { key: 'library', hrefs: ['/rulebooks', '/modalities', '/body-parts', '/prompts', '/marketplace', '/terminology', '/teaching'] },
   { key: 'integrations', hrefs: ['/providers', '/admin/ubag', '/admin/pacs', '/admin/fhir-import', '/offline'] },

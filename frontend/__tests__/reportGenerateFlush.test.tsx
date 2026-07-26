@@ -99,6 +99,13 @@ vi.mock('@/lib/api', () => {
     },
     rulebooks: { list: vi.fn(async () => []) },
     templates: { list: vi.fn(async () => []) },
+    // ReportClient reads tenant.settings.get() to mirror RequireZeroBlockers
+    // (see the enforceBlockers comment there) — only the field it reads matters here.
+    tenant: {
+      settings: {
+        get: vi.fn(async () => ({ validation: { requireZeroBlockers: true } })),
+      },
+    },
     // Iter-36 — ReportClient fetches the admin catalogs for the study-context dropdowns.
     modalities: { list: vi.fn(async () => []) },
     bodyParts: { list: vi.fn(async () => []) },
