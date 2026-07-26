@@ -1,5 +1,5 @@
 /**
- * Report Templates (RPT-030) — built-in starter designs. Presets live ONLY here:
+ * Report Templates (REPORT-TEMPLATES) — built-in starter designs. Presets live ONLY here:
  * "Use preset" in the gallery POSTs the full `layoutJson` to `/api/report-layouts`,
  * so the backend has zero preset-specific knowledge — it only ever sees a normal
  * saved layout. `presets.test.ts` asserts every entry below passes `validateLayout`.

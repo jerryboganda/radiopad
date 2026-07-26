@@ -3,7 +3,7 @@ using RadioPad.Domain.Entities;
 namespace RadioPad.Api.Services.ReportLayouts;
 
 /// <summary>
-/// Report Templates (RPT-030) — pure content-resolution helpers shared by
+/// Report Templates (REPORT-TEMPLATES) — pure content-resolution helpers shared by
 /// <see cref="PdfLayoutRenderer"/> and <see cref="DocxLayoutRenderer"/>, so the
 /// two formats can never drift on what a given field or section resolves to.
 /// Section bodies are always the verbatim <see cref="Report"/> strings — the

@@ -1,5 +1,5 @@
 /**
- * Report Templates (RPT-030) — designer state: the layout draft plus undo/redo
+ * Report Templates (REPORT-TEMPLATES) — designer state: the layout draft plus undo/redo
  * history (capped at 50 steps) and the currently-selected block. Explicit Save
  * only — there is no autosave, so `dirty` gates the "unsaved changes" guard and
  * the Save button's enabled state.

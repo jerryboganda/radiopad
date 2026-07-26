@@ -1,5 +1,5 @@
 /**
- * Report Templates (RPT-030) — the LayoutJson document model, schema version 1.
+ * Report Templates (REPORT-TEMPLATES) — the LayoutJson document model, schema version 1.
  *
  * Mirrors `backend/RadioPad.Api/src/RadioPad.Api/Services/ReportLayouts/ReportLayoutModel.cs`
  * and `ReportLayoutParser.cs` field-for-field, including JSON key casing (camelCase

@@ -1211,7 +1211,7 @@ public class ReportsController : TenantedController
     }
 
     /// <summary>
-    /// PRD RPT-011 / RPT-030 — PDF export via QuestPDF. Subject to RPT-012 gating.
+    /// PRD RPT-011 / REPORT-TEMPLATES — PDF export via QuestPDF. Subject to RPT-012 gating.
     /// <paramref name="layoutId"/> selects a Report Templates design — see
     /// <see cref="ResolveExportLayoutAsync"/> for resolution order; omitted or
     /// unresolvable falls back to the frozen legacy Classic layout.
@@ -1236,7 +1236,7 @@ public class ReportsController : TenantedController
     }
 
     /// <summary>
-    /// PRD RPT-011 / RPT-030 — DOCX export via OpenXML SDK. Subject to RPT-012 gating.
+    /// PRD RPT-011 / REPORT-TEMPLATES — DOCX export via OpenXML SDK. Subject to RPT-012 gating.
     /// <paramref name="layoutId"/> selects a Report Templates design — see
     /// <see cref="ResolveExportLayoutAsync"/> for resolution order; omitted or
     /// unresolvable falls back to the frozen legacy Classic layout.
@@ -1263,7 +1263,7 @@ public class ReportsController : TenantedController
     }
 
     /// <summary>
-    /// Report Templates (RPT-030) — resolves which <see cref="ReportLayoutModel"/> (if
+    /// Report Templates (REPORT-TEMPLATES) — resolves which <see cref="ReportLayoutModel"/> (if
     /// any) an export should use. Resolution order: explicit <c>layoutId="classic"</c>
     /// forces the legacy layout; an explicit Guid must belong to this tenant (400
     /// otherwise); absent an explicit choice, the caller's own default, then the

@@ -28,7 +28,7 @@ export function rulebookEditorHref(id?: string): string {
   return '/rulebooks/editor';
 }
 
-/** Report Templates (RPT-030) — the output-document designer. Query-param routing keeps `output: 'export'` static. */
+/** Report Templates (REPORT-TEMPLATES) — the output-document designer. Query-param routing keeps `output: 'export'` static. */
 export function reportLayoutDesignerHref(id?: string): string {
   if (id) return withParam('/report-templates/designer', 'id', id);
   return '/report-templates/designer';

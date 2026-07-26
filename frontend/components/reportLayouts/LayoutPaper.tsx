@@ -28,7 +28,7 @@ export interface LayoutPaperProps {
 }
 
 /**
- * Report Templates (RPT-030) — the single pure-React renderer for a
+ * Report Templates (REPORT-TEMPLATES) — the single pure-React renderer for a
  * `ReportLayoutJson` against the fictional `SAMPLE_REPORT`. Used by the designer
  * canvas, the gallery's mini card previews, and the preset picker, so all three
  * surfaces agree on what a layout looks like. This is a *preview*, not the export

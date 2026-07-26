@@ -4,7 +4,7 @@ using System.Text.Json;
 namespace RadioPad.Api.Services.ReportLayouts;
 
 /// <summary>
-/// Report Templates (RPT-030) — strict validating parser from a raw
+/// Report Templates (REPORT-TEMPLATES) — strict validating parser from a raw
 /// <c>LayoutJson</c> string to a known-good <see cref="ReportLayoutModel"/>.
 /// Mirrors <c>frontend/lib/reportLayouts/schema.ts</c>'s <c>validateLayout</c>
 /// field-for-field so a layout that saves client-side also parses server-side.

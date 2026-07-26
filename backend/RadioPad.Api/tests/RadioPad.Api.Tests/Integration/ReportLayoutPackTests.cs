@@ -14,7 +14,7 @@ using Xunit;
 namespace RadioPad.Api.Tests.Integration;
 
 /// <summary>
-/// Report Templates (RPT-030) — covers: personal CRUD + ownership enforcement,
+/// Report Templates (REPORT-TEMPLATES) — covers: personal CRUD + ownership enforcement,
 /// cross-tenant isolation, LayoutJson validation, the per-user default and the
 /// tenant admin's recommended pointer (including delete-cascade), sample-data
 /// preview (no side effects, mandatory branding present), and export layoutId
@@ -416,7 +416,7 @@ public class ReportLayoutPackTests : IClassFixture<RadioPadAppFactory>
 
         // The exact narrative content the legacy renderer has always emitted for
         // this report (see CreateAcknowledgedReportAsync) — proves the no-layoutId
-        // path is byte-for-byte the same BuildNarrative content as before RPT-030.
+        // path is byte-for-byte the same BuildNarrative content as before REPORT-TEMPLATES.
         Assert.Contains("Lungs clear. No nodules.", text);
         Assert.Contains("No acute pulmonary findings", text);
     }

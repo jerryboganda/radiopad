@@ -1,7 +1,7 @@
 namespace RadioPad.Api.Services.ReportLayouts;
 
 /// <summary>
-/// Report Templates (RPT-030) — the strongly-typed, already-validated form of a
+/// Report Templates (REPORT-TEMPLATES) — the strongly-typed, already-validated form of a
 /// <see cref="RadioPad.Domain.Entities.ReportLayout.LayoutJson"/> row. Produced only
 /// by <see cref="ReportLayoutParser.TryParse"/>; never constructed by hand outside
 /// tests, so every instance in the renderer pipeline is known-valid.

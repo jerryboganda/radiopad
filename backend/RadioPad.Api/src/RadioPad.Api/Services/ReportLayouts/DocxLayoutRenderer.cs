@@ -10,7 +10,7 @@ using WordDocument = DocumentFormat.OpenXml.Wordprocessing.Document;
 namespace RadioPad.Api.Services.ReportLayouts;
 
 /// <summary>
-/// Report Templates (RPT-030) — renders a <see cref="ReportLayoutModel"/> to DOCX via
+/// Report Templates (REPORT-TEMPLATES) — renders a <see cref="ReportLayoutModel"/> to DOCX via
 /// the OpenXml SDK. Mirrors <see cref="PdfLayoutRenderer"/> block-for-block; section
 /// body text is always the verbatim <see cref="Report"/> strings via
 /// <see cref="ReportLayoutContent"/>, and the "Powered by RadioPad" branding line in

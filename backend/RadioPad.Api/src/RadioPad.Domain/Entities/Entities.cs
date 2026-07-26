@@ -922,7 +922,7 @@ public class TenantSettings : Entity
     public string Locale { get; set; } = "en";
 
     /// <summary>
-    /// Report Templates (RPT-030) — the tenant admin's suggested
+    /// Report Templates (REPORT-TEMPLATES) — the tenant admin's suggested
     /// <see cref="ReportLayout"/> for the team's exported PDF/DOCX documents.
     /// Purely advisory: it is the last fallback in export layout resolution,
     /// behind an explicit <c>layoutId</c> query param and the caller's own
@@ -1612,7 +1612,7 @@ public class LibraryRecentUse : Entity
 }
 
 /// <summary>
-/// Report Templates (RPT-030) — a radiologist-authored visual design for the
+/// Report Templates (REPORT-TEMPLATES) — a radiologist-authored visual design for the
 /// exported PDF/DOCX report document (page setup, letterhead/logo, section
 /// order and styling, signature block). Distinct from <see cref="ReportTemplate"/>,
 /// which governs clinical section *content* scaffolding, not document
@@ -1636,7 +1636,7 @@ public class ReportLayout : Entity
 }
 
 /// <summary>
-/// Report Templates (RPT-030) — a caller's personal default <see cref="ReportLayout"/>
+/// Report Templates (REPORT-TEMPLATES) — a caller's personal default <see cref="ReportLayout"/>
 /// for their own exports, one row per (tenant, user). Kept as a dedicated row
 /// rather than a column on <see cref="User"/> so clearing it, or cascading a
 /// delete of the referenced layout, never needs to touch the Users table.

@@ -936,7 +936,7 @@ bell-click away. Backend delivery mechanics live in
 
 ---
 
-### 4.18 Report Templates — gallery + designer (`.rp-rl-*`, RPT-030)
+### 4.18 Report Templates — gallery + designer (`.rp-rl-*`, REPORT-TEMPLATES)
 
 `/report-templates` (gallery) and `/report-templates/designer` — a per-radiologist
 visual designer for the exported PDF/DOCX output document. Distinct from
@@ -964,11 +964,14 @@ sidebar group).
   collapsing to two then one column below 1279px / 899px. Block reorder reuses
   the exact `.rp-drag-handle` / `.rp-drag-active` / `.rp-drop-zone` pattern from
   the rulebook editor (§4.10), not a new drag library.
-- **The mandatory "Powered by RadioPad" branding footer has no editable field
-  anywhere** — `LayoutPaper` renders it unconditionally from
-  `BRANDING_FOOTER_TEXT` (`lib/reportLayouts/accents.ts`), mirroring the
-  server's `ReportLayoutBranding.FooterText`. There is deliberately no prop or
-  schema field that could suppress it.
+- **The mandatory "Powered by RadioPad" branding footer, and the legal
+  disclaimer "NOT VALID IN COURT OF LAW", have no editable field anywhere** —
+  `LayoutPaper` renders both unconditionally, bold, from `BRANDING_FOOTER_TEXT`
+  and `LEGAL_DISCLAIMER_TEXT` (`lib/reportLayouts/accents.ts`), mirroring the
+  server's `ReportLayoutBranding.FooterText`/`.LegalDisclaimer`. There is
+  deliberately no prop or schema field that could suppress or un-bold either.
+  The footer is always one line — status/custom text, then the two mandatory
+  bold segments, then the page number — never stacked.
 
 ---
 

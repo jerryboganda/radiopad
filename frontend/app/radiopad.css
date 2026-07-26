@@ -5295,7 +5295,7 @@
 .rp-hk-groups .data-table th { white-space: nowrap; }
 
 /* ---------------------------------------------------------------------------
-   Report Templates (RPT-030) — /report-templates gallery + designer.
+   Report Templates (REPORT-TEMPLATES) — /report-templates gallery + designer.
    The exported document itself (LayoutPaper) is a fixed, theme-independent
    print surface — like .document-preview, it deliberately renders white/dark
    ink regardless of the app theme, so its own colours are inline styles, not

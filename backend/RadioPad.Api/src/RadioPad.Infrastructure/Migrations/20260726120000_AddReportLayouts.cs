@@ -9,7 +9,7 @@ using RadioPad.Infrastructure.Persistence;
 namespace RadioPad.Infrastructure.Migrations
 {
     /// <summary>
-    /// RPT-030 — Report Templates: radiologist-authored visual designs for the
+    /// REPORT-TEMPLATES — Report Templates: radiologist-authored visual designs for the
     /// exported PDF/DOCX report document, a per-(tenant, user) chosen default,
     /// and the tenant admin's "recommended" layout pointer on TenantSettings.
     ///

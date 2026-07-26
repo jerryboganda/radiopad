@@ -10,7 +10,7 @@ using RadioPad.Infrastructure.Persistence;
 namespace RadioPad.Api.Controllers;
 
 /// <summary>
-/// Report Templates (RPT-030) — CRUD for radiologist-authored output-document
+/// Report Templates (REPORT-TEMPLATES) — CRUD for radiologist-authored output-document
 /// designs, the caller's chosen default, and sample-data previews. Mirrors
 /// <see cref="FindingsLibraryController"/>: reading and authoring are open to
 /// every tenant member (a personal design is how a radiologist shapes their own

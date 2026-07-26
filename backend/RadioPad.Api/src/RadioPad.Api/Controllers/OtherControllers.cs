@@ -1825,7 +1825,7 @@ public class TenantSettingsController : TenantedController
                 requireZeroBlockers = s.RequireZeroBlockers,
                 warnAsBlocker = s.WarnAsBlocker,
             },
-            // Report Templates (RPT-030) — the tenant admin's suggested output-document design.
+            // Report Templates (REPORT-TEMPLATES) — the tenant admin's suggested output-document design.
             reportLayouts = new
             {
                 recommendedId = s.RecommendedReportLayoutId,
@@ -1855,7 +1855,7 @@ public class TenantSettingsController : TenantedController
         // Iter-31 RPT-012 / AI-007 — validation strictness toggles.
         bool? RequireZeroBlockers = null,
         bool? WarnAsBlocker = null,
-        // Report Templates (RPT-030) — recommended ReportLayout id. null = unchanged,
+        // Report Templates (REPORT-TEMPLATES) — recommended ReportLayout id. null = unchanged,
         // "" = clear, otherwise must be a Guid of a layout that exists in this tenant.
         string? RecommendedReportLayoutId = null);
 
@@ -1874,7 +1874,7 @@ public class TenantSettingsController : TenantedController
         if (dto.IpAllowlistJson is not null && !ValidateIpAllowlistJson(dto.IpAllowlistJson, out var ipAllowlistError))
             return BadRequest(new { error = ipAllowlistError, kind = "validation" });
 
-        // Report Templates (RPT-030) — null = unchanged, "" = clear, else must be a
+        // Report Templates (REPORT-TEMPLATES) — null = unchanged, "" = clear, else must be a
         // Guid of a layout that exists in this tenant.
         string? recommendedLayoutAction = null;
         Guid? recommendedLayoutId = null;

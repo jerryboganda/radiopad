@@ -1557,7 +1557,7 @@ export default function ReportPage() {
   }
 
   /** RC-09 — the Export panel drives Sending / Delivered / Failed off this
-   * promise; failures reject with a friendly message. `layoutId` (RPT-030)
+   * promise; failures reject with a friendly message. `layoutId` (REPORT-TEMPLATES)
    * only applies to pdf/docx — see ExportPanel's Layout selector. */
   async function runExport(fmt: ExportFormat, layoutId?: string): Promise<void> {
     try {

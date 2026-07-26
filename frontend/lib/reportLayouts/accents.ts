@@ -1,5 +1,5 @@
 /**
- * Report Templates (RPT-030) — presentation constants mirroring
+ * Report Templates (REPORT-TEMPLATES) — presentation constants mirroring
  * `backend/RadioPad.Api/src/RadioPad.Api/Services/ReportLayouts/ReportLayoutBranding.cs`.
  *
  * These are applied as inline `style=` on the paper canvas (`LayoutPaper`), not as

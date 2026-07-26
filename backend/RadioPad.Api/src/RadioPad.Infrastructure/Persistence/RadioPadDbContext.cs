@@ -103,10 +103,10 @@ public class RadioPadDbContext : DbContext
     /// <summary>NOTIF-001 — one row per (tenant, user) of notification preferences.</summary>
     public DbSet<NotificationPreference> NotificationPreferences => Set<NotificationPreference>();
 
-    /// <summary>Report Templates (RPT-030) — radiologist-authored output-document designs.</summary>
+    /// <summary>Report Templates (REPORT-TEMPLATES) — radiologist-authored output-document designs.</summary>
     public DbSet<ReportLayout> ReportLayouts => Set<ReportLayout>();
 
-    /// <summary>Report Templates (RPT-030) — one row per (tenant, user) caller-chosen default layout.</summary>
+    /// <summary>Report Templates (REPORT-TEMPLATES) — one row per (tenant, user) caller-chosen default layout.</summary>
     public DbSet<ReportLayoutUserDefault> ReportLayoutUserDefaults => Set<ReportLayoutUserDefault>();
 
     protected override void OnModelCreating(ModelBuilder b)
@@ -235,7 +235,7 @@ public class RadioPadDbContext : DbContext
             .HasFilter("DedupeKey IS NOT NULL");
         b.Entity<NotificationPreference>().HasIndex(x => new { x.TenantId, x.UserId }).IsUnique();
 
-        // Report Templates (RPT-030) — gallery list scan, and one default layout per caller.
+        // Report Templates (REPORT-TEMPLATES) — gallery list scan, and one default layout per caller.
         b.Entity<ReportLayout>().HasIndex(x => x.TenantId);
         b.Entity<ReportLayoutUserDefault>().HasIndex(x => new { x.TenantId, x.UserId }).IsUnique();
 

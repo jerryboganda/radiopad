@@ -33,7 +33,7 @@ export interface ExportPanelProps {
   warnings: number;
   onOpenValidation: () => void;
   /**
-   * Report Templates (RPT-030) — for pdf/docx, `layoutId` is "" (server
+   * Report Templates (REPORT-TEMPLATES) — for pdf/docx, `layoutId` is "" (server
    * resolves: caller default -> tenant recommended -> Classic), "classic"
    * (force the legacy layout), or a saved `ReportLayout` id. Every other
    * format ignores it (they are BuildNarrative-aligned by design).
@@ -53,7 +53,7 @@ export default function ExportPanel(p: ExportPanelProps) {
   const [fmt, setFmt] = useState<ExportFormat>('pdf');
   const [delivery, setDelivery] = useState<DeliveryState>({ status: 'idle' });
 
-  // Report Templates (RPT-030) — layout choice only matters for pdf/docx;
+  // Report Templates (REPORT-TEMPLATES) — layout choice only matters for pdf/docx;
   // lazy-loaded the first time either is selected so every other export stays cheap.
   const [layoutId, setLayoutId] = useState('');
   const [layoutOptions, setLayoutOptions] = useState<{

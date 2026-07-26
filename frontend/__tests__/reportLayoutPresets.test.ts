@@ -1,4 +1,4 @@
-// Report Templates (RPT-030) — every shipped preset must be a valid,
+// Report Templates (REPORT-TEMPLATES) — every shipped preset must be a valid,
 // server-acceptable layout: the gallery renders them without ever calling the
 // API, so a broken preset would only surface when a radiologist tried to save it.
 import { describe, it, expect } from 'vitest';

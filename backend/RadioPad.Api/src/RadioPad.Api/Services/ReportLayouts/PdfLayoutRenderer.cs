@@ -7,7 +7,7 @@ using PdfDocument = QuestPDF.Fluent.Document;
 namespace RadioPad.Api.Services.ReportLayouts;
 
 /// <summary>
-/// Report Templates (RPT-030) — renders a <see cref="ReportLayoutModel"/> to PDF via
+/// Report Templates (REPORT-TEMPLATES) — renders a <see cref="ReportLayoutModel"/> to PDF via
 /// QuestPDF. Section BODY TEXT always comes verbatim from <see cref="Report"/>'s six
 /// section strings (the same source <c>FhirDiagnosticReportSerializer.BuildNarrative</c>
 /// concatenates for text/FHIR export) — this renderer only ever changes presentation:

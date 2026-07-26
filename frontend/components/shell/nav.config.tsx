@@ -110,7 +110,7 @@ export const navGroups: NavGroup[] = [
       { href: '/notifications', labelKey: 'notifications', icon: Icons.notifications, surfaces: ['desktop'] },
       { href: '/reports/compose', labelKey: 'composer', icon: Icons.composer, permission: 'reports.draft', matchPrefix: '/reports/view' },
       { href: '/templates', labelKey: 'templates', icon: Icons.templates, permission: 'templates.read' },
-      // RPT-030 — per-radiologist output-document designer. Distinct from
+      // REPORT-TEMPLATES — per-radiologist output-document designer. Distinct from
       // /templates above (clinical section-content scaffolding, not layout).
       { href: '/report-templates', labelKey: 'reportTemplates', icon: Icons.reportTemplates, permission: 'templates.read' },
       { href: '/protocols', labelKey: 'protocols', icon: Icons.protocols },

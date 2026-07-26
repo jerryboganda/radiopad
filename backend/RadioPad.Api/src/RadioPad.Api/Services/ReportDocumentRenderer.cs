@@ -14,7 +14,7 @@ using WordDocument = DocumentFormat.OpenXml.Wordprocessing.Document;
 namespace RadioPad.Api.Services;
 
 /// <summary>
-/// PRD RPT-011 / RPT-030 — PDF + DOCX export facade.
+/// PRD RPT-011 / REPORT-TEMPLATES — PDF + DOCX export facade.
 ///
 /// <see cref="RenderPdf(Report, Tenant)"/> / <see cref="RenderDocx(Report, Tenant)"/>
 /// are the frozen "Classic" legacy layout — unchanged since RPT-011, used whenever no
@@ -25,7 +25,7 @@ namespace RadioPad.Api.Services;
 ///
 /// <see cref="RenderPdf(Report, Tenant, ReportLayoutModel)"/> /
 /// <see cref="RenderDocx(Report, Tenant, ReportLayoutModel)"/> are the Report Templates
-/// (RPT-030) layout-driven overloads, delegating to <see cref="PdfLayoutRenderer"/> /
+/// (REPORT-TEMPLATES) layout-driven overloads, delegating to <see cref="PdfLayoutRenderer"/> /
 /// <see cref="DocxLayoutRenderer"/>. They still resolve section BODY text from the same
 /// six <see cref="Report"/> strings <c>BuildNarrative</c> reads — only presentation
 /// (order, labels, typography, branding placement) is layout-controlled.
@@ -38,11 +38,11 @@ public static class ReportDocumentRenderer
         QuestPDF.Settings.License = LicenseType.Community;
     }
 
-    /// <summary>Report Templates (RPT-030) — layout-driven PDF export.</summary>
+    /// <summary>Report Templates (REPORT-TEMPLATES) — layout-driven PDF export.</summary>
     public static byte[] RenderPdf(Report report, Tenant tenant, ReportLayoutModel layout) =>
         PdfLayoutRenderer.Render(report, tenant, layout);
 
-    /// <summary>Report Templates (RPT-030) — layout-driven DOCX export.</summary>
+    /// <summary>Report Templates (REPORT-TEMPLATES) — layout-driven DOCX export.</summary>
     public static byte[] RenderDocx(Report report, Tenant tenant, ReportLayoutModel layout) =>
         DocxLayoutRenderer.Render(report, tenant, layout);
 

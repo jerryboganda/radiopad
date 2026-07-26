@@ -1,7 +1,7 @@
 namespace RadioPad.Api.Services.ReportLayouts;
 
 /// <summary>
-/// Report Templates (RPT-030) — server-side constants shared by
+/// Report Templates (REPORT-TEMPLATES) — server-side constants shared by
 /// <see cref="RadioPad.Api.Services.PdfLayoutRenderer"/> and
 /// <see cref="RadioPad.Api.Services.DocxLayoutRenderer"/>.
 ///

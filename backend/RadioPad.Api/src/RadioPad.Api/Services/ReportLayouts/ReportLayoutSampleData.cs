@@ -4,7 +4,7 @@ using RadioPad.Domain.Enums;
 namespace RadioPad.Api.Services.ReportLayouts;
 
 /// <summary>
-/// Report Templates (RPT-030) — an in-memory, non-persisted CT-chest report used
+/// Report Templates (REPORT-TEMPLATES) — an in-memory, non-persisted CT-chest report used
 /// by <c>POST /api/report-layouts/preview/{pdf,docx}</c> so a radiologist can see
 /// true rendering fidelity for a design before it ever touches a real patient
 /// report. No database row is read or written; nothing here carries PHI —

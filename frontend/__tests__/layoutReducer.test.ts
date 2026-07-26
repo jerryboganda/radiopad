@@ -1,4 +1,4 @@
-// Report Templates (RPT-030) — the designer's undo/redo history reducer.
+// Report Templates (REPORT-TEMPLATES) — the designer's undo/redo history reducer.
 import { describe, it, expect } from 'vitest';
 import { createDesignerState, designerReducer } from '@/lib/reportLayouts/layoutReducer';
 import { createEmptyLayout, newBlockOfType } from '@/lib/reportLayouts/schema';

@@ -18,7 +18,7 @@ import LayoutCanvas from './LayoutCanvas';
 import InspectorPanel from './InspectorPanel';
 
 /**
- * Report Templates (RPT-030) — the three-zone visual designer. Loaded via
+ * Report Templates (REPORT-TEMPLATES) — the three-zone visual designer. Loaded via
  * `?id=` (static-export query-param routing — see `lib/routes.ts`); with no id
  * it starts from `createEmptyLayout()` and the first Save creates the row.
  *

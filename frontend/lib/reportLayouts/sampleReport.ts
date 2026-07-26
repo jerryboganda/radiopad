@@ -1,5 +1,5 @@
 /**
- * Report Templates (RPT-030) — a fictional CT-chest report used to render the
+ * Report Templates (REPORT-TEMPLATES) — a fictional CT-chest report used to render the
  * designer canvas and gallery previews. Mirrors
  * `backend/RadioPad.Api/src/RadioPad.Api/Services/ReportLayouts/ReportLayoutSampleData.cs`
  * (duplicated, not shared — the backend copy renders server-side PDF/DOCX previews;

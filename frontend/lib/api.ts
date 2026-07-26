@@ -999,7 +999,7 @@ export type ReportTemplate = {
 };
 
 /**
- * Report Templates (RPT-030) — a radiologist-authored visual design for the
+ * Report Templates (REPORT-TEMPLATES) — a radiologist-authored visual design for the
  * exported PDF/DOCX output document. Distinct from `ReportTemplate` above,
  * which governs clinical section *content* scaffolding, not document
  * presentation. `layoutJson` is the `ReportLayoutJson` shape defined in
@@ -1752,7 +1752,7 @@ export const api = {
       request<string>(
         `/api/reports/${id}/export/text${opts?.preview ? '?preview=true' : ''}`,
       ),
-    // Report Templates (RPT-030) — layoutId selects a saved design; "classic"
+    // Report Templates (REPORT-TEMPLATES) — layoutId selects a saved design; "classic"
     // forces the legacy layout; omitted resolves caller default -> tenant
     // recommended -> legacy server-side (see ReportsController.ResolveExportLayoutAsync).
     exportPdf: (id: string, layoutId?: string) =>
@@ -2371,7 +2371,7 @@ export const api = {
       }>(`/api/templates/${id}/usage`),
   },
   /**
-   * Report Templates (RPT-030) — radiologist-authored output-document designs.
+   * Report Templates (REPORT-TEMPLATES) — radiologist-authored output-document designs.
    * Reads are open to every tenant member (a shared gallery, like Findings
    * Library); a layout may only be edited/deleted by its author or a reporting
    * administrator. `setDefault` is the caller's own per-device-independent
@@ -2710,7 +2710,7 @@ export const api = {
             requireZeroBlockers: boolean;
             warnAsBlocker: boolean;
           };
-          // Report Templates (RPT-030) — the tenant admin's suggested output-document design.
+          // Report Templates (REPORT-TEMPLATES) — the tenant admin's suggested output-document design.
           reportLayouts: {
             recommendedId: string | null;
           };
@@ -2735,7 +2735,7 @@ export const api = {
         cmkVerified?: boolean | null;
         requireZeroBlockers?: boolean | null;
         warnAsBlocker?: boolean | null;
-        // Report Templates (RPT-030) — null = unchanged, "" = clear, else a ReportLayout id.
+        // Report Templates (REPORT-TEMPLATES) — null = unchanged, "" = clear, else a ReportLayout id.
         recommendedReportLayoutId?: string | null;
       }) =>
         request<{ id: string }>('/api/tenant/settings', {
