@@ -16,6 +16,15 @@ export interface LayoutPaperProps {
   onSelectBlock?: (id: string) => void;
   /** Enables hover/selection affordances — the designer canvas only. */
   interactive?: boolean;
+  /**
+   * true (default) hard-clips to exactly one page's height — right for a
+   * fixed-aspect-ratio thumbnail (gallery cards, the preset picker). The
+   * designer canvas MUST pass false: real content routinely runs longer than
+   * one physical page, and a real PDF/DOCX export simply flows onto page 2 —
+   * clipping the preview here would silently hide content the export still
+   * produces, which is strictly worse than an honest, taller preview.
+   */
+  clip?: boolean;
 }
 
 /**
@@ -27,21 +36,18 @@ export interface LayoutPaperProps {
  * (server-rendered via the same block model). The branding line below is always
  * rendered here too, exactly as the server renderers emit it unconditionally.
  */
-export default function LayoutPaper({ layout, scale = 1, selectedBlockId, onSelectBlock, interactive }: LayoutPaperProps) {
+export default function LayoutPaper({ layout, scale = 1, selectedBlockId, onSelectBlock, interactive, clip = true }: LayoutPaperProps) {
   const size = PAGE_SIZE_PT[layout.page.size];
   const accentHex = ACCENT_HEX[layout.page.accent];
   const fontFamily = FONT_STACKS[layout.page.font];
 
-  const wrapStyle: CSSProperties = {
-    width: size.width * scale,
-    height: size.height * scale,
-    overflow: 'hidden',
-    flex: '0 0 auto',
-  };
+  const wrapStyle: CSSProperties = clip
+    ? { width: size.width * scale, height: size.height * scale, overflow: 'hidden', flex: '0 0 auto' }
+    : { width: size.width * scale, flex: '0 0 auto' };
 
   const paperStyle: CSSProperties = {
     width: size.width,
-    height: size.height,
+    ...(clip ? { height: size.height } : { minHeight: size.height }),
     transform: `scale(${scale})`,
     transformOrigin: 'top left',
     background: '#ffffff',
@@ -69,24 +75,25 @@ export default function LayoutPaper({ layout, scale = 1, selectedBlockId, onSele
           />
         ))}
         <div style={{ flex: 1 }} />
-        <div className="rp-rl-paper-footer">
-          {(layout.footer.showStatusLine || layout.footer.customText) && (
-            <div style={{ fontSize: 8, color: '#595959', textAlign: 'center', marginBottom: 2 }}>
-              {[layout.footer.customText, layout.footer.showStatusLine
-                ? `${SAMPLE_REPORT.status} — ${new Date(SAMPLE_REPORT.updatedAt).toLocaleString()}`
-                : null].filter(Boolean).join('   •   ')}
-            </div>
-          )}
-          <div style={{ fontSize: 7.5, color: '#808080', textAlign: 'center' }}>
-            {BRANDING_FOOTER_TEXT}
-          </div>
-          {layout.page.showPageNumbers && (
-            <div style={{ fontSize: 7.5, color: '#808080', textAlign: 'center', marginTop: 2 }}>Page 1 of 1</div>
-          )}
+        {/* Single line — status/custom text, then the mandatory branding, then
+            the page number, joined with a bullet separator. Never stacked. */}
+        <div style={{ fontSize: 7.5, color: '#6b7280', textAlign: 'center' }}>
+          {footerLine(layout)}
         </div>
       </div>
     </div>
   );
+}
+
+function footerLine(layout: ReportLayoutJson): string {
+  const parts: string[] = [];
+  if (layout.footer.customText) parts.push(layout.footer.customText);
+  if (layout.footer.showStatusLine) {
+    parts.push(`${SAMPLE_REPORT.status} — ${new Date(SAMPLE_REPORT.updatedAt).toLocaleString()}`);
+  }
+  parts.push(BRANDING_FOOTER_TEXT);
+  if (layout.page.showPageNumbers) parts.push('Page 1 of 1');
+  return parts.join('   •   ');
 }
 
 function LayoutPaperBlock({

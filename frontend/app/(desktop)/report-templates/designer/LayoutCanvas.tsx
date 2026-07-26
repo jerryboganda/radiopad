@@ -29,6 +29,7 @@ export default function LayoutCanvas({ layout, selectedBlockId, onSelectBlock }:
           selectedBlockId={selectedBlockId}
           onSelectBlock={onSelectBlock}
           interactive
+          clip={false}
         />
       </div>
     </div>

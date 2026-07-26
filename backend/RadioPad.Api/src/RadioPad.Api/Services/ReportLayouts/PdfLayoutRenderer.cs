@@ -41,40 +41,30 @@ public static class PdfLayoutRenderer
                     }
                 });
 
-                page.Footer().Column(col =>
+                // Single line — lead text (custom/status), then the mandatory branding,
+                // then the page number, joined with a bullet separator. Never stacked.
+                page.Footer().AlignCenter().Text(t =>
                 {
-                    col.Spacing(2);
-                    if (layout.Footer.ShowStatusLine || !string.IsNullOrWhiteSpace(layout.Footer.CustomText))
+                    t.DefaultTextStyle(x => x.FontSize(7.5f).FontColor(Colors.Grey.Medium));
+
+                    var leadParts = new List<string>();
+                    if (!string.IsNullOrWhiteSpace(layout.Footer.CustomText)) leadParts.Add(layout.Footer.CustomText!);
+                    if (layout.Footer.ShowStatusLine) leadParts.Add($"{report.Status} — {report.UpdatedAt:u}");
+                    if (leadParts.Count > 0)
                     {
-                        col.Item().AlignCenter().Text(t =>
-                        {
-                            t.DefaultTextStyle(x => x.FontSize(8).FontColor(Colors.Grey.Darken1));
-                            if (!string.IsNullOrWhiteSpace(layout.Footer.CustomText))
-                            {
-                                t.Span(layout.Footer.CustomText);
-                                if (layout.Footer.ShowStatusLine) t.Span("   •   ");
-                            }
-                            if (layout.Footer.ShowStatusLine)
-                            {
-                                t.Span($"{report.Status} — {report.UpdatedAt:u}");
-                            }
-                        });
+                        t.Span(string.Join("   •   ", leadParts));
+                        t.Span("   •   ");
                     }
 
                     // Mandatory, non-configurable branding — see ReportLayoutBranding.FooterText.
-                    col.Item().AlignCenter().Text(ReportLayoutBranding.FooterText)
-                        .FontSize(7.5f).FontColor(Colors.Grey.Medium);
+                    t.Span(ReportLayoutBranding.FooterText);
 
                     if (layout.Page.ShowPageNumbers)
                     {
-                        col.Item().AlignCenter().Text(t =>
-                        {
-                            t.DefaultTextStyle(x => x.FontSize(7.5f).FontColor(Colors.Grey.Medium));
-                            t.Span("Page ");
-                            t.CurrentPageNumber();
-                            t.Span(" of ");
-                            t.TotalPages();
-                        });
+                        t.Span("   •   Page ");
+                        t.CurrentPageNumber();
+                        t.Span(" of ");
+                        t.TotalPages();
                     }
                 });
             });

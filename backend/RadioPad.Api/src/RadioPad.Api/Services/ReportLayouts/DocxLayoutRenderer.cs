@@ -68,36 +68,45 @@ public static class DocxLayoutRenderer
 
     // ---- footer --------------------------------------------------------------
 
+    /// <summary>
+    /// Single line — lead text (custom/status), then the mandatory branding, then
+    /// the page number, joined with a bullet separator. Never stacked paragraphs.
+    /// </summary>
     private static Footer BuildFooter(Report report, ReportLayoutModel layout, string fontFamily)
     {
         var footer = new Footer();
+        var paragraph = new Paragraph(new ParagraphProperties(new Justification { Val = JustificationValues.Center }));
 
-        if (layout.Footer.ShowStatusLine || !string.IsNullOrWhiteSpace(layout.Footer.CustomText))
+        RunProperties RPr()
         {
-            var parts = new List<string>();
-            if (!string.IsNullOrWhiteSpace(layout.Footer.CustomText)) parts.Add(layout.Footer.CustomText!);
-            if (layout.Footer.ShowStatusLine) parts.Add($"{report.Status} — {report.UpdatedAt:u}");
-            footer.Append(Para(string.Join("   •   ", parts), fontFamily, 8, colorHex: "595959", align: JustificationValues.Center));
+            var rPr = new RunProperties();
+            rPr.Append(new RunFonts { Ascii = fontFamily, HighAnsi = fontFamily });
+            rPr.Append(new Color { Val = "6b7280" });
+            rPr.Append(new FontSize { Val = "15" }); // 7.5pt
+            return rPr;
+        }
+        Run TextRun(string text) => new(RPr(), new Text(text) { Space = SpaceProcessingModeValues.Preserve });
+
+        var leadParts = new List<string>();
+        if (!string.IsNullOrWhiteSpace(layout.Footer.CustomText)) leadParts.Add(layout.Footer.CustomText!);
+        if (layout.Footer.ShowStatusLine) leadParts.Add($"{report.Status} — {report.UpdatedAt:u}");
+        if (leadParts.Count > 0)
+        {
+            paragraph.Append(TextRun(string.Join("   •   ", leadParts) + "   •   "));
         }
 
         // Mandatory, non-configurable branding — see ReportLayoutBranding.FooterText.
-        footer.Append(Para(ReportLayoutBranding.FooterText, fontFamily, 7.5, colorHex: "808080", align: JustificationValues.Center));
+        paragraph.Append(TextRun(ReportLayoutBranding.FooterText));
 
         if (layout.Page.ShowPageNumbers)
         {
-            var pageNumberParagraph = new Paragraph(new ParagraphProperties(new Justification { Val = JustificationValues.Center }));
-            var rPr = new RunProperties();
-            rPr.Append(new RunFonts { Ascii = fontFamily, HighAnsi = fontFamily });
-            rPr.Append(new FontSize { Val = "15" }); // 7.5pt
-            rPr.Append(new Color { Val = "808080" });
-
-            pageNumberParagraph.Append(new Run((RunProperties)rPr.CloneNode(true), new Text("Page ") { Space = SpaceProcessingModeValues.Preserve }));
-            pageNumberParagraph.Append(new SimpleField(new Run((RunProperties)rPr.CloneNode(true), new Text("1"))) { Instruction = "PAGE" });
-            pageNumberParagraph.Append(new Run((RunProperties)rPr.CloneNode(true), new Text(" of ") { Space = SpaceProcessingModeValues.Preserve }));
-            pageNumberParagraph.Append(new SimpleField(new Run((RunProperties)rPr.CloneNode(true), new Text("1"))) { Instruction = "NUMPAGES" });
-            footer.Append(pageNumberParagraph);
+            paragraph.Append(TextRun("   •   Page "));
+            paragraph.Append(new SimpleField(new Run(RPr(), new Text("1"))) { Instruction = "PAGE" });
+            paragraph.Append(TextRun(" of "));
+            paragraph.Append(new SimpleField(new Run(RPr(), new Text("1"))) { Instruction = "NUMPAGES" });
         }
 
+        footer.Append(paragraph);
         return footer;
     }
 
