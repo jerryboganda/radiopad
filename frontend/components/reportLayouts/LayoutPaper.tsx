@@ -1,9 +1,9 @@
 'use client';
 
-import type { CSSProperties } from 'react';
+import type { CSSProperties, ReactNode } from 'react';
 import type { LayoutBlock, ReportLayoutJson } from '@/lib/reportLayouts/schema';
 import {
-  ACCENT_HEX, BRANDING_FOOTER_TEXT, FONT_STACKS, PAGE_SIZE_PT,
+  ACCENT_HEX, BRANDING_FOOTER_TEXT, FONT_STACKS, LEGAL_DISCLAIMER_TEXT, PAGE_SIZE_PT,
   SECTION_LABEL_FALLBACK, STUDY_FIELD_LABEL_FALLBACK,
 } from '@/lib/reportLayouts/accents';
 import { SAMPLE_REPORT, resolveSampleStudyField } from '@/lib/reportLayouts/sampleReport';
@@ -75,25 +75,40 @@ export default function LayoutPaper({ layout, scale = 1, selectedBlockId, onSele
           />
         ))}
         <div style={{ flex: 1 }} />
-        {/* Single line — status/custom text, then the mandatory branding, then
-            the page number, joined with a bullet separator. Never stacked. */}
+        {/* Single line — status/custom text, then the mandatory bold legal
+            disclaimer and branding, then the page number. Never stacked. */}
         <div style={{ fontSize: 7.5, color: '#6b7280', textAlign: 'center' }}>
-          {footerLine(layout)}
+          <FooterLine layout={layout} />
         </div>
       </div>
     </div>
   );
 }
 
-function footerLine(layout: ReportLayoutJson): string {
-  const parts: string[] = [];
+const FOOTER_SEP = '   •   ';
+
+function FooterLine({ layout }: { layout: ReportLayoutJson }) {
+  const parts: ReactNode[] = [];
   if (layout.footer.customText) parts.push(layout.footer.customText);
   if (layout.footer.showStatusLine) {
     parts.push(`${SAMPLE_REPORT.status} — ${new Date(SAMPLE_REPORT.updatedAt).toLocaleString()}`);
   }
-  parts.push(BRANDING_FOOTER_TEXT);
+  // Mandatory, non-configurable — see ReportLayoutBranding.cs. Bold: legal
+  // disclaimer, then the branding line.
+  parts.push(<strong key="disclaimer" style={{ fontWeight: 700 }}>{LEGAL_DISCLAIMER_TEXT}</strong>);
+  parts.push(<strong key="branding" style={{ fontWeight: 700 }}>{BRANDING_FOOTER_TEXT}</strong>);
   if (layout.page.showPageNumbers) parts.push('Page 1 of 1');
-  return parts.join('   •   ');
+
+  return (
+    <>
+      {parts.map((part, i) => (
+        <span key={i}>
+          {i > 0 && FOOTER_SEP}
+          {part}
+        </span>
+      ))}
+    </>
+  );
 }
 
 function LayoutPaperBlock({

@@ -8,7 +8,7 @@ import type {
   SectionBlock, SignaturesBlock, StudyFieldKey, StudyInfoBlock, TextBlock,
 } from '@/lib/reportLayouts/schema';
 import { STUDY_FIELD_KEYS, MAX_LOGO_BYTES } from '@/lib/reportLayouts/schema';
-import { ACCENT_LABEL, FONT_LABEL, BRANDING_FOOTER_TEXT, STUDY_FIELD_LABEL_FALLBACK } from '@/lib/reportLayouts/accents';
+import { ACCENT_LABEL, FONT_LABEL, BRANDING_FOOTER_TEXT, LEGAL_DISCLAIMER_TEXT, STUDY_FIELD_LABEL_FALLBACK } from '@/lib/reportLayouts/accents';
 
 export interface InspectorPanelProps {
   page: PageSetup;
@@ -113,7 +113,10 @@ function FooterFields({ footer, onChange }: { footer: LayoutFooter; onChange: (f
       </label>
       <div className="rp-rl-branding-note">
         <Lock size={12} strokeWidth={2} aria-hidden />
-        <span>Every export always includes "{BRANDING_FOOTER_TEXT}" — this can't be removed.</span>
+        <span>
+          Every export always includes <strong>{LEGAL_DISCLAIMER_TEXT}</strong> and{' '}
+          <strong>{BRANDING_FOOTER_TEXT}</strong> — neither can be removed.
+        </span>
       </div>
     </div>
   );

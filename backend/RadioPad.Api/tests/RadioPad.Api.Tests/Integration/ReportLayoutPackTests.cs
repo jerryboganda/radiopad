@@ -318,6 +318,7 @@ public class ReportLayoutPackTests : IClassFixture<RadioPadAppFactory>
         var text = ExtractDocxText(bytes);
         Assert.Contains("Powered by RadioPad", text);
         Assert.Contains("radiopadstudio.com", text);
+        Assert.Contains("NOT VALID IN COURT OF LAW", text);
     }
 
     [Fact]

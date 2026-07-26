@@ -77,15 +77,16 @@ public static class DocxLayoutRenderer
         var footer = new Footer();
         var paragraph = new Paragraph(new ParagraphProperties(new Justification { Val = JustificationValues.Center }));
 
-        RunProperties RPr()
+        RunProperties RPr(bool bold = false)
         {
             var rPr = new RunProperties();
             rPr.Append(new RunFonts { Ascii = fontFamily, HighAnsi = fontFamily });
+            if (bold) rPr.Append(new Bold());
             rPr.Append(new Color { Val = "6b7280" });
             rPr.Append(new FontSize { Val = "15" }); // 7.5pt
             return rPr;
         }
-        Run TextRun(string text) => new(RPr(), new Text(text) { Space = SpaceProcessingModeValues.Preserve });
+        Run TextRun(string text, bool bold = false) => new(RPr(bold), new Text(text) { Space = SpaceProcessingModeValues.Preserve });
 
         var leadParts = new List<string>();
         if (!string.IsNullOrWhiteSpace(layout.Footer.CustomText)) leadParts.Add(layout.Footer.CustomText!);
@@ -95,8 +96,11 @@ public static class DocxLayoutRenderer
             paragraph.Append(TextRun(string.Join("   •   ", leadParts) + "   •   "));
         }
 
-        // Mandatory, non-configurable branding — see ReportLayoutBranding.FooterText.
-        paragraph.Append(TextRun(ReportLayoutBranding.FooterText));
+        // Mandatory, non-configurable — see ReportLayoutBranding. Bold: legal
+        // disclaimer, then the branding line, separated by a bullet.
+        paragraph.Append(TextRun(ReportLayoutBranding.LegalDisclaimer, bold: true));
+        paragraph.Append(TextRun("   •   "));
+        paragraph.Append(TextRun(ReportLayoutBranding.FooterText, bold: true));
 
         if (layout.Page.ShowPageNumbers)
         {

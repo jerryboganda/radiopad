@@ -13,6 +13,9 @@ export const BRAND_LINE = 'Powered by RadioPad';
 export const BRAND_WEBSITE = 'radiopadstudio.com';
 export const BRANDING_FOOTER_TEXT = `${BRAND_LINE} — ${BRAND_WEBSITE}`;
 
+/** Mandatory legal disclaimer — same non-removable contract as {@link BRANDING_FOOTER_TEXT}. */
+export const LEGAL_DISCLAIMER_TEXT = 'NOT VALID IN COURT OF LAW';
+
 export const ACCENT_HEX: Record<AccentColor, string> = {
   graphite: '#374151',
   navy: '#1e3a8a',

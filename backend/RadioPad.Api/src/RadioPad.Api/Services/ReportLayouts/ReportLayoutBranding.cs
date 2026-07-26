@@ -18,6 +18,13 @@ public static class ReportLayoutBranding
     public const string Website = "radiopadstudio.com";
     public const string FooterText = BrandLine + " — " + Website;
 
+    /// <summary>
+    /// Mandatory legal disclaimer — same non-removable contract as
+    /// <see cref="FooterText"/>: never read from client JSON, always rendered,
+    /// bold, in every layout-driven PDF/DOCX page and the frontend preview.
+    /// </summary>
+    public const string LegalDisclaimer = "NOT VALID IN COURT OF LAW";
+
     /// <summary>Pinned hex per <see cref="LayoutAccent"/> — never a client-supplied color string.</summary>
     public static readonly IReadOnlyDictionary<LayoutAccent, string> AccentHex = new Dictionary<LayoutAccent, string>
     {

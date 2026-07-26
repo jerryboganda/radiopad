@@ -56,8 +56,11 @@ public static class PdfLayoutRenderer
                         t.Span("   •   ");
                     }
 
-                    // Mandatory, non-configurable branding — see ReportLayoutBranding.FooterText.
-                    t.Span(ReportLayoutBranding.FooterText);
+                    // Mandatory, non-configurable — see ReportLayoutBranding. Bold: legal
+                    // disclaimer, then the branding line, separated by a bullet.
+                    t.Span(ReportLayoutBranding.LegalDisclaimer).Bold();
+                    t.Span("   •   ");
+                    t.Span(ReportLayoutBranding.FooterText).Bold();
 
                     if (layout.Page.ShowPageNumbers)
                     {
