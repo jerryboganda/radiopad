@@ -242,7 +242,7 @@ public class ReportLayoutPackTests : IClassFixture<RadioPadAppFactory>
         Assert.Equal(HttpStatusCode.NoContent, delete.StatusCode);
         var listAfterDelete = await client.GetAsync("/api/report-layouts");
         var afterDeleteJson = JsonDocument.Parse(await listAfterDelete.Content.ReadAsStringAsync()).RootElement;
-        Assert.Equal(JsonValueKind.Null, afterDeleteJson.GetProperty("myDefaultId").ValueKind);
+        AssertJsonNullOrAbsent(afterDeleteJson, "myDefaultId");
 
         var clear = await client.PutAsJsonAsync("/api/report-layouts/default", new { layoutId = (Guid?)null });
         Assert.True(clear.IsSuccessStatusCode, await clear.Content.ReadAsStringAsync());
@@ -276,14 +276,14 @@ public class ReportLayoutPackTests : IClassFixture<RadioPadAppFactory>
         // Deleting the recommended layout must null the tenant pointer, not leave it dangling.
         await tenantClient.DeleteAsync($"/api/report-layouts/{id}");
         var settingsAfterDelete = JsonDocument.Parse(await (await adminClient.GetAsync("/api/tenant/settings")).Content.ReadAsStringAsync()).RootElement;
-        Assert.Equal(JsonValueKind.Null, settingsAfterDelete.GetProperty("reportLayouts").GetProperty("recommendedId").ValueKind);
+        AssertJsonNullOrAbsent(settingsAfterDelete.GetProperty("reportLayouts"), "recommendedId");
 
         var (id2, _) = await CreateLayoutAsync(tenantClient, "Recommend me too", ValidLayoutJson);
         await adminClient.PostAsJsonAsync("/api/tenant/settings", new { recommendedReportLayoutId = id2.ToString() });
         var clearRecommended = await adminClient.PostAsJsonAsync("/api/tenant/settings", new { recommendedReportLayoutId = "" });
         Assert.True(clearRecommended.IsSuccessStatusCode, await clearRecommended.Content.ReadAsStringAsync());
         var settingsAfterClear = JsonDocument.Parse(await (await adminClient.GetAsync("/api/tenant/settings")).Content.ReadAsStringAsync()).RootElement;
-        Assert.Equal(JsonValueKind.Null, settingsAfterClear.GetProperty("reportLayouts").GetProperty("recommendedId").ValueKind);
+        AssertJsonNullOrAbsent(settingsAfterClear.GetProperty("reportLayouts"), "recommendedId");
     }
 
     // -------------------------------------------------------------- preview
@@ -452,6 +452,22 @@ public class ReportLayoutPackTests : IClassFixture<RadioPadAppFactory>
         var ack = await client.PostAsync($"/api/reports/{id}/acknowledge", null);
         Assert.Equal(HttpStatusCode.OK, ack.StatusCode);
         return id;
+    }
+
+    /// <summary>
+    /// The API's global JsonSerializerOptions sets
+    /// <c>DefaultIgnoreCondition = JsonIgnoreCondition.WhenWritingNull</c>, so a
+    /// null-valued property (e.g. a cleared <c>recommendedId</c>) is OMITTED from
+    /// the JSON entirely, not emitted as <c>null</c>. <c>JsonElement.GetProperty</c>
+    /// throws <see cref="KeyNotFoundException"/> on an absent property, so "null or
+    /// absent" is the correct check here, not <c>ValueKind == JsonValueKind.Null</c>.
+    /// </summary>
+    private static void AssertJsonNullOrAbsent(JsonElement obj, string property)
+    {
+        if (obj.TryGetProperty(property, out var value))
+        {
+            Assert.Equal(JsonValueKind.Null, value.ValueKind);
+        }
     }
 
     /// <summary>Concatenates every XML part's text so a footer/document text assertion
