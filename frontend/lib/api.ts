@@ -527,6 +527,7 @@ export type LocalGenerateDto = {
   bodyPart?: string | null;
   contrast?: string | null;
   age?: number | null;
+  ageUnit?: 'Years' | 'Months' | null;
   gender?: string | null;
   indication?: string | null;
   findings?: string | null;
@@ -948,8 +949,10 @@ export type Report = {
     bodyPart: string;
     /** Hybrid contrast model — "" | "None" | "With" | "WithAndWithout". Drives contrast-aware template resolution. */
     contrast: string;
-    /** Iter-36 — patient age in years (null when unknown). Replaced study-context indication. */
+    /** Iter-36 — patient age, expressed in `ageUnit` (null when unknown). Replaced study-context indication. */
     age: number | null;
+    /** Unit `age` is expressed in — Years by default, Months for infants. */
+    ageUnit: 'Years' | 'Months';
     /** Iter-36 — patient gender (Male/Female/Other/Unknown). */
     gender: string;
     comparison: string;
@@ -1642,6 +1645,7 @@ export const api = {
         bodyPart?: string;
         contrast?: string;
         age?: number | null;
+        ageUnit?: 'Years' | 'Months';
         gender?: string;
       },
     ) => request<Report>(`/api/reports/${id}`, { method: 'PATCH', body: JSON.stringify(body) }),

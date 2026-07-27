@@ -1,4 +1,5 @@
 using RadioPad.Domain.Entities;
+using RadioPad.Domain.Enums;
 
 namespace RadioPad.Api.Services.ReportLayouts;
 
@@ -18,7 +19,9 @@ public static class ReportLayoutContent
         LayoutStudyField.Modality => Dash(report.Study.Modality),
         LayoutStudyField.BodyPart => Dash(report.Study.BodyPart),
         LayoutStudyField.Contrast => Dash(report.Study.Contrast),
-        LayoutStudyField.Age => report.Study.Age?.ToString() ?? "—",
+        LayoutStudyField.Age => report.Study.Age is int a
+            ? report.Study.AgeUnit == StudyAgeUnit.Months ? $"{a} mo" : a.ToString()
+            : "—",
         LayoutStudyField.Gender => Dash(report.Study.Gender),
         LayoutStudyField.Comparison => Dash(report.Study.Comparison),
         LayoutStudyField.PriorReportSummary => Dash(report.Study.PriorReportSummary),

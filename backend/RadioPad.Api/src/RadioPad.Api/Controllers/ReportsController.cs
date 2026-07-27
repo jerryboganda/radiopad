@@ -113,8 +113,13 @@ public class ReportsController : TenantedController
 
     public record CreateReportDto(
         string? Modality, string? BodyPart, string? Contrast, string? Indication,
-        int? Age, string? Gender,
+        int? Age, string? AgeUnit, string? Gender,
         string? Comparison, string? AccessionNumber, Guid? RulebookId, Guid? TemplateId);
+
+    /// <summary>Matches "Months" case-insensitively (mirrors the free-form Gender/Contrast
+    /// convention on <see cref="StudyContext"/>); anything else — including null — is Years.</summary>
+    private static StudyAgeUnit ParseAgeUnit(string? raw) =>
+        string.Equals(raw, "Months", StringComparison.OrdinalIgnoreCase) ? StudyAgeUnit.Months : StudyAgeUnit.Years;
 
     [HttpGet]
     public async Task<IActionResult> List(
@@ -287,6 +292,7 @@ public class ReportsController : TenantedController
                 BodyPart = dto.BodyPart ?? "",
                 Contrast = dto.Contrast ?? "",
                 Age = dto.Age,
+                AgeUnit = ParseAgeUnit(dto.AgeUnit),
                 Gender = dto.Gender ?? "",
                 Comparison = dto.Comparison ?? "",
                 AccessionNumber = dto.AccessionNumber ?? Guid.NewGuid().ToString("n")[..10],
@@ -495,7 +501,7 @@ public class ReportsController : TenantedController
         string? Findings, string? Impression, string? Recommendations,
         string? AiHighlightsJson, Guid? RulebookId,
         // Iter-36 — study-context fields editable from the reporting panel.
-        string? Modality, string? BodyPart, int? Age, string? Gender, string? Contrast,
+        string? Modality, string? BodyPart, int? Age, string? AgeUnit, string? Gender, string? Contrast,
         // Manual binding overrides — an explicit id pins the binding; sending
         // TemplatePinned/RulebookPinned = false clears the pin (reset-to-auto).
         Guid? TemplateId = null, bool? TemplatePinned = null, bool? RulebookPinned = null,
@@ -565,6 +571,7 @@ public class ReportsController : TenantedController
 
         // Iter-36 — study-context demographics + the modality/body-part selection key.
         if (dto.Age is not null) report.Study.Age = dto.Age;
+        if (dto.AgeUnit is not null) report.Study.AgeUnit = ParseAgeUnit(dto.AgeUnit);
         if (dto.Gender is not null) report.Study.Gender = dto.Gender;
         var modalityChanged = dto.Modality is not null && dto.Modality != report.Study.Modality;
         var bodyPartChanged = dto.BodyPart is not null && dto.BodyPart != report.Study.BodyPart;

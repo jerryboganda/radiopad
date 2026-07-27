@@ -91,7 +91,7 @@ public sealed class LocalGenerationController : ControllerBase
     private const string JobMode = "report";
 
     public record GenerateReportDto(
-        string? Modality, string? BodyPart, string? Contrast, int? Age, string? Gender,
+        string? Modality, string? BodyPart, string? Contrast, int? Age, string? AgeUnit, string? Gender,
         string? Indication, string? Findings);
 
     /// <summary>
@@ -103,11 +103,11 @@ public sealed class LocalGenerationController : ControllerBase
     /// stacking a second generation onto the single-request llama-server.
     /// </summary>
     public record GenerateReportJobDto(
-        string? Modality, string? BodyPart, string? Contrast, int? Age, string? Gender,
+        string? Modality, string? BodyPart, string? Contrast, int? Age, string? AgeUnit, string? Gender,
         string? Indication, string? Findings, Guid CorrelationId)
     {
         public GenerateReportDto ToReportDto() =>
-            new(Modality, BodyPart, Contrast, Age, Gender, Indication, Findings);
+            new(Modality, BodyPart, Contrast, Age, AgeUnit, Gender, Indication, Findings);
     }
 
     public record GeneratedReportSections(
@@ -187,9 +187,21 @@ public sealed class LocalGenerationController : ControllerBase
         }
         """;
 
+    /// <summary>Mirrors <c>ReportingService.FormatAge</c> for the on-device generation path,
+    /// which carries age/unit through its own DTO rather than a <c>StudyContext</c>.</summary>
+    private static string FormatAge(int? age, string? unit)
+    {
+        if (age is not int a) return "Unknown";
+        var isMonths = string.Equals(unit, "Months", StringComparison.OrdinalIgnoreCase);
+        var unitWord = isMonths
+            ? (a == 1 ? "month" : "months")
+            : (a == 1 ? "year" : "years");
+        return $"{a} {unitWord}";
+    }
+
     private static string BuildUserPrompt(GenerateReportDto dto)
     {
-        var age = dto.Age is { } a ? a.ToString() : "Unknown";
+        var age = FormatAge(dto.Age, dto.AgeUnit);
         var gender = string.IsNullOrWhiteSpace(dto.Gender) ? "Unknown" : dto.Gender;
         var contrast = string.IsNullOrWhiteSpace(dto.Contrast) ? "Unspecified" : dto.Contrast;
         return $"""

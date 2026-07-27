@@ -471,6 +471,17 @@ public enum ValidationSeverity
     Blocker = 2,
 }
 
+/// <summary>
+/// Iter-36 follow-up — unit that <see cref="Entities.StudyContext.Age"/> is expressed in.
+/// Defaults to <see cref="Years"/>; <see cref="Months"/> exists for neonates/infants where
+/// an age under one year is clinically meaningful and "0" would otherwise read as unknown.
+/// </summary>
+public enum StudyAgeUnit
+{
+    Years = 0,
+    Months = 1,
+}
+
 /// <summary>PRD BILL-001/006. Plan tier governs feature flags + Stripe price ids.</summary>
 public enum TenantPlan
 {

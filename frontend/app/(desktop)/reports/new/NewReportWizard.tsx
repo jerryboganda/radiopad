@@ -56,6 +56,7 @@ export default function NewReportWizard() {
   const [bodyPart, setBodyPart] = useState<string | null>(null);
   const [contrast, setContrast] = useState('None');
   const [age, setAge] = useState('');
+  const [ageUnit, setAgeUnit] = useState<'Years' | 'Months'>('Years');
   const [gender, setGender] = useState('');
 
   // Steps 2 & 3 — rich text (serialized to clean Markdown by the editor). The
@@ -114,6 +115,7 @@ export default function NewReportWizard() {
     setBodyPart(null);
     setContrast('None');
     setAge('');
+    setAgeUnit('Years');
     setGender('');
     setFindings('');
     setHistory('');
@@ -137,6 +139,7 @@ export default function NewReportWizard() {
         bodyPart,
         contrast,
         age: age === '' ? null : Number(age),
+        ageUnit,
         gender,
         indication: history,
       });
@@ -161,6 +164,7 @@ export default function NewReportWizard() {
             bodyPart,
             contrast,
             age: age === '' ? null : Number(age),
+            ageUnit,
             gender,
             indication: history,
             findings,
@@ -207,6 +211,7 @@ export default function NewReportWizard() {
     bodyPart,
     contrast,
     age,
+    ageUnit,
     gender,
     history,
     findings,
@@ -294,16 +299,35 @@ export default function NewReportWizard() {
             <div className="rp-row rp-gap-sm">
               <div className="section-block" style={{ flex: 1 }}>
                 <label htmlFor="rp-new-age">Age</label>
-                <input
-                  id="rp-new-age"
-                  className="rp-input"
-                  type="number"
-                  min={0}
-                  max={150}
-                  value={age}
-                  onChange={(e) => setAge(e.target.value)}
-                  placeholder="e.g. 54"
-                />
+                <div className="rp-row rp-gap-sm">
+                  <input
+                    id="rp-new-age"
+                    className="rp-input"
+                    type="number"
+                    min={0}
+                    max={ageUnit === 'Months' ? 23 : 150}
+                    value={age}
+                    onChange={(e) => setAge(e.target.value)}
+                    placeholder={ageUnit === 'Months' ? 'e.g. 6' : 'e.g. 54'}
+                    style={{ flex: 1 }}
+                  />
+                  <select
+                    aria-label="Age unit"
+                    className="rp-input"
+                    value={ageUnit}
+                    onChange={(e) => {
+                      // Switching units resets the value rather than converting it —
+                      // "54" carried over from Years to Months would silently misstate
+                      // a patient's age instead of just prompting a re-entry.
+                      setAgeUnit(e.target.value as 'Years' | 'Months');
+                      setAge('');
+                    }}
+                    style={{ flex: '0 0 auto', width: 96 }}
+                  >
+                    <option value="Years">Years</option>
+                    <option value="Months">Months</option>
+                  </select>
+                </div>
               </div>
               <div className="section-block" style={{ flex: 1 }}>
                 <label htmlFor="rp-new-gender">Gender</label>
@@ -398,7 +422,7 @@ export default function NewReportWizard() {
                 {bodyPart ? bodyPartOptions.find((o) => o.value === bodyPart)?.label : '—'}
               </li>
               <li>
-                <strong>Patient:</strong> {age || '—'}
+                <strong>Patient:</strong> {age ? `${age} ${ageUnit.toLowerCase()}` : '—'}
                 {gender ? `, ${gender}` : ''}
               </li>
               <li>

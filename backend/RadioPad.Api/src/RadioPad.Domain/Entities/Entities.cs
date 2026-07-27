@@ -348,10 +348,13 @@ public class StudyContext
     /// UI constrains it to the fixed set. Drives contrast-aware template resolution.
     /// </summary>
     public string Contrast { get; set; } = "";
-    /// <summary>Iter-36 — patient age in years. Null when unknown. Replaces the
-    /// former study-context Indication field; the report-body Indication section
-    /// (<see cref="Report.Indication"/>) remains the clinical indication of record.</summary>
+    /// <summary>Iter-36 — patient age, expressed in <see cref="AgeUnit"/> (years by default).
+    /// Null when unknown. Replaces the former study-context Indication field; the report-body
+    /// Indication section (<see cref="Report.Indication"/>) remains the clinical indication of record.</summary>
     public int? Age { get; set; }
+    /// <summary>Unit <see cref="Age"/> is expressed in. Defaults to Years; the composer switches
+    /// this to Months for infants so a baby's age isn't misread as "0 years".</summary>
+    public StudyAgeUnit AgeUnit { get; set; } = StudyAgeUnit.Years;
     /// <summary>Iter-36 — patient gender (Male/Female/Other/Unknown). Free-form
     /// string for forward-compat; the UI constrains it to a fixed set.</summary>
     public string Gender { get; set; } = "";

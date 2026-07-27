@@ -311,7 +311,7 @@ public class ReportingService
                "urgency, or follow-up intervals. If no follow-up is warranted, state that no specific follow-up is indicated — " +
                "never leave the recommendations empty.";
 
-        var age = report.Study.Age is int a ? a.ToString() : "Unknown";
+        var age = FormatAge(report.Study);
         var gender = string.IsNullOrWhiteSpace(report.Study.Gender) ? "Unknown" : report.Study.Gender;
         var contrast = string.IsNullOrWhiteSpace(report.Study.Contrast) ? "Unspecified" : report.Study.Contrast;
 
@@ -413,6 +413,17 @@ public class ReportingService
     /// otherwise (observed empirically against the on-device model) — normalize it to "•" instead of
     /// treating the line as unformatted, which would otherwise double-bullet it as "• * ...".
     /// </summary>
+    /// <summary>Renders patient age for the prompt header in its stored unit (Years by
+    /// default; Months for infants), e.g. "54 years" / "6 months" / "Unknown".</summary>
+    private static string FormatAge(StudyContext study)
+    {
+        if (study.Age is not int a) return "Unknown";
+        var unit = study.AgeUnit == StudyAgeUnit.Months
+            ? (a == 1 ? "month" : "months")
+            : (a == 1 ? "year" : "years");
+        return $"{a} {unit}";
+    }
+
     private static string NormalizeBulletLine(string line)
     {
         var asterisk = System.Text.RegularExpressions.Regex.Match(line, @"^\*\s+(.*)$");
@@ -545,7 +556,7 @@ public class ReportingService
         // Iter-36 — patient demographics replace the former study-context Indication
         // field in the prompt header; the clinical indication of record is now the
         // report-body Indication section (report.Indication).
-        var age = report.Study.Age is int a ? a.ToString() : "Unknown";
+        var age = FormatAge(report.Study);
         var gender = string.IsNullOrWhiteSpace(report.Study.Gender) ? "Unknown" : report.Study.Gender;
         var contrast = string.IsNullOrWhiteSpace(report.Study.Contrast) ? "Unspecified" : report.Study.Contrast;
 
