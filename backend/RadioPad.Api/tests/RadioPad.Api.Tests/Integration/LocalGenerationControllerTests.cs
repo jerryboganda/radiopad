@@ -93,7 +93,7 @@ public class LocalGenerationControllerTests : IClassFixture<RadioPadAppFactory>
     }
 
     private static LocalGenerationController.GenerateReportJobDto NewJobDto(Guid correlationId) =>
-        new(Modality: "CT", BodyPart: "Chest", Contrast: null, Age: 50, Gender: "Female",
+        new(Modality: "CT", BodyPart: "Chest", Contrast: null, Age: 50, AgeUnit: null, Gender: "Female",
             Indication: "Cough.", Findings: "Clear lungs.", CorrelationId: correlationId);
 
     // Read the (internal, anonymous) endpoint result objects the same way the ASP.NET pipeline does —
@@ -170,7 +170,7 @@ public class LocalGenerationControllerTests : IClassFixture<RadioPadAppFactory>
         var (controller, _, _) = NewController(adapter);
         var result = await controller.GenerateReport(
             new LocalGenerationController.GenerateReportDto(
-                Modality: "CT", BodyPart: "KUB", Contrast: "Without contrast", Age: 45, Gender: "Male",
+                Modality: "CT", BodyPart: "KUB", Contrast: "Without contrast", Age: 45, AgeUnit: null, Gender: "Male",
                 Indication: "Flank pain.", Findings: "5mm right renal calculus."),
             CancellationToken.None);
 
@@ -215,7 +215,7 @@ public class LocalGenerationControllerTests : IClassFixture<RadioPadAppFactory>
 
         var result = await controller.GenerateReport(
             new LocalGenerationController.GenerateReportDto(
-                Modality: "CT", BodyPart: "KUB", Contrast: null, Age: null, Gender: null,
+                Modality: "CT", BodyPart: "KUB", Contrast: null, Age: null, AgeUnit: null, Gender: null,
                 Indication: "", Findings: "x"),
             CancellationToken.None);
 
@@ -232,7 +232,7 @@ public class LocalGenerationControllerTests : IClassFixture<RadioPadAppFactory>
 
         var result = await controller.GenerateReport(
             new LocalGenerationController.GenerateReportDto(
-                Modality: "CT", BodyPart: "KUB", Contrast: null, Age: null, Gender: null,
+                Modality: "CT", BodyPart: "KUB", Contrast: null, Age: null, AgeUnit: null, Gender: null,
                 Indication: "", Findings: "x"),
             CancellationToken.None);
 

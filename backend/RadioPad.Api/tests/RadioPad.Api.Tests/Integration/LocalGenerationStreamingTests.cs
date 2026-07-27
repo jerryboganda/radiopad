@@ -120,7 +120,7 @@ public class LocalGenerationStreamingTests
     }
 
     private static LocalGenerationController.GenerateReportJobDto NewJobDto(Guid correlationId) =>
-        new(Modality: "CT", BodyPart: "KUB", Contrast: "Without contrast", Age: 45, Gender: "Male",
+        new(Modality: "CT", BodyPart: "KUB", Contrast: "Without contrast", Age: 45, AgeUnit: null, Gender: "Male",
             Indication: "Flank pain.", Findings: "5mm right renal calculus.", CorrelationId: correlationId);
 
     private static JsonElement AsJson(object o) => JsonSerializer.SerializeToElement(o, o.GetType());
@@ -353,7 +353,7 @@ public class LocalGenerationStreamingTests
         var collected = new List<string>();
         var sink = new SynchronousProgress<AiStreamChunk>(c => collected.Add(c.Delta));
         var dto = new LocalGenerationController.GenerateReportDto(
-            Modality: "CT", BodyPart: "KUB", Contrast: "Without contrast", Age: 45, Gender: "Male",
+            Modality: "CT", BodyPart: "KUB", Contrast: "Without contrast", Age: 45, AgeUnit: null, Gender: "Male",
             Indication: "Flank pain.", Findings: "5mm right renal calculus.");
 
         var result = await provider.CompleteAsync(LocalGenerationController.BuildCompletionRequest(dto, sink), CancellationToken.None);

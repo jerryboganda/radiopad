@@ -309,30 +309,7 @@ public static class ReportLayoutParser
         var ok = true;
         ok &= TryOptionalString(el, "clinicName", errors, $"{path}.clinicName", 200, out var clinicName);
 
-        var lines = new List<string>();
-        if (el.TryGetProperty("lines", out var linesEl))
-        {
-            if (linesEl.ValueKind != JsonValueKind.Array)
-            {
-                errors.Add($"{path}.lines must be an array."); ok = false;
-            }
-            else if (linesEl.GetArrayLength() > 4)
-            {
-                errors.Add($"{path}.lines may contain at most 4 lines."); ok = false;
-            }
-            else
-            {
-                foreach (var lineEl in linesEl.EnumerateArray())
-                {
-                    if (lineEl.ValueKind != JsonValueKind.String || (lineEl.GetString()?.Length ?? 0) > 120)
-                    {
-                        errors.Add($"{path}.lines entries must be strings of at most 120 characters."); ok = false;
-                        break;
-                    }
-                    lines.Add(lineEl.GetString()!);
-                }
-            }
-        }
+        var lines = ParseLetterheadLines(el, path, errors, ref ok);
 
         LayoutLogoModel? logo = null;
         if (el.TryGetProperty("logo", out var logoEl) && logoEl.ValueKind == JsonValueKind.Object)
@@ -351,6 +328,118 @@ public static class ReportLayoutParser
 
         if (!ok) return null;
         return new LetterheadBlockModel(id, clinicName, lines, logo, logoPosition, align, showAccentRule);
+    }
+
+    /// <summary>
+    /// Parses the letterhead's rich-text address lines. Each array entry is either a legacy
+    /// plain string (a pre-rich-text saved layout — wrapped as one unstyled run so old layouts
+    /// keep loading unchanged) or an object <c>{ runs: [...] }</c> carrying per-run
+    /// bold/italic/underline/font/sizePt. A line's combined run text may not exceed 120
+    /// characters, matching the original per-line cap.
+    /// </summary>
+    private static IReadOnlyList<RichTextLine> ParseLetterheadLines(JsonElement el, string path, List<string> errors, ref bool ok)
+    {
+        var lines = new List<RichTextLine>();
+        if (!el.TryGetProperty("lines", out var linesEl))
+        {
+            return lines;
+        }
+        if (linesEl.ValueKind != JsonValueKind.Array)
+        {
+            errors.Add($"{path}.lines must be an array."); ok = false;
+            return lines;
+        }
+        if (linesEl.GetArrayLength() > 4)
+        {
+            errors.Add($"{path}.lines may contain at most 4 lines."); ok = false;
+            return lines;
+        }
+
+        var lineIndex = 0;
+        foreach (var lineEl in linesEl.EnumerateArray())
+        {
+            var linePath = $"{path}.lines[{lineIndex}]";
+            lineIndex++;
+
+            if (lineEl.ValueKind == JsonValueKind.String)
+            {
+                var text = lineEl.GetString() ?? "";
+                if (text.Length > 120)
+                {
+                    errors.Add($"{path}.lines entries must total at most 120 characters."); ok = false;
+                    break;
+                }
+                lines.Add(new RichTextLine(text.Length > 0
+                    ? new[] { new RichTextRun(text, false, false, false, null, null) }
+                    : Array.Empty<RichTextRun>()));
+                continue;
+            }
+
+            if (lineEl.ValueKind != JsonValueKind.Object || !lineEl.TryGetProperty("runs", out var runsEl) || runsEl.ValueKind != JsonValueKind.Array)
+            {
+                errors.Add($"{linePath} must be a string or an object with a \"runs\" array."); ok = false;
+                break;
+            }
+            if (runsEl.GetArrayLength() > 20)
+            {
+                errors.Add($"{linePath}.runs may contain at most 20 entries."); ok = false;
+                break;
+            }
+
+            var runs = new List<RichTextRun>();
+            var totalLen = 0;
+            var runsOk = true;
+            foreach (var runEl in runsEl.EnumerateArray())
+            {
+                if (runEl.ValueKind != JsonValueKind.Object || !runEl.TryGetProperty("text", out var textEl) || textEl.ValueKind != JsonValueKind.String)
+                {
+                    errors.Add($"{linePath}.runs[].text is required and must be a string."); runsOk = false;
+                    break;
+                }
+                var runText = textEl.GetString() ?? "";
+                var bold = TryBool(runEl, "bold", false);
+                var italic = TryBool(runEl, "italic", false);
+                var underline = TryBool(runEl, "underline", false);
+                if (!TryOptionalFont(runEl, "font", errors, $"{linePath}.runs[].font", out var font)) { runsOk = false; break; }
+                if (!TryOptionalSizePt(runEl, "sizePt", errors, $"{linePath}.runs[].sizePt", out var sizePt)) { runsOk = false; break; }
+                totalLen += runText.Length;
+                runs.Add(new RichTextRun(runText, bold, italic, underline, font, sizePt));
+            }
+            if (!runsOk) { ok = false; break; }
+            if (totalLen > 120)
+            {
+                errors.Add($"{path}.lines entries must total at most 120 characters."); ok = false;
+                break;
+            }
+            lines.Add(new RichTextLine(runs));
+        }
+        return lines;
+    }
+
+    private static bool TryOptionalFont(JsonElement obj, string prop, List<string> errors, string path, out LayoutFont? value)
+    {
+        value = null;
+        if (!obj.TryGetProperty(prop, out var el) || el.ValueKind == JsonValueKind.Null) return true;
+        if (el.ValueKind != JsonValueKind.String || el.GetString() is not { } s || !Fonts.TryGetValue(s, out var mapped))
+        {
+            errors.Add($"{path} must be one of: {string.Join(", ", Fonts.Keys)}.");
+            return false;
+        }
+        value = mapped;
+        return true;
+    }
+
+    private static bool TryOptionalSizePt(JsonElement obj, string prop, List<string> errors, string path, out double? value)
+    {
+        value = null;
+        if (!obj.TryGetProperty(prop, out var el) || el.ValueKind == JsonValueKind.Null) return true;
+        if (el.ValueKind != JsonValueKind.Number || !el.TryGetDouble(out var d) || d < 6 || d > 24)
+        {
+            errors.Add($"{path} must be a number between 6 and 24.");
+            return false;
+        }
+        value = d;
+        return true;
     }
 
     private static LayoutLogoModel? ParseLogo(JsonElement el, List<string> errors, string path)

@@ -3300,6 +3300,26 @@
 .rp-rte-surface strong { font-weight: 700; }
 .rp-rte-surface em { font-style: italic; }
 
+/* Report Templates — letterhead "Address / extra lines" rich-text box. A short,
+   ≤4-paragraph field, so it uses a much shorter min-height than the intake wizard's
+   prose editors (.rp-rte .rp-rte-surface above is sized for long-form findings/history). */
+.rp-rte .rp-rl-letterhead-lines { min-height: 72px; font-size: 13px; }
+.rp-rl-letterhead-font-select {
+  height: 26px;
+  padding: 0 6px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  background: var(--bg-panel);
+  color: var(--text);
+  font-size: 12px;
+}
+.rp-rl-letterhead-size {
+  min-width: 30px;
+  text-align: center;
+  font-size: 12px;
+  color: var(--text-muted);
+}
+
 /* Staged generation overlay */
 .rp-genoverlay {
   position: fixed;

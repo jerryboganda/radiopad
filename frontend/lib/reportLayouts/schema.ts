@@ -61,11 +61,28 @@ export interface LogoConfig {
   widthPt: number;
 }
 
+/** One contiguous run of identically-styled text within a `RichTextLine`. */
+export interface RichTextRun {
+  text: string;
+  bold?: boolean;
+  italic?: boolean;
+  underline?: boolean;
+  /** Per-run font override; absent = inherit the page font. */
+  font?: LayoutFont;
+  /** Per-run absolute point size override (6-24); absent = the line's base size. */
+  sizePt?: number;
+}
+
+/** One line of the letterhead address block — a sequence of independently-styled runs. */
+export interface RichTextLine {
+  runs: RichTextRun[];
+}
+
 export interface LetterheadBlock {
   id: string;
   type: 'letterhead';
   clinicName: string | null;
-  lines: string[];
+  lines: RichTextLine[];
   logo: LogoConfig | null;
   logoPosition: LogoPosition;
   align: BlockAlign;
@@ -351,7 +368,7 @@ function validateBlockByType(
   switch (type) {
     case 'letterhead': {
       const clinicName = optionalString(b.clinicName, 200, `${path}.clinicName`, errors);
-      const lines = stringArray(b.lines, 4, 120, `${path}.lines`, errors);
+      const lines = richLineArray(b.lines, 4, 120, `${path}.lines`, errors);
       const logo = validateLogo(b.logo, `${path}.logo`, errors);
       const logoPosition = enumOrDefault(b.logoPosition, LOGO_POSITIONS, 'left', `${path}.logoPosition`, errors);
       const align = enumOrDefault(b.align, ALIGNS, 'left', `${path}.align`, errors);
@@ -468,7 +485,16 @@ function optionalString(value: unknown, maxLen: number, path: string, errors: st
   return value;
 }
 
-function stringArray(value: unknown, maxItems: number, maxLen: number, path: string, errors: string[]): string[] {
+const MAX_RUNS_PER_LINE = 20;
+
+/**
+ * Validates the letterhead's rich-text lines. Each entry is either a legacy plain
+ * string (pre-rich-text saved layouts — wrapped as a single unstyled run so old
+ * layouts keep loading unchanged) or an object `{ runs: [...] }` carrying per-run
+ * bold/italic/underline/font/size. A line's combined run text may not exceed
+ * `maxLen` characters, matching the original per-line cap.
+ */
+function richLineArray(value: unknown, maxItems: number, maxLen: number, path: string, errors: string[]): RichTextLine[] {
   if (value === undefined) return [];
   if (!Array.isArray(value)) {
     errors.push(`${path} must be an array.`);
@@ -478,13 +504,71 @@ function stringArray(value: unknown, maxItems: number, maxLen: number, path: str
     errors.push(`${path} may contain at most ${maxItems} entries.`);
     return [];
   }
-  const out: string[] = [];
-  for (const item of value) {
-    if (typeof item !== 'string' || item.length > maxLen) {
-      errors.push(`${path} entries must be strings of at most ${maxLen} characters.`);
+  const out: RichTextLine[] = [];
+  for (let i = 0; i < value.length; i++) {
+    const item = value[i];
+    const linePath = `${path}[${i}]`;
+    if (typeof item === 'string') {
+      if (item.length > maxLen) {
+        errors.push(`${path} entries must total at most ${maxLen} characters.`);
+        return [];
+      }
+      out.push({ runs: item.length > 0 ? [{ text: item }] : [] });
+      continue;
+    }
+    if (typeof item !== 'object' || item === null || !Array.isArray((item as Record<string, unknown>).runs)) {
+      errors.push(`${linePath} must be a string or an object with a "runs" array.`);
       return [];
     }
-    out.push(item);
+    const rawRuns = (item as { runs: unknown[] }).runs;
+    if (rawRuns.length > MAX_RUNS_PER_LINE) {
+      errors.push(`${linePath}.runs may contain at most ${MAX_RUNS_PER_LINE} entries.`);
+      return [];
+    }
+    const runs: RichTextRun[] = [];
+    let totalLen = 0;
+    for (const rawRun of rawRuns) {
+      const run = richTextRun(rawRun, linePath, errors);
+      if (run === null) return [];
+      totalLen += run.text.length;
+      runs.push(run);
+    }
+    if (totalLen > maxLen) {
+      errors.push(`${path} entries must total at most ${maxLen} characters.`);
+      return [];
+    }
+    out.push({ runs });
   }
   return out;
+}
+
+function richTextRun(value: unknown, linePath: string, errors: string[]): RichTextRun | null {
+  if (typeof value !== 'object' || value === null) {
+    errors.push(`${linePath}.runs entries must be objects.`);
+    return null;
+  }
+  const r = value as Record<string, unknown>;
+  if (typeof r.text !== 'string') {
+    errors.push(`${linePath}.runs[].text is required and must be a string.`);
+    return null;
+  }
+  const run: RichTextRun = { text: r.text };
+  if (r.bold === true) run.bold = true;
+  if (r.italic === true) run.italic = true;
+  if (r.underline === true) run.underline = true;
+  if (r.font !== undefined) {
+    if (typeof r.font !== 'string' || !(FONTS as readonly string[]).includes(r.font)) {
+      errors.push(`${linePath}.runs[].font must be one of: ${FONTS.join(', ')}.`);
+      return null;
+    }
+    run.font = r.font as LayoutFont;
+  }
+  if (r.sizePt !== undefined) {
+    if (typeof r.sizePt !== 'number' || r.sizePt < 6 || r.sizePt > 24) {
+      errors.push(`${linePath}.runs[].sizePt must be a number between 6 and 24.`);
+      return null;
+    }
+    run.sizePt = r.sizePt;
+  }
+  return run;
 }

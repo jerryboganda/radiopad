@@ -972,6 +972,20 @@ sidebar group).
   deliberately no prop or schema field that could suppress or un-bold either.
   The footer is always one line — status/custom text, then the two mandatory
   bold segments, then the page number — never stacked.
+- **Letterhead "Address / extra lines" is a real per-selection rich-text field**,
+  not a block-level toggle: `LetterheadLinesEditor`
+  (`components/reportLayouts/LetterheadLinesEditor.tsx`, a constrained Tiptap
+  instance — bold/italic/underline, per-run font family, and a +/- point-size
+  stepper, capped at 4 paragraphs/lines) replaces the plain textarea in
+  `InspectorPanel.tsx`. Persisted as `RichTextLine[]` (`lib/reportLayouts/schema.ts`),
+  a small array-of-runs model — NOT Markdown, since font-family/size have no
+  Markdown syntax (contrast with the intake wizard's `RichTextEditor` +
+  `docToMarkdown`, which stays plain-text). A legacy plain-string line (pre-rich-text
+  saved layouts) is still accepted everywhere and silently upgrades to one unstyled
+  run. Reuses `.rp-rte`/`.rp-rte-toolbar`/`.rp-rte-btn` token-based classes; the two
+  new classes are `.rp-rl-letterhead-font-select` and `.rp-rl-letterhead-size`
+  (small toolbar-embedded controls) plus a shorter `.rp-rl-letterhead-lines`
+  min-height override (this field is ≤4 short lines, not long-form prose).
 
 ---
 

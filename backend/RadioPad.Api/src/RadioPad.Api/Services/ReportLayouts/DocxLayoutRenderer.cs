@@ -151,7 +151,7 @@ public static class DocxLayoutRenderer
         body.Append(Para(clinicName, fontFamily, 16, bold: true, align: align));
         foreach (var line in b.Lines)
         {
-            body.Append(Para(line, fontFamily, 9, colorHex: "595959", align: align));
+            body.Append(ParaRich(line, fontFamily, 9, "595959", align));
         }
 
         if (b.ShowAccentRule)
@@ -396,6 +396,40 @@ public static class DocxLayoutRenderer
             paragraph.Append(new ParagraphProperties(pPrChildren.ToArray()));
         }
         paragraph.Append(run);
+        return paragraph;
+    }
+
+    /// <summary>
+    /// Builds one paragraph with a separate <see cref="Run"/> per <see cref="RichTextRun"/>,
+    /// each with its own RunProperties — the letterhead address lines' per-run bold/italic/
+    /// underline/font/size, which <see cref="Para"/> (one uniformly-styled run) can't express.
+    /// Element order inside rPr matches <see cref="Para"/>: RunFonts, [Bold], [Italic],
+    /// [Underline], Color, FontSize.
+    /// </summary>
+    private static Paragraph ParaRich(RichTextLine line, string defaultFontFamily, double defaultSizePt, string colorHex, JustificationValues? align)
+    {
+        var paragraph = new Paragraph();
+        if (align != null)
+        {
+            paragraph.Append(new ParagraphProperties(new Justification { Val = align.Value }));
+        }
+
+        foreach (var run in line.Runs)
+        {
+            var fontFamily = run.Font is { } f ? ReportLayoutBranding.DocxFontFamily[f] : defaultFontFamily;
+            var sizePt = run.SizePt ?? defaultSizePt;
+
+            var rPr = new RunProperties();
+            rPr.Append(new RunFonts { Ascii = fontFamily, HighAnsi = fontFamily });
+            if (run.Bold) rPr.Append(new Bold());
+            if (run.Italic) rPr.Append(new Italic());
+            if (run.Underline) rPr.Append(new Underline { Val = UnderlineValues.Single });
+            rPr.Append(new Color { Val = colorHex });
+            rPr.Append(new FontSize { Val = ((int)Math.Round(sizePt * 2)).ToString() });
+
+            paragraph.Append(new Run(rPr, new Text(run.Text) { Space = SpaceProcessingModeValues.Preserve }));
+        }
+
         return paragraph;
     }
 }

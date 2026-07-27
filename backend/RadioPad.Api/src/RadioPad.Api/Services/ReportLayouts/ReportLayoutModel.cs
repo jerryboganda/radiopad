@@ -76,7 +76,7 @@ public abstract record LayoutBlockModel(string Id);
 public sealed record LetterheadBlockModel(
     string Id,
     string? ClinicName,
-    IReadOnlyList<string> Lines,
+    IReadOnlyList<RichTextLine> Lines,
     LayoutLogoModel? Logo,
     LayoutLogoPosition LogoPosition,
     LayoutAlign Align,
@@ -89,6 +89,17 @@ public sealed record StudyInfoBlockModel(
     int Columns,
     bool ShowBox,
     IReadOnlyList<StudyFieldEntry> Fields) : LayoutBlockModel(Id);
+
+/// <summary>
+/// One contiguous run of identically-styled text within a <see cref="RichTextLine"/>.
+/// Mirrors the frontend <c>RichTextRun</c> (<c>frontend/lib/reportLayouts/schema.ts</c>).
+/// <see cref="Font"/> null = inherit the page font; <see cref="SizePt"/> null = inherit
+/// the containing block's base size.
+/// </summary>
+public sealed record RichTextRun(string Text, bool Bold, bool Italic, bool Underline, LayoutFont? Font, double? SizePt);
+
+/// <summary>One line of the letterhead address block — a sequence of independently-styled runs.</summary>
+public sealed record RichTextLine(IReadOnlyList<RichTextRun> Runs);
 
 public sealed record SectionBlockModel(
     string Id,

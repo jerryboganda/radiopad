@@ -105,7 +105,10 @@ export const REPORT_LAYOUT_PRESETS: ReportLayoutPreset[] = [
       blocks: [
         {
           id: 'formal-letterhead', type: 'letterhead', clinicName: null,
-          lines: ['123 Radiology Way, Suite 400', 'Reporting Department'],
+          lines: [
+            { runs: [{ text: '123 Radiology Way, Suite 400' }] },
+            { runs: [{ text: 'Reporting Department' }] },
+          ],
           logo: null, logoPosition: 'above', align: 'center', showAccentRule: true,
         },
         { id: 'formal-studyinfo', type: 'studyInfo', columns: 2, showBox: true, fields: [

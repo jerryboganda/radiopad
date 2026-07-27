@@ -329,6 +329,53 @@ public class ReportLayoutPackTests : IClassFixture<RadioPadAppFactory>
         Assert.Equal(HttpStatusCode.BadRequest, preview.StatusCode);
     }
 
+    /// <summary>
+    /// The letterhead's "Address / extra lines" accepts BOTH shapes at once: a rich-run
+    /// object (per-run bold/italic/underline/font/size — the new editor's output) and a
+    /// legacy plain string (pre-rich-text saved layouts, wrapped as one unstyled run). Both
+    /// must survive parsing and render in both export formats.
+    /// </summary>
+    private const string RichLetterheadLayoutJson = """
+        {
+          "schemaVersion": 1,
+          "page": { "size": "letter", "marginPt": 36, "font": "sans", "baseFontSizePt": 11, "accent": "graphite", "showPageNumbers": true },
+          "blocks": [
+            {
+              "id": "letterhead1", "type": "letterhead", "clinicName": null,
+              "lines": [
+                { "runs": [
+                  { "text": "Suite ", "bold": true },
+                  { "text": "400 East Wing", "italic": true, "underline": true, "font": "serif", "sizePt": 12 }
+                ] },
+                "Reporting Department"
+              ],
+              "logo": null, "logoPosition": "left", "align": "left", "showAccentRule": false
+            },
+            { "id": "findings1", "type": "section", "section": "findings", "label": null, "headingStyle": "uppercase", "hideIfEmpty": false }
+          ],
+          "footer": { "showStatusLine": true, "customText": null }
+        }
+        """;
+
+    [Fact]
+    public async Task Preview_Renders_RichRun_And_Legacy_String_Letterhead_Lines_In_Both_Formats()
+    {
+        using var client = _factory.CreateTenantClient();
+
+        var pdfPreview = await client.PostAsJsonAsync("/api/report-layouts/preview/pdf", new { layoutJson = RichLetterheadLayoutJson });
+        Assert.Equal(HttpStatusCode.OK, pdfPreview.StatusCode);
+        var pdfBytes = await pdfPreview.Content.ReadAsByteArrayAsync();
+        Assert.Equal("%PDF-", Encoding.ASCII.GetString(pdfBytes, 0, 5));
+
+        var docxPreview = await client.PostAsJsonAsync("/api/report-layouts/preview/docx", new { layoutJson = RichLetterheadLayoutJson });
+        Assert.Equal(HttpStatusCode.OK, docxPreview.StatusCode);
+        var docxText = ExtractDocxText(await docxPreview.Content.ReadAsByteArrayAsync());
+
+        Assert.Contains("Suite", docxText);
+        Assert.Contains("400 East Wing", docxText);
+        Assert.Contains("Reporting Department", docxText);
+    }
+
     // --------------------------------------------------------------- export
 
     [Fact]

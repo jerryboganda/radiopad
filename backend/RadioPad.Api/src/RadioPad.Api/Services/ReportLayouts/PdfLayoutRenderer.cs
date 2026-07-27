@@ -96,7 +96,19 @@ public static class PdfLayoutRenderer
             inner.Item().Text(clinicName).SemiBold().FontSize(16);
             foreach (var line in b.Lines)
             {
-                inner.Item().Text(line).FontSize(9).FontColor(Colors.Grey.Darken2);
+                inner.Item().Text(t =>
+                {
+                    t.DefaultTextStyle(x => x.FontSize(9).FontColor(Colors.Grey.Darken2));
+                    foreach (var run in line.Runs)
+                    {
+                        var span = t.Span(run.Text);
+                        if (run.Bold) span.Bold();
+                        if (run.Italic) span.Italic();
+                        if (run.Underline) span.Underline();
+                        if (run.Font is { } f) span.FontFamily(ReportLayoutBranding.PdfFontFamily[f]);
+                        if (run.SizePt is { } sz) span.FontSize((float)sz);
+                    }
+                });
             }
         }
 

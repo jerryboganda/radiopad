@@ -126,7 +126,22 @@ function LayoutPaperBlock({
         <div style={{ textAlign: block.align }}>
           <div style={{ fontSize: 16, fontWeight: 600 }}>{clinicName}</div>
           {block.lines.map((line, i) => (
-            <div key={i} style={{ fontSize: 9, color: '#595959' }}>{line}</div>
+            <div key={i} style={{ fontSize: 9, color: '#595959' }}>
+              {line.runs.map((run, j) => (
+                <span
+                  key={j}
+                  style={{
+                    fontWeight: run.bold ? 700 : undefined,
+                    fontStyle: run.italic ? 'italic' : undefined,
+                    textDecoration: run.underline ? 'underline' : undefined,
+                    fontFamily: run.font ? FONT_STACKS[run.font] : undefined,
+                    fontSize: run.sizePt,
+                  }}
+                >
+                  {run.text}
+                </span>
+              ))}
+            </div>
           ))}
         </div>
       );

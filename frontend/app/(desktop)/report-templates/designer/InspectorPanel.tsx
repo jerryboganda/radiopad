@@ -9,6 +9,7 @@ import type {
 } from '@/lib/reportLayouts/schema';
 import { STUDY_FIELD_KEYS, MAX_LOGO_BYTES } from '@/lib/reportLayouts/schema';
 import { ACCENT_LABEL, FONT_LABEL, BRANDING_FOOTER_TEXT, LEGAL_DISCLAIMER_TEXT, STUDY_FIELD_LABEL_FALLBACK } from '@/lib/reportLayouts/accents';
+import LetterheadLinesEditor from '@/components/reportLayouts/LetterheadLinesEditor';
 
 export interface InspectorPanelProps {
   page: PageSetup;
@@ -167,11 +168,7 @@ function LetterheadFields({ block, onChange }: { block: LetterheadBlock; onChang
       </label>
       <label className="rp-rl-field">
         <span>Address / extra lines (one per line, up to 4)</span>
-        <textarea
-          rows={3}
-          value={block.lines.join('\n')}
-          onChange={(e) => onChange({ lines: e.target.value.split('\n').slice(0, 4).map((l) => l.slice(0, 120)) })}
-        />
+        <LetterheadLinesEditor lines={block.lines} onChange={(lines) => onChange({ lines })} />
       </label>
       <label className="rp-rl-field">
         <span>Alignment</span>

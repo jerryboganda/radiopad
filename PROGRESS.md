@@ -2578,3 +2578,75 @@ Total tracked PRD ids: **129** (was 112; iter-32 added 17 finer-grained sub-ids)
 - **Side-effect bugfix found while adding the migration**: `RadioPadDbContextModelSnapshot.cs` had been stale since before `20260723090000_AddAiJobs` — `dotnet ef migrations add` was about to bundle five already-applied migrations' worth of `CreateTable`/`AddColumn` operations (AiJobs, Notifications, ReportLayouts, etc.) into this one, which would have crashed the app on next boot the moment it tried to re-create tables that already exist in production. Kept the regenerated (now-correct) snapshot but hand-pruned the new migration's `Up()`/`Down()` down to only the actual new column, `Study_AgeUnit`.
 - **Tests**: existing `newReportWizard.test.tsx` (3 tests) re-verified green against the split field; no new test added (no test harness reaches the AI prompt string directly in this pass).
 - **Scope**: backend + frontend → desktop release required (DESK-001) once the operator asks to ship it.
+
+## Iter-57 - Report Templates: full rich-text editor for the letterhead address lines
+
+- **Date**: 2026-07-28
+- **Trigger**: Operator request — the letterhead's "Address / extra lines" box was a plain
+  `<textarea>`; asked for bold/italic/underline, a font-family choice, and a font-size +/-
+  stepper. Confirmed via a clarifying question that this meant genuine per-selection rich
+  text (any word/phrase independently styled, Word/Google-Docs style), not a whole-block
+  toggle (contrast with `TextBlock`'s existing block-level `italic`/`fontSizeDelta` flags).
+- **New data model**: `RichTextRun` (`text` + optional `bold`/`italic`/`underline`/`font`/
+  `sizePt`) and `RichTextLine` (`{ runs: RichTextRun[] }`) in both
+  `frontend/lib/reportLayouts/schema.ts` and the mirrored backend
+  `ReportLayoutModel.cs`. `LetterheadBlock.lines` (frontend) / `LetterheadBlockModel.Lines`
+  (backend) changed from `string[]` to `RichTextLine[]` — **NOT** Markdown, since
+  font-family/point-size have no Markdown syntax (contrast with the report intake's
+  `RichTextEditor` + `docToMarkdown`, which stays plain-text for exactly that reason).
+- **Backward compatibility, no schema-version bump**: every parser (frontend
+  `richLineArray` in schema.ts, backend `ParseLetterhead`/`ParseLetterheadLines` in
+  ReportLayoutParser.cs) accepts EITHER shape per line — a legacy plain string
+  (pre-rich-text saved layouts, wrapped as one unstyled run) or a rich `{ runs: [...] }`
+  object. Already-saved production `LayoutJson` rows keep loading unchanged. Per-line
+  cap stays 120 characters, now measured as the sum of a line's run texts; lines capped
+  at 4, runs capped at 20/line.
+- **Editor**: `LetterheadLinesEditor` (`components/reportLayouts/LetterheadLinesEditor.tsx`)
+  — a constrained Tiptap instance (`StarterKit` with headings/lists/blockquote/code/rules/
+  hardBreak all disabled, so "one paragraph = one address line" stays exact) plus
+  `@tiptap/extension-underline` and one custom mark, `LetterheadTextStyle`
+  (`lib/editor/letterheadTextStyle.ts`, extends `@tiptap/extension-text-style`'s
+  `TextStyle` with BOTH `fontFamily` and `fontSize` attributes/commands in a single
+  extension — deliberately not the official separate `@tiptap/extension-font-family`
+  package, since two extensions both registering the `textStyle` mark name would have
+  Tiptap silently keep only the last one, dropping the other's attributes). A keydown
+  guard blocks a 5th paragraph rather than truncating after the fact. New serializer
+  `lib/reportLayouts/richTextSerialize.ts` (`docToRichLines`/`richLinesToDoc`) converts
+  between the Tiptap doc JSON and `RichTextLine[]`, mapping the font enum to/from the
+  CSS generic-family keywords (`sans-serif`/`serif`/`monospace`) Tiptap actually stores.
+  Uncontrolled by design (seeds initial content once on mount only, matching the intake
+  wizard's `RichTextEditor` — resyncing on every keystroke would fight the user's own
+  edits and reset the cursor).
+- **Rendering — three surfaces, one model**: `LayoutPaper.tsx` (live browser preview) now
+  maps each run to its own styled `<span>`; `PdfLayoutRenderer.RenderLetterhead` uses
+  QuestPDF's multi-span `Text(t => { t.Span(...).Bold()... })` API; `DocxLayoutRenderer`
+  gained `ParaRich` (one OpenXml `Run`/`RunProperties` per run, in the RunFonts→Bold→
+  Italic→Underline→Color→FontSize element order OpenXml's schema requires) alongside the
+  existing single-run `Para` helper. Per-run font overrides route through the existing
+  `ReportLayoutBranding.PdfFontFamily`/`DocxFontFamily` dictionaries so PDF/DOCX keep their
+  already-established (and already inconsistent-with-each-other) font-name mappings.
+- **Side-effect bugfix caught by `dotnet test` (not `dotnet build`)**: the Iter-56 AgeUnit
+  change (same day) had added a new required `AgeUnit` parameter to
+  `LocalGenerationController.GenerateReportDto`/`GenerateReportJobDto` but only checked
+  production call sites for breakage — three integration test files still constructed
+  those records with all-but-`AgeUnit` named arguments, which doesn't compile (C# records
+  require every non-defaulted parameter regardless of named-vs-positional syntax). Building
+  just `RadioPad.Api.csproj` never surfaces this (it excludes the test project); running
+  `dotnet test` for the first time since that change did. Fixed by adding
+  `AgeUnit: null` at all 6 call sites across `LocalGenerationControllerTests.cs` and
+  `LocalGenerationStreamingTests.cs`.
+- **Tests**: backend `ReportLayoutPackTests.Preview_Renders_RichRun_And_Legacy_String_
+  Letterhead_Lines_In_Both_Formats` (PDF + DOCX preview, mixed rich-run + legacy-string
+  lines, asserts the run text survives into the DOCX). Frontend new
+  `__tests__/reportLayoutRichLines.test.ts` (8 cases: legacy-string wrapping, rich-run
+  preservation, 4-line cap, 120-char cap measured across runs, invalid font/sizePt
+  rejection, doc↔RichTextLine[] round trip). All 19 `ReportLayoutPackTests`, both fixed
+  LocalGeneration test files, and all 30 frontend `reportLayoutPresets`/
+  `reportLayoutRichLines` tests pass locally.
+- **Not verified in a live browser session**: the designer page sits behind login and
+  this session had no valid credentials for either the real backend or a logged-in real
+  Chrome session (the available real Chrome instance's `localhost:3000` belongs to an
+  unrelated app already running on that port) — correctness rests on the test coverage
+  above plus manual code review, not an interactive check. Flagging this explicitly
+  rather than claiming a visual verification that didn't happen.
+- **Scope**: backend + frontend + docs → desktop release required (DESK-001).
