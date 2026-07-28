@@ -46,9 +46,13 @@
 .rp-nav a:hover { background: var(--bg-subtle); color: var(--text); text-decoration: none; }
 .rp-nav a.active { background: var(--bg-muted); color: var(--text-strong); }
 
+/* The tile owns the colour pairing (tinted bg + accent ink, or gradient bg +
+   accent-fg ink); the letter always inherits it. Hardcoding --accent here made
+   the "R" render blue-on-blue — invisible — on every gradient mark. */
+.brand-mark { color: var(--accent); }
 .brand-mark-letter {
   font: 700 13px/1 var(--sans);
-  color: var(--accent);
+  color: inherit;
   letter-spacing: 0.02em;
 }
 
@@ -1734,7 +1738,7 @@
   flex: 0 0 auto;
   box-shadow: 0 6px 18px rgba(47, 136, 216, 0.3); /* theme-neutral */
 }
-.rp-comp-brand .brand-mark-letter { font-size: 19px; color: #ffffff; }
+.rp-comp-brand .brand-mark-letter { font-size: 19px; }
 .rp-comp-brand-text { display: flex; flex-direction: column; gap: 1px; min-width: 0; }
 .rp-comp-brand-name { font: 700 17px/1.15 var(--sans); letter-spacing: -0.01em; color: var(--text-strong); }
 .rp-comp-brand-kicker { font: 600 9px/1 var(--sans); letter-spacing: 0.1em; text-transform: uppercase; color: var(--text-soft); }
