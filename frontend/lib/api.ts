@@ -1465,7 +1465,7 @@ export type ModelProgress = {
 
 /**
  * How a model entry is provisioned + run, driving the card's actions:
- * - `HostedFile` — we download/verify a model bundle (Parakeet).
+ * - `HostedFile` — we download/verify a model bundle.
  * - `WindowsBuiltIn` — System.Speech / SAPI: ships with Windows, no download.
  * - `WindowsLanguagePack` — WinRT speech: "download" opens Windows speech settings.
  * - `BrowserWebSpeech` — Edge Web Speech: runs in the WebView; availability probed
@@ -1868,7 +1868,7 @@ export const api = {
      * deterministic pass-through (§5.2) → formatter (PHI-gated AiGateway) →
      * validation-diff (§5.3, fail-safe fallback to the corrected transcript) →
      * laterality/negation/gender sentinel (§5.6) → local audit (§5.7). Report-scoped
-     * cloud path today (like cleanupDictation); the optional local MedGemma formatter
+     * cloud path today (like cleanupDictation); the optional local on-device formatter
      * is selected on the desktop once the on-device sidecar is wired.
      */
     dictationDraft: (id: string, rawDictation: string) =>
@@ -1878,9 +1878,9 @@ export const api = {
       }),
     /**
      * Optional OFFLINE draft path (desktop only): runs the whole safety pipeline on the loopback
-     * sidecar with the local MedGemma formatter — the transcript (PHI) never leaves the machine.
+     * sidecar with the local on-device formatter — the transcript (PHI) never leaves the machine.
      * Stateless (report context is passed in the body, not resolved from the DB). Returns 503 until
-     * the on-device formatter is enabled and the MedGemma model + llama-server runtime are
+     * the on-device formatter is enabled and the on-device model + llama-server runtime are
      * provisioned (the runtime is fetched ON DEMAND alongside the model — it is not bundled in the
      * installer); callers fall back to `dictationDraft` (cloud) on failure.
      *
@@ -1907,7 +1907,7 @@ export const api = {
     },
     // Dictation transcription. On the desktop the recorded audio is transcribed
     // FULLY ON-DEVICE by the bundled STT sidecar (MedASR by default per decision
-    // D2, with Parakeet and Windows Speech selectable; all CPU-only) — the
+    // D2, with Windows Speech selectable; all CPU-only) — the
     // PHI-bearing audio never leaves the machine; only the
     // resulting de-identified transcript is saved to the production report. On
     // web (no sidecar) it falls back to the report-scoped cloud path, where PHI

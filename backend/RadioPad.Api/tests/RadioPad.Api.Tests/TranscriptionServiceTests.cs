@@ -107,7 +107,7 @@ public class TranscriptionServiceTests
         // cloud provider is selectable.
         var ubag = new FakeUbag();
         var audit = new RecordingAudit();
-        var local = new FakeLocalStt(new TranscriptionResult("on-device transcript", "local", "parakeet-tdt-0.6b-v3", 12));
+        var local = new FakeLocalStt(new TranscriptionResult("on-device transcript", "local", "local-stt-model-v3", 12));
         var svc = Build(Provider(ProviderComplianceClass.Sandbox), ubag, audit, local);
 
         var result = await svc.TranscribeAsync(
@@ -116,7 +116,7 @@ public class TranscriptionServiceTests
 
         Assert.Equal("on-device transcript", result.Text);
         Assert.Equal("local", result.Provider);
-        Assert.Equal("parakeet-tdt-0.6b-v3", result.Model);
+        Assert.Equal("local-stt-model-v3", result.Model);
         Assert.Equal(1, local.Calls);
 
         // The cloud path must be completely untouched.

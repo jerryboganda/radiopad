@@ -17,7 +17,7 @@ public class SttReconcilerTests
     [Fact]
     public void Identical_Confident_Hypotheses_Produce_No_Flags()
     {
-        var a = Eng("parakeet", T("lungs", 0.95), T("are", 0.95), T("clear", 0.95));
+        var a = Eng("engineA", T("lungs", 0.95), T("are", 0.95), T("clear", 0.95));
         var b = Eng("secondary", T("lungs", 0.92), T("are", 0.92), T("clear", 0.92));
 
         var r = SttReconciler.Reconcile(a, b);
@@ -30,20 +30,20 @@ public class SttReconcilerTests
     [Fact]
     public void Confident_WideMargin_Disagreement_Picks_Winner_Unflagged()
     {
-        var a = Eng("parakeet", T("lung", 0.95));
+        var a = Eng("engineA", T("lung", 0.95));
         var b = Eng("secondary", T("long", 0.60));
 
         var r = SttReconciler.Reconcile(a, b);
 
         Assert.Equal("lung", r.Text);
         Assert.False(r.Spans[0].Flagged);
-        Assert.Equal("parakeet", r.Spans[0].Source);
+        Assert.Equal("engineA", r.Spans[0].Source);
     }
 
     [Fact]
     public void Narrow_Disagreement_Is_Flagged()
     {
-        var a = Eng("parakeet", T("lung", 0.70));
+        var a = Eng("engineA", T("lung", 0.70));
         var b = Eng("secondary", T("long", 0.65));
 
         var r = SttReconciler.Reconcile(a, b);
@@ -56,7 +56,7 @@ public class SttReconcilerTests
     [Fact]
     public void Insertion_Deletion_Is_Flagged()
     {
-        var a = Eng("parakeet", T("the", 0.9), T("lung", 0.9));
+        var a = Eng("engineA", T("the", 0.9), T("lung", 0.9));
         var b = Eng("secondary", T("the", 0.9));
 
         var r = SttReconciler.Reconcile(a, b);
@@ -71,7 +71,7 @@ public class SttReconcilerTests
     [Fact]
     public void Safety_Token_Is_Flagged_Even_When_Engines_Agree()
     {
-        var a = Eng("parakeet", T("left", 0.97));
+        var a = Eng("engineA", T("left", 0.97));
         var b = Eng("secondary", T("left", 0.97));
 
         var r = SttReconciler.Reconcile(a, b);
@@ -83,7 +83,7 @@ public class SttReconcilerTests
     [Fact]
     public void Numeric_Measurement_Is_Flagged()
     {
-        var a = Eng("parakeet", T("1.2", 0.95), T("cm", 0.95));
+        var a = Eng("engineA", T("1.2", 0.95), T("cm", 0.95));
         var b = Eng("secondary", T("1.2", 0.95), T("cm", 0.95));
 
         var r = SttReconciler.Reconcile(a, b);
@@ -96,7 +96,7 @@ public class SttReconcilerTests
     [Fact]
     public void Low_Confidence_Agreement_Is_Flagged()
     {
-        var a = Eng("parakeet", T("haze", 0.40));
+        var a = Eng("engineA", T("haze", 0.40));
         var b = Eng("secondary", T("haze", 0.45));
 
         var r = SttReconciler.Reconcile(a, b);
@@ -108,13 +108,13 @@ public class SttReconcilerTests
     [Fact]
     public void EngineScale_Calibration_Can_Flip_The_Winner()
     {
-        // Raw: parakeet 0.9 > secondary 0.8. With a 0.5 scale on the (over-confident)
-        // transducer, calibrated parakeet 0.45 < secondary 0.8 -> secondary wins.
-        var a = Eng("parakeet", T("alpha", 0.9));
+        // Raw: engineA 0.9 > secondary 0.8. With a 0.5 scale on the (over-confident)
+        // transducer, calibrated engineA 0.45 < secondary 0.8 -> secondary wins.
+        var a = Eng("engineA", T("alpha", 0.9));
         var b = Eng("secondary", T("beta", 0.8));
         var opts = new ReconcileOptions
         {
-            EngineScale = new Dictionary<string, double> { ["parakeet"] = 0.5 },
+            EngineScale = new Dictionary<string, double> { ["engineA"] = 0.5 },
         };
 
         var r = SttReconciler.Reconcile(a, b, opts);
@@ -126,7 +126,7 @@ public class SttReconcilerTests
     [Fact]
     public void Word_Equality_Ignores_Case_And_Punctuation()
     {
-        var a = Eng("parakeet", T("Clear.", 0.9));
+        var a = Eng("engineA", T("Clear.", 0.9));
         var b = Eng("secondary", T("clear", 0.9));
 
         var r = SttReconciler.Reconcile(a, b);
@@ -153,7 +153,7 @@ public class SttReconcilerTests
     {
         // Backbone (live draft) = secondary "long" @0.5; two other engines say "lung".
         var live = Eng("secondary", T("long", 0.50));
-        var p = Eng("parakeet", T("lung", 0.90));
+        var p = Eng("engineA", T("lung", 0.90));
         var k = Eng("tertiary", T("lung", 0.90));
 
         var r = SttReconciler.ReconcileMany(new[] { live, p, k });
@@ -171,7 +171,7 @@ public class SttReconcilerTests
     {
         // Equal summed confidence → the dictated backbone word wins (no change).
         var live = Eng("secondary", T("alpha", 0.80));
-        var p = Eng("parakeet", T("beta", 0.80));
+        var p = Eng("engineA", T("beta", 0.80));
 
         var r = SttReconciler.ReconcileMany(new[] { live, p });
 
@@ -183,7 +183,7 @@ public class SttReconcilerTests
     public void ReconcileMany_NeverDeletes_A_Dictated_Word()
     {
         var live = Eng("secondary", T("the", 0.9), T("nodule", 0.9));
-        var p = Eng("parakeet", T("the", 0.9));
+        var p = Eng("engineA", T("the", 0.9));
         var k = Eng("tertiary", T("the", 0.9));
 
         var r = SttReconciler.ReconcileMany(new[] { live, p, k });
@@ -195,7 +195,7 @@ public class SttReconcilerTests
     public void ReconcileMany_InsertsOnlyOnUnanimousAgreement()
     {
         var live = Eng("secondary", T("the", 0.9), T("lung", 0.9));
-        var p = Eng("parakeet", T("the", 0.9), T("left", 0.9), T("lung", 0.9));
+        var p = Eng("engineA", T("the", 0.9), T("left", 0.9), T("lung", 0.9));
         var k = Eng("tertiary", T("the", 0.9), T("left", 0.9), T("lung", 0.9));
 
         var r = SttReconciler.ReconcileMany(new[] { live, p, k });
@@ -210,7 +210,7 @@ public class SttReconcilerTests
     public void ReconcileMany_DropsInsertion_WithoutUnanimousAgreement()
     {
         var live = Eng("secondary", T("the", 0.9), T("lung", 0.9));
-        var p = Eng("parakeet", T("the", 0.9), T("left", 0.9), T("lung", 0.9));
+        var p = Eng("engineA", T("the", 0.9), T("left", 0.9), T("lung", 0.9));
         var k = Eng("tertiary", T("the", 0.9), T("lung", 0.9)); // no "left"
 
         var r = SttReconciler.ReconcileMany(new[] { live, p, k });
@@ -223,7 +223,7 @@ public class SttReconcilerTests
     public void ReconcileMany_PreservesSafetyFlag()
     {
         var live = Eng("secondary", T("left", 0.97));
-        var p = Eng("parakeet", T("left", 0.97));
+        var p = Eng("engineA", T("left", 0.97));
 
         var r = SttReconciler.ReconcileMany(new[] { live, p });
 

@@ -444,10 +444,8 @@ it is read only from the off-reducer `jobPartials` store for display and is neve
 written to `report` state or persisted — the sanctioned apply paths remain the
 only route AI text reaches the report. A `.rp-stream-preview-actions` footer
 carries Stop (while active, wired to `jobs.cancel`) and Regenerate (terminal
-error/cancelled and retryable, wired to `jobs.retry`); the `variant="local"`
-footnote flags that raw MedGemma output becomes structured sections only on
-completion. No animation, so nothing for `prefers-reduced-motion` to disable. RC
-tokens only.
+error/cancelled and retryable, wired to `jobs.retry`). No animation, so nothing
+for `prefers-reduced-motion` to disable. RC tokens only.
 
 #### 3.1.1 In-page two-pane primitive (`.split`)
 

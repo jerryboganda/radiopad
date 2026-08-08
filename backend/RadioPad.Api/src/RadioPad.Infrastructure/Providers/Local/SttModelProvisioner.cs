@@ -8,8 +8,8 @@ using Microsoft.Extensions.Logging;
 namespace RadioPad.Infrastructure.Providers.Local;
 
 /// <summary>
-/// First-run provisioner for the on-device STT model. Downloads the pinned
-/// sherpa-onnx Parakeet bundle, verifies its SHA-256, and extracts it into the
+/// First-run provisioner for the on-device STT model. Downloads a pinned
+/// sherpa-onnx model bundle, verifies its SHA-256, and extracts it into the
 /// model directory — entirely on-device, idempotent, and safe to call on every
 /// startup (a fast no-op once the model is present). Models are NEVER shipped in
 /// the MSI; this keeps the installer small while still guaranteeing a fully
@@ -31,9 +31,6 @@ public sealed class SttModelProvisioner
     }
 
     private SemaphoreSlim LockFor(string id) => _locks.GetOrAdd(id, _ => new SemaphoreSlim(1, 1));
-
-    /// <summary>Ensure the default (Parakeet) model is installed.</summary>
-    public Task<bool> EnsureAsync(CancellationToken ct) => EnsureAsync(LocalSttModels.Parakeet, ct);
 
     /// <summary>
     /// Ensure the MedASR CTC bundle (the default primary STT, D2) is installed — its two raw files
@@ -76,34 +73,8 @@ public sealed class SttModelProvisioner
     }
 
     /// <summary>
-    /// Provision the MedGemma GGUF together with the llama-server runtime it needs to run.
-    ///
-    /// <para>The runtime goes first: it is ~17 MB against the model's 2.5 GB, so if the platform has
-    /// no pinned build or the download fails, the user learns in seconds instead of after a
-    /// multi-gigabyte transfer. A runtime failure is NOT fatal to the model download — the GGUF is
-    /// still worth keeping, and the formatter reports an actionable message about the missing
-    /// server — but the pair is what makes the feature real.</para>
-    /// </summary>
-    private async Task<bool> EnsureMedGemmaWithRuntimeAsync(LocalModelDescriptor desc, CancellationToken ct)
-    {
-        var runtimeOk = await EnsureLlamaServerAsync(ct);
-        if (!runtimeOk)
-            _log.LogWarning(
-                "llama-server runtime could not be provisioned; the MedGemma model will download but " +
-                "offline formatting will stay unavailable until a server is present.");
-
-        var modelOk = await EnsureFileAsync(
-            new LocalSttModels.FileSpec(
-                desc.Id,
-                desc.FileName ?? throw new InvalidOperationException("MedGemma requires a file name"),
-                desc.DownloadUrl, desc.SizeBytes, desc.Sha256), ct);
-
-        return modelOk && runtimeOk;
-    }
-
-    /// <summary>
     /// Ensure the pinned llama-server runtime is installed (dictation brief §2.2 — the optional
-    /// offline MedGemma formatter needs an actual server process to talk to).
+    /// on-device report formatter needs an actual server process to talk to).
     ///
     /// <para>Downloads the archive, verifies its SHA-256, and extracts the WHOLE thing into the
     /// runtime dir: on Windows <c>llama-server.exe</c> is a ~9 KB launcher stub whose real code is
@@ -211,13 +182,6 @@ public sealed class SttModelProvisioner
     {
         if (desc.Placeholder)
             return Task.FromResult(false);
-
-        // Downloading MedGemma must yield something that actually WORKS. The GGUF alone is inert —
-        // it needs a llama-server to run in — so the ~17 MB runtime is fetched alongside the 2.5 GB
-        // model rather than hidden behind a second action the user has to discover. Ordered
-        // runtime-first because it is tiny and its failure is the cheap one to surface.
-        if (string.Equals(desc.Id, LocalModelCatalog.MedGemmaId, StringComparison.Ordinal))
-            return EnsureMedGemmaWithRuntimeAsync(desc, ct);
 
         return desc.ArchiveKind switch
         {

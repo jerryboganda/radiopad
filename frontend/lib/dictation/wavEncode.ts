@@ -1,6 +1,6 @@
 // Phase 1 (local STT) — convert a recorded audio Blob into 16 kHz mono 16-bit
 // PCM WAV, entirely in the browser. The desktop shell uses this before uploading
-// dictation audio so the on-device STT engine (sherpa-onnx / Parakeet) receives
+// dictation audio so the on-device STT engine (sherpa-onnx) receives
 // exactly the format it needs, and the server decodes WAV in-process — no ffmpeg.
 //
 // The WebView2 (Chromium) engine ships the Opus decoder, so `decodeAudioData`

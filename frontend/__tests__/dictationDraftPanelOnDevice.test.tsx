@@ -1,7 +1,7 @@
 // The on-device formatting route in the draft panel.
 //
 // This exists because the route did not: `api.reports.dictationDraftLocal` had ZERO callers, so the
-// entire offline MedGemma path — model provisioning, llama-server, the whole §4.2 pipeline running
+// entire offline on-device path — model provisioning, llama-server, the whole §4.2 pipeline running
 // on the workstation — was unreachable from the UI no matter how well it worked underneath. These
 // tests pin the wiring, and pin the two behaviours that make it safe to offer at all: cloud stays
 // the default (decision D1), and a fallback to the cloud is never silent.
@@ -53,7 +53,7 @@ async function renderPanel() {
 
 beforeEach(() => {
   dictationDraft.mockResolvedValue(result('cloud'));
-  dictationDraftLocal.mockResolvedValue(result('local-medgemma'));
+  dictationDraftLocal.mockResolvedValue(result('local-on-device'));
   lexiconList.mockResolvedValue([{ term: 'c-spine', replacement: 'cervical spine' }]);
   userCorrectionsList.mockResolvedValue([{ id: '1', from: 'mri', to: 'MRI' }]);
 });

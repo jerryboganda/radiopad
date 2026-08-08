@@ -1,7 +1,7 @@
 name: desktop-stt-smoke
 
 # Validates the REAL on-device STT engine on Windows: loads the sherpa-onnx
-# native library + the downloaded NVIDIA Parakeet model and transcribes a real
+# native library + the downloaded MedASR model and transcribes a real
 # speech WAV. The model is cached by SHA-256 so only the first run pays the
 # download.
 #
@@ -22,75 +22,8 @@ permissions:
   contents: read
 
 jobs:
-  smoke:
-    name: on-device STT engine smoke (windows)
-    runs-on: windows-latest
-    env:
-      RADIOPAD_STT_SMOKE_REQUIRE: '1'
-      # Exercise the OPTIMIZED config end-to-end (these are also the code defaults).
-      RADIOPAD_STT_DECODING: modified_beam_search
-      RADIOPAD_STT_MAX_ACTIVE_PATHS: '4'
-    steps:
-      - uses: actions/checkout@v4
-
-      - uses: actions/setup-dotnet@v4
-        with:
-          dotnet-version: '8.0.x'
-
-      - name: Cache Parakeet model
-        id: model
-        uses: actions/cache@v4
-        with:
-          path: stt-model
-          key: stt-parakeet-tdt-0.6b-v3-int8-5793d0fd
-
-      - name: Download + verify + extract model
-        if: steps.model.outputs.cache-hit != 'true'
-        shell: bash
-        run: |
-          set -euo pipefail
-          url="https://github.com/k2-fsa/sherpa-onnx/releases/download/asr-models/sherpa-onnx-nemo-parakeet-tdt-0.6b-v3-int8.tar.bz2"
-          curl -fL "$url" -o model.tar.bz2
-          echo "5793d0fd397c5778d2cf2126994d58e9d56b1be7c04d13c7a15bb1b4eafb16bf  model.tar.bz2" | sha256sum -c -
-          mkdir -p stt-model
-          tar -xf model.tar.bz2 -C stt-model
-
-      - name: Locate a real speech WAV from the bundle
-        shell: bash
-        run: |
-          set -euo pipefail
-          root="$(pwd)/stt-model"
-          # Prefer an English sample; else any WAV.
-          wav="$(find "$root" -iname 'en*.wav' | head -n1)"
-          test -n "$wav" || wav="$(find "$root" -iname '*.wav' | head -n1)"
-          test -n "$wav" || { echo "no sample WAV in Parakeet bundle"; exit 1; }
-          echo "RADIOPAD_STT_SMOKE_WAV=$(cygpath -w "$wav")" >> "$GITHUB_ENV"
-          echo "using sample WAV (absolute): $wav"
-
-      - name: Wire radiology hotwords if the bundle ships a BPE vocab
-        shell: bash
-        run: |
-          set -euo pipefail
-          vocab="$(find stt-model -iname 'bpe.vocab' -o -iname '*.vocab' | head -n1 || true)"
-          hot="$(pwd)/backend/RadioPad.Api/src/RadioPad.Infrastructure/Providers/Local/radiology-hotwords.txt"
-          if [ -n "$vocab" ]; then
-            echo "RADIOPAD_STT_HOTWORDS_FILE=$(cygpath -w "$hot")" >> "$GITHUB_ENV"
-            echo "hotword biasing wired (BPE vocab: $vocab)"
-          else
-            echo "no BPE vocab in Parakeet bundle -> hotwords skipped; beam search still verified"
-          fi
-
-      - name: Run Parakeet engine smoke (real native lib + model)
-        shell: bash
-        working-directory: backend/RadioPad.Api
-        env:
-          RADIOPAD_STT_SMOKE_MODEL_DIR: ${{ github.workspace }}\stt-model
-        run: |
-          dotnet test --filter "FullyQualifiedName~SttEngineSmokeTests" -c Release
-
   medasr:
-    # MedASR is the DEFAULT primary engine (decision D2), so it needs the same real-engine proof as
-    # Parakeet. Its own job so the two models cache independently and run in parallel.
+    # MedASR is the DEFAULT primary engine (decision D2), and needs a real-engine proof.
     #
     # This job exists because a local runtime check caught what compile-checking could not: MedASR
     # emits `{period}` / `[FINDINGS]` markup rather than plain punctuation, which would otherwise

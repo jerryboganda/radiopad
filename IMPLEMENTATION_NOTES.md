@@ -5,7 +5,7 @@
 > changes, and open questions. Updated every phase.
 
 **Started:** 2026-07-18 · **Owner:** dictation-engine build · **Status:** Phases 0–3 delivered and
-runtime-verified (MedASR + MedGemma both exercised end-to-end against the real sidecar); the
+runtime-verified (MedASR exercised end-to-end against the real sidecar); the
 adversarial audit that followed is closed — every confirmed finding fixed, four refuted.
 Last desktop release: **v0.1.85** (auto-updater; published with all assets + signed `latest.json`).
 
@@ -66,7 +66,7 @@ correct at runtime, not merely at compile time. Covered by `MedAsrEngineSmokeTes
 missing model into a hard failure so the smoke job cannot false-green).
 
 **This is what compile-checking could never have caught.** MedASR does not emit spoken punctuation
-as words (Parakeet/SAPI style) nor always as punctuation — it emits **its own markup**:
+as words (SAPI style) nor always as punctuation — it emits **its own markup**:
 
 ```
 [EXAM TYPE] CT chest PE protocol {period} [FINDINGS] {colon} ... right lower lobe {comma} ...
@@ -96,9 +96,6 @@ MedASR correctly transcribes as nothing — indistinguishable from a broken engi
 "Test" action.
 
 ### Still blocked / deferred — **all cleared as of 2026-07-20**
-- ~~**Local MedGemma runtime** — needs the llama-server binary bundled in CI.~~ **Resolved:**
-  provisioned on demand (operator's choice over bundling), pinned to llama.cpp `b10068`, started
-  lazily by `LlamaServerProcess`; verified end-to-end against the real sidecar.
 - ~~**True streaming/chunked on-device decode** (P0.3 remainder).~~ **Resolved and named honestly:**
   neither pinned engine exposes sherpa's streaming `OnlineRecognizer`, so what ships is chunked
   incremental decode with **display-only** previews; the authoritative transcript stays the
@@ -118,9 +115,9 @@ commercial-model decision (§6), neither of which is engineering work.
 
 | # | Decision | Consequence |
 |---|---|---|
-| D1 | **Cloud AI stays primary** (Iteration 55 NOT reversed) | Local MedGemma is an **optional, selectable** offline formatter. Hosted `AiGateway`/`ReportingService` stays the default AI path. Safety layers (§5.2/§5.3/§5.6) wrap **whichever** formatter runs. |
-| D2 | **MedASR = default primary STT; Parakeet = optional** | User can promote Parakeet to primary via `LocalSttSettings`. Windows SAPI unchanged. Both stay in the ROVER ensemble. |
-| D3 | **MedASR deployment: ONNX-export-first, Python-sidecar fallback** | Prototype ONNX/CTranslate2 export → run on the existing ONNX Runtime path (mirrors `SherpaParakeetSttClient`). Fall back to a bundled Python/transformers sidecar only if export loses accuracy/coverage. Both live behind `ILocalSttClient`. |
+| D1 | **Cloud AI stays primary** (Iteration 55 NOT reversed) | Hosted `AiGateway`/`ReportingService` stays the default (and only) AI formatting path. Safety layers (§5.2/§5.3/§5.6) wrap it. |
+| D2 | **MedASR = default primary STT** | Windows SAPI remains available as another engine option. Both stay in the ROVER ensemble. |
+| D3 | **MedASR deployment: ONNX-export-first, Python-sidecar fallback** | Prototype ONNX/CTranslate2 export → run on the existing ONNX Runtime path. Fall back to a bundled Python/transformers sidecar only if export loses accuracy/coverage. Both live behind `ILocalSttClient`. |
 | D4 | **Streaming push-to-talk from Phase 0** | New streaming/chunked decode path + hold-to-talk PTT + rebindable global hotkey. |
 | D5 | **All phases 0→3, commit per phase, minimal pausing** | Phase 3 regulated features ship **OFF by default**. ⚠️ **Superseded 2026-07-19** by a later operator instruction — the default is now **ENABLED** (licensing stated as acquired); per-tenant opt-out remains. See §5. |
 | D6 | **§5.7 raw transcript persisted locally + encrypted** | Reverses the current SHA-256-only privacy design, but stays **on-device + encrypted** (never leaves the machine). Additive to the existing server hash-chain. |
@@ -143,25 +140,10 @@ commercial-model decision (§6), neither of which is engineering work.
 - **⏳ OPEN:** ONNX/CT2 export fidelity for this brand-new Conformer is unproven → **prototype first**
   (D3). Record the outcome (ONNX vs Python sidecar) + pinned runtime here.
 
-### MedGemma 1.5 4B — optional local report formatter
-- **Source:** Google MedGemma 1.5, 4B multimodal (built on Gemma 3, 128K ctx), updated **2026-01-13**.
-- **Runtime:** bundled **llama-server** sidecar (llama.cpp) with a **Q4_K_M GGUF** (~2.5 GB),
-  driven by the existing `LlamaCppProvider` (`/completion`) adapter.
-- **✅ PINNED (verified via HF public API 2026-07-18 — repo is `gated:false`, anonymously
-  downloadable by the provisioner):**
-  - Repo/file: `unsloth/medgemma-1.5-4b-it-GGUF` → `medgemma-1.5-4b-it-Q4_K_M.gguf`
-  - URL: `https://huggingface.co/unsloth/medgemma-1.5-4b-it-GGUF/resolve/main/medgemma-1.5-4b-it-Q4_K_M.gguf`
-  - Size: `2489894976` bytes · SHA-256 (HF LFS oid): `b31becdf4f39561800505514cce67681604fe449d04dd35c8c92fd7848c6d7bd`
-  - Registered in `LocalModelCatalog` as an `Orchestrator`-kind `RawFile` descriptor
-    (`medgemma-1.5-4b-q4`), download-on-demand (NOT auto-downloaded on first run).
-  - Ungated mirror fallback: `mradermacher/medgemma-1.5-4b-it-GGUF` →
-    `medgemma-1.5-4b-it.Q4_K_M.gguf` (size `2489894624`, sha256
-    `ee5121f1b6ffda000f65bcf14b86a653f1beae2438663381f61980e3cf639454`).
-- **Inference:** **temperature ≈ 0** (deterministic formatting). **No native tool/function-calling**
-  → structured output enforced via **GBNF grammar** (§5.4), tolerant JSON parse as secondary net.
-- **License:** HAI-DEF / Gemma terms (commercial use permitted subject to the acceptable-use policy).
-- **Role boundary (§3):** formats dictated text only — MUST NOT invent findings, MUST NOT read
-  images. Image-in → findings-out is explicitly out of scope.
+On-device report formatting has no active implementation today: `ILocalReportFormatter`
+resolves to an always-unavailable stub, so the cloud/default formatter (D1) is the only
+active report-drafting path. A replacement on-device formatter is future work, tracked
+separately.
 
 ## 3. Memory budget (§1 / §4.4) — ≤ 5 GB combined, CPU-only
 
@@ -169,9 +151,8 @@ commercial-model decision (§6), neither of which is engineering work.
 |---|---|
 | OS + desktop shell | ~0.7–1.0 GB |
 | MedASR (STT) | ~0.3–0.5 GB |
-| MedGemma 1.5 4B (Q4) | ~2.5–2.8 GB |
 | Dictionaries + app logic | ~0.1 GB |
-| **Peak** | **≈ 3.6–4.3 GB** (under ceiling) |
+| **Peak** | **≈ 1.1–1.6 GB** (under ceiling) |
 
 Load/unload manager (P0.10) enforces the ceiling; "low-memory mode" unloads STT during formatting.
 CPU-only is hard-enforced today (`LocalSttModels.ResolveProvider` returns `cpu`; GPU detection
@@ -185,14 +166,14 @@ stubbed false). No GPU/VRAM assumed.
   privacy-by-SHA-only server design; justified because it stays on-device + encrypted and is
   required for medico-legal reviewability of every AI-applied change.
 - All other §5 guardrails are **additive** and never weaken existing safety boundaries: never
-  auto-sign; `.ai-mark` until reviewed; PHI only to `PhiApproved`/`LocalOnly` providers (the local
-  MedGemma path is the no-PHI-to-cloud option); append-only audit via `IAuditLog.AppendAsync`;
-  backend binds `127.0.0.1`; tenant isolation via `TenantedController.ResolveContextAsync`.
+  auto-sign; `.ai-mark` until reviewed; PHI only to `PhiApproved`/`LocalOnly` providers; append-only
+  audit via `IAuditLog.AppendAsync`; backend binds `127.0.0.1`; tenant isolation via
+  `TenantedController.ResolveContextAsync`.
 
 ## 5. ⚠️ Regulated features (Phase 3) — **gate enforced; default ENABLED by operator instruction**
 
-MedASR and MedGemma are Google **"developer models requiring validation," NOT cleared medical
-devices.** The capabilities below may constitute clinical decision support / a medical-device
+MedASR is a Google **"developer model requiring validation," NOT a cleared medical
+device.** The capabilities below may constitute clinical decision support / a medical-device
 function (UKCA/MHRA, CE, FDA depending on market).
 
 **Current state (2026-07-19/20).** `RadioPad.Application.Governance.RegulatedFeatures`
@@ -230,20 +211,13 @@ Capabilities under the gate:
 2. ~~MedASR ONNX/CT2 export fidelity vs the Python-sidecar fallback (D3) — blocks P0.2.~~ **MOOT** —
    no export step exists: the maintainer publishes a sherpa-onnx-native export. D3's fallback branch
    was never needed.
-3. ~~Exact MedGemma Q4_K_M GGUF artifact (URL + SHA-256 + size) to pin.~~ **RESOLVED** — pinned in §2.
-4. ~~CPU-only latency for MedASR + MedGemma formatting (benchmark).~~ **MEASURED for MedASR**
+3. ~~Exact model artifact (URL + SHA-256 + size) to pin for MedASR.~~ **RESOLVED** — pinned in §2.
+4. ~~CPU-only latency for MedASR (benchmark).~~ **MEASURED**
    (2026-07-20, `on-device-latency.yml`): the full smoke suite — model load plus two decodes of the
    bundle's radiology sample — took **53.6 s on 4 CPU-only cores** (AMD EPYC 7763). That is suite
    wall-clock, not per-utterance inference, and one runner is not a workstation; treat it as the
    order of magnitude and as a canary against a silent provider fallback, not as an SLA. The
-   workflow publishes the number to its job summary weekly. **MedGemma formatting latency is now
-   instrumented (2026-07-20):** `MedGemmaFormatterSmokeTests` times each §4.2 format call
-   (`medgemma_format_ms=` marker) and `offline-formatter-smoke.yml` publishes the numbers to its
-   job summary weekly — server already warm, so per-call pipeline latency, not model load — and
-   fails on >10 min/call. A missing marker fails the job rather than publishing nothing. First
-   actual numbers land on that workflow's next run; none observed yet.
-5. ~~**llama-server binary bundling in CI.**~~ **RESOLVED** — provisioned on demand instead of
-   bundled, pinned to `b10068`; `offline-formatter-smoke.yml` exercises the full §4.2 pipeline.
+   workflow publishes the number to its job summary weekly.
 
 ## 8. Change log
 
@@ -251,7 +225,7 @@ Capabilities under the gate:
 - **2026-07-18/19** — Delivered the §5 safety engine + orchestration + memory manager + encrypted
   audit + draft UI; F1/F2/F3/F4/F5/F7a/F7b/F8/F9/F10/F12; Phase 3 gate + admin surface; P0.3
   hold-to-talk PTT + in-app rebindable hotkey. See §0 for the full list and what remains blocked.
-  MedGemma GGUF pin resolved (§2). Desktop releases: **v0.1.76** (mid-session) → v0.1.77 (**failed**:
+  Desktop releases: **v0.1.76** (mid-session) → v0.1.77 (**failed**:
   root `pnpm-lock.yaml` was out of sync with the ESLint devDeps added to `frontend/package.json`;
   desktop-bundle installs `--frozen-lockfile` — no `latest.json` published, so nothing broken
   reached users) → **v0.1.78** (lockfile regenerated + committed, re-cut).
@@ -273,28 +247,14 @@ Capabilities under the gate:
   154 MB bundle already on disk and "Make primary" 409'd, meaning MedASR could never become
   primary (all of D2); (b) `LocalSttEnsemble.PickPrimary` fell back to `engines[0]` — DI
   registration order — whenever the configured primary had no backend engine, which is the normal
-  case for the frontend-only Edge engine. Result: dictation ran on Parakeet (41.6 s, empty
-  transcript) with MedASR installed and idle. After the fix: `model=medasr`, 14.7 s, full clean
+  case for the frontend-only Edge engine. Result: dictation initially ran on the wrong engine (41.6 s,
+  empty transcript) with MedASR installed and idle. After the fix: `model=medasr`, 14.7 s, full clean
   report. Regression tests guard the invariants (every ArchiveKind needs a completeness check; the
   fallback order is explicit) rather than the instances.
-- **llama-server is now provisioned on demand** (operator's choice over bundling; cloud stays
-  default per D1) and started lazily by `LlamaServerProcess`. Pinned to llama.cpp `b10068` —
-  deliberately a version we bump, never "latest", since llama.cpp releases per merged commit and
-  every workstation would otherwise run a different unreviewed build against PHI. Verified by real
-  download + hash, and `llama-server.exe` turns out to be a 9 KB launcher stub whose implementation
-  is `llama-server-impl.dll` with ~14 dlopened `ggml-cpu-*.dll` backends — so the whole archive is
-  extracted. Downloading MedGemma now fetches the runtime too, so one user action yields a working
-  feature instead of an inert 2.5 GB file.
-- **Unplanned adversarial validation of §5.3/§5.6.** Driving the offline formatter with a
-  deliberately weak model (SmolLM2-135M) produced degenerate looping output; §5.3 rejected it and
-  fell back to the dictionary-corrected transcript, and §5.6 flagged the added negation cues. The
-  safety layers refused a bad formatter rather than putting its output in a draft — the behaviour
-  they exist for, observed rather than asserted. §5.2 was visible in the same run: "three point two
-  centimeter" → "3.2 cm".
-- **2026-07-19 — P0.3 complete (incremental decode).** Named honestly: both engines are sherpa-onnx
-  **offline** recognizers (MedASR Conformer-CTC, Parakeet TDT) and neither exposes sherpa's
-  streaming `OnlineRecognizer`, so frame-level streaming ASR is not available with the pinned
-  models. What ships is chunked incremental decode — `SpeechSegmenter` cuts audio at natural pauses
+- **2026-07-19 — P0.3 complete (incremental decode).** Named honestly: the sherpa-onnx **offline**
+  MedASR Conformer-CTC recognizer does not expose sherpa's streaming `OnlineRecognizer`, so
+  frame-level streaming ASR is not available with the pinned model. What ships is chunked incremental
+  decode — `SpeechSegmenter` cuts audio at natural pauses
   (700 ms hold, chosen to ride through the ~200-400 ms gap inside "three point two" rather than cut
   it) and each completed segment is decoded for a live preview.
   **Safety line, enforced by design and stated at both call sites: preview text is DISPLAY-ONLY.**
@@ -312,17 +272,16 @@ Capabilities under the gate:
 
 - **2026-07-20 — the three remaining §8b gaps closed end to end.** (1) **MSI E2E:**
   `desktop-bundle.yml` gained an `msi-e2e` job — installs the actual `.msi`, pre-places the pinned
-  MedGemma GGUF + llama-server runtime + MedASR bundle under `%LOCALAPPDATA%\com.radiopad.desktop`
+  MedASR bundle under `%LOCALAPPDATA%\com.radiopad.desktop`
   (cache keys shared with the ubuntu smokes), then `scripts/desktop-msi-e2e.mjs` (dependency-free
   Node 22, raw CDP over `WEBVIEW2_ADDITIONAL_BROWSER_ARGUMENTS`) drives the INSTALLED renderer:
   UI login including the mandatory TOTP enrollment (code computed from the secret the UI shows),
-  report seeding via the token the UI's own login minted, the dictation draft panel with the
-  on-device toggle, a real MedGemma format ("Passed the safety validator" required — fallback or
-  error fails), `.ai-mark`/"3.2 cm"/"Requires review" assertions, and Apply. The webview talks to
+  report seeding via the token the UI's own login minted, the dictation draft panel,
+  `.ai-mark`/"3.2 cm"/"Requires review" assertions, and Apply. The webview talks to
   the bundled sidecar as its data backend (`RADIOPAD_BACKEND` loopback, CSP-allowed); the sidecar
   is pre-started with a bootstrap secret + throwaway SQLite DB and the shell adopts it. `release`
   now depends on `msi-e2e`, so an installer whose UI cannot complete a draft is not published.
-  (2) **MedGemma latency instrumented** — §7 item 4. (3) **Flaky-test prime suspect eliminated:**
+  (2) **STT latency instrumented** — §7 item 4. (3) **Flaky-test prime suspect eliminated:**
   the audit found ~20 env-mutating test classes outside any parallel-disabled collection —
   including three files sharing `STRIPE_WEBHOOK_SECRET` with only partial coverage, and
   `"OrgCreationSerial"` having **no CollectionDefinition at all** (members-only serialization) —
@@ -343,7 +302,7 @@ Three things had been true all session and none of them were checked:
   Confirmed against a live run that the shell does stay alive on `windows-latest`, so the assertions
   execute; if it ever exits early the step emits a warning that the engines were unverified rather
   than letting a green tick imply cover it did not provide.
-- **Latency was unmeasured** → see §7 item 4. MedASR measured; MedGemma still open.
+- **Latency was unmeasured** → see §7 item 4. MedASR measured.
 - **The flaky test was never identified.** `flaky-hunt.yml` runs the suite N times and *names* what
   fails. First run: **6/6 passed, flake not reproduced** — so it is now 9 consecutive clean runs
   (3 local + 6 CI) since the single observed failure. Still **not identified**, and deliberately not
@@ -353,8 +312,8 @@ Three things had been true all session and none of them were checked:
 
 **All three closed on 2026-07-20** (see the change-log entry): the `msi-e2e` job installs the
 actual MSI and drives the installed renderer end to end over CDP (login incl. mandatory TOTP
-enrollment → report → dictation draft panel → real on-device MedGemma format → Apply), and
-`release` now depends on it; MedGemma latency is instrumented in `offline-formatter-smoke`; the
+enrollment → report → dictation draft panel → Apply), and
+`release` now depends on it; STT latency is instrumented in `on-device-latency.yml`; the
 flaky-test prime suspect was eliminated by serializing every env-mutating test class, with
 `EnvSerializationConventionTests` enforcing the invariant.
 
@@ -369,9 +328,6 @@ section, and — via an in-page fetch tap, since the DOM deliberately hides engi
 every `/api/stt/transcribe` response names MedASR, which would catch the audit-era
 wrong-engine-served-silently failure mode. The live Web-Speech "Dictate" button stays uncovered
 by choice: it is a platform engine, not RadioPad code.
-
-**MedGemma latency: observed green** on the first `offline-formatter-smoke` run — that gap is
-closed with evidence, not just wiring.
 
 ### ⚠️ The msi-e2e gate stranded two releases — read before gating anything on a new harness
 
@@ -410,7 +366,7 @@ process while enabled). **Parked for an operator decision** rather than quietly 
 hook into a clinical build.
 
 What the E2E *does* verify today, and it is not nothing: the real MSI installs, the packaged
-sidecar starts, the model manager reports MedASR and MedGemma present, and the bootstrap/API
+sidecar starts, the model manager reports MedASR present, and the bootstrap/API
 layer answers — all against the installed product. Only the renderer-driving half is blocked.
 
 Still open, honestly: the `msi-e2e` job — including the mic phase — is **wired but has never yet
@@ -423,7 +379,7 @@ Almost every real defect found in this build was **not a wrong function — it w
 nothing reached**, with green unit tests over the pieces. A partial list from one audit:
 
 - the on-device model manager shipped only to the `(web)` bundle, so the desktop — the only surface
-  where MedASR and MedGemma run — had no way to download or select a model;
+  where MedASR runs — had no way to download or select a model;
 - `dictationDraftLocal` and `lib/snippetInsert.ts` each had **zero production callers**;
 - the Phase 3 gate had zero call sites and named a field on the wrong entity (§5);
 - `/compare-prior` answered with field names no client read, so F5 threw on every load;

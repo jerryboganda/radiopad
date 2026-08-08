@@ -10,7 +10,7 @@ namespace RadioPad.Api.Controllers;
 
 /// <summary>
 /// Manage the on-device AI models — download, delete, test, and diagnose them.
-/// STT (Parakeet) is actionable today; TTS + an orchestrator brain are
+/// STT is actionable today; TTS + an orchestrator brain are
 /// roadmap placeholders surfaced as "coming soon".
 ///
 /// Mirrors <see cref="SttController"/>'s safety model: not report-scoped, so there
@@ -53,7 +53,7 @@ public sealed class LocalModelsController : ControllerBase
         _engines = engines.ToList();
         _settings = settings;
         _log = log;
-        // Orchestrator models (MedGemma) run through an IAiProviderAdapter, not an
+        // Orchestrator models run through an IAiProviderAdapter, not an
         // ILocalSttEngine. Optional so the existing test fixtures that construct this
         // controller with the STT-only set keep compiling.
         _aiAdapters = aiAdapters?.ToList() ?? [];
@@ -402,7 +402,7 @@ public sealed class LocalModelsController : ControllerBase
             return Ok(Failure("The llama.cpp adapter is not registered in this build.", stage: "adapter"));
 
         // An operator-pointed server always wins; otherwise we own the process.
-        var configured = Environment.GetEnvironmentVariable(LocalMedGemmaFormatter.UrlEnv);
+        var configured = Environment.GetEnvironmentVariable("RADIOPAD_LOCAL_LLAMA_URL");
         string endpoint;
         if (!string.IsNullOrWhiteSpace(configured))
         {
@@ -572,7 +572,7 @@ public sealed class LocalModelsController : ControllerBase
                 return d.ArchiveKind switch
                 {
                     ModelArchiveKind.TarBz2 => LocalSttModels.IsComplete(dir),
-                    // The MedASR CTC bundle is two raw files, so neither the Parakeet transducer
+                    // The MedASR CTC bundle is two raw files, so neither the TarBz2 transducer
                     // check nor the single-FileName check answers "is it installed".
                     ModelArchiveKind.MedAsrCtc => LocalSttModels.IsMedAsrComplete(dir),
                     ModelArchiveKind.RawFile => d.FileName is not null && System.IO.File.Exists(Path.Combine(dir, d.FileName)),

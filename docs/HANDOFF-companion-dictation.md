@@ -86,7 +86,7 @@ audio-dropping gap. Fundamentally unfit for continuous dictation. REMOVED.
   with a `type` field, ≤256KB, `CompanionRelayEndpoint.cs`). **Desktop is the OFFERER** (on
   `peer_joined`); phone answers.
 - Desktop transcribes each segment with the SAME engine as local dictation (`blobToWav16kMono`
-  + `api.reports.transcribe` → loopback Parakeet sidecar), strictly in seq order
+  + `api.reports.transcribe` → loopback on-device STT sidecar), strictly in seq order
   (`frontend/lib/companionAudioReceiver.ts` FIFO), then `insertAtCursor`. Text appears
   per-phrase (real-time word-by-word is gone — accepted tradeoff for smoothness).
 - `companionSpeech.ts` gutted → `ensureMicPermission()` only (keeps the speech-recognition
@@ -158,7 +158,7 @@ be tested on two real devices on the same Wi-Fi, and is UNVERIFIED:
    requests RECORD_AUDIO via the speech plugin first; then `getUserMedia`). If it throws
    `NotAllowedError`, the permission path needs work.
 3. **Codec** — Android `MediaRecorder` webm/opus → desktop WebView2 `decodeAudioData` (`blobToWav16kMono`)
-   → Parakeet. Some Android WebViews only expose `audio/mp4`; `decodeAudioData` should still handle it.
+   → the on-device STT engine. Some Android WebViews only expose `audio/mp4`; `decodeAudioData` should still handle it.
 
 **How to test:** both devices on the SAME Wi-Fi → desktop opens a report → "Pair phone" → phone
 scans QR → desktop should show **"Paired over Wi-Fi"** → tap the phone mic, speak → text lands
@@ -214,7 +214,7 @@ FIXES (desktop, needs a desktop release to reach the fleet):
 - Readiness probe on RTC connect (`api.localModels.list()`): no blob-capable STT engine
   available → actionable banner immediately (Downloading state gets its own message).
   NOTE: Edge Web Speech CANNOT transcribe blobs (live-mic API only — also NOT available in
-  WebView2/Android WebView at all, confirmed by research); blob-capable = Parakeet + SAPI,
+  WebView2/Android WebView at all, confirmed by research); blob-capable = MedASR + SAPI,
   and the sidecar already honors the user's persisted primary engine.
 - "Still transcribing — engine may be loading…" escalation after 8s; success clears stale
   error banners; `dictation` finals got the same no-focus fallback (findings → first section).

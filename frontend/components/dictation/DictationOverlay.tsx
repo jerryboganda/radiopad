@@ -14,10 +14,9 @@
 // / no recognizer), the mic is disabled and the radiologist uses the "HQ" button,
 // which records and transcribes through the bundled on-device sidecar engine.
 // Decision D2 (backend/.../Providers/Local/LocalSttSettings.cs): the sidecar's
-// DEFAULT primary is Google MedASR (radiology-tuned Conformer-CTC), not
-// Parakeet — Parakeet is the general-purpose, user-promotable fallback. The
-// ensemble's engine-pick order also puts MedASR ahead of Parakeet so a fresh
-// install never silently favors Parakeet by registration order. The "Fix"
+// DEFAULT primary is Google MedASR (radiology-tuned Conformer-CTC). The
+// ensemble's engine-pick order puts MedASR first so a fresh install never
+// silently favors a fallback engine by registration order. The "Fix"
 // button asks the host page to clean the dictation into medical phrasing via
 // UBAG.
 

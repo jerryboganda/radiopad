@@ -15,7 +15,7 @@ export interface EditorCorrection {
   originalText?: string;
   correctedText?: string;
   reason?: string;
-  /** Which engine/model produced the correction (e.g. parakeet, llm, rover). */
+  /** Which engine/model produced the correction (e.g. medasr, llm, rover). */
   source?: string;
   /** laterality | negation | anatomy | measurement | drug_term | ... */
   category?: string;

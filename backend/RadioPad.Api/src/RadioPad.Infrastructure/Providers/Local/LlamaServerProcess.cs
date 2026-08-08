@@ -5,7 +5,7 @@ namespace RadioPad.Infrastructure.Providers.Local;
 
 /// <summary>
 /// Starts and supervises the on-demand <c>llama-server</c> child process that runs the optional
-/// local MedGemma formatter (dictation brief §2.2).
+/// on-device report formatter (dictation brief §2.2).
 ///
 /// <para><b>Why the sidecar owns this rather than the Tauri shell.</b> The formatter is the only
 /// consumer, it knows exactly when a request needs the model loaded, and keeping the process inside
@@ -69,7 +69,7 @@ public sealed class LlamaServerProcess : IDisposable
             }
             if (!File.Exists(modelPath))
             {
-                _log.LogWarning("MedGemma model {Path} is not present; cannot start the offline formatter.", modelPath);
+                _log.LogWarning("Model {Path} is not present; cannot start the offline formatter.", modelPath);
                 return null;
             }
 

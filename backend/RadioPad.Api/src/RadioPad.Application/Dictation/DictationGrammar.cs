@@ -4,7 +4,7 @@ namespace RadioPad.Application.Dictation;
 
 /// <summary>
 /// Brief §5.4 — grammar-constrained decoding. Builds a GBNF grammar (llama.cpp format) that forces
-/// the local MedGemma formatter to emit a valid report-section JSON object and nothing else. This
+/// the local formatter to emit a valid report-section JSON object and nothing else. This
 /// makes the model structurally unable to emit malformed output; tolerant JSON parsing remains the
 /// secondary net. GBNF is preferred over an OpenAI-style JSON schema for small local models.
 /// </summary>

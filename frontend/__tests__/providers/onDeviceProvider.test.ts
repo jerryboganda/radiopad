@@ -20,12 +20,12 @@ import {
   LOCAL_LLAMA_ENDPOINT,
 } from '@/lib/models/onDeviceProvider';
 
-const MODEL_ID = 'medgemma-1.5-4b-q4';
+const MODEL_ID = 'on-device-1.5-4b-q4';
 
 function provider(partial: Partial<Provider>): Provider {
   return {
     id: 'p1',
-    name: 'MedGemma (on-device)',
+    name: 'On-device formatter',
     adapter: LOCAL_LLAMA_ADAPTER,
     model: MODEL_ID,
     endpointUrl: LOCAL_LLAMA_ENDPOINT,
@@ -69,7 +69,7 @@ describe('ensureOnDeviceProvider', () => {
     listMock.mockResolvedValueOnce([]).mockResolvedValueOnce([provider({})]);
     saveMock.mockResolvedValue({ id: 'p1' });
 
-    const res = await ensureOnDeviceProvider(MODEL_ID, 'MedGemma');
+    const res = await ensureOnDeviceProvider(MODEL_ID, 'OnDeviceFormatter');
 
     expect(res.status).toBe('created');
     expect(saveMock).toHaveBeenCalledTimes(1);
@@ -87,7 +87,7 @@ describe('ensureOnDeviceProvider', () => {
     listMock.mockResolvedValueOnce([]).mockResolvedValueOnce([provider({})]);
     saveMock.mockResolvedValue({ id: 'p1' });
 
-    await ensureOnDeviceProvider(MODEL_ID, 'MedGemma');
+    await ensureOnDeviceProvider(MODEL_ID, 'OnDeviceFormatter');
 
     const body = saveMock.mock.calls[0][0] as { endpointUrl: string };
     expect(new URL(body.endpointUrl).hostname).toBe('127.0.0.1');
@@ -96,7 +96,7 @@ describe('ensureOnDeviceProvider', () => {
   it('is a no-op when an enabled row already exists', async () => {
     listMock.mockResolvedValueOnce([provider({ enabled: true })]);
 
-    const res = await ensureOnDeviceProvider(MODEL_ID, 'MedGemma');
+    const res = await ensureOnDeviceProvider(MODEL_ID, 'OnDeviceFormatter');
 
     expect(res.status).toBe('already');
     expect(saveMock).not.toHaveBeenCalled();
@@ -109,7 +109,7 @@ describe('ensureOnDeviceProvider', () => {
       .mockResolvedValueOnce([{ ...existing, enabled: true }]);
     saveMock.mockResolvedValue({ id: 'existing' });
 
-    const res = await ensureOnDeviceProvider(MODEL_ID, 'MedGemma');
+    const res = await ensureOnDeviceProvider(MODEL_ID, 'OnDeviceFormatter');
 
     expect(res.status).toBe('enabled');
     const body = saveMock.mock.calls[0][0] as Record<string, unknown>;
@@ -123,7 +123,7 @@ describe('ensureOnDeviceProvider', () => {
     listMock.mockResolvedValueOnce([]);
     saveMock.mockRejectedValue(Object.assign(new Error('Forbidden'), { status: 403 }));
 
-    await expect(ensureOnDeviceProvider(MODEL_ID, 'MedGemma')).resolves.toEqual({
+    await expect(ensureOnDeviceProvider(MODEL_ID, 'OnDeviceFormatter')).resolves.toEqual({
       status: 'forbidden',
     });
   });
@@ -132,6 +132,6 @@ describe('ensureOnDeviceProvider', () => {
     listMock.mockResolvedValueOnce([]);
     saveMock.mockRejectedValue(Object.assign(new Error('boom'), { status: 500 }));
 
-    await expect(ensureOnDeviceProvider(MODEL_ID, 'MedGemma')).rejects.toThrow('boom');
+    await expect(ensureOnDeviceProvider(MODEL_ID, 'OnDeviceFormatter')).rejects.toThrow('boom');
   });
 });

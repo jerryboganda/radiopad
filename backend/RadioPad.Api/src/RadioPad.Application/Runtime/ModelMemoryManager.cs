@@ -31,7 +31,7 @@ public sealed record MemorySnapshot(
     IReadOnlyList<ModelResidency> Models);
 
 /// <summary>
-/// Brief §4.4 — coordinates MedASR + MedGemma lifecycles so combined resident model memory never
+/// Brief §4.4 — coordinates MedASR + the local formatter model lifecycles so combined resident model memory never
 /// breaches the ≤5 GB ceiling (§1). It evicts STT before the LLM, refuses to load a model that
 /// cannot fit even after eviction, and offers a low-memory mode that unloads STT for the duration of
 /// a formatting call. The actual load/unload is delegated to <see cref="IManagedModel"/> (native

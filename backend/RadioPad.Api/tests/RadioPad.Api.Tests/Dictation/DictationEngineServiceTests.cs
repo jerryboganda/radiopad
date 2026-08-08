@@ -23,7 +23,7 @@ public class DictationEngineServiceTests
         public Task<FormatterOutput> FormatAsync(string protectedTranscript, DictationFormatContext context, CancellationToken ct)
         {
             Received = protectedTranscript;
-            return Task.FromResult(new FormatterOutput(Map(protectedTranscript), "local-medgemma", "medgemma-1.5-4b-q4", 42));
+            return Task.FromResult(new FormatterOutput(Map(protectedTranscript), "local-formatter", "local-formatter-v1", 42));
         }
     }
 
@@ -51,7 +51,7 @@ public class DictationEngineServiceTests
         Assert.True(draft.Accepted);
         Assert.False(draft.UsedFallback);
         Assert.Equal("3.2 cm nodule in the right upper lobe.", draft.DraftSections["findings"]);
-        Assert.Equal("local-medgemma", draft.Provider);
+        Assert.Equal("local-formatter", draft.Provider);
     }
 
     [Fact]

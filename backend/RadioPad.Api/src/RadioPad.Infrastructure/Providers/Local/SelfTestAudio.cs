@@ -2,7 +2,7 @@ namespace RadioPad.Infrastructure.Providers.Local;
 
 /// <summary>
 /// Supplies a small WAV buffer for the on-device model "Test" action. Prefers a
-/// real sample shipped inside the downloaded bundle (the sherpa Parakeet bundle
+/// real sample shipped inside the downloaded bundle (a sherpa-onnx transducer bundle
 /// ships <c>test_wavs/*.wav</c>) so a non-empty transcript is a true end-to-end
 /// pass; falls back to a synthesized 16 kHz mono tone — which still exercises the
 /// native load + decode + inference path — when no sample is present (e.g. a

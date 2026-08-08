@@ -6,7 +6,7 @@ namespace RadioPad.Api.Tests;
 /// <summary>
 /// §5.3 must discard the formatter's output for FABRICATION and only for fabrication.
 ///
-/// <para>Found end-to-end: MedGemma formatted a real dictation into a clean report with zero
+/// <para>Found end-to-end: the local formatter formatted a real dictation into a clean report with zero
 /// sentinel warnings, and the pipeline threw it away because the radiologist had not dictated a
 /// "recommendations" section. The model was penalised for correctly refusing to invent content —
 /// the single most important thing it is asked to do. Since most dictations omit at least one

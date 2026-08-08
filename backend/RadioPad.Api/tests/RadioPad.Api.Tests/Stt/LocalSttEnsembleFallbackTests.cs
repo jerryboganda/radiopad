@@ -12,8 +12,9 @@ namespace RadioPad.Api.Tests;
 /// <para>Found by running the real desktop sidecar: with the persisted primary set to
 /// <c>edge-webspeech</c> — a FRONTEND-only engine with no backend implementation — every
 /// transcription fell back to <c>engines[0]</c>, i.e. whichever engine DI registered first. That
-/// routed dictation to Parakeet while MedASR sat installed and available, quietly defeating
-/// decision D2. Registration order must never decide which engine transcribes a radiologist.</para>
+/// routed dictation to a general-purpose engine while MedASR sat installed and available, quietly
+/// defeating decision D2. Registration order must never decide which engine transcribes a
+/// radiologist.</para>
 /// </summary>
 public class LocalSttEnsembleFallbackTests
 {
@@ -52,10 +53,11 @@ public class LocalSttEnsembleFallbackTests
     [Fact]
     public async Task FrontendOnly_Primary_Falls_Back_To_MedAsr_Not_Registration_Order()
     {
-        // Parakeet deliberately registered FIRST — the old `engines[0]` fallback picked it.
+        // The Windows SAPI engine deliberately registered FIRST — the old `engines[0]` fallback
+        // picked it.
         var ensemble = Build(
             LocalModelCatalog.EdgeWebSpeechEngine,
-            new FakeEngine(SherpaParakeetSttClient.EngineName),
+            new FakeEngine(LocalModelCatalog.WindowsSapiEngine),
             new FakeEngine(SherpaMedAsrSttClient.EngineName));
 
         var result = await ensemble.TranscribeAsync(
@@ -65,33 +67,18 @@ public class LocalSttEnsembleFallbackTests
     }
 
     [Fact]
-    public async Task Falls_Back_To_Parakeet_When_MedAsr_Is_Not_Available()
-    {
-        // MedASR still downloading: the next deliberate choice is Parakeet, not SAPI.
-        var ensemble = Build(
-            LocalModelCatalog.EdgeWebSpeechEngine,
-            new FakeEngine(LocalModelCatalog.WindowsSapiEngine),
-            new FakeEngine(SherpaParakeetSttClient.EngineName));
-
-        var result = await ensemble.TranscribeAsync(
-            new MemoryStream(Wav()), "audio/wav", CancellationToken.None, mode: "single");
-
-        Assert.Equal(SherpaParakeetSttClient.EngineName, result.Model);
-    }
-
-    [Fact]
     public async Task An_Explicitly_Configured_Primary_Still_Wins()
     {
         // The fallback order must not override a real user choice.
         var ensemble = Build(
-            SherpaParakeetSttClient.EngineName, // Parakeet, explicitly promoted
+            LocalModelCatalog.WindowsSapiEngine, // SAPI, explicitly promoted
             new FakeEngine(SherpaMedAsrSttClient.EngineName),
-            new FakeEngine(SherpaParakeetSttClient.EngineName));
+            new FakeEngine(LocalModelCatalog.WindowsSapiEngine));
 
         var result = await ensemble.TranscribeAsync(
             new MemoryStream(Wav()), "audio/wav", CancellationToken.None, mode: "single");
 
-        Assert.Equal(SherpaParakeetSttClient.EngineName, result.Model);
+        Assert.Equal(LocalModelCatalog.WindowsSapiEngine, result.Model);
     }
 
     [Fact]
@@ -100,12 +87,12 @@ public class LocalSttEnsembleFallbackTests
         var ensemble = Build(
             LocalModelCatalog.EdgeWebSpeechEngine,
             new FakeEngine(SherpaMedAsrSttClient.EngineName, available: false),
-            new FakeEngine(SherpaParakeetSttClient.EngineName));
+            new FakeEngine(LocalModelCatalog.WindowsSapiEngine));
 
         var result = await ensemble.TranscribeAsync(
             new MemoryStream(Wav()), "audio/wav", CancellationToken.None, mode: "single");
 
-        Assert.Equal(SherpaParakeetSttClient.EngineName, result.Model);
+        Assert.Equal(LocalModelCatalog.WindowsSapiEngine, result.Model);
     }
 
     [Fact]

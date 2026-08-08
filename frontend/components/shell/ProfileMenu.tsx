@@ -123,7 +123,7 @@ export default function ProfileMenu({ variant = 'sidebar' }: { variant?: 'sideba
           <label
             className="rp-profile-popover-item rp-profile-popover-check"
             data-testid="profile-dual-check"
-            title="Cross-check dictation with a second on-device engine (Parakeet + Windows Speech) and flag disagreements for review. Doubles CPU/RAM."
+            title="Cross-check dictation with a second on-device engine (Windows Speech) and flag disagreements for review. Doubles CPU/RAM."
           >
             <input
               type="checkbox"

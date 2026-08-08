@@ -4,7 +4,7 @@ namespace RadioPad.Infrastructure.Providers.Local;
 
 /// <summary>
 /// Pinned on-demand RUNTIME binaries — currently just llama.cpp's <c>llama-server</c>, which
-/// executes the optional local MedGemma formatter (dictation brief §2.2).
+/// executes the optional on-device report formatter (dictation brief §2.2).
 ///
 /// <para><b>Why on-demand rather than bundled.</b> Cloud formatting stays the default (decision
 /// D1), so the offline formatter is a minority feature; shipping ~17 MB of runtime in every

@@ -47,7 +47,7 @@ type LinkState = 'idle' | 'connecting' | 'connected' | 'failed';
 // A hung decode or engine call must become a skippable error, never a frozen
 // "Transcribing…" (the FIFO stalls totally behind one unsettled await). The
 // engine budget is generous because the first phrase after app start can pay
-// the Parakeet cold-load; a phrase that trips it is skipped and the queue
+// the engine cold-load; a phrase that trips it is skipped and the queue
 // moves on (the engine usually finishes warming meanwhile).
 const DECODE_TIMEOUT_MS = 20_000;
 const TRANSCRIBE_TIMEOUT_MS = 60_000;

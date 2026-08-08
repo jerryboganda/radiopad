@@ -489,9 +489,9 @@
    this instead of either. */
 .rp-table-scroll { overflow-x: auto; }
 .rp-table-scroll > .rp-table { min-width: 520px; }
-/* Provider display names run long ("MedGemma 1.5 4B (Q4_K_M) — on-device report
-   formatter"). Without a floor the browser hands this column ~99px and the name
-   becomes one word per line; with it the table simply scrolls instead. */
+/* Provider display names run long ("On-device Model 1.5 4B (Q4_K_M) — on-device
+   report formatter"). Without a floor the browser hands this column ~99px and the
+   name becomes one word per line; with it the table simply scrolls instead. */
 .rp-providers-name { min-width: 190px; }
 
 .rp-table { width: 100%; border-collapse: collapse; }
@@ -4580,7 +4580,7 @@
    explicit reason line, per the accessibility rule in design.md §7. */
 .rp-model-card[data-state='failed'] { border-color: var(--red-border); }
 
-/* Orchestrator cards (MedGemma) pair their content with the runtime-chain
+/* Orchestrator cards (on-device formatter) pair their content with the runtime-chain
    panel side by side, matching the rest of the platform's icon+body split. */
 .rp-model-card[data-kind='Orchestrator'] {
   flex-direction: row;
@@ -5100,8 +5100,8 @@
 }
 .rp-ai-provider-icon[data-kind="local"] { background: var(--bg-subtle); color: var(--text-muted); }
 .rp-ai-provider-icon[data-kind="ubag"] { background: var(--ai-bg); color: var(--ai); }
-/* On-device model names run long ("MedGemma 1.5 4B (Q4_K_M) — on-device report
-   formatter"). Unclamped they wrap to four lines and knock every other card in
+/* On-device model names run long ("On-device Model 1.5 4B (Q4_K_M) — on-device
+   report formatter"). Unclamped they wrap to four lines and knock every other card in
    the row out of alignment, so they clamp to two and carry the full name in a
    title attribute. */
 .rp-ai-provider-name {

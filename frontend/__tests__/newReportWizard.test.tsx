@@ -143,7 +143,7 @@ describe('new report wizard', () => {
   it('routes generation through the local sidecar JOB when an on-device provider is selected', async () => {
     providersListMock.mockReset().mockResolvedValue([
       {
-        id: 'p-local', name: 'MedGemma (on-device)', adapter: 'llama-cpp', model: 'medgemma-1.5-4b-q4',
+        id: 'p-local', name: 'On-device formatter', adapter: 'llama-cpp', model: 'on-device-1.5-4b-q4',
         compliance: 4, enabled: true, priority: 100,
       },
     ]);

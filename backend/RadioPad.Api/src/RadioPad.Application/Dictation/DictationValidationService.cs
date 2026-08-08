@@ -28,7 +28,7 @@ public sealed record ValidationViolation(ValidationRejectReason Reason, string D
     /// <para>This distinction is load-bearing. Most dictations do not state "recommendations", so
     /// treating a missing section as a reject made the offline formatter fall back on nearly every
     /// real dictation — the feature looked broken while behaving "correctly". Observed end-to-end:
-    /// MedGemma produced a clean report with zero sentinel warnings and was still discarded for the
+    /// the local formatter produced a clean report with zero sentinel warnings and was still discarded for the
     /// one section the radiologist had not dictated.</para>
     /// </summary>
     public bool IsBlocking => Reason is not ValidationRejectReason.MissingRequiredSection;

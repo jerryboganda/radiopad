@@ -5,7 +5,7 @@
  *
  * Audio segments arrive from the phone over the WebRTC data channel (already
  * reassembled by {@link ./companionRtc}). Transcription is async and the
- * on-device Parakeet sidecar is single-threaded, so segments MUST be transcribed
+ * on-device STT sidecar is single-threaded, so segments MUST be transcribed
  * and inserted strictly in capture order (`seq`) or the report text scrambles.
  * This runs a single-consumer FIFO: it waits for the next expected `seq`,
  * transcribes it, inserts it, then advances — never processing a later phrase

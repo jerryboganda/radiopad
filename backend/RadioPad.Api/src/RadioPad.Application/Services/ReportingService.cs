@@ -409,8 +409,8 @@ public class ReportingService
     }
 
     /// <summary>
-    /// MedGemma sometimes substitutes "*" for the requested "•" bullet despite explicit instructions
-    /// otherwise (observed empirically against the on-device model) — normalize it to "•" instead of
+    /// The on-device model sometimes substitutes "*" for the requested "•" bullet despite explicit
+    /// instructions otherwise (observed empirically) — normalize it to "•" instead of
     /// treating the line as unformatted, which would otherwise double-bullet it as "• * ...".
     /// </summary>
     /// <summary>Renders patient age for the prompt header in its stored unit (Years by

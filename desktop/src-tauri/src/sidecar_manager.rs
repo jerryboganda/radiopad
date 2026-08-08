@@ -27,11 +27,10 @@ struct BackendStatus {
 /// different languages and different repos-worth of code, with nothing but this list joining them.
 ///
 /// That gap shipped a real defect: `RADIOPAD_LOCAL_FORMATTER_ENABLED` was never set here, while
-/// `LocalMedGemmaFormatter.Available` gated on it — so `POST /api/dictation/draft-local` answered
-/// `503 formatter_unavailable` in every build ever shipped. MedGemma was provisioned, pinned,
-/// smoke-tested in CI and completely unreachable to a user, because one line was missing from this
-/// list. Hence the test below: it asserts the capability flags rather than trusting a reader to
-/// notice an absence.
+/// the on-device formatter's `Available` gated on it — so `POST /api/dictation/draft-local`
+/// answered `503 formatter_unavailable` in every build ever shipped, because one line was missing
+/// from this list. Hence the test below: it asserts the capability flags rather than trusting a
+/// reader to notice an absence.
 ///
 /// Note the deliberate asymmetry: this enables the local formatter as a CAPABILITY, so the
 /// on-device endpoint serves. It does NOT set `RADIOPAD_LOCAL_FORMATTER_DEFAULT` — cloud stays the
@@ -42,11 +41,11 @@ fn sidecar_env(bind: &str, db_conn: Option<&str>) -> Vec<(String, String)> {
         // Boot with local defaults instead of demanding cloud production secrets
         // (RADIOPAD_AUTH_SECRET / RADIOPAD_COLUMN_KEY_*).
         ("ASPNETCORE_ENVIRONMENT".to_string(), "Development".to_string()),
-        // On-device, offline STT (MedASR by default, Parakeet/SAPI selectable). The sidecar
+        // On-device, offline STT (MedASR by default, SAPI selectable). The sidecar
         // downloads the model to %LOCALAPPDATA% on first run and decodes the desktop's 16 kHz mono
         // WAV in-process — no ffmpeg, no cloud.
         ("RADIOPAD_LOCAL_STT_ENABLED".to_string(), "1".to_string()),
-        // On-device MedGemma report formatting (§4.2 local path), so the transcript never leaves
+        // On-device report formatting (§4.2 local path), so the transcript never leaves
         // the machine when the radiologist chooses it.
         ("RADIOPAD_LOCAL_FORMATTER_ENABLED".to_string(), "1".to_string()),
     ];
@@ -60,7 +59,7 @@ fn sidecar_env(bind: &str, db_conn: Option<&str>) -> Vec<(String, String)> {
 ///
 /// This sidecar is NOT the application's data backend — the desktop UI talks to the hosted
 /// production API (see `get_backend_url`). It exists ONLY to run on-device work (dictation
-/// transcription and, when the radiologist selects it, MedGemma report formatting), so its bind is
+/// transcription and, when the radiologist selects it, on-device report formatting), so its bind is
 /// a fixed loopback address, deliberately INDEPENDENT of `RADIOPAD_BACKEND` (which points the UI at
 /// production). `RADIOPAD_LOCAL_BIND` can override it for local development of the sidecar itself.
 fn stt_sidecar_bind() -> String {
@@ -239,7 +238,7 @@ mod tests {
 
     /// Every on-device capability the desktop depends on must actually be switched on for the
     /// sidecar. `RADIOPAD_LOCAL_FORMATTER_ENABLED` was missing for the whole life of the feature,
-    /// so `/api/dictation/draft-local` returned 503 in every shipped build while MedGemma sat
+    /// so `/api/dictation/draft-local` returned 503 in every shipped build while the model sat
     /// downloaded and unreachable. Asserting the flags is the only thing that makes an ABSENCE
     /// visible — nothing else fails when a line is simply not there.
     #[test]

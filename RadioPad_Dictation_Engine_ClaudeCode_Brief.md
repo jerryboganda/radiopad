@@ -28,13 +28,12 @@
 **Memory budget (target, both models resident):**
 - OS + desktop app shell: ~0.7–1.0 GB
 - MedASR (STT): ~0.3–0.5 GB
-- MedGemma 1.5 4B (Q4): ~2.5–2.8 GB
 - Dictionaries + app logic: ~0.1 GB
-- **Peak ≈ 3.6–4.3 GB** — under ceiling. MedASR is small enough to co-reside with the LLM. Still, implement the load/unload manager in §4.4 so peak never breaches 5 GB under load.
+- **Peak ≈ 1.1–1.6 GB** — well under ceiling. Still, implement the load/unload manager in §4.4 so peak never breaches 5 GB under load.
 
 ---
 
-## 2. The two models (verified specifications)
+## 2. The core model (verified specifications)
 
 ### 2.1 MedASR — default speech-to-text engine
 - **Source:** `google/medasr` on Hugging Face (repo: `google-health/medasr`).
@@ -51,23 +50,18 @@
 
 **Deployment decision you must make (document in `IMPLEMENTATION_NOTES.md`):** MedASR ships as a PyTorch/transformers model (Python). In a Rust-based desktop shell (e.g. Tauri) you have two options — (a) run it in a **Python sidecar process** the app talks to over local IPC/HTTP, or (b) **export to ONNX / CTranslate2** for a lighter CPU-embedded runtime. Evaluate ONNX export first for the CPU-only constraint; fall back to a bundled Python sidecar if export is impractical. Choose based on the actual RadioPad stack you find.
 
-### 2.2 MedGemma 1.5 4B — report formatting/orchestration LLM
-- **Source:** Google MedGemma 1.5, 4B multimodal, built on Gemma 3, 128K context (released 2026-01-13).
-- **Runtime:** Ollama or embedded `llama.cpp` with a **Q4_K_M GGUF** (~2.5–2.8 GB).
-- **Verify:** confirm whether the **1.5 4B** tag is in the Ollama registry (e.g. an appropriate `medgemma` tag). If the 1.5 GGUF is not directly pullable, download the GGUF from Hugging Face and create a `Modelfile`. Do not assume a specific pull command works — check first.
-- **Inference settings:** **temperature ≈ 0** (deterministic formatting, not creative writing).
-- **Note:** base Gemma 3 / MedGemma does **not** support Ollama's tools/function-calling API. Do **not** rely on native tool-calling. Use **structured prompting + grammar-constrained decoding (GBNF)** instead (§5.4).
-- **License:** HAI-DEF / Gemma terms (commercial use permitted subject to the acceptable-use policy).
-- **On 2 cores:** expect modest throughput (single-digit-to-low-double-digit tokens/sec). This is acceptable because formatting runs **after** dictation, not in the live audio path. Show a brief "formatting…" state in the UI.
+### 2.2 On-device report-formatting LLM — not currently implemented
+- The optional on-device LLM that would auto-structure a raw transcript into Technique/Findings/Impression (organising into sections, applying house style, expanding dictated shorthand) has been **removed from scope and is not currently implemented.**
+- Until a replacement is selected and verified, the report-assembly pipeline (§4.2) presents the deterministic, dictionary-corrected transcript (§5.2, §6) directly to the radiologist as the editable draft — there is no LLM formatting/orchestration step in the current build.
+- If this capability is reinstated in a future phase, it must be re-verified against the same constraints as §1 (RAM/CPU/no-cloud) and re-specified here, including the safety guardrails in §5 (deterministic pass-through, validation pass, grammar-constrained decoding, sign-off gate) before it can format any report content.
 
 ---
 
-## 3. Role boundaries (critical — defines what each model may and may not do)
+## 3. Role boundaries (critical — defines what the model may and may not do)
 
 - **MedASR** transcribes the radiologist's **spoken dictation** into raw text. That is its only job.
-- **MedGemma** takes that **dictated raw text** and **structures, cleans, and assembles it into a formatted report** (organising into Technique / Findings / Impression, applying house style, expanding dictated shorthand). 
-- **MedGemma MUST NOT invent, infer, or "complete" clinical findings.** It formats what was dictated — nothing more.
-- **MedGemma MUST NOT be used to generate findings from a medical image autonomously.** MedGemma is technically multimodal, but using it to read an image and produce diagnostic findings turns RadioPad into diagnostic decision support — a different, far higher regulatory category, and outside the scope of this build. **Image-in → findings-out is explicitly out of scope.** The engine's job is dictation → structured report, with the radiologist as the author.
+- No model in the current build reads or infers from a medical image. **Image-in → findings-out is explicitly out of scope** — that would turn RadioPad into diagnostic decision support, a different, far higher regulatory category. The engine's job is dictation → (deterministically corrected) transcript, with the radiologist as the author of the final report.
+- If an on-device report-formatting LLM is reinstated (§2.2), it **MUST NOT invent, infer, or "complete" clinical findings** and **MUST NOT** be used to generate findings from a medical image autonomously — these constraints carry forward to any future formatter.
 
 ---
 
@@ -82,24 +76,24 @@
 
 ### 4.2 Report-assembly pipeline (post-dictation path)
 1. Raw transcript → **deterministic pre-processing** (§5.2): protect numbers, measurements, laterality, dates; apply correction dictionary (§6).
-2. Protected transcript → MedGemma with the system prompt (§5.1) + the active study template (§ Phase 1) + GBNF grammar (§5.4).
-3. MedGemma output → **validation pass** (§5.3). If it fails, **discard the LLM output and present the raw (dictionary-corrected) transcript instead** — fail safe, never fail silent.
-4. Result shown as an **editable draft**. Radiologist edits → **explicit sign-off gate** (§5.5) → finalise.
+2. The dictionary-corrected transcript is presented directly as the **editable draft** — there is currently no on-device LLM formatting step (§2.2). If one is reinstated, it must run against the active study template (§ Phase 1) with grammar-constrained output (§5.4) and pass a validation step (§5.3) before display, failing safe to the raw transcript on any rejection.
+3. Radiologist edits → **explicit sign-off gate** (§5.5) → finalise.
 
 ### 4.3 Local storage
 - Report drafts, templates, dictionaries, macros, style profiles, and the audit log all persist **locally**, encrypted at rest.
 - No telemetry containing PHI leaves the device.
 
 ### 4.4 Model load/unload manager
-- Manage MedASR and MedGemma lifecycles so combined resident memory never breaches 5 GB.
-- Default: both resident (fits budget). Provide a "low-memory mode" that unloads MedASR during the formatting phase if a larger LLM quant is ever selected.
+- Manage MedASR's lifecycle so resident memory never breaches 5 GB.
+- Default: MedASR resident (fits budget comfortably). If an on-device formatting LLM is reinstated (§2.2), extend this manager to cover its lifecycle too, with a "low-memory mode" that unloads MedASR during the formatting phase.
 - Expose current memory usage in a debug/status panel.
 
 ---
 
 ## 5. Safety guardrails (NON-NEGOTIABLE — build these before feature polish)
 
-### 5.1 System prompt for MedGemma (starting point — refine, keep the constraints)
+### 5.1 System prompt for a future report-formatting LLM (not currently used — no such model is integrated, §2.2)
+If an on-device formatting LLM is reinstated, it must be constrained by a system prompt with at least these guarantees, kept as a starting point and refined:
 ```
 You are RadioPad's report formatter. You convert a radiologist's dictated
 findings into a structured radiology report.
@@ -121,17 +115,17 @@ You MUST NOT:
 Output the report only. No commentary, no preamble.
 ```
 
-### 5.2 Deterministic pass-through (runs BEFORE the LLM)
-- Use regex/rules to **extract and lock** all numbers, measurements, units, laterality terms, and dates from the transcript so the LLM cannot change them (token-protect or placeholder-substitute-then-restore).
-- Normalise measurements deterministically ("three point two centimetres" → "3.2 cm") — **not** via the LLM.
-- This layer directly compensates for MedASR's known weakness on temporal data.
+### 5.2 Deterministic pass-through (runs BEFORE any formatting step)
+- Use regex/rules to **extract and lock** all numbers, measurements, units, laterality terms, and dates from the transcript so no downstream formatting step can change them (token-protect or placeholder-substitute-then-restore).
+- Normalise measurements deterministically ("three point two centimetres" → "3.2 cm") — deterministically, not via an LLM.
+- This layer directly compensates for MedASR's known weakness on temporal data. It is active today even with no LLM formatter in the pipeline.
 
-### 5.3 Validation pass (runs AFTER the LLM, before display)
+### 5.3 Validation pass (applies if/when an LLM formatting step is reinstated, before display)
 - Diff LLM output against the protected transcript. **Reject** the output if it: introduces a number/measurement/date not in the source, drops a required section, changes a locked laterality, or adds a finding with no source token.
 - On rejection → show the raw dictionary-corrected transcript; log the event.
 
-### 5.4 Grammar-constrained decoding
-- Use **GBNF grammar in llama.cpp** to force valid report structure. The model should be structurally unable to emit malformed output.
+### 5.4 Grammar-constrained decoding (applies if/when an LLM formatting step is reinstated)
+- Use **GBNF grammar in llama.cpp** (or equivalent) to force valid report structure. The model should be structurally unable to emit malformed output.
 
 ### 5.5 Mandatory sign-off gate
 - No report can be finalised/exported without an explicit radiologist verification action. This is medico-legally required and is what makes any residual model error an editable draft rather than a live error.
@@ -145,7 +139,7 @@ Output the report only. No commentary, no preamble.
 ---
 
 ## 6. Correction dictionary, macros, style (the specced baseline)
-- **Per-user correction dictionary:** deterministic find-replace applied **before** the LLM. Radiologist fixes a term once ("hypo dense" → "hypodense"); applied to all future transcripts. Handles the bulk of systematic errors, including MedASR's drug-name weakness.
+- **Per-user correction dictionary:** deterministic find-replace applied **before** any formatting step. Radiologist fixes a term once ("hypo dense" → "hypodense"); applied to all future transcripts. Handles the bulk of systematic errors, including MedASR's drug-name weakness.
 - **Org lexicon + personal overrides:** shared medical term base, each user layers their own on top.
 - **Voice macros / templates:** voice command inserts a full canned block; cursor jumps to the first editable field.
 - **Per-radiologist style profiles:** terse vs verbose, house phrasing, tense, laterality wording.
@@ -157,7 +151,7 @@ Output the report only. No commentary, no preamble.
 Build in this order. **Regulated features (Phase 3) ship disabled by default.**
 
 ### PHASE 0 — Foundation (no features yet)
-- Integrate MedASR (§2.1) and MedGemma (§2.2); implement load/unload manager (§4.4).
+- Integrate MedASR (§2.1); implement the load/unload manager (§4.4). No on-device formatting LLM is integrated (§2.2).
 - Push-to-talk capture → 16 kHz int16 → chunked MedASR decode → text into report field.
 - Wire the full §4.2 assembly pipeline with §5 guardrails **before** any feature work.
 - **Exit criteria:** dictate → structured draft → sign-off, entirely local, within the memory budget, with audit trail working.
@@ -200,9 +194,9 @@ These are the ⚠️ items. Each may constitute **clinical decision support / a 
 
 ## 9. Explicit non-goals / do-not-do
 - Do **not** send audio or report text to any cloud STT/LLM in the runtime path.
-- Do **not** use MedGemma to read images and produce findings (§3).
+- Do **not** use any model to read images and produce findings (§3).
 - Do **not** enable any Phase 3 regulated feature by default (§7).
-- Do **not** rely on native tool/function-calling for MedGemma (§2.2).
+- Do **not** reintroduce an on-device formatting LLM without re-verifying it against §1 and re-specifying its guardrails under §5 (§2.2).
 - Do **not** weaken or bypass a §5 guardrail to hit a performance or convenience target.
 - Do **not** pin a model tag or package version you have not verified against the live source.
 
@@ -212,4 +206,4 @@ These are the ⚠️ items. Each may constitute **clinical decision support / a 
 - The integration plan (after §0 exploration), before feature code.
 - Per-phase summaries with what shipped and what's tested.
 - `IMPLEMENTATION_NOTES.md` with pinned versions, the MedASR deployment decision (ONNX vs sidecar), and all open questions.
-- A clear, separate note listing every regulated (Phase 3) feature and the statement that these require a regulatory/clinical-validation pathway (UKCA/MHRA/CE/FDA as applicable) before any clinical use — and that MedASR/MedGemma are Google "developer models requiring validation," not cleared medical devices.
+- A clear, separate note listing every regulated (Phase 3) feature and the statement that these require a regulatory/clinical-validation pathway (UKCA/MHRA/CE/FDA as applicable) before any clinical use — and that MedASR is a Google "developer model requiring validation," not a cleared medical device.

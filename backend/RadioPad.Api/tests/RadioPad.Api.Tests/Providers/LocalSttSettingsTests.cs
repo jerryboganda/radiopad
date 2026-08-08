@@ -26,34 +26,21 @@ public class LocalSttSettingsTests
     }
 
     [Fact]
-    public void Parakeet_Selection_Maps_To_The_Parakeet_Engine()
-    {
-        var path = TempFile();
-        try
-        {
-            var s = new LocalSttSettings(path);
-            s.SetPrimary(LocalSttModels.DefaultModelName); // promote Parakeet
-            Assert.Equal(SherpaParakeetSttClient.EngineName, s.PrimaryEngineId);
-        }
-        finally { try { File.Delete(path); } catch { /* best effort */ } }
-    }
-
-    [Fact]
     public void SetPrimary_Updates_Selection_And_Persists()
     {
         var path = TempFile();
         try
         {
             var s = new LocalSttSettings(path);
-            s.SetPrimary(LocalSttModels.DefaultModelName); // Parakeet — a visible engine
+            const string otherModelId = "some-other-stt-model";
+            s.SetPrimary(otherModelId);
 
-            Assert.Equal(SherpaParakeetSttClient.EngineName, s.PrimaryEngineId);
-            Assert.True(s.IsPrimary(LocalSttModels.DefaultModelName));
+            Assert.True(s.IsPrimary(otherModelId));
             Assert.False(s.IsPrimary(LocalSttModels.MedAsrModelName));
 
             // Choice survives a reload from disk.
             var reloaded = new LocalSttSettings(path);
-            Assert.Equal(LocalSttModels.DefaultModelName, reloaded.PrimaryModelId);
+            Assert.Equal(otherModelId, reloaded.PrimaryModelId);
         }
         finally { try { File.Delete(path); } catch { /* best effort */ } }
     }
@@ -103,6 +90,5 @@ public class LocalSttSettingsTests
 
         // The engines radiologists actually use are unaffected.
         Assert.Contains(cat.Visible, m => m.Id == LocalSttModels.MedAsrModelName);
-        Assert.Contains(cat.Visible, m => m.Id == LocalSttModels.DefaultModelName);
     }
 }

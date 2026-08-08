@@ -5,7 +5,7 @@ namespace RadioPad.Infrastructure.Providers.Local;
 /// <summary>
 /// Translates MedASR's own output markup into plain report text.
 ///
-/// <para>MedASR does not emit spoken punctuation as words (the way Parakeet/SAPI do) nor always as
+/// <para>MedASR does not emit spoken punctuation as words (the way other on-device engines / SAPI do) nor always as
 /// real punctuation — when the speaker dictates "period" it emits a literal <c>{period}</c> marker,
 /// and it segments the dictation with <c>[FINDINGS]</c>-style section tags. Verified against the
 /// bundle's own test_wavs (see <c>MedAsrTranscriptNormalizerTests</c>). Left untranslated those

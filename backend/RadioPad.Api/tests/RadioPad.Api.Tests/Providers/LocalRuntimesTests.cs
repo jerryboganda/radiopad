@@ -6,7 +6,7 @@ using Xunit;
 namespace RadioPad.Api.Tests;
 
 /// <summary>
-/// The pinned llama-server runtime that powers the optional offline MedGemma formatter.
+/// The pinned llama-server runtime that powers the optional offline local report formatter.
 ///
 /// <para>Facts here were verified against the live GitHub release and a real download: the Windows
 /// asset is 18,007,324 bytes with SHA-256 <c>01d5f308…</c>, and the archive is flat with 51 entries

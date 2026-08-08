@@ -41,7 +41,7 @@ function IntakeBackdrop() {
 export const DraftInFlight = () => (
   <>
     <IntakeBackdrop />
-    <GenerationOverlay active done={false} providerName="MedGemma (on-device)" />
+    <GenerationOverlay active done={false} providerName="On-device formatter" />
   </>
 );
 
@@ -53,7 +53,7 @@ export const ProviderTimedOut = () => (
     <GenerationOverlay
       active
       done={false}
-      providerName="MedGemma (on-device)"
+      providerName="On-device formatter"
       error="Provider timed out after 60s — the draft was not created."
       onRetry={() => {}}
       onBack={() => {}}

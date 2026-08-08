@@ -55,8 +55,8 @@ export const GenerateDraftProvenance = () => (
         action: 'Generate Draft',
         status: 'completed',
         scope: 'Findings, Impression',
-        provider: 'MedGemma (on-device)',
-        model: 'medgemma-4b-it',
+        provider: 'On-device formatter',
+        model: 'on-device-4b-it',
         promptVersion: 'report-draft@v12',
         latencyMs: 41800,
       }}
