@@ -26,8 +26,8 @@ public class CrossCheckDiffTests
         var spans = new[]
         {
             new ReconciledSpan("the", false, null, "live"),
-            new ReconciledSpan("right", true, "disagreement", "parakeet", OriginalText: "left",
-                Votes: new[] { V("live", "left", 0.5), V("parakeet", "right", 0.9), V("medical", "right", 0.9) }),
+            new ReconciledSpan("right", true, "disagreement", "sttB", OriginalText: "left",
+                Votes: new[] { V("live", "left", 0.5), V("sttB", "right", 0.9), V("medical", "right", 0.9) }),
             new ReconciledSpan("lung", false, null, "live"),
             new ReconciledSpan("is", false, null, "live"),
             new ReconciledSpan("clear", false, null, "live"),
@@ -51,8 +51,8 @@ public class CrossCheckDiffTests
     {
         var spans = new[]
         {
-            new ReconciledSpan("no", true, "safety", "parakeet", OriginalText: "known",
-                Votes: new[] { V("live", "known", 0.5), V("parakeet", "no", 0.95) }),
+            new ReconciledSpan("no", true, "safety", "sttB", OriginalText: "known",
+                Votes: new[] { V("live", "known", 0.5), V("sttB", "no", 0.95) }),
             new ReconciledSpan("acute", false, null, "live"),
             new ReconciledSpan("findings", false, null, "live"),
         };
@@ -74,8 +74,8 @@ public class CrossCheckDiffTests
         var spans = new[]
         {
             new ReconciledSpan("the", false, null, "live"),
-            new ReconciledSpan("left", true, "insert", "parakeet", OriginalText: "",
-                Votes: new[] { V("parakeet", "left", 0.9), V("medical", "left", 0.9) }),
+            new ReconciledSpan("left", true, "insert", "sttB", OriginalText: "",
+                Votes: new[] { V("sttB", "left", 0.9), V("medical", "left", 0.9) }),
             new ReconciledSpan("lung", false, null, "live"),
         };
         var corrections = CrossCheckDiff.BuildCorrections(live, new ReconciledResult("the left lung", spans));

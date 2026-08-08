@@ -192,7 +192,7 @@ describe('status + scheduling helpers', () => {
 describe('labels & descriptors', () => {
   it('maps kind+mode to a label', () => {
     expect(jobKindLabel({ kind: 'generate', mode: 'generate' })).toBe('Draft generation');
-    expect(jobKindLabel({ kind: 'local-generate', mode: 'report' })).toBe('Local draft (MedGemma)');
+    expect(jobKindLabel({ kind: 'local-generate', mode: 'report' })).toBe('Local draft (on-device)');
     expect(jobKindLabel({ kind: 'ai', mode: 'impression' })).toBe('Impression');
     expect(jobKindLabel({ kind: 'ai', mode: 'rewrite' })).toBe('Rewrite');
   });

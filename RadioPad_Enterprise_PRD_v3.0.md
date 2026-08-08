@@ -527,7 +527,7 @@ Every deployment can choose any combination of these. PHI eligibility is a tenan
 
 | Provider class | Examples | PHI default | Footprint |
 | :---- | :---- | :---- | :---- |
-| **Local CPU (quantized)** | llama.cpp + Llama-3 8B Q4_K_M, Qwen2.5 7B, Mistral 7B, Phi-3 mini, MedGemma (when license permits) | ✅ Allowed | 4–6 GB RAM |
+| **Local CPU (quantized)** | llama.cpp + Llama-3 8B Q4_K_M, Qwen2.5 7B, Mistral 7B, Phi-3 mini | ✅ Allowed | 4–6 GB RAM |
 | **Local GPU** | vLLM + Llama-3 70B / Qwen2.5 32B / Mixtral 8×7B | ✅ Allowed | 1× consumer GPU sufficient for 7–13B |
 | **Local NPU / edge** | ONNX Runtime + DirectML / CoreML / OpenVINO | ✅ Allowed | Embedded inference |
 | **Browser (WebGPU)** | wllama / web-llm | ✅ Allowed (no exfil) | 2–4 GB VRAM |

@@ -87,7 +87,7 @@ public sealed record AiCompletionRequest(
     /// Phase 0 (brief §5.4) — optional GBNF grammar (llama.cpp format) that constrains the model's
     /// decoding so it is structurally unable to emit malformed output. When set, local llama.cpp
     /// adapters forward it as the <c>grammar</c> field on <c>/completion</c>. Null = unconstrained.
-    /// Preferred over <see cref="OutputSchema"/> for small local models (e.g. MedGemma 1.5 4B), where
+    /// Preferred over <see cref="OutputSchema"/> for small local models (e.g. a 4B on-device model), where
     /// prose-instructed JSON is fragile; tolerant JSON parsing remains the secondary net.
     /// </summary>
     public string? Grammar { get; init; }
@@ -98,7 +98,7 @@ public sealed record AiCompletionRequest(
     /// on-device whole-report drafting) can otherwise degenerate into repeating the same line
     /// verbatim until it exhausts its token budget once a small model runs out of genuinely new
     /// content to add; a moderate penalty (empirically ~1.1) fixes this without measurably
-    /// distorting content the way a stronger penalty does (verified against MedGemma 1.5 4B: 1.3
+    /// distorting content the way a stronger penalty does (verified against a 4B on-device model: 1.3
     /// caused the model to fabricate a different measurement rather than repeat the dictated one).
     /// Only meaningful to local llama.cpp adapters; other providers ignore it.
     /// </summary>
@@ -253,7 +253,7 @@ public sealed record UbagArtifact(
 
 /// <summary>
 /// Phase 1 (local STT) — an on-device, fully-offline speech-to-text engine
-/// (e.g. sherpa-onnx Parakeet). When <see cref="Available"/> is
+/// (e.g. sherpa-onnx). When <see cref="Available"/> is
 /// true, <see cref="ITranscriptionService"/> routes dictation audio here and the
 /// bytes never leave the machine — replacing the cloud (UBAG) path on desktop.
 /// Implementations self-disable (<see cref="Available"/> == false) when the

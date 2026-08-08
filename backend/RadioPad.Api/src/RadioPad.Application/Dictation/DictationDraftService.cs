@@ -16,7 +16,7 @@ public interface IDictationDraftService
 /// Brief §4.2 — wraps the EXISTING report formatter (<see cref="IDictationCleanupService"/>, which
 /// already routes through the PHI-gated <c>AiGateway</c>) with the deterministic safety pipeline
 /// (§5.2 pass-through → §5.3 validation → §5.6 sentinel) and records the §5.7 audit trail. Reuses
-/// the cloud formatter today; the same wrapper serves the optional local MedGemma formatter once the
+/// the cloud formatter today; the same wrapper serves the optional local formatter once the
 /// desktop llama-server path is wired (P0.4). NEVER signs — the draft feeds the §5.5 sign-off gate.
 /// </summary>
 public sealed class DictationDraftService : IDictationDraftService
@@ -47,14 +47,14 @@ public sealed class DictationDraftService : IDictationDraftService
             BodyPart: report.Study?.BodyPart ?? string.Empty,
             Indication: report.Indication ?? string.Empty,
             SectionKeys: DictationGrammar.DefaultSections,
-            // §5.4 — used by the local MedGemma formatter; the cloud formatter ignores it.
+            // §5.4 — used by the local formatter; the cloud formatter ignores it.
             Grammar: DictationGrammar.ReportSectionsGbnf);
 
         // Cloud is the default report formatter (decision D1); the on-device one takes over here
         // only when explicitly preferred, NOT merely because it is available. This used to read
         // `Available ? local : cloud`, which conflated "can run here" with "should run by default"
         // — so switching the capability on for the on-device endpoint would have silently rerouted
-        // every desktop report draft to MedGemma. The deterministic safety layers wrap whichever
+        // every desktop report draft to the local formatter. The deterministic safety layers wrap whichever
         // one runs.
         IDictationFormatter formatter = _localFormatter.PreferredForReportDrafts
             ? _localFormatter

@@ -34,7 +34,7 @@ public class GeneratedFindingsFormattingTests
     }
 
     /// <summary>
-    /// MedGemma (on-device) sometimes writes "*" instead of the requested "•" bullet. Without
+    /// The on-device formatter sometimes writes "*" instead of the requested "•" bullet. Without
     /// normalization this would be treated as unformatted and double-bulleted as "• * ...".
     /// </summary>
     [Fact]

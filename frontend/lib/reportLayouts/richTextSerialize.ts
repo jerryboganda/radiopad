@@ -7,6 +7,7 @@
 // the intake editors are write-only (fresh each time), but a saved layout's letterhead
 // must load back into the editor exactly as it was styled.
 
+import type { JSONContent } from '@tiptap/core';
 import type { LayoutFont, RichTextLine, RichTextRun } from './schema';
 
 // Structurally compatible with Tiptap's `JSONContent` (all fields optional), matching
@@ -64,8 +65,8 @@ export function docToRichLines(doc: { content?: PmNode[] } | null | undefined): 
   });
 }
 
-function runMarks(run: RichTextRun): PmMark[] | undefined {
-  const marks: PmMark[] = [];
+function runMarks(run: RichTextRun): NonNullable<JSONContent['marks']> | undefined {
+  const marks: NonNullable<JSONContent['marks']> = [];
   if (run.bold) marks.push({ type: 'bold' });
   if (run.italic) marks.push({ type: 'italic' });
   if (run.underline) marks.push({ type: 'underline' });
@@ -82,7 +83,7 @@ function runMarks(run: RichTextRun): PmMark[] | undefined {
 }
 
 /** Build the initial Tiptap doc JSON for editing an existing letterhead's `RichTextLine[]`. */
-export function richLinesToDoc(lines: RichTextLine[]): { type: 'doc'; content: PmNode[] } {
+export function richLinesToDoc(lines: RichTextLine[]): JSONContent {
   if (lines.length === 0) {
     return { type: 'doc', content: [{ type: 'paragraph' }] };
   }

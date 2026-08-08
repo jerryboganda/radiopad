@@ -86,7 +86,8 @@ jobs:
 
       # The Rust unit tests ran NOWHERE in CI — including the ones guarding the sidecar's
       # environment contract with the .NET backend, which is exactly how a missing
-      # RADIOPAD_LOCAL_FORMATTER_ENABLED shipped and left MedGemma unreachable in every build.
+      # RADIOPAD_LOCAL_FORMATTER_ENABLED shipped and left the on-device formatter unreachable in
+      # every build.
       # This job already has the toolchain, the cache and (below) the real sidecar binary, so
       # running them here costs almost nothing. Placed BEFORE the installer build: a broken
       # contract should fail in seconds, not after a full bundle.

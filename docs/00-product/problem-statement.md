@@ -31,7 +31,7 @@ Radiologists spend 30–60% of their reporting time on tasks that are mechanical
 
 ## Why now
 
-- Open-weights medical LLMs (Llama 3.1 medical fine-tunes, MedGemma, etc.) make on-prem AI viable.
+- Open-weights medical LLMs (Llama 3.1 medical fine-tunes, etc.) make on-prem AI viable.
 - FHIR R4 is the de facto interop standard.
 - Health systems are tightening PHI policies — AI vendors that can evidence where PHI went have a structural advantage. RadioPad's answer is the append-only audit trail rather than a routing control.
 - Tauri 2 + Capacitor 6 make a single TypeScript codebase deployable across web/desktop/mobile, lowering go-to-market cost.

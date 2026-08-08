@@ -7,7 +7,7 @@ using RadioPad.Infrastructure.Providers.Local;
 namespace RadioPad.Api.Services;
 
 /// <summary>
-/// Runs the desktop sidecar's on-device (MedGemma / llama.cpp) whole-report generation jobs
+/// Runs the desktop sidecar's on-device (llama.cpp) whole-report generation jobs
 /// asynchronously, detached from the HTTP request that submitted them
 /// (<see cref="LocalGenerationController"/>). This is what makes local generation non-blocking: the
 /// submit endpoint returns a job id in milliseconds, this runner does the minutes-long work, and the
@@ -117,7 +117,7 @@ public sealed class LocalGenerationJobRunner
                 // the poll (and the /events SSE) can expose live token counts + partial text for the
                 // desktop preview. SynchronousProgress invokes inline in arrival order (never
                 // System.Progress, which posts to the ThreadPool and can reorder chunks). Percent stays
-                // null: n_predict=1024 is a ceiling MedGemma rarely reaches, so tokens/n_predict would
+                // null: n_predict=1024 is a ceiling the local model rarely reaches, so tokens/n_predict would
                 // be a fake bar (design §3.10) — honest indeterminate progress instead.
                 var onStream = new SynchronousProgress<AiStreamChunk>(chunk =>
                 {

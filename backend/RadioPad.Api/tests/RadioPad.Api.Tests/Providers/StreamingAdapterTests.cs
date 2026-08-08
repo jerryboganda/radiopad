@@ -184,7 +184,7 @@ public class StreamingAdapterTests
         {
             Name = "llamacpp-local",
             Adapter = LlamaCppProvider.AdapterId,
-            Model = "medgemma",
+            Model = "qwen-2.5",
             EndpointUrl = "http://127.0.0.1:8080",
             Compliance = ProviderComplianceClass.LocalOnly,
             Enabled = true,
@@ -228,7 +228,7 @@ public class StreamingAdapterTests
         {
             Name = "llamacpp-local",
             Adapter = LlamaCppProvider.AdapterId,
-            Model = "medgemma",
+            Model = "qwen-2.5",
             EndpointUrl = "http://127.0.0.1:8080",
             Compliance = ProviderComplianceClass.LocalOnly,
             Enabled = true,

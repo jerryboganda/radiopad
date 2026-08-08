@@ -37,7 +37,7 @@ const THEME_OPTIONS: { value: ThemePreference; label: string; hint: string; icon
 ];
 
 function sttModeLabel(m: SttMode): string {
-  if (m === 'single') return 'Single (Parakeet)';
+  if (m === 'single') return 'Single engine';
   if (m === 'ensemble') return 'Ensemble (cross-checked)';
   return 'Auto';
 }
@@ -170,7 +170,7 @@ export default function SettingsPage() {
               ))}
             </select>
             <p className="rp-page-sub" style={{ marginTop: 4 }}>
-              Auto picks the best engine. Ensemble runs Parakeet and Windows Speech together and flags
+              Auto picks the best engine. Ensemble runs multiple engines together and flags
               words they disagree on.
             </p>
           </div>

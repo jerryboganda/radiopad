@@ -39,7 +39,7 @@ public class LocalModelsControllerTests : IClassFixture<RadioPadAppFactory>
         Assert.True(models.GetArrayLength() >= 4);
 
         var ids = models.EnumerateArray().Select(m => m.GetProperty("id").GetString()).ToList();
-        Assert.Contains("radiology-tdt-v1-beta", ids);
+        Assert.Contains("medasr-ctc-en-int8", ids);
 
         // Future kinds surface as disabled "coming soon" placeholders.
         Assert.Contains(
@@ -113,7 +113,7 @@ public class LocalModelsControllerTests : IClassFixture<RadioPadAppFactory>
     public async Task Forced_Download_While_Disabled_Returns_503_Unavailable()
     {
         using var client = _factory.CreateClient();
-        var resp = await client.PostAsync("/api/local-models/radiology-tdt-v1-beta/download?force=true", null);
+        var resp = await client.PostAsync("/api/local-models/medasr-ctc-en-int8/download?force=true", null);
 
         Assert.Equal(HttpStatusCode.ServiceUnavailable, resp.StatusCode);
         Assert.Contains("stt_unavailable", await resp.Content.ReadAsStringAsync());
@@ -133,7 +133,7 @@ public class LocalModelsControllerTests : IClassFixture<RadioPadAppFactory>
     public async Task Download_RealModel_While_Disabled_Returns_503_Unavailable()
     {
         using var client = _factory.CreateClient();
-        var resp = await client.PostAsync("/api/local-models/radiology-tdt-v1-beta/download", null);
+        var resp = await client.PostAsync("/api/local-models/medasr-ctc-en-int8/download", null);
 
         Assert.Equal(HttpStatusCode.ServiceUnavailable, resp.StatusCode);
         Assert.Contains("stt_unavailable", await resp.Content.ReadAsStringAsync());
@@ -152,7 +152,7 @@ public class LocalModelsControllerTests : IClassFixture<RadioPadAppFactory>
     public async Task Diagnostics_While_Disabled_Returns_Minimal_Without_Server_Paths()
     {
         using var client = _factory.CreateClient();
-        var resp = await client.GetAsync("/api/local-models/radiology-tdt-v1-beta/diagnostics");
+        var resp = await client.GetAsync("/api/local-models/medasr-ctc-en-int8/diagnostics");
 
         Assert.Equal(HttpStatusCode.OK, resp.StatusCode);
         using var doc = JsonDocument.Parse(await resp.Content.ReadAsStringAsync());
@@ -166,7 +166,7 @@ public class LocalModelsControllerTests : IClassFixture<RadioPadAppFactory>
     public async Task SetPrimary_While_Disabled_Returns_503()
     {
         using var client = _factory.CreateClient();
-        var resp = await client.PostAsync("/api/local-models/radiology-tdt-v1-beta/primary", null);
+        var resp = await client.PostAsync("/api/local-models/medasr-ctc-en-int8/primary", null);
 
         Assert.Equal(HttpStatusCode.ServiceUnavailable, resp.StatusCode);
         Assert.Contains("stt_unavailable", await resp.Content.ReadAsStringAsync());

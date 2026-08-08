@@ -10,10 +10,10 @@ namespace RadioPad.Infrastructure.Providers.Local;
 /// </summary>
 public interface ILocalSttSettings
 {
-    /// <summary>The model id chosen as primary (defaults to Parakeet).</summary>
+    /// <summary>The model id chosen as primary (defaults to MedASR).</summary>
     string PrimaryModelId { get; }
 
-    /// <summary>Engine that should lead transcription (e.g. "parakeet").</summary>
+    /// <summary>Engine that should lead transcription (e.g. "medasr").</summary>
     string PrimaryEngineId { get; }
 
     bool IsPrimary(string modelId);
@@ -51,8 +51,8 @@ public sealed class LocalSttSettings : ILocalSttSettings
 
     /// <summary>
     /// The out-of-box primary on a fresh install: **MedASR** (decision D2 — MedASR is
-    /// the default primary sherpa engine; Parakeet is the user-promotable fallback).
-    /// The ensemble's primary-pick falls back to the first available engine, so this is
+    /// the default primary sherpa engine). The ensemble's primary-pick falls back to
+    /// the first available engine, so this is
     /// always safe (e.g. while MedASR is still downloading).
     ///
     /// <para>This previously preferred Windows on-device speech (SAPI) whenever a
@@ -85,8 +85,8 @@ public sealed class LocalSttSettings : ILocalSttSettings
 
     /// <summary>Map a primary model id to the engine id that should lead. The two
     /// Windows engines + the Edge Web Speech engine map to their own ids; everything
-    /// else (incl. Parakeet) maps to Parakeet. Edge is frontend-routed and has no
-    /// backend engine, so when it is primary the ensemble's primary-pick simply
+    /// else maps to MedASR, the default on-device engine. Edge is frontend-routed and
+    /// has no backend engine, so when it is primary the ensemble's primary-pick simply
     /// falls back to the first available engine for any (rare) sidecar call.</summary>
     internal static string MapEngine(string modelId) => modelId switch
     {
@@ -95,8 +95,7 @@ public sealed class LocalSttSettings : ILocalSttSettings
         // recognizer (SAPI), so it maps to the SAPI engine rather than a separate one.
         LocalModelCatalog.WindowsWinRtId => LocalModelCatalog.WindowsSapiEngine,
         LocalModelCatalog.EdgeWebSpeechId => LocalModelCatalog.EdgeWebSpeechEngine,
-        LocalSttModels.MedAsrModelName => SherpaMedAsrSttClient.EngineName,
-        _ => SherpaParakeetSttClient.EngineName,
+        _ => SherpaMedAsrSttClient.EngineName,
     };
 
     public bool IsPrimary(string modelId) =>
@@ -120,16 +119,16 @@ public sealed class LocalSttSettings : ILocalSttSettings
 }
 
 /// <summary>
-/// Default (in-memory, Parakeet-primary) settings used when an engine/orchestrator
+/// Default (in-memory, MedASR-primary) settings used when an engine/orchestrator
 /// is constructed without DI — e.g. the unit/smoke tests that build engines
-/// directly. Keeps the historical behavior (Parakeet primary).
+/// directly. Mirrors the D2 out-of-box default (MedASR primary).
 /// </summary>
 internal sealed class DefaultLocalSttSettings : ILocalSttSettings
 {
     public static readonly DefaultLocalSttSettings Instance = new();
-    public string PrimaryModelId => LocalSttModels.DefaultModelName;
-    public string PrimaryEngineId => SherpaParakeetSttClient.EngineName;
+    public string PrimaryModelId => LocalSttModels.MedAsrModelName;
+    public string PrimaryEngineId => SherpaMedAsrSttClient.EngineName;
     public bool IsPrimary(string modelId) =>
-        string.Equals(modelId, LocalSttModels.DefaultModelName, StringComparison.Ordinal);
+        string.Equals(modelId, LocalSttModels.MedAsrModelName, StringComparison.Ordinal);
     public void SetPrimary(string modelId) { }
 }

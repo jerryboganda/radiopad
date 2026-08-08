@@ -7,7 +7,7 @@ namespace RadioPad.Infrastructure.Providers.Local;
 
 /// <summary>
 /// The manual cross-check pass. Re-runs the retained dictation audio through every
-/// available on-device ASR engine (Parakeet + the platform speech engines when
+/// available on-device ASR engine (MedASR + the platform speech engines when
 /// present), reconciles them against the live draft via the N-way ROVER voter
 /// (<see cref="SttReconciler.ReconcileMany"/>), and emits an original→corrected
 /// list for the editor. The live draft is the backbone (so corrections are framed
@@ -90,14 +90,8 @@ public sealed class CrossCheckService : ICrossCheckService
         }
     }
 
-    // Keep the transducer (Parakeet) scaled like the live ensemble so its
-    // over-confidence doesn't dominate the vote.
+    // No engine-specific confidence scaling is currently needed; reserved for future
+    // per-engine calibration once reliability tables exist from a held-out dictation set.
     private static ReconcileOptions BuildOptions()
-        => new()
-        {
-            EngineScale = new Dictionary<string, double>
-            {
-                [SherpaParakeetSttClient.EngineName] = 0.9,
-            },
-        };
+        => new();
 }

@@ -10,8 +10,8 @@ Browser-driven flows that exercise the static export against a running backend.
 
 **Desktop MSI E2E** — removed 2026-07-21 (operator decision: manual release testing instead of
 maintaining an unproven CI harness). It used to install the actual Windows `.msi` on every tag
-push and drive the installed renderer (login incl. TOTP enrollment, report creation, on-device
-MedGemma format + Apply, microphone dictation through MedASR) over CDP via
+push and drive the installed renderer (login incl. TOTP enrollment, report creation,
+microphone dictation through MedASR) over CDP via
 `scripts/desktop-msi-e2e.mjs`; both the job (`desktop-bundle.yml`) and the reusable workflow
 (`desktop-msi-e2e.yml`) are gone. The desktop release is no longer gated on any renderer-driven
 test — see `PROGRESS.md` for the removal note.

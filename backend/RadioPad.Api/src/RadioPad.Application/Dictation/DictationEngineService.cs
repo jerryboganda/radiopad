@@ -1,6 +1,6 @@
 namespace RadioPad.Application.Dictation;
 
-/// <summary>The structured report sections returned by a formatter (cloud or local MedGemma).</summary>
+/// <summary>The structured report sections returned by a formatter (cloud or local on-device).</summary>
 public sealed record FormatterOutput(
     IReadOnlyDictionary<string, string> Sections,
     string Provider,
@@ -17,7 +17,7 @@ public sealed record DictationFormatContext(
 
 /// <summary>
 /// Abstraction over the report formatter. The production adapter routes through the existing
-/// <c>AiGateway</c> (cloud, default) or a local MedGemma <c>LocalOnly</c> provider (optional,
+/// <c>AiGateway</c> (cloud, default) or a local on-device <c>LocalOnly</c> provider (optional,
 /// offline); the deterministic safety layers wrap whichever one runs.
 /// </summary>
 public interface IDictationFormatter
@@ -47,7 +47,7 @@ public sealed record DictationDraft(
 /// Brief §4.2 — orchestrates the report-assembly pipeline: §5.2 deterministic pass-through →
 /// formatter → §5.3 validation-diff → §5.6 sentinel. On validation rejection it fails safe to the
 /// dictionary-corrected raw transcript (never fails silent). Formatter-agnostic: the same pipeline
-/// wraps the cloud formatter (default) and the optional local MedGemma formatter. It NEVER signs a
+/// wraps the cloud formatter (default) and the optional local formatter. It NEVER signs a
 /// report — the output is always an editable draft gated by the §5.5 sign-off flow.
 /// </summary>
 public sealed class DictationEngineService
@@ -78,7 +78,7 @@ public sealed class DictationEngineService
         //    + token lock. The corrected transcript is what the formatter sees AND the fallback.
         var pass = _passThrough.Process(rawTranscript, corrections);
 
-        // 2) Formatter — cloud (default) or local MedGemma (optional). Never signs; format only.
+        // 2) Formatter — cloud (default) or local on-device (optional). Never signs; format only.
         var formatted = await formatter.FormatAsync(pass.CorrectedTranscript, context, ct);
 
         // 3) Validation-diff (§5.3) — reject fabricated numbers/measurements/dates or dropped sections.

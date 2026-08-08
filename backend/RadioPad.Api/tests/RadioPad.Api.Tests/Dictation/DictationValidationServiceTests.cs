@@ -121,8 +121,8 @@ public class DictationValidationServiceTests
     /// <para>This test previously asserted rejection. The rule it encoded — the brief's "reject on
     /// a dropped required section" — is really about the formatter LOSING dictated content, and an
     /// empty section was a crude proxy for that. In practice the proxy fired hardest on correct
-    /// behaviour: MedGemma, run end-to-end, produced a clean report and was discarded because the
-    /// radiologist had not dictated any recommendations. Since most dictations omit at least one
+    /// behaviour: the local formatter, run end-to-end, produced a clean report and was discarded
+    /// because the radiologist had not dictated any recommendations. Since most dictations omit at least one
     /// required section, the offline formatter fell back on nearly every real input.</para>
     ///
     /// <para>The underlying safety property is now measured directly instead of by proxy — see

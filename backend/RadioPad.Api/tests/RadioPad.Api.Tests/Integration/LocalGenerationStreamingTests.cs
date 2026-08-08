@@ -172,7 +172,7 @@ public class LocalGenerationStreamingTests
             foreach (var piece in Chunk(ModelJson, 16))
                 req.OnStream?.Report(new AiStreamChunk(piece, ++n));
             await gate.Task;
-            return new AiResult(ModelJson, "llama-cpp", "medgemma", 42, 10, n, req.PromptVersion);
+            return new AiResult(ModelJson, "llama-cpp", "local-model", 42, 10, n, req.PromptVersion);
         });
 
     private static (DefaultHttpContext context, CapturingStream body) SseContext(CancellationToken aborted)

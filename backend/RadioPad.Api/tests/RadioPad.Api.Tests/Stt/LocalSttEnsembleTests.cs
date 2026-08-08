@@ -35,7 +35,7 @@ public class LocalSttEnsembleTests
         public StubSettings(string primaryModelId) => _primary = primaryModelId;
         public string PrimaryModelId => _primary;
         public string PrimaryEngineId => _primary == LocalModelCatalog.WindowsSapiId
-            ? LocalModelCatalog.WindowsSapiEngine : SherpaParakeetSttClient.EngineName;
+            ? LocalModelCatalog.WindowsSapiEngine : SherpaMedAsrSttClient.EngineName;
         public bool IsPrimary(string id) => id == _primary;
         public void SetPrimary(string id) => _primary = id;
     }
@@ -53,7 +53,7 @@ public class LocalSttEnsembleTests
             var ensemble = new LocalSttEnsemble(
                 new ILocalSttEngine[]
                 {
-                    new FakeEngine("parakeet", true, T("para", 0.9)),
+                    new FakeEngine("engineA", true, T("para", 0.9)),
                     new FakeEngine(LocalModelCatalog.WindowsSapiEngine, true, T("sapi", 0.9)),
                 },
                 NullLogger<LocalSttEnsemble>.Instance,
@@ -77,13 +77,13 @@ public class LocalSttEnsembleTests
         await WithEnsemble(false, async () =>
         {
             var svc = Build(
-                new FakeEngine("parakeet", true, T("lungs", 0.9), T("clear", 0.9)),
+                new FakeEngine("engineA", true, T("lungs", 0.9), T("clear", 0.9)),
                 new FakeEngine("secondary", true, T("lungs", 0.9), T("clear", 0.9)));
 
             var r = await svc.TranscribeAsync(Audio(), "audio/wav", CancellationToken.None);
 
             Assert.Equal("local", r.Provider);
-            Assert.Equal("parakeet", r.Model);
+            Assert.Equal("engineA", r.Model);
             Assert.Equal("lungs clear", r.Text);
             Assert.Null(r.Spans);
         });
@@ -95,13 +95,13 @@ public class LocalSttEnsembleTests
         await WithEnsemble(true, async () =>
         {
             var svc = Build(
-                new FakeEngine("parakeet", true, T("lungs", 0.7), T("clear", 0.5)),
+                new FakeEngine("engineA", true, T("lungs", 0.7), T("clear", 0.5)),
                 new FakeEngine("secondary", true, T("lungs", 0.65), T("clean", 0.5)));
 
             var r = await svc.TranscribeAsync(Audio(), "audio/wav", CancellationToken.None);
 
             Assert.Equal("local_ensemble", r.Provider);
-            Assert.Equal("parakeet+secondary", r.Model);
+            Assert.Equal("engineA+secondary", r.Model);
             Assert.NotNull(r.Spans);
             Assert.Contains(r.Spans!, s => s.Flagged); // the clear/clean disagreement
         });
@@ -113,13 +113,13 @@ public class LocalSttEnsembleTests
         await WithEnsemble(true, async () =>
         {
             var svc = Build(
-                new FakeEngine("parakeet", true, T("lungs", 0.9)),
+                new FakeEngine("engineA", true, T("lungs", 0.9)),
                 new FakeEngine("secondary", available: false, T("ignored", 0.9)));
 
             var r = await svc.TranscribeAsync(Audio(), "audio/wav", CancellationToken.None);
 
             Assert.Equal("local", r.Provider);
-            Assert.Equal("parakeet", r.Model);
+            Assert.Equal("engineA", r.Model);
             Assert.Null(r.Spans);
         });
     }
@@ -130,7 +130,7 @@ public class LocalSttEnsembleTests
         await WithEnsemble(false, async () =>
         {
             var svc = Build(
-                new FakeEngine("parakeet", true, T("lungs", 0.7), T("clear", 0.5)),
+                new FakeEngine("engineA", true, T("lungs", 0.7), T("clear", 0.5)),
                 new FakeEngine("secondary", true, T("lungs", 0.65), T("clean", 0.5)));
 
             var r = await svc.TranscribeAsync(Audio(), "audio/wav", CancellationToken.None, "ensemble");
@@ -146,7 +146,7 @@ public class LocalSttEnsembleTests
         await WithEnsemble(true, async () =>
         {
             var svc = Build(
-                new FakeEngine("parakeet", true, T("lungs", 0.9)),
+                new FakeEngine("engineA", true, T("lungs", 0.9)),
                 new FakeEngine("secondary", true, T("lungs", 0.9)));
 
             var r = await svc.TranscribeAsync(Audio(), "audio/wav", CancellationToken.None, "single");

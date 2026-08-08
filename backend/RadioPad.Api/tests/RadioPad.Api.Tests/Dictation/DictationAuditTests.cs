@@ -25,8 +25,8 @@ public class DictationAuditTests
             Diff: "n/a",
             TemplateId: "chest_ct_v1",
             SttModel: "medasr-1.0.0",
-            FormatterProvider: "local-medgemma",
-            FormatterModel: "medgemma-1.5-4b-q4",
+            FormatterProvider: "local-formatter",
+            FormatterModel: "local-formatter-v1",
             Accepted: true,
             TimestampUtc: ts);
 

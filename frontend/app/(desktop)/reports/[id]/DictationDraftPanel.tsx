@@ -67,7 +67,7 @@ export default function DictationDraftPanel({ reportId, initialText, onApply }: 
   const [applied, setApplied] = useState(false);
   // Offline formatting is DESKTOP-only and OPT-IN: decision D1 keeps the cloud formatter the
   // default. Until this existed, `api.reports.dictationDraftLocal` had no caller at all — the whole
-  // on-device MedGemma path was unreachable from the UI no matter how it was provisioned.
+  // on-device formatting path was unreachable from the UI no matter how it was provisioned.
   const [onDevice, setOnDevice] = useState(false);
   const [canRunOnDevice, setCanRunOnDevice] = useState(false);
   const [fellBack, setFellBack] = useState(false);
@@ -150,7 +150,7 @@ export default function DictationDraftPanel({ reportId, initialText, onApply }: 
       {fellBack && (
         <Banner tone="warn" onDismiss={() => setFellBack(false)}>
           On-device formatting was unavailable, so this draft was formatted in the cloud. Download
-          the MedGemma model in Settings → On-device models to keep dictation on this machine.
+          the on-device model in Settings → On-device models to keep dictation on this machine.
         </Banner>
       )}
 
@@ -172,7 +172,7 @@ export default function DictationDraftPanel({ reportId, initialText, onApply }: 
               Format on this device (offline)
               <span className="rp-page-sub" style={{ display: 'block' }}>
                 Keeps the dictation on this machine instead of sending it to the cloud formatter.
-                Requires the MedGemma model; falls back to the cloud if it is not installed.
+                Requires the on-device model; falls back to the cloud if it is not installed.
               </span>
             </span>
           </label>

@@ -12,11 +12,11 @@ using RadioPad.Infrastructure.Providers.Local;
 namespace RadioPad.Api.Controllers;
 
 /// <summary>
-/// Whole-report generation against the on-device MedGemma model, entirely on this workstation.
+/// Whole-report generation against the on-device local model, entirely on this workstation.
 ///
 /// <para>The normal <c>/api/reports/{id}/generate</c> path always runs through the hosted API — fine
 /// for cloud providers, but wrong for an on-device model: the radiologist's whole point in picking
-/// MedGemma is that nothing leaves the workstation, and a hosted container has neither the GGUF file
+/// a local model is that nothing leaves the workstation, and a hosted container has neither the GGUF file
 /// nor a running llama-server on its own loopback. This endpoint gives the desktop frontend a way to
 /// run generation locally end to end when an on-device provider is selected, calling
 /// <see cref="LlamaCppProvider"/> directly (bypassing <see cref="IAiGateway"/> — no tenant/PHI-policy
@@ -31,7 +31,7 @@ namespace RadioPad.Api.Controllers;
 /// <para><b>Own prompt, not <see cref="ReportingService.BuildStructuredPrompt"/> (deliberate).</b> That
 /// prompt is tuned for and validated against large cloud models (see
 /// ConsultantGradeGeneratePromptTests) and asks for heading/bullet-formatted findings purely through
-/// prose instructions. Empirically that does NOT work on MedGemma 1.5 4B (Q4_K_M): tested directly
+/// prose instructions. Empirically that does NOT work on the local 4B model (Q4_K_M): tested directly
 /// against the local llama-server with and without the GBNF grammar, it produced a single
 /// undifferentiated prose paragraph either way — a small-model capability gap, not a bug in the
 /// grammar or the prompt's content. A short instruction plus a worked example reliably gets it to
@@ -89,6 +89,12 @@ public sealed class LocalGenerationController : ControllerBase
     // correlation id (the HOSTED report's Guid) instead — see GenerateReportJobDto.
     private const string JobKind = "local-generate";
     private const string JobMode = "report";
+
+    // The on-device report-formatting model id. There is currently no catalog entry for an
+    // on-device Orchestrator model (the prior one was removed); this stays a private constant
+    // here rather than a catalog lookup so this endpoint still compiles and fails predictably
+    // (model not installed) instead of resolving to an unrelated model.
+    private const string OnDeviceModelId = "on-device-report-formatter";
 
     public record GenerateReportDto(
         string? Modality, string? BodyPart, string? Contrast, int? Age, string? AgeUnit, string? Gender,
@@ -227,7 +233,7 @@ public sealed class LocalGenerationController : ControllerBase
     }
 
     /// <summary>
-    /// The on-device provider config is fixed — there is only ever one target (the MedGemma model on
+    /// The on-device provider config is fixed — there is only ever one target (the local model on
     /// this workstation), so no tenant/registry lookup. Shared by the sync endpoint and the async job
     /// runner so both paths build the byte-identical request (prompt, GBNF grammar, repeat penalty).
     /// </summary>
@@ -235,9 +241,9 @@ public sealed class LocalGenerationController : ControllerBase
     {
         var provider = new ProviderConfig
         {
-            Name = "local-medgemma",
+            Name = "local-on-device",
             Adapter = LlamaCppProvider.AdapterId,
-            Model = LocalModelCatalog.MedGemmaId,
+            Model = OnDeviceModelId,
             EndpointUrl = LlamaServerProcess.BaseUrl,
             Compliance = ProviderComplianceClass.LocalOnly,
             Enabled = true,

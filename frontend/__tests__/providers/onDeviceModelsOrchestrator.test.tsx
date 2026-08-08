@@ -17,12 +17,12 @@ vi.mock('@/lib/api', () => ({
 
 import OnDeviceModels from '@/components/models/OnDeviceModels';
 
-const MEDGEMMA = 'medgemma-1.5-4b-q4';
+const LOCAL_MODEL = 'on-device-1.5-4b-q4';
 
-function medgemma(partial: Partial<LocalModel> = {}): LocalModel {
+function localModel(partial: Partial<LocalModel> = {}): LocalModel {
   return {
-    id: MEDGEMMA,
-    displayName: 'MedGemma 1.5 4B (Q4_K_M) — on-device report formatter',
+    id: LOCAL_MODEL,
+    displayName: 'On-device 1.5 4B (Q4_K_M) — on-device report formatter',
     kind: 'Orchestrator',
     engine: 'llama-cpp',
     sizeBytes: 2489894976,
@@ -34,7 +34,7 @@ function medgemma(partial: Partial<LocalModel> = {}): LocalModel {
     supportsPrimary: false,
     isPrimary: false,
     runtime: { id: 'llama-server-b10068', installed: true, running: true },
-    progress: { id: MEDGEMMA, state: 'Ready', bytesDownloaded: 0, totalBytes: 0, error: null },
+    progress: { id: LOCAL_MODEL, state: 'Ready', bytesDownloaded: 0, totalBytes: 0, error: null },
     ...partial,
   };
 }
@@ -57,13 +57,13 @@ describe('OnDeviceModels — orchestrator card', () => {
    * and returned "model not downloaded" for a model sitting on disk.
    */
   it('never offers "Make primary" for an orchestrator model', async () => {
-    renderWith(medgemma());
-    await waitFor(() => expect(screen.getByText(/MedGemma/)).toBeInTheDocument());
+    renderWith(localModel());
+    await waitFor(() => expect(screen.getByText(/On-device/)).toBeInTheDocument());
     expect(screen.queryByRole('button', { name: /Make primary/ })).not.toBeInTheDocument();
   });
 
   it('offers "Use for report generation" once the chain is complete', async () => {
-    renderWith(medgemma());
+    renderWith(localModel());
     await waitFor(() =>
       expect(screen.getByRole('button', { name: /Use for report generation/ })).toBeEnabled(),
     );
@@ -71,7 +71,7 @@ describe('OnDeviceModels — orchestrator card', () => {
 
   it('shows "Setup incomplete" — not "Ready" — when the runtime is missing', async () => {
     renderWith(
-      medgemma({
+      localModel({
         available: false,
         runtime: { id: 'llama-server-b10068', installed: false, running: false },
       }),
@@ -82,7 +82,7 @@ describe('OnDeviceModels — orchestrator card', () => {
 
   it('renders each prerequisite link so the missing one is identifiable', async () => {
     renderWith(
-      medgemma({
+      localModel({
         available: false,
         runtime: { id: 'llama-server-b10068', installed: false, running: false },
       }),
@@ -93,15 +93,15 @@ describe('OnDeviceModels — orchestrator card', () => {
   });
 
   it('marks the card as already registered when a provider row exists', async () => {
-    renderWith(medgemma(), [
-      { id: 'p1', name: 'MedGemma', adapter: 'llama-cpp', model: MEDGEMMA, enabled: true },
+    renderWith(localModel(), [
+      { id: 'p1', name: 'On-device', adapter: 'llama-cpp', model: LOCAL_MODEL, enabled: true },
     ]);
     await waitFor(() => expect(screen.getByText('In report generation')).toBeInTheDocument());
     expect(screen.queryByRole('button', { name: /Use for report generation/ })).not.toBeInTheDocument();
   });
 
   it('surfaces the download size before the model is fetched', async () => {
-    renderWith(medgemma({ downloaded: false, available: false, runtime: null }));
+    renderWith(localModel({ downloaded: false, available: false, runtime: null }));
     await waitFor(() =>
       expect(screen.getByRole('button', { name: /Download 2\.32 GB/ })).toBeInTheDocument(),
     );
@@ -110,7 +110,7 @@ describe('OnDeviceModels — orchestrator card', () => {
 
   /** The repair path — a corrupt model otherwise reports "Ready" forever. */
   it('always offers re-download once the model is installed', async () => {
-    renderWith(medgemma());
+    renderWith(localModel());
     await waitFor(() =>
       expect(screen.getByRole('button', { name: /Re-download/ })).toBeInTheDocument(),
     );
@@ -118,11 +118,11 @@ describe('OnDeviceModels — orchestrator card', () => {
 
   it('reports real download progress rather than a fabricated percentage', async () => {
     renderWith(
-      medgemma({
+      localModel({
         downloaded: false,
         available: false,
         progress: {
-          id: MEDGEMMA,
+          id: LOCAL_MODEL,
           state: 'Downloading',
           bytesDownloaded: 1244947488,
           totalBytes: 2489894976,
@@ -137,11 +137,11 @@ describe('OnDeviceModels — orchestrator card', () => {
 
   it('omits aria-valuenow while verifying, when no honest percentage exists', async () => {
     renderWith(
-      medgemma({
+      localModel({
         downloaded: false,
         available: false,
         progress: {
-          id: MEDGEMMA,
+          id: LOCAL_MODEL,
           state: 'Verifying',
           bytesDownloaded: 2489894976,
           totalBytes: 2489894976,

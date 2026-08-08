@@ -31,8 +31,8 @@ public sealed class SttModelProvisionHostedService : BackgroundService
         try
         {
             // D2 — MedASR is the default primary on-device engine, so provision it on first run
-            // (public/ungated sherpa-onnx bundle, ~160 MB). Parakeet stays the user-promotable
-            // fallback, downloaded on demand via the model manager rather than eagerly here.
+            // (public/ungated sherpa-onnx bundle, ~160 MB). Other on-device models stay
+            // user-promotable, downloaded on demand via the model manager rather than eagerly here.
             await _provisioner.EnsureMedAsrAsync(stoppingToken);
         }
         catch (OperationCanceledException)

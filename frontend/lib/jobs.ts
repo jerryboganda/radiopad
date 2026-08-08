@@ -225,7 +225,7 @@ export function specMode(spec: JobSubmitSpec): string {
 /** Human label for a job's kind+mode: "Draft generation" / "Impression" / … */
 export function jobKindLabel(job: Pick<Job, 'kind' | 'mode'> & { origin?: JobOrigin }): string {
   if (job.kind === 'generate') return 'Draft generation';
-  if (job.kind === 'local-generate') return 'Local draft (MedGemma)';
+  if (job.kind === 'local-generate') return 'Local draft (on-device)';
   // Cross-check is a first-class kind (durable async-job platform): the audio half
   // runs locally on the sidecar, the medical review half runs hosted. Label by
   // ORIGIN — the widget then reads "Cross-check (audio)" vs "Cross-check (review)".

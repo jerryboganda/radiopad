@@ -14,8 +14,7 @@ name: on-device-latency
 on:
   workflow_dispatch:
   schedule:
-    # Weekly. This downloads a 154 MB model (and optionally 2.5 GB of MedGemma), so it is not
-    # something to run per-push.
+    # Weekly. This downloads a 154 MB model, so it is not something to run per-push.
     - cron: '0 5 * * 1'
 
 jobs:

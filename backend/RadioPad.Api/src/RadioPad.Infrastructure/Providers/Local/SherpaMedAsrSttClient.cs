@@ -9,11 +9,10 @@ namespace RadioPad.Infrastructure.Providers.Local;
 
 /// <summary>
 /// Brief §2.1 / decision D2 — the DEFAULT primary on-device STT: Google MedASR (Conformer-CTC,
-/// radiology-tuned, ~4.6% WER) running fully offline via sherpa-onnx on the CPU. Same in-process,
-/// audio-never-leaves-the-workstation contract as <see cref="SherpaParakeetSttClient"/>; the only
-/// differences are the model (a two-file sherpa-onnx CTC bundle, <c>model.int8.onnx</c> +
-/// <c>tokens.txt</c>) and the recognizer config (<c>OfflineModelConfig.MedAsr</c> instead of the
-/// transducer). Parakeet remains as the user-promotable fallback.
+/// radiology-tuned, ~4.6% WER) running fully offline via sherpa-onnx on the CPU. In-process,
+/// audio-never-leaves-the-workstation contract, using a two-file sherpa-onnx CTC bundle
+/// (<c>model.int8.onnx</c> + <c>tokens.txt</c>) and the recognizer config
+/// (<c>OfflineModelConfig.MedAsr</c>).
 ///
 /// <para><b>Activation.</b> Dormant unless <c>RADIOPAD_LOCAL_STT_ENABLED</c> is truthy AND the
 /// bundle is present under <c>%LOCALAPPDATA%\com.radiopad.desktop\models\medasr-ctc-en-int8</c>
@@ -30,7 +29,7 @@ public sealed class SherpaMedAsrSttClient : ILocalSttClient, ILocalSttEngine, ID
 
     // Offline CTC does not expose a usable per-token confidence through the sherpa C# result, so
     // emit a fixed prior; the ROVER reconciler then flags disagreements rather than trusting a
-    // missing signal — the safe default, mirroring the Parakeet client.
+    // missing signal — the safe default for an engine with no native confidence output.
     private const double MedAsrConfidence = 0.85;
 
     private const int SampleRate = 16000;
@@ -65,7 +64,7 @@ public sealed class SherpaMedAsrSttClient : ILocalSttClient, ILocalSttEngine, ID
     /// <summary>
     /// True only when the engine is enabled, the decoder can run, and the MedASR CTC bundle is
     /// present and not already known-bad. The routing layer checks this before using MedASR — false
-    /// means "fall back to Parakeet / the cloud path".
+    /// means "fall back to another on-device engine, or the cloud path".
     /// </summary>
     public bool Available
     {

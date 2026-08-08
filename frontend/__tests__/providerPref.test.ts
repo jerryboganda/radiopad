@@ -28,9 +28,9 @@ describe('preferred provider (per-user AI engine choice)', () => {
   beforeEach(() => setPreferredProviderId(''));
 
   it('persists and round-trips the saved engine', () => {
-    setPreferredProviderId('medgemma');
-    expect(getPreferredProviderId()).toBe('medgemma');
-    expect(window.localStorage.getItem('radiopad:preferred-provider')).toBe('medgemma');
+    setPreferredProviderId('local-provider');
+    expect(getPreferredProviderId()).toBe('local-provider');
+    expect(window.localStorage.getItem('radiopad:preferred-provider')).toBe('local-provider');
   });
 
   it('clearing removes the stored key', () => {

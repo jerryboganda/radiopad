@@ -29,7 +29,7 @@ public class SttModelProvisionerTests
     {
         var root = TempDir();
         // Mirror the archive layout: files live under a nested top-level folder.
-        var nested = Path.Combine(root, "sherpa-onnx-nemo-parakeet-tdt-0.6b-v3-int8");
+        var nested = Path.Combine(root, "sherpa-onnx-nemo-stt-tdt-0.6b-v3-int8");
         WriteBundle(nested);
         try
         {

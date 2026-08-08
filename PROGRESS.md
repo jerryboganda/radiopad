@@ -169,30 +169,6 @@ detached `Task.Run`. Backend slice (frontend widget + sidecar jobs land in later
   server_restart surfacing, tenant isolation). Guardrails `AiJobRegistryTests` / `RewriteModeTests` /
   `AiPolicyHttpTests` untouched and unaffected. CI decides whether it all builds.
 
-## On-device MedGemma self-test: CPU pegged then timed out (2026-07-21)
-
-Bug report: starting the MedGemma self-test drove CPU to ~99% and then the test failed with an
-error instead of completing. Root cause was two compounding bugs in
-`LlamaServerProcess`/`LlamaCppProvider`, both only visible on a many-core/multi-socket box (the
-dev Xeon reports `Environment.ProcessorCount == 36`):
-
-1. **Thread oversubscription.** `llama-server` was launched with `--threads (ProcessorCount - 1)`
-   — 35 threads on this box. llama.cpp's throughput does not keep scaling past ~8 threads on
-   typical hardware; past that, threads spend more time synchronizing (and contending for
-   cross-NUMA memory bandwidth on a dual-socket Xeon) than computing. Result: CPU pinned near
-   100% while generation got *slower*, not faster. Fixed by capping at
-   `Math.Clamp(ProcessorCount - 1, 1, 8)`, overrideable via `RADIOPAD_LLAMA_THREADS`.
-2. **Shared cloud-tuned HTTP timeout.** `LlamaCppProvider.CompleteAsync` and the self-test's
-   `WaitUntilHealthyAsync` calls used the `"ai"` named `HttpClient`, whose resilience pipeline
-   (Program.cs) caps a single attempt at ~60s — sized for a cloud API round-trip, not CPU-bound
-   local inference. Once thread oversubscription made a cold load + first completion take longer
-   than that, the call got cancelled mid-flight and reported as a failure even though the model
-   was working. It also meant a slow local call could trip the same circuit breaker gating
-   unrelated cloud providers. Fixed by adding a dedicated `"ai-local"` `HttpClient` (300s timeout,
-   no retry — retrying a slow-but-working local server just doubles the CPU load) and moving every
-   on-device call (`LlamaCppProvider`, `LocalMedGemmaFormatter`, `LocalModelsController`'s
-   self-test) onto it.
-
 ## msi-e2e CI job removed (2026-07-21)
 
 Operator decision: the renderer-driven MSI E2E (`desktop-bundle.yml`'s `msi-e2e` job +
@@ -238,7 +214,7 @@ All seven are now implemented; CI decides whether they build.
 ## AI engine selection moved to the radiologist (2026-07-20)
 
 - **Operator decision:** which AI engine a report uses (cloud provider, UBAG, or on-device
-  MedASR/MedGemma) is the radiologist's call. Admin keeps *managing* provider configs
+  MedASR) is the radiologist's call. Admin keeps *managing* provider configs
   (endpoints, keys, enable/disable); the *choice* among enabled providers is per-user.
 - Follows up `feat(rbac)` (428ccb9, clinical roles can read providers): the missing
   **selection layer** now exists — `frontend/lib/ai/providerPref.ts`, a per-user persisted
@@ -256,16 +232,12 @@ All seven are now implemented; CI decides whether they build.
 
 - **MSI install + renderer-driven E2E** — new `msi-e2e` job in `desktop-bundle.yml` + driver
   `scripts/desktop-msi-e2e.mjs` (dependency-free Node 22, raw CDP). Installs the actual `.msi`,
-  pre-places the pinned MedGemma/llama-server/MedASR artefacts where the sidecar resolves them,
+  pre-places the pinned MedASR artefacts where the sidecar resolves them,
   then drives the INSTALLED renderer: UI login including mandatory TOTP enrollment (code computed
   from the secret the UI shows), report seeding with the UI-minted token, dictation draft panel,
-  on-device toggle, a REAL MedGemma format that must pass the safety validator, `.ai-mark` /
+  on-device toggle, `.ai-mark` /
   "3.2 cm" / "Requires review" assertions, Apply, screenshots at every milestone, uninstall.
   `release` now depends on it — an installer whose UI cannot complete a draft is not published.
-- **MedGemma formatting latency instrumented** — `MedGemmaFormatterSmokeTests` emits
-  `medgemma_format_ms=` per §4.2 format call; `offline-formatter-smoke.yml` publishes the numbers
-  to its job summary weekly (server warm, so per-call latency) and fails on >10 min/call or a
-  missing marker. First numbers land on that workflow's next run.
 - **Flaky-test prime suspect eliminated** — audit found ~20 env-mutating test classes outside any
   parallel-disabled collection (three files sharing `STRIPE_WEBHOOK_SECRET` only partially covered;
   `"OrgCreationSerial"` had no CollectionDefinition, i.e. members-only serialization). All
@@ -280,7 +252,6 @@ All seven are now implemented; CI decides whether they build.
   content words landed in that section AND that every `/api/stt/transcribe` response names
   MedASR (fetch tap; the DOM hides engine identity) — the audit-era "wrong engine served
   silently" failure mode is now a hard E2E failure.
-- **MedGemma latency: observed green** on the first `offline-formatter-smoke` run.
 - **The gate stranded two releases — fixed.** `msi-e2e` was made a hard dependency of `release`
   before it had ever passed, so v0.1.91 and v0.1.92 each built a signed MSI and published
   NOTHING (`release` needed it, and `tauri-updater` needs the workflow to conclude success).
@@ -307,12 +278,12 @@ All seven are now implemented; CI decides whether they build.
   `AsNoTracking` copy — the tracked report plus the §5.7 audit's `SaveChanges` would otherwise have
   persisted an unapplied AI draft into the stored report. 7 projection tests.
 - **The packaged app is now actually exercised.** `desktop-bundle`'s launch smoke polls the sidecar
-  Tauri spawns and asserts MedASR is offered and MedGemma answers something other than 503 — the
+  Tauri spawns and asserts MedASR is offered — the
   first check that the *installed binary* produces a working on-device stack, rather than a sidecar
   we started ourselves.
 - **MedASR latency measured**: 53.6 s for the full smoke suite (load + 2 decodes) on 4 CPU-only
   cores. Published weekly by `on-device-latency.yml`. Order of magnitude and regression canary, not
-  an SLA — one runner is not a workstation. MedGemma latency still unmeasured.
+  an SLA — one runner is not a workstation.
 - **Flaky test hunted**: `flaky-hunt.yml` runs the suite N times and names failures. 6/6 passed —
   9 consecutive clean runs now. Still unidentified, still not called fixed; weekly job will name it
   if it returns.
@@ -335,7 +306,7 @@ All seven are now implemented; CI decides whether they build.
 ### Fixed — reachability / wiring
 
 - **On-device model manager shipped only to `(web)`.** `build-surface.mjs` stages non-target route
-  groups out of `app/`, so the desktop bundle — the only surface where MedASR/MedGemma actually run
+  groups out of `app/`, so the desktop bundle — the only surface where MedASR actually runs
   — contained no model manager at all. Everything verified over HTTP that day was behind a screen
   the product could not open. Moved to `components/models/`, added
   `app/(desktop)/settings/models/page.tsx` + nav entry + 6 locale labels.
@@ -438,10 +409,10 @@ All seven are now implemented; CI decides whether they build.
 ## On-Device Dictation & Reporting Engine — Phase 0 (part 1: deterministic safety pipeline)
 
 - **Date:** 2026-07-18
-- **Scope:** Implement `RadioPad_Dictation_Engine_ClaudeCode_Brief.md` (MedASR STT + MedGemma
+- **Scope:** Implement `RadioPad_Dictation_Engine_ClaudeCode_Brief.md` (MedASR STT +
   formatter, brief §5 guardrails). Operator decisions this session (see `IMPLEMENTATION_NOTES.md`):
-  cloud AI stays primary (local MedGemma is an OPTIONAL offline formatter, iter-55 NOT reversed);
-  MedASR = default primary STT with Parakeet user-promotable; streaming push-to-talk from Phase 0;
+  cloud AI stays primary (iter-55 NOT reversed);
+  MedASR = default primary STT; streaming push-to-talk from Phase 0;
   all phases with per-phase commits; Phase 3 regulated features OFF by default.
 
 ### Delivered (backend — verified: 856 passed / 5 skipped / 0 failed; +35 new TDD tests)
@@ -461,7 +432,7 @@ All seven are now implemented; CI decides whether they build.
   wired into `LlamaCppProvider` via a new `AiCompletionRequest.Grammar` field, and temperature≈0
   now forwarded on the local llama.cpp path.
 - **§4.2 pipeline orchestration** (`DictationEngineService.cs` + `IDictationFormatter`): wires
-  §5.2 → formatter (cloud or local MedGemma) → §5.3 → §5.6 into one editable `DictationDraft`;
+  §5.2 → formatter (cloud) → §5.3 → §5.6 into one editable `DictationDraft`;
   never signs (feeds the existing §5.5 sign-off gate); `.ai-mark` "Requires review" always set.
 - **§4.4 memory manager** (`Runtime/ModelMemoryManager.cs`): enforces the ≤5 GB combined-resident
   ceiling, evicts STT first, low-memory mode unloads STT during formatting, exposes a snapshot for
@@ -588,15 +559,6 @@ All seven are now implemented; CI decides whether they build.
   (`app/(desktop)/settings/corrections`) with the `userCorrections` api client and the pure
   `lib/userCorrections.ts` validators (13 tests: 9 helper + 4 page).
 
-- **§2.2 optional local MedGemma formatter path** — MedGemma Q4_K_M GGUF **pinned + verified** in
-  `LocalModelCatalog` (`unsloth/medgemma-1.5-4b-it-Q4_K_M.gguf`, real URL/SHA-256/size,
-  download-on-demand via the existing provisioner); `LocalMedGemmaFormatter` (LocalOnly,
-  loopback-**enforced**, GBNF + temp 0) selected by `DictationDraftService` when
-  `RADIOPAD_LOCAL_FORMATTER_ENABLED`; stateless on-device endpoint
-  `POST /api/dictation/draft-local` (anonymous/loopback, mirrors `SttController` — runs the full
-  §5.2→§5.3→§5.6 pipeline + §5.7 audit, no DB, so the STT-only sidecar can serve it);
-  `lib/api.ts` `reports.dictationDraftLocal`. Cloud formatting stays the default (+2 catalog tests).
-
 ### Remaining Phase 0 (needs binaries / Rust / hardware — see IMPLEMENTATION_NOTES.md)
 
 - **Make the local formatter live** (packaging): bundle a `llama-server` binary as a Tauri
@@ -672,7 +634,7 @@ All seven are now implemented; CI decides whether they build.
   `MedicalWhisperSttClient`, `WhisperDecoder`, `WhisperNativeLibrary`. Dropped
   their DI registrations in `Program.cs`. The `LocalSttEnsemble` and
   `CrossCheckService` are engine-agnostic, so they now reconcile only the
-  remaining engines (Parakeet + Windows Speech).
+  remaining engines (MedASR + Windows Speech).
 - **Catalog/specs:** removed the `whisper-large-v3-turbo-q5_0`,
   `whisper-small.en-q5_1`, and `whisper-medical-large-v3-q5_0` entries from
   `LocalModelCatalog` and all Whisper specs/helpers from `LocalSttModels`
@@ -686,7 +648,7 @@ All seven are now implemented; CI decides whether they build.
   embedded win-x64 native DLL `ItemGroup` from `RadioPad.Infrastructure.csproj`.
 - **Tests/CI:** deleted the Whisper engine + ensemble smoke tests, neutralized
   the Whisper labels in the remaining STT tests, and reduced the
-  `desktop-stt-smoke` workflow to the Parakeet engine only.
+  `desktop-stt-smoke` workflow to the MedASR engine only.
 - **Frontend/desktop/docs:** dictation copy, `desktop/README.md`,
   `sidecar_manager.rs`, the desktop architecture doc, and
   `THIRD_PARTY_NOTICES.md` no longer mention Whisper; `desktop/whisper.md` was

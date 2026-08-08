@@ -96,7 +96,7 @@ public class SttControllerTests : IClassFixture<RadioPadAppFactory>
         var root = doc.RootElement;
         Assert.Equal("chest is clear", root.GetProperty("transcript").GetString());
         Assert.Equal("on-device", root.GetProperty("provider").GetString());
-        Assert.Equal("parakeet+secondary", root.GetProperty("model").GetString());
+        Assert.Equal("local-stt+secondary", root.GetProperty("model").GetString());
         Assert.Equal(42, root.GetProperty("latencyMs").GetInt64());
         var spans = root.GetProperty("spans");
         Assert.Equal(JsonValueKind.Array, spans.ValueKind);
@@ -119,7 +119,7 @@ public class SttControllerTests : IClassFixture<RadioPadAppFactory>
             => Task.FromResult(new TranscriptionResult(
                 Text: "chest is clear",
                 Provider: "on-device",
-                Model: "parakeet+secondary",
+                Model: "local-stt+secondary",
                 LatencyMs: 42,
                 Spans: new[] { new ReconciledSpan("clear", true, "disagreement", "secondary") }));
     }

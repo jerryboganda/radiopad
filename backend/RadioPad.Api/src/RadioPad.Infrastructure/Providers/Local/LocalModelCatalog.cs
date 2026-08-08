@@ -10,7 +10,7 @@ public enum ModelArchiveKind { TarBz2, RawFile, MedAsrCtc }
 
 /// <summary>
 /// How an entry is provisioned + run. Distinguishes the hosted-file engines
-/// (Parakeet — we download a model bundle) from the platform speech
+/// (e.g. MedASR — we download a model bundle) from the platform speech
 /// engines that have no hosted artifact:
 /// <list type="bullet">
 /// <item><see cref="HostedFile"/> — we download/verify/extract a model file from
@@ -46,7 +46,7 @@ public sealed record LocalModelDescriptor(
     string? FileName,
     bool Placeholder,
     // How this entry is provisioned + run. Defaults to HostedFile so the existing
-    // Parakeet descriptor is unchanged; the platform speech engines set it
+    // hosted-file descriptors are unchanged; the platform speech engines set it
     // explicitly. When not HostedFile, DownloadUrl/Sha256/FileName/ArchiveKind
     // are ignored (there is no hosted artifact).
     ModelProvisioning Provisioning = ModelProvisioning.HostedFile,
@@ -94,12 +94,6 @@ public sealed class LocalModelCatalog : ILocalModelCatalog
     public const string EdgeWebSpeechEngine = "edge_webspeech";
     public const string EdgeWebSpeechId = "edge-webspeech";
 
-    // ── Optional on-device MedGemma report formatter (dictation brief §2.2) ────
-    /// <summary>Catalog id == the models/&lt;id&gt; folder the GGUF is provisioned into.</summary>
-    public const string MedGemmaId = "medgemma-1.5-4b-q4";
-    /// <summary>Pinned MedGemma Q4_K_M GGUF file name (see IMPLEMENTATION_NOTES.md for the SHA-256).</summary>
-    public const string MedGemmaFileName = "medgemma-1.5-4b-it-Q4_K_M.gguf";
-
     public IReadOnlyList<LocalModelDescriptor> All { get; } = Build();
 
     public IReadOnlyList<LocalModelDescriptor> Visible { get; } =
@@ -118,13 +112,12 @@ public sealed class LocalModelCatalog : ILocalModelCatalog
 
     private static IReadOnlyList<LocalModelDescriptor> Build()
     {
-        var parakeet = LocalSttModels.Parakeet;
         return new List<LocalModelDescriptor>
         {
             // MedASR (Google Conformer-CTC, radiology-tuned ~4.6% WER) — the DEFAULT primary
             // on-device engine (D2), via the public/ungated sherpa-onnx CTC bundle (two raw files:
-            // model.int8.onnx + tokens.txt). Auto-provisioned on first run; runs on the same
-            // sherpa-onnx CPU runtime as Parakeet. Pinned in LocalSttModels (verified, HF gated:false).
+            // model.int8.onnx + tokens.txt). Auto-provisioned on first run; runs on the
+            // sherpa-onnx CPU runtime. Pinned in LocalSttModels (verified, HF gated:false).
             new(
                 Id: LocalSttModels.MedAsrModelName,
                 DisplayName: "Custom Trained Radiology ASR Model",
@@ -139,19 +132,6 @@ public sealed class LocalModelCatalog : ILocalModelCatalog
                 Placeholder: false,
                 Provisioning: ModelProvisioning.HostedFile,
                 Note: "Radiology-tuned on-device speech-to-text (~160 MB). Runs fully on-device — audio never leaves the workstation."),
-
-            new(
-                Id: parakeet.Name,
-                DisplayName: "Custom Trained Radiology Ai TDT Model",
-                Kind: ModelKind.Stt,
-                Engine: SherpaParakeetSttClient.EngineName, // "parakeet"
-                DownloadUrl: parakeet.Url,
-                Sha256: parakeet.Sha256,
-                SizeBytes: parakeet.SizeBytes,
-                License: "CC-BY-4.0",
-                ArchiveKind: ModelArchiveKind.TarBz2,
-                FileName: null,
-                Placeholder: false),
 
             // ── Platform speech engines (no hosted artifact) ───────────────────
             // System.Speech / SAPI — ships with Windows, 100% on-device (PHI-safe),
@@ -231,33 +211,6 @@ public sealed class LocalModelCatalog : ILocalModelCatalog
                 ArchiveKind: ModelArchiveKind.RawFile,
                 FileName: null,
                 Placeholder: true),
-            // MedGemma 1.5 4B (Q4_K_M) — the OPTIONAL on-device report formatter (dictation brief
-            // §2.2). Downloaded on demand from the model manager (NOT auto-provisioned on first run;
-            // only MedASR is). Run via the LlamaCppProvider LocalOnly adapter against a llama-server
-            // on loopback that RadioPad provisions and supervises itself:
-            // SttModelProvisioner.EnsureMedGemmaWithRuntimeAsync fetches the pinned llama.cpp
-            // runtime (LocalRuntimes.LlamaServerId) alongside this GGUF, and LlamaServerProcess
-            // starts it lazily on first use. One download therefore yields a working feature — do
-            // NOT reintroduce the old "bring your own llama-server" wording here or in the Note;
-            // it described a state resolved in 2026-07 (IMPLEMENTATION_NOTES.md) and had already
-            // outlived it once, telling users a shipped feature was inert. Pin verified against the
-            // HF public API (repo gated:false, so the provisioner's anonymous SHA-256-verified
-            // download works). Cloud formatting stays the default — this is the fully-offline,
-            // no-PHI-to-cloud alternative.
-            new(
-                Id: MedGemmaId,
-                DisplayName: "MedGemma 1.5 4B (Q4_K_M) — on-device report formatter",
-                Kind: ModelKind.Orchestrator,
-                Engine: LlamaCppProvider.AdapterId, // "llama-cpp"
-                DownloadUrl: "https://huggingface.co/unsloth/medgemma-1.5-4b-it-GGUF/resolve/main/medgemma-1.5-4b-it-Q4_K_M.gguf",
-                Sha256: "b31becdf4f39561800505514cce67681604fe449d04dd35c8c92fd7848c6d7bd",
-                SizeBytes: 2489894976L,
-                License: "HAI-DEF / Gemma",
-                ArchiveKind: ModelArchiveKind.RawFile,
-                FileName: MedGemmaFileName,
-                Placeholder: false,
-                Provisioning: ModelProvisioning.HostedFile,
-                Note: "Optional offline report formatter (~2.5 GB). Formats dictated findings only — never invents findings, never reads images. Nothing leaves this workstation: it runs against a llama.cpp server RadioPad downloads with the model and starts on loopback for you. Cloud formatting remains the default until you select this model for report generation."),
         };
     }
 }

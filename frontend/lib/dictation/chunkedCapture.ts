@@ -1,7 +1,7 @@
 // P0.3 / decision D4 — incremental dictation decode.
 //
-// WHAT THIS IS, PRECISELY. Both on-device engines are sherpa-onnx *offline* recognizers (MedASR is
-// Conformer-CTC, Parakeet is TDT); neither exposes sherpa's streaming `OnlineRecognizer`. So this
+// WHAT THIS IS, PRECISELY. On-device engines are sherpa-onnx *offline* recognizers (MedASR is
+// Conformer-CTC); none expose sherpa's streaming `OnlineRecognizer`. So this
 // is NOT frame-level streaming ASR. It is chunked incremental decode: while the radiologist keeps
 // talking, audio is cut at natural pauses and each completed segment is decoded on its own, so text
 // appears during dictation instead of only after it. Calling it "streaming" would overstate it.

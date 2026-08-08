@@ -46,7 +46,7 @@ public class EndpointPermissionRbacTests : IClassFixture<RadioPadAppFactory>
         // A Radiologist (ProvidersRead only) may self-register their OWN on-device model --
         // the local llama.cpp adapter at LocalOnly compliance -- without ProvidersManage.
         using var radiologist = _factory.CreateTenantClient();
-        var onDeviceResp = await radiologist.PostAsJsonAsync("/api/providers", OnDeviceProviderPayload("My MedGemma"));
+        var onDeviceResp = await radiologist.PostAsJsonAsync("/api/providers", OnDeviceProviderPayload("My Local Model"));
         Assert.Equal(HttpStatusCode.OK, onDeviceResp.StatusCode);
         var savedId = (await onDeviceResp.Content.ReadFromJsonAsync<System.Text.Json.JsonElement>())
             .GetProperty("id").GetGuid();
@@ -67,7 +67,7 @@ public class EndpointPermissionRbacTests : IClassFixture<RadioPadAppFactory>
 
         // But the radiologist CAN edit the on-device row they already created.
         var editResp = await radiologist.PostAsJsonAsync(
-            "/api/providers", OnDeviceProviderPayload("My MedGemma (renamed)", id: savedId));
+            "/api/providers", OnDeviceProviderPayload("My Local Model (renamed)", id: savedId));
         Assert.Equal(HttpStatusCode.OK, editResp.StatusCode);
     }
 
@@ -229,7 +229,7 @@ public class EndpointPermissionRbacTests : IClassFixture<RadioPadAppFactory>
         id,
         name,
         adapter = "llama-cpp",
-        model = "medgemma-1.5-4b-q4",
+        model = "local-llama-4b-q4",
         endpointUrl = "http://127.0.0.1:8080",
         apiKeySecretRef = "",
         compliance = ProviderComplianceClass.LocalOnly,

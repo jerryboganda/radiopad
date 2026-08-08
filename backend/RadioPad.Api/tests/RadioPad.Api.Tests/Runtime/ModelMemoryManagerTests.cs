@@ -39,12 +39,12 @@ public class ModelMemoryManagerTests
     {
         var mgr = new ModelMemoryManager(ceilingBytes: 5 * GB, reservedBytes: 1 * GB);
         var stt = new FakeModel("medasr", ManagedModelKind.Stt, GB / 2);
-        var llm = new FakeModel("medgemma", ManagedModelKind.Llm, (long)(2.8 * GB));
+        var llm = new FakeModel("llm-model", ManagedModelKind.Llm, (long)(2.8 * GB));
         mgr.Register(stt);
         mgr.Register(llm);
 
         Assert.True(await mgr.EnsureResidentAsync("medasr", CancellationToken.None));
-        Assert.True(await mgr.EnsureResidentAsync("medgemma", CancellationToken.None));
+        Assert.True(await mgr.EnsureResidentAsync("llm-model", CancellationToken.None));
         Assert.True(stt.IsResident);
         Assert.True(llm.IsResident);
     }
@@ -54,12 +54,12 @@ public class ModelMemoryManagerTests
     {
         var mgr = new ModelMemoryManager(ceilingBytes: 4 * GB, reservedBytes: 1 * GB); // budget = 3 GB
         var stt = new FakeModel("medasr", ManagedModelKind.Stt, 1 * GB);
-        var llm = new FakeModel("medgemma", ManagedModelKind.Llm, (long)(2.5 * GB));
+        var llm = new FakeModel("llm-model", ManagedModelKind.Llm, (long)(2.5 * GB));
         mgr.Register(stt);
         mgr.Register(llm);
 
         Assert.True(await mgr.EnsureResidentAsync("medasr", CancellationToken.None));
-        Assert.True(await mgr.EnsureResidentAsync("medgemma", CancellationToken.None));
+        Assert.True(await mgr.EnsureResidentAsync("llm-model", CancellationToken.None));
 
         Assert.False(stt.IsResident);   // evicted to make room
         Assert.True(llm.IsResident);

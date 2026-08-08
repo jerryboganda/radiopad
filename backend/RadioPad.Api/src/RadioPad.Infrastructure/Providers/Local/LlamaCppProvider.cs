@@ -60,7 +60,7 @@ public sealed class LlamaCppProvider : IAiProviderAdapter
         // The managed on-device server is started lazily on first use, not kept running as a
         // background service — every caller that talks to OUR default loopback endpoint must
         // make sure it is actually up first. The self-test path (LocalModelsController) and the
-        // dictation formatter (LocalMedGemmaFormatter) both already do this before calling in;
+        // dictation formatter both already do this before calling in;
         // the generic AiGateway → ProviderRouter → adapter path that "use for report generation"
         // enables does not, so without this a fresh self-test could pass and the very next
         // report-generation request would still get "Connection refused" against a server nobody
@@ -79,7 +79,7 @@ public sealed class LlamaCppProvider : IAiProviderAdapter
         var url = $"{baseUrl}/completion";
         var prompt = $"SYSTEM: {request.SystemPrompt}\n\nUSER: {request.UserPrompt}\n\nASSISTANT:";
 
-        // Brief §5.4 — forward the clamped temperature (callers set ≈0 for MedGemma report
+        // Brief §5.4 — forward the clamped temperature (callers set ≈0 for on-device report
         // formatting) and, when supplied, the GBNF grammar so decoding is structurally constrained.
         var body = new Dictionary<string, object?>
         {
@@ -126,7 +126,7 @@ public sealed class LlamaCppProvider : IAiProviderAdapter
             sw.Stop();
             // A bare "Connection refused" against OUR managed endpoint tells a radiologist nothing
             // actionable — name which link in the auto-start chain above is actually missing, mirroring
-            // LocalMedGemmaFormatter.DiagnoseUnreachable for the dictation path. This is the generic
+            // DiagnoseUnreachable below for the dictation path. This is the generic
             // report-generation path (AiGateway → ProviderRouter), which had no equivalent until now —
             // see the comment on the auto-start guard above for why that gap existed. An operator's own
             // remote EndpointUrl gets the raw message unchanged: we never tried to manage that server.

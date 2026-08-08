@@ -1,26 +1,12 @@
 namespace RadioPad.Infrastructure.Providers.Local;
 
 /// <summary>
-/// Pinned catalog + path resolution for the on-device STT model, shared by the
-/// engine (<see cref="SherpaParakeetSttClient"/>) and the first-run provisioner
-/// (<see cref="SttModelProvisioner"/>) so they always agree on the model name,
-/// download source, and on-disk location.
+/// Pinned catalog + path resolution for the on-device STT models, shared by the
+/// engines and the first-run provisioner (<see cref="SttModelProvisioner"/>) so
+/// they always agree on the model name, download source, and on-disk location.
 /// </summary>
 public static class LocalSttModels
 {
-    public const string DefaultModelName = "radiology-tdt-v1-beta";
-
-    /// <summary>
-    /// NVIDIA Parakeet-TDT-0.6B-v3 INT8, packaged for sherpa-onnx (~465 MB).
-    /// CC-BY-4.0 weights (attribution required in the app About/notices).
-    /// <see cref="ModelSpec.Sha256"/> is the GitHub release asset digest.
-    /// </summary>
-    public static readonly ModelSpec Parakeet = new(
-        Name: DefaultModelName,
-        Url: "https://github.com/k2-fsa/sherpa-onnx/releases/download/asr-models/sherpa-onnx-nemo-parakeet-tdt-0.6b-v3-int8.tar.bz2",
-        SizeBytes: 487170055L,
-        Sha256: "5793d0fd397c5778d2cf2126994d58e9d56b1be7c04d13c7a15bb1b4eafb16bf");
-
     // ── MedASR (default primary STT, brief §2.1 / decision D2) ─────────────
     public const string MedAsrModelName = "medasr-ctc-en-int8";
 
@@ -29,8 +15,8 @@ public static class LocalSttModels
     /// sherpa-onnx maintainer (csukuangfj). Two raw files — no archive. The repo is <b>public and
     /// ungated</b> (HF API <c>gated:false</c>), so the anonymous provisioner downloads it directly;
     /// no HF token or license-click is needed. Runs via <see cref="SherpaMedAsrSttClient"/> on the
-    /// existing sherpa-onnx (<c>OfflineModelConfig.MedAsr</c>) CPU path — the same runtime as
-    /// Parakeet. Verified against the HF blob API 2026-07-19.
+    /// existing sherpa-onnx (<c>OfflineModelConfig.MedAsr</c>) CPU path.
+    /// Verified against the HF blob API 2026-07-19.
     /// </summary>
     public static readonly FileSpec MedAsrModel = new(
         Name: MedAsrModelName,
@@ -53,7 +39,7 @@ public static class LocalSttModels
     /// ~1.4 MB). Provisioned alongside the model so the model-manager "Test" action transcribes
     /// actual speech: <see cref="SelfTestAudio"/> otherwise falls back to a synthesized 440 Hz tone,
     /// which MedASR correctly transcribes as nothing — indistinguishable from a broken engine.
-    /// The Parakeet bundle ships test_wavs inside its archive; this restores parity.
+    /// A transducer model bundle ships test_wavs inside its archive; this restores parity.
     /// </summary>
     public static readonly FileSpec MedAsrSampleWav = new(
         Name: MedAsrModelName,
@@ -91,7 +77,7 @@ public static class LocalSttModels
     // All default to the *optimized* setting so a stock desktop build benefits
     // without configuration; env vars exist for per-site tuning + CI coverage.
 
-    /// <summary>Parakeet decoding. Beam search beats greedy on WER and is the
+    /// <summary>Transducer decoding. Beam search beats greedy on WER and is the
     /// prerequisite for hotword biasing. Override: <c>RADIOPAD_STT_DECODING</c>.</summary>
     public const string DefaultDecodingMethod = "modified_beam_search";
 

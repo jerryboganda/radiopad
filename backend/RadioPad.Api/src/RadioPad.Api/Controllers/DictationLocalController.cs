@@ -8,9 +8,9 @@ namespace RadioPad.Api.Controllers;
 /// Stateless, on-device dictation FORMATTING (dictation brief §4.2, optional local path).
 ///
 /// Mirrors <see cref="SttController"/>: the desktop is a thin client over the hosted API for
-/// everything except on-device work. When the offline MedGemma formatter is enabled
+/// everything except on-device work. When the offline local formatter is enabled
 /// (<c>RADIOPAD_LOCAL_FORMATTER_ENABLED</c>), the loopback sidecar runs the FULL safety pipeline
-/// locally — §5.2 deterministic pass-through → MedGemma (llama-server, LocalOnly) → §5.3
+/// locally — §5.2 deterministic pass-through → local formatter (llama-server, LocalOnly) → §5.3
 /// validation-diff → §5.6 sentinel → §5.7 local audit — so the transcript (PHI) never leaves the
 /// machine. It is NOT report-scoped: the report context + corrections come in the body, so no
 /// tenant/DB lookup is needed and it is safe to serve anonymously (the sidecar binds 127.0.0.1).
@@ -60,7 +60,7 @@ public sealed class DictationLocalController : ControllerBase
 
         if (!_localFormatter.Available)
             return StatusCode(StatusCodes.Status503ServiceUnavailable,
-                new { error = "On-device MedGemma formatting is not available on this build.", kind = "formatter_unavailable" });
+                new { error = "On-device formatting is not available on this build.", kind = "formatter_unavailable" });
 
         var corrections = (dto.Corrections ?? new List<CorrectionDto>())
             .Where(c => !string.IsNullOrWhiteSpace(c.From) && !string.IsNullOrWhiteSpace(c.To))

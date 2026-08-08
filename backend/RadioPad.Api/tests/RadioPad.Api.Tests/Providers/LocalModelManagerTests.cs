@@ -12,29 +12,11 @@ namespace RadioPad.Api.Tests;
 public class LocalModelCatalogTests
 {
     [Fact]
-    public void Catalog_Includes_Stt_Models_Whose_Ids_And_Engines_Match_The_Pinned_Specs()
-    {
-        var cat = new LocalModelCatalog();
-
-        var parakeet = cat.ById(LocalSttModels.Parakeet.Name);
-        Assert.NotNull(parakeet);
-        Assert.Equal(ModelKind.Stt, parakeet!.Kind);
-        Assert.Equal(SherpaParakeetSttClient.EngineName, parakeet.Engine);
-        Assert.Equal(ModelArchiveKind.TarBz2, parakeet.ArchiveKind);
-        Assert.False(parakeet.Placeholder);
-        // Id MUST equal the model-dir name the engine resolves, or status/delete
-        // look in the wrong folder.
-        Assert.Equal(LocalSttModels.Parakeet.Sha256, parakeet.Sha256);
-    }
-
-    [Fact]
-    public void Catalog_Surfaces_Tts_As_Placeholder_And_MedGemma_As_A_Real_Orchestrator()
+    public void Catalog_Surfaces_Tts_As_A_Placeholder()
     {
         var cat = new LocalModelCatalog();
         // TTS is still a roadmap placeholder.
         Assert.Contains(cat.All, m => m.Kind == ModelKind.Tts && m.Placeholder);
-        // The orchestrator kind is now a REAL model (MedGemma), not a placeholder.
-        Assert.Contains(cat.All, m => m.Kind == ModelKind.Orchestrator && !m.Placeholder);
     }
 
     [Fact]

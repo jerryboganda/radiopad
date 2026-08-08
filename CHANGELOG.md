@@ -6,6 +6,18 @@ The format is based on [Keep a Changelog 1.1.0](https://keepachangelog.com/en/1.
 
 ## [Unreleased]
 
+### Removed
+- **Removed MedGemma and NVIDIA Parakeet support.** The optional on-device
+  MedGemma report formatter (`LocalMedGemmaFormatter`, the pinned
+  `medgemma-1.5-4b-it` GGUF, and the `offline-formatter-smoke` CI workflow) and
+  the Parakeet on-device STT engine (`SherpaParakeetSttClient`, the
+  `sherpa-onnx-nemo-parakeet-tdt-0.6b-v3-int8` model, and the Parakeet leg of
+  `desktop-stt-smoke`) are fully removed, with no feature flag or dead config
+  left behind. `ILocalReportFormatter` now resolves to an always-unavailable
+  stub so the cloud formatter stays the only active report-drafting path; the
+  on-device STT ensemble continues to run MedASR and the platform speech
+  engines (Windows Speech / Edge).
+
 ### Changed
 - **Desktop-first surface specialisation — one frontend, three scoped apps.**
   The single Next.js frontend now builds into three surfaces selected by a

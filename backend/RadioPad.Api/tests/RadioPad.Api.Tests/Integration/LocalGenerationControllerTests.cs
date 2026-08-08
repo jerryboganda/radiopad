@@ -164,7 +164,7 @@ public class LocalGenerationControllerTests : IClassFixture<RadioPadAppFactory>
         var adapter = new FakeLlamaAdapter(req =>
         {
             captured = req;
-            return Task.FromResult(new AiResult(json, "llama-cpp", "medgemma", 42, 10, 5, req.PromptVersion));
+            return Task.FromResult(new AiResult(json, "llama-cpp", "local-model", 42, 10, 5, req.PromptVersion));
         });
 
         var (controller, _, _) = NewController(adapter);
@@ -180,7 +180,7 @@ public class LocalGenerationControllerTests : IClassFixture<RadioPadAppFactory>
         Assert.Contains("Right lower pole calculus", sections.Findings);
         Assert.Equal("1. Non-obstructive calculus.", sections.Impression);
         Assert.Equal("No specific follow-up is indicated.", sections.Recommendations);
-        Assert.Equal("medgemma", sections.Model);
+        Assert.Equal("local-model", sections.Model);
 
         // Never routes through the tenant-aware AiGateway/provider registry — always the same
         // fixed local adapter, and the prompt embeds the raw inputs directly (no rulebook fetch).
@@ -191,7 +191,7 @@ public class LocalGenerationControllerTests : IClassFixture<RadioPadAppFactory>
 
         // The on-device path uses its own few-shot, example-led prompt (not
         // ReportingService.BuildStructuredPrompt's prose-only instructions) — empirically the only
-        // thing that reliably gets MedGemma to reproduce heading+bullet structure. The example uses
+        // thing that reliably gets the on-device model to reproduce heading+bullet structure. The example uses
         // bracketed placeholders, not concrete clinical values — a concrete-value version measurably
         // caused the model to leak the example's fabricated finding into unrelated cases. And a
         // moderate repeat penalty is set to prevent the model degenerating into repeating its last
@@ -264,7 +264,7 @@ public class LocalGenerationControllerTests : IClassFixture<RadioPadAppFactory>
     public void Submit_Without_CorrelationId_Is_400()
     {
         using var _ = new EnvScope("RADIOPAD_LOCAL_STT_ENABLED", "1");
-        var adapter = new FakeLlamaAdapter(req => Task.FromResult(new AiResult("{}", "llama-cpp", "medgemma", 1, 1, 1, req.PromptVersion)));
+        var adapter = new FakeLlamaAdapter(req => Task.FromResult(new AiResult("{}", "llama-cpp", "local-model", 1, 1, 1, req.PromptVersion)));
         var (controller, _, _) = NewController(adapter);
 
         var bad = Assert.IsType<BadRequestObjectResult>(controller.SubmitJob(NewJobDto(Guid.Empty)));
@@ -301,7 +301,7 @@ public class LocalGenerationControllerTests : IClassFixture<RadioPadAppFactory>
              "impression":"1. Normal.","recommendations":"None."}
             """;
         var adapter = new FakeLlamaAdapter(req =>
-            Task.FromResult(new AiResult(json, "llama-cpp", "medgemma", 42, 10, 5, req.PromptVersion)));
+            Task.FromResult(new AiResult(json, "llama-cpp", "local-model", 42, 10, 5, req.PromptVersion)));
         var (controller, _, _) = NewController(adapter);
 
         var jobId = AcceptedJobId(controller.SubmitJob(NewJobDto(Guid.NewGuid())));
@@ -314,7 +314,7 @@ public class LocalGenerationControllerTests : IClassFixture<RadioPadAppFactory>
         // `result` carries the section-shaped payload (PascalCase, GeneratedReportSections).
         var sections = env.GetProperty("result");
         Assert.Contains("Clear", sections.GetProperty("Findings").GetString());
-        Assert.Equal("medgemma", sections.GetProperty("Model").GetString());
+        Assert.Equal("local-model", sections.GetProperty("Model").GetString());
     }
 
     [Fact]
@@ -328,7 +328,7 @@ public class LocalGenerationControllerTests : IClassFixture<RadioPadAppFactory>
         {
             Interlocked.Increment(ref callCount);
             await release.Task;
-            return new AiResult("{}", "llama-cpp", "medgemma", 1, 1, 1, req.PromptVersion);
+            return new AiResult("{}", "llama-cpp", "local-model", 1, 1, 1, req.PromptVersion);
         });
         var (controller, _, _) = NewController(adapter);
 
@@ -356,7 +356,7 @@ public class LocalGenerationControllerTests : IClassFixture<RadioPadAppFactory>
         {
             Interlocked.Increment(ref callCount);
             await release.Task;   // block every call until the test releases
-            return new AiResult(json, "llama-cpp", "medgemma", 42, 10, 5, req.PromptVersion);
+            return new AiResult(json, "llama-cpp", "local-model", 42, 10, 5, req.PromptVersion);
         });
         var (controller, _, _) = NewController(adapter);
 
@@ -388,7 +388,7 @@ public class LocalGenerationControllerTests : IClassFixture<RadioPadAppFactory>
         {
             Interlocked.Increment(ref callCount);
             await release.Task;
-            return new AiResult("{}", "llama-cpp", "medgemma", 1, 1, 1, req.PromptVersion);
+            return new AiResult("{}", "llama-cpp", "local-model", 1, 1, 1, req.PromptVersion);
         });
         var (controller, _, _) = NewController(adapter);
 
@@ -417,7 +417,7 @@ public class LocalGenerationControllerTests : IClassFixture<RadioPadAppFactory>
         using var _ = new EnvScope("RADIOPAD_LOCAL_STT_ENABLED", "1");
 
         var adapter = new FakeLlamaAdapter(req =>
-            Task.FromResult(new AiResult("{}", "llama-cpp", "medgemma", 1, 1, 1, req.PromptVersion)));
+            Task.FromResult(new AiResult("{}", "llama-cpp", "local-model", 1, 1, 1, req.PromptVersion)));
         var (controller, _, _) = NewController(adapter);
 
         var jobId = AcceptedJobId(controller.SubmitJob(NewJobDto(Guid.NewGuid())));
@@ -440,7 +440,7 @@ public class LocalGenerationControllerTests : IClassFixture<RadioPadAppFactory>
         using var envScope = new EnvScope("RADIOPAD_LOCAL_STT_ENABLED", "1");
 
         var adapter = new FakeLlamaAdapter(req =>
-            Task.FromResult(new AiResult("{}", "llama-cpp", "medgemma", 1, 1, 1, req.PromptVersion)));
+            Task.FromResult(new AiResult("{}", "llama-cpp", "local-model", 1, 1, 1, req.PromptVersion)));
         var (controller, _, _) = NewController(adapter);
 
         var correlationId = Guid.NewGuid();

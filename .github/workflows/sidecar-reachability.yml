@@ -1,19 +1,11 @@
 # Does the SHIPPED sidecar actually serve the on-device endpoints?
 #
-# Every other check in this repo verifies a component. This one verifies REACHABILITY, because that
-# is where the real defects were: MedGemma was pinned, provisioned, and covered by a green smoke
-# test in CI, while `POST /api/dictation/draft-local` returned `503 formatter_unavailable` in every
-# build ever shipped — the Tauri launcher never set `RADIOPAD_LOCAL_FORMATTER_ENABLED`, which
-# `LocalMedGemmaFormatter.Available` gates on. Nothing failed, because nothing asserted that a user
-# could get there.
-#
-# So this job publishes the sidecar EXACTLY as desktop-bundle does (self-contained single file),
-# starts it with EXACTLY the environment `sidecar_manager::sidecar_env()` produces, and then calls
-# the endpoints the desktop calls. The models are NOT downloaded here — that is deliberate. The
-# question is not "does inference work" (desktop-stt-smoke and offline-formatter-smoke answer that
-# with real models); it is "does the request reach the engine at all". A 503 "not available on this
-# build" means the capability never arrived and is a hard failure; a 502 transport error means the
-# flag arrived, the pipeline ran, and only the unprovisioned model was missing — which is a PASS.
+# Every other check in this repo verifies a component. This one verifies REACHABILITY: it publishes
+# the sidecar EXACTLY as desktop-bundle does (self-contained single file), starts it with EXACTLY
+# the environment `sidecar_manager::sidecar_env()` produces, and then calls the endpoints the
+# desktop calls. The model is NOT downloaded here — that is deliberate. The question is not "does
+# inference work" (desktop-stt-smoke answers that with a real model); it is "does the request reach
+# the engine at all".
 name: sidecar-reachability
 
 on:
@@ -53,7 +45,7 @@ jobs:
           # never set", so it must look at the syntax that actually sets it.
           sets() { grep -qE "\(\"$1\"\.to_string\(\)," "$src"; }
 
-          for flag in RADIOPAD_LOCAL_STT_ENABLED RADIOPAD_LOCAL_FORMATTER_ENABLED; do
+          for flag in RADIOPAD_LOCAL_STT_ENABLED; do
             sets "$flag" || {
               echo "::error file=$src::$flag is no longer set by the Tauri sidecar launcher."
               echo "The backend gates a capability on it, so dropping it makes that feature"
@@ -119,30 +111,6 @@ jobs:
             exit 1
           }
           echo "ok: MedASR offered"
-
-      - name: MedGemma on-device formatting is REACHABLE (not 503)
-        shell: bash
-        run: |
-          set -euo pipefail
-          code=$(curl -s -o "$RUNNER_TEMP/draft.json" -w '%{http_code}' \
-            -X POST http://127.0.0.1:7457/api/dictation/draft-local \
-            -H 'Content-Type: application/json' \
-            -d '{"rawDictation":"CT chest. No pneumothorax.","modality":"CT","bodyPart":"Chest"}')
-          echo "HTTP $code"; cat "$RUNNER_TEMP/draft.json"; echo
-
-          if [ "$code" = "503" ]; then
-            echo "::error::503 formatter_unavailable — the on-device formatter capability did NOT"
-            echo "reach the backend. This is the exact defect that shipped: MedGemma provisioned and"
-            echo "smoke-tested, yet unreachable to every user because the launcher never enabled it."
-            exit 1
-          fi
-
-          # 200 (a model happened to be present) or 502 (llama-server/GGUF absent on this runner)
-          # both prove the request got past the capability gate and into the pipeline.
-          case "$code" in
-            200|502) echo "ok: capability reached the backend (HTTP $code)" ;;
-            *) echo "::error::unexpected status $code from /api/dictation/draft-local"; exit 1 ;;
-          esac
 
       - name: Stop the sidecar
         if: always()

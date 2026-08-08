@@ -269,7 +269,7 @@ builder.Services.AddScoped<IPromptOverrideStore, EfPromptOverrideStore>();
 builder.Services.AddScoped<RadioPad.Application.Abstractions.IDictationCleanupService,
     RadioPad.Application.Services.DictationCleanupService>();
 // Dictation-engine brief §4.2/§5 — deterministic on-device safety pipeline. Stateless singletons
-// that wrap whichever formatter runs (cloud default / local MedGemma optional).
+// that wrap whichever formatter runs (cloud default / on-device optional).
 builder.Services.AddSingleton<RadioPad.Application.Dictation.DeterministicPassThrough>();
 builder.Services.AddSingleton<RadioPad.Application.Dictation.DictationValidationService>();
 builder.Services.AddSingleton<RadioPad.Application.Dictation.LateralityNegationSentinel>();
@@ -284,7 +284,7 @@ builder.Services.AddSingleton<RadioPad.Application.Dictation.IDictationAuditStor
 // → audit). Scoped: wraps the scoped IDictationCleanupService.
 builder.Services.AddScoped<RadioPad.Application.Dictation.IDictationDraftService,
     RadioPad.Application.Dictation.DictationDraftService>();
-// §2.2 — optional on-device MedGemma report formatter (LocalOnly, loopback-enforced). Inert unless
+// §2.2 — optional on-device report formatter (LocalOnly, loopback-enforced). Inert unless
 // RADIOPAD_LOCAL_FORMATTER_ENABLED is set; the cloud formatter stays the default everywhere else.
 // The llama-server runtime is provisioned ON DEMAND (not bundled in the installer) and started
 // lazily by LlamaServerProcess — singleton so one process is shared and disposed with the host,
@@ -296,7 +296,7 @@ builder.Services.AddSingleton<RadioPad.Infrastructure.Providers.Local.LlamaServe
 // controller gates every endpoint on RADIOPAD_LOCAL_STT_ENABLED), so registering it always is safe.
 builder.Services.AddSingleton<RadioPad.Api.Services.LocalGenerationJobRunner>();
 builder.Services.AddSingleton<RadioPad.Application.Dictation.ILocalReportFormatter,
-    RadioPad.Infrastructure.Providers.Local.LocalMedGemmaFormatter>();
+    RadioPad.Infrastructure.Providers.Local.NullLocalReportFormatter>();
 // Cross-check LLM medical-accuracy review (hosted-side; routes via IAiGateway so
 // PHI policy + audit apply). Opt-in UBAG is honored by a forced provider.
 builder.Services.AddScoped<RadioPad.Application.Abstractions.ICrossCheckReviewService,
@@ -319,18 +319,14 @@ builder.Services.AddScoped<RadioPad.Application.Abstractions.ITranscriptionServi
 // The recognizer loads the native model once (singleton); the WAV decoder is stateless.
 builder.Services.AddSingleton<RadioPad.Infrastructure.Audio.IAudioDecoder,
     RadioPad.Infrastructure.Audio.WavAudioDecoder>();
-builder.Services.AddSingleton<RadioPad.Infrastructure.Providers.Local.SherpaParakeetSttClient>();
 // The ensemble orchestrator is the ILocalSttClient: it reconciles the available
 // engines when RADIOPAD_STT_ENSEMBLE is on (≥2 available), else transcribes
 // single-engine.
 builder.Services.AddSingleton<RadioPad.Application.Abstractions.ILocalSttClient,
     RadioPad.Infrastructure.Providers.Local.LocalSttEnsemble>();
-// Engines register as ILocalSttEngine for the orchestrator to consume.
-builder.Services.AddSingleton<RadioPad.Application.Abstractions.ILocalSttEngine>(
-    sp => sp.GetRequiredService<RadioPad.Infrastructure.Providers.Local.SherpaParakeetSttClient>());
 // MedASR (Google Conformer-CTC, radiology-tuned) — the DEFAULT primary on-device engine (D2), via
-// the public/ungated sherpa-onnx CTC bundle. Same sherpa-onnx CPU runtime as Parakeet; Available is
-// false until the bundle is provisioned, so it degrades gracefully to Parakeet / the cloud path.
+// the public/ungated sherpa-onnx CTC bundle. Available is false until the bundle is provisioned,
+// so it degrades gracefully to the cloud path.
 builder.Services.AddSingleton<RadioPad.Infrastructure.Providers.Local.SherpaMedAsrSttClient>();
 builder.Services.AddSingleton<RadioPad.Application.Abstractions.ILocalSttEngine>(
     sp => sp.GetRequiredService<RadioPad.Infrastructure.Providers.Local.SherpaMedAsrSttClient>());

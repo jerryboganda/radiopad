@@ -21,7 +21,7 @@ namespace RadioPad.Infrastructure.Providers.Local;
 /// </summary>
 public sealed class LocalSttEnsemble : ILocalSttClient
 {
-    private const string SingleProvider = SherpaParakeetSttClient.ProviderName; // "local"
+    private const string SingleProvider = SherpaMedAsrSttClient.ProviderName; // "local"
     private const string EnsembleProvider = "local_ensemble";
 
     private readonly IReadOnlyList<ILocalSttEngine> _engines;
@@ -103,14 +103,13 @@ public sealed class LocalSttEnsemble : ILocalSttClient
     /// <para>This is not hypothetical: the Edge Web Speech engine is frontend-only, so whenever it
     /// is the user's primary, EVERY sidecar transcription falls back. Before this order existed the
     /// fallback was <c>engines[0]</c> — i.e. whichever engine DI happened to register first — which
-    /// silently routed dictation to Parakeet even with MedASR installed and available, defeating
-    /// decision D2. Registration order is an implementation detail and must never decide which
-    /// engine transcribes a radiologist's dictation.</para>
+    /// silently routed dictation to an unintended engine even with MedASR installed and available,
+    /// defeating decision D2. Registration order is an implementation detail and must never decide
+    /// which engine transcribes a radiologist's dictation.</para>
     /// </summary>
     private static readonly string[] FallbackEngineOrder =
     {
         SherpaMedAsrSttClient.EngineName,      // D2: the radiology-tuned default primary
-        SherpaParakeetSttClient.EngineName,    // general-purpose alternative
         LocalModelCatalog.WindowsSapiEngine,   // always-present Windows recognizer
     };
 
@@ -147,9 +146,8 @@ public sealed class LocalSttEnsemble : ILocalSttClient
         }
     }
 
-    // Parakeet (transducer) is over-confident vs a calibrated token-prob, so scale
-    // it down for a fair calibrated vote regardless of which engine leads. A starting
-    // prior until reliability tables are built from a held-out dictation set.
+    // No engine-specific confidence scaling is currently needed; reserved for future
+    // per-engine calibration once reliability tables exist from a held-out dictation set.
     private static ReconcileOptions BuildOptions()
-        => new() { EngineScale = new Dictionary<string, double> { [SherpaParakeetSttClient.EngineName] = 0.9 } };
+        => new();
 }
