@@ -62,6 +62,8 @@ import DictationDraftPanel from './DictationDraftPanel';
 import SignAndSendButton from './SignAndSendButton';
 import CopyToRisButton from './CopyToRisButton';
 import ReportInspector, { type InspectorTab } from './ReportInspector';
+import PositiveFindingsTab from './components/PositiveFindingsTab';
+import reportingClient, { type DictationAudioDto } from '@/lib/api/reportingClient';
 import {
   SECTIONS,
   SECTION_FIELD_MAP,
@@ -243,6 +245,40 @@ export default function ReportPage() {
   const [showDictationDraft, setShowDictationDraft] = useState(false);
   const [showSignSend, setShowSignSend] = useState(false);
   const [pairOpen, setPairOpen] = useState(false);
+  const [workspaceTab, setWorkspaceTab] = useState<'editor' | 'positive-findings'>('editor');
+  const [dictations, setDictations] = useState<DictationAudioDto[]>([]);
+
+  const refreshDictations = useCallback(async () => {
+    if (!id) return;
+    try {
+      const res = await reportingClient.getReportById(id);
+      if (res && res.dictations) {
+        setDictations(res.dictations);
+      }
+    } catch {
+      /* ignore fetch error in offline/unmocked test scenarios */
+    }
+  }, [id]);
+
+  useEffect(() => {
+    void refreshDictations();
+  }, [refreshDictations]);
+
+  const handleAppendToFindings = useCallback(async (text: string) => {
+    if (!text || !text.trim()) return;
+    const currentFindings = reportRef.current?.findings || '';
+    const newFindings = currentFindings.trim()
+      ? `${currentFindings.trim()}\n\n${text.trim()}`
+      : text.trim();
+
+    await update({ findings: newFindings });
+    toast({ tone: 'success', title: 'Appended', message: 'Dictation findings appended to main report.' });
+  }, [update, toast]);
+
+  const handleRetranscribe = useCallback(async (dictationId: string, engine: string) => {
+    toast({ tone: 'info', title: 'Re-transcribe requested', message: `Re-running dictation ${dictationId.slice(0, 6)} with ${engine}...` });
+    await refreshDictations();
+  }, [toast, refreshDictations]);
   /**
    * Whether unresolved Blockers should stop acknowledge/export in the UI.
    * Mirrors the tenant's `RequireZeroBlockers`, which the API enforces on
@@ -1784,468 +1820,507 @@ export default function ReportPage() {
             <span className={`rp-status ${statusTone(report.status)}`}>{statusLabel(report.status)}</span>
           </div>
 
-          {voiceCommandPills.length > 0 && (
-            <div className="rp-row" style={{ gap: 6, flexWrap: 'wrap', marginBottom: 8 }}>
-              {voiceCommandPills.map((pill) => (
-                <span key={pill.id} className="badge" data-testid="voice-command-pill">{pill.command}</span>
-              ))}
-            </div>
-          )}
-
-          {generatingJob && dismissedGenBanner !== generatingJob.id && (
-            <GenerationBanner
-              job={generatingJob}
-              onDismiss={() => setDismissedGenBanner(generatingJob.id)}
-              onStop={() => { void jobs.cancel(generatingJob.id); }}
-              previewSlot={
-                <AiStreamPreview
-                  jobId={generatingJob.id}
-                  job={generatingJob}
-                  variant={generatingJob.kind === 'local-generate' ? 'local' : 'generate'}
-                  onStop={() => { void jobs.cancel(generatingJob.id); }}
-                  onRegenerate={() => { void jobs.retry(generatingJob.id); }}
-                />
-              }
-            />
-          )}
-
-          {generateReadyJobId && (
-            <div className="banner info" role="status" data-testid="draft-ready-banner">
-              A freshly generated draft is ready.
-              <button
-                className="ghost"
-                type="button"
-                style={{ marginLeft: 8 }}
-                onClick={() => {
-                  const jid = generateReadyJobId;
-                  setGenerateReadyJobId(null);
-                  void reloadReport().then(() => { if (jid) markAppliedJob(jid); });
-                }}
-              >
-                Refresh to see it
-              </button>
-            </div>
-          )}
-
-          {pendingAiResult && (
-            <div className="banner ai" role="status" data-testid="pending-ai-result">
-              <span className="badge ai">✨ generated</span>{' '}
-              {pendingAiResult.kind === 'impression'
-                ? 'A new impression'
-                : pendingAiResult.kind === 'cleanup'
-                  ? 'Cleaned-up dictation'
-                  : 'A generated draft'}{' '}
-              is ready, but this report changed since it was requested — review before applying.
-              <div className="rp-toolbar rp-mt-sm">
-                <button className="primary" type="button" onClick={() => { void applyPendingResult(); }}>
-                  Apply
-                </button>
-                <button className="ghost" type="button" onClick={dismissPendingResult}>
-                  Dismiss
-                </button>
-              </div>
-            </div>
-          )}
-
-          <ComposerRibbon
-            dictating={dictating}
-            onDictate={() => window.dispatchEvent(new CustomEvent('radiopad:dictate'))}
-            voiceCommandMode={voiceCommandMode}
-            onToggleVoiceCommands={() => setVoiceCommandMode((v) => !v)}
-            canValidate={canValidate}
-            onValidate={validate}
-            showPrior={showPrior}
-            onToggleCompare={() => setShowPrior((v) => !v)}
-            showDictationDraft={showDictationDraft}
-            onToggleFormatDraft={() => setShowDictationDraft((v) => !v)}
-            canEdit={canEdit}
-            activeActions={activeAiActions}
-            onGenerateDraft={() => { void runGenerateDraft(); }}
-            onGenerateImpression={() => { void runAi('impression'); }}
-            rewriteModes={REWRITE_MODES}
-            sections={REWRITABLE_KEYS.map((k) => ({
-              key: k as string,
-              label: SECTIONS.find((s) => s.key === k)?.label ?? (k as string),
-            }))}
-            rewriteSection={rewriteSection as string}
-            onRewriteSectionChange={(k) => setRewriteSection(k as keyof Report | 'full')}
-            onRewrite={(mode, instruction) => { void runRewrite(mode, undefined, instruction); }}
-            rewriteBusy={rewriteBusy}
-            rewriteOpen={rewriteOpen}
-            onRewriteOpenChange={setRewriteOpen}
-            stylePanelOpen={stylePanelOpen}
-            onToggleStylePanel={() => setStylePanelOpen((v) => !v)}
-            providerId={providerId}
-            providers={providers.filter((x) => x.enabled).map((x) => ({ id: x.id, name: x.name }))}
-            rewriteProviderId={rewriteProviderId}
-            onRewriteProviderChange={setRewriteProviderId}
-            canSign={canSign}
-            canExport={canExport}
-            showSignSend={showSignSend}
-            onToggleSignSend={() => setShowSignSend((v) => !v)}
-            blockers={blockers}
-            enforceBlockers={enforceBlockers}
-            onAcknowledge={acknowledge}
-            primarySigned={primarySigned}
-            onOpenSignoff={() => setInspectorTab('signoff')}
-            pairOpen={pairOpen}
-            onTogglePair={() => setPairOpen((v) => !v)}
-          />
-
-          <div ref={pairPanelRef}>
-            <CompanionHostPanel open={pairOpen} />
+          <div className="rp-tabs mb-4" role="tablist" aria-label="Report workspace tabs">
+            <button
+              type="button"
+              role="tab"
+              aria-selected={workspaceTab === 'editor'}
+              className={`rp-tab${workspaceTab === 'editor' ? ' active' : ''}`}
+              onClick={() => setWorkspaceTab('editor')}
+              data-testid="tab-report-editor"
+            >
+              Report Editor
+            </button>
+            <button
+              type="button"
+              role="tab"
+              aria-selected={workspaceTab === 'positive-findings'}
+              className={`rp-tab${workspaceTab === 'positive-findings' ? ' active' : ''}`}
+              onClick={() => setWorkspaceTab('positive-findings')}
+              data-testid="tab-positive-findings"
+            >
+              Positive Findings
+              {dictations.length > 0 && (
+                <span className="badge font-mono text-xs bg-cyan-950 text-cyan-300 border border-cyan-800 px-1.5 py-0.5 rounded-full ml-1.5">
+                  {dictations.length}
+                </span>
+              )}
+            </button>
           </div>
 
-          {/* PRD §14.15 (CR-001..010) — critical-results communication loop for
-              this report: log the finding, record the call, capture the
-              read-back. RadioPad never communicates on the radiologist's
-              behalf; every transition here is an explicit human action. */}
-          <CriticalResultPanel reportId={report.id} />
-
-          {/* Transient AI working surfaces — appear between the AI bar and the cards. */}
-          {stylePanelOpen && (
-            <div className="rp-panel">
-              <div className="rp-panel-title">Style rewrite</div>
-              <div className="section-block">
-                <label htmlFor="rp-style-section">Apply to</label>
-                <select
-                  id="rp-style-section"
-                  className="rp-input"
-                  value={styleSection}
-                  onChange={(e) =>
-                    setStyleSection(e.target.value as 'findings' | 'impression' | 'recommendations')
-                  }
-                >
-                  <option value="findings">Findings</option>
-                  <option value="impression">Impression</option>
-                  <option value="recommendations">Recommendations</option>
-                </select>
-              </div>
-              <RewriteStylePanel
-                reportId={report.id}
-                section={styleSection}
-                currentText={String((report as Record<string, unknown>)[styleSection] ?? '')}
-                providerId={providerId || undefined}
-                onAccept={async (text) => {
-                  setAiUndo((prev) => ({
-                    ...prev,
-                    [styleSection]: String((reportRef.current as Record<string, unknown> | null)?.[styleSection] ?? ''),
-                  }));
-                  const next = { ...aiHighlights, [styleSection]: true };
-                  setAiHighlights(next);
-                  await update({
-                    [styleSection]: text,
-                    aiHighlightsJson: JSON.stringify(next),
-                  } as Partial<Report>);
-                  setStylePanelOpen(false);
-                }}
-              />
-            </div>
-          )}
-
-          {showPrior && <PriorComparePanel reportId={report.id} />}
-
-          {showSignSend && canSign && canExport && (
-            <div ref={signSendPanelRef}>
-              <SignAndSendButton reportId={report.id} />
-            </div>
-          )}
-
-          {showDictationDraft && (
-            <DictationDraftPanel
+          {workspaceTab === 'positive-findings' ? (
+            <PositiveFindingsTab
               reportId={report.id}
-              initialText={String((report as Record<string, unknown>).findings ?? '')}
-              onApply={async (sections) => {
-                const patch: Partial<Report> = {};
-                const nextHighlights = { ...aiHighlightsRef.current };
-                const undo: Record<string, string> = {};
-                (['indication', 'technique', 'findings', 'impression', 'recommendations'] as const).forEach((k) => {
-                  const v = sections[k];
-                  if (v && v.trim()) {
-                    undo[k] = String((reportRef.current as Record<string, unknown> | null)?.[k] ?? '');
-                    (patch as Record<string, unknown>)[k] = v;
-                    nextHighlights[k] = true;
-                  }
-                });
-                if (Object.keys(patch).length === 0) return;
-                setAiUndo((prev) => ({ ...prev, ...undo }));
-                setAiHighlights(nextHighlights);
-                await update({ ...patch, aiHighlightsJson: JSON.stringify(nextHighlights) } as Partial<Report>);
-              }}
+              dictations={dictations}
+              onAppendToFindings={handleAppendToFindings}
+              onRefreshDictations={refreshDictations}
+              onRetranscribe={handleRetranscribe}
             />
-          )}
-
-          {rewriteDraft && (
-            <div className="rp-panel" ref={rewritePreviewRef}>
-              <div className="rp-panel-title">
-                Rewrite preview · <code>{rewriteDraft.mode}</code>
-                <span className="badge ai">✨ generated</span>
-              </div>
-              <p className="rp-page-sub">
-                Section: <code>{rewriteDraft.section === 'full' ? 'Full report' : String(rewriteDraft.section)}</code>
-              </p>
-              {rewriteDraft.section === 'full' && (!rewriteDraft.sections || Object.keys(rewriteDraft.sections).length === 0) && (
-                <div role="alert" className="text-warning" style={{ marginTop: 4, marginBottom: 8, fontSize: 13 }}>
-                  Couldn&apos;t match this response back to report sections — Accept is disabled. Reject and try again,
-                  or rewrite one section at a time instead.
+          ) : (
+            <>
+              {voiceCommandPills.length > 0 && (
+                <div className="rp-row" style={{ gap: 6, flexWrap: 'wrap', marginBottom: 8 }}>
+                  {voiceCommandPills.map((pill) => (
+                    <span key={pill.id} className="badge" data-testid="voice-command-pill">{pill.command}</span>
+                  ))}
                 </div>
               )}
-              {rewriteDraft.diff ? (
-                <div className="rp-rewrite-diff">
-                  <div>
-                    <div className="rp-stat-label">Original</div>
-                    <pre className="rp-rewrite-pre">{rewriteDraft.original || '(empty)'}</pre>
+
+              {generatingJob && dismissedGenBanner !== generatingJob.id && (
+                <GenerationBanner
+                  job={generatingJob}
+                  onDismiss={() => setDismissedGenBanner(generatingJob.id)}
+                  onStop={() => { void jobs.cancel(generatingJob.id); }}
+                  previewSlot={
+                    <AiStreamPreview
+                      jobId={generatingJob.id}
+                      job={generatingJob}
+                      variant={generatingJob.kind === 'local-generate' ? 'local' : 'generate'}
+                      onStop={() => { void jobs.cancel(generatingJob.id); }}
+                      onRegenerate={() => { void jobs.retry(generatingJob.id); }}
+                    />
+                  }
+                />
+              )}
+
+              {generateReadyJobId && (
+                <div className="banner info" role="status" data-testid="draft-ready-banner">
+                  A freshly generated draft is ready.
+                  <button
+                    className="ghost"
+                    type="button"
+                    style={{ marginLeft: 8 }}
+                    onClick={() => {
+                      const jid = generateReadyJobId;
+                      setGenerateReadyJobId(null);
+                      void reloadReport().then(() => { if (jid) markAppliedJob(jid); });
+                    }}
+                  >
+                    Refresh to see it
+                  </button>
+                </div>
+              )}
+
+              {pendingAiResult && (
+                <div className="banner ai" role="status" data-testid="pending-ai-result">
+                  <span className="badge ai">✨ generated</span>{' '}
+                  {pendingAiResult.kind === 'impression'
+                    ? 'A new impression'
+                    : pendingAiResult.kind === 'cleanup'
+                      ? 'Cleaned-up dictation'
+                      : 'A generated draft'}{' '}
+                  is ready, but this report changed since it was requested — review before applying.
+                  <div className="rp-toolbar rp-mt-sm">
+                    <button className="primary" type="button" onClick={() => { void applyPendingResult(); }}>
+                      Apply
+                    </button>
+                    <button className="ghost" type="button" onClick={dismissPendingResult}>
+                      Dismiss
+                    </button>
                   </div>
-                  <div>
-                    <div className="rp-stat-label">Proposed</div>
+                </div>
+              )}
+
+              <ComposerRibbon
+                dictating={dictating}
+                onDictate={() => window.dispatchEvent(new CustomEvent('radiopad:dictate'))}
+                voiceCommandMode={voiceCommandMode}
+                onToggleVoiceCommands={() => setVoiceCommandMode((v) => !v)}
+                canValidate={canValidate}
+                onValidate={validate}
+                showPrior={showPrior}
+                onToggleCompare={() => setShowPrior((v) => !v)}
+                showDictationDraft={showDictationDraft}
+                onToggleFormatDraft={() => setShowDictationDraft((v) => !v)}
+                canEdit={canEdit}
+                activeActions={activeAiActions}
+                onGenerateDraft={() => { void runGenerateDraft(); }}
+                onGenerateImpression={() => { void runAi('impression'); }}
+                rewriteModes={REWRITE_MODES}
+                sections={REWRITABLE_KEYS.map((k) => ({
+                  key: k as string,
+                  label: SECTIONS.find((s) => s.key === k)?.label ?? (k as string),
+                }))}
+                rewriteSection={rewriteSection as string}
+                onRewriteSectionChange={(k) => setRewriteSection(k as keyof Report | 'full')}
+                onRewrite={(mode, instruction) => { void runRewrite(mode, undefined, instruction); }}
+                rewriteBusy={rewriteBusy}
+                rewriteOpen={rewriteOpen}
+                onRewriteOpenChange={setRewriteOpen}
+                stylePanelOpen={stylePanelOpen}
+                onToggleStylePanel={() => setStylePanelOpen((v) => !v)}
+                providerId={providerId}
+                providers={providers.filter((x) => x.enabled).map((x) => ({ id: x.id, name: x.name }))}
+                rewriteProviderId={rewriteProviderId}
+                onRewriteProviderChange={setRewriteProviderId}
+                canSign={canSign}
+                canExport={canExport}
+                showSignSend={showSignSend}
+                onToggleSignSend={() => setShowSignSend((v) => !v)}
+                blockers={blockers}
+                enforceBlockers={enforceBlockers}
+                onAcknowledge={acknowledge}
+                primarySigned={primarySigned}
+                onOpenSignoff={() => setInspectorTab('signoff')}
+                pairOpen={pairOpen}
+                onTogglePair={() => setPairOpen((v) => !v)}
+              />
+
+              <div ref={pairPanelRef}>
+                <CompanionHostPanel open={pairOpen} />
+              </div>
+
+              {/* PRD §14.15 (CR-001..010) — critical-results communication loop for
+                  this report: log the finding, record the call, capture the
+                  read-back. RadioPad never communicates on the radiologist's
+                  behalf; every transition here is an explicit human action. */}
+              <CriticalResultPanel reportId={report.id} />
+
+              {/* Transient AI working surfaces — appear between the AI bar and the cards. */}
+              {stylePanelOpen && (
+                <div className="rp-panel">
+                  <div className="rp-panel-title">Style rewrite</div>
+                  <div className="section-block">
+                    <label htmlFor="rp-style-section">Apply to</label>
+                    <select
+                      id="rp-style-section"
+                      className="rp-input"
+                      value={styleSection}
+                      onChange={(e) =>
+                        setStyleSection(e.target.value as 'findings' | 'impression' | 'recommendations')
+                      }
+                    >
+                      <option value="findings">Findings</option>
+                      <option value="impression">Impression</option>
+                      <option value="recommendations">Recommendations</option>
+                    </select>
+                  </div>
+                  <RewriteStylePanel
+                    reportId={report.id}
+                    section={styleSection}
+                    currentText={String((report as Record<string, unknown>)[styleSection] ?? '')}
+                    providerId={providerId || undefined}
+                    onAccept={async (text) => {
+                      setAiUndo((prev) => ({
+                        ...prev,
+                        [styleSection]: String((reportRef.current as Record<string, unknown> | null)?.[styleSection] ?? ''),
+                      }));
+                      const next = { ...aiHighlights, [styleSection]: true };
+                      setAiHighlights(next);
+                      await update({
+                        [styleSection]: text,
+                        aiHighlightsJson: JSON.stringify(next),
+                      } as Partial<Report>);
+                      setStylePanelOpen(false);
+                    }}
+                  />
+                </div>
+              )}
+
+              {showPrior && <PriorComparePanel reportId={report.id} />}
+
+              {showSignSend && canSign && canExport && (
+                <div ref={signSendPanelRef}>
+                  <SignAndSendButton reportId={report.id} />
+                </div>
+              )}
+
+              {showDictationDraft && (
+                <DictationDraftPanel
+                  reportId={report.id}
+                  initialText={String((report as Record<string, unknown>).findings ?? '')}
+                  onApply={async (sections) => {
+                    const patch: Partial<Report> = {};
+                    const nextHighlights = { ...aiHighlightsRef.current };
+                    const undo: Record<string, string> = {};
+                    (['indication', 'technique', 'findings', 'impression', 'recommendations'] as const).forEach((k) => {
+                      const v = sections[k];
+                      if (v && v.trim()) {
+                        undo[k] = String((reportRef.current as Record<string, unknown> | null)?.[k] ?? '');
+                        (patch as Record<string, unknown>)[k] = v;
+                        nextHighlights[k] = true;
+                      }
+                    });
+                    if (Object.keys(patch).length === 0) return;
+                    setAiUndo((prev) => ({ ...prev, ...undo }));
+                    setAiHighlights(nextHighlights);
+                    await update({ ...patch, aiHighlightsJson: JSON.stringify(nextHighlights) } as Partial<Report>);
+                  }}
+                />
+              )}
+
+              {rewriteDraft && (
+                <div className="rp-panel" ref={rewritePreviewRef}>
+                  <div className="rp-panel-title">
+                    Rewrite preview · <code>{rewriteDraft.mode}</code>
+                    <span className="badge ai">✨ generated</span>
+                  </div>
+                  <p className="rp-page-sub">
+                    Section: <code>{rewriteDraft.section === 'full' ? 'Full report' : String(rewriteDraft.section)}</code>
+                  </p>
+                  {rewriteDraft.section === 'full' && (!rewriteDraft.sections || Object.keys(rewriteDraft.sections).length === 0) && (
+                    <div role="alert" className="text-warning" style={{ marginTop: 4, marginBottom: 8, fontSize: 13 }}>
+                      Couldn&apos;t match this response back to report sections — Accept is disabled. Reject and try again,
+                      or rewrite one section at a time instead.
+                    </div>
+                  )}
+                  {rewriteDraft.diff ? (
+                    <div className="rp-rewrite-diff">
+                      <div>
+                        <div className="rp-stat-label">Original</div>
+                        <pre className="rp-rewrite-pre">{rewriteDraft.original || '(empty)'}</pre>
+                      </div>
+                      <div>
+                        <div className="rp-stat-label">Proposed</div>
+                        <div className="ai-mark">
+                          <pre className="rp-rewrite-pre">{rewriteDraft.proposed}</pre>
+                        </div>
+                      </div>
+                    </div>
+                  ) : (
                     <div className="ai-mark">
                       <pre className="rp-rewrite-pre">{rewriteDraft.proposed}</pre>
                     </div>
-                  </div>
-                </div>
-              ) : (
-                <div className="ai-mark">
-                  <pre className="rp-rewrite-pre">{rewriteDraft.proposed}</pre>
-                </div>
-              )}
-              {rewriteDraft.violations && rewriteDraft.violations.length > 0 && (
-                <div role="alert" className="text-warning" style={{ marginTop: 8, fontSize: 13 }}>
-                  <strong>Requires review — this edit added values not in the original text:</strong>
-                  <ul style={{ margin: '4px 0 0', paddingLeft: 18 }}>
-                    {rewriteDraft.violations.map((v, i) => (
-                      <li key={i}>{v.detail}</li>
-                    ))}
-                  </ul>
-                </div>
-              )}
-              <div className="rp-toolbar rp-mt-sm">
-                <button
-                  className="primary"
-                  disabled={rewriteDraft.section === 'full' && (!rewriteDraft.sections || Object.keys(rewriteDraft.sections).length === 0)}
-                  onClick={acceptRewrite}
-                >
-                  Accept
-                </button>
-                <button className="ghost" onClick={() => setRewriteDraft(null)}>Reject</button>
-                <button
-                  className="subtle"
-                  onClick={() => setRewriteDraft({ ...rewriteDraft, diff: !rewriteDraft.diff })}
-                >
-                  {rewriteDraft.diff ? 'Hide diff' : 'Diff'}
-                </button>
-              </div>
-            </div>
-          )}
-
-          {Object.values(corrections).some((list) => list.length > 0) && (
-            <div className="rp-panel" data-testid="crosscheck-panel">
-              <div className="rp-panel-title">
-                Cross-check suggestions <span className="badge ai">AI</span>
-              </div>
-              <p className="rp-page-sub">
-                Review each change the cross-check engines and medical AI proposed. Accepting applies the edit.
-              </p>
-              {Object.entries(corrections).flatMap(([sectionKey, list]) =>
-                list.map((c) => (
-                  <div key={c.id} className={`rp-xc-item ${c.severity}`}>
-                    <div className="rp-xc-change">
-                      <span className="rp-xc-from">{c.originalText || '∅'}</span>
-                      <span className="rp-xc-arrow" aria-hidden="true">→</span>
-                      <span className="rp-xc-to">{c.correctedText}</span>
+                  )}
+                  {rewriteDraft.violations && rewriteDraft.violations.length > 0 && (
+                    <div role="alert" className="text-warning" style={{ marginTop: 8, fontSize: 13 }}>
+                      <strong>Requires review — this edit added values not in the original text:</strong>
+                      <ul style={{ margin: '4px 0 0', paddingLeft: 18 }}>
+                        {rewriteDraft.violations.map((v, i) => (
+                          <li key={i}>{v.detail}</li>
+                        ))}
+                      </ul>
                     </div>
-                    <div className="rp-xc-meta">
-                      <span className="badge">{sectionKey}</span>
-                      <span className="rp-xc-reason">{c.reason}</span>
-                      <span className="rp-xc-source">{c.source}</span>
-                    </div>
-                    <div className="rp-row" style={{ gap: 8 }}>
-                      <button className="primary" onClick={() => acceptCorrection(c)}>Accept</button>
-                      <button className="ghost" onClick={() => rejectCorrection(sectionKey, c.id)}>Reject</button>
-                    </div>
-                  </div>
-                )),
-              )}
-              <div className="rp-toolbar rp-mt-sm">
-                {Object.keys(corrections).map((sectionKey) =>
-                  (corrections[sectionKey]?.length ?? 0) > 0 ? (
-                    <button key={sectionKey} className="subtle" onClick={() => acceptAllCorrections(sectionKey)}>
-                      Accept all
+                  )}
+                  <div className="rp-toolbar rp-mt-sm">
+                    <button
+                      className="primary"
+                      disabled={rewriteDraft.section === 'full' && (!rewriteDraft.sections || Object.keys(rewriteDraft.sections).length === 0)}
+                      onClick={acceptRewrite}
+                    >
+                      Accept
                     </button>
-                  ) : null,
-                )}
-                <button className="ghost" onClick={() => setCorrections({})}>Reject all</button>
-                <button className="subtle" onClick={() => { void flushEdits().catch(() => {}); }}>Save</button>
-              </div>
-            </div>
-          )}
+                    <button className="ghost" onClick={() => setRewriteDraft(null)}>Reject</button>
+                    <button
+                      className="subtle"
+                      onClick={() => setRewriteDraft({ ...rewriteDraft, diff: !rewriteDraft.diff })}
+                    >
+                      {rewriteDraft.diff ? 'Hide diff' : 'Diff'}
+                    </button>
+                  </div>
+                </div>
+              )}
 
-          {hasAiText && (
-            <div className="banner ai">
-              AI-generated text is highlighted below — review every section before acknowledging.
-            </div>
-          )}
+              {Object.values(corrections).some((list) => list.length > 0) && (
+                <div className="rp-panel" data-testid="crosscheck-panel">
+                  <div className="rp-panel-title">
+                    Cross-check suggestions <span className="badge ai">AI</span>
+                  </div>
+                  <p className="rp-page-sub">
+                    Review each change the cross-check engines and medical AI proposed. Accepting applies the edit.
+                  </p>
+                  {Object.entries(corrections).flatMap(([sectionKey, list]) =>
+                    list.map((c) => (
+                      <div key={c.id} className={`rp-xc-item ${c.severity}`}>
+                        <div className="rp-xc-change">
+                          <span className="rp-xc-from">{c.originalText || '∅'}</span>
+                          <span className="rp-xc-arrow" aria-hidden="true">→</span>
+                          <span className="rp-xc-to">{c.correctedText}</span>
+                        </div>
+                        <div className="rp-xc-meta">
+                          <span className="badge">{sectionKey}</span>
+                          <span className="rp-xc-reason">{c.reason}</span>
+                          <span className="rp-xc-source">{c.source}</span>
+                        </div>
+                        <div className="rp-row" style={{ gap: 8 }}>
+                          <button className="primary" onClick={() => acceptCorrection(c)}>Accept</button>
+                          <button className="ghost" onClick={() => rejectCorrection(sectionKey, c.id)}>Reject</button>
+                        </div>
+                      </div>
+                    )),
+                  )}
+                  <div className="rp-toolbar rp-mt-sm">
+                    {Object.keys(corrections).map((sectionKey) =>
+                      (corrections[sectionKey]?.length ?? 0) > 0 ? (
+                        <button key={sectionKey} className="subtle" onClick={() => acceptAllCorrections(sectionKey)}>
+                          Accept all
+                        </button>
+                      ) : null,
+                    )}
+                    <button className="ghost" onClick={() => setCorrections({})}>Reject all</button>
+                    <button className="subtle" onClick={() => { void flushEdits().catch(() => {}); }}>Save</button>
+                  </div>
+                </div>
+              )}
 
-          {unmetRequiredSections.length > 0 && (
-            <div className="banner warn" data-testid="required-sections-notice">
-              This template marks {unmetRequiredSections.length === 1 ? 'a section' : 'sections'} as
-              required, still empty: <strong>{unmetRequiredSections.join(', ')}</strong>.
-            </div>
-          )}
+              {hasAiText && (
+                <div className="banner ai">
+                  AI-generated text is highlighted below — review every section before acknowledging.
+                </div>
+              )}
 
-          {scaffoldNotice && (
-            <div className="banner info" data-testid="scaffold-notice">
-              Template changed to “{scaffoldNotice.templateName}” — kept your text in:{' '}
-              {scaffoldNotice.kept.join(', ')}.
-              <button
-                className="ghost"
-                type="button"
-                style={{ marginLeft: 8 }}
-                onClick={() => setScaffoldNotice(null)}
-              >
-                Dismiss
-              </button>
-            </div>
-          )}
+              {unmetRequiredSections.length > 0 && (
+                <div className="banner warn" data-testid="required-sections-notice">
+                  This template marks {unmetRequiredSections.length === 1 ? 'a section' : 'sections'} as
+                  required, still empty: <strong>{unmetRequiredSections.join(', ')}</strong>.
+                </div>
+              )}
 
-          {SECTIONS.map(({ key, label, cls }) => {
-            const keyStr = key as string;
-            // Only Comparison is dismissible. Findings/Impression are where the
-            // radiologist types — hiding those would remove the ability to
-            // write the report at all — and the rest carry required content.
-            const dismissible = keyStr === 'comparison';
-            const sectionText = String((report as unknown as Record<string, unknown>)[keyStr] ?? '').trim();
-            // Blank-only, deliberately: `comparison` IS serialized into the HL7
-            // ORU and FHIR exports, so hiding a section that still holds text
-            // would send content to the RIS the radiologist can no longer see —
-            // precisely the defect documented in reportShared.tsx. If text ever
-            // lands here (typed, dictated, or inserted by the prior-compare
-            // panel) the card reappears on its own.
-            const canHideThis = dismissible && sectionText === '';
-            if (canHideThis && hiddenSections[keyStr]) return null;
-            const generated = Boolean(aiHighlights[keyStr]);
-            const rewritable = REWRITABLE_KEYS.includes(key);
-            const menuItems: SectionCardMenuItem[] = [];
-            if (canEdit && rewritable) {
-              menuItems.push(
-                { label: 'Make concise', onClick: () => { void runRewrite('concise', key); } },
-                { label: 'Formal register', onClick: () => { void runRewrite('formal', key); } },
-                { label: 'Patient-friendly', onClick: () => { void runRewrite('patient_friendly', key); } },
-                { label: 'Referring summary', onClick: () => { void runRewrite('referring_summary', key); } },
-                {
-                  label: 'Rewrite in my style',
-                  onClick: () => {
-                    setStyleSection(keyStr as 'findings' | 'impression' | 'recommendations');
-                    setStylePanelOpen(true);
-                  },
-                },
-              );
-            }
-            if (canEdit && generated) {
-              menuItems.push(
-                { label: 'Accept AI text', onClick: () => { void acceptSection(keyStr); } },
-                {
-                  label: 'Undo AI insertion',
-                  onClick: () => { void undoSection(keyStr); },
-                  disabled: aiUndo[keyStr] === undefined,
-                },
-              );
-            }
-            return (
-              <Fragment key={keyStr}>
-              <SectionCard
-                sectionKey={keyStr}
-                title={SECTION_TITLES[keyStr] ?? label}
-                icon={SECTION_ICONS[keyStr]}
-                generated={generated}
-                menuItems={menuItems}
-                flash={flash?.section === keyStr ? flash.tone : undefined}
-                onDismiss={canHideThis ? () => hideSection(keyStr) : undefined}
-                actions={
-                  canEdit && generated ? (
-                    <>
-                      <button className="primary" type="button" onClick={() => { void acceptSection(keyStr); }}>
-                        Accept
-                      </button>
-                      <button
-                        className="ghost"
-                        type="button"
-                        disabled={aiUndo[keyStr] === undefined}
-                        title={aiUndo[keyStr] === undefined ? 'No earlier text recorded for this section' : undefined}
-                        onClick={() => { void undoSection(keyStr); }}
-                      >
-                        Undo
-                      </button>
-                      <span className="rp-sectioncard-hint">Editing or accepting clears the review flag.</span>
-                    </>
-                  ) : undefined
+              {scaffoldNotice && (
+                <div className="banner info" data-testid="scaffold-notice">
+                  Template changed to “{scaffoldNotice.templateName}” — kept your text in:{' '}
+                  {scaffoldNotice.kept.join(', ')}.
+                  <button
+                    className="ghost"
+                    type="button"
+                    style={{ marginLeft: 8 }}
+                    onClick={() => setScaffoldNotice(null)}
+                  >
+                    Dismiss
+                  </button>
+                </div>
+              )}
+
+              {SECTIONS.map(({ key, label, cls }) => {
+                const keyStr = key as string;
+                // Only Comparison is dismissible. Findings/Impression are where the
+                // radiologist types — hiding those would remove the ability to
+                // write the report at all — and the rest carry required content.
+                const dismissible = keyStr === 'comparison';
+                const sectionText = String((report as unknown as Record<string, unknown>)[keyStr] ?? '').trim();
+                // Blank-only, deliberately: `comparison` IS serialized into the HL7
+                // ORU and FHIR exports, so hiding a section that still holds text
+                // would send content to the RIS the radiologist can no longer see —
+                // precisely the defect documented in reportShared.tsx. If text ever
+                // lands here (typed, dictated, or inserted by the prior-compare
+                // panel) the card reappears on its own.
+                const canHideThis = dismissible && sectionText === '';
+                if (canHideThis && hiddenSections[keyStr]) return null;
+                const generated = Boolean(aiHighlights[keyStr]);
+                const rewritable = REWRITABLE_KEYS.includes(key);
+                const menuItems: SectionCardMenuItem[] = [];
+                if (canEdit && rewritable) {
+                  menuItems.push(
+                    { label: 'Make concise', onClick: () => { void runRewrite('concise', key); } },
+                    { label: 'Formal register', onClick: () => { void runRewrite('formal', key); } },
+                    { label: 'Patient-friendly', onClick: () => { void runRewrite('patient_friendly', key); } },
+                    { label: 'Referring summary', onClick: () => { void runRewrite('referring_summary', key); } },
+                    {
+                      label: 'Rewrite in my style',
+                      onClick: () => {
+                        setStyleSection(keyStr as 'findings' | 'impression' | 'recommendations');
+                        setStylePanelOpen(true);
+                      },
+                    },
+                  );
                 }
-              >
-                <div className={generated ? 'ai-mark' : ''}>
-                  {richEditor ? (
-                    <SectionEditor
-                      sectionKey={keyStr}
-                      className={cls}
-                      ariaLabel={SECTION_TITLES[keyStr] ?? label}
-                      value={(report as Record<string, unknown>)[keyStr] as string}
-                      corrections={anchorCorrections(
-                        (report as Record<string, unknown>)[keyStr] as string,
-                        corrections[keyStr] ?? [],
+                if (canEdit && generated) {
+                  menuItems.push(
+                    { label: 'Accept AI text', onClick: () => { void acceptSection(keyStr); } },
+                    {
+                      label: 'Undo AI insertion',
+                      onClick: () => { void undoSection(keyStr); },
+                      disabled: aiUndo[keyStr] === undefined,
+                    },
+                  );
+                }
+                return (
+                  <Fragment key={keyStr}>
+                  <SectionCard
+                    sectionKey={keyStr}
+                    title={SECTION_TITLES[keyStr] ?? label}
+                    icon={SECTION_ICONS[keyStr]}
+                    generated={generated}
+                    menuItems={menuItems}
+                    flash={flash?.section === keyStr ? flash.tone : undefined}
+                    onDismiss={canHideThis ? () => hideSection(keyStr) : undefined}
+                    actions={
+                      canEdit && generated ? (
+                        <>
+                          <button className="primary" type="button" onClick={() => { void acceptSection(keyStr); }}>
+                            Accept
+                          </button>
+                          <button
+                            className="ghost"
+                            type="button"
+                            disabled={aiUndo[keyStr] === undefined}
+                            title={aiUndo[keyStr] === undefined ? 'No earlier text recorded for this section' : undefined}
+                            onClick={() => { void undoSection(keyStr); }}
+                          >
+                            Undo
+                          </button>
+                          <span className="rp-sectioncard-hint">Editing or accepting clears the review flag.</span>
+                        </>
+                      ) : undefined
+                    }
+                  >
+                    <div className={generated ? 'ai-mark' : ''}>
+                      {richEditor ? (
+                        <SectionEditor
+                          sectionKey={keyStr}
+                          className={cls}
+                          ariaLabel={SECTION_TITLES[keyStr] ?? label}
+                          value={(report as Record<string, unknown>)[keyStr] as string}
+                          corrections={anchorCorrections(
+                            (report as Record<string, unknown>)[keyStr] as string,
+                            corrections[keyStr] ?? [],
+                          )}
+                          onChange={(val) => {
+                            dirtyRef.current = true;
+                            const next = { ...aiHighlights };
+                            if (next[keyStr]) delete next[keyStr];
+                            setAiHighlights(next);
+                            setReport({ ...report, [key]: val });
+                          }}
+                          onBlur={(val) =>
+                            update({
+                              [key]: val,
+                              aiHighlightsJson: JSON.stringify(aiHighlights),
+                            } as Partial<Report>)
+                          }
+                        />
+                      ) : (
+                        <textarea
+                          className={cls}
+                          value={(report as Record<string, unknown>)[keyStr] as string}
+                          // Snippets are a per-user feature, not a per-editor one: turning the rich
+                          // editor off used to remove them silently. snippetKeyDown returns false when
+                          // there is no trigger or field to act on, so Tab still moves focus.
+                          onKeyDown={(e) => {
+                            if (e.key !== 'Tab' || e.shiftKey) return;
+                            if (snippetKeyDown(e.currentTarget)) e.preventDefault();
+                          }}
+                          onChange={(e) => {
+                            dirtyRef.current = true;
+                            const next = { ...aiHighlights };
+                            if (next[keyStr]) delete next[keyStr];
+                            setAiHighlights(next);
+                            setReport({ ...report, [key]: e.target.value });
+                          }}
+                          onBlur={(e) =>
+                            update({
+                              [key]: e.target.value,
+                              aiHighlightsJson: JSON.stringify(aiHighlights),
+                            } as Partial<Report>)
+                          }
+                        />
                       )}
-                      onChange={(val) => {
-                        dirtyRef.current = true;
-                        const next = { ...aiHighlights };
-                        if (next[keyStr]) delete next[keyStr];
-                        setAiHighlights(next);
-                        setReport({ ...report, [key]: val });
-                      }}
-                      onBlur={(val) =>
-                        update({
-                          [key]: val,
-                          aiHighlightsJson: JSON.stringify(aiHighlights),
-                        } as Partial<Report>)
-                      }
-                    />
-                  ) : (
-                    <textarea
-                      className={cls}
-                      value={(report as Record<string, unknown>)[keyStr] as string}
-                      // Snippets are a per-user feature, not a per-editor one: turning the rich
-                      // editor off used to remove them silently. snippetKeyDown returns false when
-                      // there is no trigger or field to act on, so Tab still moves focus.
-                      onKeyDown={(e) => {
-                        if (e.key !== 'Tab' || e.shiftKey) return;
-                        if (snippetKeyDown(e.currentTarget)) e.preventDefault();
-                      }}
-                      onChange={(e) => {
-                        dirtyRef.current = true;
-                        const next = { ...aiHighlights };
-                        if (next[keyStr]) delete next[keyStr];
-                        setAiHighlights(next);
-                        setReport({ ...report, [key]: e.target.value });
-                      }}
-                      onBlur={(e) =>
-                        update({
-                          [key]: e.target.value,
-                          aiHighlightsJson: JSON.stringify(aiHighlights),
-                        } as Partial<Report>)
-                      }
+                    </div>
+                  </SectionCard>
+                  {keyStr === 'impression' && streamingAiJob && (
+                    <AiStreamPreview
+                      jobId={streamingAiJob.id}
+                      job={streamingAiJob}
+                      variant="impression"
+                      onStop={() => { void jobs.cancel(streamingAiJob.id); }}
+                      onRegenerate={() => { void jobs.retry(streamingAiJob.id); }}
                     />
                   )}
-                </div>
-              </SectionCard>
-              {keyStr === 'impression' && streamingAiJob && (
-                <AiStreamPreview
-                  jobId={streamingAiJob.id}
-                  job={streamingAiJob}
-                  variant="impression"
-                  onStop={() => { void jobs.cancel(streamingAiJob.id); }}
-                  onRegenerate={() => { void jobs.retry(streamingAiJob.id); }}
-                />
-              )}
-              </Fragment>
-            );
-          })}
-        </div>
+                  </Fragment>
+                );
+              })}
+            </>
+          )}
 
         <div ref={inspectorRef}>
         <ReportInspector
