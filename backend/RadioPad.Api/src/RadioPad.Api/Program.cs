@@ -259,6 +259,7 @@ builder.Services.AddSignalR();
 builder.Services.AddSingleton<ReportValidator>();
 builder.Services.AddScoped<RadioPad.Application.Services.ReportingService>();
 builder.Services.AddScoped<RadioPad.Application.Reporting.Services.IReportingService, RadioPad.Api.Services.MobileReportingService>();
+builder.Services.AddSingleton<RadioPad.Application.Reporting.Services.IDictationSettingsService, RadioPad.Application.Reporting.Services.DictationSettingsService>();
 builder.Services.AddScoped<RadioPad.Application.Transcription.ITranscriptionEngine, RadioPad.Infrastructure.Transcription.MedAsrTranscriptionEngine>();
 builder.Services.AddScoped<RadioPad.Application.Transcription.ITranscriptionEngine, RadioPad.Infrastructure.Transcription.UbagTranscriptionEngine>();
 builder.Services.AddScoped<RadioPad.Application.Transcription.ITranscriptionNotifier, RadioPad.Api.Hubs.SignalRTranscriptionNotifier>();

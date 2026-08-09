@@ -77,6 +77,13 @@ export type DictationDraftResult = {
   latencyMs: number;
 };
 
+/** Dictation & Audio AI settings shape for admin configuration. */
+export type DictationSettings = {
+  activeEngine: string;
+  ubagModel: string;
+  radiologySystemPrompt: string;
+};
+
 /** Desktop-created companion session (returned to the desktop host). */
 export type CompanionSessionInit = {
   sessionId: string;
@@ -2488,6 +2495,15 @@ export const api = {
       request<CatalogItem>('/api/body-parts', { method: 'POST', body: JSON.stringify(body) }),
     remove: (id: string) =>
       request<void>(`/api/body-parts/${id}`, { method: 'DELETE' }),
+  },
+  /** Admin panel dictation & audio AI settings endpoints. */
+  dictationSettings: {
+    get: () => request<DictationSettings>('/api/v1/admin/dictation-settings'),
+    update: (body: DictationSettings) =>
+      request<DictationSettings>('/api/v1/admin/dictation-settings', {
+        method: 'POST',
+        body: JSON.stringify(body),
+      }),
   },
   /**
    * Iter-35 — versioned clinical validation packs (rulebook golden suites).
