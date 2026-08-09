@@ -987,7 +987,7 @@ public sealed class AiJobCoordinator
     /// async generate job so both persist identically.
     /// </summary>
     public static async Task ApplyStructuredResultAsync(
-        RadioPadDbContext db, Report report, User user, ReportingService.StructuredReportResult result, CancellationToken ct)
+        RadioPadDbContext db, Report report, User user, RadioPad.Application.Services.ReportingService.StructuredReportResult result, CancellationToken ct)
     {
         var highlights = ParseHighlights(report.AiHighlightsJson);
         void Adopt(string key, string value, Action<string> set)

@@ -255,8 +255,10 @@ builder.Services.AddScoped<IRoutingPreviewService, EfRoutingPreviewService>();
 builder.Services.AddScoped<AiGateway>();
 builder.Services.AddScoped<IAiGateway>(sp =>
     new RadioPad.Api.Services.PerfInstrumentedAiGateway(sp.GetRequiredService<AiGateway>()));
+builder.Services.AddSignalR();
 builder.Services.AddSingleton<ReportValidator>();
-builder.Services.AddScoped<ReportingService>();
+builder.Services.AddScoped<RadioPad.Application.Services.ReportingService>();
+builder.Services.AddScoped<RadioPad.Application.Reporting.Services.IReportingService, RadioPad.Api.Services.MobileReportingService>();
 // Iter-35 — versioned clinical validation packs.
 builder.Services.AddScoped<RadioPad.Api.Services.ValidationPackService>();
 // PRD §18 — advanced analytics dashboard service.
@@ -872,6 +874,7 @@ if (!app.Environment.IsProduction() || Environment.GetEnvironmentVariable("RADIO
     app.UseSwaggerUI();
 }
 app.MapControllers();
+app.MapHub<RadioPad.Api.Hubs.ReportingHub>("/hubs/reporting");
 app.MapGet("/api/health", () => Results.Ok(new { status = "ok", service = "radiopad-api", time = DateTimeOffset.UtcNow }));
 app.MapGet("/api/health/ready", async (RadioPadDbContext db, CancellationToken ct) =>
 {
