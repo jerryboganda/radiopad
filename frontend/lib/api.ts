@@ -868,7 +868,26 @@ async function requestFormTo<T>(base: string, path: string, form: FormData, sign
 async function requestTo<T>(base: string, path: string, init?: RequestInit): Promise<T> {
   const headers = new Headers(init?.headers || {});
   if (init?.body && !headers.has('Content-Type')) headers.set('Content-Type', 'application/json');
-  const res = await fetch(`${base}${path}`, { ...init, headers, credentials: 'omit' });
+  const isDesktop = typeof window !== 'undefined' && '__TAURI__' in window;
+  const method = (init?.method || 'GET').toUpperCase();
+  const retriable = isDesktop && (method === 'GET' || method === 'HEAD');
+  const maxAttempts = retriable ? 15 : 1;
+  let res: Response | null = null;
+  let lastErr: unknown;
+  for (let attempt = 0; attempt < maxAttempts; attempt++) {
+    try {
+      res = await fetch(`${base}${path}`, { ...init, headers, credentials: 'omit' });
+      break;
+    } catch (e) {
+      lastErr = e;
+      if (attempt === maxAttempts - 1 || !(e instanceof TypeError)) {
+        if (e instanceof TypeError) throw friendlyNetworkError(e);
+        throw e;
+      }
+      await new Promise((r) => setTimeout(r, 600));
+    }
+  }
+  if (!res) throw friendlyNetworkError(lastErr);
   if (!res.ok) {
     throw await apiError(res);
   }
