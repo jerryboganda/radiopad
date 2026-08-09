@@ -16,6 +16,7 @@ import PageTransition from '@/components/ui/PageTransition';
 import { ToastProvider } from '@/components/ui/ToastProvider';
 import JobsProvider from '@/components/jobs/JobsProvider';
 import NotificationsProvider from '@/components/notifications/NotificationsProvider';
+import { CompanionProvider } from '@/components/companion/CompanionContext';
 
 function ShellRoot({ children }: { children: ReactNode }) {
   const { collapsed } = useShell();
@@ -78,7 +79,9 @@ export default function AppShell({ children }: { children: ReactNode }) {
                 inboxes too. It wraps the shell so the topbar bell always has the
                 context, on every surface (NOTIF-001). */}
             <JobsProvider>
-              <NotificationsProvider>{shell}</NotificationsProvider>
+              <NotificationsProvider>
+                <CompanionProvider>{shell}</CompanionProvider>
+              </NotificationsProvider>
             </JobsProvider>
           </AuthGate>
         </PageActionsProvider>
