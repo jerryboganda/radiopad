@@ -87,4 +87,42 @@ describe('OnDeviceModels — platform speech engines', () => {
     // The Edge availability probe resolves and drives the "Available" badge.
     await waitFor(() => expect(screen.getByText('Available')).toBeInTheDocument());
   });
+
+  it('renders 6-Gram LM badge, bundle itemization, and custom download button label for MedASR model', async () => {
+    listMock.mockResolvedValue({
+      enabled: true,
+      models: [
+        model({
+          id: 'medasr-ctc-en-int8',
+          displayName: 'MedASR English CTC INT8',
+          engine: 'sherpa_onnx',
+          sizeBytes: 216373412,
+          downloaded: false,
+          available: false,
+        }),
+      ],
+    });
+
+    render(<OnDeviceModels />);
+
+    await waitFor(() => expect(screen.getByText('MedASR English CTC INT8')).toBeInTheDocument());
+
+    // 1. Badge: 6-Gram LM Included
+    expect(screen.getByText('6-Gram LM Included')).toBeInTheDocument();
+
+    // 2. Bundle contents itemization
+    expect(screen.getByText('Bundle Contents:')).toBeInTheDocument();
+    expect(screen.getByText(/Acoustic Model/)).toBeInTheDocument();
+    expect(screen.getByText(/Conformer-CTC ~105M/)).toBeInTheDocument();
+    expect(screen.getByText(/Language Model/)).toBeInTheDocument();
+    expect(screen.getByText(/6-Gram LM Beam Search/)).toBeInTheDocument();
+    expect(screen.getByText(/Vocabulary/)).toBeInTheDocument();
+    expect(screen.getByText(/Token table/)).toBeInTheDocument();
+
+    // 3. Download button label
+    expect(
+      screen.getByRole('button', { name: /Download MedASR \+ 6-Gram LM Bundle \(~206 MB\)/ }),
+    ).toBeInTheDocument();
+  });
 });
+

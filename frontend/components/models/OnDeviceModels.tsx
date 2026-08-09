@@ -495,6 +495,7 @@ function ModelCard({
       <div className="rp-model-meta">
         {model.isPrimary && <span className="badge ai">Primary</span>}
         {registered && <span className="badge ai">In report generation</span>}
+        {model.id === 'medasr-ctc-en-int8' && <span className="badge ai">6-Gram LM Included</span>}
         {!model.placeholder && !isPlatform && <span className="badge">{fmtBytes(model.sizeBytes)}</span>}
         {model.license && <span className="badge">{model.license}</span>}
         {model.available && !orchestrator && <span className="badge ok">Loaded</span>}
@@ -504,6 +505,37 @@ function ModelCard({
         <p className="rp-model-note" data-testid="model-note">
           {model.note}
         </p>
+      )}
+
+      {model.id === 'medasr-ctc-en-int8' && (
+        <div
+          className="rp-bundle-contents"
+          style={{
+            display: 'flex',
+            flexDirection: 'column',
+            gap: '6px',
+            padding: '10px 12px',
+            marginTop: '8px',
+            marginBottom: '8px',
+            border: '1px solid var(--border-soft, #e2e8f0)',
+            borderRadius: '6px',
+            background: 'var(--bg-subtle, #f8fafc)',
+            fontSize: '12px',
+          }}
+        >
+          <div style={{ fontWeight: 600, color: 'var(--text-muted, #64748b)' }}>Bundle Contents:</div>
+          <ul style={{ listStyle: 'none', padding: 0, margin: 0, display: 'flex', flexDirection: 'column', gap: '4px' }}>
+            <li style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+              <span>🧠</span> <span><strong>Acoustic Model</strong>: Conformer-CTC ~105M (<code>model.int8.onnx</code> ~154 MB)</span>
+            </li>
+            <li style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+              <span>🎯</span> <span><strong>Language Model</strong>: 6-Gram LM Beam Search (<code>lm_6gram.fst</code> ~52.4 MB)</span>
+            </li>
+            <li style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+              <span>🔤</span> <span><strong>Vocabulary</strong>: Token table (<code>tokens.txt</code> ~4.7 KB)</span>
+            </li>
+          </ul>
+        </div>
       )}
 
       {inProgress && <ProgressRow model={model} />}
@@ -571,7 +603,11 @@ function ModelCard({
               aria-busy={busy === 'download' || inProgress}
             >
               <Download aria-hidden size={14} />{' '}
-              {busy === 'download' || inProgress ? 'Downloading…' : `Download ${fmtBytes(model.sizeBytes)}`}
+              {busy === 'download' || inProgress
+                ? 'Downloading…'
+                : model.id === 'medasr-ctc-en-int8'
+                  ? 'Download MedASR + 6-Gram LM Bundle (~206 MB)'
+                  : `Download ${fmtBytes(model.sizeBytes)}`}
             </button>
           ) : (
             <>
