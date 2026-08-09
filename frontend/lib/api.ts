@@ -426,7 +426,7 @@ async function apiError(res: Response): Promise<Error> {
   const body = await errorBody(res);
   const b = body && typeof body === 'object' ? (body as Record<string, unknown>) : null;
   const kind = typeof b?.kind === 'string' ? b.kind : undefined;
-  const detail = typeof b?.detail === 'string' ? b.detail : typeof b?.error === 'string' ? b.error : typeof b?.title === 'string' ? b.title : typeof body === 'string' ? body : undefined;
+  const detail = typeof b?.detail === 'string' ? b.detail : typeof b?.error === 'string' ? b.error : typeof b?.title === 'string' ? b.title : undefined;
   const msg = detail ? `API ${res.status} ${res.statusText}: ${detail}` : `API ${res.status} ${res.statusText}`;
   return Object.assign(new Error(msg), { status: res.status, body, kind });
 }
