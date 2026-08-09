@@ -64,10 +64,31 @@ export async function getReportById(id: string): Promise<ReportDto> {
   return request<ReportDto>(`/api/v1/reporting/reports/${id}`);
 }
 
+/**
+  Upload audio dictation file for a report.
+ */
+export async function uploadDictation(
+  reportId: string,
+  audioBlob: Blob,
+  durationSeconds: number
+): Promise<DictationAudioDto> {
+  const formData = new FormData();
+  const fileExt = audioBlob.type.includes('wav') ? 'wav' : 'webm';
+  formData.append('file', audioBlob, `dictation.${fileExt}`);
+  formData.append('durationSeconds', durationSeconds.toString());
+
+  return request<DictationAudioDto>(`/api/v1/reporting/reports/${reportId}/dictations`, {
+    method: 'POST',
+    body: formData,
+  });
+}
+
 export const reportingClient = {
   getReports,
   createReport,
   getReportById,
+  uploadDictation,
 };
 
 export default reportingClient;
+

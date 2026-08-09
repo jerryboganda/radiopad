@@ -426,7 +426,9 @@ async function apiError(res: Response): Promise<Error> {
 
 export async function request<T>(path: string, init?: RequestInit): Promise<T> {
   const headers = new Headers(init?.headers || {});
-  if (!headers.has('Content-Type')) headers.set('Content-Type', 'application/json');
+  if (!headers.has('Content-Type') && !(typeof FormData !== 'undefined' && init?.body instanceof FormData)) {
+    headers.set('Content-Type', 'application/json');
+  }
   applyTenantHeaders(headers);
   applyAuthHeader(headers);
   const base = await apiBase();
