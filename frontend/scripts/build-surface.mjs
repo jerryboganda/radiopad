@@ -35,8 +35,31 @@
 
 import { createRequire } from 'node:module';
 import { spawnSync } from 'node:child_process';
-import { rmSync, renameSync, existsSync, mkdirSync, readdirSync, writeFileSync, readFileSync } from 'node:fs';
+import { rmSync, renameSync, cpSync, existsSync, mkdirSync, readdirSync, writeFileSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
+
+function safeMove(from, to) {
+  try {
+    renameSync(from, to);
+  } catch (err) {
+    if (err.code === 'EPERM' || err.code === 'EXDEV') {
+      cpSync(from, to, { recursive: true });
+      rmSync(from, { recursive: true, force: true });
+    } else {
+      throw err;
+    }
+  }
+}
+
+function safeRm(targetPath) {
+  if (!existsSync(targetPath)) return;
+  try {
+    rmSync(targetPath, { recursive: true, force: true, maxRetries: 5, retryDelay: 200 });
+  } catch {
+    /* ignore cleanup retry error */
+  }
+}
+
 
 const require = createRequire(import.meta.url);
 
@@ -103,7 +126,7 @@ function restoreStaged() {
   // ROOT_BAK out of STAGE_DIR before the group loop reads the directory.
   if (existsSync(ROOT_BAK)) {
     rmSync(ROOT_PAGE, { force: true });
-    renameSync(ROOT_BAK, ROOT_PAGE);
+    safeMove(ROOT_BAK, ROOT_PAGE);
   }
   let allRestored = true;
   for (const name of readdirSync(STAGE_DIR)) {
@@ -114,7 +137,7 @@ function restoreStaged() {
       allRestored = false;
       continue;
     }
-    renameSync(from, to);
+    safeMove(from, to);
   }
   // Only remove the staging dir once every entry is safely back.
   if (allRestored) rmSync(STAGE_DIR, { recursive: true, force: true });
@@ -131,10 +154,10 @@ function stageForSurface() {
   if (excluded.length || swapRoot) mkdirSync(STAGE_DIR, { recursive: true });
 
   for (const name of excluded) {
-    renameSync(join(APP_DIR, name), join(STAGE_DIR, name));
+    safeMove(join(APP_DIR, name), join(STAGE_DIR, name));
   }
   if (swapRoot) {
-    renameSync(ROOT_PAGE, ROOT_BAK);
+    safeMove(ROOT_PAGE, ROOT_BAK);
     writeFileSync(ROOT_PAGE, rootStub(ROOT_REDIRECT[surface] ?? '/'));
   }
   if (excluded.length) console.log(`build-surface: excluding ${excluded.join(', ')} for ${surface}`);
@@ -158,14 +181,19 @@ for (const sig of ['SIGINT', 'SIGTERM']) {
 }
 
 const outDir = `out-${surface}`;
-rmSync('out', { recursive: true, force: true });
-rmSync(outDir, { recursive: true, force: true });
+safeRm('out');
+safeRm(outDir);
+safeRm('.next');
+safeRm('tsconfig.tsbuildinfo');
+stageForSurface();
+
 // Each surface has a *different* route tree, so a `.next` cache from another
 // surface leaves stale generated route types (typed-routes stubs for excluded
 // pages). Clear it for a correct, self-contained per-surface build.
-rmSync('.next', { recursive: true, force: true });
+safeRm('.next');
+safeRm('tsconfig.tsbuildinfo');
 
-stageForSurface();
+
 
 let status = 1;
 try {
