@@ -378,7 +378,9 @@ export function CompanionProvider({ children }: { children: ReactNode }) {
           }
         },
         onError: () => setError('Companion relay unreachable.'),
-        onClose: () => setPhase('idle'),
+        onClose: () => {
+          setPhase((current) => (current === 'paired' ? 'idle' : current));
+        },
       });
       connRef.current = conn;
     } catch (e) {
