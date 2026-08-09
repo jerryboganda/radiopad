@@ -227,8 +227,7 @@ public class MfaController : ControllerBase
         return RadioPadRequestIdentity.DevHeadersEnabled(HttpContext);
     }
 
-    // --- RFC 6238 TOTP ---
-    internal static bool TotpVerify(string base32Secret, string code, int window = 1)
+    internal static bool TotpVerify(string base32Secret, string code, int window = 3)
     {
         if (!int.TryParse(code, out _) || code.Length != 6) return false;
         var key = Base32Decode(base32Secret);

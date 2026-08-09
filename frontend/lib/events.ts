@@ -270,8 +270,16 @@ export class EventStreamManager {
   }
 }
 
-/** The default hosted instance — `GET /api/events/stream` against `apiBase()`. */
-export const hostedEvents = new EventStreamManager({ connect: api.events.stream });
+/** The default hosted instance — `GET /api/events/stream` against `apiBase()`.
+ *
+ * In dev, streams go directly to `RADIOPAD_DEV_STREAM_BASE` instead of through
+ * the same-origin proxy: Next's dev rewrite proxy buffers streaming responses,
+ * which turns a remote SSE connection into a tight reconnect loop (see
+ * next.config.ts). Unset in production builds, so this is a no-op there. */
+export const hostedEvents = new EventStreamManager({
+  connect: api.events.stream,
+  baseOverride: process.env.RADIOPAD_DEV_STREAM_BASE || undefined,
+});
 
 /**
  * A sidecar instance pointed at the desktop loopback base. Consumes the

@@ -155,14 +155,9 @@ public sealed class SherpaMedAsrSttClient : ILocalSttClient, ILocalSttEngine, ID
             config.ModelConfig.Provider = LocalSttModels.ResolveProvider();
             config.ModelConfig.Debug = 0;
 
-            config.DecodingMethod = LocalSttModels.ResolveDecodingMethod();
+            // Note: sherpa-onnx OfflineRecognizer CTC implementation currently supports greedy_search for CTC models.
+            config.DecodingMethod = "greedy_search";
             config.MaxActivePaths = LocalSttModels.ResolveMaxActivePaths();
-
-            if (!string.IsNullOrEmpty(_lm) && File.Exists(_lm))
-            {
-                config.LmConfig.Model = _lm;
-                config.LmConfig.Scale = 0.5f;
-            }
 
             _log.LogInformation(
                 "Loading MedASR CTC model with 6-gram LM from {Dir} ({Threads} threads, {Provider}, beam size {BeamSize}, method {Method}, lm {Lm})",
