@@ -122,7 +122,7 @@ describe('Mobile ReportingPage & NewReportModal', () => {
       fireEvent.click(card);
     }
 
-    expect(pushMock).toHaveBeenCalledWith('/mobile/reporting/report-1/dictate');
+    expect(pushMock).toHaveBeenCalledWith('/reporting/dictate?id=report-1');
   });
 
   it('opens New Report modal when clicking + New Report button', async () => {
@@ -185,7 +185,7 @@ describe('Mobile ReportingPage & NewReportModal', () => {
         patientAge: 38,
         patientGender: 'Female',
       });
-      expect(pushMock).toHaveBeenCalledWith('/mobile/reporting/report-new-123/dictate');
+      expect(pushMock).toHaveBeenCalledWith('/reporting/dictate?id=report-new-123');
     });
   });
 });

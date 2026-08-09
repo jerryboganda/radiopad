@@ -1,15 +1,16 @@
 'use client';
 
 import React, { useEffect, useState } from 'react';
-import { useParams, useRouter } from 'next/navigation';
+import { useParams, useRouter, useSearchParams } from 'next/navigation';
 import { ArrowLeft, Mic, RefreshCw, AlertCircle } from 'lucide-react';
 import { getReportById, ReportDto } from '@/lib/api/reportingClient';
-import AudioRecorderControls from '../../components/AudioRecorderControls';
+import AudioRecorderControls from '../components/AudioRecorderControls';
 
 export default function DictateClient() {
   const router = useRouter();
   const params = useParams();
-  const reportId = typeof params?.id === 'string' ? params.id : Array.isArray(params?.id) ? params.id[0] : '';
+  const searchParams = useSearchParams();
+  const reportId = searchParams?.get('id') || (typeof params?.id === 'string' ? params.id : Array.isArray(params?.id) ? params.id[0] : '');
 
   const [report, setReport] = useState<ReportDto | null>(null);
   const [isLoading, setIsLoading] = useState(true);

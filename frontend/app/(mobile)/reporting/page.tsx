@@ -61,7 +61,7 @@ export default function ReportingPage() {
   }, [reports, searchQuery, statusFilter]);
 
   const handleCardClick = (id: string) => {
-    router.push(`/mobile/reporting/${id}/dictate`);
+    router.push(`/reporting/dictate?id=${id}`);
   };
 
   return (

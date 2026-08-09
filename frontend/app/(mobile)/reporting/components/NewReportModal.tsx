@@ -69,7 +69,7 @@ export default function NewReportModal({ isOpen, onClose, onSuccess }: NewReport
       }
       onClose();
       // Navigate to audio dictate page
-      const targetPath = `/mobile/reporting/${newReport.id}/dictate`;
+      const targetPath = `/reporting/dictate?id=${newReport.id}`;
       router.push(targetPath);
     } catch (err: unknown) {
       const msg = err instanceof Error ? err.message : 'Failed to create report. Please try again.';

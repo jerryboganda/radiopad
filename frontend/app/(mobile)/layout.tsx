@@ -19,7 +19,7 @@ export default function MobileLayout({ children }: { children: React.ReactNode }
       label: 'Reporting',
       href: '/reporting',
       icon: FileText,
-      isActive: pathname === '/reporting' || pathname?.startsWith('/reporting') || pathname?.startsWith('/mobile/reporting'),
+      isActive: pathname === '/reporting' || pathname?.startsWith('/reporting'),
     },
   ];
 
