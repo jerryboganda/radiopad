@@ -48,7 +48,8 @@
     "settingsHub": "Configuración",
     "hotkeys": "Atajos",
     "onDeviceModels": "Modelos en el dispositivo",
-    "notifications": "Notificaciones"
+    "notifications": "Notificaciones",
+    "devicePairing": "Emparejamiento de dispositivos"
   },
   "buttons": {
     "primary": {

@@ -50,7 +50,8 @@
     "settingsHub": "Settings",
     "hotkeys": "Hotkeys",
     "onDeviceModels": "On-device models",
-    "notifications": "Notifications"
+    "notifications": "Notifications",
+    "devicePairing": "Device pairing"
   },
   "buttons": {
     "primary": {

@@ -48,7 +48,8 @@
     "settingsHub": "Einstellungen",
     "hotkeys": "Tastenkürzel",
     "onDeviceModels": "Lokale Modelle",
-    "notifications": "Benachrichtigungen"
+    "notifications": "Benachrichtigungen",
+    "devicePairing": "Gerätekopplung"
   },
   "buttons": {
     "primary": {

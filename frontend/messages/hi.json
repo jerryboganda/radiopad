@@ -48,7 +48,8 @@
     "settingsHub": "सेटिंग्स",
     "hotkeys": "शॉर्टकट",
     "onDeviceModels": "डिवाइस पर मॉडल",
-    "notifications": "सूचनाएँ"
+    "notifications": "सूचनाएँ",
+    "devicePairing": "डिवाइस पेयरिंग"
   },
   "buttons": {
     "primary": {

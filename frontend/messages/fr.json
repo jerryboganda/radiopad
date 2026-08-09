@@ -48,7 +48,8 @@
     "settingsHub": "Paramètres",
     "hotkeys": "Raccourcis",
     "onDeviceModels": "Modèles sur l’appareil",
-    "notifications": "Notifications"
+    "notifications": "Notifications",
+    "devicePairing": "Couplage d'appareils"
   },
   "buttons": {
     "primary": {
