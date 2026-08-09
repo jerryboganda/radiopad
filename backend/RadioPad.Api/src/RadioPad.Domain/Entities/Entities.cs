@@ -363,7 +363,7 @@ public class StudyContext
     public string PatientReference { get; set; } = "";
 }
 
-public class Report : Entity
+public partial class Report : Entity
 {
     public Guid TenantId { get; set; }
     public Guid CreatedByUserId { get; set; }

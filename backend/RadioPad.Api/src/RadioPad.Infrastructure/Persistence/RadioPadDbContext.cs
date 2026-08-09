@@ -23,6 +23,7 @@ public class RadioPadDbContext : DbContext
     /// <summary>Iter-36 — admin-managed, tenant-scoped anatomical body-part catalog.</summary>
     public DbSet<BodyPart> BodyParts => Set<BodyPart>();
     public DbSet<Report> Reports => Set<Report>();
+    public DbSet<DictationAudio> DictationAudios => Set<DictationAudio>();
     public DbSet<ReportVersion> ReportVersions => Set<ReportVersion>();
     public DbSet<ReportSignature> ReportSignatures => Set<ReportSignature>();
     /// <summary>Iter-0a (PRD §14.12, RADS-001) — first-class structured RADS assessments per report.</summary>
