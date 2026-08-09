@@ -259,6 +259,10 @@ builder.Services.AddSignalR();
 builder.Services.AddSingleton<ReportValidator>();
 builder.Services.AddScoped<RadioPad.Application.Services.ReportingService>();
 builder.Services.AddScoped<RadioPad.Application.Reporting.Services.IReportingService, RadioPad.Api.Services.MobileReportingService>();
+builder.Services.AddScoped<RadioPad.Application.Transcription.ITranscriptionEngine, RadioPad.Infrastructure.Transcription.MedAsrTranscriptionEngine>();
+builder.Services.AddScoped<RadioPad.Application.Transcription.ITranscriptionEngine, RadioPad.Infrastructure.Transcription.UbagTranscriptionEngine>();
+builder.Services.AddScoped<RadioPad.Application.Transcription.ITranscriptionNotifier, RadioPad.Api.Hubs.SignalRTranscriptionNotifier>();
+builder.Services.AddScoped<RadioPad.Infrastructure.Transcription.TranscriptionOrchestrator>();
 // Iter-35 — versioned clinical validation packs.
 builder.Services.AddScoped<RadioPad.Api.Services.ValidationPackService>();
 // PRD §18 — advanced analytics dashboard service.

@@ -14,6 +14,8 @@ using RadioPad.Domain.Entities;
 using RadioPad.Domain.Enums;
 using RadioPad.Infrastructure.Persistence;
 
+using RadioPad.Infrastructure.Transcription;
+
 namespace RadioPad.Api.Services;
 
 public class MobileReportingService : IReportingService
@@ -21,15 +23,21 @@ public class MobileReportingService : IReportingService
     private readonly RadioPadDbContext _db;
     private readonly IHubContext<ReportingHub> _hubContext;
     private readonly ILogger<MobileReportingService> _logger;
+    private readonly IServiceProvider? _serviceProvider;
+    private readonly TranscriptionOrchestrator? _orchestrator;
 
     public MobileReportingService(
         RadioPadDbContext db,
         IHubContext<ReportingHub> hubContext,
-        ILogger<MobileReportingService> logger)
+        ILogger<MobileReportingService> logger,
+        IServiceProvider? serviceProvider = null,
+        TranscriptionOrchestrator? orchestrator = null)
     {
         _db = db;
         _hubContext = hubContext;
         _logger = logger;
+        _serviceProvider = serviceProvider;
+        _orchestrator = orchestrator;
     }
 
     public async Task<ReportDto> CreateReportAsync(CreateReportRequestDto dto, CancellationToken ct = default)
@@ -136,6 +144,44 @@ public class MobileReportingService : IReportingService
         catch (Exception ex)
         {
             _logger.LogWarning(ex, "Failed to broadcast DictationUploaded event via SignalR hub");
+        }
+
+        if (_orchestrator != null)
+        {
+            var orch = _orchestrator;
+            var dId = dictation.Id;
+            _ = Task.Run(async () =>
+            {
+                try
+                {
+                    await orch.ProcessDictationAsync(dId);
+                }
+                catch (Exception ex)
+                {
+                    _logger.LogError(ex, "Failed background transcription for dictation {DictationId}", dId);
+                }
+            });
+        }
+        else if (_serviceProvider != null)
+        {
+            var sp = _serviceProvider;
+            var dId = dictation.Id;
+            _ = Task.Run(async () =>
+            {
+                try
+                {
+                    using var scope = sp.CreateScope();
+                    var orch = scope.ServiceProvider.GetService<TranscriptionOrchestrator>();
+                    if (orch != null)
+                    {
+                        await orch.ProcessDictationAsync(dId);
+                    }
+                }
+                catch (Exception ex)
+                {
+                    _logger.LogError(ex, "Failed background transcription for dictation {DictationId}", dId);
+                }
+            });
         }
 
         return dto;
