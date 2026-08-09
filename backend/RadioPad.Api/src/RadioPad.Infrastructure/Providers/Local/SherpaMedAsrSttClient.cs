@@ -169,7 +169,7 @@ public sealed class SherpaMedAsrSttClient : ILocalSttClient, ILocalSttEngine, ID
         lock (_gate)
         {
             if (_modelDir is null) return;
-            var (model, tokens) = LocalSttModels.ResolveMedAsrFiles(_modelDir);
+            var (model, tokens, _) = LocalSttModels.ResolveMedAsrFiles(_modelDir);
             _model = model;
             _tokens = tokens;
         }

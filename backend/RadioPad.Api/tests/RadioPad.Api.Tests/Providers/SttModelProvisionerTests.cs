@@ -110,6 +110,25 @@ public class SttModelProvisionerTests
     }
 
     [Fact]
+    public void ResolveMedAsrFiles_Returns_Model_Tokens_And_Lm()
+    {
+        var dir = TempDir();
+        WriteMedAsrBundle(dir);
+        File.WriteAllText(Path.Combine(dir, "lm_6gram.fst"), "x");
+        try
+        {
+            var (model, tokens, lm) = LocalSttModels.ResolveMedAsrFiles(dir);
+            Assert.NotNull(model);
+            Assert.NotNull(tokens);
+            Assert.NotNull(lm);
+            Assert.EndsWith("model.int8.onnx", model!);
+            Assert.EndsWith("tokens.txt", tokens!);
+            Assert.EndsWith("lm_6gram.fst", lm!);
+        }
+        finally { Directory.Delete(dir, recursive: true); }
+    }
+
+    [Fact]
     public void MedAsr_IsComplete_False_When_Tokens_Missing()
     {
         var dir = TempDir();

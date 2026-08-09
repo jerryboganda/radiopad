@@ -34,6 +34,14 @@ public static class LocalSttModels
         SizeBytes: 4712L,
         Sha256: "");
 
+    /// <summary>MedASR 6-gram LM model file for beam search decoding (~52.4 MB).</summary>
+    public static readonly FileSpec MedAsr6GramLm = new(
+        Name: MedAsrModelName,
+        FileName: "lm_6gram.fst",
+        Url: "https://huggingface.co/csukuangfj/sherpa-onnx-medasr-ctc-en-int8-2025-12-25/resolve/main/lm_6gram.fst",
+        SizeBytes: 52428800L,
+        Sha256: "");
+
     /// <summary>
     /// A real radiology dictation sample from the bundle's own <c>test_wavs/</c> (16 kHz mono,
     /// ~1.4 MB). Provisioned alongside the model so the model-manager "Test" action transcribes
@@ -53,23 +61,23 @@ public static class LocalSttModels
     /// <summary>A single downloadable model file (no archive extraction).</summary>
     public sealed record FileSpec(string Name, string FileName, string Url, long SizeBytes, string Sha256);
 
-    /// <summary>Resolve the MedASR CTC model + tokens under <paramref name="dir"/> (null when absent).</summary>
-    public static (string? model, string? tokens) ResolveMedAsrFiles(string? dir)
+    /// <summary>Resolve the MedASR CTC model + tokens + 6-gram LM under <paramref name="dir"/> (null when absent).</summary>
+    public static (string? model, string? tokens, string? lm) ResolveMedAsrFiles(string? dir)
     {
         if (string.IsNullOrEmpty(dir) || !Directory.Exists(dir))
-            return (null, null);
+            return (null, null, null);
         string? Pick(string fileName)
         {
             var f = Directory.GetFiles(dir, fileName, SearchOption.AllDirectories).FirstOrDefault();
             return f;
         }
-        return (Pick(MedAsrModel.FileName), Pick(MedAsrTokens.FileName));
+        return (Pick(MedAsrModel.FileName), Pick(MedAsrTokens.FileName), Pick(MedAsr6GramLm.FileName));
     }
 
     /// <summary>True when the MedASR CTC model + tokens are both present under <paramref name="dir"/>.</summary>
     public static bool IsMedAsrComplete(string? dir)
     {
-        var (m, t) = ResolveMedAsrFiles(dir);
+        var (m, t, _) = ResolveMedAsrFiles(dir);
         return m is not null && t is not null;
     }
 

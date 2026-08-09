@@ -125,13 +125,13 @@ public sealed class LocalModelCatalog : ILocalModelCatalog
                 Engine: SherpaMedAsrSttClient.EngineName, // "medasr"
                 DownloadUrl: LocalSttModels.MedAsrModel.Url,
                 Sha256: LocalSttModels.MedAsrModel.Sha256,
-                SizeBytes: LocalSttModels.MedAsrModel.SizeBytes,
+                SizeBytes: 206535219L,
                 License: "HAI-DEF",
                 ArchiveKind: ModelArchiveKind.MedAsrCtc,
                 FileName: LocalSttModels.MedAsrModel.FileName,
                 Placeholder: false,
                 Provisioning: ModelProvisioning.HostedFile,
-                Note: "Radiology-tuned on-device speech-to-text (~160 MB). Runs fully on-device — audio never leaves the workstation."),
+                Note: "Radiology-tuned on-device speech-to-text with 6-gram LM beam search (~206 MB). Runs fully on-device — audio never leaves the workstation."),
 
             // ── Platform speech engines (no hosted artifact) ───────────────────
             // System.Speech / SAPI — ships with Windows, 100% on-device (PHI-safe),

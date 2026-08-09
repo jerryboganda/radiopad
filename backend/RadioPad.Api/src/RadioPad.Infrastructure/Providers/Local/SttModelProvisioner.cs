@@ -53,6 +53,12 @@ public sealed class SttModelProvisioner
         var okModel = await EnsureFileInDirAsync(LocalSttModels.MedAsrModel, dir, ct);
         var okTokens = await EnsureFileInDirAsync(LocalSttModels.MedAsrTokens, dir, ct);
 
+        try { await EnsureFileInDirAsync(LocalSttModels.MedAsr6GramLm, dir, ct); }
+        catch (Exception ex) when (ex is not OperationCanceledException)
+        {
+            _log.LogWarning(ex, "MedASR 6-gram LM could not be provisioned; beam search will fall back to greedy/plain decoding.");
+        }
+
         // Best-effort: the self-test sample makes the manager's "Test" action transcribe real
         // speech, but the engine is fully functional without it, so a failure here must not fail
         // provisioning. Deliberately excluded from IsMedAsrComplete for the same reason.
