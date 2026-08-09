@@ -1,6 +1,8 @@
 {
   "nav": {
     "reports": "Reports",
+    "reporting": "Reporting",
+    "companion": "Companion",
     "rulebooks": "Rulebooks",
     "templates": "Templates",
     "reportTemplates": "Report Templates",

@@ -424,7 +424,7 @@ async function apiError(res: Response): Promise<Error> {
   return Object.assign(new Error(`API ${res.status} ${res.statusText}`), { status: res.status, body, kind });
 }
 
-async function request<T>(path: string, init?: RequestInit): Promise<T> {
+export async function request<T>(path: string, init?: RequestInit): Promise<T> {
   const headers = new Headers(init?.headers || {});
   if (!headers.has('Content-Type')) headers.set('Content-Type', 'application/json');
   applyTenantHeaders(headers);
