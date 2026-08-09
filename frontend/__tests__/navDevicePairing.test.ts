@@ -19,11 +19,11 @@ describe('Navigation — Device Pairing item', () => {
   });
 
   it('has translation for devicePairing in all locale message files', () => {
-    expect((enMessages.nav as Record<string, string>).devicePairing).toBe('Device pairing');
-    expect((deMessages.nav as Record<string, string>).devicePairing).toBe('Gerätekopplung');
-    expect((esMessages.nav as Record<string, string>).devicePairing).toBe('Emparejamiento de dispositivos');
-    expect((frMessages.nav as Record<string, string>).devicePairing).toBe("Couplage d'appareils");
-    expect((hiMessages.nav as Record<string, string>).devicePairing).toBe('डिवाइस पेयरिंग');
-    expect((ptMessages.nav as Record<string, string>).devicePairing).toBe('Emparelhamento de dispositivos');
+    expect((enMessages.nav as any).devicePairing).toBe('Device pairing');
+    expect((deMessages.nav as any).devicePairing).toBe('Gerätekopplung');
+    expect((esMessages.nav as any).devicePairing).toBe('Emparejamiento de dispositivos');
+    expect((frMessages.nav as any).devicePairing).toBe("Couplage d'appareils");
+    expect((hiMessages.nav as any).devicePairing).toBe('डिवाइस पेयरिंग');
+    expect((ptMessages.nav as any).devicePairing).toBe('Emparelhamento de dispositivos');
   });
 });

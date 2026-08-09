@@ -216,7 +216,6 @@ export default function DevicePairingPage() {
                 <div className="flex flex-col sm:flex-row items-center gap-6 py-2">
                   {qrDataUrl ? (
                     <div className="p-3 bg-white rounded-xl shadow-md border border-border/40 shrink-0">
-                      {/* eslint-disable-next-line @next/next/no-img-element */}
                       <img
                         src={qrDataUrl}
                         alt="Companion pairing QR code"

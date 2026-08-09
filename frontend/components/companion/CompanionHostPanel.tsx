@@ -70,7 +70,6 @@ export default function CompanionHostPanel({ open }: { open: boolean }) {
               Open the RadioPad phone app and <strong>scan this QR</strong> to pair — no phone sign-in needed:
             </p>
             {qrDataUrl && (
-              // eslint-disable-next-line @next/next/no-img-element
               <img
                 src={qrDataUrl}
                 alt="Pairing QR code"
