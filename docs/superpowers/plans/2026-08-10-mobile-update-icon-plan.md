@@ -1,11 +1,28 @@
-'use client';
+# Sleek Icon-Only Mobile Update Check Implementation Plan
 
-/**
- * "Check for updates" icon control for the mobile companion app header.
- *
- * Rendered in CompanionTopbar next to ThemeToggle. Shows a clean 36x36px icon button
- * that triggers update checks and opens a sleek popover with version info & download CTA.
- */
+> **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
+
+**Goal:** Refactor `<MobileUpdateCheck />` into a compact icon-only button with a sleek update popover.
+
+**Architecture:** 
+- Convert `MobileUpdateCheck` button to a sleek 36px icon button (`RefreshCw` / `DownloadCloud`).
+- Implement an absolute popover dropdown for status messages ("Up to date vX.Y.Z", "Update available", "Download & install").
+- Maintain clean layout alignment in `CompanionTopbar`.
+
+**Tech Stack:** React, Lucide Icons, Tailwind CSS / Vanilla CSS.
+
+---
+
+### Task 1: Refactor MobileUpdateCheck component to sleek icon button with popover
+
+**Files:**
+- Modify: [e:/Projects/RadioPad/RADIOPAD/frontend/components/companion/MobileUpdateCheck.tsx](file:///e:/Projects/RadioPad/RADIOPAD/frontend/components/companion/MobileUpdateCheck.tsx)
+
+- [ ] **Step 1: Update MobileUpdateCheck implementation**
+
+Refactor `MobileUpdateCheck.tsx` to render an icon button with popover state:
+```tsx
+'use client';
 
 import { useCallback, useState, useRef, useEffect } from 'react';
 import { DownloadCloud, RefreshCw, CheckCircle2, AlertCircle, X } from 'lucide-react';
@@ -55,7 +72,7 @@ export default function MobileUpdateCheck() {
     <div className="relative inline-block" ref={containerRef}>
       <button
         type="button"
-        className={`relative w-9 h-9 flex items-center justify-center rounded-xl border border-[var(--border,#262c40)] bg-[var(--bg-panel,#131722)] text-[var(--text-muted,#94a3b8)] hover:text-[var(--text,#e2e8f0)] transition-colors ${
+        className={`relative w-9 h-9 flex items-center justify-center rounded-xl border border-[var(--border)] bg-[var(--bg-panel)] text-[var(--text-muted)] hover:text-[var(--text)] transition-colors ${
           phase === 'available' ? 'border-blue-500 text-blue-400 bg-blue-500/10' : ''
         }`}
         onClick={check}
@@ -68,13 +85,13 @@ export default function MobileUpdateCheck() {
           className={phase === 'checking' ? 'animate-spin text-blue-400' : ''}
         />
         {phase === 'available' && (
-          <span className="absolute -top-0.5 -right-0.5 w-2.5 h-2.5 rounded-full bg-blue-500 ring-2 ring-[var(--bg-app,#0b0f17)] animate-pulse" />
+          <span className="absolute -top-1 -right-1 w-2.5 h-2.5 rounded-full bg-blue-500 ring-2 ring-[var(--bg-app)] animate-pulse" />
         )}
       </button>
 
       {open && phase !== 'checking' && (
-        <div className="absolute right-0 top-11 z-50 w-64 p-3.5 rounded-2xl bg-[var(--bg-panel,#131722)] border border-[var(--border,#262c40)] shadow-2xl text-xs flex flex-col gap-2.5">
-          <div className="flex items-center justify-between font-semibold text-[var(--text-strong,#f8fafc)]">
+        <div className="absolute right-0 top-11 z-50 w-64 p-3 rounded-2xl bg-[var(--bg-panel)] border border-[var(--border)] shadow-xl text-xs flex flex-col gap-2.5 animate-in fade-in slide-in-from-top-2 duration-150">
+          <div className="flex items-center justify-between font-semibold text-[var(--text-strong)]">
             <span className="flex items-center gap-1.5">
               {phase === 'available' && <DownloadCloud size={14} className="text-blue-400" />}
               {phase === 'uptodate' && <CheckCircle2 size={14} className="text-emerald-400" />}
@@ -84,16 +101,16 @@ export default function MobileUpdateCheck() {
             <button
               type="button"
               onClick={() => setOpen(false)}
-              className="p-1 text-[var(--text-muted,#94a3b8)] hover:text-[var(--text,#e2e8f0)] rounded-lg transition-colors"
+              className="p-1 text-[var(--text-muted)] hover:text-[var(--text)] rounded-lg"
             >
-              <X size={13} />
+              <X size={12} />
             </button>
           </div>
 
           {phase === 'available' && info && (
             <>
-              <p className="text-[var(--text-muted,#94a3b8)] leading-relaxed">
-                Version <strong className="text-[var(--text-strong,#f8fafc)]">v{info.latest}</strong> is available. (You have v{info.current})
+              <p className="text-[var(--text-muted)] leading-relaxed">
+                Version <strong className="text-[var(--text-strong)]">v{info.latest}</strong> is available. (You have v{info.current})
               </p>
               <a
                 className="w-full py-2 px-3 rounded-xl bg-blue-600 hover:bg-blue-500 text-white font-medium flex items-center justify-center gap-1.5 transition-colors text-center"
@@ -108,13 +125,13 @@ export default function MobileUpdateCheck() {
           )}
 
           {phase === 'uptodate' && (
-            <p className="text-[var(--text-muted,#94a3b8)] leading-relaxed">
-              You are running the latest version (<strong className="text-[var(--text-strong,#f8fafc)]">v{APP_VERSION}</strong>).
+            <p className="text-[var(--text-muted)]">
+              You are running the latest version (<strong className="text-[var(--text-strong)]">v{APP_VERSION}</strong>).
             </p>
           )}
 
           {phase === 'error' && (
-            <p className="text-[var(--text-muted,#94a3b8)] leading-relaxed">
+            <p className="text-[var(--text-muted)]">
               Could not check for updates. Tap the icon to retry.
             </p>
           )}
@@ -123,4 +140,21 @@ export default function MobileUpdateCheck() {
     </div>
   );
 }
+```
 
+- [ ] **Step 2: Typecheck & verify compilation**
+
+Run: `pnpm --filter frontend run typecheck`
+Expected: PASS cleanly (0 errors).
+
+---
+
+### Task 2: Commit and push updated release
+
+- [ ] **Step 1: Commit icon button refactor**
+
+Commit changes: `fix(mobile): refactor check for updates to sleek icon button in topbar`
+
+- [ ] **Step 2: Tag and push version release**
+
+Tag `v0.1.153` and push to trigger fresh GitHub build.
