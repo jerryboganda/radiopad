@@ -424,11 +424,11 @@ async function errorBody(res: Response): Promise<unknown> {
  */
 async function apiError(res: Response): Promise<Error> {
   const body = await errorBody(res);
-  const kind =
-    body && typeof body === 'object' && typeof (body as { kind?: unknown }).kind === 'string'
-      ? (body as { kind: string }).kind
-      : undefined;
-  return Object.assign(new Error(`API ${res.status} ${res.statusText}`), { status: res.status, body, kind });
+  const b = body && typeof body === 'object' ? (body as Record<string, unknown>) : null;
+  const kind = typeof b?.kind === 'string' ? b.kind : undefined;
+  const detail = typeof b?.detail === 'string' ? b.detail : typeof b?.error === 'string' ? b.error : typeof b?.title === 'string' ? b.title : typeof body === 'string' ? body : undefined;
+  const msg = detail ? `API ${res.status} ${res.statusText}: ${detail}` : `API ${res.status} ${res.statusText}`;
+  return Object.assign(new Error(msg), { status: res.status, body, kind });
 }
 
 export async function request<T>(path: string, init?: RequestInit): Promise<T> {

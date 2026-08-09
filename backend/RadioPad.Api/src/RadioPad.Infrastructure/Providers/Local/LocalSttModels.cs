@@ -23,16 +23,15 @@ public static class LocalSttModels
         FileName: "model.int8.onnx",
         Url: "https://huggingface.co/csukuangfj/sherpa-onnx-medasr-ctc-en-int8-2025-12-25/resolve/main/model.int8.onnx",
         SizeBytes: 154106419L,
-        Sha256: "2c20f03265ee6144c566fd18b0f7bbb4f0d005d11ce9440dd641920210f4c33a");
+        Sha256: "e10de9493602c4fd5f9966d3e90bb72c44a8ebeec7205f3698ad1f6536cc8398");
 
-    /// <summary>MedASR token table. A tiny non-LFS vocab file (~4.7 KB); an empty
-    /// <see cref="FileSpec.Sha256"/> tells the provisioner to skip content verification for it.</summary>
+    /// <summary>MedASR token table. A tiny non-LFS vocab file (~4.7 KB).</summary>
     public static readonly FileSpec MedAsrTokens = new(
         Name: MedAsrModelName,
         FileName: "tokens.txt",
         Url: "https://huggingface.co/csukuangfj/sherpa-onnx-medasr-ctc-en-int8-2025-12-25/resolve/main/tokens.txt",
         SizeBytes: 4712L,
-        Sha256: "");
+        Sha256: "b43987c0f8f660068a166d155f02b1e439d1f03dda36d50759b4e282e98814f2");
 
     /// <summary>MedASR 6-gram LM model file for beam search decoding (~52.4 MB).</summary>
     public static readonly FileSpec MedAsr6GramLm = new(
@@ -77,11 +76,11 @@ public static class LocalSttModels
         return (Pick(MedAsrModel.FileName), Pick(MedAsrTokens.FileName), lm);
     }
 
-    /// <summary>True when the MedASR CTC model + tokens + 6-gram LM are all present under <paramref name="dir"/>.</summary>
+    /// <summary>True when the MedASR CTC model + tokens are present under <paramref name="dir"/>.</summary>
     public static bool IsMedAsrComplete(string? dir)
     {
-        var (m, t, lm) = ResolveMedAsrFiles(dir);
-        return m is not null && t is not null && lm is not null;
+        var (m, t, _) = ResolveMedAsrFiles(dir);
+        return m is not null && t is not null;
     }
 
     // ── Tuning knobs (env-overridable; safe defaults) ──────────────────────

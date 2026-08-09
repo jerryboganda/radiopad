@@ -145,7 +145,7 @@ public class SttModelProvisionerTests
     }
 
     [Fact]
-    public void MedAsr_IsComplete_False_When_Lm_Missing()
+    public void MedAsr_IsComplete_True_When_Model_And_Tokens_Present()
     {
         var dir = TempDir();
         Directory.CreateDirectory(dir);
@@ -153,7 +153,7 @@ public class SttModelProvisionerTests
         {
             File.WriteAllText(Path.Combine(dir, "model.int8.onnx"), "x");
             File.WriteAllText(Path.Combine(dir, "tokens.txt"), "x"); // lm_6gram.fst absent
-            Assert.False(LocalSttModels.IsMedAsrComplete(dir));
+            Assert.True(LocalSttModels.IsMedAsrComplete(dir));
         }
         finally { Directory.Delete(dir, recursive: true); }
     }
@@ -195,16 +195,17 @@ public class SttModelProvisionerTests
     [Fact]
     public void MedAsr_Descriptor_Pins_The_Verified_Public_Artifact()
     {
-        // Guards the pinned integrity metadata (verified against the HF blob API 2026-07-19).
+        // Guards the pinned integrity metadata (verified against HF resolve API).
         Assert.Equal(154106419L, LocalSttModels.MedAsrModel.SizeBytes);
         Assert.Equal(
-            "2c20f03265ee6144c566fd18b0f7bbb4f0d005d11ce9440dd641920210f4c33a",
+            "e10de9493602c4fd5f9966d3e90bb72c44a8ebeec7205f3698ad1f6536cc8398",
             LocalSttModels.MedAsrModel.Sha256);
         Assert.Contains("sherpa-onnx-medasr-ctc-en-int8", LocalSttModels.MedAsrModel.Url);
         Assert.Equal("model.int8.onnx", LocalSttModels.MedAsrModel.FileName);
         Assert.Equal("tokens.txt", LocalSttModels.MedAsrTokens.FileName);
-        // The tiny non-LFS tokens file carries no digest → provisioner skips its verification.
-        Assert.Equal("", LocalSttModels.MedAsrTokens.Sha256);
+        Assert.Equal(
+            "b43987c0f8f660068a166d155f02b1e439d1f03dda36d50759b4e282e98814f2",
+            LocalSttModels.MedAsrTokens.Sha256);
     }
 
     [Fact]
