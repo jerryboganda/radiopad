@@ -263,22 +263,6 @@ export default function ReportPage() {
   useEffect(() => {
     void refreshDictations();
   }, [refreshDictations]);
-
-  const handleAppendToFindings = useCallback(async (text: string) => {
-    if (!text || !text.trim()) return;
-    const currentFindings = reportRef.current?.findings || '';
-    const newFindings = currentFindings.trim()
-      ? `${currentFindings.trim()}\n\n${text.trim()}`
-      : text.trim();
-
-    await update({ findings: newFindings });
-    toast({ tone: 'success', title: 'Appended', message: 'Dictation findings appended to main report.' });
-  }, [update, toast]);
-
-  const handleRetranscribe = useCallback(async (dictationId: string, engine: string) => {
-    toast({ tone: 'info', title: 'Re-transcribe requested', message: `Re-running dictation ${dictationId.slice(0, 6)} with ${engine}...` });
-    await refreshDictations();
-  }, [toast, refreshDictations]);
   /**
    * Whether unresolved Blockers should stop acknowledge/export in the UI.
    * Mirrors the tenant's `RequireZeroBlockers`, which the API enforces on
@@ -496,6 +480,22 @@ export default function ReportPage() {
       setSaving(false);
     }
   }, []);
+
+  const handleAppendToFindings = useCallback(async (text: string) => {
+    if (!text || !text.trim()) return;
+    const currentFindings = reportRef.current?.findings || '';
+    const newFindings = currentFindings.trim()
+      ? `${currentFindings.trim()}\n\n${text.trim()}`
+      : text.trim();
+
+    await update({ findings: newFindings });
+    toast({ tone: 'success', title: 'Appended', message: 'Dictation findings appended to main report.' });
+  }, [update, toast]);
+
+  const handleRetranscribe = useCallback(async (dictationId: string, engine: string) => {
+    toast({ tone: 'info', title: 'Re-transcribe requested', message: `Re-running dictation ${dictationId.slice(0, 6)} with ${engine}...` });
+    await refreshDictations();
+  }, [toast, refreshDictations]);
 
   /**
    * HANDOFF gotcha #3 — section textareas only persist on blur, but the AI
@@ -2321,6 +2321,7 @@ export default function ReportPage() {
               })}
             </>
           )}
+        </div>
 
         <div ref={inspectorRef}>
         <ReportInspector

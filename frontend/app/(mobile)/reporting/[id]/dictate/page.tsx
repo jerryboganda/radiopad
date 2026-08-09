@@ -35,7 +35,7 @@ export default function DictatePage() {
   }, [reportId]);
 
   const handleNavigationBack = () => {
-    router.push('/mobile/reporting');
+    router.push('/reporting');
   };
 
   return (
@@ -93,7 +93,7 @@ export default function DictatePage() {
           <AudioRecorderControls
             report={report}
             onUploadSuccess={() => {
-              router.push('/mobile/reporting');
+              router.push('/reporting');
             }}
             onCancel={handleNavigationBack}
           />

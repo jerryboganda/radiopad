@@ -29,7 +29,7 @@ const LOCKED_GROUPS: ReadonlyArray<{ key: string; hrefs: string[] }> = [
   // '/settings/models' is DESKTOP-only: the on-device engines run there, and the manager
   // previously shipped only in the (web) bundle — reachable by platform operators but not by the
   // radiologist who actually has to download the model.
-  { key: 'account', hrefs: ['/settings', '/settings/models', '/account/security'] },
+  { key: 'account', hrefs: ['/settings', '/settings/models', '/account/security', '/companion', '/reporting'] },
 ];
 
 describe('sidebar nav config', () => {

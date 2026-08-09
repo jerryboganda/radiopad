@@ -184,7 +184,7 @@ export const navGroups: NavGroup[] = [
     ],
   },
   {
-    // Personal account — desktop settings hub + shared sign-in devices.
+    // Personal account — desktop settings hub + shared sign-in devices + mobile companion surface navigation.
     labelKey: 'account',
     items: [
       { href: '/settings', labelKey: 'settingsHub', icon: Icons.settings, surfaces: ['desktop'] },
@@ -192,11 +192,6 @@ export const navGroups: NavGroup[] = [
       // only under (web) and was staged out of the desktop bundle entirely.
       { href: '/settings/models', labelKey: 'onDeviceModels', icon: Icons.onDeviceModels, surfaces: ['desktop'] },
       { href: '/account/security', labelKey: 'signInDevices', icon: Icons.signInDevices },
-  {
-    // Mobile companion surface navigation.
-    labelKey: 'mobile',
-    surfaces: ['mobile'],
-    items: [
       { href: '/companion', labelKey: 'companion', icon: Icons.aiAssistant, surfaces: ['mobile'] },
       { href: '/reporting', labelKey: 'reporting', icon: Icons.reports, surfaces: ['mobile'] },
     ],

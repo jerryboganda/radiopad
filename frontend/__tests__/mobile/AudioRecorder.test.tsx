@@ -162,6 +162,6 @@ describe('AudioRecorderControls & DictatePage', () => {
     const backBtn = screen.getByRole('button', { name: /back to reporting list/i });
     fireEvent.click(backBtn);
 
-    expect(pushMock).toHaveBeenCalledWith('/mobile/reporting');
+    expect(pushMock).toHaveBeenCalledWith('/reporting');
   });
 });

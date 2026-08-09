@@ -1,3 +1,10 @@
+import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { render, screen, fireEvent, act } from '@testing-library/react';
+import React from 'react';
+import PositiveFindingsTab from '@/app/(desktop)/reports/[id]/components/PositiveFindingsTab';
+import DictationAudioCard from '@/app/(desktop)/reports/[id]/components/DictationAudioCard';
+import type { DictationAudioDto } from '@/lib/api/reportingClient';
+
 beforeEach(() => {
   window.HTMLMediaElement.prototype.play = vi.fn().mockImplementation(() => Promise.resolve());
   window.HTMLMediaElement.prototype.pause = vi.fn();
@@ -38,16 +45,16 @@ describe('DictationAudioCard component', () => {
     );
   });
 
-  it('toggles audio play/pause state when play button is clicked', () => {
+  it('toggles audio play/pause state when play button is clicked', async () => {
     const onAppend = vi.fn();
     render(<DictationAudioCard dictation={sampleDictation1} onAppendToFindings={onAppend} />);
 
     const playBtn = screen.getByTestId('audio-play-pause-btn');
     expect(playBtn.getAttribute('aria-label')).toBe('Play');
 
-    // Click to play
-    fireEvent.click(playBtn);
-    // Standard audio play mock in jsdom may not update state unless play succeeds/resists, but aria-label / click handles safely.
+    await act(async () => {
+      fireEvent.click(playBtn);
+    });
     expect(playBtn).toBeDefined();
   });
 
