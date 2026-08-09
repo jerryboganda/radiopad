@@ -38,6 +38,7 @@ import {
   RefreshCw,
   type LucideIcon,
 } from 'lucide-react';
+import { useCompanion } from '@/components/companion/CompanionContext';
 
 export type RibbonAction = 'draft' | 'impression';
 
@@ -224,6 +225,8 @@ export default function ComposerRibbon(p: ComposerRibbonProps) {
 
   const busy = (a: RibbonAction) => p.activeActions.includes(a);
   const showSignoffGroup = p.canEdit || p.canSign;
+  const { phase: compPhase, companionDeviceName, phoneListening } = useCompanion();
+  const isCompPaired = compPhase === 'paired';
 
   return (
     <div className="rp-composer-ribbon" role="toolbar" aria-label="Report composer actions">
@@ -263,12 +266,28 @@ export default function ComposerRibbon(p: ComposerRibbonProps) {
           onClick={p.onToggleFormatDraft}
         />
         <RibbonButton
-          icon={<Smartphone size={16} />}
-          label="Pair phone"
-          short="Phone"
-          className={p.pairOpen ? 'active' : ''}
+          icon={
+            phoneListening ? (
+              <Mic size={16} className="text-rose-500 animate-pulse" />
+            ) : (
+              <Smartphone size={16} className={isCompPaired ? 'text-emerald-500' : ''} />
+            )
+          }
+          label={
+            isCompPaired
+              ? `Paired with ${companionDeviceName || 'phone'}`
+              : 'Pair phone'
+          }
+          short={isCompPaired ? (phoneListening ? 'Live mic' : 'Paired') : 'Phone'}
+          className={`${p.pairOpen ? 'active' : ''} ${
+            isCompPaired ? 'border-emerald-500/40 text-emerald-600 dark:text-emerald-400' : ''
+          }`}
           aria-expanded={p.pairOpen}
-          title="Pair your phone as a dictation companion"
+          title={
+            isCompPaired
+              ? `Paired with ${companionDeviceName || 'phone'} — wireless mic active`
+              : 'Pair your phone as a dictation companion'
+          }
           onClick={p.onTogglePair}
         />
       </RibbonGroup>
