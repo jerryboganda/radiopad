@@ -56,6 +56,7 @@ public class LocalModelDownloadedStateTests
             Directory.CreateDirectory(dir);
             File.WriteAllText(Path.Combine(dir, LocalSttModels.MedAsrModel.FileName), "onnx");
             File.WriteAllText(Path.Combine(dir, LocalSttModels.MedAsrTokens.FileName), "tokens");
+            File.WriteAllText(Path.Combine(dir, LocalSttModels.MedAsr6GramLm.FileName), "lm");
 
             Assert.True(IsInstalled(ModelArchiveKind.MedAsrCtc, dir, LocalSttModels.MedAsrModel.FileName),
                 "a fully-provisioned MedASR bundle must report as downloaded");

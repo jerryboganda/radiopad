@@ -90,21 +90,24 @@ public class SttModelProvisionerTests
         Directory.CreateDirectory(dir);
         File.WriteAllText(Path.Combine(dir, "model.int8.onnx"), "x");
         File.WriteAllText(Path.Combine(dir, "tokens.txt"), "x");
+        File.WriteAllText(Path.Combine(dir, "lm_6gram.fst"), "x");
     }
 
     [Fact]
-    public void MedAsr_IsComplete_And_Resolves_When_Model_And_Tokens_Present()
+    public void MedAsr_IsComplete_And_Resolves_When_Model_Tokens_And_Lm_Present()
     {
         var dir = TempDir();
         WriteMedAsrBundle(dir);
         try
         {
             Assert.True(LocalSttModels.IsMedAsrComplete(dir));
-            var (model, tokens) = LocalSttModels.ResolveMedAsrFiles(dir);
+            var (model, tokens, lm) = LocalSttModels.ResolveMedAsrFiles(dir);
             Assert.NotNull(model);
             Assert.NotNull(tokens);
+            Assert.NotNull(lm);
             Assert.EndsWith("model.int8.onnx", model!);
             Assert.EndsWith("tokens.txt", tokens!);
+            Assert.EndsWith("lm_6gram.fst", lm!);
         }
         finally { Directory.Delete(dir, recursive: true); }
     }
@@ -114,7 +117,6 @@ public class SttModelProvisionerTests
     {
         var dir = TempDir();
         WriteMedAsrBundle(dir);
-        File.WriteAllText(Path.Combine(dir, "lm_6gram.fst"), "x");
         try
         {
             var (model, tokens, lm) = LocalSttModels.ResolveMedAsrFiles(dir);
@@ -136,9 +138,58 @@ public class SttModelProvisionerTests
         try
         {
             File.WriteAllText(Path.Combine(dir, "model.int8.onnx"), "x"); // tokens.txt absent
+            File.WriteAllText(Path.Combine(dir, "lm_6gram.fst"), "x");
             Assert.False(LocalSttModels.IsMedAsrComplete(dir));
         }
         finally { Directory.Delete(dir, recursive: true); }
+    }
+
+    [Fact]
+    public void MedAsr_IsComplete_False_When_Lm_Missing()
+    {
+        var dir = TempDir();
+        Directory.CreateDirectory(dir);
+        try
+        {
+            File.WriteAllText(Path.Combine(dir, "model.int8.onnx"), "x");
+            File.WriteAllText(Path.Combine(dir, "tokens.txt"), "x"); // lm_6gram.fst absent
+            Assert.False(LocalSttModels.IsMedAsrComplete(dir));
+        }
+        finally { Directory.Delete(dir, recursive: true); }
+    }
+
+    [Fact]
+    public void ResolveMedAsrFiles_Fallback_To_BpeVocab_Or_Fst()
+    {
+        var dir1 = TempDir();
+        Directory.CreateDirectory(dir1);
+        try
+        {
+            File.WriteAllText(Path.Combine(dir1, "model.int8.onnx"), "x");
+            File.WriteAllText(Path.Combine(dir1, "tokens.txt"), "x");
+            File.WriteAllText(Path.Combine(dir1, "bpe.vocab"), "x");
+
+            var (m, t, lm) = LocalSttModels.ResolveMedAsrFiles(dir1);
+            Assert.NotNull(lm);
+            Assert.EndsWith("bpe.vocab", lm!);
+            Assert.True(LocalSttModels.IsMedAsrComplete(dir1));
+        }
+        finally { Directory.Delete(dir1, recursive: true); }
+
+        var dir2 = TempDir();
+        Directory.CreateDirectory(dir2);
+        try
+        {
+            File.WriteAllText(Path.Combine(dir2, "model.int8.onnx"), "x");
+            File.WriteAllText(Path.Combine(dir2, "tokens.txt"), "x");
+            File.WriteAllText(Path.Combine(dir2, "custom_lm.fst"), "x");
+
+            var (m, t, lm) = LocalSttModels.ResolveMedAsrFiles(dir2);
+            Assert.NotNull(lm);
+            Assert.EndsWith("custom_lm.fst", lm!);
+            Assert.True(LocalSttModels.IsMedAsrComplete(dir2));
+        }
+        finally { Directory.Delete(dir2, recursive: true); }
     }
 
     [Fact]

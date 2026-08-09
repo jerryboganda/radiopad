@@ -165,8 +165,8 @@ public sealed class SherpaMedAsrSttClient : ILocalSttClient, ILocalSttEngine, ID
             }
 
             _log.LogInformation(
-                "Loading MedASR CTC model from {Dir} ({Threads} threads, {Provider})",
-                _modelDir, config.ModelConfig.NumThreads, config.ModelConfig.Provider);
+                "Loading MedASR CTC model with 6-gram LM from {Dir} ({Threads} threads, {Provider}, beam size {BeamSize}, method {Method}, lm {Lm})",
+                _modelDir, config.ModelConfig.NumThreads, config.ModelConfig.Provider, config.MaxActivePaths, config.DecodingMethod, !string.IsNullOrEmpty(_lm));
 
             _recognizer = new OfflineRecognizer(config);
             return _recognizer;

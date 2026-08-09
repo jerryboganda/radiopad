@@ -68,17 +68,20 @@ public static class LocalSttModels
             return (null, null, null);
         string? Pick(string fileName)
         {
-            var f = Directory.GetFiles(dir, fileName, SearchOption.AllDirectories).FirstOrDefault();
+            var f = Directory.GetFiles(dir!, fileName, SearchOption.AllDirectories).FirstOrDefault();
             return f;
         }
-        return (Pick(MedAsrModel.FileName), Pick(MedAsrTokens.FileName), Pick(MedAsr6GramLm.FileName));
+        var lm = Pick(MedAsr6GramLm.FileName)
+            ?? Pick("bpe.vocab")
+            ?? (dir is not null && Directory.Exists(dir) ? Directory.GetFiles(dir, "*.fst", SearchOption.AllDirectories).FirstOrDefault() : null);
+        return (Pick(MedAsrModel.FileName), Pick(MedAsrTokens.FileName), lm);
     }
 
-    /// <summary>True when the MedASR CTC model + tokens are both present under <paramref name="dir"/>.</summary>
+    /// <summary>True when the MedASR CTC model + tokens + 6-gram LM are all present under <paramref name="dir"/>.</summary>
     public static bool IsMedAsrComplete(string? dir)
     {
-        var (m, t, _) = ResolveMedAsrFiles(dir);
-        return m is not null && t is not null;
+        var (m, t, lm) = ResolveMedAsrFiles(dir);
+        return m is not null && t is not null && lm is not null;
     }
 
     // ── Tuning knobs (env-overridable; safe defaults) ──────────────────────
