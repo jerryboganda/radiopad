@@ -2,6 +2,7 @@ name: mobile-bundle
 on:
   workflow_dispatch:
   push:
+    tags: ['v*.*.*']
     paths:
       - 'mobile/**'
       - 'frontend/**'
@@ -70,7 +71,6 @@ jobs:
       # PRD DESK-013 — sign release APK with apksigner when keystore secrets
       # are present. Skipped silently otherwise so PRs from forks still build.
       - name: Assemble release APK
-        if: env.ANDROID_KEYSTORE_BASE64 != ''
         working-directory: mobile/android
         run: ./gradlew assembleRelease --no-daemon
       - name: Sign release APK
@@ -81,13 +81,12 @@ jobs:
           ANDROID_KEY_PASSWORD: ${{ secrets.ANDROID_KEY_PASSWORD }}
         run: |
           set -euo pipefail
-          KEYSTORE="$RUNNER_TEMP/release.keystore"
+          KEYSTORE="${RUNNER_TEMP}/release.keystore"
           echo "$ANDROID_KEYSTORE_BASE64" | base64 -d > "$KEYSTORE"
-          BUILD_TOOLS=$(ls -d "$ANDROID_SDK_ROOT"/build-tools/* | sort -V | tail -n1)
-          APKSIGNER="$BUILD_TOOLS/apksigner"
+          BUILD_TOOLS=$(ls -d "${ANDROID_SDK_ROOT}/build-tools/*" | sort -V | tail -n1)
+          APKSIGNER="${BUILD_TOOLS}/apksigner"
           shopt -s nullglob
-          for apk in mobile/android/app/build/outputs/apk/release/*-unsigned.apk \
-                     mobile/android/app/build/outputs/apk/release/*.apk; do
+          for apk in mobile/android/app/build/outputs/apk/release/*-unsigned.apk mobile/android/app/build/outputs/apk/release/*.apk; do
             signed="${apk%.apk}-signed.apk"
             "$APKSIGNER" sign \
               --ks "$KEYSTORE" \
@@ -102,12 +101,11 @@ jobs:
         with:
           name: radiopad-android-debug
           path: mobile/android/app/build/outputs/apk/debug/*.apk
-      - name: Upload signed release APK
-        if: env.ANDROID_KEYSTORE_BASE64 != ''
+      - name: Upload release APK
         uses: actions/upload-artifact@v4
         with:
           name: radiopad-android-release
-          path: mobile/android/app/build/outputs/apk/release/*-signed.apk
+          path: mobile/android/app/build/outputs/apk/release/*.apk
           if-no-files-found: warn
 
   ios:
