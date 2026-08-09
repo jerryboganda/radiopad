@@ -26,7 +26,7 @@ export default function MobileLayout({ children }: { children: React.ReactNode }
   return (
     <div className="rp-mobile-layout flex flex-col min-h-screen bg-[var(--bg-app,#0b0f17)] text-[var(--text,#e2e8f0)]">
       {/* Content View */}
-      <div className="flex-1 w-full relative">
+      <div className="flex-1 w-full relative pb-24">
         {children}
       </div>
 

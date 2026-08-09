@@ -106,7 +106,10 @@ function CompanionTopbar() {
           <span className="rp-comp-brand-kicker">AI-assisted radiology reporting</span>
         </span>
       </div>
-      <ThemeToggle />
+      <div className="flex items-center gap-2">
+        <MobileUpdateCheck />
+        <ThemeToggle />
+      </div>
     </div>
   );
 }
@@ -585,7 +588,6 @@ export default function MobileCompanionPage() {
                 )}
               </div>
 
-              <div className="rp-comp-footer"><MobileUpdateCheck /></div>
             </>
           )}
         </div>
@@ -614,7 +616,6 @@ export default function MobileCompanionPage() {
               <ArrowRight className="rp-auth-submit-trail" size={18} aria-hidden />
             </button>
           </div>
-          <div className="rp-comp-footer"><MobileUpdateCheck /></div>
         </div>
       </div>
     );
