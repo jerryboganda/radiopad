@@ -43,6 +43,7 @@ public sealed class SherpaMedAsrSttClient : ILocalSttClient, ILocalSttEngine, ID
 
     private string? _model;
     private string? _tokens;
+    private string? _lm;
     private OfflineRecognizer? _recognizer;
     private volatile bool _loadFailed;
     private volatile string? _lastError;
@@ -154,6 +155,15 @@ public sealed class SherpaMedAsrSttClient : ILocalSttClient, ILocalSttEngine, ID
             config.ModelConfig.Provider = LocalSttModels.ResolveProvider();
             config.ModelConfig.Debug = 0;
 
+            config.DecodingMethod = LocalSttModels.ResolveDecodingMethod();
+            config.MaxActivePaths = LocalSttModels.ResolveMaxActivePaths();
+
+            if (!string.IsNullOrEmpty(_lm) && File.Exists(_lm))
+            {
+                config.LmConfig.Model = _lm;
+                config.LmConfig.Scale = 0.5f;
+            }
+
             _log.LogInformation(
                 "Loading MedASR CTC model from {Dir} ({Threads} threads, {Provider})",
                 _modelDir, config.ModelConfig.NumThreads, config.ModelConfig.Provider);
@@ -169,9 +179,10 @@ public sealed class SherpaMedAsrSttClient : ILocalSttClient, ILocalSttEngine, ID
         lock (_gate)
         {
             if (_modelDir is null) return;
-            var (model, tokens, _) = LocalSttModels.ResolveMedAsrFiles(_modelDir);
+            var (model, tokens, lm) = LocalSttModels.ResolveMedAsrFiles(_modelDir);
             _model = model;
             _tokens = tokens;
+            _lm = lm;
         }
     }
 

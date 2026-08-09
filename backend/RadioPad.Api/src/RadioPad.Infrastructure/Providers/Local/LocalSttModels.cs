@@ -121,7 +121,7 @@ public static class LocalSttModels
             : Math.Clamp(Environment.ProcessorCount - 1, 1, 4);
 
     public static int ResolveMaxActivePaths()
-        => int.TryParse(Env("RADIOPAD_STT_MAX_ACTIVE_PATHS"), out var n) && n > 0 ? n : 4;
+        => int.TryParse(Env("RADIOPAD_STT_MAX_ACTIVE_PATHS"), out var n) && n > 0 ? n : 8;
 
     /// <summary>Explicit hotwords file (one phrase per line); null when unset/missing.</summary>
     public static string? ResolveHotwordsFile()
