@@ -1,8 +1,10 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import type { DictationAudioDto } from '@/lib/api/reportingClient';
+import type { DictationAudioDto, TranscriptionEngineDto } from '@/lib/api/reportingClient';
+import { getTranscriptionEngines } from '@/lib/api/reportingClient';
 import DictationAudioCard from './DictationAudioCard';
+import EmptyState from '@/components/ui/EmptyState';
 import { Volume2, Sparkles, X, RefreshCw } from 'lucide-react';
 
 export interface PositiveFindingsTabProps {
@@ -22,6 +24,21 @@ export default function PositiveFindingsTab({
 }: PositiveFindingsTabProps) {
   const [items, setItems] = useState<DictationAudioDto[]>(dictations);
   const [toastNotice, setToastNotice] = useState<string | null>(null);
+  const [engines, setEngines] = useState<TranscriptionEngineDto[]>([]);
+
+  useEffect(() => {
+    let cancelled = false;
+    getTranscriptionEngines()
+      .then((list) => {
+        if (!cancelled) setEngines(list);
+      })
+      .catch(() => {
+        // Dropdown falls back to the dictation's own engine in DictationAudioCard.
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, []);
 
   useEffect(() => {
     setItems(dictations);
@@ -81,20 +98,20 @@ export default function PositiveFindingsTab({
   }, [reportId, onRefreshDictations]);
 
   return (
-    <div className="rp-panel rp-positive-findings-tab p-4 bg-slate-900/40 rounded-lg border border-slate-800">
+    <div className="rp-panel rp-positive-findings-tab">
       {/* Tab Header */}
-      <div className="flex items-center justify-between mb-4 pb-2 border-b border-slate-800">
-        <div className="flex items-center gap-2">
-          <Sparkles className="text-cyan-400" size={18} aria-hidden />
-          <h2 className="text-base font-semibold text-slate-100">Positive Findings & Mobile Dictations</h2>
-          <span className="badge font-mono text-xs bg-slate-800 text-cyan-300 px-2 py-0.5 rounded-full" data-testid="dictations-count-badge">
+      <div className="rp-positive-findings-header">
+        <div className="rp-dictation-title">
+          <Sparkles size={18} aria-hidden style={{ color: 'var(--accent)' }} />
+          <h2 className="rp-positive-findings-title">Positive Findings & Mobile Dictations</h2>
+          <span className="badge info" data-testid="dictations-count-badge">
             {items.length}
           </span>
         </div>
         {onRefreshDictations && (
           <button
             type="button"
-            className="ghost text-xs flex items-center gap-1 text-slate-400 hover:text-slate-200"
+            className="ghost"
             data-testid="refresh-dictations-btn"
             onClick={() => void onRefreshDictations()}
           >
@@ -107,17 +124,17 @@ export default function PositiveFindingsTab({
       {/* Real-time SignalR toast / banner */}
       {toastNotice && (
         <div
-          className="banner info flex items-center justify-between mb-4 p-3 bg-cyan-950/80 border border-cyan-700/60 rounded-md text-cyan-200 text-sm shadow-lg animate-fade-in"
+          className="banner info rp-dictation-toast"
           role="status"
           data-testid="realtime-dictation-toast"
         >
-          <div className="flex items-center gap-2">
-            <Sparkles size={16} className="text-cyan-400 animate-pulse" aria-hidden />
+          <div className="rp-dictation-actions-left">
+            <Sparkles size={16} aria-hidden />
             <span>{toastNotice}</span>
           </div>
           <button
             type="button"
-            className="ghost text-xs p-1 text-cyan-300 hover:text-cyan-100"
+            className="ghost"
             onClick={() => setToastNotice(null)}
             aria-label="Dismiss notification"
           >
@@ -128,21 +145,22 @@ export default function PositiveFindingsTab({
 
       {/* Dictation cards list */}
       {items.length === 0 ? (
-        <div className="rp-panel text-center py-10 px-4 bg-slate-950/50 rounded-lg border border-slate-800/80" data-testid="empty-dictations-notice">
-          <Volume2 size={36} className="mx-auto text-slate-500 mb-3" aria-hidden />
-          <h3 className="text-sm font-semibold text-slate-300">No Mobile Dictations Recorded Yet</h3>
-          <p className="text-xs text-slate-400 mt-1 max-w-sm mx-auto">
-            Audio dictations uploaded from the mobile reporting app will automatically hand off here in real time with AI transcription.
-          </p>
+        <div data-testid="empty-dictations-notice">
+          <EmptyState
+            icon={<Volume2 size={18} aria-hidden />}
+            title="No Mobile Dictations Recorded Yet"
+            description="Audio dictations uploaded from the mobile reporting app will automatically hand off here in real time with AI transcription."
+          />
         </div>
       ) : (
-        <div className="space-y-4" data-testid="dictation-cards-list">
+        <div className="rp-takes-list" data-testid="dictation-cards-list">
           {items.map((item) => (
             <DictationAudioCard
               key={item.id}
               dictation={item}
               onAppendToFindings={onAppendToFindings}
               onRetranscribe={onRetranscribe}
+              engines={engines}
             />
           ))}
         </div>

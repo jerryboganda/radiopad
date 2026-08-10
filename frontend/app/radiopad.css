@@ -864,6 +864,7 @@
 .rp-field { display: flex; flex-direction: column; gap: 4px; margin-bottom: 12px; }
 .rp-field > span { font: 500 12px/1.4 var(--sans); color: var(--text-muted); }
 .rp-field.rp-row { flex-direction: row; align-items: center; }
+.rp-modal .row { display: flex; justify-content: flex-end; gap: 8px; margin-top: 4px; }
 
 /* Section list — vertical stack of template sections / preview rows. Used by
    the Templates editor (draft sections) and the template preview panel. */
@@ -1640,6 +1641,45 @@
   margin: 12px 0;
 }
 .rp-companion-remote .ghost { flex: 1 1 auto; }
+
+/* Mobile app shell — fixed bottom tab bar shared by Companion + Reporting
+   (app/(mobile)/layout.tsx). Locked tokens only. */
+.rp-mobile-layout { display: flex; flex-direction: column; min-height: 100vh; background: var(--bg-app); color: var(--text); }
+.rp-mobile-layout-content { flex: 1 1 auto; width: 100%; position: relative; padding-bottom: 96px; }
+.rp-mobile-nav {
+  position: fixed;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  z-index: 40;
+  display: flex;
+  align-items: center;
+  justify-content: space-around;
+  gap: 8px;
+  padding: 8px 24px;
+  background: color-mix(in srgb, var(--bg-panel) 95%, transparent);
+  backdrop-filter: blur(10px);
+  border-top: 1px solid var(--border);
+  box-shadow: var(--shadow-md);
+}
+.rp-mobile-nav-item {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+  padding: 4px 16px;
+  border-radius: var(--radius);
+  color: var(--text-muted);
+  text-decoration: none;
+  transition: color 150ms ease, transform 150ms ease;
+}
+.rp-mobile-nav-item:hover { color: var(--text); }
+.rp-mobile-nav-item.active { color: var(--accent); font-weight: 600; transform: scale(1.05); }
+.rp-mobile-nav-icon { display: flex; align-items: center; justify-content: center; padding: 6px; border-radius: var(--radius-sm); }
+.rp-mobile-nav-item.active .rp-mobile-nav-icon { background: var(--accent-tint); }
+.rp-mobile-nav-label { font-size: 11px; letter-spacing: 0.02em; }
+
 
 /* "Check for updates" footer on the phone companion (mobile surface only). The
    sideloaded APK can't self-update, so this checks the latest release and offers
@@ -5540,3 +5580,174 @@
 /* ExportPanel — Report Templates layout selector (components/reports/ExportPanel.tsx) */
 .rp-exportpanel-layout { display: flex; flex-direction: column; gap: 4px; margin: 4px 0 12px; }
 .rp-exportpanel-layout select { width: 100%; }
+
+/* ============================================================
+   Positive Findings tab — mobile-dictated audio review
+   (app/(desktop)/reports/[id]/components/{PositiveFindingsTab,DictationAudioCard}.tsx)
+   and the mobile Reporting surface that feeds it
+   (app/(mobile)/reporting/**). Locked tokens only — no hardcoded
+   colours. See docs/02-design/design.md §"Mobile workflows".
+   ============================================================ */
+.rp-dictation-card { display: flex; flex-direction: column; gap: 12px; }
+.rp-dictation-card-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  padding-bottom: 10px;
+  border-bottom: 1px solid var(--border-soft);
+}
+.rp-dictation-title { display: flex; align-items: center; gap: 8px; font-weight: 600; font-size: 13.5px; color: var(--text-strong); }
+.rp-dictation-meta { display: flex; align-items: center; gap: 8px; font-size: 12px; color: var(--text-muted); }
+
+.rp-audio-player {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 10px 12px;
+  border-radius: var(--radius-sm);
+  background: var(--bg-subtle);
+  border: 1px solid var(--border-soft);
+}
+.rp-audio-play-btn { flex: 0 0 auto; padding: 8px; border-radius: 999px; }
+.rp-audio-seek-wrap { flex: 1 1 auto; display: flex; flex-direction: column; justify-content: center; gap: 4px; }
+.rp-audio-seek {
+  width: 100%;
+  height: 5px;
+  border-radius: 999px;
+  background: var(--border);
+  accent-color: var(--accent);
+  cursor: pointer;
+}
+.rp-audio-time { display: flex; justify-content: space-between; font-size: 11px; color: var(--text-muted); font-family: var(--mono); }
+.rp-speed-options { display: flex; gap: 2px; padding: 3px; border-radius: var(--radius-sm); background: var(--bg-panel); border: 1px solid var(--border-soft); }
+.rp-speed-btn {
+  appearance: none;
+  border: none;
+  background: transparent;
+  color: var(--text-muted);
+  font-size: 11px;
+  padding: 3px 6px;
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+}
+.rp-speed-btn.active { background: var(--accent); color: var(--accent-fg); font-weight: 700; }
+.rp-speed-btn:hover:not(.active) { color: var(--text); }
+
+.rp-dictation-transcript-label { display: block; font-size: 11.5px; font-weight: 500; color: var(--text-muted); margin-bottom: 4px; text-transform: uppercase; letter-spacing: 0.02em; }
+.rp-dictation-transcript { font-family: var(--mono); font-size: 13px; }
+.rp-dictation-actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  padding-top: 10px;
+  border-top: 1px solid var(--border-soft);
+}
+.rp-dictation-actions-left { display: flex; align-items: center; gap: 8px; }
+.rp-dictation-actions-left select { width: auto; font-size: 12px; padding: 5px 8px; }
+
+.rp-positive-findings-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  padding-bottom: 10px;
+  margin-bottom: 12px;
+  border-bottom: 1px solid var(--border-soft);
+}
+.rp-positive-findings-title { display: flex; align-items: center; gap: 8px; font-size: 15px; font-weight: 600; color: var(--text-strong); }
+/* Dismissible banner variant (icon+label left, close button right) — used by the
+   Positive Findings tab's real-time "new dictation received" toast. */
+.rp-dictation-toast { display: flex; align-items: center; justify-content: space-between; gap: 10px; }
+
+/* ============================================================
+   Mobile Reporting — standalone report creation + multi-take
+   dictation on the phone (app/(mobile)/reporting/**). Reuses
+   `.rp-mobile`/`.rp-mic-btn`/`.rp-panel`/`.primary`/`.ghost`/`.badge`
+   wherever they already fit; the classes below cover the
+   list/card/form/recorder chrome specific to this flow.
+   ============================================================ */
+.rp-reporting-list-header { display: flex; align-items: flex-start; justify-content: space-between; gap: 10px; margin-bottom: 12px; }
+.rp-reporting-search { position: relative; margin-bottom: 10px; }
+.rp-reporting-search svg { position: absolute; left: 10px; top: 50%; transform: translateY(-50%); color: var(--text-faint); pointer-events: none; }
+.rp-reporting-search input { padding-left: 34px; }
+.rp-reporting-filters { display: flex; align-items: center; gap: 6px; overflow-x: auto; padding-bottom: 4px; }
+.rp-reporting-filter-pill {
+  appearance: none;
+  border: 1px solid var(--border);
+  background: var(--bg-panel);
+  color: var(--text-muted);
+  font-size: 12px;
+  font-weight: 500;
+  padding: 6px 14px;
+  border-radius: 999px;
+  cursor: pointer;
+  white-space: nowrap;
+}
+.rp-reporting-filter-pill.active { background: var(--accent); border-color: var(--accent); color: var(--accent-fg); }
+
+.rp-report-card {
+  display: block;
+  width: 100%;
+  text-align: left;
+  padding: 14px;
+  border-radius: var(--radius-lg);
+  border: 1px solid var(--border);
+  background: var(--bg-panel);
+  cursor: pointer;
+  transition: border-color 120ms ease, background 120ms ease;
+}
+.rp-report-card:hover { border-color: var(--accent); background: var(--bg-subtle); }
+.rp-report-card-top { display: flex; align-items: flex-start; justify-content: space-between; gap: 10px; margin-bottom: 6px; }
+.rp-report-card-id { display: inline-block; font-family: var(--mono); font-weight: 600; font-size: 11.5px; padding: 2px 8px; border-radius: var(--radius-sm); background: var(--accent-tint); color: var(--accent-strong); margin-bottom: 4px; }
+.rp-report-card-name { display: flex; align-items: center; gap: 6px; font-size: 15px; font-weight: 600; color: var(--text-strong); }
+.rp-report-card-footer { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 8px; padding-top: 8px; margin-top: 8px; border-top: 1px solid var(--border-soft); font-size: 12px; color: var(--text-muted); }
+.rp-report-card-footer-left { display: flex; align-items: center; gap: 10px; }
+.rp-report-card-audio-count { display: flex; align-items: center; gap: 4px; color: var(--accent); font-weight: 500; }
+
+.rp-patient-banner {
+  padding: 14px;
+  border-radius: var(--radius-lg);
+  border: 1px solid var(--border);
+  background: var(--bg-panel);
+}
+.rp-patient-banner-top { display: flex; align-items: center; gap: 8px; margin-bottom: 4px; }
+.rp-patient-banner-name { display: flex; align-items: center; gap: 6px; font-size: 16px; font-weight: 700; color: var(--text-strong); }
+.rp-patient-banner-meta { display: flex; align-items: center; gap: 8px; font-size: 12px; color: var(--text-muted); }
+
+.rp-takes-list { display: flex; flex-direction: column; gap: 8px; margin-top: 12px; }
+.rp-take-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 12px;
+  border-radius: var(--radius);
+  border: 1px solid var(--border);
+  background: var(--bg-panel);
+}
+.rp-take-row-index { flex: 0 0 auto; display: flex; align-items: center; justify-content: center; width: 26px; height: 26px; border-radius: 999px; background: var(--accent-tint); color: var(--accent-strong); font-size: 12px; font-weight: 700; }
+.rp-take-row-meta { flex: 1 1 auto; display: flex; flex-direction: column; gap: 2px; }
+.rp-take-row-title { font-size: 13px; font-weight: 500; color: var(--text); }
+.rp-take-row-sub { font-size: 11.5px; color: var(--text-muted); }
+.rp-take-row-status { font-size: 11px; }
+
+.rp-recorder-visualizer {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 5px;
+  height: 72px;
+  padding: 12px 16px;
+  border-radius: var(--radius);
+  background: var(--bg-subtle);
+  border: 1px solid var(--border-soft);
+}
+.rp-recorder-bar { width: 5px; border-radius: 999px; background: var(--border-strong); transition: background 150ms ease; }
+.rp-recorder-bar.is-recording { background: var(--green); }
+.rp-recorder-bar.is-paused { background: var(--amber); }
+.rp-recorder-bar.is-stopped { background: var(--green); opacity: 0.7; }
+.rp-recorder-timer { font-family: var(--mono); font-size: 32px; font-weight: 700; color: var(--text-strong); }
+.rp-recorder-timer.is-recording { color: var(--red); }
+.rp-recorder-controls { display: flex; align-items: center; justify-content: center; gap: 10px; }

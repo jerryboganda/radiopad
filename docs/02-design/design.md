@@ -1,6 +1,6 @@
 # RadioPad — Design System (RC tokens, dual-theme sidebar shell)
 
-**Status:** RC design system (PRD v3.0 §20) · Light default + first-class dark · Build-time Tailwind · Sidebar shell  **Owner:** Product Design  **Last Updated:** 2026-07-13
+**Status:** RC design system (PRD v3.0 §20) · Light default + first-class dark · Build-time Tailwind · Sidebar shell  **Owner:** Product Design  **Last Updated:** 2026-08-10
 
 > **MISSION-CRITICAL RULE.** RadioPad's visual identity is the **RC design
 > system**: a light-first, white/blue clinical-SaaS palette with a
@@ -984,6 +984,67 @@ sidebar group).
   new classes are `.rp-rl-letterhead-font-select` and `.rp-rl-letterhead-size`
   (small toolbar-embedded controls) plus a shorter `.rp-rl-letterhead-lines`
   min-height override (this field is ≤4 short lines, not long-form prose).
+
+### 4.19 Positive Findings & Mobile Dictations (desktop) / standalone mobile Reporting
+
+Two surfaces of one feature: a radiologist dictates audio findings on mobile
+(no pairing required — a real signed-in session, distinct from `/companion`'s
+QR-pairing remote-mic flow) and a senior/junior colleague transcribes +
+autofills them into the desktop report's Positive Findings section.
+
+**Desktop — `PositiveFindingsTab.tsx` / `DictationAudioCard.tsx`:**
+
+- `.rp-positive-findings-toolbar`, `.rp-positive-findings-empty` wrap the tab
+  body; `<EmptyState>` covers the zero-dictations case.
+- `.rp-dictation-toast` is a flex-row layout modifier applied alongside
+  `.banner.info` for the dismissible "new dictation received" real-time toast
+  — scoped to this feature only (a bare `.banner` has no `display: flex` by
+  default; do not add that globally, it would affect unrelated banners like
+  `BillingStatusBanner`).
+- `.rp-dictation-card` (+ `.rp-dictation-card-header`, `.rp-dictation-title`,
+  `.rp-dictation-meta`) is one audio take's card; `.rp-audio-player` wraps the
+  native `<audio>` element plus `.rp-speed-btn` (+ `.active`) playback-rate
+  buttons.
+- The transcription-engine `<select>` is populated from
+  `getTranscriptionEngines()` (`lib/api/reportingClient.ts`) — default engine
+  is local `medASR-6gram`; other enabled providers appear alongside it. One
+  click transcribes and autofills the Positive Findings editor with the
+  returned text (still requires the usual `.ai-mark` review treatment once
+  inserted into report prose).
+- `.rp-dictation-transcript-label`, `.rp-dictation-transcript` style the
+  read-only transcript preview under a card once transcribed.
+
+**Mobile — `app/(mobile)/reporting/*`:**
+
+- Bottom nav (`app/(mobile)/layout.tsx`): `.rp-mobile-layout`,
+  `.rp-mobile-nav` (+ `.rp-mobile-nav-item`, `.rp-mobile-nav-icon`,
+  `.rp-mobile-nav-label`) — a two-tab bar (Companion, Reporting) distinct from
+  the sidebar's Account-group entries for the same routes; both render
+  together intentionally (§4.9), not a redundancy to remove.
+- Worklist (`reporting/page.tsx`): `.rp-reporting-list-header`,
+  `.rp-reporting-search`, `.rp-reporting-filters` / `.rp-reporting-filter-pill`
+  (+ `.active`), `.rp-report-card` (+ `.rp-report-card-top`,
+  `.rp-report-card-id`, `.rp-report-card-name`, `.rp-report-card-footer`,
+  `.rp-report-card-footer-left`, `.rp-report-card-audio-count`). Status pills
+  reuse the shared `.badge` family (`ok`/`warn`/`info`).
+- New Report modal (`reporting/components/NewReportModal.tsx`): reuses the
+  existing `.rp-modal-backdrop` / `.rp-modal` / `.rp-field` shell — Modality
+  and Region-of-Scan are `<select>` populated from the tenant's
+  `api.modalities.list()` / `api.bodyParts.list()` catalogs (the same ones the
+  desktop admin pages manage), falling back to free-text `<input>` if the
+  catalog is empty/unavailable, so a mobile-created report stays consistent
+  with template/rulebook auto-resolution. `.rp-modal .row` right-aligns the
+  Cancel/Submit action row (mirrors the older `.modal .row` rule for the
+  RC modal shell).
+- Multi-take recorder (`reporting/components/AudioRecorderControls.tsx`):
+  `.rp-patient-banner` (+ `-top`, `-name`, `-meta`) header, `.rp-recorder-timer`
+  (+ `.is-recording` pulse), `.rp-recorder-visualizer` / `.rp-recorder-bar`
+  (+ `.is-recording`/`.is-paused`/`.is-stopped`), `.rp-recorder-controls`. The
+  component stays mounted across takes — record → stop → submit resets
+  straight back to idle so a senior consultant can record as many findings
+  takes as needed for one case before handing it to a junior resident/PGR;
+  `.rp-takes-list` / `.rp-take-row` (+ `-index`, `-meta`, `-title`, `-sub`,
+  `-status`) shows the running list of takes uploaded so far.
 
 ---
 

@@ -2,12 +2,17 @@
 
 import { useState, useRef, useEffect } from 'react';
 import { Play, Pause, Check, RefreshCw, Volume2 } from 'lucide-react';
-import type { DictationAudioDto } from '@/lib/api/reportingClient';
+import type { DictationAudioDto, TranscriptionEngineDto } from '@/lib/api/reportingClient';
+import { getDictationAudioUrl } from '@/lib/api/reportingClient';
 
 export interface DictationAudioCardProps {
   dictation: DictationAudioDto;
   onAppendToFindings: (text: string) => void;
   onRetranscribe?: (dictationId: string, engine: string) => void;
+  /** Transcription engines available for the dropdown (fetched once by the parent tab
+   *  via getTranscriptionEngines() and shared across every card). Falls back to just the
+   *  dictation's own engine if the list hasn't loaded yet. */
+  engines?: TranscriptionEngineDto[];
 }
 
 const SPEED_OPTIONS = [1.0, 1.25, 1.5, 2.0];
@@ -16,6 +21,7 @@ export default function DictationAudioCard({
   dictation,
   onAppendToFindings,
   onRetranscribe,
+  engines,
 }: DictationAudioCardProps) {
   const [isPlaying, setIsPlaying] = useState(false);
   const [currentTime, setCurrentTime] = useState(0);
@@ -33,7 +39,7 @@ export default function DictationAudioCard({
 
   const audioUrl = dictation.storagePath?.startsWith('http') || dictation.storagePath?.startsWith('/')
     ? dictation.storagePath
-    : `/api/v1/reporting/reports/${dictation.reportId}/dictations/${dictation.id}/audio`;
+    : getDictationAudioUrl(dictation.reportId, dictation.id);
 
   const togglePlay = () => {
     if (!audioRef.current) return;
@@ -73,20 +79,27 @@ export default function DictationAudioCard({
 
   const isMedAsr = (dictation.transcriptionEngine || '').toLowerCase().includes('medasr');
   const engineBadgeLabel = isMedAsr ? 'medASR (4.4% WER)' : dictation.transcriptionEngine || 'UBAG Gemini';
+  const engineOptions: TranscriptionEngineDto[] =
+    engines && engines.length > 0
+      ? engines
+      : [
+          { engineId: 'medASR-6gram', displayName: 'medASR (Local 4.4% WER)', isLocal: true, isAvailable: true, isDefault: true },
+          { engineId: 'UBAG Gemini', displayName: 'UBAG Gemini', isLocal: false, isAvailable: true, isDefault: false },
+        ];
 
   return (
-    <div className="rp-panel rp-dictation-card mb-4 p-4 rounded-lg bg-slate-900/80 border border-slate-800 shadow-md" data-testid="dictation-audio-card">
+    <div className="rp-panel rp-dictation-card" data-testid="dictation-audio-card">
       {/* Header */}
-      <div className="flex items-center justify-between border-b border-slate-800 pb-2 mb-3">
-        <div className="flex items-center gap-2">
-          <Volume2 size={16} className="text-cyan-400" aria-hidden />
-          <span className="font-semibold text-sm text-slate-200">Senior Radiologist Dictation</span>
+      <div className="rp-dictation-card-header">
+        <div className="rp-dictation-title">
+          <Volume2 size={16} aria-hidden style={{ color: 'var(--accent)' }} />
+          <span>Senior Radiologist Dictation</span>
         </div>
-        <div className="flex items-center gap-2">
-          <span className={`badge ${isMedAsr ? 'ok' : 'ai'} text-xs px-2 py-0.5 rounded`} data-testid="engine-badge">
+        <div className="rp-dictation-meta">
+          <span className={`badge ${isMedAsr ? 'ok' : 'ai'}`} data-testid="engine-badge">
             {engineBadgeLabel}
           </span>
-          <span className="text-xs text-slate-400">
+          <span>
             {dictation.uploadedAt
               ? new Date(dictation.uploadedAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
               : 'Just now'}
@@ -95,7 +108,7 @@ export default function DictationAudioCard({
       </div>
 
       {/* Audio Player Bar */}
-      <div className="rp-audio-player flex items-center gap-3 bg-slate-950/70 p-2.5 rounded-md border border-slate-800/80 mb-3">
+      <div className="rp-audio-player">
         <audio
           ref={audioRef}
           src={audioUrl}
@@ -111,7 +124,7 @@ export default function DictationAudioCard({
         />
         <button
           type="button"
-          className="primary p-2 rounded-full flex items-center justify-center"
+          className="primary rp-audio-play-btn"
           onClick={togglePlay}
           aria-label={isPlaying ? 'Pause' : 'Play'}
           data-testid="audio-play-pause-btn"
@@ -119,7 +132,7 @@ export default function DictationAudioCard({
           {isPlaying ? <Pause size={16} /> : <Play size={16} />}
         </button>
 
-        <div className="flex-1 flex flex-col justify-center">
+        <div className="rp-audio-seek-wrap">
           <input
             type="range"
             min={0}
@@ -129,24 +142,22 @@ export default function DictationAudioCard({
             onChange={handleSeek}
             aria-label="Seek audio"
             data-testid="audio-seek-slider"
-            className="rp-input-range w-full cursor-pointer accent-cyan-500 h-1.5 bg-slate-700 rounded-lg"
+            className="rp-audio-seek"
           />
-          <div className="flex justify-between text-xs text-slate-400 mt-1">
+          <div className="rp-audio-time">
             <span>{formatTime(currentTime)}</span>
             <span>{formatTime(duration)}</span>
           </div>
         </div>
 
         {/* Speed options */}
-        <div className="flex gap-1 bg-slate-900 p-1 rounded border border-slate-800">
+        <div className="rp-speed-options">
           {SPEED_OPTIONS.map((s) => (
             <button
               key={s}
               type="button"
               data-testid={`speed-option-${s}`}
-              className={`text-xs px-1.5 py-0.5 rounded ${
-                speed === s ? 'bg-cyan-600 text-white font-bold' : 'text-slate-400 hover:text-slate-200'
-              }`}
+              className={`rp-speed-btn${speed === s ? ' active' : ''}`}
               onClick={() => handleSpeedChange(s)}
             >
               {s}x
@@ -156,8 +167,8 @@ export default function DictationAudioCard({
       </div>
 
       {/* Editable AI-Transcribed findings textarea */}
-      <div className="mb-3">
-        <label className="block text-xs font-medium text-slate-400 mb-1">
+      <div>
+        <label className="rp-dictation-transcript-label">
           AI-Transcribed Findings (Editable)
         </label>
         <textarea
@@ -165,28 +176,31 @@ export default function DictationAudioCard({
           onChange={(e) => setEditedText(e.target.value)}
           placeholder="Dictation transcript will appear here..."
           rows={3}
-          className="rp-input w-full p-2.5 bg-slate-950 border border-slate-800 rounded text-sm text-slate-100 font-mono focus:border-cyan-500 focus:outline-none"
+          className="rp-dictation-transcript"
           aria-label="Editable AI Transcribed Findings"
           data-testid="transcribed-text-input"
         />
       </div>
 
       {/* Action Buttons */}
-      <div className="flex flex-wrap items-center justify-between gap-2 pt-2 border-t border-slate-800/60">
-        <div className="flex items-center gap-2">
+      <div className="rp-dictation-actions">
+        <div className="rp-dictation-actions-left">
           <select
             value={selectedEngine}
             onChange={(e) => setSelectedEngine(e.target.value)}
-            className="rp-input text-xs bg-slate-950 border border-slate-800 text-slate-300 rounded px-2 py-1"
             aria-label="Select transcription engine"
             data-testid="engine-select"
           >
-            <option value="medASR-6gram">medASR (Local 4.4% WER)</option>
-            <option value="UBAG Gemini">UBAG Gemini (Cloud)</option>
+            {engineOptions.map((eng) => (
+              <option key={eng.engineId} value={eng.engineId} disabled={!eng.isAvailable}>
+                {eng.displayName}
+                {eng.isLocal ? ' (Local)' : ' (Cloud)'}
+              </option>
+            ))}
           </select>
           <button
             type="button"
-            className="ghost text-xs flex items-center gap-1.5 px-2.5 py-1.5"
+            className="ghost"
             data-testid="retranscribe-btn"
             onClick={() => onRetranscribe?.(dictation.id, selectedEngine)}
           >
@@ -197,7 +211,7 @@ export default function DictationAudioCard({
 
         <button
           type="button"
-          className="primary text-xs flex items-center gap-1.5 px-3 py-1.5 rounded font-medium"
+          className="primary"
           data-testid="append-to-findings-btn"
           onClick={() => onAppendToFindings(editedText)}
         >

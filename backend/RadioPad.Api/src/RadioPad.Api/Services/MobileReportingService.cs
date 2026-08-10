@@ -40,29 +40,38 @@ public class MobileReportingService : IReportingService
         _orchestrator = orchestrator;
     }
 
-    public async Task<ReportDto> CreateReportAsync(CreateReportRequestDto dto, CancellationToken ct = default)
+    public async Task<ReportDto> CreateReportAsync(CreateReportRequestDto dto, Guid tenantId, Guid createdByUserId, CancellationToken ct = default)
     {
         var report = new Report
         {
             Id = Guid.NewGuid(),
+            TenantId = tenantId,
+            CreatedByUserId = createdByUserId,
             RadiologyId = dto.RadiologyId,
             PatientName = dto.PatientName,
             PatientAge = dto.PatientAge,
             PatientGender = dto.PatientGender,
             CreatedAt = DateTimeOffset.UtcNow,
-            Status = ReportStatus.Draft
+            Status = ReportStatus.Draft,
+            Study = new StudyContext
+            {
+                Modality = dto.Modality ?? "",
+                BodyPart = dto.BodyPart ?? "",
+                Age = dto.PatientAge,
+                Gender = dto.PatientGender,
+            },
         };
 
         _db.Reports.Add(report);
         await _db.SaveChangesAsync(ct);
-        _logger.LogInformation("Created report {ReportId} with RadiologyId {RadiologyId}", report.Id, report.RadiologyId);
+        _logger.LogInformation("Created report {ReportId} with RadiologyId {RadiologyId} for Tenant {TenantId}", report.Id, report.RadiologyId, tenantId);
 
         return MapToDto(report);
     }
 
-    public async Task<List<ReportDto>> GetReportsAsync(string? search = null, string? status = null, CancellationToken ct = default)
+    public async Task<List<ReportDto>> GetReportsAsync(Guid tenantId, string? search = null, string? status = null, CancellationToken ct = default)
     {
-        IQueryable<Report> query = _db.Reports.Include(r => r.Dictations);
+        IQueryable<Report> query = _db.Reports.Include(r => r.Dictations).Where(r => r.TenantId == tenantId);
 
         if (!string.IsNullOrWhiteSpace(search))
         {
@@ -83,23 +92,27 @@ public class MobileReportingService : IReportingService
         return reports.Select(MapToDto).ToList();
     }
 
-    public async Task<ReportDto?> GetReportByIdAsync(Guid id, CancellationToken ct = default)
+    public async Task<ReportDto?> GetReportByIdAsync(Guid id, Guid tenantId, CancellationToken ct = default)
     {
+        // Tenant filter is part of the WHERE, not a post-hoc check: a cross-tenant id must look
+        // exactly like "does not exist" (404), never leak that a report with that id exists
+        // elsewhere.
         var report = await _db.Reports
             .Include(r => r.Dictations)
-            .FirstOrDefaultAsync(r => r.Id == id, ct);
+            .FirstOrDefaultAsync(r => r.Id == id && r.TenantId == tenantId, ct);
 
         return report is null ? null : MapToDto(report);
     }
 
     public async Task<DictationAudioDto> AddDictationAudioAsync(
-        Guid reportId, 
+        Guid reportId,
+        Guid tenantId,
         Stream audioStream, 
         string fileName, 
         double durationSeconds, 
         CancellationToken ct = default)
     {
-        var report = await _db.Reports.FirstOrDefaultAsync(r => r.Id == reportId, ct);
+        var report = await _db.Reports.FirstOrDefaultAsync(r => r.Id == reportId && r.TenantId == tenantId, ct);
         if (report is null)
         {
             throw new KeyNotFoundException($"Report with Id '{reportId}' was not found.");
@@ -146,24 +159,12 @@ public class MobileReportingService : IReportingService
             _logger.LogWarning(ex, "Failed to broadcast DictationUploaded event via SignalR hub");
         }
 
-        if (_orchestrator != null)
+        if (_serviceProvider != null)
         {
-            var orch = _orchestrator;
-            var dId = dictation.Id;
-            _ = Task.Run(async () =>
-            {
-                try
-                {
-                    await orch.ProcessDictationAsync(dId);
-                }
-                catch (Exception ex)
-                {
-                    _logger.LogError(ex, "Failed background transcription for dictation {DictationId}", dId);
-                }
-            });
-        }
-        else if (_serviceProvider != null)
-        {
+            // Prefer a FRESH DI scope (own DbContext) over reusing the request-scoped
+            // _orchestrator/_db: this task is fire-and-forget and can still be running after the
+            // HTTP request finishes and its scope (and _db) gets disposed, which would otherwise
+            // risk an ObjectDisposedException mid-transcription.
             var sp = _serviceProvider;
             var dId = dictation.Id;
             _ = Task.Run(async () =>
@@ -176,6 +177,24 @@ public class MobileReportingService : IReportingService
                     {
                         await orch.ProcessDictationAsync(dId);
                     }
+                }
+                catch (Exception ex)
+                {
+                    _logger.LogError(ex, "Failed background transcription for dictation {DictationId}", dId);
+                }
+            });
+        }
+        else if (_orchestrator != null)
+        {
+            // No IServiceProvider was supplied (e.g. a unit test constructing the service
+            // directly) — fall back to the already-injected orchestrator/DbContext.
+            var orch = _orchestrator;
+            var dId = dictation.Id;
+            _ = Task.Run(async () =>
+            {
+                try
+                {
+                    await orch.ProcessDictationAsync(dId);
                 }
                 catch (Exception ex)
                 {
@@ -198,7 +217,9 @@ public class MobileReportingService : IReportingService
             report.PatientGender,
             report.CreatedAt,
             report.Status.ToString(),
-            dictations.OrderBy(d => d.UploadedAt).Select(MapToDictationDto).ToList()
+            dictations.OrderBy(d => d.UploadedAt).Select(MapToDictationDto).ToList(),
+            report.Study?.Modality ?? "",
+            report.Study?.BodyPart ?? ""
         );
     }
 

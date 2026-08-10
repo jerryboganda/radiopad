@@ -64,7 +64,7 @@ describe('DictationAudioCard component', () => {
 
     const speed15 = screen.getByTestId('speed-option-1.5');
     fireEvent.click(speed15);
-    expect(speed15.className).toContain('bg-cyan-600');
+    expect(speed15.className).toContain('active');
   });
 
   it('allows editing transcript and appends to findings', () => {

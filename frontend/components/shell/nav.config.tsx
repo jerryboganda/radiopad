@@ -196,6 +196,11 @@ export const navGroups: NavGroup[] = [
       { href: '/settings/models', labelKey: 'onDeviceModels', icon: Icons.onDeviceModels, surfaces: ['desktop'] },
       { href: '/account/security', labelKey: 'signInDevices', icon: Icons.signInDevices },
       { href: '/companion', labelKey: 'companion', icon: Icons.aiAssistant, surfaces: ['mobile'] },
+      // Standalone mobile reporting (create report → multi-take dictation → hand off to
+      // desktop Positive Findings for transcription). Sits alongside Companion since both
+      // are mobile-only entry points; unlike Companion this route requires a full signed-in
+      // session (goes through AuthGate → /login like every other route).
+      { href: '/reporting', labelKey: 'reporting', icon: Icons.reports, surfaces: ['mobile'] },
     ],
   },
 ];

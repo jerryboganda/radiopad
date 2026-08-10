@@ -493,9 +493,17 @@ export default function ReportPage() {
   }, [update, toast]);
 
   const handleRetranscribe = useCallback(async (dictationId: string, engine: string) => {
-    toast({ tone: 'info', title: 'Re-transcribe requested', message: `Re-running dictation ${dictationId.slice(0, 6)} with ${engine}...` });
-    await refreshDictations();
-  }, [toast, refreshDictations]);
+    if (!id) return;
+    toast({ tone: 'info', title: 'Transcribing…', message: `Running dictation ${dictationId.slice(0, 6)} through ${engine}...` });
+    try {
+      await reportingClient.transcribeDictation(id, dictationId, engine);
+      await refreshDictations();
+      toast({ tone: 'success', title: 'Transcription complete', message: 'Review the transcript before appending to findings.' });
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : 'Transcription failed.';
+      toast({ tone: 'danger', title: 'Transcription failed', message: msg });
+    }
+  }, [id, toast, refreshDictations]);
 
   /**
    * HANDOFF gotcha #3 — section textareas only persist on blur, but the AI
