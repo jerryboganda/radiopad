@@ -31,7 +31,7 @@ public static class CompanionRelayEndpoint
 
     /// <summary>Hard cap on how long a companion session may carry relay traffic,
     /// enforced at connect and by the liveness watchdog (Finding #11). Matches the
-    /// bearer's own 12h TTL so a paired session cannot outlive its credential.</summary>
+    /// relay's operational ceiling; the companion bearer itself expires sooner.</summary>
     private static readonly TimeSpan MaxSessionLifetime = TimeSpan.FromHours(12);
 
     public static async Task HandleAsync(HttpContext context)
@@ -101,17 +101,24 @@ public static class CompanionRelayEndpoint
         var peer = new CompanionRelayRegistry.Peer(hello.Role, socket, deviceName);
         var other = registry.AddPeer(session.Id, peer);
 
-        // Finding #12: the owner may have ended the session (REST) in the race
-        // window between the liveness check above and AddPeer. Re-read it; if it
-        // was ended/expired meanwhile, do not leave an orphan peer on a dead
-        // session — notify + tear this socket down.
+        // Finding #12: the owner may have ended/revoked the session (REST) in the
+        // race window between the liveness check above and AddPeer. Revalidate the
+        // bearer and live-session window too; do not leave either peer attached to
+        // a dead or revoked session.
         var recheck = await sessions.GetAsync(tenant.Id, user.Id, session.Id, ct);
-        if (recheck is null
-            || recheck.Status is CompanionSessionStatus.Ended or CompanionSessionStatus.Expired)
+        var recheckAuth = await ValidateBearerAsync(db, env, token, ct);
+        var recheckNow = DateTimeOffset.UtcNow;
+        var recheckLive = recheck is not null
+            && (recheck.Status == CompanionSessionStatus.Paired
+                || (recheck.Status == CompanionSessionStatus.Advertising && recheck.ExpiresAt > recheckNow))
+            && (recheckNow - recheck.CreatedAt) < MaxSessionLifetime;
+        if (recheckAuth is null || !recheckLive)
         {
-            registry.RemovePeer(session.Id, peer);
+            var remaining = registry.RemovePeer(session.Id, peer);
             await peer.SendTextAsync(SessionEnded(), ct);
             await peer.CloseOutputAsync(WebSocketCloseStatus.NormalClosure, "session_ended");
+            if (remaining is not null)
+                await SafeSendAsync(remaining, SessionEnded());
             return;
         }
 
@@ -143,7 +150,13 @@ public static class CompanionRelayEndpoint
                 if (message is null)
                     break; // close frame or transport gone
 
-                if (!IsRelayableJson(message))
+                if (IsControlMessage(message, "ping"))
+                {
+                    await peer.SendTextAsync(Pong(), relayCts.Token);
+                    continue;
+                }
+
+                if (IsControlMessage(message, "pong") || !IsRelayableJson(message))
                     continue; // ignore malformed / non-object / typeless frames
 
                 var current = registry.GetPeers(session.Id);
@@ -371,6 +384,22 @@ public static class CompanionRelayEndpoint
         }
     }
 
+    private static bool IsControlMessage(string message, string expectedType)
+    {
+        try
+        {
+            using var doc = JsonDocument.Parse(message);
+            return doc.RootElement.ValueKind == JsonValueKind.Object
+                && doc.RootElement.TryGetProperty("type", out var type)
+                && type.ValueKind == JsonValueKind.String
+                && string.Equals(type.GetString(), expectedType, StringComparison.Ordinal);
+        }
+        catch (JsonException)
+        {
+            return false;
+        }
+    }
+
     private static async Task AckFailAndCloseAsync(WebSocket socket, string message, CancellationToken ct)
     {
         try
@@ -422,6 +451,8 @@ public static class CompanionRelayEndpoint
         $"{{\"type\":\"peer_joined\",\"deviceName\":{JsonSerializer.Serialize(deviceName)}}}";
 
     private static string PeerLeft() => "{\"type\":\"peer_left\"}";
+
+    private static string Pong() => "{\"type\":\"pong\"}";
 
     public static string SessionEnded() => "{\"type\":\"session_ended\"}";
 }

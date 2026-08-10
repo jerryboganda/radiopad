@@ -417,6 +417,9 @@ namespace RadioPad.Infrastructure.Migrations
                     b.Property<string>("CompanionDeviceName")
                         .HasColumnType("TEXT");
 
+                    b.Property<string>("CompanionTokenHash")
+                        .HasColumnType("TEXT");
+
                     b.Property<long>("CreatedAt")
                         .HasColumnType("INTEGER");
 
@@ -450,6 +453,8 @@ namespace RadioPad.Infrastructure.Migrations
 
                     b.HasIndex("PairingCode")
                         .IsUnique();
+
+                    b.HasIndex("CompanionTokenHash");
 
                     b.HasIndex("TenantId", "UserId", "Status");
 

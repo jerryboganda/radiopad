@@ -1308,8 +1308,14 @@ public class CompanionSession : Entity
     /// <summary>Name of the phone that paired; null until <see cref="Status"/> becomes
     /// <see cref="CompanionSessionStatus.Paired"/>.</summary>
     public string? CompanionDeviceName { get; set; }
+    /// <summary>
+    /// One-way binding to the companion bearer minted for this session. Keeping the
+    /// digest on the coordination row lets unlink revoke only this QR credential,
+    /// rather than racing with a newer session for the same user.
+    /// </summary>
+    public string? CompanionTokenHash { get; set; }
     public CompanionSessionStatus Status { get; set; } = CompanionSessionStatus.Advertising;
-    /// <summary>The code stops being pairable once this passes (default: 5 minutes).</summary>
+    /// <summary>The code stops being pairable once this passes (default: 15 minutes).</summary>
     public DateTimeOffset ExpiresAt { get; set; }
     /// <summary>When the phone paired; null while still advertising / ended / expired.</summary>
     public DateTimeOffset? PairedAt { get; set; }

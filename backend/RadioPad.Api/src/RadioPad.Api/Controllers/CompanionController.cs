@@ -1,3 +1,4 @@
+using System.Collections.Concurrent;
 using System.Globalization;
 using System.Net.WebSockets;
 using System.Text.Json;
@@ -35,6 +36,7 @@ public class CompanionController : TenantedController
     /// (see <see cref="End"/>); the 12h WS relay cap is the hard backstop.
     /// </summary>
     private static readonly TimeSpan CompanionTokenLifetime = TimeSpan.FromHours(2);
+    private static readonly ConcurrentDictionary<Guid, SemaphoreSlim> PairAuditLocks = new();
 
     /// <summary><see cref="AuthSession.Method"/> tag for companion bearers, so
     /// ending a session can revoke exactly these (and not the radiologist's
@@ -86,6 +88,8 @@ public class CompanionController : TenantedController
             tenant.Slug, user.Email, user.SessionEpoch, _env, now, CompanionTokenLifetime);
         await EnterpriseIdentityBridge.RecordAuthSessionAsync(
             _db, user, companionToken, CompanionAuthMethod, now.Add(CompanionTokenLifetime), ct);
+        session.CompanionTokenHash = EnterpriseIdentityBridge.Sha256Hex(companionToken);
+        await _db.SaveChangesAsync(ct);
 
         return Ok(new
         {
@@ -102,31 +106,63 @@ public class CompanionController : TenantedController
     }
 
     /// <summary>Phone pairs to an advertised session by its code. Unknown / expired /
-    /// already-paired / cross-user codes all return 404 so a prober cannot tell them
-    /// apart.</summary>
+    /// cross-user codes and retries using a different bearer return 404 so a prober
+    /// cannot tell them apart; a retry using the same QR bearer is idempotent.</summary>
     [HttpPost("pair")]
     public async Task<IActionResult> Pair([FromBody] PairDto dto, CancellationToken ct)
     {
         var (tenant, user) = await ResolveContextAsync(_db, ct);
 
-        var session = await _sessions.PairAsync(tenant.Id, user.Id, dto.PairingCode ?? "", dto.DeviceName ?? "Phone", ct);
-        if (session is null)
+        var companionToken = RadioPadSessionCookies.ExtractBearer(Request);
+        var companionTokenHash = string.IsNullOrWhiteSpace(companionToken)
+            ? null
+            : EnterpriseIdentityBridge.Sha256Hex(companionToken);
+        var paired = await _sessions.PairWithResultAsync(
+            tenant.Id,
+            user.Id,
+            dto.PairingCode ?? "",
+            dto.DeviceName ?? "Phone",
+            companionTokenHash,
+            ct);
+        if (paired is null)
             return NotFound(new { error = "Pairing code is invalid or expired.", kind = "not_found" });
 
         // Append-only audit. Records the session id only — never device names or any
-        // dictation/report content (transient relay carries no PHI to the log).
-        await _audit.AppendAsync(new AuditEvent
+        // dictation/report content (transient relay carries no PHI to the log). Check
+        // the durable log rather than relying only on WasRetry: if the pair commit
+        // succeeded but the first response/audit append was interrupted, a retry
+        // must be able to complete the missing audit event.
+        var auditGate = PairAuditLocks.GetOrAdd(paired.Session.Id, _ => new SemaphoreSlim(1, 1));
+        await auditGate.WaitAsync(ct);
+        try
         {
-            TenantId = tenant.Id,
-            UserId = user.Id,
-            Action = AuditAction.CompanionPaired,
-            DetailsJson = JsonSerializer.Serialize(new { sessionId = session.Id }),
-        }, ct);
+            var auditDetails = JsonSerializer.Serialize(new { sessionId = paired.Session.Id });
+            var alreadyAudited = await _db.AuditEvents
+                .AsNoTracking()
+                .AnyAsync(a => a.TenantId == tenant.Id
+                    && a.UserId == user.Id
+                    && a.Action == AuditAction.CompanionPaired
+                    && a.DetailsJson == auditDetails, ct);
+            if (!alreadyAudited)
+            {
+                await _audit.AppendAsync(new AuditEvent
+                {
+                    TenantId = tenant.Id,
+                    UserId = user.Id,
+                    Action = AuditAction.CompanionPaired,
+                    DetailsJson = auditDetails,
+                }, ct);
+            }
+        }
+        finally
+        {
+            auditGate.Release();
+        }
 
         return Ok(new
         {
-            sessionId = session.Id.ToString(),
-            hostDeviceName = session.HostDeviceName,
+            sessionId = paired.Session.Id.ToString(),
+            hostDeviceName = paired.Session.HostDeviceName,
         });
     }
 
@@ -138,20 +174,22 @@ public class CompanionController : TenantedController
         var (tenant, user) = await ResolveContextAsync(_db, ct);
         await _sessions.EndAsync(tenant.Id, user.Id, sessionId, ct);
 
-        // Revoke the companion bearer(s) minted for this identity so a phone paired
-        // off the QR loses ALL API access the moment the radiologist unpairs — not
-        // just when the 2h token would have expired. We revoke every live companion
-        // session for this (tenant, user) rather than correlating one token to one
-        // pairing: it needs no extra schema and errs safe (unpair drops every
-        // companion phone for this user, which is the intended "sign my phone out"
-        // gesture). Desktop/web sessions (other Method tags) are untouched.
+        // Revoke the bearer bound to this durable session so a phone paired off the
+        // QR loses API access the moment the radiologist unpairs — not just when the
+        // 2h token would have expired. Desktop/web sessions and newer companion QR
+        // sessions for this user are untouched.
         var now = DateTimeOffset.UtcNow;
-        var live = await _db.AuthSessions
-            .Where(s => s.TenantId == tenant.Id
-                && s.UserId == user.Id
-                && s.Method == CompanionAuthMethod
-                && s.RevokedAt == null)
-            .ToListAsync(ct);
+        var ended = await _sessions.GetAsync(tenant.Id, user.Id, sessionId, ct);
+        var companionTokenHash = ended?.CompanionTokenHash;
+        var live = string.IsNullOrWhiteSpace(companionTokenHash)
+            ? new List<AuthSession>()
+            : await _db.AuthSessions
+                .Where(s => s.TenantId == tenant.Id
+                    && s.UserId == user.Id
+                    && s.Method == CompanionAuthMethod
+                    && s.TokenHash == companionTokenHash
+                    && s.RevokedAt == null)
+                .ToListAsync(ct);
         foreach (var s in live)
         {
             s.RevokedAt = now;

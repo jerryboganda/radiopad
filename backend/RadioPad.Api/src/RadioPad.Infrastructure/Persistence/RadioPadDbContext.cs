@@ -176,6 +176,7 @@ public class RadioPadDbContext : DbContext
         // Companion pairing — the phone joins by PairingCode, so it must be a fast
         // lookup; unique so an active code resolves to exactly one session.
         b.Entity<CompanionSession>().HasIndex(x => x.PairingCode).IsUnique();
+        b.Entity<CompanionSession>().HasIndex(x => x.CompanionTokenHash);
         b.Entity<CompanionSession>().HasIndex(x => new { x.TenantId, x.UserId, x.Status });
 
         // PRD §14.15 — critical results. The radiologist queue + overdue sweep scan by

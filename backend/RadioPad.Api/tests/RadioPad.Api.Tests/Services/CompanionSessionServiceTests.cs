@@ -42,6 +42,10 @@ public class CompanionSessionServiceTests
         Assert.Equal(6, session.PairingCode.Length);
         Assert.Matches("^[A-Z0-9]{6}$", session.PairingCode);
         Assert.True(session.ExpiresAt > DateTimeOffset.UtcNow);
+        Assert.InRange(
+            session.ExpiresAt - session.CreatedAt,
+            TimeSpan.FromMinutes(14),
+            TimeSpan.FromMinutes(16));
         Assert.Null(session.PairedAt);
         Assert.Null(session.CompanionDeviceName);
         Assert.Equal("Reading Room PC", session.HostDeviceName);
@@ -77,6 +81,46 @@ public class CompanionSessionServiceTests
         Assert.Equal(CompanionSessionStatus.Paired, paired.Status);
         Assert.Equal("John's iPhone", paired.CompanionDeviceName);
         Assert.NotNull(paired.PairedAt);
+    }
+
+    [Fact]
+    public async Task PairWithResult_MarksOnlySameBearerRetryAsIdempotent()
+    {
+        using var db = NewDb();
+        var svc = new CompanionSessionService(db);
+        var tenantId = Guid.NewGuid();
+        var userId = Guid.NewGuid();
+        var created = await svc.CreateAsync(tenantId, userId, "Desk", default);
+        created.CompanionTokenHash = "token-hash";
+        await db.SaveChangesAsync();
+
+        var first = await svc.PairWithResultAsync(
+            tenantId,
+            userId,
+            created.PairingCode,
+            "Phone",
+            "token-hash",
+            default);
+        var retry = await svc.PairWithResultAsync(
+            tenantId,
+            userId,
+            created.PairingCode,
+            "Phone",
+            "token-hash",
+            default);
+        var differentBearer = await svc.PairWithResultAsync(
+            tenantId,
+            userId,
+            created.PairingCode,
+            "Phone",
+            "other-token-hash",
+            default);
+
+        Assert.NotNull(first);
+        Assert.False(first!.WasRetry);
+        Assert.NotNull(retry);
+        Assert.True(retry!.WasRetry);
+        Assert.Null(differentBearer);
     }
 
     [Fact]

@@ -50,6 +50,7 @@ export type CompanionSignal =
 
 export type CompanionMessage =
   | { type: 'ack'; ok: boolean; message?: string }
+  | { type: 'pong' }
   | { type: 'dictation'; text: string; isFinal: boolean }
   | { type: 'command'; command: CompanionCommand }
   | { type: 'section_context'; sectionKey: string; sectionTitle: string }
@@ -82,6 +83,9 @@ export interface CompanionConnection {
   state(): CompanionConnectionState;
 }
 
+const HEARTBEAT_INTERVAL_MS = 20_000;
+const RECONNECT_DELAYS_MS = [1_000, 2_000, 4_000, 8_000, 16_000, 30_000] as const;
+
 function buildWsUrl(wsPath: string): string {
   const base = companionWsBase();
   const token = getActiveAuthToken();
@@ -99,8 +103,26 @@ export function connectCompanion(opts: CompanionConnectOptions): CompanionConnec
   const wsPath = opts.wsPath ?? '/ws/companion';
   let state: CompanionConnectionState = 'connecting';
   let closedByCaller = false;
+  let reconnectAttempt = 0;
+  let reconnectTimer: ReturnType<typeof setTimeout> | null = null;
+  let terminalCloseNotified = false;
   const outbox: string[] = [];
-  const ws = new WebSocket(buildWsUrl(wsPath));
+  let heartbeatTimer: ReturnType<typeof setInterval> | null = null;
+  let ws: WebSocket;
+
+  function stopHeartbeat() {
+    if (heartbeatTimer !== null) {
+      clearInterval(heartbeatTimer);
+      heartbeatTimer = null;
+    }
+  }
+
+  function stopReconnect() {
+    if (reconnectTimer !== null) {
+      clearTimeout(reconnectTimer);
+      reconnectTimer = null;
+    }
+  }
 
   function flush() {
     while (outbox.length && ws.readyState === WebSocket.OPEN) {
@@ -109,36 +131,83 @@ export function connectCompanion(opts: CompanionConnectOptions): CompanionConnec
   }
 
   function enqueue(payload: Record<string, unknown>) {
+    if (closedByCaller || terminalCloseNotified) return;
     outbox.push(JSON.stringify(payload));
     flush();
   }
 
-  ws.addEventListener('open', () => {
-    state = 'open';
-    // First frame is always the hello handshake.
-    ws.send(JSON.stringify({ type: 'hello', role: opts.role, sessionId: opts.sessionId }));
-    flush();
-    opts.onOpen?.();
-  });
-
-  ws.addEventListener('message', (ev) => {
-    let msg: CompanionMessage | null = null;
-    try {
-      msg = JSON.parse(typeof ev.data === 'string' ? ev.data : '') as CompanionMessage;
-    } catch {
-      return; // ignore non-JSON frames
-    }
-    if (msg && typeof msg.type === 'string') opts.onMessage?.(msg);
-  });
-
-  ws.addEventListener('error', (ev) => {
-    opts.onError?.(ev);
-  });
-
-  ws.addEventListener('close', (ev) => {
+  function notifyClosed(ev: CloseEvent) {
+    if (terminalCloseNotified) return;
+    terminalCloseNotified = true;
     state = 'closed';
-    if (!closedByCaller) opts.onClose?.(ev);
-  });
+    opts.onClose?.(ev);
+  }
+
+  function scheduleReconnect(ev: CloseEvent) {
+    stopHeartbeat();
+    if (closedByCaller) return;
+    if (reconnectAttempt >= RECONNECT_DELAYS_MS.length) {
+      notifyClosed(ev);
+      return;
+    }
+
+    state = 'connecting';
+    const delay = RECONNECT_DELAYS_MS[reconnectAttempt];
+    reconnectAttempt += 1;
+    reconnectTimer = setTimeout(() => {
+      reconnectTimer = null;
+      openSocket();
+    }, delay);
+  }
+
+  function openSocket() {
+    if (closedByCaller) return;
+    const socket = new WebSocket(buildWsUrl(wsPath));
+    ws = socket;
+
+    socket.addEventListener('open', () => {
+      reconnectAttempt = 0;
+      state = 'open';
+      // First frame is always the hello handshake.
+      socket.send(JSON.stringify({ type: 'hello', role: opts.role, sessionId: opts.sessionId }));
+      flush();
+      heartbeatTimer = setInterval(() => {
+        if (socket.readyState === WebSocket.OPEN) {
+          socket.send('{"type":"ping"}');
+        }
+      }, HEARTBEAT_INTERVAL_MS);
+      opts.onOpen?.();
+    });
+
+    socket.addEventListener('message', (ev) => {
+      let msg: CompanionMessage | null = null;
+      try {
+        msg = JSON.parse(typeof ev.data === 'string' ? ev.data : '') as CompanionMessage;
+      } catch {
+        return; // ignore non-JSON frames
+      }
+      if (!msg || typeof msg.type !== 'string') return;
+
+      opts.onMessage?.(msg);
+      if (msg.type === 'session_ended' || (msg.type === 'ack' && !msg.ok)) {
+        closedByCaller = true;
+        stopReconnect();
+        stopHeartbeat();
+        state = 'closed';
+        socket.close();
+      }
+    });
+
+    socket.addEventListener('error', (ev) => {
+      if (!closedByCaller) opts.onError?.(ev);
+    });
+
+    socket.addEventListener('close', (ev) => {
+      scheduleReconnect(ev as CloseEvent);
+    });
+  }
+
+  openSocket();
 
   return {
     sendDictation(text, isFinal) {
@@ -159,6 +228,8 @@ export function connectCompanion(opts: CompanionConnectOptions): CompanionConnec
     close() {
       closedByCaller = true;
       state = 'closed';
+      stopReconnect();
+      stopHeartbeat();
       try {
         ws.close();
       } catch {

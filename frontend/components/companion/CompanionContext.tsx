@@ -291,6 +291,10 @@ export function CompanionProvider({ children }: { children: ReactNode }) {
   useEffect(() => () => teardown(), [teardown]);
 
   const startPairing = useCallback(async () => {
+    // A dropped relay or a previous cancel can leave a durable session behind.
+    // Close it before minting the next QR so the host never has two active
+    // sockets competing for the same provider state.
+    teardown();
     setError(null);
     setCompanionDeviceName(null);
     setPhase('advertising');
@@ -320,6 +324,7 @@ export function CompanionProvider({ children }: { children: ReactNode }) {
       const conn = connectCompanion({
         sessionId: session.sessionId,
         role: 'host',
+        onOpen: () => setError(null),
         onMessage: (msg) => {
           if (msg.type === 'dictation') {
             const resolved =
@@ -377,9 +382,10 @@ export function CompanionProvider({ children }: { children: ReactNode }) {
             stopRtc();
           }
         },
-        onError: () => setError('Companion relay unreachable.'),
+        onError: () => setError('Companion relay interrupted. Reconnecting…'),
         onClose: () => {
           setPhase((current) => (current === 'paired' ? 'idle' : current));
+          setError('Companion relay connection lost. Start pairing again.');
         },
       });
       connRef.current = conn;
@@ -388,7 +394,7 @@ export function CompanionProvider({ children }: { children: ReactNode }) {
       setError(ex.body?.error ?? ex.message ?? 'Could not start pairing.');
       setPhase('error');
     }
-  }, [handleCommand, sendSectionContext, clearInterimEverywhere, startRtc, stopRtc]);
+  }, [handleCommand, sendSectionContext, clearInterimEverywhere, startRtc, stopRtc, teardown]);
 
   const unpair = useCallback(async () => {
     teardown();

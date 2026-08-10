@@ -6,6 +6,8 @@ using RadioPad.Infrastructure.Persistence;
 
 namespace RadioPad.Api.Services;
 
+public sealed record CompanionPairResult(CompanionSession Session, bool WasRetry);
+
 /// <summary>
 /// Coordinates the durable side of the desktop↔phone companion handshake: minting
 /// a pairing session with a short code, pairing a phone by that code, tearing a
@@ -20,7 +22,7 @@ namespace RadioPad.Api.Services;
 public sealed class CompanionSessionService
 {
     /// <summary>Advertised codes are pairable for this long before they expire.</summary>
-    public static readonly TimeSpan PairingWindow = TimeSpan.FromMinutes(5);
+    public static readonly TimeSpan PairingWindow = TimeSpan.FromMinutes(15);
 
     // Uppercase alphanumerics. Ambiguous glyphs are dropped so a code read off a
     // desktop screen and typed on a phone is unambiguous (no O/0, I/1, etc.).
@@ -58,12 +60,47 @@ public sealed class CompanionSessionService
 
     /// <summary>
     /// Pairs a phone to an advertising session by its code. Returns the paired
-    /// session, or <c>null</c> when the code is unknown, expired, already paired, or
-    /// belongs to a different tenant/user — every one of which the caller surfaces
-    /// as a 404 so the failure mode is indistinguishable to a probing client.
+    /// session, or <c>null</c> when the code is unknown, expired, paired to a
+    /// different bearer, or belongs to a different tenant/user. A retry using the
+    /// same QR bearer returns the already-paired session.
     /// </summary>
+    public Task<CompanionSession?> PairAsync(
+        Guid tenantId,
+        Guid userId,
+        string pairingCode,
+        string companionDeviceName,
+        CancellationToken ct) =>
+        PairAsync(tenantId, userId, pairingCode, companionDeviceName, null, ct);
+
     public async Task<CompanionSession?> PairAsync(
-        Guid tenantId, Guid userId, string pairingCode, string companionDeviceName, CancellationToken ct)
+        Guid tenantId,
+        Guid userId,
+        string pairingCode,
+        string companionDeviceName,
+        string? companionTokenHash,
+        CancellationToken ct)
+    {
+        var result = await PairWithResultAsync(
+            tenantId,
+            userId,
+            pairingCode,
+            companionDeviceName,
+            companionTokenHash,
+            ct);
+        return result?.Session;
+    }
+
+    /// <summary>
+    /// Pairs a phone to an advertising session and optionally binds the QR bearer
+    /// so a retry of the same request can be completed idempotently.
+    /// </summary>
+    public async Task<CompanionPairResult?> PairWithResultAsync(
+        Guid tenantId,
+        Guid userId,
+        string pairingCode,
+        string companionDeviceName,
+        string? companionTokenHash,
+        CancellationToken ct)
     {
         if (string.IsNullOrWhiteSpace(pairingCode))
             return null;
@@ -76,7 +113,21 @@ public sealed class CompanionSessionService
                 s => s.PairingCode == code && s.TenantId == tenantId && s.UserId == userId,
                 ct);
 
-        if (session is null || session.Status != CompanionSessionStatus.Advertising)
+        if (session is null)
+            return null;
+
+        // A client may retry after the pair response was lost in transit. The QR
+        // bearer is bound to this row, so the retry is safe and idempotent while a
+        // different bearer still receives the normal single-use failure.
+        if (session.Status == CompanionSessionStatus.Paired)
+        {
+            return !string.IsNullOrWhiteSpace(companionTokenHash)
+                && string.Equals(session.CompanionTokenHash, companionTokenHash, StringComparison.Ordinal)
+                ? new CompanionPairResult(session, WasRetry: true)
+                : null;
+        }
+
+        if (session.Status != CompanionSessionStatus.Advertising)
             return null;
 
         if (session.ExpiresAt <= now)
@@ -88,14 +139,32 @@ public sealed class CompanionSessionService
             return null;
         }
 
-        session.Status = CompanionSessionStatus.Paired;
-        session.CompanionDeviceName = string.IsNullOrWhiteSpace(companionDeviceName)
+        var deviceName = string.IsNullOrWhiteSpace(companionDeviceName)
             ? "Phone"
             : companionDeviceName.Trim();
-        session.PairedAt = now;
-        session.UpdatedAt = now;
-        await _db.SaveChangesAsync(ct);
-        return session;
+        var updated = await _db.CompanionSessions
+            .Where(s => s.Id == session.Id
+                && s.Status == CompanionSessionStatus.Advertising
+                && s.ExpiresAt > now)
+            .ExecuteUpdateAsync(setters => setters
+                .SetProperty(s => s.Status, CompanionSessionStatus.Paired)
+                .SetProperty(s => s.CompanionDeviceName, deviceName)
+                .SetProperty(s => s.PairedAt, now)
+                .SetProperty(s => s.UpdatedAt, now), ct);
+        if (updated == 0)
+        {
+            var raced = await _db.CompanionSessions
+                .AsNoTracking()
+                .FirstOrDefaultAsync(s => s.Id == session.Id, ct);
+            return raced?.Status == CompanionSessionStatus.Paired
+                && !string.IsNullOrWhiteSpace(companionTokenHash)
+                && string.Equals(raced.CompanionTokenHash, companionTokenHash, StringComparison.Ordinal)
+                ? new CompanionPairResult(raced, WasRetry: true)
+                : null;
+        }
+
+        await _db.Entry(session).ReloadAsync(ct);
+        return new CompanionPairResult(session, WasRetry: false);
     }
 
     /// <summary>

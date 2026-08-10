@@ -86,4 +86,40 @@ public class CompanionPairingTests : IClassFixture<RadioPadAppFactory>
         var after = await phone.GetAsync($"/api/companion/sessions/{sessionId}");
         Assert.Equal(HttpStatusCode.Unauthorized, after.StatusCode);
     }
+
+    [Fact]
+    public async Task Ending_an_old_session_does_not_revoke_a_new_qr_token()
+    {
+        var desktop = _factory.CreateTenantClient();
+        var (oldSessionId, _, _) = await AdvertiseAsync(desktop);
+        var (_, newCode, newToken) = await AdvertiseAsync(desktop);
+
+        var end = await desktop.DeleteAsync($"/api/companion/sessions/{oldSessionId}");
+        Assert.Equal(HttpStatusCode.NoContent, end.StatusCode);
+
+        var phone = _factory.CreateClient();
+        phone.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", newToken);
+        var pair = await phone.PostAsJsonAsync(
+            "/api/companion/pair",
+            new { pairingCode = newCode, deviceName = "Android phone" });
+
+        Assert.Equal(HttpStatusCode.OK, pair.StatusCode);
+    }
+
+    [Fact]
+    public async Task Retrying_the_same_qr_pair_request_is_idempotent()
+    {
+        var desktop = _factory.CreateTenantClient();
+        var (_, code, token) = await AdvertiseAsync(desktop);
+
+        var phone = _factory.CreateClient();
+        phone.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", token);
+        var payload = new { pairingCode = code, deviceName = "Android phone" };
+
+        var first = await phone.PostAsJsonAsync("/api/companion/pair", payload);
+        var second = await phone.PostAsJsonAsync("/api/companion/pair", payload);
+
+        Assert.Equal(HttpStatusCode.OK, first.StatusCode);
+        Assert.Equal(HttpStatusCode.OK, second.StatusCode);
+    }
 }

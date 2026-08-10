@@ -862,7 +862,12 @@ app.UseCors();
 // (browsers/webviews cannot set WS headers), so it is mapped here as an isolated
 // terminal branch AHEAD of the /api bearer middlewares — which only guard /api
 // paths — rather than relying on them.
-app.UseWebSockets();
+app.UseWebSockets(new WebSocketOptions
+{
+    // Keep hospital/NAT/proxy connections alive while the radiologist is
+    // dictating silently or the phone screen is idle.
+    KeepAliveInterval = TimeSpan.FromSeconds(20),
+});
 app.Map("/ws/companion", static branch =>
     branch.Run(RadioPad.Api.Services.CompanionRelayEndpoint.HandleAsync));
 app.UseMiddleware<OidcBearerMiddleware>();

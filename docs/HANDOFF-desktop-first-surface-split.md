@@ -51,6 +51,9 @@ Raw WebSocket (NOT SignalR — pnpm store blocked the client dep). Meets at the 
   `backend/RadioPad.Api/src/RadioPad.Api/{Controllers,Services}/Companion*.cs`.
   WS auth mirrors `RadioPadBearerMiddleware` incl. the AuthSession revocation/expiry check;
   a `RevalidateLoopAsync` watchdog + 12h max-lifetime cap close revoked/expired sockets.
+  QR advertisements last 15 minutes, pair retries are idempotent for the same bearer,
+  and unlinking revokes only the token bound to that session. The relay sends a
+  20-second keepalive and clients reconnect with bounded backoff after transient drops.
 - Frontend: `frontend/lib/companion.ts` (WS client, `companionBase()` → cloud),
   `frontend/components/companion/CompanionHostPanel.tsx` (desktop "Pair phone", inserts
   dictation via `sectionEditorRegistry.getLastFocusedSectionEditor().insertAtCursor`),

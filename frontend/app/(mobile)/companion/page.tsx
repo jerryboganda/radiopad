@@ -214,6 +214,18 @@ export default function MobileCompanionPage() {
     scanAbortRef.current = null;
   }, [stopCapture]);
 
+  const resetPeerState = useCallback(() => {
+    stopCapture();
+    typeStreamerRef.current?.dispose();
+    typeStreamerRef.current = null;
+    setTypedText('');
+    setLastInserted('');
+    justCommittedRef.current = null;
+    rtcRef.current?.close();
+    rtcRef.current = null;
+    setLink('connecting');
+  }, [stopCapture]);
+
   useEffect(() => () => teardown(), [teardown]);
 
   const describePairError = useCallback((e: unknown): string => {
@@ -255,8 +267,15 @@ export default function MobileCompanionPage() {
     const conn = connectCompanion({
       sessionId,
       role: 'companion',
-      onOpen: () => setPhase('live'),
-      onClose: () => { teardown(); setPhase('ended'); },
+      onOpen: () => {
+        setError(null);
+        setPhase('live');
+      },
+      onClose: () => {
+        teardown();
+        setError('Connection lost. Scan a new desktop QR code to pair again.');
+        setPhase('ended');
+      },
       onMessage: (msg) => {
         if (msg.type === 'section_context') {
           setSection(msg.sectionTitle || msg.sectionKey || '');
@@ -265,16 +284,24 @@ export default function MobileCompanionPage() {
           void createFreshRtcPeer().handleSignal(msg);
         } else if (msg.type === 'rtc_answer' || msg.type === 'rtc_ice' || msg.type === 'rtc_bye') {
           void rtcRef.current?.handleSignal(msg);
-        } else if (msg.type === 'peer_left' || msg.type === 'session_ended') {
-          // Desktop dropped or the session ended — stop the mic and close down.
+        } else if (msg.type === 'peer_left') {
+          // Keep the authenticated relay alive while the desktop reconnects.
+          resetPeerState();
+          setError('Desktop disconnected. Waiting for it to reconnect…');
+          setPhase('connecting');
+        } else if (msg.type === 'peer_joined') {
+          setError(null);
+          setPhase('live');
+        } else if (msg.type === 'session_ended') {
+          // The desktop explicitly ended the durable session.
           teardown();
           setPhase('ended');
         }
       },
-      onError: () => setError('Connection interrupted. Re-pair to continue.'),
+      onError: () => setError('Connection interrupted. Reconnecting…'),
     });
     connRef.current = conn;
-  }, [teardown, createFreshRtcPeer]);
+  }, [teardown, createFreshRtcPeer, resetPeerState]);
 
   const pairFromPayload = useCallback(async (payload: CompanionPairingPayload) => {
     stopScan();
@@ -288,7 +315,15 @@ export default function MobileCompanionPage() {
         localStorage.setItem('radiopad.tenant', payload.tenant);
         localStorage.setItem('radiopad.user', payload.user);
       }
-      void setAuthToken(payload.token).catch(() => undefined);
+      // Persist the new QR bearer before opening the relay. The in-memory token
+      // authenticates this request immediately, while awaiting the secure-store
+      // write prevents an old token from winning a rapid unlink/relink race.
+      try {
+        await setAuthToken(payload.token);
+      } catch {
+        // Pairing still uses the in-memory bearer; the next app launch can ask
+        // the user to scan again if the native secure store is unavailable.
+      }
 
       const res = await api.companion.pair(payload.code, deviceName());
       connectAfterPair(res.sessionId, res.hostDeviceName);

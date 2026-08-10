@@ -946,11 +946,10 @@ async function requestCompanion<T>(path: string, init?: RequestInit): Promise<T>
   applyAuthHeader(headers);
   const base = companionBase();
   const normalizedPath = normalizeRequestPath(path, init);
-  const res = await fetch(`${base}${normalizedPath}`, {
+  const res = await fetchWithAuthRetry(`${base}${normalizedPath}`, {
     ...init,
-    headers,
     credentials: base ? 'include' : 'same-origin',
-  });
+  }, headers);
   if (!res.ok) {
     throw await apiError(res);
   }

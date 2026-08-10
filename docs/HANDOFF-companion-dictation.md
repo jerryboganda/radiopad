@@ -93,6 +93,18 @@ audio-dropping gap. Fundamentally unfit for continuous dictation. REMOVED.
   plugin ONLY for its RECORD_AUDIO manifest entry; `getUserMedia` does the capture).
 - Desktop CSP got `webrtc 'allow'` + `media-src ... mediastream:` (`tauri.conf.json`).
 
+### Pairing reliability hardening
+
+- New QR advertisements remain pairable for **15 minutes**, rather than 5, so a
+  phone can scan after a realistic hand-off delay.
+- Each QR bearer is bound to its own `CompanionSession` by a one-way digest.
+  Unlinking an older desktop session therefore cannot revoke a newly scanned QR
+  token, and retrying the same pair request after a lost response is idempotent.
+- The raw relay has server and client keepalive traffic every 20 seconds. The
+  browser/WebView client reconnects with bounded backoff after transient network
+  drops; a desktop reconnect leaves the authenticated phone relay alive and
+  renegotiates WebRTC instead of forcing another QR scan.
+
 **KEY seq gotcha:** the send seq is owned by the **RTC peer** (per-connection), NOT the capture
 session. The phone recreates its peer on EVERY offer so its seq resets in lockstep with the
 desktop receiver's per-connection `nextSeq` — otherwise mic-toggle/reconnect desyncs them and
