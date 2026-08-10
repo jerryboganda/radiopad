@@ -10,6 +10,19 @@ This file is the entry point for every AI coding agent (Claude Code, Codex, Curs
 
 > **Directory-scoped memory:** some rules live in a nested `CLAUDE.md` next to the code they govern — currently [frontend/CLAUDE.md](frontend/CLAUDE.md) (the `RADIOPAD_SURFACE` route-group model). Claude Code loads these automatically when it touches that directory; **other agents do not** — if you are working under `frontend/`, open it yourself before adding or moving any route.
 
+## 0.0.1. DEFAULT AGENT OS WORKFLOW
+
+Every agent session working in this repository must automatically use the Agent OS
+workflow: select applicable skills and specialists, plan non-trivial work, delegate
+independent PR-sized units when useful, coordinate dependencies, perform focused
+validation, and report unverified CI work honestly. Keep trivial changes inline when
+orchestration would add overhead. Routine decisions should be made autonomously;
+questions are reserved for genuine requirements, authorization, or safety blockers.
+
+This workflow does not grant new permissions or override user approval, repository
+rules, security boundaries, protected Git operations, secrets policy, or the
+GitHub-Actions-only policy for heavy validation.
+
 ## 0.1. MISSION-CRITICAL UI/UX RULE
 
 > **RadioPad's visual identity is the "RC" design system: a light-first white/blue clinical-SaaS palette with a first-class deep-navy dark theme. BOTH themes are mandatory** (light is the first-run default; dark is first-class, never pure black). The APP SHELL is the canonical left-sidebar SaaS layout. You MUST NOT introduce a different design system, colour palette, or component/theme library (MUI / Ant / Chakra / Bootstrap). Build-time **Tailwind 3** IS part of the stack and allowed.
@@ -150,7 +163,7 @@ These are non-negotiable. Violations must be reverted in review.
 
 1. **Radiologist owns the final report.** RadioPad never auto-signs.
 2. **AI-drafted text is visually marked** (`.ai-mark`) until reviewed.
-3. **PHI policy is enforced in the AI gateway.** A request with `containsPhi: true` may only route to a provider with compliance class `PhiApproved` or `LocalOnly`. The gateway throws `ProviderPolicyException`; never swallow this exception silently.
+3. **PHI routing is unrestricted by compliance class under the current operator policy.** Enabled providers may receive requests regardless of `containsPhi` or `ProviderComplianceClass`; compliance is informational. Only `Enabled == false` and `Compliance == Blocked` reject a provider. `ContainsPhi` must remain recorded in audit and usage data.
 4. **Audit log is append-only.** Use `IAuditLog.AppendAsync`. Never `UPDATE` or `DELETE` rows in `AuditEvents`.
 5. **Backend binds 127.0.0.1 by default.** Remote exposure requires the operator to set `RADIOPAD_BIND` explicitly.
 6. **Secrets never appear in logs, JSON responses, or test fixtures.** Provider API keys live in env vars referenced by `ApiKeySecretRef` (`env:NAME`).
@@ -160,7 +173,7 @@ These are non-negotiable. Violations must be reverted in review.
 
 ## 4.5. UBAG integration
 
-- Adapter id `ubag` routes report AI work through the UBAG browser-automation gateway. The adapter is `PhiApproved` (operator decision 2026-06-27): only de-identified report text is routed, gated by AiGateway's compliance class; the Hub endpoints (`/api/ubag/*`) still apply PHI/secret heuristics to raw operator prompts.
+- Adapter id `ubag` routes report AI work through the UBAG browser-automation gateway. Its `PhiApproved` value is informational under the current operator policy; the Hub endpoints (`/api/ubag/*`) still apply PHI/secret heuristics to raw operator prompts.
 - The env contract (base URL, auth secret-ref, allowed/ordered targets, alert email) is documented in [docs/03-architecture/provider-catalog.md](docs/03-architecture/provider-catalog.md) and [docs/07-devops/deploy-guide.md](docs/07-devops/deploy-guide.md).
 - Login signal is **tri-state**: a gateway that registers no browser context is "no signal" — never treat missing contexts as logged-out or disable a provider on it; only an explicit `login_state` context row flips `Enabled`.
 - UBAG failures must throw `ProviderTransportException` so gateway failover works.

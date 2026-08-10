@@ -1,0 +1,30 @@
+# Agent OS Standards Index
+
+backend:
+  dotnet:
+    description: C# layering, async, controller, persistence, and test conventions
+
+frontend:
+  rc-design-system:
+    description: RC tokens, shell, theme, accessibility, and UI component rules
+  surfaces:
+    description: Desktop, web, mobile route groups and static export boundaries
+
+global:
+  architecture:
+    description: Layering, API client, tenant isolation, and surface architecture
+  change-management:
+    description: Source-of-truth, documentation, CI, validation, and release rules
+  safety:
+    description: Report ownership, AI review, audit, PHI policy, secrets, and network safety
+  tech-stack:
+    description: Locked Next.js, ASP.NET Core, Tauri, Capacitor, CLI, and database stack
+
+rulebooks:
+  authoring:
+    description: Stable IDs, semantic versions, approval lifecycle, and golden-case requirements
+
+testing:
+  quality-gates:
+    description: Focused tests, synthetic fixtures, AI policy coverage, and CI quality gates
+

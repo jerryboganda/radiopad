@@ -2,6 +2,15 @@
 
 > Read this file before any task. **[CLAUDE.md](CLAUDE.md) is the authoritative source of truth** — this file is a thin pointer to it for Gemini agents; if they ever disagree, CLAUDE.md wins.
 
+## DEFAULT AGENT OS WORKFLOW
+
+Every agent session must automatically use the Agent OS workflow: select applicable
+skills and specialists, plan non-trivial work, delegate independent PR-sized units when
+useful, coordinate dependencies, validate with focused checks, and report unverified CI
+work honestly. Keep trivial changes inline. Make routine decisions autonomously and ask
+only for genuine requirements, authorization, or safety blockers. This does not grant
+new permissions or override repository, security, Git, secrets, or CI rules.
+
 ## Project summary
 
 RadioPad is an AI-assisted radiology reporting platform. A radiologist drafts a structured report, AI suggests phrasing, a rulebook validates findings, and the radiologist signs/exports — RadioPad never auto-signs.
@@ -42,13 +51,15 @@ Do not propose other frameworks/ORMs.
 ## Commands
 
 ```powershell
-# Backend
-cd backend/RadioPad.Api && dotnet build && dotnet test
+# Backend focused feedback
+cd backend/RadioPad.Api
+dotnet test --filter <TestName>
 dotnet run --project src/RadioPad.Api    # → http://127.0.0.1:7457
 
-# Frontend
-cd frontend && pnpm install && pnpm dev   # → http://localhost:3000
-pnpm typecheck && pnpm build
+# Frontend focused feedback
+cd frontend
+pnpm dev                                # → http://localhost:3000
+pnpm vitest run <one-file>
 
 # CLI
 dotnet run --project cli/RadioPad.Cli -- rulebook validate ../../rulebooks/chest_ct_v1.yaml
@@ -57,7 +68,7 @@ dotnet run --project cli/RadioPad.Cli -- rulebook validate ../../rulebooks/chest
 ## Agent behavior rules
 
 1. RadioPad never auto-signs; AI text wears `.ai-mark` until reviewed.
-2. PHI requests are blocked unless provider compliance is `PhiApproved` or `LocalOnly` (enforced in `AiGateway`; throws `ProviderPolicyException`).
+2. Enabled providers may receive PHI requests regardless of compliance class under the current operator policy; only disabled providers and the explicit `Blocked` class are rejected. Audit `ProviderBlocked` before rethrowing `ProviderPolicyException`; `ContainsPhi` remains recorded in audit and usage data.
 3. Audit log is append-only via `IAuditLog.AppendAsync`.
 4. Backend binds `127.0.0.1` by default.
 5. Tenant isolation enforced via `TenantedController.ResolveContextAsync`.

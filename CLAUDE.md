@@ -2,6 +2,35 @@
 
 > **This file is the authoritative project instruction file.** [AGENTS.md](AGENTS.md) and [GEMINI.md](GEMINI.md) are thin pointers to it; if they ever disagree, this file wins.
 
+## ⚠️ DEFAULT AGENT OS WORKFLOW — ALL FUTURE SESSIONS
+
+Every agent session working in this repository must use the Agent OS workflow by
+default, without requiring the operator to request it: automatically select relevant
+skills and specialists, plan non-trivial work, delegate independent PR-sized units to
+isolated sessions when that improves safety or speed, coordinate dependencies, apply
+repository and directory-scoped instructions, perform focused validation, and report
+unverified CI work honestly. Keep trivial changes inline when orchestration would add
+overhead.
+
+Agents should make routine implementation decisions autonomously and ask questions
+only for a genuine requirements, authorization, or safety blocker. This workflow does
+not grant new permissions or override user approval, repository rules, security
+boundaries, protected Git operations, secrets policy, or the instruction to run
+heavy validation in GitHub Actions.
+
+## Cross-agent instruction map
+
+Keep this file canonical and use the following discovery bridges for other agents:
+
+- Claude: `CLAUDE.md`
+- Codex and compatible agents: `AGENTS.md`
+- Gemini and Antigravity-compatible agents: `GEMINI.md`
+- GitHub Copilot: `.github/instructions/*.instructions.md`
+
+The bridge files must point back to this file and may contain only compatible,
+surface-specific summaries; when a rule changes, update the affected bridge in the same
+change so agents do not receive contradictory guidance.
+
 ## ⚠️ MISSION-CRITICAL: RC design system (dual-theme tokens), build-time Tailwind, sidebar shell
 
 RadioPad's visual identity is the **RC design system** (PRD v3.0 §20; reference mockups at `UI UX SCREENS/Authentication/`, RC-01…RC-10): a light-first white/blue clinical-SaaS palette with a **first-class deep-navy dark theme**. The **canonical token source** is [frontend/app/tokens.css](frontend/app/tokens.css) (RC `--color-*` primitives — light in `:root`, dark overridden under `html[data-theme="dark"]` — **plus** the alias layers that re-point RadioPad's original 44 token names — `--bg`, `--accent`, semantic families — onto the RC primitives, joined by the new tokens `--accent-fg`/`--scrim`/`--link`/`--bg-selected` and the `--ai`/`--navy` families) and [frontend/tailwind.config.ts](frontend/tailwind.config.ts) (`var()`-based Tailwind scales, `darkMode: ['selector', '[data-theme="dark"]']`). Theme runtime: [frontend/lib/theme.ts](frontend/lib/theme.ts) (`rp-theme` localStorage, pre-paint bootstrap in `layout.tsx`) + `<ThemeToggle />`. [frontend/app/globals.css](frontend/app/globals.css) carries the `@tailwind` directives; [frontend/app/shell.css](frontend/app/shell.css) is the sidebar shell + page chrome. The **app shell** is the canonical left-sidebar SaaS shell. Read [docs/02-design/design.md](docs/02-design/design.md) before touching any UI.

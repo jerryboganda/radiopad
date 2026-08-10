@@ -8,7 +8,7 @@ applyTo: "**"
 - Backend layers: `RadioPad.Domain` (entities, enums) → `RadioPad.Application` (services, DTOs) → `RadioPad.Validation` (rule engine) → `RadioPad.Infrastructure` (EF Core, audit chain) → `RadioPad.Api` (controllers, middleware). Never reverse the dependency direction.
 - All tenanted queries must filter through the `(tenant, user)` tuple returned by `TenantedController.ResolveContextAsync(_db, ct)`.
 - Audit log is **append-only**. Use `IAuditLog.AppendAsync`. Never UPDATE/DELETE rows in `AuditEvents`. The SHA-256 chain is `sha256("{id}|{tenantId}|{(int)action}|{detailsJson}|{prevHash}")`.
-- AI gateway is the only place that may talk to external model providers. PHI requests must be blocked unless `ProviderComplianceClass` is `PhiApproved` or `LocalOnly`. The gateway audits `AuditAction.ProviderBlocked` before rethrowing `ProviderPolicyException`.
+- AI gateway is the only place that may talk to external model providers. Under the current operator policy, enabled providers may receive PHI requests regardless of `ProviderComplianceClass`; compliance is informational. Only disabled providers and the explicit `Blocked` class are rejected, with `ContainsPhi` retained in audit and usage data. Audit `AuditAction.ProviderBlocked` before rethrowing `ProviderPolicyException` for those explicit switches.
 - HTTP API conventions: REST + JSON, camelCase, `JsonIgnoreCondition.WhenWritingNull`, RFC-7807 problem details for errors, `X-Total-Count` for paginated lists, `X-Request-Id` correlation header.
 - Frontend goes through `frontend/lib/api.ts` only — never call `fetch` from a page.
 - New design tokens or component classes require an update to both `frontend/app/globals.css` and `docs/02-design/design.md` in the same change.

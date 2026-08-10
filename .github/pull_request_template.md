@@ -15,9 +15,8 @@
 
 ## RadioPad checklist
 
-- [ ] UI uses only the locked Open Design tokens & component classes (no Tailwind / MUI / dark mode / emoji icons).
-- [ ] `dotnet build && dotnet test` passes for backend changes.
-- [ ] `pnpm typecheck` (and `pnpm build` if exporting) passes for frontend changes.
+- [ ] UI uses only the locked RC tokens and `.rp-*` component classes; both light and dark themes are covered (no MUI / Ant / Chakra / Bootstrap / emoji icons).
+- [ ] Focused local validation was run where appropriate; full builds, suites, typechecks, lint, and packaging are left to GitHub Actions.
 - [ ] Tenant isolation respected — every new query filters via `ResolveContextAsync`.
 - [ ] PHI policy untouched, or change reviewed by a human under [docs/04-security/security-architecture.md](../docs/04-security/security-architecture.md).
 - [ ] Audit log writes go through `IAuditLog.AppendAsync` only (append-only).
