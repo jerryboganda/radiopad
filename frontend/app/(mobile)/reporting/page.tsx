@@ -31,7 +31,9 @@ export default function ReportingPage() {
     setError(null);
     try {
       const data = await getReports(searchQuery, statusFilter);
-      setReports(data || []);
+      // Defensive: never let a malformed (non-array) response crash the whole
+      // page via `reports.filter` below — surface it as a load error instead.
+      setReports(Array.isArray(data) ? data : []);
     } catch (err: unknown) {
       const msg = err instanceof Error ? err.message : 'Failed to load reports';
       setError(msg);

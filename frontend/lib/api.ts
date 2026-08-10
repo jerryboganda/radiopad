@@ -11,6 +11,7 @@ import { SseParser, type SseEvent } from './sse';
 // edge does not exist (notifications.ts imports nothing from api.ts), so this is a
 // clean one-directional dependency, not a cycle.
 import type { NotificationItem } from './notifications';
+import { isMobileSurface } from './surface';
 
 // Re-exported so `lib/events.ts` and other stream consumers get the parser's
 // event shape from the same place they get `connectEventStream`.
@@ -171,6 +172,18 @@ async function apiBase(): Promise<string> {
     } catch {
       /* regular browser/dev proxy path */
     }
+  }
+  // The Capacitor mobile shell has no reverse proxy in front of it (unlike the
+  // web build, which is same-origin with the backend) and no native bridge like
+  // Tauri's `get_backend_url` — a bare relative '' base here would resolve
+  // every request against the app's OWN `https://localhost` static bundle
+  // rather than a real backend, which "succeeds" with a 200 HTML page instead
+  // of failing loudly (2026-08-10 mobile Reporting crash). Mirror
+  // `companionBase()`'s resolution instead, and don't cache the mobile result
+  // in `resolvedApiBase` so a later companion-pairing `setCompanionBase()`
+  // override is picked up on the next call.
+  if (isMobileSurface) {
+    return companionBase();
   }
   resolvedApiBase = '';
   return resolvedApiBase;
@@ -431,6 +444,29 @@ async function apiError(res: Response): Promise<Error> {
   return Object.assign(new Error(msg), { status: res.status, body, kind });
 }
 
+/**
+ * Parse a successful (2xx) response body, guarding against a base URL that
+ * resolves to nothing reachable. A misconfigured/unreachable API base (e.g.
+ * the Capacitor mobile shell falling back to a relative path against its own
+ * `https://localhost` static bundle instead of a real backend) still answers
+ * with `200 text/html` — the app's own SPA shell — never a network error. If
+ * callers naively cast that HTML string to the expected JSON shape, it
+ * silently corrupts state instead of failing loudly (e.g. `reports.filter is
+ * not a function` when a list endpoint "succeeds" with a raw HTML page,
+ * 2026-08-10 mobile Reporting crash). Treat it as a hard failure instead.
+ */
+async function parseOkResponse<T>(res: Response, path: string): Promise<T> {
+  if (res.status === 204) return undefined as unknown as T;
+  const ct = res.headers.get('content-type') || '';
+  if (ct.includes('text/html')) {
+    throw new Error(`API request to ${path} returned an HTML page instead of JSON — the API base is likely misconfigured or unreachable.`);
+  }
+  if (ct.includes('application/json') || ct.includes('application/fhir+json')) {
+    return (await res.json()) as T;
+  }
+  return (await res.text()) as unknown as T;
+}
+
 export async function request<T>(path: string, init?: RequestInit): Promise<T> {
   const headers = new Headers(init?.headers || {});
   if (!headers.has('Content-Type') && !(typeof FormData !== 'undefined' && init?.body instanceof FormData)) {
@@ -447,12 +483,7 @@ export async function request<T>(path: string, init?: RequestInit): Promise<T> {
   if (!res.ok) {
     throw await apiError(res);
   }
-  if (res.status === 204) return undefined as unknown as T;
-  const ct = res.headers.get('content-type') || '';
-  if (ct.includes('application/json') || ct.includes('application/fhir+json')) {
-    return (await res.json()) as T;
-  }
-  return (await res.text()) as unknown as T;
+  return parseOkResponse<T>(res, normalizedPath);
 }
 
 /** Job lifecycle status shared by the hosted job engine and the desktop sidecar.
@@ -900,10 +931,7 @@ async function requestTo<T>(base: string, path: string, init?: RequestInit): Pro
   if (!res.ok) {
     throw await apiError(res);
   }
-  if (res.status === 204) return undefined as unknown as T;
-  const ct = res.headers.get('content-type') || '';
-  if (ct.includes('application/json')) return (await res.json()) as T;
-  return (await res.text()) as unknown as T;
+  return parseOkResponse<T>(res, path);
 }
 
 /**
@@ -917,7 +945,8 @@ async function requestCompanion<T>(path: string, init?: RequestInit): Promise<T>
   applyTenantHeaders(headers);
   applyAuthHeader(headers);
   const base = companionBase();
-  const res = await fetch(`${base}${normalizeRequestPath(path, init)}`, {
+  const normalizedPath = normalizeRequestPath(path, init);
+  const res = await fetch(`${base}${normalizedPath}`, {
     ...init,
     headers,
     credentials: base ? 'include' : 'same-origin',
@@ -925,10 +954,7 @@ async function requestCompanion<T>(path: string, init?: RequestInit): Promise<T>
   if (!res.ok) {
     throw await apiError(res);
   }
-  if (res.status === 204) return undefined as unknown as T;
-  const ct = res.headers.get('content-type') || '';
-  if (ct.includes('application/json')) return (await res.json()) as T;
-  return (await res.text()) as unknown as T;
+  return parseOkResponse<T>(res, normalizedPath);
 }
 
 /**
