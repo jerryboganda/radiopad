@@ -196,7 +196,6 @@ export const navGroups: NavGroup[] = [
       { href: '/settings/models', labelKey: 'onDeviceModels', icon: Icons.onDeviceModels, surfaces: ['desktop'] },
       { href: '/account/security', labelKey: 'signInDevices', icon: Icons.signInDevices },
       { href: '/companion', labelKey: 'companion', icon: Icons.aiAssistant, surfaces: ['mobile'] },
-      { href: '/reporting', labelKey: 'reporting', icon: Icons.reports, surfaces: ['mobile'] },
     ],
   },
 ];

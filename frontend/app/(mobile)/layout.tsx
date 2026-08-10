@@ -3,8 +3,16 @@
 import React from 'react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
-import { Mic, FileText } from 'lucide-react';
+import { Mic } from 'lucide-react';
 
+/**
+ * Mobile is a dictation companion ONLY — pairing + voice dictation to a live
+ * desktop session (frontend/CLAUDE.md §"three specialised surfaces"). There is
+ * intentionally a single nav destination: standalone reporting requires a full
+ * signed-in session (AuthGate → /login) that the mobile surface never
+ * establishes (it only carries a short-lived QR pairing token), so it must not
+ * be offered here.
+ */
 export default function MobileLayout({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
 
@@ -14,12 +22,6 @@ export default function MobileLayout({ children }: { children: React.ReactNode }
       href: '/companion',
       icon: Mic,
       isActive: pathname === '/companion' || pathname?.startsWith('/companion/'),
-    },
-    {
-      label: 'Reporting',
-      href: '/reporting',
-      icon: FileText,
-      isActive: pathname === '/reporting' || pathname?.startsWith('/reporting'),
     },
   ];
 
