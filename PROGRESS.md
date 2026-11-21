@@ -7,7 +7,14 @@
 ## Production ops: Cloudflare in front of radiopadstudio.com + VPS tidy-up (2026-11-21)
 
 Ops-only (one config line in the repo). Production was already on latest main (v0.1.160,
-`c1a979d`); nothing redeployed.
+`c1a979d`); the running containers were not replaced.
+
+- **CI auto-deploy is broken (found 2026-11-21):** the `ee9a0cc` push ran `web-deploy-images`;
+  the deploy job `docker load`ed new `radiopad-{api,web,marketing}:latest` onto the VPS, then
+  failed at `docker compose up` with `open /opt/docker/radiopad/.secrets.env: permission denied`
+  — the file is `root:root 600` (changed around 2026-10-10), unreadable by `radiopad-deploy`.
+  Running containers still use the 2026-08-10 images; the next `docker compose up -d` by anyone
+  switches all three to the loaded ones. Fix: `chown radiopad-deploy .secrets.env` (keep 600).
 
 - **Deploy path changed:** production now lives at `/opt/docker/radiopad` (compose +
   `.secrets.env` + `data/`), owned by `radiopad-deploy`. There is no source checkout on the VPS —
