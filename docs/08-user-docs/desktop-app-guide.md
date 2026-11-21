@@ -41,7 +41,7 @@ for paste targets you didn't intend.
 
 | Symptom | Likely cause | Fix |
 | ------- | ------------ | --- |
-| Can't sign in / pages won't load | No internet, or the hosted service is unreachable | Check your connection; the desktop needs to reach `radiopad.polytronx.com` |
+| Can't sign in / pages won't load | No internet, or the hosted service is unreachable | Check your connection; the desktop needs to reach `api.radiopadstudio.com` |
 | Dictation: "engine is starting up" | On-device model still downloading on first run, or the machine can't reach the model host | Wait a moment and retry; if it persists, your network may be blocking the one-time model download |
 | AI provider greyed out | Provider not enabled or no API key | Open **Providers** and toggle / set the key |
 | AI button is disabled | The current rulebook is not approved | Open **Rulebooks** and approve a tested rulebook |

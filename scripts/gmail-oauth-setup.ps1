@@ -119,7 +119,7 @@ Write-Host "=== SUCCESS ===" -ForegroundColor Green
 Write-Host ""
 Write-Host "Refresh Token: $($response.refresh_token)" -ForegroundColor Cyan
 Write-Host ""
-Write-Host "Add these to your VPS /opt/radiopad/.secrets.env:" -ForegroundColor Yellow
+Write-Host "Add these to your VPS /opt/docker/radiopad/.secrets.env:" -ForegroundColor Yellow
 Write-Host ""
 Write-Host "RADIOPAD_EMAIL_PROVIDER=gmail"
 Write-Host "RADIOPAD_EMAIL_FROM=RadioPad <manwara575@gmail.com>"

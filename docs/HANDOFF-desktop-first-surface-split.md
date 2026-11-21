@@ -5,11 +5,13 @@
 > Persistent memories also cover this: `radiopad-surface-specialization`,
 > `radiopad-web-topology`, `radiopad-npm-vhost-clobber` (auto-load next session).
 
-> **Update 2026-11-21 (ops):** production moved to `radiopadstudio.com` (marketing) +
-> `admin.radiopadstudio.com` (admin app), behind Cloudflare → NPM, compose project
-> `/opt/docker/radiopad`. `/opt/radiopad`, `_deploy-images.sh`, the compose override and the
-> separate `radiopad-admin` container are gone. §4, §6 and §10 are corrected; the
-> `radiopad.polytronx.com` notes in §4 are kept as history. See `PROGRESS.md` (2026-11-21).
+> **Update 2026-11-21 (ops):** the website (`radiopadstudio.com`) and admin web app
+> (`admin.radiopadstudio.com`) are static builds on **Hostinger**; the VPS runs only the API at
+> **`api.radiopadstudio.com`** (compose project `/opt/docker/radiopad`), all behind Cloudflare.
+> `/opt/radiopad`, `_deploy-images.sh`, the compose override and the `radiopad-web` /
+> `radiopad-marketing` / `radiopad-admin` containers are gone. §4, §6 and §10 are corrected;
+> the `radiopad.polytronx.com` notes in §4 are history. Current runbooks:
+> `deploy/vps/README.md`, `deploy/hostinger/README.md`.
 
 Repo root: `E:\RadioPad MEGA Folder\RADIOPAD`  ·  GitHub: `jerryboganda/radiopad` (branch `main`)
 Approved plan: `C:\Users\Admin\.claude\plans\please-i-want-to-lexical-sunset.md`
@@ -89,11 +91,11 @@ Cloudflare→NPM→web→api chain (401 = auth reached; would be 101 with a vali
 - **VPS:** `root@185.252.233.186` (SSH key already works: `ssh root@185.252.233.186`). Shared
   multi-app box. App dir `/opt/docker/radiopad` (compose + `.secrets.env` + `data/`; images
   only, no source checkout).
-- **Current topology (2026-11-21):** Cloudflare (Full strict) → NPM proxy host 42
-  (`radiopadstudio.com`, `www`) → `radiopad-marketing`, and host 43
-  (`admin.radiopadstudio.com`) → `radiopad-web`; both → `radiopad-api:7457`. Both hosts set
-  `real_ip_header CF-Connecting-IP;` in NPM's advanced config — keep it, or the API sees
-  Cloudflare IPs. No compose override file.
+- **Current topology (2026-11-21):** Cloudflare (Full strict) →
+  `radiopadstudio.com`/`www`/`admin` → Hostinger web hosting (static); `api.radiopadstudio.com`
+  → VPS NPM hand-maintained `proxy_host/radiopad-api-manual.conf` → `radiopad-api:7457`
+  (`real_ip_header CF-Connecting-IP;` — keep it, or the API sees Cloudflare IPs). The companion
+  `/ws/` relay lives on the api host. No compose override file.
 - **Historical (July, `radiopad.polytronx.com`) — superseded, kept for reference:**
 - **Topology:** Cloudflare → NPM (`nginx-proxy-manager-app-1`, host :443) → containers.
   `radiopad.polytronx.com` is a **Cloudflare origin**; its NPM vhost is a HAND-MAINTAINED
@@ -133,18 +135,16 @@ If a typecheck fails with `Cannot find module '../../app/.../page.js'`, run `rm 
 
 ## 6. How to deploy (the playbook I used)
 
-1. **Commit + push to `main`.** Any change under `backend/** frontend/** deploy/vps/**
-   package.json …` triggers the **`web-deploy-images`** CI (builds `radiopad-api` +
-   `radiopad-web` images → uploads a `radiopad-images` artifact). No registry.
-2. **Deploy to the VPS:** the same workflow's `deploy` job ships the images to
-   `/opt/docker/radiopad` and runs `docker compose up -d` (skipped if the `VPS_*` secrets are
-   unset). Manual fallback, on the VPS:
+1. **Commit + push to `main`.** `backend/** rulebooks/** templates/**` (+ `deploy/vps/api.Dockerfile`,
+   compose) → **`web-deploy-images`** builds the `radiopad-api` image and its `deploy` job ships it
+   to `/opt/docker/radiopad` + `docker compose up -d`. Manual fallback, on the VPS:
    `gh run download <run_id> --repo jerryboganda/radiopad -n radiopad-images -D /tmp/rpimg &&
    gunzip -c /tmp/rpimg/radiopad-images.tar.gz | docker load &&
-   cd /opt/docker/radiopad && docker compose up -d`. Recreates api + web + marketing.
-   Backend runs EF migrations on startup.
+   cd /opt/docker/radiopad && docker compose up -d`. Backend runs EF migrations on startup.
+2. **Web app + website:** `frontend/** marketing/**` → **`hostinger-deploy`** builds `out-web`
+   (API base `https://api.radiopadstudio.com`) + marketing and rsyncs them to Hostinger.
 3. **Desktop release:** `pnpm release:desktop` (bumps `tauri.conf.json`+`Cargo.toml`, commits,
-   tags `vX.Y.Z`, pushes → `desktop-bundle` builds+signs MSI/AppImage + creates the release,
+   tags `vX.Y.Z`, pushes → `desktop-bundle` builds+signs the Windows MSI + creates the release,
    `tauri-updater` publishes `latest.json`). Needs a CLEAN tree first (untracked files block
    it — there are 2 stray PNGs in `UI UX SCREENS/`; move them aside or they'll block it).
    Watch: `gh run watch <desktop-bundle run id>`.
@@ -191,15 +191,13 @@ build + 799 tests green.
 ## 10. Quick health check (paste to verify prod anytime)
 
 ```bash
-ssh root@185.252.233.186 '
-Rm="--resolve radiopadstudio.com:443:127.0.0.1"; Ra="--resolve admin.radiopadstudio.com:443:127.0.0.1"
 WS="-H Connection:Upgrade -H Upgrade:websocket -H Sec-WebSocket-Version:13 -H Sec-WebSocket-Key:dGhlIHNhbXBsZSBub25jZQ=="
-curl -sk $Rm -o /dev/null -w "marketing/ %{http_code}\n" https://radiopadstudio.com/
-curl -sk $Rm -o /dev/null -w "api %{http_code}\n" https://radiopadstudio.com/api/health
-curl -sk --http1.1 $Rm $WS -o /dev/null -w "ws %{http_code}(401=ok)\n" https://radiopadstudio.com/ws/companion
-curl -sk $Ra -o /dev/null -w "admin/ %{http_code}\n" https://admin.radiopadstudio.com/
-curl -sk $Ra -o /dev/null -w "admin/admin/users %{http_code}\n" https://admin.radiopadstudio.com/admin/users/
-cd /opt/docker/radiopad && docker compose ps --format "{{.Name}}: {{.State}}"'
+curl -s -o /dev/null -w "marketing/ %{http_code}\n" https://radiopadstudio.com/
+curl -s -o /dev/null -w "api %{http_code}\n" https://api.radiopadstudio.com/api/health
+curl -s --http1.1 $WS -o /dev/null -w "ws %{http_code}(401=ok)\n" https://api.radiopadstudio.com/ws/companion
+curl -s -o /dev/null -w "admin/ %{http_code}\n" https://admin.radiopadstudio.com/
+curl -s -o /dev/null -w "admin/admin/users %{http_code}\n" https://admin.radiopadstudio.com/admin/users/
+ssh root@185.252.233.186 'cd /opt/docker/radiopad && docker compose ps --format "{{.Name}}: {{.State}}"'
 ```
 
-Expected: 200 / 200 / 401 / 200 / 200, three containers running.
+Expected: 200 / 200 / 401 / 200 / 200, one container (`radiopad-api`) running.

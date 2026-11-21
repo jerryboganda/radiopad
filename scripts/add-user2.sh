@@ -1,6 +1,6 @@
 #!/bin/sh
 set -eu
-DB_PATH=${RADIOPAD_DB_PATH:-/opt/radiopad/data/radiopad.db}
+DB_PATH=${RADIOPAD_DB_PATH:-/opt/docker/radiopad/data/radiopad.db}
 TENANT_ID=${RADIOPAD_TENANT_ID:?set RADIOPAD_TENANT_ID}
 USER_EMAIL=${RADIOPAD_DEV_USER_EMAIL:?set RADIOPAD_DEV_USER_EMAIL}
 USER_DISPLAY=${RADIOPAD_DEV_USER_DISPLAY:-Test Radiologist}

@@ -1,9 +1,13 @@
 # Deployment
 
-**Status:** Current (basic)  ·  **Owner:** Ops  ·  **Last Updated:** 2026-05-20
+**Status:** Current (basic)  ·  **Owner:** Ops  ·  **Last Updated:** 2026-11-21
 
 ## Targets
 
+- **Production (current):** website + admin web app as static builds on Hostinger
+  ([deploy/hostinger/README.md](../../deploy/hostinger/README.md)); API on the VPS at
+  `https://api.radiopadstudio.com` ([deploy/vps/README.md](../../deploy/vps/README.md)); all
+  behind Cloudflare. Production data is **SQLite** (`/opt/docker/radiopad/data/radiopad.db`).
 - **Local:** `dotnet run` + `pnpm dev`. See [dev-setup.md](dev-setup.md).
 - **Self-hosted (v0.x):** Docker Compose under `deploy/`. See [deploy-guide.md](deploy-guide.md).
 - **Hosted (planned, Phase 2/3):** Kubernetes via Helm.
@@ -52,17 +56,17 @@ volumes:
 
 ## Production environment requirements
 
-- Production uses Postgres via `ConnectionStrings__RadioPad`; SQLite is for local
-  development and legacy data migration only.
+- `ConnectionStrings__RadioPad` selects the database. The live production API still runs
+  on SQLite; Postgres is the intended target (migration steps in `deploy/vps/README.md`).
 - `RADIOPAD_AUTH_SECRET`, `RADIOPAD_COLUMN_KEY_REF`, and
   `RADIOPAD_COLUMN_KEY_WRAPPED` must be set before starting a Production API.
 - Optional OIDC validation is enabled with `RADIOPAD_OIDC_AUTHORITY`; set
   `RADIOPAD_OIDC_CLIENT_ID`, optional `RADIOPAD_OIDC_CLIENT_SECRET`,
   `RADIOPAD_OIDC_REDIRECT_URI`, `RADIOPAD_OIDC_AUDIENCE`, tenant/email claim
   env vars, and `RADIOPAD_OIDC_REQUIRE_MFA=1` to match the IdP policy.
-- The VPS manifest in `deploy/vps/` binds the web container to loopback by
-  default (`127.0.0.1:8093`) so Nginx Proxy Manager or another TLS proxy is the
-  only public entry point.
+- The build-from-source reference manifest `deploy/vps/docker-compose.yml` binds its
+  containers to loopback (`127.0.0.1:8093/8094`). Production instead runs only
+  `radiopad-api`, reached by Nginx Proxy Manager over a Docker network.
 
 ## Frontend
 

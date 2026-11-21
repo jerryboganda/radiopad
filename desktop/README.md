@@ -1,7 +1,7 @@
 # RadioPad Desktop (Tauri 2)
 
 Native shell that loads the static export of the Next.js frontend. The app is a
-**thin client over the hosted production API** (`https://radiopad.polytronx.com`)
+**thin client over the hosted production API** (`https://api.radiopadstudio.com`)
 for everything — auth, reports, AI, settings. The ONE exception is **on-device
 dictation transcription**: the desktop bundles a loopback-only `radiopad-api`
 sidecar that runs the on-device CPU STT engine, so dictation audio

@@ -94,7 +94,7 @@ it triggers are in [/release-desktop](.claude/commands/release-desktop.md).
 
 **All heavy, CPU/RAM-intensive work for this project — full builds, full test suites, lint and type-check sweeps, static analysis, bundling, desktop/mobile packaging, Docker image builds, and coverage — runs on GitHub Actions. Not on the development laptop. Not on the VPS.** This is a permanent project rule that binds every agent and contributor.
 
-Why: the development machine is low-spec and saturating it stalls the whole session, and the production VPS (`/opt/radiopad`) hosts live tenants — a compiler or test run there risks the live site. CI runners are disposable, parallel, and free for this purpose.
+Why: the development machine is low-spec and saturating it stalls the whole session, and the production VPS (`/opt/docker/radiopad`, the API) hosts live tenants — a compiler or test run there risks the live site. CI runners are disposable, parallel, and free for this purpose.
 
 1. **Do not run full builds, full test suites, or lint/type-check sweeps** locally or on the VPS. Commit and push; GitHub Actions runs them.
 2. **Allowed locally** — focused, cheap feedback only: editing and reading code, one targeted unit test (`dotnet test --filter <Name>`, or a single Vitest file), and running the app to look at a change (`pnpm dev`, `dotnet run`). Anything that compiles the whole solution or the whole frontend, or runs a whole suite, belongs in CI.
@@ -123,6 +123,21 @@ product or vanishes from all three.
 
 **Before adding or moving any route, page, or nav entry, read [frontend/CLAUDE.md](frontend/CLAUDE.md)** —
 it carries the route-group layout, the build-flag mechanics, and the companion relay.
+
+## Production topology (current since 2026-11-21)
+
+All behind Cloudflare (Free plan, SSL **Full (strict)**; DNS moved there from Hostinger nameservers):
+
+| Host | Served by | Deployed by |
+| --- | --- | --- |
+| `radiopadstudio.com`, `www` — marketing (`marketing/`, Astro) | Hostinger web hosting (static, LiteSpeed) | `hostinger-deploy.yml` (rsync) |
+| `admin.radiopadstudio.com` — web app (`frontend/`, `build:web`) | Hostinger web hosting (static) | `hostinger-deploy.yml` |
+| `api.radiopadstudio.com` — API + `/ws` companion relay | VPS `185.252.233.186`, `/opt/docker/radiopad`, container `radiopad-api` behind NPM | `web-deploy-images.yml` (API image only) |
+
+Desktop (`get_backend_url`), the companion relay (`DEFAULT_COMPANION_BASE`) and mobile all default to
+`https://api.radiopadstudio.com`; the web build bakes it in via `NEXT_PUBLIC_API_BASE`. Hostinger cannot
+run .NET, so the API stays on the VPS. Full runbook: [deploy/vps/README.md](deploy/vps/README.md) and
+[deploy/hostinger/README.md](deploy/hostinger/README.md).
 
 ## Project mission
 

@@ -4,9 +4,9 @@ The `deploy` job in [`.github/workflows/web-deploy-images.yml`](../../.github/wo
 ships the built Docker images to production over SSH and reloads compose. It
 authenticates as a **dedicated, least-privilege deploy user** — never `root`,
 never an existing personal/admin key. This is a one-time setup on the VPS;
-after it's done, every push to `main` that touches `backend/**`, `frontend/**`,
-`marketing/**`, `rulebooks/**`, `templates/**`, or `deploy/vps/**` deploys
-itself.
+after it's done, every push to `main` that touches `backend/**`, `rulebooks/**`, `templates/**`,
+`deploy/vps/api.Dockerfile` or `deploy/vps/docker-compose.yml` deploys the API
+itself. (The website and web app deploy to Hostinger via `hostinger-deploy.yml`.)
 
 ## Why not root
 
@@ -66,6 +66,12 @@ chown -R radiopad-deploy:radiopad-deploy /opt/docker/radiopad
 `cd /opt/docker/radiopad && docker compose up -d` without sudo. It does NOT
 need to read `.secrets.env`'s contents to do that — `docker compose up`
 reads it as the `radiopad-deploy` user, same as any file it owns.
+
+**Keep `.secrets.env` owned by `radiopad-deploy` (mode 600).** If anyone edits it
+as root and it ends up `root:root 600`, every CI deploy fails at `docker compose up`
+with `open .secrets.env: permission denied` *after* loading the new image (this
+happened 2026-10-10 → 2026-11-21). Fix: `chown radiopad-deploy:radiopad-deploy
+/opt/docker/radiopad/.secrets.env`.
 
 ## 5. Verify the login works before wiring CI to it
 

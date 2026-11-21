@@ -9,7 +9,7 @@ Tauri 2 (Rust core + WebView2/WKWebView). Source under `desktop/src-tauri/`.
 ## Backend model — thin client over production + on-device STT
 
 The desktop is a **thin client over the hosted production API**
-(`https://radiopad.polytronx.com`): auth, reports, AI, settings — everything —
+(`https://api.radiopadstudio.com`): auth, reports, AI, settings — everything —
 goes to production (`get_backend_url`, override with `RADIOPAD_BACKEND`). The app
 no longer runs a local backend for its data.
 

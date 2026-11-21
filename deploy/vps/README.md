@@ -1,223 +1,146 @@
-# RadioPad — VPS Deployment (Nginx Proxy Manager pattern)
+# RadioPad — VPS Deployment (API only, Nginx Proxy Manager)
 
 **Status:** Current  ·  **Owner:** Operations  ·  **Last Updated:** 2026-11-21
 
-This directory contains the image build recipes and reference manifests for the
-production VPS (`185.252.233.186`), which uses **Nginx Proxy Manager** (NPM) for
-TLS termination and routing, behind **Cloudflare**. This differs from the root
-`deploy/` directory, which uses Caddy for TLS.
+The production VPS (`185.252.233.186`, shared multi-app box) runs **only the
+RadioPad API**, published as **`https://api.radiopadstudio.com`**. The website
+(`radiopadstudio.com`, `www`) and the admin web app
+(`admin.radiopadstudio.com`) are static builds on Hostinger — see
+[`deploy/hostinger/README.md`](../hostinger/README.md).
 
-> **Layout changed.** Production is the compose project at `/opt/docker/radiopad`
-> and runs **prebuilt images only** — there is no source checkout on the VPS and
-> nothing is built there (CPU-heavy work runs on GitHub Actions, see `CLAUDE.md`).
-> The old `/opt/radiopad` + `src/` + `--build` flow and `_deploy-images.sh` no
-> longer exist.
+> Production is the compose project `/opt/docker/radiopad`, prebuilt images
+> only — no source checkout and nothing built on the VPS (CLAUDE.md: heavy work
+> runs on GitHub Actions). The old `/opt/radiopad` layout, `_deploy-images.sh`,
+> the `radiopad-web` / `radiopad-marketing` containers and NPM proxy hosts
+> 42/43 are gone (removed 2026-11-21; NPM backup in
+> `/opt/docker/nginx-proxy-manager/removed-radiopad-hosts-202611211611/`).
 
 ## Architecture
 
-> **2026-11-21: the website and admin web app moved to Hostinger.** Public
-> traffic for `radiopadstudio.com`, `www` and `admin.radiopadstudio.com` now
-> goes to Hostinger web hosting (static builds deployed by
-> `.github/workflows/hostinger-deploy.yml`, `.htaccess` in `deploy/hostinger/`).
-> The VPS serves only the API at **`api.radiopadstudio.com`**: Cloudflare → NPM
-> hand-maintained `proxy_host/radiopad-api-manual.conf` → `radiopad-api:7457`
-> (the API container joins the `npm` network; certbot cert renewed by
-> `/etc/cron.d/radiopad-api-cert-renew`). The `radiopad-web` /
-> `radiopad-marketing` services and images were removed from the VPS on
-> 2026-11-21, and `web-deploy-images` now builds only the API image. NPM proxy
-> hosts 42/43 still exist but point at the removed containers. The diagram
-> shows the pre-move layout.
-
 ```
-Internet → Cloudflare (proxied, SSL Full strict)
-         → NPM (host :443, container nginx-proxy-manager-app-1)
-              proxy host 42: radiopadstudio.com, www  → radiopad-marketing:80 (nginx + Astro static)
-                                                          ↓ /api /ws /saml /scim proxy (back-compat)
-              proxy host 43: admin.radiopadstudio.com → radiopad-web:80 (nginx + Next.js static)
-                                                          ↓ /api/* proxy
-                                                    radiopad-api:7457 (ASP.NET Core 8)
-                                                          ↓
-                                                    SQLite: /opt/docker/radiopad/data/radiopad.db
+Desktop app / phone companion / admin web app (Hostinger)
+   → Cloudflare (proxied, SSL Full strict)
+   → NPM (host :443, container nginx-proxy-manager-app-1)
+        proxy_host/radiopad-api-manual.conf  (hand-maintained, NOT in NPM's DB)
+   → radiopad-api:7457 (ASP.NET Core 8, container on networks radiopad + npm + platform)
+   → SQLite: /opt/docker/radiopad/data/radiopad.db
+   → UBAG gateway over the `platform` network (see below)
 ```
 
-NPM reaches the containers by name over the external docker network
-`nginx-proxy-manager_default` (compose network alias `npm`); no host ports are
-published. `radiopad-api` additionally joins the external `platform` network
-for UBAG (see below).
-
-The root domain serves the marketing site (`marketing/`, Astro); the admin app
-(`frontend/`, `build:web` surface) lives on `admin.radiopadstudio.com`. The
-marketing container ALSO proxies `/api`, `/ws`, `/saml`, `/scim` straight
-through to `radiopad-api` — this is deliberate, not leftover: already-installed
-desktop clients default to `RADIOPAD_BACKEND=https://radiopadstudio.com`
-(baked in at build time) and must keep working indefinitely on the root
-domain, even though new desktop builds default to the admin subdomain. Do not
-remove those proxy blocks from `nginx-marketing.conf` without shipping and
-fully rolling out a desktop release first.
-
-## Files
+## Files in this directory
 
 | File | Purpose |
 |---|---|
-| `web.Dockerfile` | Multi-stage: pnpm 9.15.9 + Next.js build → nginx:alpine (admin app) |
-| `marketing.Dockerfile` | Multi-stage: pnpm 9.15.9 + Astro build → nginx:alpine (marketing site) |
-| `api.Dockerfile` | Multi-stage: .NET SDK 8 build → aspnet:8.0 runtime |
-| `nginx.conf` | Nginx config for the admin app: static SPA + `/api/*` proxy to API container |
-| `nginx-marketing.conf` | Nginx config for the marketing site: static multi-page site + the same `/api /ws /saml /scim` proxy blocks (back-compat, see above) |
-| `docker-compose.yml` | **Build-from-source reference** (builds images, publishes loopback ports, defines an unused `radiopad-postgres`). Not what production runs — see below. |
-| `docker-compose.ubag.yml` | Overlay that joins the shared UBAG network |
+| `api.Dockerfile` | Multi-stage: .NET SDK 8 build → aspnet:8.0 runtime (+ Gemini CLI). **The only image production uses.** |
 | `README-deploy-user.md` | One-time setup of the least-privilege `radiopad-deploy` user for CI deploys |
+| `docker-compose.yml` | Build-from-source reference (all services, loopback ports, unused `radiopad-postgres`). Not what production runs. |
+| `docker-compose.ubag.yml` | Overlay that joins the shared UBAG network |
+| `web.Dockerfile`, `marketing.Dockerfile`, `nginx.conf`, `nginx-marketing.conf` | Legacy container builds of the two static surfaces — no longer deployed (Hostinger serves them). |
 
 ## Production layout (`/opt/docker/radiopad`)
 
 | Path | Contents |
 |---|---|
-| `docker-compose.yml` | Image-only compose: `image: radiopad-{api,web,marketing}:latest` + `pull_policy: never`, env, networks |
-| `.secrets.env` | Secrets (`chmod 600`) — loaded via `env_file`. **Must be readable by `radiopad-deploy`** (owner `radiopad-deploy`), or the CI deploy fails at `docker compose up` with `open .secrets.env: permission denied` after loading the new images |
-| `data/` | SQLite database (`radiopad.db`) mounted at `/data` in `radiopad-api` |
-| `backups/` | Ad-hoc DB backups |
+| `docker-compose.yml` | Image-only compose: one service, `radiopad-api` (`image: radiopad-api:latest`, `pull_policy: never`), env, networks `radiopad`, `npm` (external `nginx-proxy-manager_default`), `platform` (external) |
+| `.secrets.env` | Secrets, `chmod 600`, **owned by `radiopad-deploy`** — if it is not readable by that user the CI deploy fails at `docker compose up` with `open .secrets.env: permission denied` |
+| `data/` | SQLite database `radiopad.db`, mounted at `/data` |
+| `backups/` | DB copies (take one before schema changes) |
 | `docker-compose.yml.bak-*` | Previous compose revisions — take one before every edit |
 
-The directory is owned by `radiopad-deploy` (in the `docker` group). Non-secret
-settings live in the compose `environment:` block, e.g.
-`ConnectionStrings__RadioPad: Data Source=/data/radiopad.db`,
-`RADIOPAD_PUBLIC_WEB_URL: https://admin.radiopadstudio.com`,
-`RADIOPAD_WEBAUTHN_RP_ID: radiopadstudio.com`, and
+Notable non-secret env in compose: `ConnectionStrings__RadioPad: Data Source=/data/radiopad.db`,
+`RADIOPAD_PUBLIC_WEB_URL: https://admin.radiopadstudio.com` (login/magic-link pages),
+`RADIOPAD_CORS_ORIGINS: https://admin.radiopadstudio.com,https://radiopadstudio.com,https://www.radiopadstudio.com`,
+`RADIOPAD_WEBAUTHN_RP_ID: radiopadstudio.com` + `RADIOPAD_WEBAUTHN_ORIGINS`,
 `Logging__LogLevel__Microsoft.EntityFrameworkCore.Database.Command: Warning`.
 
 ## Deploying
 
-Every push to `main` touching `backend/**`, `frontend/**`, `marketing/**`,
-`rulebooks/**`, `templates/**` or `deploy/vps/**` runs
+Pushes to `main` touching `backend/**`, `rulebooks/**`, `templates/**`,
+`deploy/vps/api.Dockerfile` or `deploy/vps/docker-compose.yml` run
 [`web-deploy-images.yml`](../../.github/workflows/web-deploy-images.yml): it
-builds the three images on GitHub Actions, uploads them as the
-`radiopad-images` artifact, and its `deploy` job ships them over SSH as
-`radiopad-deploy` and runs `docker compose up -d`. The deploy job is skipped
-(not failed) until the `VPS_HOST` / `VPS_DEPLOY_USER` / `VPS_DEPLOY_SSH_KEY`
-secrets exist — see `README-deploy-user.md`.
+builds `radiopad-api:latest` on GitHub Actions, ships it over SSH as
+`radiopad-deploy` (secrets `VPS_HOST`, `VPS_DEPLOY_USER`, `VPS_DEPLOY_SSH_KEY`),
+`docker load`s it and runs `docker compose up -d` in `/opt/docker/radiopad`.
+The API runs EF migrations on startup.
 
 Manual fallback (on the VPS):
 
 ```bash
 gh run download <run_id> --repo jerryboganda/radiopad -n radiopad-images -D /tmp/rpimg
 gunzip -c /tmp/rpimg/radiopad-images.tar.gz | docker load
-cd /opt/docker/radiopad && docker compose up -d
-docker compose ps
+cd /opt/docker/radiopad && docker compose up -d && docker compose ps
 ```
 
-Changing only env/config (no new image): back up `docker-compose.yml`, edit it,
-then `docker compose config -q && docker compose up -d <service>` to recreate
-just that service. The API runs EF migrations on startup.
+Env/config-only change: back up `docker-compose.yml`, edit, then
+`docker compose config -q && docker compose up -d radiopad-api`.
 
-## Secrets
+## `api.radiopadstudio.com` proxy + certificate
 
-`/opt/docker/radiopad/.secrets.env` (`chmod 600`). Production startup
-intentionally fails unless these are present:
+- Vhost: `/opt/docker/nginx-proxy-manager/data/nginx/proxy_host/radiopad-api-manual.conf`
+  (hand-maintained, like the other `*-manual.conf` files on this box; it does
+  not appear in the NPM UI). Port 80 serves ACME + redirects; port 443 proxies
+  to `radiopad-api:7457` with `real_ip_header CF-Connecting-IP`, `/ws/` upgrade
+  (3600s, access log off — the bearer rides in `?access_token=`), 300s read
+  timeout and `proxy_buffering off` for AI jobs / SSE.
+- Cert: Let's Encrypt via certbot inside the NPM container (webroot
+  `/data/letsencrypt-acme-challenge`), path
+  `/etc/letsencrypt/live/api.radiopadstudio.com/`. Renewed weekly by
+  `/etc/cron.d/radiopad-api-cert-renew` (Mon 03:17, then `nginx -s reload`).
+- After editing: `docker exec nginx-proxy-manager-app-1 nginx -t && docker exec nginx-proxy-manager-app-1 nginx -s reload`.
+- Real client IPs: NPM trusts Cloudflare ranges (`ip_ranges.conf`) and the vhost
+  reads `CF-Connecting-IP`; the API's forwarded-headers handling then sees the
+  visitor IP (per-IP rate limiter + audit log depend on it — keep it).
+- Cloudflare Free cuts any single request at **100s** (nginx allows 300s); a
+  non-streaming call longer than that returns 524 to the client.
+
+## Secrets (`/opt/docker/radiopad/.secrets.env`)
+
+Production startup fails unless these are present:
 
 | Env var | Purpose |
 |---|---|
-| `RADIOPAD_AUTH_SECRET` | RadioPad bearer token signing secret |
+| `RADIOPAD_AUTH_SECRET` | Bearer token signing secret |
 | `RADIOPAD_COLUMN_KEK` | Env-backed wrapping key (compose sets `RADIOPAD_COLUMN_KEY_REF: env:RADIOPAD_COLUMN_KEK`) |
-| `RADIOPAD_COLUMN_KEY_WRAPPED` | Base64 wrapped data encryption key for encrypted columns |
+| `RADIOPAD_COLUMN_KEY_WRAPPED` | Base64 wrapped data key for encrypted columns |
 
-Also present in production: the Gmail API OAuth trio
-(`RADIOPAD_GMAIL_CLIENT_ID` / `_CLIENT_SECRET` / `_REFRESH_TOKEN`, with
-`RADIOPAD_EMAIL_PROVIDER: gmail` in compose), `RADIOPAD_BOOTSTRAP_SECRET`, and
-`RADIOPAD_UBAG_TOKEN`. Generate new keys with `openssl rand -base64 48`
-(auth secret) / `openssl rand -base64 32` (KEK). The deterministic development
-column key fallback must not be used in Production. If OIDC is enabled, also
-set `RADIOPAD_OIDC_AUTHORITY`, `RADIOPAD_OIDC_CLIENT_ID`, optional
-`RADIOPAD_OIDC_CLIENT_SECRET`, `RADIOPAD_OIDC_AUDIENCE`, redirect URI, and claim
-mapping env vars for the IdP.
+Also present: Gmail API OAuth trio (`RADIOPAD_GMAIL_CLIENT_ID` /
+`_CLIENT_SECRET` / `_REFRESH_TOKEN`, with `RADIOPAD_EMAIL_PROVIDER: gmail`),
+`RADIOPAD_BOOTSTRAP_SECRET`, `RADIOPAD_UBAG_TOKEN`. New keys:
+`openssl rand -base64 48` (auth secret), `openssl rand -base64 32` (KEK). The
+development column-key fallback must never be used in Production. OIDC, if
+enabled: `RADIOPAD_OIDC_AUTHORITY`, `RADIOPAD_OIDC_CLIENT_ID`, optional
+`RADIOPAD_OIDC_CLIENT_SECRET`, `RADIOPAD_OIDC_AUDIENCE`, redirect URI, claim maps.
 
-## Cloudflare + NPM proxy hosts
+## UBAG AI-orchestrator wiring
 
-DNS for `radiopadstudio.com` is on Cloudflare (Free plan; moved from Hostinger
-nameservers 2026-11-21).
+RadioPad consumes the UBAG gateway (compose project `/opt/docker/ubag`,
+container `ubag-vps-gateway-1`) over the shared external docker network
+`platform` — never via the public `ubag.polytronx.com` host.
 
-| Record | Cloudflare | Target |
-|---|---|---|
-| `radiopadstudio.com` (A), `www` (CNAME), `admin` (A) | Proxied | `185.252.233.186` |
-| MX `mx1`/`mx2.hostinger.pk`, SPF TXT, `autoconfig`, `autodiscover` | DNS only | Hostinger mail — never proxy these |
+- `.secrets.env`: `RADIOPAD_UBAG_TOKEN=<UBAG_APP_SECRET>`.
+- compose env: `RADIOPAD_UBAG_BASE_URL: http://ubag-vps-gateway-1:8080`,
+  `RADIOPAD_UBAG_AUTH_SECRET_REF: env:RADIOPAD_UBAG_TOKEN`,
+  `RADIOPAD_UBAG_ALLOWED_TARGETS: gemini_web,deepseek_web,chatgpt_web,mock`,
+  `RADIOPAD_OPERATOR_ALERT_EMAIL`.
+- Verify: `GET https://api.radiopadstudio.com/api/ubag/status` (admin) →
+  `health.ok: true`; `ready: null` per target is normal for vps-local executors.
 
-- **SSL/TLS mode: Full (strict).** The origin keeps its own Let's Encrypt certs
-  in NPM (cert 44 for root+www, 45 for admin), renewed by NPM over HTTP-01.
-  Do not drop to Flexible — NPM force-redirects to HTTPS and Flexible loops.
-- **Real client IPs:** proxy hosts 42 and 43 carry
-  `real_ip_header CF-Connecting-IP;` in NPM's *Advanced* field (NPM already
-  trusts Cloudflare ranges via its generated `ip_ranges.conf`). Without it the
-  API's forwarded-headers handling resolves every request to a Cloudflare edge
-  IP, which breaks the per-IP rate limiter and the audit log's IPs. Keep it on
-  both hosts when editing them in the NPM UI.
-- **100s limit:** Cloudflare Free cuts any single request at 100s (nginx allows
-  300s). A non-streaming API call longer than that returns 524 to the client.
-- Universal SSL covers `radiopadstudio.com` + `*.radiopadstudio.com`, so
-  `admin` can stay proxied. A 2-level name (e.g. `x.admin.radiopadstudio.com`)
-  would need DNS-only.
-
-When the admin app's public URL changes, also update on the API container:
-- `RADIOPAD_PUBLIC_WEB_URL` → the new admin origin
-- `RADIOPAD_WEBAUTHN_ORIGINS` → add the new origin (keep the existing ones so
-  passkeys/sessions keep working). `RADIOPAD_WEBAUTHN_RP_ID` stays the parent
-  domain; WebAuthn accepts an RP ID that is a registrable-domain suffix of the
-  calling origin.
-
-## UBAG AI-orchestrator wiring (updated 2026-07-18)
-
-RadioPad consumes the UBAG gateway (compose project at `/opt/docker/ubag`,
-gateway container `ubag-vps-gateway-1`) as its browser-driving AI provider
-layer. RadioPad reaches it **internally** over the shared external docker
-network `platform` — never via the public `ubag.polytronx.com` host, which
-sits behind operator Basic-auth.
-
-1. Add to `/opt/docker/radiopad/.secrets.env` (chmod 600):
-
-   ```bash
-   # Preferred: secret-ref indirection — only the env NAME is ever stored elsewhere.
-   RADIOPAD_UBAG_TOKEN=<UBAG_APP_SECRET from the ubag gateway's env>
-   ```
-
-   and in the compose `environment:` block (non-secret values):
-
-   ```yaml
-   RADIOPAD_UBAG_BASE_URL: http://ubag-vps-gateway-1:8080
-   RADIOPAD_UBAG_AUTH_SECRET_REF: env:RADIOPAD_UBAG_TOKEN
-   RADIOPAD_UBAG_ALLOWED_TARGETS: gemini_web,deepseek_web,chatgpt_web,mock
-   # Operator inbox for login-lost / gateway-down alert emails (throttled 1/provider/day):
-   RADIOPAD_OPERATOR_ALERT_EMAIL: ops@example.com
-   ```
-
-2. Give `radiopad-api` the `platform` network (external) in addition to
-   `radiopad_network`, then `docker compose up -d`. On hosts without UBAG,
-   omit the network + env — RadioPad logs a startup ERROR in Production when
-   the base URL/secret are missing and fails over to its non-UBAG providers.
-
-3. Verify: `GET https://<domain>/api/ubag/status` (authenticated, admin role)
-   shows `health.ok: true`, per-target readiness (tri-state — `ready: null`
-   means the gateway reports no login signal, which is normal for vps-local
-   executors and does NOT disable providers), and any operator alerts
-   (`alerts[]`, `gatewayUnreachableSince`).
-
-## Health and readiness checks
-
-Run on the VPS (goes through NPM locally, bypassing Cloudflare):
+## Health checks
 
 ```bash
-Rm="--resolve radiopadstudio.com:443:127.0.0.1"; Ra="--resolve admin.radiopadstudio.com:443:127.0.0.1"
-curl -sk $Rm https://radiopadstudio.com/api/health
-# Expected: {"status":"ok","service":"radiopad-api","time":"..."}
-curl -sk $Ra -o /dev/null -w "%{http_code}\n" https://admin.radiopadstudio.com/
-# Expected: 200
-curl -sk $Rm -I https://radiopadstudio.com/saml/metadata
-# Expected when SAML is configured: API response, not the static web index.
+# From anywhere:
+curl -s https://api.radiopadstudio.com/api/health            # {"status":"ok",...}
+curl -s https://api.radiopadstudio.com/api/mobile/latest     # current desktop/APK version
+# On the VPS (through NPM, bypassing Cloudflare):
+R="--resolve api.radiopadstudio.com:443:127.0.0.1"
+curl -s $R https://api.radiopadstudio.com/api/health
+curl -s $R -o /dev/null -w "ws %{http_code} (401=ok)\n" --http1.1 \
+  -H Connection:Upgrade -H Upgrade:websocket -H Sec-WebSocket-Version:13 \
+  -H Sec-WebSocket-Key:dGhlIHNhbXBsZSBub25jZQ== https://api.radiopadstudio.com/ws/companion
 cd /opt/docker/radiopad && docker compose ps
 ```
 
 ## Backup and restore (SQLite)
-
-Production data is the SQLite file `/opt/docker/radiopad/data/radiopad.db`
-(WAL mode). Take a consistent copy before every deploy that changes schema, and
-store it off-host after encrypting it with the operator-approved process:
 
 ```bash
 cd /opt/docker/radiopad
@@ -226,34 +149,27 @@ cp -p data/radiopad.db backups/radiopad-$(date +%Y%m%d-%H%M%S).db
 docker compose start radiopad-api
 ```
 
-Restore by stopping `radiopad-api`, copying the backup over `data/radiopad.db`
-(and removing stale `radiopad.db-wal` / `-shm`), then starting it again.
-Validate on a copy first unless downtime is approved.
+Restore: stop `radiopad-api`, copy the backup over `data/radiopad.db` (remove
+stale `radiopad.db-wal` / `-shm`), start it. Validate on a copy first unless
+downtime is approved. Store encrypted copies off-host.
 
-## Moving to PostgreSQL (not done yet)
+## Moving to PostgreSQL (not done)
 
-Production still runs on SQLite. The repo's build-from-source
-`docker-compose.yml` defines a `radiopad-postgres` service, but its API still
-points at SQLite. To migrate later: stop writes and take a cold SQLite backup,
-start a Postgres container on `radiopad_network`, load the DB with
-`dimitri/pgloader` (mount `/opt/docker/radiopad/data` writable — pgloader opens
-SQLite read-write), normalize types to the EF/Npgsql natives (GUID → `uuid`,
-timestamps → `timestamptz`, booleans → `boolean`, enum/int → `integer`), point
-`ConnectionStrings__RadioPad` at Postgres, and keep the SQLite backup until
-readiness, tenant sign-in, report creation and audit verification pass. Never
-run both stacks with live traffic at once.
+Production still runs on SQLite. To migrate later: cold SQLite backup → start a
+Postgres container on `radiopad_network` → load with `dimitri/pgloader` (mount
+`/opt/docker/radiopad/data` writable) → normalise types (GUID → `uuid`,
+timestamps → `timestamptz`, booleans → `boolean`, enum/int → `integer`) → point
+`ConnectionStrings__RadioPad` at Postgres → keep the SQLite backup until
+sign-in, report creation and audit verification pass. Never run both stacks
+with live traffic.
 
 ## Rollback
 
 - **Bad image:** re-run the manual fallback with the last good
-  `web-deploy-images` run id (`docker load` overwrites `:latest`), then
-  `docker compose up -d`. Schema downgrades are not automatic — if a migration
-  changed schema, restore the pre-deploy SQLite backup.
-- **Bad config edit:** restore the matching `docker-compose.yml.bak-*` and
-  `docker compose up -d`.
-- **Bad NPM edit:** NPM keeps its DB at
-  `/opt/docker/nginx-proxy-manager/data/database.sqlite`; take a copy before
-  bulk edits. Restore it plus the `proxy_host/*.conf` file, then
-  `docker exec nginx-proxy-manager-app-1 nginx -s reload`.
-- **Traffic rollback:** in Cloudflare, switch the record to DNS only (bypasses
-  Cloudflare), or disable the NPM proxy host.
+  `web-deploy-images` run id, then `docker compose up -d`. Schema changes are
+  not auto-reverted — restore the pre-deploy SQLite backup if needed.
+- **Bad compose edit:** restore the matching `docker-compose.yml.bak-*`, `docker compose up -d`.
+- **Bad vhost edit:** fix/restore `radiopad-api-manual.conf`, `nginx -t`, reload.
+  NPM's DB is `/opt/docker/nginx-proxy-manager/data/database.sqlite` — copy it
+  before bulk NPM edits.
+- **Traffic:** in Cloudflare, set the `api` record to DNS only to bypass Cloudflare.
