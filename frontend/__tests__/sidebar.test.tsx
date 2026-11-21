@@ -20,8 +20,8 @@ const LOCKED_GROUPS: ReadonlyArray<{ key: string; hrefs: string[] }> = [
   { key: 'workspace', hrefs: ['/dashboard', '/worklist', '/critical-results', '/reports', '/ai-assistant'] },
   { key: 'library', hrefs: ['/templates', '/report-templates', '/findings-library', '/protocols', '/rulebooks', '/prompts', '/modalities', '/body-parts', '/terminology', '/teaching', '/marketplace'] },
   { key: 'quality', hrefs: ['/peer-review', '/quality', '/analytics', '/validation', '/audit'] },
-  { key: 'integrations', hrefs: ['/providers', '/admin/ubag', '/admin/pacs'] },
-  { key: 'admin', hrefs: ['/admin/users', '/admin/governance', '/admin/model-eval', '/admin/security', '/admin/feature-flags', '/admin/billing', '/admin/usage', '/admin/settings'] },
+  { key: 'integrations', hrefs: ['/providers', '/admin/ubag', '/admin/pacs', '/admin/mcp'] },
+  { key: 'admin', hrefs: ['/admin/users', '/admin/governance', '/admin/model-eval', '/admin/validation-packs', '/admin/security', '/admin/sso', '/admin/feature-flags', '/admin/billing', '/admin/usage', '/admin/settings'] },
   { key: 'settings', hrefs: ['/settings', '/settings/models', '/device-pairing', '/notifications', '/account/security', '/admin/fhir-import', '/offline'] },
   { key: 'account', hrefs: ['/account/security', '/companion', '/reporting'] },
 ];

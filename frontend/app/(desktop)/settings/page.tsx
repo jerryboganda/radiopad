@@ -14,6 +14,9 @@ import {
   Keyboard,
   ShieldCheck,
   ArrowRight,
+  Cpu,
+  Smartphone,
+  Bell,
   Sparkles,
   SpellCheck,
   Type,
@@ -29,6 +32,18 @@ import {
 import { STT_MODES, useSttMode } from '@/lib/dictation/sttMode';
 import { useCrossCheckEnabled, useUseUbag } from '@/lib/dictation/crossCheckPrefs';
 import type { SttMode } from '@/lib/api';
+
+// Every personal settings screen, so this page is the one place to look.
+const MORE_SETTINGS = [
+  { href: '/settings/models', label: 'On-device AI models', Icon: Cpu },
+  { href: '/admin/dictation-settings', label: 'Dictation engine settings', Icon: Mic },
+  { href: '/settings/corrections', label: 'Dictation corrections', Icon: SpellCheck },
+  { href: '/settings/snippets', label: 'Snippets', Icon: Type },
+  { href: '/settings/hotkeys', label: 'Hotkeys', Icon: Keyboard },
+  { href: '/device-pairing', label: 'Phone pairing', Icon: Smartphone },
+  { href: '/notifications', label: 'Notifications', Icon: Bell },
+  { href: '/account/security', label: 'Sign-in & security', Icon: ShieldCheck },
+];
 
 const THEME_OPTIONS: { value: ThemePreference; label: string; hint: string; icon: typeof Sun }[] = [
   { value: 'light', label: 'Light', hint: 'Bright clinical look', icon: Sun },
@@ -106,45 +121,18 @@ export default function SettingsPage() {
 
           <div className="rp-panel-title" style={{ margin: '14px 0 8px' }}>More settings</div>
           <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
-            <Link
-              href="/settings/corrections"
-              className="rp-card"
-              style={{ flexDirection: 'row', alignItems: 'center', gap: 10, padding: '8px 10px', textDecoration: 'none' }}
-            >
-              <SpellCheck size={16} strokeWidth={1.8} aria-hidden className="text-accent" />
-              <span style={{ flex: 1, fontSize: 13, fontWeight: 600 }}>Dictation corrections</span>
-              <ArrowRight size={14} strokeWidth={1.8} aria-hidden className="text-ink-soft" />
-            </Link>
-
-            <Link
-              href="/settings/snippets"
-              className="rp-card"
-              style={{ flexDirection: 'row', alignItems: 'center', gap: 10, padding: '8px 10px', textDecoration: 'none' }}
-            >
-              <Type size={16} strokeWidth={1.8} aria-hidden className="text-accent" />
-              <span style={{ flex: 1, fontSize: 13, fontWeight: 600 }}>Snippets</span>
-              <ArrowRight size={14} strokeWidth={1.8} aria-hidden className="text-ink-soft" />
-            </Link>
-
-            <Link
-              href="/settings/hotkeys"
-              className="rp-card"
-              style={{ flexDirection: 'row', alignItems: 'center', gap: 10, padding: '8px 10px', textDecoration: 'none' }}
-            >
-              <Keyboard size={16} strokeWidth={1.8} aria-hidden className="text-accent" />
-              <span style={{ flex: 1, fontSize: 13, fontWeight: 600 }}>Hotkeys</span>
-              <ArrowRight size={14} strokeWidth={1.8} aria-hidden className="text-ink-soft" />
-            </Link>
-
-            <Link
-              href="/account/security"
-              className="rp-card"
-              style={{ flexDirection: 'row', alignItems: 'center', gap: 10, padding: '8px 10px', textDecoration: 'none' }}
-            >
-              <ShieldCheck size={16} strokeWidth={1.8} aria-hidden className="text-accent" />
-              <span style={{ flex: 1, fontSize: 13, fontWeight: 600 }}>Sign-in &amp; security</span>
-              <ArrowRight size={14} strokeWidth={1.8} aria-hidden className="text-ink-soft" />
-            </Link>
+            {MORE_SETTINGS.map(({ href, label, Icon }) => (
+              <Link
+                key={href}
+                href={href}
+                className="rp-card"
+                style={{ flexDirection: 'row', alignItems: 'center', gap: 10, padding: '8px 10px', textDecoration: 'none' }}
+              >
+                <Icon size={16} strokeWidth={1.8} aria-hidden className="text-accent" />
+                <span style={{ flex: 1, fontSize: 13, fontWeight: 600 }}>{label}</span>
+                <ArrowRight size={14} strokeWidth={1.8} aria-hidden className="text-ink-soft" />
+              </Link>
+            ))}
           </div>
         </div>
 

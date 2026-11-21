@@ -185,6 +185,18 @@ type FlashTone = 'blocker' | 'warning' | 'info';
  *  in step with the `rp-section-flash` animation length in radiopad.css. */
 const FLASH_MS = 6000;
 
+/** The editable section text + AI highlight map, as one PATCH body. */
+function draftBody(current: Report, highlights: unknown) {
+  return {
+    indication: current.indication,
+    technique: current.technique,
+    findings: current.findings,
+    impression: current.impression,
+    recommendations: current.recommendations,
+    aiHighlightsJson: JSON.stringify(highlights),
+  };
+}
+
 export default function ReportPage() {
   const router = useRouter();
   // RBAC mirror — hide editing/signing/exporting affordances a read-only viewer
@@ -516,18 +528,30 @@ export default function ReportPage() {
    * correct even when triggered from the window-event / voice-command paths,
    * which would otherwise overwrite the DB with outdated text.
    */
+  // Timed autosave: blur-only saving lost long dictations if the app closed
+  // mid-section. Deliberately does NOT setReport(response) — the reader may have
+  // typed while the request was in flight, and the on-screen text must win.
+  useEffect(() => {
+    const t = setInterval(() => {
+      const sent = reportRef.current;
+      if (!sent || !dirtyRef.current) return;
+      api.reports
+        .patch(sent.id, draftBody(sent, aiHighlightsRef.current))
+        .then(() => {
+          if (reportRef.current === sent) dirtyRef.current = false;
+          setSaveError(null);
+          setSavedAt(Date.now());
+        })
+        .catch((e: Error) => setSaveError(e.message || 'Changes are not yet synced.'));
+    }, 20_000);
+    return () => clearInterval(t);
+  }, []);
+
   const flushEdits = useCallback(async () => {
     const current = reportRef.current;
     if (!current) return;
     try {
-      const next = await api.reports.patch(current.id, {
-        indication: current.indication,
-        technique: current.technique,
-        findings: current.findings,
-        impression: current.impression,
-        recommendations: current.recommendations,
-        aiHighlightsJson: JSON.stringify(aiHighlightsRef.current),
-      });
+      const next = await api.reports.patch(current.id, draftBody(current, aiHighlightsRef.current));
       setReport(next);
       setSaveError(null);
       setSavedAt(Date.now());

@@ -2751,3 +2751,17 @@ Total tracked PRD ids: **129** (was 112; iter-32 added 17 finer-grained sub-ids)
 - **Not verified**: no visual check in either theme — the dev frontend stays on "Loading…" without a running backend and a working login. Both themes must be looked at before this ships.
 - **Not done yet**: "Sign and next case", autosave on a timer, first-run onboarding, single settings hub page, web admin setup checklist/invites, mobile polish, the 8 `window.confirm`/`prompt` calls, hard-coded `en-US` dictation language.
 - **Scope**: frontend → desktop release required (DESK-001) once the operator asks to ship it; pushing also redeploys the web admin build.
+
+## Iter-59 - Workflow streamlining, part 2: autosave, next case, settings hub, first-run checklists, hidden admin pages
+
+- **Date**: 2026-11-21
+- **Autosave** (`ReportClient.tsx`): unsaved section edits are PATCHed every 20 s (was blur-only). The response is deliberately not applied to state, so text typed while the request is in flight is never overwritten; the dirty flag clears only if nothing changed meanwhile. `draftBody()` is shared with `flushEdits`.
+- **Next case** (`SignAndSendButton.tsx`): after a successful Sign & Send, a **Next case** button opens the longest-waiting other draft, or the worklist when none is left. Signing itself is unchanged (still the two-click confirm).
+- **Settings hub** (`/settings`): "More settings" is now a single data-driven list of every personal settings screen — on-device models, dictation engine settings (previously URL-only), corrections, snippets, hotkeys, phone pairing, notifications, sign-in & security.
+- **First-run checklists** (new `components/ui/GettingStarted.tsx`): ordered setup links, dismissed per device in localStorage — five steps on the desktop dashboard, five on the web admin landing page (`/admin/users`). Steps are links only; nothing is auto-ticked.
+- **Web admin nav**: `/admin/sso`, `/admin/mcp` and `/admin/validation-packs` were reachable only by URL; they now have sidebar entries (labels added in all six locales).
+- **Fix**: dashboard "Open worklist" button linked to `/reports`; now `/worklist`.
+- **Tests**: new `gettingStarted.test.tsx`; `sidebar.test.tsx` updated; `reportPage`, `reportGenerateFlush`, `composer`, `signAndSend`, `crossSurfaceLinks` re-run green locally. Full suite, typecheck and lint left to CI.
+- **Deliberately not done**: (1) replacing the 15 `confirm()` popups with an in-app dialog — they guard deletes and acknowledgement, and swapping them without being able to click through the app is a data-loss risk; (2) dictation language — still `en-US`; it needs a real per-user setting, since guessing from the OS or UI locale could silently worsen recognition; (3) email invites for new users — needs backend mail support; (4) mobile companion polish — not viewable in this session; (5) merging duplicate pages (`/governance` vs `/admin/governance`, `/pair` vs `/device-pairing`).
+- **Not verified**: still no visual check in either theme (no backend + login in this session).
+- **Scope**: frontend → desktop release required (DESK-001) once the operator asks to ship it; pushing also redeploys the web admin build.

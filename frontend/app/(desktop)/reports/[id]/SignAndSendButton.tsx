@@ -10,7 +10,10 @@
  */
 
 import { useState } from 'react';
+import { useRouter } from 'next/navigation';
 import { api } from '@/lib/api';
+import { reportHref } from '@/lib/routes';
+import { statusLabel } from './reportShared';
 import Banner from '@/components/ui/Banner';
 
 type ExportFmt = 'text' | 'fhir' | 'hl7' | 'json';
@@ -21,6 +24,19 @@ export default function SignAndSendButton({ reportId }: { reportId: string }) {
   const [confirming, setConfirming] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [done, setDone] = useState(false);
+  const router = useRouter();
+
+  /** Open the longest-waiting other draft, or the worklist when the queue is empty. */
+  async function nextCase() {
+    try {
+      const drafts = (await api.reports.list())
+        .filter((r) => r.id !== reportId && statusLabel(r.status) === 'Draft')
+        .sort((a, b) => new Date(a.updatedAt).getTime() - new Date(b.updatedAt).getTime());
+      router.push(drafts[0] ? reportHref(drafts[0].id) : '/worklist');
+    } catch {
+      router.push('/worklist');
+    }
+  }
 
   async function run() {
     setBusy(true);
@@ -48,6 +64,11 @@ export default function SignAndSendButton({ reportId }: { reportId: string }) {
 
       {error && <Banner tone="danger" onDismiss={() => setError(null)}>{error}</Banner>}
       {done && <Banner tone="success" title="Signed, acknowledged & exported." />}
+      {done && (
+        <button className="primary" type="button" onClick={() => { void nextCase(); }}>
+          Next case
+        </button>
+      )}
 
       <div className="rp-toolbar">
         <label htmlFor="rp-sas-format" className="rp-page-sub">Export as</label>

@@ -7,6 +7,7 @@ import SignInRequired from '@/components/ui/SignInRequired';
 import { TableSkeleton } from '@/components/ui/Skeleton';
 import EmptyState from '@/components/ui/EmptyState';
 import Banner from '@/components/ui/Banner';
+import GettingStarted from '@/components/ui/GettingStarted';
 
 function humanizeRole(role: string): string {
   return role.replace(/([a-z])([A-Z])/g, '$1 $2');
@@ -178,6 +179,17 @@ export default function UsersAdminPage() {
 
   return (
     <div className="rp-container">
+      <GettingStarted
+        id="web-admin"
+        title="Set up your organization"
+        steps={[
+          { href: '/admin/users', title: 'Add your team', detail: 'create accounts and assign roles' },
+          { href: '/providers', title: 'Connect an AI provider', detail: 'the model that drafts reports' },
+          { href: '/admin/sso', title: 'Turn on single sign-on', detail: 'optional, for your identity provider' },
+          { href: '/admin/pacs', title: 'Connect the imaging archive', detail: 'so studies and priors load automatically' },
+          { href: '/admin/billing', title: 'Check plan and billing', detail: 'seats, usage and invoices' },
+        ]}
+      />
       <header className="rp-page-header">
         <div className="rp-page-header-text">
           <h1 className="rp-page-title">Users &amp; access</h1>

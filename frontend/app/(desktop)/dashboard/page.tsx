@@ -13,6 +13,7 @@ import EmptyState from '@/components/ui/EmptyState';
 import ErrorState from '@/components/ui/ErrorState';
 import StatusBadge, { reportStatusTone } from '@/components/ui/StatusBadge';
 import AnimatedNumber from '@/components/ui/AnimatedNumber';
+import GettingStarted from '@/components/ui/GettingStarted';
 
 /**
  * Dashboard — the landing page of the desktop app. One glance answers:
@@ -96,11 +97,23 @@ export default function DashboardPage() {
           </Link>
         }
         secondaryActions={
-          <Link href="/reports" className="ghost" style={{ textDecoration: 'none', display: 'inline-flex', alignItems: 'center', gap: 6 }}>
+          <Link href="/worklist" className="ghost" style={{ textDecoration: 'none', display: 'inline-flex', alignItems: 'center', gap: 6 }}>
             Open worklist
             <ArrowRight size={15} strokeWidth={1.8} aria-hidden />
           </Link>
         }
+      />
+
+      <GettingStarted
+        id="desktop"
+        title="Get set up in five steps"
+        steps={[
+          { href: '/settings/models', title: 'Choose your AI model', detail: 'download an on-device engine or pick a connected one' },
+          { href: '/device-pairing', title: 'Pair your phone', detail: 'use it as a wireless dictation microphone' },
+          { href: '/report-templates', title: 'Design your report layout', detail: 'letterhead, fonts and signature block for PDF and Word' },
+          { href: '/settings/hotkeys', title: 'Learn the hotkeys', detail: 'dictate, generate and validate without the mouse' },
+          { href: '/reports/new', title: 'Create your first report', detail: 'dictate positive findings and generate a draft' },
+        ]}
       />
 
       {/* ── KPI row ──────────────────────────────────────────────── */}

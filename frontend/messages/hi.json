@@ -1,5 +1,8 @@
 {
   "nav": {
+    "sso": "सिंगल साइन-ऑन",
+    "mcp": "MCP टूल",
+    "validationPacks": "वैलिडेशन पैक",
     "reports": "रिपोर्ट",
     "rulebooks": "नियमावली",
     "templates": "टेम्पलेट",

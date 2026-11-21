@@ -10,7 +10,7 @@ import {
   FileInput, WifiOff, Scale, FlaskConical, ShieldCheck, Flag, CreditCard,
   Activity, Settings2, Fingerprint, Users, ScanLine, Bone, Cpu,
   LayoutDashboard, ListTodo, Layers, Sparkles, Library, BadgeCheck,
-  GraduationCap, UsersRound, AlertTriangle, Bell, FileStack, Smartphone,
+  KeyRound, Plug, GraduationCap, UsersRound, AlertTriangle, Bell, FileStack, Smartphone,
 } from 'lucide-react';
 import type { PermissionKey } from '@/lib/permissions';
 import { UBAG_HUB_ROLES } from '@/lib/roles';
@@ -95,6 +95,8 @@ export const Icons: Record<string, NavIcon> = {
   settings: Settings2,
   signInDevices: Fingerprint,
   users: Users,
+  sso: KeyRound,
+  mcp: Plug,
 };
 
 export const navGroups: NavGroup[] = [
@@ -160,6 +162,7 @@ export const navGroups: NavGroup[] = [
       // / ComplianceReviewer), not a permission key — mirror that here.
       { href: '/admin/ubag', labelKey: 'ubag', icon: Icons.ubag, roles: UBAG_HUB_ROLES },
       { href: '/admin/pacs', labelKey: 'pacs', icon: Icons.pacs, permission: 'tenant_settings.manage' },
+      { href: '/admin/mcp', labelKey: 'mcp', icon: Icons.mcp, permission: 'mcp_tools.manage' },
     ],
   },
   {
@@ -171,7 +174,9 @@ export const navGroups: NavGroup[] = [
       { href: '/admin/users', labelKey: 'users', icon: Icons.users, permission: 'users.manage' },
       { href: '/admin/governance', labelKey: 'governance', icon: Icons.governance, permission: 'audit.verify' },
       { href: '/admin/model-eval', labelKey: 'modelEval', icon: Icons.modelEval, permission: 'audit.verify' },
+      { href: '/admin/validation-packs', labelKey: 'validationPacks', icon: Icons.validation, permission: 'validation_packs.read' },
       { href: '/admin/security', labelKey: 'security', icon: Icons.security, permission: 'security.manage' },
+      { href: '/admin/sso', labelKey: 'sso', icon: Icons.sso, permission: 'security.manage' },
       { href: '/admin/feature-flags', labelKey: 'featureFlags', icon: Icons.flags, permission: 'billing.read' },
       { href: '/admin/billing', labelKey: 'billing', icon: Icons.billing, permission: 'billing.read' },
       { href: '/admin/usage', labelKey: 'usage', icon: Icons.usage, permission: 'audit.read' },
