@@ -4,6 +4,52 @@
 
 ---
 
+## Production ops: Cloudflare in front of radiopadstudio.com + VPS tidy-up (2026-11-21)
+
+Ops-only (one config line in the repo). Production was already on latest main (v0.1.160,
+`c1a979d`); nothing redeployed.
+
+- **Deploy path changed:** production now lives at `/opt/docker/radiopad` (compose +
+  `.secrets.env` + `data/`), owned by `radiopad-deploy`. There is no source checkout on the VPS —
+  `radiopad-api|web|marketing:latest` images only. The older `/opt/radiopad` path (and
+  `/opt/radiopad/_deploy-images.sh`) in Iteration 42 and `docs/HANDOFF-*.md` no longer exists.
+- **Slow-load diagnosis:** the site intermittently took 6–30s from Pakistan while the server
+  answered in ~30ms locally and 0.08–1.9s from 12 other countries (check-host.net). Cause was
+  the ISP route to the VPS, not the app. Fix: Cloudflare proxy (below) — now ~0.3s via the
+  Karachi edge.
+- **Cloudflare (Free plan, account that also holds polytronx.com):**
+  - Nameservers changed at Hostinger (second Hostinger account) to `teagan.ns.cloudflare.com` /
+    `yisroel.ns.cloudflare.com`. DNSSEC was off, so no DS record to clean up.
+  - Proxied: `radiopadstudio.com`, `www` (CNAME), `admin`. DNS-only: Hostinger mail
+    (`mx1`/`mx2.hostinger.pk`), SPF TXT, `autoconfig`, `autodiscover` — email unaffected.
+  - SSL/TLS mode **Full (strict)** (origin keeps its NPM Let's Encrypt certs). Universal edge
+    cert active to 2027-02-19. Expect a few minutes of edge TLS errors whenever a zone is
+    first activated, before the universal cert propagates.
+  - **Known limit:** Free plan cuts any single request at 100s. A non-streaming API call longer
+    than that returns 524 to the client (nginx `proxy_read_timeout` is 300s). None seen yet.
+- **Real client IPs behind Cloudflare:** NPM proxy hosts 42 (`radiopadstudio.com`, `www`) and 43
+  (`admin`) now have `real_ip_header CF-Connecting-IP;` — set in NPM's `advanced_config`
+  (sqlite) *and* the generated `proxy_host/4{2,3}.conf`, so it survives NPM regeneration. Only
+  trusted from Cloudflare ranges (NPM's `ip_ranges.conf`). Without it the API's
+  `ForwardedHeaders` (ForwardLimit 2) would resolve to a Cloudflare edge IP and the per-IP rate
+  limiter + audit log would see shared Cloudflare addresses. Backups:
+  `database.sqlite.pre-cloudflare-*`, `proxy_host/4{2,3}.conf.pre-cloudflare-*`.
+- **API log noise:** EF Core logged every SQL command at Information (~3.7k lines/day matching
+  error keywords). `appsettings.json` now sets
+  `Microsoft.EntityFrameworkCore.Database.Command: Warning` (`ee9a0cc`); the same override is in
+  the VPS compose env (`Logging__LogLevel__...`) so it applies before the next image build.
+  Backup: `docker-compose.yml.bak-eflog-20261121`.
+- **Not RadioPad, same VPS:** `radiologyos-worker-knowledge-1` (celery, ~214% CPU for 33 days)
+  stopped at the operator's request; a transient systemd timer
+  (`resume-radiologyos-worker-knowledge.timer`) restarts it 2026-11-28 14:34 CET. The timer does
+  not survive a reboot — start the container by hand if the VPS restarts before then.
+- **False alarms (no change):** the 404 page works (Astro `404.html`, ~30ms); the login submit
+  button has an accessible name (its "Sign in" `<span>`).
+- **Verified via Cloudflare:** homepage 14/15 loads 0.26–0.39s; `/api/health` (both hosts),
+  `/api/mobile/latest`, `/login/`, 404, http→https all correct; access log shows real client IPs.
+
+---
+
 ## Dictation-cleanup + cross-check as durable job kinds — PR-B5 (2026-07-23)
 
 Backend-only. Makes the two previously-synchronous AI passes (dictation cleanup, cross-check
