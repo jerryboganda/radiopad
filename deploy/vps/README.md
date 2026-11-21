@@ -15,6 +15,17 @@ TLS termination and routing, behind **Cloudflare**. This differs from the root
 
 ## Architecture
 
+> **2026-11-21: the website and admin web app moved to Hostinger.** Public
+> traffic for `radiopadstudio.com`, `www` and `admin.radiopadstudio.com` now
+> goes to Hostinger web hosting (static builds deployed by
+> `.github/workflows/hostinger-deploy.yml`, `.htaccess` in `deploy/hostinger/`).
+> The VPS serves only the API at **`api.radiopadstudio.com`**: Cloudflare → NPM
+> hand-maintained `proxy_host/radiopad-api-manual.conf` → `radiopad-api:7457`
+> (the API container joins the `npm` network; certbot cert renewed by
+> `/etc/cron.d/radiopad-api-cert-renew`). The `radiopad-web` /
+> `radiopad-marketing` containers and NPM proxy hosts 42/43 below still run but
+> receive no traffic. The diagram shows the pre-move layout.
+
 ```
 Internet → Cloudflare (proxied, SSL Full strict)
          → NPM (host :443, container nginx-proxy-manager-app-1)

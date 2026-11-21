@@ -4,6 +4,44 @@
 
 ---
 
+## Website + admin web app moved to Hostinger; API at api.radiopadstudio.com (2026-11-21)
+
+Operator chose the hybrid layout: Hostinger web hosting cannot run .NET/Docker/background jobs,
+so only the two static surfaces moved; the API stays on the VPS.
+
+- **Layout now:** Cloudflare (Full strict) →
+  - `radiopadstudio.com`, `www` → Hostinger (`46.202.138.251`) `~/domains/radiopadstudio.com/public_html` (Astro `marketing/dist`)
+  - `admin.radiopadstudio.com` → Hostinger `~/domains/admin.radiopadstudio.com/public_html` (`frontend/out-web`)
+  - `api.radiopadstudio.com` → VPS `185.252.233.186` → NPM hand-maintained
+    `proxy_host/radiopad-api-manual.conf` → `radiopad-api:7457` (API joined the `npm` network).
+    Cert: certbot webroot in the NPM container, renewed by `/etc/cron.d/radiopad-api-cert-renew`.
+- **Hostinger:** Unlimited Web Hosting plan (account also holding the `radiopadstudio.com`
+  registration). Two PHP/HTML sites, LiteSpeed, Lifetime (Let's Encrypt) SSL auto-installed.
+  SSH `u372263031@46.202.138.251:65002`, key `radiopad-hostinger-deploy` (hPanel) = GitHub secret
+  `HOSTINGER_SSH_KEY`. `.htaccess` files in `deploy/hostinger/` mirror the nginx headers; the web
+  app CSP allows `https://api.radiopadstudio.com` + `wss://`.
+- **CI:** new `.github/workflows/hostinger-deploy.yml` (push to `frontend/** marketing/**
+  deploy/hostinger/**`): builds `build:web` with `NEXT_PUBLIC_API_BASE=https://api.radiopadstudio.com`
+  + marketing, rsyncs `--delete` to both sites, pinned ED25519 host key. `web-deploy-images`
+  still builds/deploys the API (its web/marketing containers on the VPS keep running but get no
+  traffic).
+- **Code (`9ce012e`):** API CORS gains `RADIOPAD_CORS_ORIGINS` (set in VPS compose to admin +
+  root + www); desktop `get_backend_url` and `DEFAULT_COMPANION_BASE` (desktop companion + mobile)
+  default to `https://api.radiopadstudio.com`; desktop CSP allows it. Desktop release **v0.1.161**
+  ships it. Installed desktop clients < 0.1.161 call `admin.`/root `/api` which no longer exist —
+  they recover via auto-update (updater reads GitHub Releases, unaffected). Mobile companion
+  needs a fresh build (`mobile-bundle`) to pick up the new default; pairing via QR already
+  carries the base from the desktop.
+- **Cut-over:** temporary Cloudflare Configuration Rule (Flexible SSL for root/www/admin,
+  operator-approved) while Hostinger issued certs; deleted afterwards — zone back to Full
+  (strict), 0 configuration rules.
+- **Also fixed:** `/opt/docker/radiopad/.secrets.env` now owned by `radiopad-deploy` (600), so
+  `web-deploy-images` deploys succeed again (first success since ~2026-10-10).
+- **Verified:** root/www/admin 200 via Cloudflare, SPA `/login/`, 404 page, http→https,
+  `api` health + `/api/mobile/latest`, `/ws/companion` 401 (auth required), CORS preflight from
+  the admin origin (credentials allowed), and a real browser `fetch` from the Hostinger-served
+  admin page to the API (200, no CSP/CORS errors). Sign-in itself not exercised.
+
 ## Production ops: Cloudflare in front of radiopadstudio.com + VPS tidy-up (2026-11-21)
 
 Ops-only (one config line in the repo). Production was already on latest main (v0.1.160,
