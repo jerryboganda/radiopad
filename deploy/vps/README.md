@@ -23,8 +23,10 @@ TLS termination and routing, behind **Cloudflare**. This differs from the root
 > hand-maintained `proxy_host/radiopad-api-manual.conf` → `radiopad-api:7457`
 > (the API container joins the `npm` network; certbot cert renewed by
 > `/etc/cron.d/radiopad-api-cert-renew`). The `radiopad-web` /
-> `radiopad-marketing` containers and NPM proxy hosts 42/43 below still run but
-> receive no traffic. The diagram shows the pre-move layout.
+> `radiopad-marketing` services and images were removed from the VPS on
+> 2026-11-21, and `web-deploy-images` now builds only the API image. NPM proxy
+> hosts 42/43 still exist but point at the removed containers. The diagram
+> shows the pre-move layout.
 
 ```
 Internet → Cloudflare (proxied, SSL Full strict)

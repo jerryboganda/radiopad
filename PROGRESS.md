@@ -23,8 +23,9 @@ so only the two static surfaces moved; the API stays on the VPS.
 - **CI:** new `.github/workflows/hostinger-deploy.yml` (push to `frontend/** marketing/**
   deploy/hostinger/**`): builds `build:web` with `NEXT_PUBLIC_API_BASE=https://api.radiopadstudio.com`
   + marketing, rsyncs `--delete` to both sites, pinned ED25519 host key. `web-deploy-images`
-  still builds/deploys the API (its web/marketing containers on the VPS keep running but get no
-  traffic).
+  now builds/deploys only the API image (triggers: `backend/** rulebooks/** templates/**`,
+  `api.Dockerfile`, compose). The VPS `radiopad-web` / `radiopad-marketing` services, containers
+  and images were removed (compose backup `docker-compose.yml.bak-pre-remove-web-*`).
 - **Code (`9ce012e`):** API CORS gains `RADIOPAD_CORS_ORIGINS` (set in VPS compose to admin +
   root + www); desktop `get_backend_url` and `DEFAULT_COMPANION_BASE` (desktop companion + mobile)
   default to `https://api.radiopadstudio.com`; desktop CSP allows it. Desktop release **v0.1.161**

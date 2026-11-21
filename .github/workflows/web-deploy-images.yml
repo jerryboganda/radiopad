@@ -1,7 +1,7 @@
 name: web-deploy-images
 
-# Builds the production web + api + marketing Docker images in GitHub Actions
-# (NOT on the CPU-capped VPS), uploads them as a single saved-image artifact,
+# Builds the production API Docker image in GitHub Actions
+# (NOT on the CPU-capped VPS), uploads it as a saved-image artifact,
 # then ships that artifact straight to the VPS over SSH and reloads compose —
 # no registry, no package-scope credentials, no manual step on a green run.
 #
@@ -21,20 +21,20 @@ name: web-deploy-images
 # actual production host; the real compose project is /opt/docker/radiopad,
 # no -f/--env-file needed since docker-compose.yml + .secrets.env live there
 # directly. That README predates the current layout.)
+#
+# Since 2026-11-21 the website + admin web app are static builds on Hostinger
+# (hostinger-deploy.yml); the VPS runs only radiopad-api, so only that image is
+# built here.
 
 on:
   push:
     branches: [main]
     paths:
       - 'backend/**'
-      - 'frontend/**'
-      - 'marketing/**'
       - 'rulebooks/**'
       - 'templates/**'
-      - 'deploy/vps/**'
-      - 'package.json'
-      - 'pnpm-lock.yaml'
-      - 'pnpm-workspace.yaml'
+      - 'deploy/vps/api.Dockerfile'
+      - 'deploy/vps/docker-compose.yml'
       - '.github/workflows/web-deploy-images.yml'
   workflow_dispatch:
 
@@ -57,16 +57,10 @@ jobs:
       - name: Build api image
         run: docker build -f deploy/vps/api.Dockerfile -t radiopad-api:latest .
 
-      - name: Build web image
-        run: docker build -f deploy/vps/web.Dockerfile -t radiopad-web:latest .
-
-      - name: Build marketing image
-        run: docker build -f deploy/vps/marketing.Dockerfile -t radiopad-marketing:latest .
-
       - name: Save + compress images
         run: |
-          docker image ls | grep -E 'radiopad-(api|web|marketing)' || true
-          docker save radiopad-api:latest radiopad-web:latest radiopad-marketing:latest | gzip > radiopad-images.tar.gz
+          docker image ls | grep -E 'radiopad-api' || true
+          docker save radiopad-api:latest | gzip > radiopad-images.tar.gz
           ls -lh radiopad-images.tar.gz
 
       - name: Upload images artifact
