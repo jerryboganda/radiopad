@@ -17,6 +17,7 @@ import {
 } from 'lucide-react';
 import { api, type AuthSessionRow, type WebAuthnCredentialRow } from '@/lib/api';
 import { registerPasskey, isPlatformAuthenticatorAvailable } from '@/lib/webauthn';
+import { confirmDialog } from '@/lib/confirmDialog';
 
 /**
  * AUTH-001/003/009 — per-user sign-in security. Lets a radiologist enroll this
@@ -143,7 +144,7 @@ export default function AccountSecurityPage() {
   }
 
   async function revokeSession(id: string) {
-    if (!confirm('Sign that device out? It will need to sign in again.')) return;
+    if (!(await confirmDialog('Sign that device out? It will need to sign in again.'))) return;
     setRevokingId(id);
     setErr(null); setInfo(null);
     try {

@@ -208,9 +208,9 @@ export default function CompanionTestSandbox() {
           <div
             className={`flex h-8 w-8 items-center justify-center rounded-full transition-colors ${
               phoneListening
-                ? 'bg-rose-500 text-white animate-pulse shadow-md shadow-rose-500/30'
+                ? 'bg-[var(--red)] text-[var(--accent-fg)] animate-pulse shadow-md'
                 : transcribing
-                ? 'bg-amber-500 text-white animate-pulse'
+                ? 'bg-[var(--amber)] text-[var(--accent-fg)] animate-pulse'
                 : 'bg-muted text-muted-foreground'
             }`}
           >

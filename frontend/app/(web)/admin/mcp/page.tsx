@@ -6,6 +6,7 @@ import { useEffect, useState } from 'react';
 import { api, type McpToolRow } from '@/lib/api';
 import Banner from '@/components/ui/Banner';
 import EmptyState from '@/components/ui/EmptyState';
+import { confirmDialog } from '@/lib/confirmDialog';
 
 const STATUS_LABEL: Record<number, string> = { 0: 'Submitted', 1: 'Approved', 2: 'Blocked' };
 const STATUS_BADGE: Record<number, string> = { 0: 'info', 1: 'ok', 2: 'danger' };
@@ -88,7 +89,7 @@ function McpAdminPageInner() {
   }
 
   async function remove(id: string) {
-    if (!confirm('Permanently delete this tool registration?')) return;
+    if (!(await confirmDialog('Permanently delete this tool registration?'))) return;
     setError(null);
     setInfo(null);
     try {

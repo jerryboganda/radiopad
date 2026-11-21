@@ -27,6 +27,7 @@ import Skeleton from '@/components/ui/Skeleton';
 import EmptyState from '@/components/ui/EmptyState';
 import ErrorState from '@/components/ui/ErrorState';
 import { useToast } from '@/components/ui/ToastProvider';
+import { confirmDialog } from '@/lib/confirmDialog';
 
 // A template section as stored in ReportTemplate.sectionsJson. Snippet.sectionsJson
 // uses the same shape, with the body in `text` rather than `placeholder`.
@@ -341,7 +342,7 @@ export default function FindingsLibraryPage() {
 
   async function deleteSnippet(item: LibraryItem) {
     if (!item.snippet) return;
-    if (!window.confirm(`Delete the snippet "${item.title}"? This cannot be undone.`)) return;
+    if (!(await confirmDialog(`Delete the snippet "${item.title}"? This cannot be undone.`))) return;
     try {
       await api.findingsLibrary.deleteSnippet(item.snippet.id);
       setSnippets((prev) => (prev ?? []).filter((s) => s.id !== item.snippet!.id));

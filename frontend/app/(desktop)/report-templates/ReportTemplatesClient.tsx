@@ -15,6 +15,7 @@ import ErrorState from '@/components/ui/ErrorState';
 import { useToast } from '@/components/ui/ToastProvider';
 import LayoutCard from './LayoutCard';
 import PresetPickerDialog from './PresetPickerDialog';
+import { confirmDialog } from '@/lib/confirmDialog';
 
 export default function ReportTemplatesClient() {
   const router = useRouter();
@@ -82,7 +83,7 @@ export default function ReportTemplatesClient() {
   }
 
   async function handleDelete(item: ReportLayout) {
-    if (!window.confirm(`Delete the layout "${item.name}"? This cannot be undone.`)) return;
+    if (!(await confirmDialog(`Delete the layout "${item.name}"? This cannot be undone.`))) return;
     try {
       await api.reportLayouts.remove(item.id);
       toast({ tone: 'success', message: 'Deleted.' });

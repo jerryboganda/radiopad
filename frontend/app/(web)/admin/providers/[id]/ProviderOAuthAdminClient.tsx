@@ -9,6 +9,7 @@ import EmptyState from '@/components/ui/EmptyState';
 import ErrorState from '@/components/ui/ErrorState';
 import Skeleton from '@/components/ui/Skeleton';
 import Banner from '@/components/ui/Banner';
+import { confirmDialog } from '@/lib/confirmDialog';
 
 /**
  * Iter-35 PROV-007 — admin surface for the per-provider OAuth refresh-token
@@ -98,7 +99,7 @@ export default function ProviderOAuthAdminPage() {
 
   async function remove() {
     if (!providerId) { setError('Missing provider id.'); return; }
-    if (!confirm('Delete the stored OAuth refresh token for this provider?')) return;
+    if (!(await confirmDialog('Delete the stored OAuth refresh token for this provider?'))) return;
     setBusy(true); setError(null); setInfo(null);
     try {
       await api.providers.oauth.delete(providerId);

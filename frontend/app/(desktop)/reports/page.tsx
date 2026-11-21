@@ -27,6 +27,7 @@ import { TableSkeleton } from '@/components/ui/Skeleton';
 import StatusBadge, { reportStatusTone } from '@/components/ui/StatusBadge';
 import { useToast } from '@/components/ui/ToastProvider';
 import Sparkline from '@/components/ui/Sparkline';
+import { confirmDialog } from '@/lib/confirmDialog';
 
 type SortBy = 'updatedAt' | 'accession' | 'modality' | 'status';
 type SortDir = 'asc' | 'desc';
@@ -163,9 +164,9 @@ export default function ReportsPage() {
 
   async function handleDelete(r: Report) {
     const accession = r.study.accessionNumber || 'this report';
-    if (!window.confirm(
+    if (!(await confirmDialog(
       `Permanently delete report ${accession}?\n\nThis cannot be undone — the report and all of its data are removed for good. An audit-log entry is kept recording the deletion.`,
-    )) return;
+    ))) return;
     setDeletingId(r.id);
     try {
       await api.reports.delete(r.id);
@@ -182,9 +183,9 @@ export default function ReportsPage() {
   async function handleBulkDelete() {
     const ids = Array.from(selected);
     if (ids.length === 0) return;
-    if (!window.confirm(
+    if (!(await confirmDialog(
       `Permanently delete ${ids.length} report${ids.length === 1 ? '' : 's'}?\n\nThis cannot be undone.`,
-    )) return;
+    ))) return;
     setBulkBusy(true);
     let ok = 0;
     for (const id of ids) {

@@ -28,6 +28,7 @@ import { ensureOnDeviceProvider, findOnDeviceProvider } from '@/lib/models/onDev
 import { probeWebSpeechAvailable } from '@/lib/dictation/speech';
 import ErrorState from '@/components/ui/ErrorState';
 import { TableSkeleton } from '@/components/ui/Skeleton';
+import { confirmDialog } from '@/lib/confirmDialog';
 
 const KIND_ORDER: LocalModelKind[] = ['Stt', 'Tts', 'Orchestrator'];
 const KIND_LABEL: Record<LocalModelKind, string> = {
@@ -386,7 +387,7 @@ function ModelCard({
 
   const doDelete = () =>
     run('delete', async () => {
-      if (!window.confirm(`Delete ${model.displayName}? You can re-download it anytime.`)) return;
+      if (!(await confirmDialog(`Delete ${model.displayName}? You can re-download it anytime.`))) return;
       await api.localModels.remove(model.id);
       await onChanged();
     });

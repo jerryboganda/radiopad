@@ -21,6 +21,7 @@ import {
   SpellCheck,
   Type,
 } from 'lucide-react';
+import { DICTATION_LANGS, getDictationLang, setDictationLang } from '@/lib/dictation/speech';
 import Container from '@/components/shell/Container';
 import PageHeader from '@/components/shell/PageHeader';
 import {
@@ -76,6 +77,8 @@ export default function SettingsPage() {
   const [sttMode, setSttMode] = useSttMode();
   const [crossCheck, setCrossCheck] = useCrossCheckEnabled();
   const [useUbag, setUseUbag] = useUseUbag();
+  const [dictLang, setDictLang] = useState('en-US');
+  useEffect(() => setDictLang(getDictationLang()), []);
 
   return (
     <Container>
@@ -141,6 +144,27 @@ export default function SettingsPage() {
           <div className="rp-panel-title" style={{ marginBottom: 8 }}>
             <Mic size={14} strokeWidth={1.8} aria-hidden style={{ verticalAlign: -2, marginRight: 6 }} />
             Dictation
+          </div>
+
+          <div className="section-block" style={{ marginBottom: 10 }}>
+            <label htmlFor="dictation-lang">Dictation language</label>
+            <select
+              id="dictation-lang"
+              className="rp-input"
+              value={dictLang}
+              onChange={(e) => {
+                setDictLang(e.target.value);
+                setDictationLang(e.target.value);
+              }}
+            >
+              {DICTATION_LANGS.map((l) => (
+                <option key={l.tag} value={l.tag}>{l.label}</option>
+              ))}
+            </select>
+            <p className="rp-page-sub" style={{ marginTop: 4 }}>
+              Used by the built-in speech engine from your next dictation. On-device engines keep
+              their own language.
+            </p>
           </div>
 
           <div className="section-block" style={{ marginBottom: 10 }}>

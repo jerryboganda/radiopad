@@ -56,7 +56,7 @@ export default function MobileUpdateCheck() {
       <button
         type="button"
         className={`relative w-9 h-9 flex items-center justify-center rounded-xl border border-[var(--border,#262c40)] bg-[var(--bg-panel,#131722)] text-[var(--text-muted,#94a3b8)] hover:text-[var(--text,#e2e8f0)] transition-colors ${
-          phase === 'available' ? 'border-blue-500 text-blue-400 bg-blue-500/10' : ''
+          phase === 'available' ? 'border-[var(--accent)] text-[var(--accent)] bg-[var(--bg-selected)]' : ''
         }`}
         onClick={check}
         disabled={phase === 'checking'}
@@ -68,7 +68,7 @@ export default function MobileUpdateCheck() {
           className={phase === 'checking' ? 'animate-spin text-blue-400' : ''}
         />
         {phase === 'available' && (
-          <span className="absolute -top-0.5 -right-0.5 w-2.5 h-2.5 rounded-full bg-blue-500 ring-2 ring-[var(--bg-app,#0b0f17)] animate-pulse" />
+          <span className="absolute -top-0.5 -right-0.5 w-2.5 h-2.5 rounded-full bg-[var(--accent)] ring-2 ring-[var(--bg-app,#0b0f17)] animate-pulse" />
         )}
       </button>
 
@@ -96,7 +96,7 @@ export default function MobileUpdateCheck() {
                 Version <strong className="text-[var(--text-strong,#f8fafc)]">v{info.latest}</strong> is available. (You have v{info.current})
               </p>
               <a
-                className="w-full py-2 px-3 rounded-xl bg-blue-600 hover:bg-blue-500 text-white font-medium flex items-center justify-center gap-1.5 transition-colors text-center"
+                className="w-full py-2 px-3 rounded-xl bg-[var(--accent)] hover:opacity-90 text-[var(--accent-fg)] font-medium flex items-center justify-center gap-1.5 transition-colors text-center"
                 href={info.downloadUrl ?? RELEASES_URL}
                 target="_blank"
                 rel="noreferrer"

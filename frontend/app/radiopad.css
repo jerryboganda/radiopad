@@ -5721,3 +5721,17 @@
 }
 .rp-lifecycle li[data-state='done'] { border-color: var(--green-border); background: var(--green-bg); color: var(--green); }
 .rp-lifecycle li[data-state='current'] { border-color: var(--accent); background: var(--accent); color: var(--accent-fg); }
+
+/* ---- Confirm dialog (lib/confirmDialog.ts) ---- */
+.rp-confirm {
+  max-width: min(440px, calc(100vw - 32px));
+  padding: 20px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: var(--bg-elevated);
+  color: var(--text);
+  font: 400 14px/1.5 var(--sans);
+}
+.rp-confirm::backdrop { background: var(--scrim); }
+.rp-confirm p { margin: 0 0 16px; white-space: pre-line; }
+.rp-confirm-actions { display: flex; justify-content: flex-end; gap: 8px; }

@@ -15,6 +15,7 @@ import PageHeader from '@/components/shell/PageHeader';
 import EmptyState from '@/components/ui/EmptyState';
 import Banner from '@/components/ui/Banner';
 import { TableSkeleton } from '@/components/ui/Skeleton';
+import { confirmDialog } from '@/lib/confirmDialog';
 
 type CatalogClient = {
   list: () => Promise<CatalogItem[]>;
@@ -86,7 +87,7 @@ export default function CatalogManager({ title, subtitle, itemNoun, client, mana
   }
 
   async function remove(item: CatalogItem) {
-    if (!confirm(`Delete ${itemNoun} “${item.code}”? Existing reports keep their stored value.`)) return;
+    if (!(await confirmDialog(`Delete ${itemNoun} “${item.code}”? Existing reports keep their stored value.`))) return;
     setError(null);
     try {
       await client.remove(item.id);

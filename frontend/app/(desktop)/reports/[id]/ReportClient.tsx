@@ -93,6 +93,7 @@ import { type ExportFormat } from '@/components/reports/ExportPanel';
 import { timeAgo } from '@/components/reports/CaseQueue';
 import Skeleton from '@/components/ui/Skeleton';
 import { sectionScaffoldText, sectionScaffoldVariants } from '@/lib/templateSeed';
+import { confirmDialog } from '@/lib/confirmDialog';
 import {
   ClipboardList,
   Settings2,
@@ -1254,7 +1255,7 @@ export default function ReportPage() {
 
   async function acknowledge() {
     if (!report) return;
-    if (!confirm('Acknowledge this AI-assisted draft? AI text will be marked as reviewed.')) return;
+    if (!(await confirmDialog('Acknowledge this AI-assisted draft? AI text will be marked as reviewed.'))) return;
     // BUG FIX: this previously had no try/catch. The server re-checks blockers
     // fresh on every acknowledge call (client-side `blockers` can be stale),
     // so a 409 here is routine, not exceptional — but with no .catch, the
@@ -1874,7 +1875,7 @@ export default function ReportPage() {
             >
               Positive Findings
               {dictations.length > 0 && (
-                <span className="badge font-mono text-xs bg-cyan-950 text-cyan-300 border border-cyan-800 px-1.5 py-0.5 rounded-full ml-1.5">
+                <span className="badge info font-mono ml-1.5">
                   {dictations.length}
                 </span>
               )}

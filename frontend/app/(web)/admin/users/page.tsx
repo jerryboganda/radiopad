@@ -8,6 +8,7 @@ import { TableSkeleton } from '@/components/ui/Skeleton';
 import EmptyState from '@/components/ui/EmptyState';
 import Banner from '@/components/ui/Banner';
 import GettingStarted from '@/components/ui/GettingStarted';
+import { confirmDialog } from '@/lib/confirmDialog';
 
 function humanizeRole(role: string): string {
   return role.replace(/([a-z])([A-Z])/g, '$1 $2');
@@ -113,7 +114,7 @@ export default function UsersAdminPage() {
   }
 
   async function resetMfa(u: UserRow) {
-    if (!confirm(`Clear ${u.email}'s authenticator? They will re-enroll TOTP on next sign-in.`)) return;
+    if (!(await confirmDialog(`Clear ${u.email}'s authenticator? They will re-enroll TOTP on next sign-in.`))) return;
     await withRow(u.id, async () => {
       await api.users.resetMfa(u.id);
       await reload();
@@ -122,7 +123,7 @@ export default function UsersAdminPage() {
   }
 
   async function removeUser(u: UserRow) {
-    if (!confirm(`Deactivate ${u.email}? Their account is disabled and all sessions revoked (the record is kept for audit).`)) return;
+    if (!(await confirmDialog(`Deactivate ${u.email}? Their account is disabled and all sessions revoked (the record is kept for audit).`))) return;
     await withRow(u.id, async () => {
       await api.users.remove(u.id);
       await reload();

@@ -11,6 +11,7 @@ import PageHeader from '@/components/shell/PageHeader';
 import Skeleton from '@/components/ui/Skeleton';
 import ErrorState from '@/components/ui/ErrorState';
 import Banner from '@/components/ui/Banner';
+import { confirmDialog } from '@/lib/confirmDialog';
 
 /**
  * PRD §14.14 — one teaching case. Reached via `/teaching/view?id=…` (query-param
@@ -59,7 +60,7 @@ export default function TeachingCaseViewPage() {
 
   async function remove() {
     if (!row) return;
-    if (!window.confirm('Delete this teaching case? This cannot be undone.')) return;
+    if (!(await confirmDialog('Delete this teaching case? This cannot be undone.'))) return;
     setBusy(true);
     setError(null);
     try {

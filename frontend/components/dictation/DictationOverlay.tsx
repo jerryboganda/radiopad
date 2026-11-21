@@ -35,12 +35,14 @@ import { startInterimDecode } from '@/lib/dictation/interimDecode';
 import { blobToWav16kMono } from '@/lib/dictation/wavEncode';
 import {
   getSpeechRecognitionCtor,
+  getDictationLang,
   parseSpeechResults,
   type SpeechRecognitionLike,
 } from '@/lib/dictation/speech';
 import { api, localSttBase, type SttMode, type SttSpan } from '@/lib/api';
 import { STT_MODES, useSttMode } from '@/lib/dictation/sttMode';
 import { readQueryParam } from '@/lib/browserParams';
+import { confirmDialog } from '@/lib/confirmDialog';
 
 const DICTATE_EVENT = 'radiopad:dictate';
 const DICTATE_STATE_EVENT = 'radiopad:dictate-listening';
@@ -218,7 +220,7 @@ export default function DictationOverlay() {
     const Ctor = getSpeechRecognitionCtor();
     if (!Ctor) return;
     const rec = new Ctor();
-    rec.lang = 'en-US';
+    rec.lang = getDictationLang();
     rec.continuous = true;
     rec.interimResults = true;
     rec.onresult = (event) => {
@@ -679,13 +681,13 @@ export default function DictationOverlay() {
             className="rp-dictation-fix subtle"
             title="Re-run the dictation through the cross-check engines and verify the wording"
             onMouseDown={(e) => e.preventDefault()}
-            onClick={() => {
+            onClick={async () => {
               if (
                 useUbag &&
-                !window.confirm(
+                !(await confirmDialog(
                   'Cross-check via UBAG sends report text to a cloud AI service. ' +
                     'Confirm this report contains NO patient-identifying information (PHI).',
-                )
+                ))
               ) {
                 return;
               }

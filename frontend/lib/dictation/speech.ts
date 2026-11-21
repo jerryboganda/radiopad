@@ -32,6 +32,40 @@ export interface SpeechRecognitionLike {
 
 export type SpeechRecognitionCtor = new () => SpeechRecognitionLike;
 
+/** Languages offered for the browser speech engine (BCP 47 tags). */
+export const DICTATION_LANGS: ReadonlyArray<{ tag: string; label: string }> = [
+  { tag: 'en-US', label: 'English (United States)' },
+  { tag: 'en-GB', label: 'English (United Kingdom)' },
+  { tag: 'en-IN', label: 'English (India)' },
+  { tag: 'en-AU', label: 'English (Australia)' },
+  { tag: 'de-DE', label: 'Deutsch' },
+  { tag: 'es-ES', label: 'Español' },
+  { tag: 'fr-FR', label: 'Français' },
+  { tag: 'pt-BR', label: 'Português (Brasil)' },
+  { tag: 'hi-IN', label: 'हिन्दी' },
+  { tag: 'ur-PK', label: 'اردو' },
+  { tag: 'ar-SA', label: 'العربية' },
+];
+const DICTATION_LANG_KEY = 'rp-dictation-lang';
+
+/** The reader's chosen dictation language; en-US until they pick one (audit F6-001). */
+export function getDictationLang(): string {
+  try {
+    const v = localStorage.getItem(DICTATION_LANG_KEY);
+    return DICTATION_LANGS.some((l) => l.tag === v) ? (v as string) : 'en-US';
+  } catch {
+    return 'en-US';
+  }
+}
+
+export function setDictationLang(tag: string): void {
+  try {
+    localStorage.setItem(DICTATION_LANG_KEY, tag);
+  } catch {
+    /* private mode: the choice lasts for this visit only */
+  }
+}
+
 export function getSpeechRecognitionCtor(): SpeechRecognitionCtor | null {
   if (typeof window === 'undefined') return null;
   const w = window as unknown as {
@@ -79,7 +113,7 @@ export function probeWebSpeechAvailable(timeoutMs = 4000): Promise<{ ok: boolean
     const timer = setTimeout(() => done({ ok: false, error: 'timeout' }), timeoutMs);
     try {
       rec = new Ctor();
-      rec.lang = 'en-US';
+      rec.lang = getDictationLang();
       rec.interimResults = false;
       rec.continuous = false;
       // A started recognizer (onstart fires before the first result) proves the

@@ -6,6 +6,7 @@ import { useEffect, useMemo, useState } from 'react';
 import { api } from '@/lib/api';
 import Banner from '@/components/ui/Banner';
 import EmptyState from '@/components/ui/EmptyState';
+import { confirmDialog } from '@/lib/confirmDialog';
 
 type Pack = Awaited<ReturnType<typeof api.validationPacks.list>>[number];
 type RunSummary = Awaited<ReturnType<typeof api.validationPacks.run>>;
@@ -77,7 +78,7 @@ function ValidationPacksPageInner() {
   }
 
   async function deprecate(id: string) {
-    if (!confirm('Mark this pack as Deprecated? It cannot be re-approved.')) return;
+    if (!(await confirmDialog('Mark this pack as Deprecated? It cannot be re-approved.'))) return;
     setBusy(id);
     setError(null);
     setInfo(null);
