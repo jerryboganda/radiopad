@@ -95,24 +95,19 @@ describe('new report wizard', () => {
   it('walks intake → generate and calls create, patch(findings), then submits a generate JOB', async () => {
     render(<NewReportWizard />);
 
-    // Step 1 — study context loads and populates the selects.
+    // One screen — study context loads and populates the selects.
     await waitFor(() => expect(screen.getByLabelText('Modality')).toBeInTheDocument());
     fireEvent.change(screen.getByLabelText('Modality'), { target: { value: 'CT' } });
     fireEvent.change(screen.getByLabelText('Body part'), { target: { value: 'Brain' } });
     fireEvent.change(screen.getByLabelText('Age'), { target: { value: '54' } });
     fireEvent.change(screen.getByLabelText('Gender'), { target: { value: 'Female' } });
-    fireEvent.click(screen.getByText('Next →'));
 
-    // Step 2 — positive findings.
     fireEvent.change(screen.getByLabelText('Positive findings'), {
       target: { value: 'Large left MCA territory infarct.' },
     });
-    fireEvent.click(screen.getByText('Next →'));
 
-    // Step 3 — history (optional) → Step 4.
-    fireEvent.click(screen.getByText('Next →'));
 
-    // Step 4 — provider defaulted to the only enabled model; generate.
+    // Provider defaulted to the only enabled model; generate.
     const genBtn = await screen.findByText('Generate report');
     fireEvent.click(genBtn);
 
@@ -136,7 +131,7 @@ describe('new report wizard', () => {
     await waitFor(() => expect(toastMock).toHaveBeenCalled());
     expect(routerPushMock).not.toHaveBeenCalled();
 
-    // Form resets for the next case — back on step 1 with a cleared modality.
+    // Form resets for the next case — a cleared modality.
     await waitFor(() => expect((screen.getByLabelText('Modality') as HTMLSelectElement).value).toBe(''));
   });
 
@@ -153,12 +148,9 @@ describe('new report wizard', () => {
     await waitFor(() => expect(screen.getByLabelText('Modality')).toBeInTheDocument());
     fireEvent.change(screen.getByLabelText('Modality'), { target: { value: 'CT' } });
     fireEvent.change(screen.getByLabelText('Body part'), { target: { value: 'Brain' } });
-    fireEvent.click(screen.getByText('Next →'));
     fireEvent.change(screen.getByLabelText('Positive findings'), {
       target: { value: 'Large left MCA territory infarct.' },
     });
-    fireEvent.click(screen.getByText('Next →'));
-    fireEvent.click(screen.getByText('Next →'));
 
     const genBtn = await screen.findByText('Generate report');
     fireEvent.click(genBtn);
@@ -184,9 +176,6 @@ describe('new report wizard', () => {
     await waitFor(() => expect(screen.getByLabelText('Modality')).toBeInTheDocument());
     fireEvent.change(screen.getByLabelText('Modality'), { target: { value: 'CT' } });
     fireEvent.change(screen.getByLabelText('Body part'), { target: { value: 'Brain' } });
-    fireEvent.click(screen.getByText('Next →')); // step 2
-    fireEvent.click(screen.getByText('Next →')); // step 3
-    fireEvent.click(screen.getByText('Next →')); // step 4
 
     expect((screen.getByText('Generate report') as HTMLButtonElement).disabled).toBe(true);
   });

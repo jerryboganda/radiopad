@@ -31,6 +31,8 @@
     "users": "Users & access",
     "signIn": "Sign in",
     "groups": {
+      "quality": "Quality",
+      "settings": "Settings",
       "workspace": "Workspace",
       "library": "Library",
       "integrations": "Connections",

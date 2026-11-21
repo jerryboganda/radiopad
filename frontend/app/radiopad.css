@@ -3196,52 +3196,6 @@
    toolbar, and the staged generation overlay. Tokens only; light-only.
    ============================================================================ */
 
-/* Stepper */
-.rp-wizard-steps {
-  list-style: none;
-  display: flex;
-  flex-wrap: wrap;
-  gap: 8px;
-  margin: 0 0 16px;
-  padding: 0;
-}
-.rp-wizard-step { flex: 1 1 160px; }
-.rp-wizard-step-btn {
-  width: 100%;
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  padding: 10px 12px;
-  border: 1px solid var(--border);
-  border-radius: var(--radius);
-  background: var(--bg-panel);
-  color: var(--text-dim, var(--text));
-  cursor: pointer;
-  text-align: left;
-  transition: border-color var(--transition-fast), background var(--transition-fast), color var(--transition-fast);
-}
-.rp-wizard-step-btn:hover:not(:disabled) { border-color: var(--border-strong); }
-.rp-wizard-step-btn:disabled { opacity: 0.5; cursor: not-allowed; }
-.rp-wizard-step.current .rp-wizard-step-btn {
-  border-color: var(--accent);
-  box-shadow: 0 0 0 3px var(--accent-soft);
-  color: var(--text-strong, var(--text));
-}
-.rp-wizard-step-num {
-  flex: 0 0 auto;
-  width: 24px;
-  height: 24px;
-  display: grid;
-  place-items: center;
-  border-radius: 999px;
-  background: var(--bg-muted);
-  color: var(--text);
-  font: 600 12.5px/1 var(--sans);
-}
-.rp-wizard-step.current .rp-wizard-step-num { background: var(--accent); color: var(--accent-fg); }
-.rp-wizard-step.done .rp-wizard-step-num { background: var(--green); color: var(--accent-fg); }
-.rp-wizard-step-label { font-size: 13.5px; font-weight: 500; }
-
 /* Panel + layout */
 .rp-wizard-panel { padding: 20px; }
 .rp-wizard-grid {
@@ -3265,7 +3219,9 @@
 .rp-wizard-footer {
   display: flex;
   justify-content: space-between;
-  gap: 8px;
+  align-items: flex-end;
+  flex-wrap: wrap;
+  gap: 12px;
   margin-top: 20px;
   padding-top: 16px;
   border-top: 1px solid var(--border);
@@ -3277,16 +3233,6 @@
   flex-wrap: wrap;
   margin-top: 8px;
 }
-.rp-wizard-summary {
-  margin-top: 18px;
-  padding: 14px 16px;
-  border: 1px solid var(--border);
-  border-radius: var(--radius);
-  background: var(--bg-subtle);
-}
-.rp-wizard-summary h3 { margin: 0 0 8px; font-size: 13px; text-transform: uppercase; letter-spacing: 0.04em; color: var(--text-dim, var(--text)); }
-.rp-wizard-summary ul { margin: 0; padding-left: 18px; font-size: 13.5px; line-height: 1.7; }
-
 /* Rich text editor (toolbar + surface) */
 .rp-rte {
   border: 1px solid var(--border);
@@ -5751,3 +5697,27 @@
 .rp-recorder-timer { font-family: var(--mono); font-size: 32px; font-weight: 700; color: var(--text-strong); }
 .rp-recorder-timer.is-recording { color: var(--red); }
 .rp-recorder-controls { display: flex; align-items: center; justify-content: center; gap: 10px; }
+
+/* ---- Composer left rail: study details folded under the queue ---- */
+.rp-studyctx-details > summary {
+  cursor: pointer;
+  padding: 8px 12px;
+  font: 600 12.5px/1.3 var(--sans);
+  color: var(--text-muted);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  background: var(--bg-subtle);
+}
+.rp-studyctx-details[open] > summary { margin-bottom: 8px; }
+
+/* ---- Report lifecycle steps (Draft > Checked > Signed > Sent) ---- */
+.rp-lifecycle { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; list-style: none; margin: 0; padding: 0; }
+.rp-lifecycle li {
+  padding: 3px 10px;
+  border: 1px solid var(--border-strong);
+  border-radius: 999px;
+  font: 600 11.5px/1.4 var(--sans);
+  color: var(--text-muted);
+}
+.rp-lifecycle li[data-state='done'] { border-color: var(--green-border); background: var(--green-bg); color: var(--green); }
+.rp-lifecycle li[data-state='current'] { border-color: var(--accent); background: var(--accent); color: var(--accent-fg); }

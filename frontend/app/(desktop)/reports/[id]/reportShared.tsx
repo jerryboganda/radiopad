@@ -97,6 +97,26 @@ export function statusLabel(s: Report['status']): string {
   return ['Draft', 'Validated', 'Acknowledged', 'Exported'][s] ?? String(s);
 }
 
+const LIFECYCLE = ['Draft', 'Validated', 'Acknowledged', 'Exported'];
+
+/** Where the report sits in its lifecycle, as an ordered list (audit P9-5). */
+export function ReportLifecycle({ status }: { status: Report['status'] }) {
+  const at = LIFECYCLE.indexOf(statusLabel(status));
+  return (
+    <ol className="rp-lifecycle" aria-label="Report progress">
+      {LIFECYCLE.map((name, i) => (
+        <li
+          key={name}
+          data-state={i < at ? 'done' : i === at ? 'current' : 'todo'}
+          aria-current={i === at ? 'step' : undefined}
+        >
+          {i + 1} {name}
+        </li>
+      ))}
+    </ol>
+  );
+}
+
 // Maps a report status to a `.rp-status` tone variant for the header pill.
 export function statusTone(s: Report['status']): 'neutral' | 'info' | 'success' {
   const label = statusLabel(s);

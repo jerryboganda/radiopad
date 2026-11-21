@@ -8,8 +8,8 @@ import hiMessages from '../messages/hi.json';
 import ptMessages from '../messages/pt.json';
 
 describe('Navigation — Device Pairing item', () => {
-  it('includes /device-pairing in the workspace group for desktop surface', () => {
-    const workspaceGroup = navGroups.find((g) => g.labelKey === 'workspace');
+  it('includes /device-pairing in the desktop settings group', () => {
+    const workspaceGroup = navGroups.find((g) => g.labelKey === 'settings');
     expect(workspaceGroup).toBeDefined();
     const item = workspaceGroup?.items.find((it) => it.href === '/device-pairing');
     expect(item).toBeDefined();

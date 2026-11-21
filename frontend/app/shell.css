@@ -115,6 +115,15 @@
 
 .rp-sidebar-group { display: flex; flex-direction: column; gap: 1px; }
 
+/* Folded groups (Library / Quality / Settings): one row until opened. */
+.rp-sidebar-group-toggle { cursor: pointer; list-style: none; user-select: none; }
+.rp-sidebar-group-toggle::-webkit-details-marker { display: none; }
+.rp-sidebar-chevron { width: 14px; height: 14px; margin-left: auto; color: var(--text-faint); transition: transform var(--transition-fast); }
+details.rp-sidebar-group[open] > summary .rp-sidebar-chevron { transform: rotate(90deg); }
+details.rp-sidebar-group > a.rp-sidebar-item { margin-left: 14px; }
+.rp-shell.collapsed .rp-sidebar-group-toggle { display: none; }
+.rp-shell.collapsed details.rp-sidebar-group > a.rp-sidebar-item { margin-left: 0; }
+
 .rp-sidebar-group-label {
   font: 600 10.5px/1.2 var(--sans);
   color: var(--text-faint);

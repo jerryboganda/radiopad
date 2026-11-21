@@ -322,6 +322,13 @@ bell** (with count), **`<ThemeToggle />`**, and the **avatar + name + role
 menu**. The RC sidebar is a flat icon+label list with a blue active bar +
 `--bg-selected` tint, section dividers, and a Collapse control at the bottom.
 
+**Desktop navigation (2026-11-21):** five always-visible items (Dashboard,
+Worklist, Critical results, Reports, AI assistant) followed by three folded
+groups — **Library**, **Quality**, **Settings** — each a single row
+(`<details>` + `.rp-sidebar-group-toggle`) that opens for the section you are
+in. Mark a group `collapsible: true` with an `icon` in `nav.config.tsx`; do not
+add new always-visible desktop items without removing one.
+
 > **Note:** the topbar/sidebar rework to this RC anatomy lands in the shell
 > phase of the redesign. Until it lands, the current chrome below remains
 > canonical; both are built from the same classes and tokens.

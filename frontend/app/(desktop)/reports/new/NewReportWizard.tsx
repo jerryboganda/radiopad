@@ -1,9 +1,8 @@
 'use client';
 
-// Guided multi-step report intake (PRD RPT — "new report" flow). Replaces the old
-// zero-input "+ New report → empty editor" jump: the radiologist supplies study
-// context + patient demographics, dictates/types the positive findings and the
-// clinical history in rich editors, picks an AI provider, then hits Generate.
+// One-screen report intake (PRD RPT — "new report" flow): study context, positive
+// findings, optional clinical history and one Generate button, all visible at
+// once. The AI provider is a remembered default shown beside Generate, not a step.
 //
 // Phase 6.2 — generation is now a durable async JOB, not an inline blocking call.
 // We create + seed the draft, submit a `generate` (online) or `local-generate`
@@ -25,15 +24,6 @@ import { reportHref } from '@/lib/routes';
 import { resolveDefaultProvider, setPreferredProviderId } from '@/lib/ai/providerPref';
 import { LOCAL_LLAMA_ADAPTER } from '@/lib/models/onDeviceProvider';
 
-type Step = 1 | 2 | 3 | 4;
-
-const STEPS: { n: Step; label: string }[] = [
-  { n: 1, label: 'Study & patient' },
-  { n: 2, label: 'Positive findings' },
-  { n: 3, label: 'Clinical history' },
-  { n: 4, label: 'Provider & generate' },
-];
-
 function catalogOptions(items: CatalogItem[]) {
   return items
     .filter((c) => c.active !== false)
@@ -44,14 +34,13 @@ export default function NewReportWizard() {
   const router = useRouter();
   const jobs = useJobs();
   const { toast } = useToast();
-  const [step, setStep] = useState<Step>(1);
 
   const [modalities, setModalities] = useState<CatalogItem[]>([]);
   const [bodyParts, setBodyParts] = useState<CatalogItem[]>([]);
   const [providers, setProviders] = useState<Provider[]>([]);
   const [loadError, setLoadError] = useState<string | null>(null);
 
-  // Step 1 — study context + demographics.
+  // Study context + demographics.
   const [modality, setModality] = useState<string | null>(null);
   const [bodyPart, setBodyPart] = useState<string | null>(null);
   const [contrast, setContrast] = useState('None');
@@ -59,13 +48,13 @@ export default function NewReportWizard() {
   const [ageUnit, setAgeUnit] = useState<'Years' | 'Months'>('Years');
   const [gender, setGender] = useState('');
 
-  // Steps 2 & 3 — rich text (serialized to clean Markdown by the editor). The
+  // Findings & history — rich text (serialized to clean Markdown by the editor). The
   // editors are uncontrolled, so remount them on reset by bumping `formKey`.
   const [findings, setFindings] = useState('');
   const [history, setHistory] = useState('');
   const [formKey, setFormKey] = useState(0);
 
-  // Step 4 — provider.
+  // Provider (remembered default).
   const [providerId, setProviderId] = useState('');
 
   // Submit lifecycle — `submitting` guards the button while we create the draft
@@ -104,13 +93,12 @@ export default function NewReportWizard() {
   );
   const selectedProvider = providers.find((p) => p.id === providerId) ?? null;
 
-  const step1Ok = !!modality && !!bodyPart;
-  const canGenerate = step1Ok && findings.trim().length > 0 && !submitting;
+  const studyOk = !!modality && !!bodyPart;
+  const canGenerate = studyOk && findings.trim().length > 0 && !submitting;
 
   /** Clear the form back to a blank first case, keeping the preferred provider
    *  so the next study defaults to the same engine. Remounts the rich editors. */
   const resetForm = useCallback(() => {
-    setStep(1);
     setModality(null);
     setBodyPart(null);
     setContrast('None');
@@ -124,10 +112,7 @@ export default function NewReportWizard() {
   }, []);
 
   const runGeneration = useCallback(async () => {
-    if (!modality || !bodyPart) {
-      setStep(1);
-      return;
-    }
+    if (!modality || !bodyPart) return;
     setSubmitting(true);
     setGenError(null);
     try {
@@ -227,7 +212,7 @@ export default function NewReportWizard() {
     <Container>
       <PageHeader
         title="New report"
-        description="Give the study context and your findings, pick a model, and generate a first draft to review."
+        description="Pick the study, dictate or type your positive findings, and generate a first draft to review."
       />
 
       {loadError && (
@@ -236,30 +221,8 @@ export default function NewReportWizard() {
         </div>
       )}
 
-      {/* Stepper */}
-      <ol className="rp-wizard-steps" aria-label="Progress">
-        {STEPS.map((s) => (
-          <li
-            key={s.n}
-            className={`rp-wizard-step${step === s.n ? ' current' : ''}${step > s.n ? ' done' : ''}`}
-            aria-current={step === s.n ? 'step' : undefined}
-          >
-            <button
-              type="button"
-              className="rp-wizard-step-btn"
-              onClick={() => setStep(s.n)}
-              disabled={s.n > 1 && !step1Ok}
-            >
-              <span className="rp-wizard-step-num">{step > s.n ? '✓' : s.n}</span>
-              <span className="rp-wizard-step-label">{s.label}</span>
-            </button>
-          </li>
-        ))}
-      </ol>
-
       <div className="rp-panel rp-wizard-panel">
-        {/* Step 1 — study & patient */}
-        <div hidden={step !== 1}>
+        <div>
           <div className="rp-wizard-grid">
             <div className="section-block">
               <label htmlFor="rp-new-modality">Modality</label>
@@ -348,8 +311,7 @@ export default function NewReportWizard() {
           </div>
         </div>
 
-        {/* Step 2 — positive findings */}
-        <div hidden={step !== 2}>
+        <div>
           <div className="section-block">
             <label>Positive findings</label>
             <p className="rp-wizard-help">
@@ -366,10 +328,9 @@ export default function NewReportWizard() {
           </div>
         </div>
 
-        {/* Step 3 — clinical history */}
-        <div hidden={step !== 3}>
+        <div>
           <div className="section-block">
-            <label>Clinical history / indication</label>
+            <label>Clinical history / indication (optional)</label>
             <p className="rp-wizard-help">
               Relevant history, presenting complaint, and the clinical question. This becomes the
               report’s indication and steers the impression.
@@ -378,16 +339,20 @@ export default function NewReportWizard() {
               key={`intake-history-${formKey}`}
               sectionKey="intake-history"
               ariaLabel="Clinical history"
-              className="rp-rte-tall"
               onChange={setHistory}
             />
           </div>
         </div>
 
-        {/* Step 4 — provider & generate */}
-        <div hidden={step !== 4}>
-          <div className="section-block">
-            <label htmlFor="rp-new-provider">AI provider</label>
+        {genError && (
+          <div className="banner warn" role="alert" style={{ marginTop: 12 }}>
+            {genError}
+          </div>
+        )}
+
+        <div className="rp-wizard-footer">
+          <div className="section-block" style={{ flex: '1 1 240px', maxWidth: 360, margin: 0 }}>
+            <label htmlFor="rp-new-provider">AI model</label>
             <SearchableSelect
               id="rp-new-provider"
               ariaLabel="AI provider"
@@ -405,67 +370,23 @@ export default function NewReportWizard() {
                 <span className="badge">{COMPLIANCE_LABELS[selectedProvider.compliance] ?? 'Unknown'}</span>
                 {selectedProvider.adapter === 'gemini-cli' && (
                   <span className="rp-wizard-help" style={{ margin: 0 }}>
-                    Uses your Google sign-in (Gemini Pro / Code Assist) on this machine — no API key.
-                    Run <code>gemini</code> once to log in if prompted.
+                    Uses your Google sign-in on this machine — no API key. Run <code>gemini</code> once
+                    to log in if prompted.
                   </span>
                 )}
               </div>
             )}
           </div>
-
-          <div className="rp-wizard-summary">
-            <h3>Ready to generate</h3>
-            <ul>
-              <li>
-                <strong>Study:</strong>{' '}
-                {modality ? modalityOptions.find((o) => o.value === modality)?.label : '—'} ·{' '}
-                {bodyPart ? bodyPartOptions.find((o) => o.value === bodyPart)?.label : '—'}
-              </li>
-              <li>
-                <strong>Patient:</strong> {age ? `${age} ${ageUnit.toLowerCase()}` : '—'}
-                {gender ? `, ${gender}` : ''}
-              </li>
-              <li>
-                <strong>Findings:</strong>{' '}
-                {findings.trim() ? `${findings.trim().slice(0, 80)}${findings.length > 80 ? '…' : ''}` : 'none yet'}
-              </li>
-            </ul>
-            {!findings.trim() && (
-              <p className="rp-wizard-help" style={{ color: 'var(--red)' }}>
-                Add at least some positive findings (Step 2) before generating.
-              </p>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 12, flexWrap: 'wrap' }}>
+            {!canGenerate && !submitting && (
+              <span className="rp-wizard-help" style={{ margin: 0 }} aria-live="polite">
+                {studyOk ? 'Add positive findings to generate.' : 'Choose modality and body part to generate.'}
+              </span>
             )}
-          </div>
-        </div>
-
-        {genError && (
-          <div className="banner warn" role="alert" style={{ marginTop: 12 }}>
-            {genError}
-          </div>
-        )}
-
-        {/* Footer nav */}
-        <div className="rp-wizard-footer">
-          <button
-            className="ghost"
-            disabled={step === 1}
-            onClick={() => setStep((s) => (s > 1 ? ((s - 1) as Step) : s))}
-          >
-            ← Back
-          </button>
-          {step < 4 ? (
-            <button
-              className="primary"
-              disabled={step === 1 && !step1Ok}
-              onClick={() => setStep((s) => (s < 4 ? ((s + 1) as Step) : s))}
-            >
-              Next →
-            </button>
-          ) : (
             <button className="primary" disabled={!canGenerate} onClick={runGeneration}>
               {submitting ? 'Queuing…' : 'Generate report'}
             </button>
-          )}
+          </div>
         </div>
       </div>
     </Container>

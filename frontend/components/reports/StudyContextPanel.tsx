@@ -4,6 +4,7 @@
 // composer. Hosts the study metadata card (the editable modality / body part /
 // contrast / age / gender selection key plus the template & rulebook binding
 // pickers relocated from the old inspector Context tab) and the case queue.
+// The queue leads; the metadata card sits in a <details> below it.
 // Rows render only for data that exists; priors surface as a blue link that
 // opens the priors comparison tray.
 import type { Report, ReportTemplate, Rulebook, CatalogItem } from '@/lib/api';
@@ -78,8 +79,16 @@ export default function StudyContextPanel(p: StudyContextPanelProps) {
         </button>
       </div>
 
-      <MetadataCard {...p} />
+      {/* Queue first: study details are pre-filled, so they stay folded unless
+          the selection key is incomplete and needs the reader's attention. */}
       <CaseQueue currentId={p.report.id} />
+      <details
+        className="rp-studyctx-details"
+        open={!p.report.study.modality || !p.report.study.bodyPart || undefined}
+      >
+        <summary>Study details, template and rulebook</summary>
+        <MetadataCard {...p} />
+      </details>
     </aside>
   );
 }

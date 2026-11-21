@@ -29,6 +29,8 @@
     "users": "Usuarios y acceso",
     "signIn": "Iniciar sesión",
     "groups": {
+      "quality": "Calidad",
+      "settings": "Configuración",
       "workspace": "Espacio de trabajo",
       "library": "Biblioteca",
       "integrations": "Integraciones",

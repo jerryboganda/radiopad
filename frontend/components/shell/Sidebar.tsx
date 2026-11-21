@@ -51,29 +51,53 @@ export default function Sidebar() {
       data-collapsed={collapsed ? 'true' : 'false'}
     >
       <nav className="rp-sidebar-nav">
-        {groups.map((group) => (
-          <div key={group.labelKey} className="rp-sidebar-group">
-            <div className="rp-sidebar-group-label">{tGroups(group.labelKey)}</div>
-            {group.items.map((item) => {
-              const active = isActive(pathname, item);
-              const Icon = item.icon;
-              return (
-                <Link
-                  key={item.href}
-                  href={item.href}
-                  className={`rp-sidebar-item ${active ? 'active' : ''}`}
-                  aria-current={active ? 'page' : undefined}
-                  title={tNav(item.labelKey)}
-                >
-                  <span className="rp-sidebar-icon">
-                    <Icon />
-                  </span>
-                  <span className="rp-sidebar-label">{tNav(item.labelKey)}</span>
-                </Link>
-              );
-            })}
-          </div>
-        ))}
+        {groups.map((group) => {
+          const links = group.items.map((item) => {
+            const active = isActive(pathname, item);
+            const Icon = item.icon;
+            return (
+              <Link
+                key={item.href}
+                href={item.href}
+                className={`rp-sidebar-item ${active ? 'active' : ''}`}
+                aria-current={active ? 'page' : undefined}
+                title={tNav(item.labelKey)}
+              >
+                <span className="rp-sidebar-icon">
+                  <Icon />
+                </span>
+                <span className="rp-sidebar-label">{tNav(item.labelKey)}</span>
+              </Link>
+            );
+          });
+          if (!group.collapsible) {
+            return (
+              <div key={group.labelKey} className="rp-sidebar-group">
+                <div className="rp-sidebar-group-label">{tGroups(group.labelKey)}</div>
+                {links}
+              </div>
+            );
+          }
+          // Folded group: opens for the section you are in, and always in the
+          // icon-only rail (where the toggle row is hidden). The user's own
+          // open/close sticks until the active section changes.
+          const GroupIcon = group.icon;
+          const hasActive = group.items.some((it) => isActive(pathname, it));
+          return (
+            <details
+              key={group.labelKey}
+              className="rp-sidebar-group"
+              open={hasActive || collapsed || undefined}
+            >
+              <summary className="rp-sidebar-item rp-sidebar-group-toggle">
+                <span className="rp-sidebar-icon">{GroupIcon && <GroupIcon />}</span>
+                <span className="rp-sidebar-label">{tGroups(group.labelKey)}</span>
+                <ChevronRight className="rp-sidebar-chevron" aria-hidden />
+              </summary>
+              {links}
+            </details>
+          );
+        })}
       </nav>
 
       <div className="rp-sidebar-footer">

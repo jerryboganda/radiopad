@@ -201,7 +201,7 @@ export default function DashboardPage() {
           {queue.length > 0 && (
             <p className="rp-page-sub" style={{ marginTop: 12, marginBottom: 0 }}>
               Showing the {queue.length === 1 ? 'most recent open case' : `${queue.length} most recent open cases`}.{' '}
-              <Link href="/reports">See the full worklist</Link>
+              <Link href="/worklist">See the full worklist</Link>
             </p>
           )}
         </section>

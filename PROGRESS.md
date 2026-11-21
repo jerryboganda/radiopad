@@ -2737,3 +2737,17 @@ Total tracked PRD ids: **129** (was 112; iter-32 added 17 finer-grained sub-ids)
   above plus manual code review, not an interactive check. Flagging this explicitly
   rather than claiming a visual verification that didn't happen.
 - **Scope**: backend + frontend + docs → desktop release required (DESK-001).
+
+## Iter-58 - Workflow streamlining, part 1: one-screen intake, queue-first editor rail, short sidebar
+
+- **Date**: 2026-11-21
+- **Trigger**: Owner request to streamline the end-to-end workflow. Decisions taken by popup: one-screen dictate-first report start, hard nav consolidation, order of work = desktop reporting flow → desktop nav/home/settings → web admin → mobile companion; workspace layout "Option A — three-pane cockpit" picked from three canvas mockups.
+- **Report start** (`/reports/new`, `NewReportWizard.tsx`): the 4-step wizard (study → findings → history → provider) is now one screen — study row, positive findings, optional clinical history, and a footer with the AI model select (remembered default, no longer a step) beside one **Generate report** button, with an inline hint naming what is still missing. Submit/job/reset behaviour is unchanged (batch-posting flow kept). Dead stepper/summary CSS removed from `radiopad.css`.
+- **Editor left rail** (`StudyContextPanel.tsx`): the case queue now leads; the study metadata / template / rulebook card sits in a `<details>` below it, auto-open only when modality or body part is missing.
+- **Lifecycle steps** (`reportShared.tsx` `ReportLifecycle`, audit P9-5): the patient bar shows Draft → Validated → Acknowledged → Exported as an ordered list instead of a single status pill.
+- **Sidebar** (`nav.config.tsx`, `Sidebar.tsx`, `shell.css`): desktop nav is 5 always-visible items (Dashboard, Worklist, Critical results, Reports, AI assistant) plus three folded groups — **Library** (11), **Quality** (5), **Settings** (7) — rendered as native `<details>` that open for the active section and in the icon-only rail. `NavGroup` gained `collapsible` + `icon`. "Report Composer" left the nav (it silently reopened the latest draft); the `/reports/compose` route still exists and Reports now stays active on editor routes. Web and mobile nav are unchanged apart from `integrations` becoming web-only. New group labels `quality` / `settings` added to all six locales.
+- **Fix**: dashboard "See the full worklist" linked to `/reports`; now `/worklist`.
+- **Tests**: `sidebar.test.tsx`, `navDevicePairing.test.ts`, `newReportWizard.test.tsx`, `reportPage.test.tsx`, `composer.test.tsx` updated where needed and run green locally (21 tests). Full suite, typecheck and lint not run — CI decides.
+- **Not verified**: no visual check in either theme — the dev frontend stays on "Loading…" without a running backend and a working login. Both themes must be looked at before this ships.
+- **Not done yet**: "Sign and next case", autosave on a timer, first-run onboarding, single settings hub page, web admin setup checklist/invites, mobile polish, the 8 `window.confirm`/`prompt` calls, hard-coded `en-US` dictation language.
+- **Scope**: frontend → desktop release required (DESK-001) once the operator asks to ship it; pushing also redeploys the web admin build.

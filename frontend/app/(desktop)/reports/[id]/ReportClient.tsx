@@ -73,6 +73,7 @@ import {
   parseFullReportRewrite,
   normalizeScaffold,
   statusLabel,
+  ReportLifecycle,
   statusTone,
   normalizeRole,
 } from './reportShared';
@@ -1766,7 +1767,7 @@ export default function ReportPage() {
         meta={demographics || undefined}
         chips={
           <>
-            <span className={`rp-status ${statusTone(report.status)}`}>{statusLabel(report.status)}</span>
+            <ReportLifecycle status={report.status} />
             {primarySigned && <span className="rp-status success">Signed</span>}
           </>
         }

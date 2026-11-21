@@ -14,23 +14,20 @@ vi.mock('next/link', () => ({
 }));
 
 const LOCKED_GROUPS: ReadonlyArray<{ key: string; hrefs: string[] }> = [
-  // '/critical-results', '/peer-review' and '/teaching' are the PowerScribe/Dragon parity
-  // modules added 2026-07-20; they are pinned here for the same reason as every other route —
-  // a primary surface that falls out of the nav is unreachable, not merely unstyled.
-  // DEVICE-PAIRING — /device-pairing (desktop companion mic & remote hub) added to workspace group.
-  { key: 'workspace', hrefs: ['/dashboard', '/worklist', '/critical-results', '/notifications', '/device-pairing', '/reports/compose', '/templates', '/report-templates', '/protocols', '/ai-assistant', '/findings-library'] },
-  { key: 'insights', hrefs: ['/reports', '/analytics', '/quality', '/peer-review', '/validation', '/audit'] },
-  { key: 'library', hrefs: ['/rulebooks', '/modalities', '/body-parts', '/prompts', '/marketplace', '/terminology', '/teaching'] },
-  { key: 'integrations', hrefs: ['/providers', '/admin/ubag', '/admin/pacs', '/admin/fhir-import', '/offline'] },
+  // Owner decision 2026-11-21: a short always-visible reading flow, with every other
+  // desktop page folded into the collapsible Library / Quality / Settings groups. Each
+  // route stays pinned here — a primary surface that falls out of the nav is unreachable.
+  { key: 'workspace', hrefs: ['/dashboard', '/worklist', '/critical-results', '/reports', '/ai-assistant'] },
+  { key: 'library', hrefs: ['/templates', '/report-templates', '/findings-library', '/protocols', '/rulebooks', '/prompts', '/modalities', '/body-parts', '/terminology', '/teaching', '/marketplace'] },
+  { key: 'quality', hrefs: ['/peer-review', '/quality', '/analytics', '/validation', '/audit'] },
+  { key: 'integrations', hrefs: ['/providers', '/admin/ubag', '/admin/pacs'] },
   { key: 'admin', hrefs: ['/admin/users', '/admin/governance', '/admin/model-eval', '/admin/security', '/admin/feature-flags', '/admin/billing', '/admin/usage', '/admin/settings'] },
-  // '/settings/models' is DESKTOP-only: the on-device engines run there, and the manager
-  // previously shipped only in the (web) bundle — reachable by platform operators but not by the
-  // radiologist who actually has to download the model.
-  { key: 'account', hrefs: ['/settings', '/settings/models', '/account/security', '/companion', '/reporting'] },
+  { key: 'settings', hrefs: ['/settings', '/settings/models', '/device-pairing', '/notifications', '/account/security', '/admin/fhir-import', '/offline'] },
+  { key: 'account', hrefs: ['/account/security', '/companion', '/reporting'] },
 ];
 
 describe('sidebar nav config', () => {
-  it('exposes the six locked groups in order', () => {
+  it('exposes the locked groups in order', () => {
     expect(navGroups.map((g) => g.labelKey)).toEqual(LOCKED_GROUPS.map((g) => g.key));
   });
 
@@ -42,20 +39,17 @@ describe('sidebar nav config', () => {
     }
   });
 
-  it('marks the Report Composer item active for compose and editor routes', () => {
-    const composer = navGroups[0].items.find((i) => i.href === '/reports/compose')!;
-    expect(isActive('/reports/compose', composer)).toBe(true);
-    expect(isActive('/reports/view', composer)).toBe(true);
-    expect(isActive('/reports', composer)).toBe(false);
-  });
-
-  it('keeps Reports active for the archive but not composer routes', () => {
-    const reports = navGroups[1].items.find((i) => i.href === '/reports')!;
+  it('keeps Reports active for the archive, intake and editor routes', () => {
+    const reports = navGroups[0].items.find((i) => i.href === '/reports')!;
     expect(isActive('/reports', reports)).toBe(true);
     expect(isActive('/reports/new', reports)).toBe(true);
-    expect(isActive('/reports/view', reports)).toBe(false);
-    expect(isActive('/reports/compose', reports)).toBe(false);
+    expect(isActive('/reports/view', reports)).toBe(true);
     expect(isActive('/rulebooks', reports)).toBe(false);
+  });
+
+  it('folds only the desktop Library, Quality and Settings groups', () => {
+    expect(navGroups.filter((g) => g.collapsible).map((g) => g.labelKey)).toEqual(['library', 'quality', 'settings']);
+    for (const g of navGroups.filter((x) => x.collapsible)) expect(g.icon).toBeTruthy();
   });
 
   it('marks a sub-section active for its own prefix', () => {

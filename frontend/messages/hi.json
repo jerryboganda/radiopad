@@ -29,6 +29,8 @@
     "users": "उपयोगकर्ता और पहुँच",
     "signIn": "साइन इन",
     "groups": {
+      "quality": "गुणवत्ता",
+      "settings": "सेटिंग्स",
       "workspace": "कार्यक्षेत्र",
       "library": "पुस्तकालय",
       "integrations": "एकीकरण",
