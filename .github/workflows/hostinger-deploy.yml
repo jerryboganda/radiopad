@@ -93,6 +93,7 @@ jobs:
       - name: Smoke test (direct to Hostinger origin)
         run: |
           for h in radiopadstudio.com admin.radiopadstudio.com; do
-            code=$(curl -s -o /dev/null -w '%{http_code}' --resolve "$h:80:$HOSTINGER_HOST" "http://$h/" -H 'X-Forwarded-Proto: https')
+            # https on the origin: Hostinger now redirects plain http to https (301)
+            code=$(curl -s -o /dev/null -w '%{http_code}' --resolve "$h:443:$HOSTINGER_HOST" "https://$h/")
             echo "$h → $code"; [ "$code" = 200 ] || exit 1
           done
