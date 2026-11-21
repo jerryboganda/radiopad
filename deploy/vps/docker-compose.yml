@@ -33,6 +33,8 @@ services:
       - ../../../.secrets.env
     environment:
       ASPNETCORE_ENVIRONMENT: Production
+      # Hosted web origins (Hostinger) that call this API cross-origin.
+      RADIOPAD_CORS_ORIGINS: ${RADIOPAD_CORS_ORIGINS:-https://admin.radiopadstudio.com,https://radiopadstudio.com,https://www.radiopadstudio.com}
       RADIOPAD_BIND: http://0.0.0.0:7457
       RADIOPAD_AUTH_SECRET: ${RADIOPAD_AUTH_SECRET:?set RADIOPAD_AUTH_SECRET}
       RADIOPAD_PUBLIC_WEB_URL: ${RADIOPAD_PUBLIC_WEB_URL:?set RADIOPAD_PUBLIC_WEB_URL}

@@ -1,0 +1,37 @@
+# admin.radiopadstudio.com — Next.js static export (RADIOPAD_SURFACE=web) on
+# Hostinger (LiteSpeed). Mirrors deploy/vps/nginx.conf minus the /api proxy:
+# the app calls the API cross-origin at https://api.radiopadstudio.com
+# (NEXT_PUBLIC_API_BASE), so connect-src must allow it.
+Options -Indexes
+DirectoryIndex index.html
+
+<IfModule mod_headers.c>
+  Header always set X-Content-Type-Options "nosniff"
+  Header always set X-Frame-Options "DENY"
+  Header always set Referrer-Policy "no-referrer"
+  Header always set Permissions-Policy "camera=(), microphone=(), geolocation=(), payment=()"
+  Header always set Strict-Transport-Security "max-age=31536000; includeSubDomains"
+  Header always set Content-Security-Policy "default-src 'self'; base-uri 'self'; frame-ancestors 'none'; form-action 'self'; img-src 'self' data: blob:; style-src 'self' 'unsafe-inline'; script-src 'self' 'unsafe-inline'; connect-src 'self' https://api.radiopadstudio.com wss://api.radiopadstudio.com"
+  Header set Cache-Control "no-cache"
+  <FilesMatch "\.(css|js|mjs|png|jpg|jpeg|gif|svg|ico|webp|woff2?)$">
+    Header set Cache-Control "public, max-age=86400"
+  </FilesMatch>
+</IfModule>
+
+RewriteEngine On
+RewriteCond %{HTTPS} !=on
+RewriteCond %{HTTP:X-Forwarded-Proto} !=https
+RewriteRule ^ https://%{HTTP_HOST}%{REQUEST_URI} [R=301,L]
+
+# Hashed build assets never change.
+<IfModule mod_headers.c>
+  <If "%{REQUEST_URI} =~ m#^/_next/static/#">
+    Header set Cache-Control "public, max-age=31536000, immutable"
+  </If>
+</IfModule>
+
+# SPA fallback (nginx: try_files $uri $uri/ /index.html).
+RewriteCond %{REQUEST_FILENAME} !-f
+RewriteCond %{REQUEST_FILENAME} !-d
+RewriteCond %{REQUEST_URI} !^/_next/
+RewriteRule ^ /index.html [L]

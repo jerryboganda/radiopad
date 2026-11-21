@@ -1,0 +1,25 @@
+# radiopadstudio.com / www — Astro static site on Hostinger (LiteSpeed).
+# Mirrors deploy/vps/nginx-marketing.conf minus the /api /ws /saml /scim
+# back-compat proxy: clients now call https://api.radiopadstudio.com directly.
+# Real multi-page site, NOT an SPA: unmatched routes get Astro's 404.html.
+Options -Indexes
+DirectoryIndex index.html
+ErrorDocument 404 /404.html
+
+<IfModule mod_headers.c>
+  Header always set X-Content-Type-Options "nosniff"
+  Header always set X-Frame-Options "DENY"
+  Header always set Referrer-Policy "no-referrer"
+  Header always set Permissions-Policy "camera=(), microphone=(), geolocation=(), payment=()"
+  Header always set Strict-Transport-Security "max-age=31536000; includeSubDomains"
+  Header always set Content-Security-Policy "default-src 'self'; base-uri 'self'; frame-ancestors 'none'; form-action 'self'; img-src 'self' data: blob:; style-src 'self' 'unsafe-inline'; script-src 'self' 'unsafe-inline'; connect-src 'self'"
+  Header set Cache-Control "no-cache"
+  <FilesMatch "\.(css|js|mjs|png|jpg|jpeg|gif|svg|ico|webp|woff2?|xml|txt)$">
+    Header set Cache-Control "public, max-age=86400"
+  </FilesMatch>
+</IfModule>
+
+RewriteEngine On
+RewriteCond %{HTTPS} !=on
+RewriteCond %{HTTP:X-Forwarded-Proto} !=https
+RewriteRule ^ https://%{HTTP_HOST}%{REQUEST_URI} [R=301,L]

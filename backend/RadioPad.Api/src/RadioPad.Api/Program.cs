@@ -640,11 +640,16 @@ builder.Services.AddCors(o => o.AddDefaultPolicy(p => p
     // iOS and https://localhost on Android (capacitor.config androidScheme:'https')
     // — BOTH must be listed or the phone's cross-origin companion calls (pair +
     // the cloud relay handshake) are blocked before the bearer is even checked.
-    .WithOrigins(
+    // RADIOPAD_CORS_ORIGINS (comma-separated) adds the hosted web origins — the
+    // admin app and marketing site are static builds served from another host
+    // (Hostinger) and call this API cross-origin at api.<domain>.
+    .WithOrigins([
         "http://localhost:3000", "http://127.0.0.1:3000",
         "tauri://localhost", "capacitor://localhost",
         "https://localhost", "http://localhost",
-        "http://tauri.localhost", "https://tauri.localhost")
+        "http://tauri.localhost", "https://tauri.localhost",
+        .. (Environment.GetEnvironmentVariable("RADIOPAD_CORS_ORIGINS") ?? "")
+            .Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)])
     .AllowAnyHeader().AllowAnyMethod().AllowCredentials()));
 
 builder.Services.AddControllers().AddJsonOptions(o =>
