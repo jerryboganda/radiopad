@@ -1493,3 +1493,18 @@ details.rp-sidebar-group > a.rp-sidebar-item { margin-left: 14px; }
 }
 .rp-sidebar-collapse:hover { background: var(--bg-subtle); color: var(--text); }
 .rp-shell.collapsed .rp-sidebar-collapse { justify-content: center; padding: 8px; }
+
+/* Skip link — off-screen until focused (WCAG 2.4.1). */
+.rp-skip-link {
+  position: absolute;
+  left: 8px;
+  top: -48px;
+  z-index: 200;
+  padding: 8px 12px;
+  border-radius: var(--radius-sm);
+  background: var(--accent);
+  color: var(--accent-fg);
+  font: 600 13px/1.3 var(--sans);
+  text-decoration: none;
+}
+.rp-skip-link:focus { top: 8px; }

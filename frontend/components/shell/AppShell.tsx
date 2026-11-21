@@ -22,13 +22,15 @@ function ShellRoot({ children }: { children: ReactNode }) {
   const { collapsed } = useShell();
   return (
     <div className={`rp-shell ${collapsed ? 'collapsed' : ''}`}>
+      {/* WCAG 2.4.1 — keyboard users skip the sidebar and topbar. */}
+      <a href="#rp-main" className="rp-skip-link">Skip to content</a>
       <Sidebar />
       <MobileDrawerBackdrop />
       <div className="rp-shell-main">
         <BillingStatusBanner />
         <Topbar />
         <DesktopStatusBanner />
-        <main className="rp-shell-content">
+        <main id="rp-main" tabIndex={-1} className="rp-shell-content">
           <PageTransition>{children}</PageTransition>
         </main>
       </div>
