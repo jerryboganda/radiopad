@@ -172,6 +172,7 @@ export default function UsersAdminPage() {
       <div className="rp-container">
         <h1 className="rp-page-title">Users &amp; access</h1>
         <SignInRequired
+          denied
           surface="You don't have access to user management."
           detail="Ask your Medical Director or IT Admin to manage users, or to grant you the Users-manage permission."
         />

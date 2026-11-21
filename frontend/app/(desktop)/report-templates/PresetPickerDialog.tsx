@@ -3,6 +3,7 @@
 import { X } from 'lucide-react';
 import { REPORT_LAYOUT_PRESETS } from '@/lib/reportLayouts/presets';
 import LayoutPaper from '@/components/reportLayouts/LayoutPaper';
+import { useCloseOnEscape } from '@/lib/useCloseOnEscape';
 
 export interface PresetPickerDialogProps {
   onClose: () => void;
@@ -11,6 +12,7 @@ export interface PresetPickerDialogProps {
 }
 
 export default function PresetPickerDialog({ onClose, onChoose, busy }: PresetPickerDialogProps) {
+  useCloseOnEscape(onClose);
   return (
     <div className="rp-rl-dialog-backdrop" role="presentation" onClick={onClose}>
       <div

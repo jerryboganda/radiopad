@@ -49,6 +49,7 @@ export default function UbagHubPage() {
       <div className="rp-container">
         <h1 className="rp-page-title">UBAG Hub</h1>
         <SignInRequired
+          denied
           surface="You don't have permission to view this page in this workspace."
           detail="UBAG Hub is limited to the IT Admin, Reporting Admin, Medical Director, and Compliance Reviewer roles."
         />

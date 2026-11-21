@@ -28,6 +28,7 @@ import StatusBadge, { reportStatusTone } from '@/components/ui/StatusBadge';
 import { useToast } from '@/components/ui/ToastProvider';
 import Sparkline from '@/components/ui/Sparkline';
 import { confirmDialog } from '@/lib/confirmDialog';
+import { useCloseOnEscape } from '@/lib/useCloseOnEscape';
 
 type SortBy = 'updatedAt' | 'accession' | 'modality' | 'status';
 type SortDir = 'asc' | 'desc';
@@ -92,6 +93,7 @@ export default function ReportsPage() {
   const [bulkBusy, setBulkBusy] = useState(false);
   const [exporting, setExporting] = useState(false);
   const [previewId, setPreviewId] = useState<string | null>(null);
+  useCloseOnEscape(() => setPreviewId(null), previewId !== null);
   const [previewReport, setPreviewReport] = useState<Report | null>(null);
   const [previewLoading, setPreviewLoading] = useState(false);
   const [menuOpenId, setMenuOpenId] = useState<string | null>(null);
@@ -510,7 +512,7 @@ export default function ReportsPage() {
 
       {previewId && (
         <div className="rp-reports-preview-backdrop" onClick={() => setPreviewId(null)}>
-          <div className="rp-reports-preview rp-panel" onClick={(e) => e.stopPropagation()}>
+          <div className="rp-reports-preview rp-panel" role="dialog" aria-modal="true" aria-label="Report preview" onClick={(e) => e.stopPropagation()}>
             <div className="rp-reports-preview-head">
               <div className="rp-panel-title">Report preview</div>
               <button type="button" className="icon-btn ghost" aria-label="Close preview" onClick={() => setPreviewId(null)}>

@@ -395,7 +395,7 @@ function SignoffPanel(p: ReportInspectorProps) {
         </>
       )}
 
-      <ul className="rp-list rp-mt-sm">
+      <ul className="rp-list rp-mt-sm rp-sig-table">
         <li className="rp-row between rp-divider-row">
           <span className="rp-stat-label rp-cell f2">Radiologist</span>
           <span className="rp-stat-label rp-cell f1">Role</span>

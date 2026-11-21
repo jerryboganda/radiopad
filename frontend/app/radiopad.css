@@ -825,8 +825,15 @@
 /* Iter-34 — muted inline text helper. Replaces ad-hoc inline `color: var(--text-faint)`
    so admin pages stay free of inline colour styles per the RC design lock. */
 .rp-faint { color: var(--text-faint); }
-.rp-divider-row > .rp-cell { margin: 0; }
+/* min-width 0 + anywhere-wrap: a long email or timestamp wraps inside its cell instead of overflowing the panel. */
+.rp-divider-row > .rp-cell { margin: 0; min-width: 0; overflow-wrap: break-word; }
 .rp-divider-row > .rp-cell.r { text-align: right; }
+/* Signature list: one shared grid, so header and rows align. The email column takes the
+   slack; role and time size to content (time wraps only at its space). */
+.rp-sig-table { display: grid; grid-template-columns: minmax(0, 1fr) auto min-content; column-gap: 10px; }
+.rp-sig-table > li { display: grid; grid-column: 1 / -1; grid-template-columns: subgrid; align-items: center; }
+.rp-sig-table > li > .rp-cell { overflow-wrap: normal; }
+.rp-sig-table > li > .rp-cell:first-child { overflow-wrap: anywhere; }
 .rp-divider-row > .rp-cell.f1 { flex: 1; }
 .rp-divider-row > .rp-cell.f2 { flex: 2; }
 .rp-actions { display: flex; justify-content: flex-end; gap: 8px; }
@@ -3436,7 +3443,9 @@
 .rp-composer { padding-top: 0; }
 .rp-composer-grid {
   display: grid;
-  grid-template-columns: minmax(280px, 320px) minmax(0, 1fr) minmax(280px, 340px);
+  /* Side rails cap at a share of the width so the report column, not the rails,
+     keeps the space on 1280-1440px laptops; wide screens still get 320/340px rails. */
+  grid-template-columns: minmax(240px, min(320px, 26%)) minmax(0, 1fr) minmax(260px, min(340px, 28%));
   gap: 16px;
   align-items: start;
   margin-top: 16px;
@@ -3446,7 +3455,7 @@
   padding-bottom: 140px;
 }
 .rp-composer-grid.left-collapsed {
-  grid-template-columns: 44px minmax(0, 1fr) minmax(280px, 340px);
+  grid-template-columns: 44px minmax(0, 1fr) minmax(260px, min(340px, 28%));
 }
 @media (max-width: 1100px) {
   .rp-composer-grid,
@@ -3535,8 +3544,9 @@
   gap: 2px;
   padding-left: 14px;
   border-left: 1px solid var(--border-soft);
-  min-width: 0;
-  flex: none;
+  /* Segments shrink (values ellipsize) so Save/Export never scroll out of view on a laptop. */
+  min-width: 72px;
+  flex: 0 1 auto;
   max-width: 260px;
 }
 .rp-patientbar-seg-label {
@@ -3696,6 +3706,7 @@
 
 /* ---- Case queue (RC-01) ---- */
 .rp-queue {
+  container-type: inline-size;
   background: var(--bg-panel);
   border: 1px solid var(--border);
   border-radius: var(--radius);
@@ -3735,8 +3746,15 @@
   box-shadow: inset 2px 0 0 var(--accent);
 }
 .rp-queue-table tbody tr:focus-visible { outline: 2px solid var(--accent); outline-offset: -2px; }
-.rp-queue-id { font: 500 10.5px/1 var(--mono); color: var(--text-muted); }
-.rp-queue-proc { max-width: 120px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.rp-queue-id { font: 500 10.5px/1 var(--mono); color: var(--text-muted); white-space: nowrap; }
+/* max-width 0 + width 100%: the procedure column takes the slack and ellipsizes, so the queue fits a narrow rail. */
+.rp-queue-proc { max-width: 0; width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.rp-queue-table .badge, .rp-queue-table .status-badge { white-space: nowrap; }
+/* In a narrow rail the "Updated" column goes, so the status stays readable. */
+@container (max-width: 280px) {
+  .rp-queue-table th:nth-child(3),
+  .rp-queue-table td.rp-queue-wait { display: none; }
+}
 .rp-queue-wait { color: var(--text-muted); white-space: nowrap; }
 .rp-queue-more {
   display: inline-block;
@@ -5626,6 +5644,8 @@
    list/card/form/recorder chrome specific to this flow.
    ============================================================ */
 .rp-reporting-list-header { display: flex; align-items: flex-start; justify-content: space-between; gap: 10px; margin-bottom: 12px; }
+/* Back button + title: keep the title beside the arrow, not pushed to the far edge. */
+.rp-reporting-list-header--back { justify-content: flex-start; align-items: center; }
 .rp-reporting-search { position: relative; margin-bottom: 10px; }
 .rp-reporting-search svg { position: absolute; left: 10px; top: 50%; transform: translateY(-50%); color: var(--text-faint); pointer-events: none; }
 .rp-reporting-search input { padding-left: 34px; }

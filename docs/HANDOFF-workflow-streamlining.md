@@ -1,8 +1,8 @@
-# HANDOFF — Workflow streamlining (Iter-58 → Iter-62)
+# HANDOFF — Workflow streamlining (Iter-58 → Iter-63)
 
-**Written:** 2026-11-21 · **Branch:** `main` · **State:** 6 commits local, **nothing pushed, nothing released**
+**Written:** 2026-11-21, **updated** 2026-11-22 · **Branch:** `main` · **State:** commits local, **nothing pushed, nothing released**
 
-Read this first, then `PROGRESS.md` Iter-58 … Iter-62 for the per-change detail.
+Read this first, then `PROGRESS.md` Iter-58 … Iter-63 for the per-change detail.
 
 ## 1. What the owner asked for
 
@@ -19,8 +19,8 @@ Decisions the owner made by popup (do not re-ask):
 | Click-through depth | **Every page, every control** |
 
 The owner's last instruction: *click through every option one by one, keep spotting and fixing
-errors, make sure everything suits the workflow and is easily understood.* That sweep was
-**interrupted by the owner as it started — it has produced no results yet.** It is the next job (§5).
+errors, make sure everything suits the workflow and is easily understood.* **Done in Iter-63**
+(2026-11-22) — see §5 for what it found and what is still open.
 
 ## 2. Unpushed commits (oldest first)
 
@@ -63,56 +63,35 @@ API (`web-deploy-images.yml`); the desktop release needs `pnpm release:desktop` 
 | Targeted Vitest files for every changed area | Pass locally |
 | Full frontend suite, typecheck (`tsc`), lint | **Not run** — CI only (project rule) |
 | Backend compile + tests (invite email) | **Not run — cannot run here**, see §6 |
-| Visual, light + dark, mock data | Done for: dashboard, sidebar, `/reports/new`, report editor, `/settings`, confirm dialog styling, worklist, reports list, templates, critical results, web Users, mobile Reporting + Companion |
+| Visual, light + dark, mock data | All 65 routes screenshotted in both themes (Iter-63); editor re-checked at 1280 / 1366 / 1920 px |
+| Every in-page control clicked, mock data | All 65 routes (Iter-63); export/download/print/sign-out skipped |
+| Reporting flow, mock data | Worklist → validate → acknowledge → sign as primary walked; "Next case" not |
 | Real data, sign, export, generate, dictation, autosave against a real server | **Never exercised** |
-| The other ~50 pages | **Not looked at** |
 
-## 5. Next job: the full click-through (owner-approved scope)
+## 5. The click-through (Iter-63, done)
 
-Frontend only, fake data, **every page, every control**, both themes. Plan that was about to run:
+All 65 routes loaded in both themes and every in-page control clicked by `docs/dev-tools/route-sweep.js`
+(headless Playwright, separate from the owner's browser pane). The mock was then filled in from
+`frontend/lib/api.ts` until the remaining crashes were real. The reporting flow was walked end to end:
+worklist → open case → edit → validate → acknowledge (in-app confirm) → review & sign → sign as primary →
+co-signer / addendum offered. Fixes are listed in `PROGRESS.md` Iter-63: Escape on every modal, "No access"
+vs "Sign in required", the editor fitting 1280–1440 px laptops, and id-less dead ends.
 
-1. **Load sweep** — load all 65 routes, record crashes, error text, console errors, blank pages.
-2. **Make the mock realistic** where a page rejects its data. The mock returns `[]` for unknown
-   endpoints, so messages like "Cannot read properties of undefined" are usually the mock's
-   fault, not a product bug. Look up the real response type in `frontend/lib/api.ts` and add it to
-   the mock before judging. A page that *white-screens* on odd data is a real robustness bug; a page
-   that shows its `ErrorState` is behaving correctly.
-3. **Click sweep** — on each page click every button, tab, `<summary>`, checkbox and change every
-   select; record exceptions. Skip export/download/print/sign-out in the automated pass and test
-   those by hand. Cancel any `dialog.rp-confirm` that opens.
-4. **Walk the reporting flow by hand**: worklist → open case → edit → validate → acknowledge →
-   sign & send → next case; new report → generate; settings.
-5. Fix what is found, re-run the touched Vitest files, append an Iter-63 entry to `PROGRESS.md`, commit locally.
+Still open after the sweep:
 
-Routes (65):
-
-```
-/ /account/security /admin/billing /admin/dictation-settings /admin/feature-flags /admin/fhir-import
-/admin/governance /admin/mcp /admin/model-eval /admin/pacs /admin/providers/oauth /admin/security
-/admin/settings /admin/sso /admin/ubag /admin/usage /admin/users /admin/validation-packs /ai-assistant
-/analytics /analytics/quality /audit /audit/verify /body-parts /companion /critical-results /dashboard
-/design/motion /device-pairing /findings-library /governance /login /marketplace /modalities
-/notifications /offline /pair /peer-review /prompts /protocols /providers /quality /register
-/report-templates /report-templates/designer /reporting /reporting/dictate /reports /reports/compose
-/reports/new /reports/view /rulebooks /rulebooks/editor /rulebooks/view /settings /settings/corrections
-/settings/hotkeys /settings/models /settings/snippets /teaching /teaching/view /templates /terminology
-/validation /worklist
-```
-
-`/reports/view`, `/rulebooks/view`, `/rulebooks/editor`, `/teaching/view`,
-`/report-templates/designer`, `/admin/providers/oauth` take `?id=…`.
-
-Tip for the load sweep: instead of 65 full navigations, load routes in hidden same-origin
-`<iframe>`s from one page (5–6 at a time, ~20 s wait for webpack to compile) and read
-`iframe.contentDocument.querySelector('main').innerText`. Keep each script run short — a single
-long-running browser script is what the owner interrupted.
+- **"Next case"** (on the Send path, `SignAndSendButton`) was not exercised: the walk used "Sign as Primary".
+- **Export / download / print / sign-out** were skipped by the automated pass and not tested by hand.
+- **Mobile surface at phone width** was only seen inside the desktop shell at 1366 px, not at 375 px.
+- **Below 1180 px** the composer drops to two columns (existing breakpoint, viewport-based, ignores the
+  248 px sidebar); not re-tuned.
 
 ## 6. How to view the app on this machine
 
 The dev machine has **no `dotnet`**, and `desktop/src-tauri/binaries/radiopad-api-*.exe` are 11-byte
 placeholders, so the real backend cannot run locally.
 
-1. Start the mock API (appendix A) on `127.0.0.1:7457`: `node <path>/mockapi.js`.
+1. Start the mock API on `127.0.0.1:7457`: `node docs/dev-tools/mock-api.js` (stateful: validate,
+   acknowledge and sign change the report; it logs unmodelled endpoints to `%TEMP%`).
 2. Start the frontend with the preview tool, config **`frontend-dev`** in the *outer*
    `D:\Projects\RadioPad\.claude\launch.json`. It must use `next dev --webpack` — Turbopack panics
    ("Next.js package not found") when launched from the outer folder and the page reload-loops on
@@ -149,45 +128,8 @@ At handoff time both servers may still be running from the interrupted session (
 - The owner wants questions as popups, design options as artifacts before a build, and every change
   recorded in `PROGRESS.md`.
 
-## Appendix A — throwaway mock API (keep out of the repo's shipped code)
+## Appendix — dev tools
 
-```js
-// Throwaway mock of the RadioPad API, only to look at screens without a backend.
-const http = require('http');
-const perms = ['reports.read', 'reports.draft', 'reports.edit', 'reports.validate', 'reports.sign', 'reports.export', 'rulebooks.read', 'templates.read', 'providers.read', 'audit.read', 'audit.verify', 'users.read', 'users.manage', 'billing.read', 'security.manage', 'tenant_settings.manage', 'validation_packs.read', 'mcp_tools.manage', 'prompt_overrides.manage', 'modalities.read', 'body_parts.read', 'critical_results.read', 'teaching_cases.read', 'peer_review.read'];
-const now = Date.now();
-const rep = (id, mod, part, status, mins, ind) => ({
-  id, status, updatedAt: new Date(now - mins * 60000).toISOString(), createdAt: new Date(now - mins * 60000).toISOString(),
-  indication: ind, technique: '', comparison: '', findings: id === 'r1' ? '8 mm solid nodule in the right upper lobe, unchanged.' : '', impression: '', recommendations: '',
-  aiHighlightsJson: '{}', templateId: null, rulebookId: null, templatePinned: false, rulebookPinned: false,
-  study: { accessionNumber: 'ACC-' + id.toUpperCase(), modality: mod, bodyPart: part, contrast: 'With', age: 58, ageUnit: 'Years', gender: 'Male', comparison: '' },
-});
-const reports = [rep('r1', 'CT', 'Chest', 'Draft', 3, 'Persistent cough. STAT.'), rep('r2', 'MR', 'Brain', 'Draft', 18, 'Headache'), rep('r3', 'XR', 'Chest', 'Validated', 50, 'Routine'), rep('r4', 'US', 'Abdomen', 'Exported', 300, 'Pain')];
-const cat = (codes) => codes.map((c, i) => ({ id: 'c' + i, code: c, name: c, active: true, sortOrder: i }));
-function body(url) {
-  const p = url.split('?')[0].replace(/\/$/, '');
-  if (p === '/api/tenant/me') return { tenant: { slug: 'dev', displayName: 'Dev Hospital' }, user: { email: 'radiologist@radiopad.local', role: 5, roleName: 'MedicalDirector', permissions: perms } };
-  if (p === '/api/reports/stats') return { total: 4, draft: 2, validated: 1, acknowledged: 0, exported: 1, trend: { total: [1, 2, 3, 4], validated: [0, 1, 1, 1], acknowledged: [0, 0, 0, 0], exported: [0, 0, 1, 1] } };
-  if (p === '/api/reports') return reports; // paged calls read the array + X-Total-Count header
-  const m = p.match(/^\/api\/reports\/(r\d)$/);
-  if (m) return reports.find((r) => r.id === m[1]);
-  if (p === '/api/modalities') return cat(['CT', 'MR', 'XR', 'US']);
-  if (p === '/api/body-parts') return cat(['Chest', 'Brain', 'Abdomen']);
-  if (p === '/api/providers') return [{ id: 'p1', name: 'On-device formatter', adapter: 'llama-cpp', model: 'x', compliance: 4, enabled: true, priority: 1 }];
-  if (/validate|validation/.test(p)) return { blockerPresent: false, findings: [] };
-  if (/\/(stats|summary|status|settings|me|count|health|ready)$/.test(p)) return {};
-  return [];
-}
-http.createServer((req, res) => {
-  res.setHeader('Access-Control-Allow-Origin', req.headers.origin || '*');
-  res.setHeader('Access-Control-Allow-Credentials', 'true');
-  res.setHeader('Access-Control-Allow-Headers', req.headers['access-control-request-headers'] || '*');
-  res.setHeader('Access-Control-Allow-Methods', 'GET,POST,PUT,PATCH,DELETE,OPTIONS');
-  if (req.method === 'OPTIONS') return res.writeHead(204).end();
-  res.setHeader('Content-Type', 'application/json');
-  res.end(JSON.stringify(body(req.url)));
-}).listen(7457, '127.0.0.1', () => console.log('mock api on 7457'));
-```
-
-Known gaps in the mock: `/api/users/roles` (Users page shows "Cannot read properties of undefined
-(reading 'length')" — it expects `{ roles: [...] }`), and every endpoint not listed above.
+`docs/dev-tools/mock-api.js` (mock API) and `docs/dev-tools/route-sweep.js` (route sweep) live in the repo
+so they survive temp-folder clean-ups. Neither is imported by the app nor built into any surface.
+Run the sweep from PowerShell, since Git Bash rewrites `/route` arguments into Windows paths.

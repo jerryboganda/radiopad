@@ -29,6 +29,7 @@ import { probeWebSpeechAvailable } from '@/lib/dictation/speech';
 import ErrorState from '@/components/ui/ErrorState';
 import { TableSkeleton } from '@/components/ui/Skeleton';
 import { confirmDialog } from '@/lib/confirmDialog';
+import { useCloseOnEscape } from '@/lib/useCloseOnEscape';
 
 const KIND_ORDER: LocalModelKind[] = ['Stt', 'Tts', 'Orchestrator'];
 const KIND_LABEL: Record<LocalModelKind, string> = {
@@ -720,9 +721,10 @@ function TestResultModal({
   onCopy: () => void;
 }) {
   const orchestrator = isOrchestrator(model);
+  useCloseOnEscape(onClose);
   return (
     <div className="rp-modal-backdrop" onClick={onClose}>
-      <div className="rp-panel rp-modal" onClick={(e) => e.stopPropagation()}>
+      <div className="rp-panel rp-modal" role="dialog" aria-modal="true" aria-label={`${model.displayName} self test`} onClick={(e) => e.stopPropagation()}>
         <div className="rp-panel-title">
           <Server aria-hidden size={15} /> {model.displayName} — self test
         </div>

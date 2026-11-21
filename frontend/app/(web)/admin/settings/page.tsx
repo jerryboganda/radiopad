@@ -158,6 +158,7 @@ export default function SettingsPage() {
       <Container>
         <h1 className="rp-page-title">Workspace settings</h1>
         <SignInRequired
+          denied
           surface="You don't have access to workspace settings."
           detail="Ask your Medical Director, Reporting Admin, or IT Admin to update these settings, or to give you access."
         />

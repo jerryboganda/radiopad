@@ -7,6 +7,7 @@ import { getReportById } from '@/lib/api/reportingClient';
 import type { ReportDto, DictationAudioDto } from '@/lib/api/reportingClient';
 import Skeleton from '@/components/ui/Skeleton';
 import ErrorState from '@/components/ui/ErrorState';
+import EmptyState from '@/components/ui/EmptyState';
 import AudioRecorderControls from '../components/AudioRecorderControls';
 
 export default function DictateClient() {
@@ -45,7 +46,7 @@ export default function DictateClient() {
 
   return (
     <div className="rp-mobile">
-      <div className="rp-reporting-list-header">
+      <div className="rp-reporting-list-header rp-reporting-list-header--back">
         <button type="button" className="ghost icon-btn" aria-label="Back to Reporting List" onClick={handleBack}>
           <ArrowLeft size={18} aria-hidden />
         </button>
@@ -58,7 +59,18 @@ export default function DictateClient() {
         </div>
       </div>
 
-      {isLoading ? (
+      {!reportId ? (
+        // A bare /reporting/dictate (stale link, lost query) would otherwise skeleton forever.
+        <EmptyState
+          title="No report selected"
+          description="Pick a report from your list to record dictation against it."
+          action={
+            <button type="button" className="primary" onClick={handleBack}>
+              Go to reports
+            </button>
+          }
+        />
+      ) : isLoading ? (
         <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }} aria-busy="true">
           <Skeleton variant="block" height={80} />
           <Skeleton variant="block" height={220} />

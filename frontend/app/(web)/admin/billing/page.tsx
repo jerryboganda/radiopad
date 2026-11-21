@@ -170,6 +170,7 @@ export default function BillingDashboardPage() {
       <Container>
         <h1 className="rp-page-title">Billing &amp; plan</h1>
         <SignInRequired
+          denied
           surface="You don't have access to billing for this workspace."
           detail="Ask your Billing Admin, IT Admin, or Medical Director to give you access — or to handle this for you."
         />

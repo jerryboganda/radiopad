@@ -10,6 +10,7 @@ import { TableSkeleton } from '@/components/ui/Skeleton';
 import EmptyState from '@/components/ui/EmptyState';
 import ErrorState from '@/components/ui/ErrorState';
 import Banner from '@/components/ui/Banner';
+import { useCloseOnEscape } from '@/lib/useCloseOnEscape';
 
 // F2 — `normal` is the section's default/"normal" body: canned prose the new-report wizard seeds
 // into the report so the radiologist edits only the exceptions. Distinct from `placeholder`, which
@@ -68,6 +69,10 @@ export default function TemplatesPage() {
   const [saving, setSaving] = useState(false);
   const [preview, setPreview] = useState<PreviewState>(null);
   const [usage, setUsage] = useState<UsageState>(null);
+  // Topmost modal first: only one is ever open, but this keeps Escape predictable.
+  useCloseOnEscape(() => setDraft(null), draft !== null);
+  useCloseOnEscape(() => setPreview(null), preview !== null && draft === null);
+  useCloseOnEscape(() => setUsage(null), usage !== null && draft === null);
   const [usingId, setUsingId] = useState<string | null>(null);
   const router = useRouter();
 
@@ -261,7 +266,7 @@ export default function TemplatesPage() {
       )}
 
       {preview && (
-        <div className="rp-modal-backdrop" onClick={() => setPreview(null)} onKeyDown={(e) => { if (e.key === 'Escape') setPreview(null); }}>
+        <div className="rp-modal-backdrop" onClick={() => setPreview(null)}>
           <div className="rp-panel rp-modal rp-anim-scale-in" role="dialog" aria-modal="true" aria-label="Template preview" onClick={(e) => e.stopPropagation()} style={{ width: 'min(720px, 100%)' }}>
             <div className="rp-row between">
               <div className="rp-panel-title">Preview — {preview.name} <code>{preview.templateId}</code></div>
@@ -283,7 +288,7 @@ export default function TemplatesPage() {
       )}
 
       {usage && (
-        <div className="rp-modal-backdrop" onClick={() => setUsage(null)} onKeyDown={(e) => { if (e.key === 'Escape') setUsage(null); }}>
+        <div className="rp-modal-backdrop" onClick={() => setUsage(null)}>
           <div className="rp-panel rp-modal rp-anim-scale-in" role="dialog" aria-modal="true" aria-label="Template usage" onClick={(e) => e.stopPropagation()} style={{ width: 'min(560px, 100%)' }}>
           <div className="rp-row between">
             <div className="rp-panel-title">Usage — <code>{usage.templateId}</code></div>
@@ -315,7 +320,7 @@ export default function TemplatesPage() {
       )}
 
       {draft && (
-        <div className="rp-modal-backdrop" onClick={() => setDraft(null)} onKeyDown={(e) => { if (e.key === 'Escape') setDraft(null); }}>
+        <div className="rp-modal-backdrop" onClick={() => setDraft(null)}>
           <div className="rp-panel rp-modal rp-anim-scale-in" role="dialog" aria-modal="true" aria-label={draft.id ? 'Edit template' : 'New template'} onClick={(e) => e.stopPropagation()} style={{ width: 'min(720px, 100%)' }}>
             <div className="rp-panel-title">{draft.id ? 'Edit template' : 'New template'}</div>
 

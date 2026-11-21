@@ -28,6 +28,7 @@ import EmptyState from '@/components/ui/EmptyState';
 import ErrorState from '@/components/ui/ErrorState';
 import { useToast } from '@/components/ui/ToastProvider';
 import { confirmDialog } from '@/lib/confirmDialog';
+import { useCloseOnEscape } from '@/lib/useCloseOnEscape';
 
 // A template section as stored in ReportTemplate.sectionsJson. Snippet.sectionsJson
 // uses the same shape, with the body in `text` rather than `placeholder`.
@@ -874,6 +875,7 @@ function PhraseRow({ phrase }: { phrase: Phrase }) {
 
 function PreviewModal({ item, onClose }: { item: LibraryItem; onClose: () => void }) {
   const { toast } = useToast();
+  useCloseOnEscape(onClose);
 
   async function copyAll() {
     try {
@@ -939,6 +941,7 @@ function SnippetModal({
   onSaved: (saved: Snippet) => void;
 }) {
   const { toast } = useToast();
+  useCloseOnEscape(onClose);
   const [name, setName] = useState(snippet?.name ?? '');
   const [modality, setModality] = useState(snippet?.modality ?? '');
   const [bodyPart, setBodyPart] = useState(snippet?.bodyPart ?? '');

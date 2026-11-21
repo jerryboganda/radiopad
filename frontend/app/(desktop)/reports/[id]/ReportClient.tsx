@@ -28,6 +28,8 @@ import GenerationBanner from '@/components/reports/GenerationBanner';
 import AiStreamPreview from '@/components/reports/AiStreamPreview';
 import { jobPartials } from '@/lib/jobStream';
 import { useToast } from '@/components/ui/ToastProvider';
+import EmptyState from '@/components/ui/EmptyState';
+import Link from 'next/link';
 import {
   canAutoApplyAiResult,
   isActiveStatus,
@@ -1685,7 +1687,18 @@ export default function ReportPage() {
   );
 
   if (error && !report) return <div className="rp-container"><div className="banner warn">{error}</div></div>;
-  if (!id && id !== null) return <div className="rp-container"><div className="banner warn">Missing report id.</div></div>;
+  if (!id && id !== null) {
+    // A bare /reports/view (stale bookmark, lost query) — give the user a way back, not a dead banner.
+    return (
+      <div className="rp-container">
+        <EmptyState
+          title="No report selected"
+          description="This link doesn't point to a report. Pick one from the worklist."
+          action={<Link className="primary" href="/worklist">Open worklist</Link>}
+        />
+      </div>
+    );
+  }
   if (id === null || !report) {
     return (
       <div className="rp-container rp-composer" role="status" aria-busy="true">

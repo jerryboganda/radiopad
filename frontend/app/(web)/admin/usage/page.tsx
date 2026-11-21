@@ -120,6 +120,7 @@ export default function UsageDashboardPage() {
       <Container>
         <h1 className="rp-page-title">Usage</h1>
         <SignInRequired
+          denied
           surface="You don't have access to usage analytics."
           detail="Ask your Medical Director, IT Admin, or Billing Admin for access."
         />

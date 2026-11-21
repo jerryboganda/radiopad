@@ -10,6 +10,7 @@ import Banner from '@/components/ui/Banner';
 import { TableSkeleton } from '@/components/ui/Skeleton';
 import OnDeviceModels from '@/components/models/OnDeviceModels';
 import { FALLBACK_UBAG_TARGETS } from '@/lib/ubagTargets';
+import { useCloseOnEscape } from '@/lib/useCloseOnEscape';
 
 const SANDBOX_COMPLIANCE = 1;
 const SANDBOX_MODES = ['impression', 'draft', 'concise', 'formal', 'patient_friendly', 'referring_summary'] as const;
@@ -83,6 +84,7 @@ export default function ProvidersPage() {
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [draft, setDraft] = useState<Editable | null>(null);
+  useCloseOnEscape(() => setDraft(null), draft !== null);
   const [saving, setSaving] = useState(false);
   const [ubagTargets, setUbagTargets] = useState<string[]>(FALLBACK_UBAG_TARGETS);
 

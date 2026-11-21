@@ -6,6 +6,7 @@ import { X, FilePlus } from 'lucide-react';
 import { createReport } from '@/lib/api/reportingClient';
 import type { ReportDto } from '@/lib/api/reportingClient';
 import { api, type CatalogItem } from '@/lib/api';
+import { useCloseOnEscape } from '@/lib/useCloseOnEscape';
 
 export interface NewReportModalProps {
   isOpen: boolean;
@@ -46,6 +47,7 @@ export default function NewReportModal({ isOpen, onClose, onSuccess }: NewReport
       .catch(() => setBodyPartOptions([]));
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isOpen]);
+  useCloseOnEscape(onClose, isOpen);
 
   if (!isOpen) return null;
 

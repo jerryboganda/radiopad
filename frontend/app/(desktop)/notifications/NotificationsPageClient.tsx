@@ -41,6 +41,7 @@ import StatusBadge from '@/components/ui/StatusBadge';
 import Skeleton from '@/components/ui/Skeleton';
 import EmptyState from '@/components/ui/EmptyState';
 import ErrorState from '@/components/ui/ErrorState';
+import { useCloseOnEscape } from '@/lib/useCloseOnEscape';
 
 interface Filters {
   category: string | null;
@@ -77,6 +78,7 @@ export default function NotificationsPageClient() {
   const [pendingBulk, setPendingBulk] = useState<{ ids: string[]; action: 'read' | 'ack' } | null>(
     null,
   );
+  useCloseOnEscape(() => setPendingBulk(null), pendingBulk !== null);
   const [busy, setBusy] = useState(false);
 
   // Liveness inputs for the stale banner.

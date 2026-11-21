@@ -50,6 +50,7 @@ export default function PermissionGate({
       <div className="rp-container">
         {title && <h1 className="rp-page-title">{title}</h1>}
         <SignInRequired
+          denied
           surface="You don't have permission to view this page in this workspace."
           detail={deniedDetail ?? 'Ask a workspace administrator to grant you access.'}
         />
