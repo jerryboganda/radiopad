@@ -2787,3 +2787,11 @@ Total tracked PRD ids: **129** (was 112; iter-32 added 17 finer-grained sub-ids)
 - **Invite email** (`UsersController.Create`): after creating a user the API sends a best-effort email — organisation name, desktop download link, "sign in with this address and the temporary password your administrator gives you", authenticator note. It never contains the password, and a mail failure never fails the creation. Response gains `inviteSent`; the web Users page confirms when it was sent. **Backend change not compiled or tested locally (no dotnet)** — CI decides.
 - **Dev tooling note**: Turbopack panics ("Next.js package not found") when `next dev` is launched from the outer `D:\Projects\RadioPad` folder; use `--webpack` there.
 - **Scope**: backend + frontend → API image deploy and desktop release required once the operator asks to ship.
+
+## Iter-62 - Workflow streamlining, part 5: second visual pass (worklist, dashboard, web admin)
+
+- **Date**: 2026-11-21
+- **Worklist**: (1) the filter bar's search + two selects stacked as three full-width rows because `.rp-input` is `width: 100%` — `.rp-filter-bar > .rp-input` now sizes to content so they sit in one row (also affects protocols, teaching, hotkeys, prompts filter bars); (2) default status filter is the new **Open cases** (everything except Exported) — a finished report with a 5-hour "wait" was ranking above live work; "All statuses" is still one click away; (3) **New report** primary button in the header.
+- **First-run checklist**: steps are now numbered (`list-style` was reset), and on web `/admin/users` it sits below the page header instead of above the title.
+- **Verified** in light and dark against the mock API: worklist, dashboard, reports list, templates, critical results, web Users page.
+- **Scope**: frontend → desktop release required once the operator asks to ship.

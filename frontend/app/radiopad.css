@@ -915,6 +915,9 @@
 /* Filter/search bar above a grid or table. */
 .rp-filter-bar { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; margin-bottom: 16px; }
 .rp-search { max-width: 320px; }
+/* Filters sit in one row; .rp-input is width:100% and would otherwise stack them. */
+.rp-filter-bar > .rp-input { width: auto; flex: 0 1 220px; }
+.rp-filter-bar > .rp-search { flex: 1 1 260px; }
 
 /* -------- Rulebooks page (page-scoped: .rp-card/.rp-card-grid/.rp-filter-bar
    are shared with 12+ other pages and stay untouched) ------------------- */

@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useRouter } from 'next/navigation';
+import Link from 'next/link';
 import { RefreshCw } from 'lucide-react';
 import { api, type Report } from '@/lib/api';
 import { reportHref } from '@/lib/routes';
@@ -33,6 +34,8 @@ type Priority = 'STAT' | 'Urgent' | 'Routine';
 type QueueStatus = 'In progress' | 'Waiting' | 'Validated' | 'Acknowledged' | 'Exported';
 
 const STATUS_OPTIONS: Array<{ value: string; label: string }> = [
+  // Default: a finished (exported) report is not waiting to be read.
+  { value: 'open', label: 'Open cases' },
   { value: 'all', label: 'All statuses' },
   { value: 'In progress', label: 'In progress' },
   { value: 'Waiting', label: 'Waiting' },
@@ -148,7 +151,7 @@ function WorklistInner() {
   const [lastRefreshed, setLastRefreshed] = useState<Date | null>(null);
   const [now, setNow] = useState(() => Date.now());
 
-  const [statusFilter, setStatusFilter] = useState('all');
+  const [statusFilter, setStatusFilter] = useState('open');
   const [modalityFilter, setModalityFilter] = useState('all');
   const [query, setQuery] = useState('');
 
@@ -222,7 +225,7 @@ function WorklistInner() {
         waitMs: now - new Date(r.updatedAt).getTime(),
       }))
       .filter((row) => {
-        if (statusFilter !== 'all' && row.queueStatus !== statusFilter) return false;
+        if (statusFilter === 'open' ? row.queueStatus === 'Exported' : statusFilter !== 'all' && row.queueStatus !== statusFilter) return false;
         if (modalityFilter !== 'all' && row.report.study.modality !== modalityFilter) return false;
         if (q) {
           const hay = [
@@ -294,13 +297,18 @@ function WorklistInner() {
   const mix = useMemo(() => computeProcedureMix(readHistory, now), [readHistory, now]);
 
   const total = reports?.length ?? 0;
-  const filtersActive = statusFilter !== 'all' || modalityFilter !== 'all' || query.trim() !== '';
+  const filtersActive = statusFilter !== 'open' || modalityFilter !== 'all' || query.trim() !== '';
 
   return (
     <Container>
       <PageHeader
         title="Worklist"
         description="The live case queue — every report in your workspace, ordered by priority and wait time."
+        primaryAction={
+          <Link href="/reports/new" className="primary" style={{ textDecoration: 'none' }}>
+            New report
+          </Link>
+        }
         secondaryActions={
           <button
             type="button"

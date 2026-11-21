@@ -181,17 +181,6 @@ export default function UsersAdminPage() {
 
   return (
     <div className="rp-container">
-      <GettingStarted
-        id="web-admin"
-        title="Set up your organization"
-        steps={[
-          { href: '/admin/users', title: 'Add your team', detail: 'create accounts and assign roles' },
-          { href: '/providers', title: 'Connect an AI provider', detail: 'the model that drafts reports' },
-          { href: '/admin/sso', title: 'Turn on single sign-on', detail: 'optional, for your identity provider' },
-          { href: '/admin/pacs', title: 'Connect the imaging archive', detail: 'so studies and priors load automatically' },
-          { href: '/admin/billing', title: 'Check plan and billing', detail: 'seats, usage and invoices' },
-        ]}
-      />
       <header className="rp-page-header">
         <div className="rp-page-header-text">
           <h1 className="rp-page-title">Users &amp; access</h1>
@@ -206,6 +195,17 @@ export default function UsersAdminPage() {
           </button>
         </div>
       </header>
+      <GettingStarted
+        id="web-admin"
+        title="Set up your organization"
+        steps={[
+          { href: '/admin/users', title: 'Add your team', detail: 'create accounts and assign roles' },
+          { href: '/providers', title: 'Connect an AI provider', detail: 'the model that drafts reports' },
+          { href: '/admin/sso', title: 'Turn on single sign-on', detail: 'optional, for your identity provider' },
+          { href: '/admin/pacs', title: 'Connect the imaging archive', detail: 'so studies and priors load automatically' },
+          { href: '/admin/billing', title: 'Check plan and billing', detail: 'seats, usage and invoices' },
+        ]}
+      />
 
       {error && <Banner tone="danger" onDismiss={() => setError(null)}>{error}</Banner>}
       {info && <Banner tone="success" onDismiss={() => setInfo(null)}>{info}</Banner>}

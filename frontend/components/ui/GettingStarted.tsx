@@ -53,7 +53,7 @@ export default function GettingStarted({
           Dismiss
         </button>
       </div>
-      <ol style={{ margin: '8px 0 0', paddingLeft: 20, display: 'grid', gap: 6 }}>
+      <ol style={{ margin: '8px 0 0', paddingLeft: 20, display: 'grid', gap: 6, listStyle: 'decimal' }}>
         {steps.map((s) => (
           <li key={s.href}>
             <Link href={s.href} style={{ fontWeight: 600 }}>{s.title}</Link>
