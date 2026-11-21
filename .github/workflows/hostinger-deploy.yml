@@ -16,6 +16,8 @@ on:
     paths:
       - 'frontend/**'
       - 'marketing/**'
+      - 'CHANGELOG.md'        # rendered by marketing /changelog/
+      - 'rulebooks/*.yaml'    # counted by marketing /product/validation/
       - 'deploy/hostinger/**'
       - 'package.json'
       - 'pnpm-lock.yaml'

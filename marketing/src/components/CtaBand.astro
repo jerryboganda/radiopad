@@ -1,0 +1,34 @@
+---
+// Closing call to action used at the bottom of every page.
+import Icon from "./Icon.astro";
+interface Props { lead?: string; title?: string; text?: string; primary?: "demo" | "download" }
+const {
+  lead = "Read the study.",
+  title = "We'll have the draft ready.",
+  text = "Book a demo for your department, or start a free trial on your own Windows workstation today.",
+  primary = "demo",
+} = Astro.props;
+const dl = primary === "download";
+---
+
+<section class="final">
+  <div class="beam-h" aria-hidden="true"><span></span></div>
+  <div class="wrap">
+    <h2 data-split><span class="l1">{lead}</span>{title}</h2>
+    <p>{text}</p>
+    <div class="cta-row">
+      {dl ? (
+        <>
+          <span class="mag"><a class="btn btn-primary btn-lg" href="/download/"><Icon name="win" /> Download for Windows</a></span>
+          <a class="btn btn-ghost btn-lg" href="/demo/">Book a demo <Icon name="arrow" class="arr" /></a>
+        </>
+      ) : (
+        <>
+          <span class="mag"><a class="btn btn-primary btn-lg" href="/demo/">Book a demo <Icon name="arrow" class="arr" /></a></span>
+          <a class="btn btn-ghost btn-lg" href="/download/"><Icon name="win" /> Download for Windows</a>
+        </>
+      )}
+    </div>
+    <div class="platforms"><span>Windows desktop, .msi</span><span>Companion for Android and iOS</span><span>Web admin console</span></div>
+  </div>
+</section>

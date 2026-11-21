@@ -1,0 +1,68 @@
+---
+import { getCollection } from "astro:content";
+import { site } from "../../lib/site";
+import BaseLayout from "../../layouts/BaseLayout.astro";
+import PageHero from "../../components/PageHero.astro";
+import Divider from "../../components/Divider.astro";
+import CtaBand from "../../components/CtaBand.astro";
+import Icon from "../../components/Icon.astro";
+
+export async function getStaticPaths() {
+  const ORDER = ["privacy", "terms", "dpa", "responsible-ai"];
+  const docs = (await getCollection("legal")).sort((a, b) => ORDER.indexOf(a.id) - ORDER.indexOf(b.id));
+  return docs.map((doc) => ({ params: { slug: doc.id }, props: { doc, docs } }));
+}
+
+const { doc, docs } = Astro.props;
+const { data } = doc;
+const headings = (doc.rendered?.metadata?.headings ?? []).filter((h) => h.depth === 2);
+// Contact addresses live in site.ts only; the markdown uses {{email}} / {{securityEmail}} in plain text.
+const mail = (addr: string) => `<a href="mailto:${addr}">${addr}</a>`;
+const html = (doc.rendered?.html ?? "")
+  .replaceAll("{{email}}", mail(site.email))
+  .replaceAll("{{securityEmail}}", mail(site.securityEmail));
+const updated = data.updated.toLocaleDateString("en-US", { year: "numeric", month: "long", day: "numeric", timeZone: "UTC" });
+---
+
+<BaseLayout title={data.title} description={data.description}>
+  <PageHero
+    crumbs={[{ label: data.title, href: `/legal/${doc.id}/` }]}
+    eyebrow="Legal"
+    title={data.title}
+    text={data.description}
+    ctas={false}
+  />
+  <Divider />
+  <section class="sec lg-sec">
+    <div class="wrap">
+      <p class="notice" role="note" data-reveal><Icon name="alert" /><span><b>Draft.</b> This page is pending legal review and is not yet a binding agreement.</span></p>
+      <div class="toc-layout">
+        <aside class="toc-rail" data-reveal>
+          <nav data-toc aria-label="On this page">
+            <p class="toc-h">On this page</p>
+            <ol>{headings.map((h) => <li><a href={`#${h.slug}`}>{h.text}</a></li>)}</ol>
+          </nav>
+          <nav aria-label="Legal pages">
+            <p class="toc-h">Legal</p>
+            <ul>
+              {docs.map((d) => (
+                <li><a href={`/legal/${d.id}/`} aria-current={d.id === doc.id ? "page" : undefined}>{d.data.title}</a></li>
+              ))}
+            </ul>
+          </nav>
+        </aside>
+        <article class="prose toc-body" data-reveal>
+          <p class="toc-updated">Last updated <time datetime={data.updated.toISOString().slice(0, 10)}>{updated}</time></p>
+          <Fragment set:html={html} />
+        </article>
+      </div>
+    </div>
+  </section>
+  <CtaBand
+    lead="Questions before you sign up?"
+    title="Bring your privacy team."
+    text={`Book a demo with your IT, privacy and clinical leads, or write to ${site.email}.`}
+  />
+</BaseLayout>
+
+<script>import "../../scripts/toc.js";</script>

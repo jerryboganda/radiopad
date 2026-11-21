@@ -24,4 +24,14 @@ const blog = defineCollection({
     }),
 });
 
-export const collections = { blog };
+// Legal pages (privacy, terms, DPA, responsible AI), rendered by pages/legal/[slug].astro.
+const legal = defineCollection({
+  loader: glob({ pattern: "**/*.md", base: "./src/content/legal" }),
+  schema: z.object({
+    title: z.string(),
+    description: z.string(),
+    updated: z.coerce.date(),
+  }),
+});
+
+export const collections = { blog, legal };

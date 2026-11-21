@@ -1,18 +1,19 @@
 ---
 import { site } from "../lib/site";
 import BaseLayout from "../layouts/BaseLayout.astro";
+import Divider from "../components/Divider.astro";
+import Faq from "../components/Faq.astro";
+import CtaBand from "../components/CtaBand.astro";
 import Hero from "../components/home/Hero.astro";
-import TrustMarquee from "../components/home/TrustMarquee.astro";
-import Metrics from "../components/home/Metrics.astro";
-import Features from "../components/home/Features.astro";
-import HowItWorks from "../components/home/HowItWorks.astro";
-import Safety from "../components/home/Safety.astro";
+import ModalityStrip from "../components/home/ModalityStrip.astro";
+import Workflow from "../components/home/Workflow.astro";
+import Validation from "../components/home/Validation.astro";
+import Platform from "../components/home/Platform.astro";
+import Surfaces from "../components/home/Surfaces.astro";
+import Integrations from "../components/home/Integrations.astro";
 import Security from "../components/home/Security.astro";
-import Testimonials from "../components/home/Testimonials.astro";
+import Audience from "../components/home/Audience.astro";
 import Pricing from "../components/home/Pricing.astro";
-import Faq from "../components/home/Faq.astro";
-import FinalCta from "../components/home/FinalCta.astro";
-import Motion from "../components/Motion.svelte";
 
 const orgJsonLd = {
   "@context": "https://schema.org",
@@ -20,24 +21,41 @@ const orgJsonLd = {
   name: site.name,
   url: site.url,
   description: site.description,
-  email: site.email,
   logo: new URL("/og-default.png", site.url).href,
 };
+
+const faq = [
+  { q: "Does RadioPad ever sign a report?", a: "No. RadioPad drafts and validates. Only a radiologist can sign, and AI-drafted text stays marked until it has been reviewed or edited." },
+  { q: "Can we run it on-prem with a local model?", a: "Yes. RadioPad can be deployed on-prem or in a private cloud, and drafting can run on a local model through Ollama or vLLM." },
+  { q: "Which AI providers are supported?", a: "Anthropic Claude and Azure OpenAI as hosted providers, or a local model on your own hardware. Every call is written to the append-only audit log." },
+  { q: "What formats can we export?", a: "FHIR R4 DiagnosticReport, PDF, DOCX and plain text." },
+  { q: "Does it connect to our PACS and RIS?", a: "The desktop app includes a PACS/RIS bridge, and the platform supports DICOMweb and an Orthanc bridge. Signed connectors are available in the marketplace." },
+  { q: "Which platforms does it run on?", a: "Reporting runs in the Windows desktop app. The mobile companion for Android and iOS handles voice dictation, and administrators use the web console." },
+  { q: "Who writes the rulebooks?", a: "Your department does. Rulebooks are institution-specific, and the CLI lets you author and validate them before they go live." },
+];
 ---
 
 <BaseLayout title={site.name} jsonLd={[orgJsonLd]}>
-  <main id="main">
-    <Hero />
-    <TrustMarquee />
-    <Metrics />
-    <Features />
-    <HowItWorks />
-    <Safety />
-    <Security />
-    <Testimonials />
-    <Pricing />
-    <Faq />
-    <FinalCta />
-  </main>
-  <Motion client:load mode="home" />
+  <Hero />
+  <Divider />
+  <ModalityStrip />
+  <Divider />
+  <Workflow />
+  <Divider />
+  <Validation />
+  <Divider />
+  <Platform />
+  <Divider />
+  <Surfaces />
+  <Divider />
+  <Integrations />
+  <Divider />
+  <Security />
+  <Divider />
+  <Audience />
+  <Divider />
+  <Pricing />
+  <Divider />
+  <Faq title="Questions radiologists and IT teams ask first." items={faq} />
+  <CtaBand />
 </BaseLayout>

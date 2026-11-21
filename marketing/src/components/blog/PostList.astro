@@ -1,0 +1,33 @@
+---
+// Tag filter and post grid, shared by /blog/ and /blog/tag/<tag>/.
+// The pills are plain links to the tag pages; blog-filter.js upgrades them to filter in place.
+import type { CollectionEntry } from "astro:content";
+import PostCard from "./PostCard.astro";
+import Icon from "../Icon.astro";
+
+interface Props {
+  posts: CollectionEntry<"blog">[]; // every published post, newest first
+  active?: string;                  // tag pages: the tag being shown
+  featuredId?: string;              // index: this post is featured above, so the "All" grid hides it
+}
+const { posts, active, featuredId } = Astro.props;
+const tags = [...new Set(posts.flatMap((p) => p.data.tags))].sort();
+const tagged = (t: string) => posts.filter((p) => p.data.tags.includes(t)).length;
+const n = active ? tagged(active) : posts.length;
+---
+<div class="bl-bar">
+  <nav class="bl-filter" data-filter aria-label="Filter posts by tag">
+    <a class="bl-pill" href="/blog/" data-tag="" aria-current={active ? undefined : "page"}>All <span>{posts.length}</span></a>
+    {tags.map((t) => (
+      <a class="bl-pill" href={`/blog/tag/${t.toLowerCase()}/`} data-tag={t} aria-current={t === active ? "page" : undefined}>{t} <span>{tagged(t)}</span></a>
+    ))}
+  </nav>
+  <p class="bl-count"><span id="blCount" aria-live="polite">{active ? `${n} ${n === 1 ? "post" : "posts"} tagged ${active}` : `${n} posts`}</span><a href="/rss.xml">RSS feed <Icon name="arrow" /></a></p>
+</div>
+<div class="bl-grid" data-reveal>
+  {posts.map((p) => (
+    <PostCard post={p} featured={p.id === featuredId} hidden={active ? !p.data.tags.includes(active) : p.id === featuredId} />
+  ))}
+</div>
+
+<script>import "../../scripts/blog-filter.js";</script>

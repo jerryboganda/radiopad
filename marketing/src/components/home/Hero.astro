@@ -1,47 +1,70 @@
----
-// Hero — asymmetric split. Product visual is a real component preview in the real
-// tokens (not a fake screenshot). Phase 4: replace with a real screenshot or astro:assets.
----
-<section class="hero">
-  <div class="wrap">
-    <div class="hero-copy">
-      <p class="eyebrow">For radiology teams</p>
-      <h1 id="heroH1">
-        <span class="line"><span>Radiology reports,</span></span>
-        <span class="line"><span>drafted in seconds.</span></span>
-        <span class="line"><span><em>Signed by you.</em></span></span>
-      </h1>
-      <p class="lead">RadioPad turns your dictation and findings into a validated draft. You review, correct, and sign. It never signs for you.</p>
-      <div class="hero-cta">
-        <a class="btn btn-primary btn-lg" href="/#demo" id="magnetic">Book a demo</a>
-        <a class="btn btn-ghost btn-lg" href="/#how">See how it works <span class="arrow">&rarr;</span></a>
-      </div>
-      <p class="hero-note">Drafts stay unsigned until a radiologist approves them.</p>
-    </div>
-
-    <div class="preview" aria-hidden="true">
-      <div class="preview-card" id="previewCard">
-        <div class="preview-bar">
-          <span class="dot" style="background:var(--danger)"></span>
-          <span class="dot" style="background:var(--warning)"></span>
-          <span class="dot" style="background:var(--success)"></span>
-          <span class="tabs"><span class="tab active">CT Chest w/o contrast</span></span>
+  <section class="hero" id="top">
+    <div class="hero-bg" aria-hidden="true"><div class="spot" id="spot"></div></div>
+    <div class="wrap">
+      <div class="hero-copy">
+        <div>
+          <p class="eyebrow"><span class="pulse"></span>AI radiology reporting for Windows</p>
+          <h1 class="hero-title" data-scan>
+            <span class="ln l1">The report is drafted.</span>
+            <span class="ln l2">The signature is yours.</span>
+          </h1>
         </div>
-        <div class="preview-body">
-          <div class="field">Findings</div>
-          <p>Lungs are clear without focal consolidation. No <span class="flag flag-red">left</span> pleural effusion. Heart size is within normal limits.</p>
-          <div class="field">Impression</div>
-          <p><span class="mark-ai">No acute cardiopulmonary process.</span> Follow up as clinically indicated.</p>
-          <div class="vdemo" style="font-size:.72rem">
-            <div class="vrow"><span class="vstate" style="background:var(--danger)"></span> Laterality mismatch: prior states right</div>
-            <div class="vrow"><span class="vstate" style="background:var(--warning)"></span> Impression uses AI-drafted text</div>
+        <div class="hero-side">
+          <p class="lead">RadioPad turns your dictation, findings, priors and measurements into a draft report, checks it against your department's rulebook, and hands it back to you. You review every line and sign. The AI never does.</p>
+          <div class="cta-row">
+            <span class="mag"><a class="btn btn-primary btn-lg" href="/demo/">Book a demo <svg class="i arr"><use href="#i-arrow"/></svg></a></span>
+            <a class="btn btn-ghost btn-lg" href="/download/"><svg class="i"><use href="#i-win"/></svg> Download for Windows</a>
+          </div>
+          <p class="fine">Free trial for radiologists. Guided demos for hospitals and imaging groups.</p>
+        </div>
+      </div>
+
+      <div class="station" id="station">
+        <div class="st-bar">
+          <div class="st-dots" aria-hidden="true"><i></i><i></i><i></i></div>
+          <div class="st-study"><span class="mono">CT CHEST W/O CONTRAST</span><span class="sep"></span><span class="mono dim opt">Demo study, synthetic image</span></div>
+          <div class="st-status"><span class="chip chip-draft" id="stStatus">Draft, unsigned</span></div>
+        </div>
+        <div class="st-body">
+          <div class="viewer" id="viewer">
+            <canvas id="ct" role="img" aria-label="Synthetic axial chest CT in lung window, used for this demo, with a small nodule in the right lower lobe"></canvas>
+            <div class="ov ov-tl">AX 1.25 mm<br>Lung window</div>
+            <div class="ov ov-tr">IM <span id="imNum">142</span> / 310</div>
+            <div class="ov ov-bl">W 1500 &nbsp;L -600</div>
+            <div class="ov ov-br"><span class="scalebar"></span>50 mm</div>
+            <div class="ov ov-a">A</div><div class="ov ov-r">R</div><div class="ov ov-l">L</div>
+            <div class="xh" id="xh"></div>
+            <div class="ov hu" id="hu" hidden>HU <b id="huVal">-850</b></div>
+          </div>
+          <div class="report" id="report">
+            <div class="rp-head"><span>Report</span><span>Rulebook chest_ct_v1</span></div>
+            <div class="rp-sec">
+              <h4>Technique</h4>
+              <p><span data-type>Axial CT of the chest without contrast, 1.25 mm slices.</span></p>
+            </div>
+            <div class="rp-sec">
+              <h4>Findings</h4>
+              <p><span data-type>Lungs: 6 mm solid nodule in the right lower lobe (IM 142).</span> <span data-type>No consolidation, pleural effusion or pneumothorax.</span></p>
+              <p><span data-type>Heart size normal. No mediastinal lymphadenopathy.</span></p>
+            </div>
+            <div class="rp-sec" id="impSec">
+              <h4>Impression <span class="ai-tag" id="aiTag"><svg><use href="#i-spark"/></svg><span>AI draft, requires review</span></span></h4>
+              <p class="ai-text"><span data-type>6 mm solid nodule, </span><span class="lat bad" id="lat" data-type>left</span><span data-type> lower lobe. Follow-up per institutional protocol.</span></p>
+            </div>
+            <ul class="flags" id="flags">
+              <li class="flag f-red" id="fBlock"><svg class="i sev"><use href="#i-x"/></svg><div><b>Blocker</b><span class="ftx">Laterality mismatch. Findings say right lower lobe, impression says left.</span></div><button class="fix" id="fixBtn" type="button">Fix</button></li>
+              <li class="flag f-amber" id="fWarn"><svg class="i sev"><use href="#i-alert"/></svg><div><b>Warning</b><span class="ftx">Impression is AI-drafted and not yet reviewed.</span></div></li>
+              <li class="flag f-blue"><svg class="i sev"><use href="#i-info"/></svg><div><b>Info</b><span class="ftx">Nodule size meets the follow-up rule in chest_ct_v1.</span></div></li>
+            </ul>
+            <div class="rp-foot">
+              <button class="btn btn-sign" id="signBtn" type="button"><svg class="i"><use href="#i-pen"/></svg><span>Sign report</span></button>
+              <span class="rp-note" id="signNote" aria-live="polite">Only a radiologist can sign. RadioPad never signs.</span>
+              <button class="replay" id="replay" type="button" aria-label="Replay demo"><svg class="i"><use href="#i-replay"/></svg></button>
+            </div>
           </div>
         </div>
-        <div class="preview-foot">
-          <span class="chip chip-ok">2 checks resolved</span>
-          <span class="preview-sign">Awaiting signature</span>
-        </div>
       </div>
     </div>
-  </div>
-</section>
+  </section>
+
+<script>import "../../scripts/ct-demo.js";</script>

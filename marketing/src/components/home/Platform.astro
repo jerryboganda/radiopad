@@ -1,0 +1,164 @@
+  <section class="sec" id="platform">
+    <div class="wrap">
+      <header class="sec-head">
+        <p class="eyebrow">Platform</p>
+        <h2 data-split>Everything a reading room needs around the draft.</h2>
+      </header>
+      <div class="plat" id="plat" data-reveal>
+        <div class="pn-list" role="tablist" aria-label="Platform capabilities" aria-orientation="vertical">
+          <button class="pn" type="button" role="tab" id="pt-tpl" aria-controls="pp-tpl" aria-selected="true"><span class="pn-k mono">01</span><span class="pn-t"><b>Templates and layouts</b><small>Reporting</small></span><span class="pn-bar" aria-hidden="true"><i></i></span></button>
+          <button class="pn" type="button" role="tab" id="pt-lib" aria-controls="pp-lib" aria-selected="false" tabindex="-1"><span class="pn-k mono">02</span><span class="pn-t"><b>Findings library</b><small>Reporting</small></span><span class="pn-bar" aria-hidden="true"><i></i></span></button>
+          <button class="pn" type="button" role="tab" id="pt-crit" aria-controls="pp-crit" aria-selected="false" tabindex="-1"><span class="pn-k mono">03</span><span class="pn-t"><b>Critical results</b><small>Safety</small></span><span class="pn-bar" aria-hidden="true"><i></i></span></button>
+          <button class="pn" type="button" role="tab" id="pt-peer" aria-controls="pp-peer" aria-selected="false" tabindex="-1"><span class="pn-k mono">04</span><span class="pn-t"><b>Peer review</b><small>Quality</small></span><span class="pn-bar" aria-hidden="true"><i></i></span></button>
+          <button class="pn" type="button" role="tab" id="pt-drift" aria-controls="pp-drift" aria-selected="false" tabindex="-1"><span class="pn-k mono">05</span><span class="pn-t"><b>Drift monitoring</b><small>AI oversight</small></span><span class="pn-bar" aria-hidden="true"><i></i></span></button>
+          <button class="pn" type="button" role="tab" id="pt-prompt" aria-controls="pp-prompt" aria-selected="false" tabindex="-1"><span class="pn-k mono">06</span><span class="pn-t"><b>Prompt overrides</b><small>AI oversight</small></span><span class="pn-bar" aria-hidden="true"><i></i></span></button>
+          <button class="pn" type="button" role="tab" id="pt-market" aria-controls="pp-market" aria-selected="false" tabindex="-1"><span class="pn-k mono">07</span><span class="pn-t"><b>Connector marketplace</b><small>Platform</small></span><span class="pn-bar" aria-hidden="true"><i></i></span></button>
+          <button class="pn" type="button" role="tab" id="pt-cli" aria-controls="pp-cli" aria-selected="false" tabindex="-1"><span class="pn-k mono">08</span><span class="pn-t"><b>RadioPad CLI</b><small>Platform</small></span><span class="pn-bar" aria-hidden="true"><i></i></span></button>
+        </div>
+
+        <div class="stage-w" id="platStage">
+          <div class="sw-bar mono"><span class="sw-dots" aria-hidden="true"><i></i><i></i><i></i></span><span id="swIdx">MODULE 01 / 08</span><span class="sw-live"><i></i><span id="swState">Live demo</span></span></div>
+          <div class="sw-panels">
+
+            <div class="pp on" role="tabpanel" id="pp-tpl" aria-labelledby="pt-tpl" data-demo="tpl">
+              <div class="pp-demo">
+                <div class="seg" id="tplSeg" role="group" aria-label="Example templates" style="--n:3;--i:0">
+                  <span class="seg-pill" aria-hidden="true"></span>
+                  <button type="button" class="sg" aria-pressed="true">Chest CT</button>
+                  <button type="button" class="sg" aria-pressed="false">Screening</button>
+                  <button type="button" class="sg" aria-pressed="false">Brain MR</button>
+                </div>
+                <div class="doc">
+                  <div class="doc-h"><span class="tiny">TEMPLATE</span><b id="tplName">Chest CT, standard</b><span class="chip" id="tplMod">CT</span></div>
+                  <ol class="secs" id="tplSecs">
+                    <li style="--j:0"><span>Indication</span><i></i></li><li style="--j:1"><span>Technique</span><i></i></li><li style="--j:2"><span>Comparison</span><i></i></li><li style="--j:3"><span>Lungs and airways</span><i></i></li><li style="--j:4"><span>Pleura</span><i></i></li><li style="--j:5"><span>Mediastinum and hila</span><i></i></li><li style="--j:6"><span>Heart and great vessels</span><i></i></li><li style="--j:7"><span>Bones and soft tissues</span><i></i></li><li style="--j:8"><span>Impression</span><i></i></li>
+                  </ol>
+                </div>
+              </div>
+              <div class="pp-cap"><h3>Templates and report layouts</h3><p>Per modality and per institution, across CT, MR, XR, US, MG, NM and PET, so every report reads the way your department expects.</p></div>
+            </div>
+
+            <div class="pp" role="tabpanel" id="pp-lib" aria-labelledby="pt-lib" data-demo="lib">
+              <div class="pp-demo">
+                <div class="search"><svg class="i"><use href="#i-search"/></svg><span id="libQ">pleural eff</span><span class="caret" aria-hidden="true"></span></div>
+                <div class="lib-res" id="libRes">
+                  <button type="button" class="lr">No pleural effusion.</button>
+                  <button type="button" class="lr pick">Small right pleural effusion.</button>
+                  <button type="button" class="lr">Loculated right pleural effusion.</button>
+                  <button type="button" class="lr">Small bilateral pleural effusions.</button>
+                </div>
+                <div class="doc">
+                  <div class="doc-h"><span class="tiny">FINDINGS</span><b>Pleura</b></div>
+                  <p>Lungs are clear without focal consolidation. <mark class="ins" id="libIns">Small right pleural effusion.</mark></p>
+                </div>
+              </div>
+              <div class="pp-cap"><h3>Findings library</h3><p>Approved phrasing your radiologists search and insert instead of retyping it, then edit like any other text.</p></div>
+            </div>
+
+            <div class="pp" role="tabpanel" id="pp-crit" aria-labelledby="pt-crit" data-demo="crit">
+              <div class="pp-demo">
+                <div class="doc">
+                  <div class="doc-h"><span class="tiny">FINDINGS</span><b>Pleura</b><span class="chip chip-live"><i></i>Critical</span></div>
+                  <p>Large right tension pneumothorax with leftward mediastinal shift.</p>
+                </div>
+                <ol class="steps" id="critSteps">
+                  <li class="r done"><i></i><span><b>Critical finding flagged</b><small>critical_result_language · blocker</small></span><time class="mono">21:04</time></li>
+                  <li class="a done"><i></i><span><b>Responsible clinician called</b><small>Read-back confirmed</small></span><time class="mono">21:06</time></li>
+                  <li class="g done"><i></i><span><b>Communication documented</b><small>Recipient and time written into the report</small></span><time class="mono">21:07</time></li>
+                </ol>
+                <div class="crit-out"><span class="chip chip-ok" id="critOk"><svg class="i"><use href="#i-check"/></svg>Blocker cleared</span><span class="tiny">Illustrative times</span></div>
+              </div>
+              <div class="pp-cap"><h3>Critical results</h3><p>A time-critical finding stays a blocker until the communication is documented, with the recipient and the time.</p></div>
+            </div>
+
+            <div class="pp" role="tabpanel" id="pp-peer" aria-labelledby="pt-peer" data-demo="peer">
+              <div class="pp-demo">
+                <div class="reads">
+                  <div class="doc"><div class="doc-h"><span class="tiny">ORIGINAL READ</span></div><p>Solid nodule in the right lower lobe measuring <span class="df hl">4 mm</span>.</p></div>
+                  <div class="doc"><div class="doc-h"><span class="tiny">SECOND READ</span></div><p>Solid nodule in the right lower lobe measuring <span class="df hl">6 mm</span>.</p></div>
+                </div>
+                <div class="seg" id="peerSeg" role="group" aria-label="Example discrepancy score" style="--n:3;--i:1" data-tone="a">
+                  <span class="seg-pill" aria-hidden="true"></span>
+                  <button type="button" class="sg" aria-pressed="false">Agree</button>
+                  <button type="button" class="sg" aria-pressed="true">Minor</button>
+                  <button type="button" class="sg" aria-pressed="false">Major</button>
+                </div>
+                <p class="tiny">Why it matters: 6 mm is where the chest CT rulebook moves a nodule into surveillance.</p>
+              </div>
+              <div class="pp-cap"><h3>Peer review</h3><p>Structured second reads, with the discrepancy recorded next to both reports instead of lost in email.</p></div>
+            </div>
+
+            <div class="pp" role="tabpanel" id="pp-drift" aria-labelledby="pt-drift" data-demo="drift">
+              <div class="pp-demo">
+                <div class="doc drift">
+                  <div class="doc-h"><span class="tiny">IMPRESSION LENGTH, WORDS</span><b>Chest CT drafts</b><span class="chip chip-draft">Drift alert</span></div>
+                  <div class="dwrap">
+                    <svg class="dchart" viewBox="0 0 410 160" preserveAspectRatio="none" aria-hidden="true">
+                      <defs><linearGradient id="dg" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#86c5ff" stop-opacity=".26"/><stop offset="1" stop-color="#86c5ff" stop-opacity="0"/></linearGradient></defs>
+                      <path d="M0 20H410M0 80H410M0 140H410" stroke="rgba(160,190,225,.1)" stroke-width="1" fill="none"/>
+                      <rect x="0" y="98" width="410" height="30" fill="rgba(88,211,160,.07)"/>
+                      <path d="M253 0V160" stroke="#f3b54a" stroke-width="1" stroke-dasharray="3 4" fill="none" opacity=".7"/>
+                      <path class="darea" d="M0 119 L26.7 113 L53.3 122 L80 116 L106.7 110 L133.3 119 L160 116 L186.7 113 L213.3 119 L240 116 L266.7 86 L293.3 68 L320 56 L346.7 47 L373.3 50 L400 44 L400 160 L0 160Z" fill="url(#dg)"/>
+                      <path class="dline" pathLength="1" d="M0 119 L26.7 113 L53.3 122 L80 116 L106.7 110 L133.3 119 L160 116 L186.7 113 L213.3 119 L240 116 L266.7 86 L293.3 68 L320 56 L346.7 47 L373.3 50 L400 44"/>
+                    </svg>
+                    <span class="dy" style="top:12.5%">80</span><span class="dy" style="top:50%">60</span><span class="dy" style="top:87.5%">40</span>
+                    <span class="dmk" style="left:61.7%">Model update</span>
+                    <span class="dband" style="top:61.25%">Expected range</span>
+                    <span class="ddot" aria-hidden="true"></span>
+                  </div>
+                  <span class="tiny">Last 16 weeks · illustrative data</span>
+                </div>
+              </div>
+              <div class="pp-cap"><h3>Drift monitoring</h3><p>Watch how AI output changes over time, so a provider update never slips into reports unnoticed.</p></div>
+            </div>
+
+            <div class="pp" role="tabpanel" id="pp-prompt" aria-labelledby="pt-prompt" data-demo="prompt">
+              <div class="pp-demo">
+                <div class="seg" id="prSeg" role="group" aria-label="Impression style override" style="--n:2;--i:1">
+                  <span class="seg-pill" aria-hidden="true"></span>
+                  <button type="button" class="sg" aria-pressed="false">Prose</button>
+                  <button type="button" class="sg" aria-pressed="true">Numbered</button>
+                </div>
+<pre class="code"><span class="k">tenant</span>: <span class="s">your-institution</span>
+<span class="k">override</span>: <span class="s">prompt_blocks.impression</span>
+<span class="k">value</span>: <span class="s" id="prVal">"Numbered, most significant first, max 5"</span></pre>
+                <div class="doc">
+                  <div class="doc-h"><span class="tiny">IMPRESSION</span><span class="ai-tag"><svg><use href="#i-spark"/></svg><span>AI draft, requires review</span></span></div>
+                  <div class="imp-stack">
+                    <p class="imp-v">Solid 6 mm right lower lobe nodule, unchanged from the prior study. Small right pleural effusion. No other acute findings.</p>
+                    <ol class="imp-v on"><li>Solid 6 mm right lower lobe nodule, unchanged from the prior study.</li><li>Small right pleural effusion.</li><li>No other acute findings.</li></ol>
+                  </div>
+                </div>
+              </div>
+              <div class="pp-cap"><h3>Prompt overrides per institution</h3><p>Each department tunes how drafts are written, without touching anyone else's tenant.</p></div>
+            </div>
+
+            <div class="pp" role="tabpanel" id="pp-market" aria-labelledby="pt-market" data-demo="market">
+              <div class="pp-demo">
+                <ul class="mk" id="mkList">
+                  <li><span class="mk-ic">DW</span><span class="mk-t"><b>DICOMweb connector</b><small>Query and retrieve studies</small></span><span class="chip">Signed</span><button type="button" class="mk-b done" aria-pressed="true"><span>Installed</span></button></li>
+                  <li><span class="mk-ic">FH</span><span class="mk-t"><b>FHIR connector</b><small>Send DiagnosticReport to the EHR</small></span><span class="chip">Signed</span><button type="button" class="mk-b done" aria-pressed="true"><span>Installed</span></button></li>
+                  <li><span class="mk-ic">OR</span><span class="mk-t"><b>Orthanc bridge</b><small>Pull studies from Orthanc</small></span><span class="chip">Signed</span><button type="button" class="mk-b" aria-pressed="false"><span>Install</span></button></li>
+                  <li><span class="mk-ic">PX</span><span class="mk-t"><b>PACS connector</b><small>Worklist and study context</small></span><span class="chip">Signed</span><button type="button" class="mk-b" aria-pressed="false"><span>Install</span></button></li>
+                </ul>
+              </div>
+              <div class="pp-cap"><h3>Connector marketplace</h3><p>Add signed plugins and clinical data connectors as your workflow grows.</p></div>
+            </div>
+
+            <div class="pp" role="tabpanel" id="pp-cli" aria-labelledby="pt-cli" data-demo="cli">
+              <div class="pp-demo">
+                <div class="term">
+                  <div class="term-bar mono"><span>Terminal</span><span>Example output</span></div>
+<pre class="term-b" id="cliOut"><span class="ln"><span class="c">&gt; </span><span id="termCmd">radiopad rulebook validate chest_ct_v1.yaml</span></span><span class="ln o"><span class="d">rulebook  </span>chest_ct_v1 · v1.1.0 · approved</span><span class="ln o"><span class="d">sections  </span>Indication, Technique, Comparison, Findings, Impression</span><span class="ln o"><span class="d">rules     </span>7 loaded · <span class="b">3 blocker</span> · <span class="w">4 warning</span></span><span class="ln o"><span class="ok">valid     </span>ready to publish</span></pre>
+                </div>
+              </div>
+              <div class="pp-cap"><h3>RadioPad CLI</h3><p>Author rulebooks as YAML, validate them in CI, and run drafts in batch from the command line.</p></div>
+            </div>
+
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+<script>import "../../scripts/platform.js";</script>

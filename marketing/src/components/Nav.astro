@@ -1,0 +1,72 @@
+---
+import { nav, site, BRAND_PATH } from "../lib/site";
+import Icon from "./Icon.astro";
+
+const path = Astro.url.pathname;
+const isCurrent = (href: string) => href !== "/" && path.startsWith(href.split("#")[0]);
+const mobile = [
+  { label: "Product", href: "/product/" },
+  { label: "Dictation", href: "/product/dictation/" },
+  { label: "Validation engine", href: "/product/validation/" },
+  { label: "Solutions for hospitals", href: "/solutions/hospitals/" },
+  { label: "Solutions for imaging groups", href: "/solutions/imaging-groups/" },
+  { label: "Solutions for radiologists", href: "/solutions/radiologists/" },
+  { label: "Integrations", href: "/integrations/" },
+  { label: "Security", href: "/security/" },
+  { label: "Pricing", href: "/pricing/" },
+  { label: "Blog", href: "/blog/" },
+  { label: "Changelog", href: "/changelog/" },
+  { label: "About", href: "/about/" },
+];
+---
+
+<header class="nav" id="nav">
+  <div class="wrap nav-in">
+    <a class="brand" href="/" aria-label="RadioPad home">
+      <span class="mark"><svg viewBox="0 0 24 24"><path d={BRAND_PATH} /></svg></span>
+      RadioPad
+    </a>
+    <nav class="links" aria-label="Primary">
+      <ul>
+        {nav.map((n) =>
+          "items" in n ? (
+            <li class="has-mega">
+              <button class="nl" aria-expanded="false" aria-controls={n.id}>{n.label} <Icon name="chev" /></button>
+              <div class:list={["mega", { sm: n.small }]} id={n.id}>
+                <div class="mega-grid">
+                  {n.items.map((m) => (
+                    <a class="mi" href={m.href}>
+                      <span class="ic"><Icon name={m.icon} /></span>
+                      <span><b>{m.label}</b><small>{m.desc}</small></span>
+                    </a>
+                  ))}
+                  {n.feature && (
+                    <a class="mega-feat" href={n.feature.href}>
+                      <b>{n.feature.title}</b><small>{n.feature.desc}</small>
+                      <span>{n.feature.cta} <Icon name="arrow" /></span>
+                    </a>
+                  )}
+                </div>
+              </div>
+            </li>
+          ) : (
+            <li><a class="nl" href={n.href} aria-current={isCurrent(n.href) ? "page" : undefined}>{n.label}</a></li>
+          )
+        )}
+      </ul>
+    </nav>
+    <div class="nav-cta">
+      <a class="nl signin" href={site.signIn}>Sign in</a>
+      <a class="btn btn-primary btn-sm" href="/demo/">Book a demo</a>
+      <button class="burger" id="burger" aria-expanded="false" aria-controls="mnav" aria-label="Open menu"><span></span><span></span></button>
+    </div>
+  </div>
+  <div class="mnav" id="mnav" hidden>
+    <div class="wrap">
+      {mobile.map((m) => <a href={m.href} aria-current={isCurrent(m.href) ? "page" : undefined}>{m.label}</a>)}
+      <a href={site.signIn}>Sign in</a>
+      <a class="btn btn-primary" href="/demo/">Book a demo</a>
+      <a class="btn btn-ghost" href="/download/"><Icon name="win" /> Download for Windows</a>
+    </div>
+  </div>
+</header>

@@ -1,0 +1,84 @@
+  <section class="sec" id="surfaces">
+    <div class="wrap">
+      <header class="sec-head">
+        <p class="eyebrow">Surfaces</p>
+        <h2 data-split>Report on Windows. Dictate from your phone. Govern from the web.</h2>
+      </header>
+      <div data-tabs>
+        <div class="tabs" role="tablist" aria-label="RadioPad surfaces">
+          <span class="tab-ind" aria-hidden="true"></span>
+          <button class="tab" role="tab" id="st1" aria-selected="true" aria-controls="sp1">Windows desktop</button>
+          <button class="tab" role="tab" id="st2" aria-selected="false" aria-controls="sp2" tabindex="-1">Mobile companion</button>
+          <button class="tab" role="tab" id="st3" aria-selected="false" aria-controls="sp3" tabindex="-1">Web admin</button>
+        </div>
+        <div class="tp" role="tabpanel" id="sp1" aria-labelledby="st1">
+          <div class="surf">
+            <div>
+              <h3>The full reporting workstation.</h3>
+              <p class="d">The desktop app is where reports are drafted, validated and signed, next to your PACS viewer.</p>
+              <ul class="ticks">
+                <li><svg class="i"><use href="#i-check"/></svg>Hotkeys for dictation and navigation</li>
+                <li><svg class="i"><use href="#i-check"/></svg>Local dictation engine on the workstation</li>
+                <li><svg class="i"><use href="#i-check"/></svg>PACS/RIS bridge and secure clipboard</li>
+                <li><svg class="i"><use href="#i-check"/></svg>Signed .msi installer with automatic updates</li>
+              </ul>
+            </div>
+            <div class="device" aria-hidden="true">
+              <div class="win">
+                <div class="win-side"><i class="on"></i><i></i><i></i><i></i><i></i></div>
+                <div class="win-main">
+                  <div class="status-row"><span class="chip chip-ok">PACS/RIS bridge connected</span><span class="chip">Secure clipboard</span></div>
+                  <div class="mini"><h5>Findings</h5><div class="bar" style="width:92%"></div><div class="bar" style="width:78%"></div><div class="bar" style="width:84%"></div><h5>Impression <span class="ai-tag"><svg><use href="#i-spark"/></svg><span>AI draft</span></span></h5><div class="bar" style="width:66%"></div></div>
+                  <div class="status-row"><span class="chip chip-draft">1 warning</span><span class="chip">Sign report</span></div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+        <div class="tp" role="tabpanel" id="sp2" aria-labelledby="st2" hidden>
+          <div class="surf">
+            <div>
+              <h3>Your phone becomes the microphone.</h3>
+              <p class="d">The companion pairs to a live desktop session. Dictation goes straight into the report open on your workstation.</p>
+              <ul class="ticks">
+                <li><svg class="i"><use href="#i-check"/></svg>Android and iOS</li>
+                <li><svg class="i"><use href="#i-check"/></svg>Pairs to a live desktop session</li>
+                <li><svg class="i"><use href="#i-check"/></svg>Voice dictation only, the report stays on desktop</li>
+              </ul>
+            </div>
+            <div class="device" aria-hidden="true">
+              <div class="phone">
+                <div class="notch"></div>
+                <span class="chip chip-ok">Paired to desktop</span>
+                <div class="wave"><i style="--i:1;--h:.5"></i><i style="--i:2;--h:.9"></i><i style="--i:3;--h:.4"></i><i style="--i:4;--h:.8"></i><i style="--i:5;--h:.6"></i><i style="--i:6;--h:1"></i><i style="--i:7;--h:.45"></i><i style="--i:8;--h:.7"></i><i style="--i:9;--h:.35"></i><i style="--i:10;--h:.85"></i><i style="--i:11;--h:.55"></i><i style="--i:12;--h:.75"></i></div>
+                <div class="mic"><svg class="i"><use href="#i-mic"/></svg></div>
+                <span class="mono dim" style="font-size:.7rem">Hold to dictate</span>
+              </div>
+            </div>
+          </div>
+        </div>
+        <div class="tp" role="tabpanel" id="sp3" aria-labelledby="st3" hidden>
+          <div class="surf">
+            <div>
+              <h3>One console for the whole department.</h3>
+              <p class="d">Administrators manage people, rulebooks and AI settings from the browser. Reporting stays on desktop.</p>
+              <ul class="ticks">
+                <li><svg class="i"><use href="#i-check"/></svg>Users, roles, SSO via OIDC and MFA</li>
+                <li><svg class="i"><use href="#i-check"/></svg>Rulebooks, templates and prompt overrides</li>
+                <li><svg class="i"><use href="#i-check"/></svg>Audit log and drift monitoring</li>
+              </ul>
+            </div>
+            <div class="device" aria-hidden="true">
+              <div class="tbl">
+                <div class="tr h"><span>Rulebook</span><span>Modality</span><span>State</span></div>
+                <div class="tr"><span>chest_ct_v1</span><span>CT</span><span class="chip chip-ok">Active</span></div>
+                <div class="tr"><span>brain_mr_stroke</span><span>MR</span><span class="chip chip-ok">Active</span></div>
+                <div class="tr"><span>breast_mg_screening</span><span>MG</span><span class="chip chip-draft">Draft</span></div>
+                <div class="tr"><span>abdomen_us</span><span>US</span><span class="chip">Review</span></div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>

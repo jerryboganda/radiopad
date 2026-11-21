@@ -1,0 +1,259 @@
+---
+import BaseLayout from "../../layouts/BaseLayout.astro";
+import PageHero from "../../components/PageHero.astro";
+import SectionHead from "../../components/SectionHead.astro";
+import Divider from "../../components/Divider.astro";
+import CtaBand from "../../components/CtaBand.astro";
+import Icon from "../../components/Icon.astro";
+
+// Default desktop bindings (desktop/src-tauri/src/hotkeys.rs); each user can rebind them.
+const hotkeys = [
+  { key: "D", label: "Start or stop dictation" },
+  { key: "R", label: "Bring RadioPad to the front" },
+  { key: "N", label: "New report" },
+  { key: "I", label: "Generate the impression" },
+  { key: "W", label: "Rewrite mode" },
+  { key: "C", label: "Secure copy of the current section" },
+];
+
+const engines = [
+  { icon: "mic", title: "MedASR", text: "A medical speech recognition model that runs on the workstation itself, with the model files stored locally." },
+  { icon: "win", title: "Windows Speech and Edge", text: "The platform speech engines built into Windows run alongside it. RadioPad reconciles what the engines heard." },
+  { icon: "pen", title: "Cleanup that keeps the facts", text: "Ask for a cleanup pass and the dictation is rewritten into clean prose, with every measurement, laterality and negation kept as spoken. The result stays marked as AI text until you review it." },
+];
+
+const companion = [
+  { icon: "key", title: "Pair by code or QR", text: "The desktop shows a six-character code and a QR. A code is pairable for 15 minutes and only pairs with your own session." },
+  { icon: "layout", title: "Into the focused section", text: "The desktop tells the phone which section has focus. Your voice goes there, through the same path as dictation at the workstation." },
+  { icon: "lock", title: "Voice only", text: "No editing and no signing on the phone. The report, its validation and your signature stay on the desktop." },
+  { icon: "phone", title: "Android and iOS", text: "Hold to talk, or step to the next section or the impression from the phone while you look at the images." },
+];
+
+// Pairing demo data. Code uses the real alphabet (no 0, O, 1 or I).
+const CODE = "K7QM4X";
+const TEXT = "6 mm solid nodule in the right lower lobe, image 142. Stable compared with the prior study. No consolidation. No pleural effusion.";
+// Decorative 21x21 QR-style pattern with finder squares; it does not encode anything.
+const N = 21;
+let seed = 11;
+const rnd = () => (seed = (seed * 9301 + 49297) % 233280) / 233280;
+const qr: [number, number][] = [];
+for (let r = 0; r < N; r++)
+  for (let c = 0; c < N; c++) {
+    // finder square plus its one-module blank separator
+    const zone = [[0, 0], [0, N - 7], [N - 7, 0]].find(([R, C]) => r >= R - 1 && r <= R + 7 && c >= C - 1 && c <= C + 7);
+    let on: boolean;
+    if (zone) {
+      const y = r - zone[0], x = c - zone[1];
+      on = y >= 0 && y < 7 && x >= 0 && x < 7 && (y === 0 || y === 6 || x === 0 || x === 6 || (y > 1 && y < 5 && x > 1 && x < 5));
+    } else on = rnd() > 0.52;
+    if (on) qr.push([c, r]);
+  }
+---
+
+<BaseLayout
+  title="Dictation"
+  description="Dictate on the Windows workstation with hotkeys and on-device speech engines, or pair your phone to the live desktop session and talk into the focused report section."
+>
+  <PageHero
+    crumbs={[{ label: "Product", href: "/product/" }, { label: "Dictation", href: "/product/dictation/" }]}
+    eyebrow="Dictation"
+    lead="Talk at the workstation."
+    title="Or dictate from your phone."
+    text="Dictation runs in the Windows desktop app with a hotkey and on-device speech engines. Pair your phone to the live desktop session and your voice goes straight into the report section you have open."
+  />
+  <Divider />
+
+  <section class="sec" id="desktop">
+    <div class="wrap">
+      <div class="split">
+        <div>
+          <p class="eyebrow">On the workstation</p>
+          <h2 class="dc-h2" data-split>Press a hotkey and talk.</h2>
+          <p class="d">Dictation lives in the desktop app next to your PACS viewer. Speech is recognised on the workstation and lands in the report section you are working in.</p>
+          <ul class="ticks">
+            <li><Icon name="check" />Global hotkeys that work while the viewer has focus</li>
+            <li><Icon name="check" />Speech recognised on the workstation</li>
+            <li><Icon name="check" />Dictated text goes into the section with the cursor</li>
+            <li><Icon name="check" />Secure copy for pasting a section elsewhere</li>
+          </ul>
+        </div>
+        <div class="panel dc-keys" data-reveal>
+          <div class="panel-h"><span>Default hotkeys</span><span>Rebind per user</span></div>
+          <ul>
+            {hotkeys.map((h) => (
+              <li><span class="dc-combo"><kbd>Ctrl</kbd><kbd>Shift</kbd><kbd>{h.key}</kbd></span><span>{h.label}</span></li>
+            ))}
+          </ul>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <Divider />
+
+  <section class="sec" id="engines">
+    <div class="wrap">
+      <SectionHead
+        eyebrow="Speech engines"
+        title="Recognised on the workstation."
+        sub="The desktop app runs an on-device speech ensemble: MedASR alongside the Windows platform engines."
+      />
+      <div class="grid grid-3">
+        {engines.map((e, i) => (
+          <article class:list={["card", { beam: i === 0 }]} data-reveal>
+            <span class="ic"><Icon name={e.icon} /></span>
+            <h3>{e.title}</h3>
+            <p>{e.text}</p>
+          </article>
+        ))}
+      </div>
+    </div>
+  </section>
+
+  <Divider />
+
+  <section class="sec" id="companion">
+    <div class="wrap">
+      <SectionHead
+        eyebrow="Phone companion"
+        title="Your phone becomes the microphone."
+        sub="Pair the companion app to a live desktop session. Your voice streams through the RadioPad relay into the section that has focus on the desktop. Try it below."
+      />
+
+      <div class="pd" id="pairDemo" data-code={CODE} data-text={TEXT} data-phase="pair" data-reveal>
+        <div class="pd-bar mono"><span>Interactive demo</span><span>Nothing leaves this page</span></div>
+        <div class="pd-stage">
+          <div class="pd-desk">
+            <div class="pd-wbar">
+              <span class="sw-dots" aria-hidden="true"><i></i><i></i><i></i></span>
+              <span class="mono pd-title">RadioPad · CT chest</span>
+              <span class="chip chip-draft" id="pdChip">Waiting for phone</span>
+            </div>
+            <div class="pd-wbody">
+              <div class="pd-host">
+                <p class="tiny">PAIR PHONE</p>
+                <p class="pd-code mono"><span class="pd-sr">Pairing code </span>{CODE}</p>
+                <svg class="pd-qr" viewBox={`-1 -1 ${N + 2} ${N + 2}`} aria-hidden="true" shape-rendering="crispEdges">
+                  {qr.map(([x, y]) => <rect x={x} y={y} width="1" height="1" />)}
+                </svg>
+                <p class="tiny">Pairable for 15 minutes</p>
+              </div>
+              <div class="pd-report">
+                <div class="pd-sec on">
+                  <p class="pd-sh">Findings <span class="chip">Focused</span></p>
+                  <p class="pd-txt" id="pdText"><span class="pd-ph">Dictation appears here</span></p>
+                </div>
+                <div class="pd-sec">
+                  <p class="pd-sh">Impression</p>
+                  <p class="pd-txt"><span class="pd-ph">Not started</span></p>
+                </div>
+                <p class="tiny pd-note">Review, validate and sign here, on the desktop.</p>
+              </div>
+            </div>
+          </div>
+
+          <div class="pd-phone">
+            <div class="notch" aria-hidden="true"></div>
+            <div class="pd-v pd-v-pair">
+              <p class="pd-ph-t">Enter the code shown on your desktop</p>
+              <input id="pdIn" class="pd-in mono" type="text" inputmode="text" maxlength="6" autocomplete="off" autocapitalize="characters" spellcheck="false" aria-label="Pairing code shown on the desktop" aria-describedby="pdErr" />
+              <button type="button" class="btn btn-primary btn-sm" id="pdPair">Pair</button>
+              <p class="pd-err" id="pdErr" hidden>That code does not match. Check the code on the desktop.</p>
+            </div>
+            <div class="pd-v pd-v-live">
+              <span class="chip chip-ok">Paired to desktop</span>
+              <p class="pd-ph-t">Dictating into <b>Findings</b></p>
+              <div class="wave pd-wave" aria-hidden="true">
+                {Array.from({ length: 12 }, (_, i) => <i style={`--i:${i + 1};--h:${[0.5, 0.9, 0.4, 0.8, 0.6, 1, 0.45, 0.7, 0.35, 0.85, 0.55, 0.75][i]}`}></i>)}
+              </div>
+              <div class="mic" aria-hidden="true"><Icon name="mic" /></div>
+              <span class="tiny">Hold to dictate</span>
+            </div>
+          </div>
+        </div>
+        <div class="pd-foot">
+          <p id="pdStatus" aria-live="polite">Type the code from the desktop into the phone, or play the demo.</p>
+          <button type="button" class="btn btn-ghost btn-sm" id="pdPlay"><Icon name="replay" /><span>Play demo</span></button>
+        </div>
+      </div>
+
+      <div class="grid grid-4 dc-facts">
+        {companion.map((c) => (
+          <article class="card" data-reveal>
+            <span class="ic"><Icon name={c.icon} /></span>
+            <h3>{c.title}</h3>
+            <p>{c.text}</p>
+          </article>
+        ))}
+      </div>
+    </div>
+  </section>
+
+  <CtaBand
+    lead="Talk through the study."
+    title="Sign it at the workstation."
+    text="Book a demo for your department, or start a free trial on your own Windows workstation and pair your phone in a minute."
+  />
+</BaseLayout>
+
+<script>import "../../scripts/pairing-demo.js";</script>
+
+<style is:global>
+  .dc-h2{font-size:clamp(2rem,4.3vw,3.4rem);margin-top:16px}
+  #desktop .split p.d{margin-top:16px}
+  .dc-keys ul{list-style:none;margin:0;padding:0;display:grid;gap:6px}
+  .dc-keys li{display:flex;align-items:center;gap:14px;flex-wrap:wrap;padding:10px 12px;border-radius:10px;border:1px solid var(--line);background:rgba(2,4,8,.35);font-size:.9rem;color:var(--fg-2)}
+  .dc-combo{display:inline-flex;gap:4px;min-width:150px}
+  .dc-facts{margin-top:14px}
+
+  .pd{border:1px solid var(--line-2);border-radius:var(--r-lg);background:linear-gradient(180deg,rgba(17,26,39,.78),rgba(5,8,13,.96));overflow:hidden;box-shadow:0 40px 90px -40px rgba(0,0,0,.9)}
+  .pd-bar{display:flex;justify-content:space-between;gap:12px;flex-wrap:wrap;padding:10px 16px;border-bottom:1px solid var(--line);font-size:.68rem;letter-spacing:.12em;text-transform:uppercase;color:var(--fg-3)}
+  .pd-stage{display:grid;grid-template-columns:minmax(0,1.55fr) minmax(0,.75fr);gap:clamp(16px,3vw,36px);align-items:center;padding:clamp(14px,3vw,32px)}
+  @media (max-width:820px){.pd-stage{grid-template-columns:minmax(0,1fr)}}
+  .pd-desk{min-width:0;border:1px solid var(--line-2);border-radius:16px;background:#05080d;overflow:hidden}
+  .pd-wbar{display:flex;align-items:center;gap:12px;height:40px;padding:0 12px;border-bottom:1px solid var(--line);font-size:.72rem;color:var(--fg-3)}
+  .pd-title{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  .pd-wbar .chip{margin-left:auto}
+  .pd-wbody{display:grid;grid-template-columns:minmax(0,170px) minmax(0,1fr);gap:14px;padding:14px}
+  @media (max-width:560px){.pd-wbody{grid-template-columns:minmax(0,1fr)}}
+  .pd-host{display:grid;gap:10px;justify-items:center;align-content:start;padding:14px 12px;border:1px solid var(--line);border-radius:12px;background:rgba(2,4,8,.5);text-align:center;transition:opacity .4s ease}
+  .pd-code{font-size:1.45rem;letter-spacing:.18em;color:var(--film);font-weight:500}
+  .pd-sr{position:absolute;width:1px;height:1px;overflow:hidden;clip-path:inset(50%);white-space:nowrap}
+  .pd-qr{width:104px;height:104px;padding:6px;border-radius:8px;background:var(--film);fill:var(--on-film)}
+  .pd:not([data-phase="pair"]) .pd-host{opacity:.45}
+  .pd-report{display:grid;gap:10px;align-content:start;min-width:0}
+  .pd-sec{display:grid;gap:6px;padding:12px 14px;border:1px solid var(--line);border-radius:12px;background:rgba(2,4,8,.45);transition:border-color .3s ease,box-shadow .3s ease}
+  .pd-sec.on{border-color:rgba(134,197,255,.35)}
+  .pd[data-phase="live"] .pd-sec.on{box-shadow:0 0 0 3px rgba(134,197,255,.1)}
+  .pd-sh{display:flex;align-items:center;gap:8px;font:500 .66rem var(--font-mono);letter-spacing:.13em;text-transform:uppercase;color:var(--fg-3)}
+  .pd-sh .chip{height:20px;font-size:.6rem;margin-left:auto}
+  .pd-txt{min-height:3.2em;font-size:.92rem;line-height:1.6;color:var(--fg)}
+  .pd-ph{color:var(--fg-3);font-style:italic}
+  .pd-w{animation:pdW .35s var(--ease-out) both}
+  @keyframes pdW{from{opacity:0;filter:blur(3px)}}
+  .pd[data-phase="live"] .pd-txt#pdText::after{content:"";display:inline-block;width:7px;height:1.05em;margin-left:2px;vertical-align:-3px;background:var(--accent);animation:blink 1s steps(1) infinite}
+  .pd-note{margin-top:2px}
+
+  .pd-phone{width:min(230px,100%);margin-inline:auto;aspect-ratio:9/17;border-radius:32px;border:1px solid var(--line-3);background:#03060b;padding:16px 14px 20px;display:flex;flex-direction:column;align-items:center;gap:12px;box-shadow:0 30px 80px -30px rgba(0,0,0,.9)}
+  @media (max-width:820px){.pd-phone{aspect-ratio:auto;min-height:330px}}
+  .pd-v{flex:1;width:100%;display:flex;flex-direction:column;align-items:center;gap:12px;text-align:center}
+  .pd-v-live{display:none}
+  .pd[data-phase="live"] .pd-v-pair,.pd[data-phase="done"] .pd-v-pair{display:none}
+  .pd[data-phase="live"] .pd-v-live,.pd[data-phase="done"] .pd-v-live{display:flex}
+  .pd-ph-t{font-size:.84rem;color:var(--fg-2);margin-top:18px}
+  .pd-ph-t b{color:var(--fg);font-weight:500}
+  .pd-in{width:100%;max-width:170px;height:48px;border-radius:12px;border:1px solid var(--line-2);background:var(--bg-2);color:var(--film);text-align:center;font-size:1.2rem;letter-spacing:.22em;text-transform:uppercase;transition:border-color .2s ease,box-shadow .2s ease}
+  .pd-in:focus{outline:none;border-color:rgba(134,197,255,.6);box-shadow:0 0 0 3px rgba(134,197,255,.16)}
+  .pd-in[aria-invalid="true"]{border-color:rgba(255,107,107,.6)}
+  .pd-in.shake{animation:shake .42s var(--ease-out)}
+  .pd[data-phase="link"] .pd-in{opacity:.6}
+  .pd-err{font-size:.76rem;color:var(--red)}
+  .pd-wave{height:44px;width:100%}
+  .pd-wave i{animation-play-state:paused}
+  .pd[data-phase="live"] .pd-wave i{animation-play-state:running}
+  .pd-v-live .mic{margin-top:auto;width:72px;height:72px;animation:none}
+  .pd[data-phase="live"] .pd-v-live .mic{animation:ring 2.2s var(--ease-out) infinite}
+  .pd-v-live .mic .i{width:26px;height:26px}
+  .pd-foot{display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap;padding:12px 16px;border-top:1px solid var(--line);font-size:.88rem;color:var(--fg-2)}
+  .pd-foot p{flex:1;min-width:200px}
+</style>

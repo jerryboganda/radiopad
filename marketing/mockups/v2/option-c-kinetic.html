@@ -1,0 +1,1548 @@
+<title>RadioPad Kinetic</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<meta name="description" content="RadioPad turns dictation into validated draft radiology reports. The radiologist signs. The AI never does.">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Anybody:wdth,wght@50..150,100..900&family=Geist:wght@300..700&family=Geist+Mono:wght@400..600&display=swap">
+<style>
+/* Layout: a kinetic poster hero framed as a PACS viewport, a velocity marquee, then a 12-column bento of live demos; light-box paper bands alternate with ink bands, caliper yellow is the one accent. */
+:root{
+  --bg:#F2F3EE; --surface:#FFFFFF; --surface-2:#E7E9E2; --ink:#0B0E13; --ink-2:#454D58; --ink-3:#5F6772;
+  --line:#D3D6CD; --line-2:#E2E4DC;
+  --accent:#FFD20A; --accent-hover:#FFC400; --on-accent:#0B0E13; --accent-text:#6E5300;
+  --strong:#0B0E13; --strong-2:#1A2029; --strong-line:#2A313C; --on-strong:#F2F3EE; --on-strong-2:#A3ABB6;
+  --blocker:#C42430; --blocker-soft:#FADDDF; --warn:#A44E09; --warn-soft:#FBE7D3; --info:#1C5FD0; --info-soft:#DEE8FB; --ok:#0F7A47; --ok-soft:#D8F0E3;
+  --focus:#1C5FD0; --shadow:rgb(11 14 19 / .10);
+  --grid:color-mix(in srgb, var(--ink) 6%, transparent);
+  --spot:color-mix(in srgb, var(--accent) 34%, transparent);
+  /* fixed tokens for surfaces that are dark in both themes (code, keycaps, audit) */
+  --code-key:#9CC3FF; --code-str:#FFE27A; --code-num:#FFAE70; --code-punc:#7B8594; --ok-strong:#44D693;
+  --cap:#1E2530; --cap-top:#2A323F; --cap-edge:#04060A;
+  --f-display:"Anybody","Arial Narrow","Helvetica Neue",Arial,sans-serif;
+  --f-body:"Geist","Inter","Segoe UI",system-ui,sans-serif;
+  --f-mono:"Geist Mono","JetBrains Mono","Cascadia Mono",Consolas,monospace;
+  --ease-out:cubic-bezier(.23,1,.32,1); --ease-io:cubic-bezier(.77,0,.175,1); --ease-drawer:cubic-bezier(.32,.72,0,1);
+  --r:20px; --wrap:1320px;
+}
+@media (prefers-color-scheme: dark){
+  :root:not([data-theme="light"]){
+    --bg:#07090D; --surface:#0F131A; --surface-2:#161B24; --ink:#ECEFE7; --ink-2:#A7AFBA; --ink-3:#848D99;
+    --line:#232A35; --line-2:#1A2029;
+    --accent:#FFD60A; --accent-hover:#FFE14D; --on-accent:#0B0E13; --accent-text:#FFD60A;
+    --strong:#151B25; --strong-2:#1E2531; --strong-line:#2D3542; --on-strong:#ECEFE7; --on-strong-2:#A7AFBA;
+    --blocker:#FF6B74; --blocker-soft:#3B1317; --warn:#FFA650; --warn-soft:#3A2410; --info:#6EB0FF; --info-soft:#10243F; --ok:#46D894; --ok-soft:#0D2B1F;
+    --focus:#7DB8FF; --shadow:rgb(0 0 0 / .45);
+    --spot:color-mix(in srgb, var(--accent) 14%, transparent);
+    color-scheme:dark;
+  }
+}
+:root[data-theme="dark"]{
+  --bg:#07090D; --surface:#0F131A; --surface-2:#161B24; --ink:#ECEFE7; --ink-2:#A7AFBA; --ink-3:#848D99;
+  --line:#232A35; --line-2:#1A2029;
+  --accent:#FFD60A; --accent-hover:#FFE14D; --on-accent:#0B0E13; --accent-text:#FFD60A;
+  --strong:#151B25; --strong-2:#1E2531; --strong-line:#2D3542; --on-strong:#ECEFE7; --on-strong-2:#A7AFBA;
+  --blocker:#FF6B74; --blocker-soft:#3B1317; --warn:#FFA650; --warn-soft:#3A2410; --info:#6EB0FF; --info-soft:#10243F; --ok:#46D894; --ok-soft:#0D2B1F;
+  --focus:#7DB8FF; --shadow:rgb(0 0 0 / .45);
+  --spot:color-mix(in srgb, var(--accent) 14%, transparent);
+  color-scheme:dark;
+}
+
+*,*::before,*::after{box-sizing:border-box}
+html{-webkit-text-size-adjust:100%;text-size-adjust:100%}
+html.lenis,html.lenis body{height:auto}
+.lenis.lenis-smooth{scroll-behavior:auto!important}
+.lenis.lenis-stopped{overflow:hidden}
+body{background:var(--bg);color:var(--ink);font-family:var(--f-body);font-size:16px;line-height:1.55;-webkit-font-smoothing:antialiased;-moz-osx-font-smoothing:grayscale}
+body::before{content:"";position:fixed;inset:0 0 auto;height:env(safe-area-inset-top,0px);z-index:70;background:var(--bg)}
+a{color:inherit;text-decoration:none}
+button{font:inherit;color:inherit;background:none;border:0;padding:0;cursor:pointer;-webkit-tap-highlight-color:transparent}
+:focus-visible{outline:2px solid var(--focus);outline-offset:3px;border-radius:8px}
+::selection{background:var(--accent);color:var(--on-accent)}
+h1,h2,h3,h4{margin:0;font-weight:inherit;text-wrap:balance}
+p{margin:0}
+ul,ol{margin:0;padding:0;list-style:none}
+kbd{font:inherit}
+.wrap{width:100%;max-width:var(--wrap);margin-inline:auto;padding-left:max(clamp(16px,4vw,40px),env(safe-area-inset-left,0px));padding-right:max(clamp(16px,4vw,40px),env(safe-area-inset-right,0px))}
+.sr-only{position:absolute!important;width:1px;height:1px;padding:0;margin:-1px;overflow:hidden;clip:rect(0 0 0 0);white-space:nowrap;border:0}
+.skip{position:fixed;left:16px;top:-80px;z-index:100;background:var(--ink);color:var(--bg);padding:10px 16px;border-radius:10px;font-weight:600;transition:top 160ms var(--ease-out)}
+.skip:focus{top:calc(12px + env(safe-area-inset-top,0px))}
+.mono{font-family:var(--f-mono)} .xs{font-size:.72rem} .muted{color:var(--ink-3)}
+.ic{width:20px;height:20px;fill:none;stroke:currentColor;stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round;flex:none;display:block}
+.eyebrow{font-family:var(--f-mono);font-size:.74rem;font-weight:500;letter-spacing:.12em;text-transform:uppercase;color:var(--ink-3)}
+h2{font-family:var(--f-display);font-variation-settings:"wght" 780,"wdth" 88;font-size:clamp(2.1rem,5.4vw,4.6rem);line-height:.96;letter-spacing:-.025em}
+h3{font-family:var(--f-display);font-variation-settings:"wght" 700,"wdth" 96;font-size:clamp(1.15rem,1.6vw,1.4rem);line-height:1.12;letter-spacing:-.01em}
+.section{padding-block:clamp(80px,11vw,150px)}
+section[id]{scroll-margin-top:76px}
+.sec-head{display:grid;gap:18px;max-width:58rem;margin-bottom:clamp(36px,5vw,64px)}
+.sec-head>p:not(.eyebrow){font-size:clamp(1.02rem,1.3vw,1.18rem);color:var(--ink-2);max-width:60ch}
+
+/* buttons */
+.magnet{display:inline-block;padding:8px;margin:-8px}
+.btn{display:inline-flex;align-items:center;justify-content:center;gap:10px;height:50px;padding:0 22px;border-radius:999px;font-weight:600;font-size:.95rem;letter-spacing:-.005em;white-space:nowrap;transition:transform 160ms var(--ease-out),background-color 200ms ease,box-shadow 200ms ease,color 200ms ease}
+.btn:active{transform:scale(.97)}
+.btn-sm{height:40px;padding:0 16px;font-size:.88rem}
+.btn-primary{background:var(--accent);color:var(--on-accent)}
+.btn-ink{background:var(--ink);color:var(--bg)}
+.btn-ghost{color:var(--ink);box-shadow:inset 0 0 0 1.5px var(--line)}
+.btn .ic{width:18px;height:18px}
+.btn .arr{transition:transform 220ms var(--ease-out)}
+.strong .btn-ghost,.band .btn-ghost{color:var(--on-strong);box-shadow:inset 0 0 0 1.5px var(--strong-line)}
+@media (hover:hover) and (pointer:fine){
+  .btn-primary:hover{background:var(--accent-hover)}
+  .btn-ink:hover{background:var(--ink-2)}
+  .btn-ghost:hover{box-shadow:inset 0 0 0 1.5px var(--ink)}
+  .strong .btn-ghost:hover,.band .btn-ghost:hover{box-shadow:inset 0 0 0 1.5px var(--on-strong)}
+  .btn:hover .arr{transform:translateX(3px)}
+}
+
+/* nav */
+.nav{position:sticky;top:env(safe-area-inset-top,0px);z-index:50;transition:background-color 220ms ease,box-shadow 220ms ease}
+.nav[data-scrolled],.drawer-open .nav{background:color-mix(in srgb,var(--bg) 86%,transparent);-webkit-backdrop-filter:saturate(1.4) blur(14px);backdrop-filter:saturate(1.4) blur(14px);box-shadow:0 1px 0 var(--line)}
+.nav-in{position:relative;display:flex;align-items:center;gap:16px;height:68px}
+.brand{display:inline-flex;align-items:center;gap:10px;font-family:var(--f-display);font-variation-settings:"wght" 820,"wdth" 112;font-size:1.22rem;letter-spacing:-.02em;flex:none}
+.brand-mark{width:32px;height:32px;border-radius:9px;background:var(--accent);color:var(--on-accent);display:grid;place-items:center}
+.brand-mark .ic{width:20px;height:20px;stroke-width:2.4}
+.nav-links{display:flex;align-items:center;gap:2px;margin-left:12px}
+.nav-link{display:inline-flex;align-items:center;gap:5px;height:38px;padding:0 12px;border-radius:999px;font-size:.92rem;font-weight:500;color:var(--ink-2);transition:color 160ms ease,background-color 160ms ease}
+.nav-link .ic{width:14px;height:14px;transition:transform 220ms var(--ease-out)}
+@media (hover:hover) and (pointer:fine){.nav-link:hover{color:var(--ink);background:var(--surface-2)}}
+.has-mega[data-open]>.nav-link{color:var(--ink);background:var(--surface-2)}
+.has-mega[data-open]>.nav-link .ic{transform:rotate(180deg)}
+.nav-cta{margin-left:auto;display:flex;align-items:center;gap:6px}
+.burger{display:none;width:44px;height:44px;border-radius:12px;place-items:center;box-shadow:inset 0 0 0 1.5px var(--line);transition:transform 160ms var(--ease-out)}
+.burger:active{transform:scale(.95)}
+.burger .i-close{display:none}
+.drawer-open .burger .i-menu{display:none}
+.drawer-open .burger .i-close{display:block}
+.mega{position:absolute;top:calc(100% - 4px);left:0;width:min(720px,calc(100vw - 48px));background:var(--surface);border:1px solid var(--line);border-radius:20px;box-shadow:0 30px 60px -24px var(--shadow),0 2px 10px var(--shadow);padding:10px;display:grid;grid-template-columns:minmax(0,1.65fr) minmax(0,1fr);gap:10px;opacity:0;visibility:hidden;transform:translateY(-6px) scale(.97);transform-origin:var(--ox,50%) 0;transition:opacity 150ms ease,transform 200ms var(--ease-out),visibility 0s linear 200ms}
+.has-mega[data-open] .mega{opacity:1;visibility:visible;transform:none;transition:opacity 180ms ease,transform 260ms var(--ease-out),visibility 0s}
+.mega-list{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:2px;align-content:start}
+.mega-item{display:flex;gap:12px;padding:12px;border-radius:12px;transition:background-color 160ms ease}
+.mi-ic{width:36px;height:36px;border-radius:10px;display:grid;place-items:center;background:var(--surface-2);color:var(--ink);flex:none;transition:background-color 160ms ease,color 160ms ease}
+.mi-ic .ic{width:18px;height:18px}
+.mega-item b{display:block;font-weight:600;font-size:.92rem;line-height:1.3}
+.mega-item .d{display:block;font-size:.8rem;color:var(--ink-3);line-height:1.4;margin-top:2px}
+@media (hover:hover) and (pointer:fine){.mega-item:hover{background:var(--surface-2)}.mega-item:hover .mi-ic{background:var(--accent);color:var(--on-accent)}}
+.mega-feat{background:var(--strong);color:var(--on-strong);border-radius:14px;padding:18px;display:flex;flex-direction:column;gap:10px}
+.mega-feat .eyebrow{color:var(--on-strong-2)}
+.mega-feat h3{font-size:1.2rem}
+.mega-feat p{font-size:.86rem;color:var(--on-strong-2)}
+.mega-feat a{margin-top:auto;display:inline-flex;align-items:center;gap:6px;font-weight:600;font-size:.88rem;color:var(--accent)}
+.mega-feat a .ic{width:16px;height:16px}
+.drawer{position:fixed;left:0;right:0;top:calc(68px + env(safe-area-inset-top,0px));bottom:0;z-index:45;background:var(--bg);overflow-y:auto;padding-block:8px 32px;padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px));opacity:0;visibility:hidden;transform:translateY(-8px);transition:opacity 160ms ease,transform 220ms var(--ease-out),visibility 0s linear 220ms}
+.drawer[data-open]{opacity:1;visibility:visible;transform:none;transition:opacity 200ms ease,transform 300ms var(--ease-drawer),visibility 0s}
+.drawer-group{border-bottom:1px solid var(--line);padding-block:14px;display:grid}
+.drawer-group a{padding:9px 0;font-family:var(--f-display);font-variation-settings:"wght" 650,"wdth" 100;font-size:1.3rem}
+.drawer-ctas{display:grid;gap:10px;margin-top:20px}
+.drawer-ctas .btn{width:100%}
+
+/* hero */
+.hero{padding-block:8px clamp(36px,5vw,64px);overflow-x:clip}
+.viewport{position:relative;border:1px solid var(--line);border-radius:clamp(18px,2.4vw,30px);background:linear-gradient(var(--grid) 1px,transparent 1px) 0 0/56px 56px,linear-gradient(90deg,var(--grid) 1px,transparent 1px) 0 0/56px 56px,var(--surface);padding:clamp(60px,7vw,96px) clamp(18px,4.4vw,60px) clamp(52px,5vw,68px);overflow:hidden;isolation:isolate}
+.ov{position:absolute;font-family:var(--f-mono);font-size:.68rem;line-height:1.55;letter-spacing:.08em;text-transform:uppercase;color:var(--ink-3);pointer-events:none;font-variant-numeric:tabular-nums}
+.ov b{color:var(--ink);font-weight:600}
+.ov-tl{top:16px;left:20px}.ov-tr{top:16px;right:20px;text-align:right}.ov-bl{bottom:16px;left:20px}.ov-br{bottom:16px;right:20px;text-align:right}
+.ov-r,.ov-l{top:50%;transform:translateY(-50%);font-size:.85rem;font-weight:600;color:var(--ink-2)}
+.ov-r{left:10px}.ov-l{right:10px}
+.ov-bl i{display:inline-block;width:7px;height:7px;border-radius:50%;background:var(--warn);margin-right:6px;vertical-align:1px}
+.hero-chips{display:flex;flex-wrap:wrap;gap:8px}
+.chip{display:inline-flex;align-items:center;gap:8px;min-height:30px;padding:4px 12px;border-radius:999px;background:var(--bg);border:1px solid var(--line);font-size:.8rem;font-weight:500;color:var(--ink-2)}
+.chip .ic{width:15px;height:15px}
+.kinetic{position:relative;font-family:var(--f-display);font-size:clamp(2.9rem,12.4vw,11rem);line-height:.86;letter-spacing:-.02em;margin-top:clamp(18px,2.4vw,30px);display:flex;flex-direction:column;align-items:flex-start}
+.k-line{display:block;white-space:nowrap;font-variation-settings:"wght" 340,"wdth" 78}
+.k-ch{display:inline-block}
+.k-outline{color:transparent;-webkit-text-stroke:max(1.5px,.016em) var(--ink)}
+.k-sign{background:var(--accent);color:var(--on-accent);padding:.02em .1em .08em;border-radius:.07em;margin-top:.05em;font-variation-settings:"wght" 820,"wdth" 92}
+.caliper{position:absolute;right:3%;top:1.02em;width:1.45em;height:auto;color:var(--accent-text);pointer-events:none;overflow:visible}
+.caliper line{stroke:currentColor;stroke-width:3;stroke-linecap:round}
+.caliper text{fill:currentColor;font-family:var(--f-mono);font-size:22px;letter-spacing:1px}
+.hero-foot{display:grid;grid-template-columns:minmax(0,1.25fr) minmax(0,.9fr);gap:clamp(24px,4vw,64px);align-items:end;margin-top:clamp(28px,4vw,52px)}
+.lead{font-size:clamp(1.05rem,1.35vw,1.24rem);line-height:1.5;color:var(--ink-2);max-width:50ch}
+.lead b{color:var(--ink);font-weight:600}
+.cta-row{display:flex;flex-wrap:wrap;gap:12px;margin-top:22px}
+.fine{font-size:.8rem;color:var(--ink-3);margin-top:14px}
+.status-card{background:var(--bg);border:1px solid var(--line);border-radius:18px;padding:16px 18px;display:grid;gap:12px;box-shadow:0 18px 40px -24px var(--shadow)}
+.sc-head{display:flex;justify-content:space-between;align-items:center;gap:8px}
+.tag{display:inline-flex;align-items:center;gap:8px;font-family:var(--f-mono);font-size:.7rem;font-weight:500;letter-spacing:.09em;text-transform:uppercase;color:var(--ink-3)}
+.tag .ic{width:13px;height:13px}
+.sc-list{display:grid;gap:9px;font-size:.9rem}
+.sc-list li{display:flex;align-items:center;gap:10px}
+.sev-ic{width:22px;height:22px;border-radius:7px;display:grid;place-items:center;flex:none}
+.sev-ic .ic{width:14px;height:14px;stroke-width:2.2}
+.s-ok{background:var(--ok-soft);color:var(--ok)}.s-blocker{background:var(--blocker-soft);color:var(--blocker)}.s-warn{background:var(--warn-soft);color:var(--warn)}.s-ink{background:var(--surface-2);color:var(--ink)}
+.live-dot{position:relative;width:8px;height:8px;border-radius:50%;background:var(--warn);flex:none}
+.live-dot::after,.pdot::after{content:"";position:absolute;inset:0;border-radius:50%;background:inherit;animation:ring 1.8s var(--ease-out) infinite}
+@keyframes ring{from{transform:scale(1);opacity:.55}to{transform:scale(2.8);opacity:0}}
+
+/* marquee */
+.mq{border-block:1px solid var(--line);overflow:hidden;padding-block:clamp(16px,2.4vw,26px);display:grid;gap:12px}
+.mq-track{display:flex;width:max-content;align-items:center;will-change:transform}
+.mq-item{display:inline-flex;align-items:center;gap:clamp(12px,1.6vw,20px);padding-right:clamp(16px,2.2vw,28px)}
+.mq-code{font-family:var(--f-display);font-size:clamp(3rem,9vw,7.5rem);line-height:.9;font-variation-settings:"wght" 880,"wdth" 118;letter-spacing:-.02em}
+.mq-code.o{color:transparent;-webkit-text-stroke:max(1.5px,.014em) var(--ink)}
+.mq-name{font-family:var(--f-mono);font-size:.7rem;line-height:1.35;letter-spacing:.1em;text-transform:uppercase;color:var(--ink-3);width:11ch}
+.mq-dot{width:clamp(14px,1.8vw,22px);height:clamp(14px,1.8vw,22px);border-radius:50%;background:var(--accent);flex:none}
+.mq-sub{font-family:var(--f-mono);font-size:.78rem;letter-spacing:.12em;text-transform:uppercase;color:var(--ink-2);white-space:nowrap}
+.mq-sub span{padding-right:30px}
+.mq-sub span::before{content:"";display:inline-block;width:6px;height:6px;background:var(--accent-text);margin-right:14px;vertical-align:2px;border-radius:1px}
+
+/* workflow */
+.wf{position:relative;display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:clamp(16px,2vw,28px)}
+.wf-line{position:absolute;left:28px;right:28px;top:27px;height:2px;background:var(--line);overflow:hidden}
+.wf-fill{position:absolute;inset:0;background:var(--ink);transform-origin:0 50%}
+.wf-step{position:relative;display:grid;gap:14px;align-content:start}
+.wf-num{position:relative;z-index:1;width:56px;height:56px;border-radius:50%;display:grid;place-items:center;background:var(--bg);box-shadow:inset 0 0 0 2px var(--line);color:var(--ink-3);transition:background-color 320ms ease,box-shadow 320ms ease,color 320ms ease}
+.wf-step.is-on .wf-num{background:var(--accent);box-shadow:inset 0 0 0 2px var(--accent);color:var(--on-accent)}
+.wf-k{font-family:var(--f-mono);font-size:.72rem;letter-spacing:.1em;color:var(--ink-3)}
+.wf-step h3{font-size:clamp(1.7rem,2.8vw,2.5rem);font-variation-settings:"wght" 820,"wdth" 84;line-height:.95}
+.wf-step p{color:var(--ink-2);font-size:.96rem;max-width:34ch}
+
+/* bento */
+.bento{display:grid;gap:14px;grid-template-columns:repeat(12,minmax(0,1fr));grid-template-areas:"d d d d d d d v v v v v" "f f f f f k k k k p p p" "f f f f f c c c c a a a" "s s s s s s s s s s s s"}
+.b{min-width:0}
+.b-d{grid-area:d}.b-v{grid-area:v}.b-f{grid-area:f}.b-k{grid-area:k}.b-p{grid-area:p}.b-c{grid-area:c}.b-a{grid-area:a}.b-s{grid-area:s}
+.cell{position:relative;height:100%;border-radius:var(--r);background:var(--surface);border:1px solid var(--line);padding:clamp(18px,2vw,26px);display:flex;flex-direction:column;gap:14px;overflow:hidden;isolation:isolate;transform-style:preserve-3d}
+.cell.strong{background:var(--strong);color:var(--on-strong);border-color:transparent}
+.cell.strong .tag{color:var(--on-strong-2)}
+.cell.soft{background:var(--surface-2);border-color:transparent}
+.cell.accent{background:var(--accent);color:var(--on-accent);border-color:transparent}
+.cell.accent .tag{color:var(--on-accent);opacity:.72}
+.cell h3{max-width:26ch}
+.cell-head{display:flex;justify-content:space-between;align-items:center;gap:10px;min-height:22px}
+.cell-note{font-size:.76rem;color:var(--ink-3);margin-top:auto}
+.strong .cell-note{color:var(--on-strong-2)}
+.spot{position:absolute;left:0;top:0;width:440px;height:440px;margin:-220px 0 0 -220px;border-radius:50%;background:radial-gradient(closest-side,var(--spot),transparent);opacity:0;transition:opacity 300ms ease;pointer-events:none;z-index:-1}
+.strong .spot{--spot:color-mix(in srgb,var(--accent) 18%,transparent)}
+.accent .spot{--spot:rgb(255 255 255 / .5)}
+@media (hover:hover) and (pointer:fine){.cell:hover .spot{opacity:1}}
+
+.cell-dict h3{font-size:clamp(1.3rem,2.1vw,1.8rem)}
+.rec-dot{position:relative;width:8px;height:8px;border-radius:50%;background:var(--blocker)}
+#wave{width:100%;height:88px;display:block}
+.transcript{font-size:clamp(1.04rem,1.55vw,1.28rem);line-height:1.45;font-weight:500;letter-spacing:-.01em;max-width:52ch}
+.w{transition:opacity 220ms ease}
+.transcript.playing .w{opacity:.22}
+.transcript.playing .w.on{opacity:1}
+.w.cur{background:linear-gradient(var(--accent),var(--accent)) 0 92%/100% .28em no-repeat}
+.draft-mini{display:grid;gap:10px;border-top:1px dashed var(--line);padding-top:14px}
+.dm-row{display:grid;grid-template-columns:88px minmax(0,1fr);gap:12px;font-size:.88rem}
+.dm-k{font-family:var(--f-mono);font-size:.68rem;text-transform:uppercase;letter-spacing:.08em;color:var(--ink-3);padding-top:3px}
+.ai-text{background:var(--info-soft);border-radius:8px;padding:6px 8px;margin:-6px -8px}
+.ai-chip,.rev-chip{display:inline-flex;align-items:center;font-family:var(--f-mono);font-size:.62rem;text-transform:uppercase;letter-spacing:.06em;padding:2px 7px;border-radius:999px;margin-right:6px;vertical-align:1px}
+.ai-chip{background:var(--info);color:var(--surface)}
+.rev-chip{background:var(--warn-soft);color:var(--warn)}
+
+.val-doc{border-radius:12px;background:var(--bg);border:1px solid var(--line-2);padding:14px 16px;display:grid;gap:10px;font-size:.98rem;line-height:1.55}
+.vk{display:block;font-family:var(--f-mono);font-size:.66rem;letter-spacing:.1em;text-transform:uppercase;color:var(--ink-3);margin-bottom:2px}
+mark.hl{background:transparent;color:inherit;border-radius:4px;padding:0 2px;transition:background-color 220ms ease,box-shadow 220ms ease}
+.val-doc[data-active="blocker"] mark[data-g="blocker"]{background:var(--blocker-soft);box-shadow:inset 0 -2px 0 var(--blocker)}
+.val-doc[data-active="warn"] mark[data-g="warn"]{background:var(--warn-soft);box-shadow:inset 0 -2px 0 var(--warn)}
+.val-doc[data-active="info"] mark[data-g="info"]{background:var(--info-soft);box-shadow:inset 0 -2px 0 var(--info)}
+.val-tabs{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:6px}
+.vt{display:flex;align-items:center;justify-content:center;gap:8px;height:40px;padding:0 10px;border-radius:10px;border:1px solid var(--line);font-size:.85rem;font-weight:600;transition:background-color 200ms ease,border-color 200ms ease,transform 160ms var(--ease-out)}
+.vt:active{transform:scale(.97)}
+.vt .sev{width:9px;height:9px;border-radius:3px;flex:none}
+.vt[data-sev="blocker"] .sev{background:var(--blocker)}.vt[data-sev="warn"] .sev{background:var(--warn)}.vt[data-sev="info"] .sev{background:var(--info)}
+.vt[data-sev="blocker"][aria-selected="true"]{background:var(--blocker-soft);border-color:var(--blocker)}
+.vt[data-sev="warn"][aria-selected="true"]{background:var(--warn-soft);border-color:var(--warn)}
+.vt[data-sev="info"][aria-selected="true"]{background:var(--info-soft);border-color:var(--info)}
+.val-msg{display:flex;gap:10px;align-items:baseline;font-size:.9rem;min-height:3em;transition:opacity 140ms ease,filter 140ms ease}
+.val-msg.swap,.prov-info.swap{opacity:0;filter:blur(2px)}
+.val-msg strong{flex:none;font-family:var(--f-mono);font-size:.66rem;letter-spacing:.08em;text-transform:uppercase;padding:3px 8px;border-radius:6px;font-weight:600}
+.val-msg[data-sev="blocker"] strong{background:var(--blocker-soft);color:var(--blocker)}
+.val-msg[data-sev="warn"] strong{background:var(--warn-soft);color:var(--warn)}
+.val-msg[data-sev="info"] strong{background:var(--info-soft);color:var(--info)}
+
+.pill-st{font-family:var(--f-mono);font-size:.7rem;padding:4px 9px;border-radius:999px;background:var(--strong-2);color:var(--on-strong-2)}
+.pill-st b{color:var(--code-str);font-weight:600}
+.is-final .pill-st b{color:var(--ok-strong)}
+.fmt-row{display:flex;flex-wrap:wrap;gap:6px}
+.fmt{font-family:var(--f-mono);font-size:.7rem;padding:5px 10px;border-radius:999px;box-shadow:inset 0 0 0 1px var(--strong-line);color:var(--on-strong-2)}
+.fmt.on{background:var(--accent);color:var(--on-accent);box-shadow:none}
+.code{flex:1;font-family:var(--f-mono);font-size:.78rem;line-height:1.62;background:var(--strong-2);border-radius:12px;padding:14px 16px;margin:0;overflow:auto;white-space:pre;min-height:290px;color:var(--on-strong-2);tab-size:2}
+.tk-k{color:var(--code-key)}.tk-s{color:var(--code-str)}.tk-n{color:var(--code-num)}.tk-p{color:var(--code-punc)}
+.tk-status{border-radius:4px;transition:background-color 300ms ease,color 300ms ease}
+.is-final .tk-status{background:var(--accent);color:var(--on-accent)}
+.caret{display:inline-block;width:.55em;height:1.15em;background:var(--accent);vertical-align:-.22em;margin-left:1px;animation:blink 1s steps(1) infinite}
+@keyframes blink{50%{opacity:0}}
+
+.keys{display:grid;gap:12px}
+.krow{display:flex;align-items:center;justify-content:space-between;gap:12px}
+.kcombo{display:flex;gap:6px;align-items:center;flex:none}
+.kcap{min-width:42px;height:40px;padding:0 10px;border-radius:9px;display:grid;place-items:center;font-family:var(--f-mono);font-size:.78rem;font-weight:600;color:var(--on-strong);background:linear-gradient(180deg,var(--cap-top),var(--cap));box-shadow:0 4px 0 var(--cap-edge),0 7px 14px rgb(0 0 0 / .35),inset 0 1px 0 rgb(255 255 255 / .08);transition:transform 90ms var(--ease-out),box-shadow 90ms var(--ease-out),color 120ms ease;cursor:pointer;user-select:none}
+.kcap.down,.kcap:active{transform:translateY(3px);color:var(--accent);box-shadow:0 1px 0 var(--cap-edge),0 2px 5px rgb(0 0 0 / .3),inset 0 1px 0 rgb(255 255 255 / .05)}
+@media (hover:hover) and (pointer:fine){.krow:hover .kcap{transform:translateY(3px);color:var(--accent);box-shadow:0 1px 0 var(--cap-edge),0 2px 5px rgb(0 0 0 / .3),inset 0 1px 0 rgb(255 255 255 / .05)}}
+.klabel{font-size:.85rem;color:var(--on-strong-2);text-align:right}
+
+.seg{position:relative;display:grid;grid-template-columns:repeat(3,minmax(0,1fr));padding:4px;border-radius:12px;background:var(--surface-2);border:1px solid var(--line)}
+.seg-pill{position:absolute;top:4px;bottom:4px;left:4px;width:calc((100% - 8px) / 3);border-radius:9px;background:var(--ink);transition:transform 260ms var(--ease-out)}
+.seg button{position:relative;z-index:1;height:38px;font-size:.82rem;font-weight:600;color:var(--ink-2);border-radius:9px;transition:color 200ms ease}
+.seg button[aria-checked="true"]{color:var(--bg)}
+.prov-info{display:grid;gap:9px;margin:0;font-size:.86rem;transition:opacity 140ms ease,filter 140ms ease}
+.prov-info div{display:grid;grid-template-columns:62px minmax(0,1fr);gap:10px}
+.prov-info dt{font-family:var(--f-mono);font-size:.66rem;letter-spacing:.08em;text-transform:uppercase;color:var(--ink-3);padding-top:3px}
+.prov-info dd{margin:0;font-weight:500}
+
+.pair-svg{width:100%;height:auto;max-height:160px;display:block}
+.pair-svg .dev{fill:var(--surface);stroke:var(--ink);stroke-width:2}
+.pair-svg .dev-screen{fill:var(--surface-2)}
+.pair-svg .stand{stroke:var(--ink);stroke-width:2;fill:none;stroke-linecap:round}
+.pair-svg .mic-ring{fill:var(--accent)}
+.pair-svg .mic{fill:none;stroke:var(--on-accent);stroke-width:2;stroke-linecap:round}
+.pair-svg .bars rect{fill:var(--ink);transform-box:fill-box;transform-origin:center;animation:bar 800ms ease-in-out infinite alternate;animation-play-state:paused}
+.cell-comp[data-state="paired"] .bars rect{animation-play-state:running}
+.pair-svg .bars rect:nth-child(2){animation-delay:-200ms}.pair-svg .bars rect:nth-child(3){animation-delay:-450ms}.pair-svg .bars rect:nth-child(4){animation-delay:-100ms}.pair-svg .bars rect:nth-child(5){animation-delay:-600ms}
+@keyframes bar{from{transform:scaleY(.3)}to{transform:scaleY(1)}}
+.pair-svg .ln{fill:var(--line)}
+.pair-svg .ln-new{fill:var(--accent);transform-box:fill-box;transform-origin:left center;transition:transform 600ms var(--ease-out) 400ms}
+.cell-comp[data-state="waiting"] .ln-new{transform:scaleX(.08);transition-delay:0s}
+.link-base{fill:none;stroke:var(--line);stroke-width:2;stroke-dasharray:3 5}
+.cell.soft .link-base{stroke:var(--ink-3)}
+.link-draw{fill:none;stroke:var(--ink);stroke-width:2.4;stroke-linecap:round;stroke-dasharray:1;stroke-dashoffset:0;transition:stroke-dashoffset 900ms var(--ease-out)}
+.cell-comp[data-state="waiting"] .link-draw{stroke-dashoffset:1;transition-duration:200ms}
+.link-pulse{fill:none;stroke:var(--accent);stroke-width:6;stroke-linecap:round;stroke-dasharray:.07 .93;animation:flow 1.5s linear infinite;transition:opacity 300ms ease}
+.cell-comp[data-state="waiting"] .link-pulse{opacity:0}
+@keyframes flow{from{stroke-dashoffset:1}to{stroke-dashoffset:0}}
+.pair-row{display:flex;align-items:center;justify-content:space-between;gap:10px 12px;flex-wrap:wrap;margin-top:auto}
+.pair-status{display:inline-flex;align-items:center;gap:8px;font-size:.84rem;font-weight:500}
+.pdot{position:relative;width:9px;height:9px;border-radius:50%;background:var(--ok);flex:none}
+.cell-comp[data-state="waiting"] .pdot{background:var(--info)}
+.mini-btn{height:32px;padding:0 12px;border-radius:999px;font-size:.8rem;font-weight:600;box-shadow:inset 0 0 0 1.5px var(--ink-3);transition:transform 160ms var(--ease-out),box-shadow 200ms ease}
+.mini-btn:active{transform:scale(.96)}
+@media (hover:hover) and (pointer:fine){.mini-btn:hover{box-shadow:inset 0 0 0 1.5px var(--ink)}}
+
+.audit{position:relative;height:200px;overflow:hidden;-webkit-mask-image:linear-gradient(#000 64%,transparent);mask-image:linear-gradient(#000 64%,transparent)}
+.audit-list{display:grid;transition:transform 420ms var(--ease-out)}
+.audit-row{height:28px;display:grid;grid-template-columns:auto auto minmax(0,1fr);gap:10px;align-items:center;font-family:var(--f-mono);font-size:.7rem;white-space:nowrap;transition:opacity 420ms ease}
+.audit-row.is-enter{opacity:0}
+.audit-row .seq{color:var(--code-punc);font-variant-numeric:tabular-nums}
+.audit-row .ev{color:var(--on-strong)}
+.audit-row .meta{color:var(--code-key);overflow:hidden;text-overflow:ellipsis}
+.audit-row.is-new .ev{color:var(--accent)}
+
+.cell-sign{padding:clamp(22px,3vw,40px)}
+.sign-grid{display:grid;grid-template-columns:minmax(0,1.35fr) auto minmax(0,1fr);gap:clamp(20px,3vw,48px);align-items:center}
+.sign-big{font-family:var(--f-display);font-variation-settings:"wght" 860,"wdth" 90;font-size:clamp(2.3rem,5.2vw,4.6rem);line-height:.92;letter-spacing:-.025em;margin-top:12px}
+.sign-sub{margin-top:14px;font-size:1rem;max-width:46ch;opacity:.86}
+.zero{display:flex;align-items:center;gap:14px}
+.slot{display:inline-block;height:1em;overflow:hidden;font-family:var(--f-display);font-variation-settings:"wght" 900,"wdth" 108;font-size:clamp(5rem,10vw,9rem);line-height:1}
+.slot-strip{display:flex;flex-direction:column;transform:translateY(-9em)}
+.slot-strip span{display:block;height:1em}
+.zero-l{font-size:.92rem;font-weight:600;line-height:1.35;max-width:15ch}
+.sign-panel{background:rgb(255 255 255 / .55);border:1px solid rgb(11 14 19 / .12);border-radius:16px;padding:16px}
+.sp{display:grid;gap:8px;font-size:.86rem;margin:0 0 14px}
+.sp div{display:flex;justify-content:space-between;gap:12px}
+.sp dt{opacity:.7}
+.sp dd{margin:0;font-weight:600;text-align:right}
+.hold{position:relative;display:block;width:100%;height:58px;border-radius:999px;box-shadow:inset 0 0 0 2px var(--on-accent);color:var(--on-accent);font-weight:700;font-size:1rem;overflow:hidden;user-select:none;-webkit-user-select:none;-webkit-touch-callout:none;touch-action:none;transition:transform 160ms var(--ease-out)}
+.hold:active{transform:scale(.98)}
+.hold-label{position:relative;display:inline-flex;align-items:center;justify-content:center;gap:8px}
+.hold-fill{position:absolute;inset:0;display:grid;place-items:center;background:var(--on-accent);color:var(--accent);clip-path:inset(0 100% 0 0);transition:clip-path 220ms var(--ease-out)}
+.hold.holding .hold-fill{clip-path:inset(0 0 0 0);transition:clip-path 1.4s linear}
+.hold.signed .hold-fill{clip-path:inset(0 0 0 0);transition:none}
+.hold-hint{font-size:.76rem;opacity:.7;margin-top:8px;text-align:center}
+
+/* surfaces */
+.surf-grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:14px}
+.surf{background:var(--surface);border:1px solid var(--line);border-radius:var(--r);padding:clamp(18px,2vw,24px);display:flex;flex-direction:column;gap:12px}
+.surf>p:not(.eyebrow){color:var(--ink-2);font-size:.95rem}
+.surf h3{font-size:clamp(1.4rem,2vw,1.75rem);font-variation-settings:"wght" 780,"wdth" 90}
+.surf-art{height:200px;border-radius:12px;background:var(--surface-2);position:relative;overflow:hidden;margin-bottom:6px}
+.ticks{display:grid;gap:8px}
+.ticks li{display:flex;gap:10px;align-items:flex-start;font-size:.92rem}
+.ticks li::before{content:"";flex:none;width:17px;height:17px;margin-top:2px;border-radius:5px;background:var(--accent) url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%230B0E13' stroke-width='3.4' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M5 12.5l4.5 4.5L19 7.5'/%3E%3C/svg%3E") center/12px no-repeat}
+.win{position:absolute;left:18px;right:-24px;top:22px;bottom:-24px;background:var(--surface);border:1px solid var(--line);border-radius:10px;box-shadow:0 20px 40px -20px var(--shadow);transition:transform 500ms var(--ease-out);display:flex;flex-direction:column}
+.win-bar{display:flex;align-items:center;gap:6px;height:30px;padding:0 10px;border-bottom:1px solid var(--line-2);font-family:var(--f-mono);font-size:.62rem;color:var(--ink-3)}
+.win-bar i{width:8px;height:8px;border-radius:50%;background:var(--line)}
+.win-bar span{margin-left:8px}
+.win-body{display:flex;flex:1;min-height:0}
+.win-side{width:54px;border-right:1px solid var(--line-2);padding:10px;display:grid;gap:8px;align-content:start}
+.win-side b{height:8px;border-radius:4px;background:var(--surface-2)}
+.win-side b:first-child{background:var(--accent)}
+.win-main{flex:1;padding:12px 14px;display:grid;gap:9px;align-content:start;position:relative}
+.l{display:block;height:7px;border-radius:4px;background:var(--surface-2)}
+.l.ai{background:var(--info-soft);box-shadow:inset 3px 0 0 var(--info)}
+.w70{width:70%}.w90{width:90%}.w60{width:60%}.w80{width:80%}.w50{width:50%}
+.win-sign{position:absolute;right:40px;bottom:44px;font-size:.7rem;font-weight:700;padding:6px 12px;border-radius:999px;background:var(--accent);color:var(--on-accent)}
+.phone{position:absolute;left:50%;top:22px;width:118px;height:220px;margin-left:-59px;border-radius:22px;border:2px solid var(--ink);background:var(--surface);transition:transform 500ms var(--ease-out);display:grid;place-items:center;align-content:start;padding-top:44px;gap:18px}
+.phone-mic{width:56px;height:56px;border-radius:50%;background:var(--accent);color:var(--on-accent);display:grid;place-items:center}
+.phone-bars{display:flex;gap:4px;align-items:center;height:30px}
+.phone-bars i{width:4px;height:100%;border-radius:2px;background:var(--ink);animation:bar 760ms ease-in-out infinite alternate}
+.phone-bars i:nth-child(2n){animation-delay:-260ms}.phone-bars i:nth-child(3n){animation-delay:-520ms}
+.phone-cap{font-family:var(--f-mono);font-size:.56rem;letter-spacing:.08em;text-transform:uppercase;color:var(--ink-3)}
+.tbl{position:absolute;left:18px;right:-24px;top:22px;bottom:-24px;background:var(--surface);border:1px solid var(--line);border-radius:10px;padding:10px 12px;display:grid;gap:8px;align-content:start;transition:transform 500ms var(--ease-out)}
+.tr{display:grid;grid-template-columns:1.2fr 1fr auto;gap:10px;align-items:center;padding:6px 0;border-bottom:1px solid var(--line-2)}
+.tr:first-child{font-family:var(--f-mono);font-size:.58rem;letter-spacing:.08em;text-transform:uppercase;color:var(--ink-3)}
+.st{font-family:var(--f-mono);font-size:.58rem;padding:2px 7px;border-radius:999px}
+.st-ok{background:var(--ok-soft);color:var(--ok)}.st-info{background:var(--info-soft);color:var(--info)}.st-warn{background:var(--warn-soft);color:var(--warn)}
+@media (hover:hover) and (pointer:fine){.surf:hover .win,.surf:hover .tbl{transform:translate(-8px,-8px)}.surf:hover .phone{transform:translateY(-10px) rotate(-3deg)}}
+
+/* integrations */
+.intg{border-top:1px solid var(--line)}
+.ig-row{position:relative;display:grid;grid-template-columns:minmax(90px,150px) minmax(0,1.15fr) minmax(0,1fr);gap:20px;align-items:center;padding:22px 14px;border-bottom:1px solid var(--line);isolation:isolate;transition:color 220ms ease}
+.ig-row::before{content:"";position:absolute;inset:0;background:var(--accent);clip-path:inset(0 100% 0 0);transition:clip-path 340ms var(--ease-out);z-index:-1}
+.ig-group{font-family:var(--f-mono);font-size:.7rem;text-transform:uppercase;letter-spacing:.1em;color:var(--ink-3);transition:color 220ms ease}
+.ig-name{font-family:var(--f-display);font-size:clamp(1.6rem,3.6vw,3rem);font-variation-settings:"wght" 720,"wdth" 98;line-height:1.05;letter-spacing:-.02em}
+.roll{display:inline-grid;overflow:hidden;vertical-align:top}
+.roll>span{grid-area:1/1;transition:transform 380ms var(--ease-out)}
+.roll>span+span{transform:translateY(105%);font-variation-settings:"wght" 900,"wdth" 112}
+.ig-desc{color:var(--ink-2);font-size:.95rem;transition:color 220ms ease}
+@media (hover:hover) and (pointer:fine){
+  .ig-row:hover::before{clip-path:inset(0 0 0 0)}
+  .ig-row:hover,.ig-row:hover .ig-group,.ig-row:hover .ig-desc{color:var(--on-accent)}
+  .ig-row:hover .roll>span:first-child{transform:translateY(-105%)}
+  .ig-row:hover .roll>span+span{transform:translateY(0)}
+}
+
+/* security band */
+.band{background:var(--strong);color:var(--on-strong)}
+.band .eyebrow{color:var(--on-strong-2)}
+.band .sec-head>p:not(.eyebrow){color:var(--on-strong-2)}
+.sec-grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:1px;background:var(--strong-line);border:1px solid var(--strong-line);border-radius:var(--r);overflow:hidden}
+.sec-item{background:var(--strong);padding:clamp(20px,2.4vw,30px);display:grid;gap:10px;align-content:start;transition:background-color 220ms ease}
+.sec-ic{width:42px;height:42px;border-radius:12px;display:grid;place-items:center;background:var(--strong-2);color:var(--accent);transition:background-color 200ms ease,color 200ms ease,transform 300ms var(--ease-out)}
+.sec-item p{color:var(--on-strong-2);font-size:.94rem}
+@media (hover:hover) and (pointer:fine){.sec-item:hover{background:var(--strong-2)}.sec-item:hover .sec-ic{background:var(--accent);color:var(--on-accent);transform:rotate(-6deg)}}
+.stats{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:14px;margin-top:clamp(40px,5vw,64px)}
+.stat{border-top:2px solid var(--accent);padding-top:16px}
+.stat-n{font-family:var(--f-display);font-variation-settings:"wght" 860,"wdth" 108;font-size:clamp(3rem,7vw,6rem);line-height:.9;color:var(--accent);font-variant-numeric:tabular-nums}
+.stat-l{font-size:.92rem;color:var(--on-strong-2);margin-top:8px}
+
+/* audiences, pricing, faq */
+.split{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:14px}
+.aud{border-radius:var(--r);padding:clamp(24px,3.4vw,48px);display:flex;flex-direction:column;gap:20px;background:var(--surface);border:1px solid var(--line)}
+.aud.strong{background:var(--strong);color:var(--on-strong);border-color:transparent}
+.aud.strong .eyebrow{color:var(--on-strong-2)}
+.aud-h{font-size:clamp(1.9rem,3.4vw,3.1rem);font-variation-settings:"wght" 820,"wdth" 86;line-height:.98;letter-spacing:-.02em}
+.aud .cta-row{margin-top:auto;padding-top:8px}
+.price-grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:14px}
+.price{border-radius:var(--r);padding:clamp(22px,2.6vw,32px);background:var(--surface);border:1px solid var(--line);display:flex;flex-direction:column;gap:14px}
+.price.strong{background:var(--strong);color:var(--on-strong);border-color:transparent}
+.price.strong .eyebrow{color:var(--on-strong-2)}
+.price-v{font-family:var(--f-display);font-variation-settings:"wght" 820,"wdth" 94;font-size:clamp(2rem,3.4vw,2.8rem);line-height:1;letter-spacing:-.02em}
+.price .desc{color:var(--ink-2);font-size:.95rem}
+.price.strong .desc{color:var(--on-strong-2)}
+.price .ticks{border-top:1px solid var(--line);padding-top:16px;margin-bottom:10px}
+.price.strong .ticks{border-color:var(--strong-line)}
+.price .btn{margin-top:auto;width:100%}
+.faq-grid{display:grid;grid-template-columns:minmax(0,.8fr) minmax(0,1.2fr);gap:clamp(28px,5vw,80px);align-items:start}
+.faq-list{border-top:1px solid var(--line)}
+.faq-item{border-bottom:1px solid var(--line)}
+.faq-q{width:100%;display:flex;justify-content:space-between;align-items:center;gap:16px;padding:22px 0;text-align:left;font-family:var(--f-display);font-variation-settings:"wght" 650,"wdth" 98;font-size:clamp(1.08rem,1.6vw,1.32rem);letter-spacing:-.01em;line-height:1.25}
+.pm{width:34px;height:34px;border-radius:50%;display:grid;place-items:center;box-shadow:inset 0 0 0 1.5px var(--line);flex:none;transition:transform 260ms var(--ease-out),background-color 200ms ease,box-shadow 200ms ease,color 200ms ease}
+.pm .ic{width:16px;height:16px}
+.faq-item[data-open] .pm{transform:rotate(45deg);background:var(--accent);box-shadow:none;color:var(--on-accent)}
+.faq-a{display:grid;grid-template-rows:0fr;visibility:hidden;transition:grid-template-rows 300ms var(--ease-out),visibility 0s linear 300ms}
+.faq-item[data-open] .faq-a{grid-template-rows:1fr;visibility:visible;transition:grid-template-rows 300ms var(--ease-out),visibility 0s}
+.faq-a>div{overflow:hidden;min-height:0}
+.faq-a p{padding-bottom:22px;color:var(--ink-2);max-width:62ch}
+
+/* final + footer */
+.final{padding-block:clamp(80px,10vw,140px);overflow-x:clip;border-top:1px solid var(--line)}
+.kinetic-final{font-size:clamp(2.6rem,9.6vw,8.6rem);margin-top:18px}
+.kinetic-final .k-line{font-variation-settings:"wght" 300,"wdth" 80}
+.kinetic-final .k-sign{font-variation-settings:"wght" 820,"wdth" 92}
+.final-foot{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:24px 48px;align-items:end;margin-top:clamp(28px,4vw,48px)}
+.cli{display:inline-flex;align-items:center;gap:8px;background:var(--strong);color:var(--on-strong);border-radius:12px;padding:6px 6px 6px 16px;font-family:var(--f-mono);font-size:.84rem;max-width:100%;min-width:0}
+.cli code{overflow-x:auto;white-space:nowrap;min-width:0;font:inherit}
+.cli code::before{content:"$ ";color:var(--accent)}
+.copy{width:38px;height:38px;border-radius:9px;display:grid;place-items:center;background:var(--strong-2);color:var(--on-strong);flex:none;transition:transform 160ms var(--ease-out),background-color 200ms ease,color 200ms ease}
+.copy:active{transform:scale(.94)}
+.copy.done{background:var(--accent);color:var(--on-accent)}
+.copy .ic{width:17px;height:17px}
+.foot{border-top:1px solid var(--line);padding-block:clamp(56px,7vw,96px) 28px;overflow-x:clip}
+.foot-top{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,2.5fr);gap:40px}
+.foot-brand p{color:var(--ink-2);font-size:.92rem;margin-block:14px 18px;max-width:30ch}
+.foot-cols{display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:24px}
+.foot-cols h4{font-family:var(--f-mono);font-size:.72rem;letter-spacing:.1em;text-transform:uppercase;color:var(--ink-3);margin-bottom:14px;font-weight:500}
+.foot-cols ul{display:grid;gap:9px}
+.foot-cols a{font-size:.9rem;color:var(--ink-2);transition:color 160ms ease}
+@media (hover:hover) and (pointer:fine){.foot-cols a:hover{color:var(--ink)}}
+.wordmark{font-family:var(--f-display);font-size:clamp(4.4rem,21vw,19rem);line-height:.82;letter-spacing:-.03em;margin-top:clamp(40px,6vw,80px);user-select:none}
+.wordmark .k-line{font-variation-settings:"wght" 200,"wdth" 62}
+.foot-bot{display:flex;flex-wrap:wrap;justify-content:space-between;gap:10px 24px;border-top:1px solid var(--line);margin-top:24px;padding-top:20px;font-size:.8rem;color:var(--ink-3)}
+.toast{position:fixed;left:50%;bottom:calc(20px + env(safe-area-inset-bottom,0px));transform:translate(-50%,12px);opacity:0;background:var(--ink);color:var(--bg);padding:10px 16px;border-radius:999px;font-size:.88rem;font-weight:500;z-index:90;pointer-events:none;transition:opacity 200ms ease,transform 260ms var(--ease-out)}
+.toast.show{opacity:1;transform:translate(-50%,0)}
+
+/* responsive */
+@media (max-width:1140px){
+  .nav-links,.nav-signin{display:none}
+  .burger{display:grid}
+  .bento{grid-template-columns:repeat(2,minmax(0,1fr));grid-template-areas:"d d" "v v" "f k" "f p" "c a" "s s"}
+}
+@media (max-width:900px){
+  .wf{grid-template-columns:repeat(2,minmax(0,1fr));row-gap:40px}
+  .wf-line{display:none}
+  .hero-foot,.surf-grid,.price-grid,.split,.faq-grid,.final-foot,.foot-top,.sign-grid{grid-template-columns:minmax(0,1fr)}
+  .sec-grid,.stats{grid-template-columns:repeat(2,minmax(0,1fr))}
+  .foot-cols{grid-template-columns:repeat(3,minmax(0,1fr))}
+  .ig-row{grid-template-columns:minmax(0,1fr);gap:6px}
+}
+@media (max-width:720px){
+  .bento{grid-template-columns:minmax(0,1fr);grid-template-areas:"d" "v" "f" "k" "p" "c" "a" "s"}
+  .code{min-height:0}
+}
+@media (max-width:640px){
+  .ov-tr,.ov-br,.ov-r,.ov-l,.caliper{display:none}
+  .wf,.sec-grid{grid-template-columns:minmax(0,1fr)}
+  .foot-cols{grid-template-columns:repeat(2,minmax(0,1fr))}
+  .nav-cta .btn-demo{display:none}
+  .dm-row{grid-template-columns:minmax(0,1fr);gap:4px}
+  .krow{flex-wrap:wrap}
+  .klabel{text-align:left}
+}
+@media (prefers-reduced-motion: reduce){
+  *,*::before,*::after{animation-duration:.01ms!important;animation-iteration-count:1!important;transition-duration:.01ms!important;scroll-behavior:auto!important}
+  .hold.holding .hold-fill{transition:clip-path 1.4s linear!important}
+}
+</style>
+
+<svg width="0" height="0" style="position:absolute" aria-hidden="true" focusable="false">
+  <defs>
+    <symbol id="i-wave" viewBox="0 0 24 24"><path d="M3 12h3l2.5 6 4-14 2.5 8H21"/></symbol>
+    <symbol id="i-mic" viewBox="0 0 24 24"><rect x="9" y="3" width="6" height="11" rx="3"/><path d="M5 11a7 7 0 0 0 14 0M12 18v3"/></symbol>
+    <symbol id="i-doc" viewBox="0 0 24 24"><path d="M7 3h7l5 5v13H7zM14 3v5h5M10 13h6M10 17h6"/></symbol>
+    <symbol id="i-check" viewBox="0 0 24 24"><path d="M5 12.5l4.5 4.5L19 7.5"/></symbol>
+    <symbol id="i-shield" viewBox="0 0 24 24"><path d="M12 3l8 3v6c0 4.5-3.4 8.3-8 9-4.6-.7-8-4.5-8-9V6z"/><path d="M8.5 12l2.5 2.5 4.5-5"/></symbol>
+    <symbol id="i-lock" viewBox="0 0 24 24"><rect x="5" y="11" width="14" height="10" rx="2"/><path d="M8 11V8a4 4 0 0 1 8 0v3"/></symbol>
+    <symbol id="i-server" viewBox="0 0 24 24"><rect x="4" y="4" width="16" height="6" rx="1.5"/><rect x="4" y="14" width="16" height="6" rx="1.5"/><path d="M8 7h.01M8 17h.01"/></symbol>
+    <symbol id="i-key" viewBox="0 0 24 24"><circle cx="8" cy="15" r="4"/><path d="M11 12l9-9M17 6l3 3"/></symbol>
+    <symbol id="i-phone" viewBox="0 0 24 24"><rect x="7" y="2.5" width="10" height="19" rx="2.5"/><path d="M11 18.5h2"/></symbol>
+    <symbol id="i-grid" viewBox="0 0 24 24"><rect x="4" y="4" width="7" height="7" rx="1.5"/><rect x="13" y="4" width="7" height="7" rx="1.5"/><rect x="4" y="13" width="7" height="7" rx="1.5"/><rect x="13" y="13" width="7" height="7" rx="1.5"/></symbol>
+    <symbol id="i-terminal" viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="16" rx="2"/><path d="M7 9l3 3-3 3M13 15h4"/></symbol>
+    <symbol id="i-plug" viewBox="0 0 24 24"><path d="M9 3v5M15 3v5M7 8h10v3a5 5 0 0 1-10 0zM12 16v5"/></symbol>
+    <symbol id="i-chart" viewBox="0 0 24 24"><path d="M4 19h16M6 15l4-5 3 3 5-7"/></symbol>
+    <symbol id="i-users" viewBox="0 0 24 24"><circle cx="9" cy="8" r="3.5"/><path d="M2.5 20c.8-3.5 3.4-5.5 6.5-5.5s5.7 2 6.5 5.5M16 4.5a3.5 3.5 0 0 1 0 7M18 14.8c1.9.7 3.1 2.5 3.5 5.2"/></symbol>
+    <symbol id="i-book" viewBox="0 0 24 24"><path d="M4 19V5a2 2 0 0 1 2-2h13v16H6a2 2 0 0 0-2 2 2 2 0 0 0 2 2h13"/></symbol>
+    <symbol id="i-download" viewBox="0 0 24 24"><path d="M12 4v11M7 10l5 5 5-5M5 20h14"/></symbol>
+    <symbol id="i-arrow" viewBox="0 0 24 24"><path d="M5 12h14M13 6l6 6-6 6"/></symbol>
+    <symbol id="i-chev" viewBox="0 0 24 24"><path d="M6 9l6 6 6-6"/></symbol>
+    <symbol id="i-copy" viewBox="0 0 24 24"><rect x="9" y="9" width="11" height="11" rx="2"/><path d="M5 15V5a2 2 0 0 1 2-2h8"/></symbol>
+    <symbol id="i-plus" viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></symbol>
+    <symbol id="i-alert" viewBox="0 0 24 24"><path d="M12 3.5l9 16H3zM12 10v4M12 17h.01"/></symbol>
+    <symbol id="i-pen" viewBox="0 0 24 24"><path d="M4 20l4-1 11-11-3-3L5 16zM14 6l3 3"/></symbol>
+    <symbol id="i-building" viewBox="0 0 24 24"><path d="M4 21V7l8-4 8 4v14M9 21v-5h6v5M9 10h.01M15 10h.01"/></symbol>
+    <symbol id="i-pulse" viewBox="0 0 24 24"><path d="M3 12h4l2-5 4 10 2-5h6"/></symbol>
+    <symbol id="i-sliders" viewBox="0 0 24 24"><path d="M4 6h9M17 6h3M4 12h3M11 12h9M4 18h11M19 18h1"/><circle cx="15" cy="6" r="2"/><circle cx="9" cy="12" r="2"/><circle cx="17" cy="18" r="2"/></symbol>
+    <symbol id="i-menu" viewBox="0 0 24 24"><path d="M4 7h16M4 12h16M4 17h16"/></symbol>
+    <symbol id="i-close" viewBox="0 0 24 24"><path d="M6 6l12 12M18 6L6 18"/></symbol>
+  </defs>
+</svg>
+
+<a class="skip" href="#main">Skip to content</a>
+
+<header class="nav">
+  <div class="wrap nav-in">
+    <a class="brand" href="#top" aria-label="RadioPad home"><span class="brand-mark"><svg class="ic"><use href="#i-wave"/></svg></span>RadioPad</a>
+    <ul class="nav-links">
+      <li class="has-mega">
+        <button class="nav-link" type="button" aria-expanded="false" aria-controls="mega-product">Product <svg class="ic"><use href="#i-chev"/></svg></button>
+        <div class="mega" id="mega-product">
+          <div class="mega-list">
+            <a class="mega-item" href="#product"><span class="mi-ic"><svg class="ic"><use href="#i-doc"/></svg></span><span><b>Reporting workspace</b><span class="d">Templates, dictation and signing on Windows.</span></span></a>
+            <a class="mega-item" href="#product"><span class="mi-ic"><svg class="ic"><use href="#i-shield"/></svg></span><span><b>Validation engine</b><span class="d">Institution rulebooks check every draft.</span></span></a>
+            <a class="mega-item" href="#product"><span class="mi-ic"><svg class="ic"><use href="#i-mic"/></svg></span><span><b>Dictation</b><span class="d">Local engine, hotkeys, secure clipboard.</span></span></a>
+            <a class="mega-item" href="#surfaces"><span class="mi-ic"><svg class="ic"><use href="#i-phone"/></svg></span><span><b>Mobile companion</b><span class="d">Pair your phone as a wireless mic.</span></span></a>
+            <a class="mega-item" href="#surfaces"><span class="mi-ic"><svg class="ic"><use href="#i-grid"/></svg></span><span><b>Admin console</b><span class="d">Users, templates, providers, audit.</span></span></a>
+            <a class="mega-item" href="#demo"><span class="mi-ic"><svg class="ic"><use href="#i-terminal"/></svg></span><span><b>CLI</b><span class="d">Author rulebooks and batch validate.</span></span></a>
+          </div>
+          <div class="mega-feat">
+            <p class="eyebrow">Built in</p>
+            <h3>Critical results</h3>
+            <p>A workflow for flagging and following up critical findings, right from the report.</p>
+            <a href="#workflow">See the workflow <svg class="ic"><use href="#i-arrow"/></svg></a>
+          </div>
+        </div>
+      </li>
+      <li class="has-mega">
+        <button class="nav-link" type="button" aria-expanded="false" aria-controls="mega-solutions">Solutions <svg class="ic"><use href="#i-chev"/></svg></button>
+        <div class="mega" id="mega-solutions">
+          <div class="mega-list">
+            <a class="mega-item" href="#solutions"><span class="mi-ic"><svg class="ic"><use href="#i-building"/></svg></span><span><b>Hospitals</b><span class="d">One reporting standard across departments.</span></span></a>
+            <a class="mega-item" href="#solutions"><span class="mi-ic"><svg class="ic"><use href="#i-users"/></svg></span><span><b>Imaging groups</b><span class="d">Shared templates and peer review across sites.</span></span></a>
+            <a class="mega-item" href="#solutions"><span class="mi-ic"><svg class="ic"><use href="#i-mic"/></svg></span><span><b>Radiologists</b><span class="d">Faster drafts on your own Windows machine.</span></span></a>
+            <a class="mega-item" href="#security"><span class="mi-ic"><svg class="ic"><use href="#i-server"/></svg></span><span><b>On-premise</b><span class="d">Run the API and models in your data center.</span></span></a>
+          </div>
+          <div class="mega-feat">
+            <p class="eyebrow">Built in</p>
+            <h3>Peer review</h3>
+            <p>Review colleagues' reports inside the same product you report in.</p>
+            <a href="#demo">Book a demo <svg class="ic"><use href="#i-arrow"/></svg></a>
+          </div>
+        </div>
+      </li>
+      <li><a class="nav-link" href="#integrations">Integrations</a></li>
+      <li><a class="nav-link" href="#security">Security</a></li>
+      <li><a class="nav-link" href="#pricing">Pricing</a></li>
+      <li class="has-mega">
+        <button class="nav-link" type="button" aria-expanded="false" aria-controls="mega-resources">Resources <svg class="ic"><use href="#i-chev"/></svg></button>
+        <div class="mega" id="mega-resources">
+          <div class="mega-list">
+            <a class="mega-item" href="#"><span class="mi-ic"><svg class="ic"><use href="#i-book"/></svg></span><span><b>Documentation</b><span class="d">Setup, rulebooks, integrations.</span></span></a>
+            <a class="mega-item" href="#"><span class="mi-ic"><svg class="ic"><use href="#i-doc"/></svg></span><span><b>Blog</b><span class="d">Notes from the team.</span></span></a>
+            <a class="mega-item" href="#"><span class="mi-ic"><svg class="ic"><use href="#i-shield"/></svg></span><span><b>Rulebook guide</b><span class="d">Write and test validation rules.</span></span></a>
+            <a class="mega-item" href="#"><span class="mi-ic"><svg class="ic"><use href="#i-plug"/></svg></span><span><b>FHIR export guide</b><span class="d">Map reports to DiagnosticReport.</span></span></a>
+            <a class="mega-item" href="#"><span class="mi-ic"><svg class="ic"><use href="#i-chart"/></svg></span><span><b>Changelog</b><span class="d">What shipped recently.</span></span></a>
+            <a class="mega-item" href="#"><span class="mi-ic"><svg class="ic"><use href="#i-pulse"/></svg></span><span><b>Status</b><span class="d">Service health.</span></span></a>
+          </div>
+          <div class="mega-feat">
+            <p class="eyebrow">For radiologists</p>
+            <h3>Get the desktop app</h3>
+            <p>Install on Windows, pair your phone, dictate your first draft today.</p>
+            <a href="#pricing">Download for Windows <svg class="ic"><use href="#i-arrow"/></svg></a>
+          </div>
+        </div>
+      </li>
+    </ul>
+    <div class="nav-cta">
+      <a class="nav-link nav-signin" href="#">Sign in</a>
+      <span class="magnet btn-demo"><a class="btn btn-primary btn-sm" href="#demo">Book a demo</a></span>
+      <button class="burger" id="burger" type="button" aria-expanded="false" aria-controls="drawer" aria-label="Menu"><svg class="ic i-menu"><use href="#i-menu"/></svg><svg class="ic i-close"><use href="#i-close"/></svg></button>
+    </div>
+  </div>
+</header>
+
+<div class="drawer" id="drawer">
+  <div class="drawer-group"><span class="eyebrow">Product</span><a href="#product">Live demos</a><a href="#workflow">How it works</a><a href="#surfaces">Desktop, mobile, web</a></div>
+  <div class="drawer-group"><span class="eyebrow">Company</span><a href="#solutions">Solutions</a><a href="#integrations">Integrations</a><a href="#security">Security</a><a href="#pricing">Pricing</a><a href="#faq">FAQ</a><a href="#">Sign in</a></div>
+  <div class="drawer-ctas"><a class="btn btn-primary" href="#demo">Book a demo</a><a class="btn btn-ghost" href="#pricing"><svg class="ic"><use href="#i-download"/></svg>Download for Windows</a></div>
+</div>
+
+<main id="main">
+  <section class="hero" id="top" aria-labelledby="heroTitle">
+    <div class="wrap">
+      <div class="viewport">
+        <span class="ov ov-tl" aria-hidden="true">RadioPad · CT chest w/o · example<br>Se 3 · Im <b id="sliceNo">112</b>/240</span>
+        <span class="ov ov-tr" aria-hidden="true">W 1500 · L −600<br>5.0 mm · lung window</span>
+        <span class="ov ov-bl" aria-hidden="true"><i></i>Draft · not signed</span>
+        <span class="ov ov-br" aria-hidden="true">AI drafts<br>Radiologist signs</span>
+        <span class="ov ov-r" aria-hidden="true">R</span>
+        <span class="ov ov-l" aria-hidden="true">L</span>
+
+        <div class="hero-chips">
+          <span class="chip"><svg class="ic"><use href="#i-wave"/></svg>AI-assisted radiology reporting</span>
+          <span class="chip">Windows desktop · Android and iOS companion</span>
+        </div>
+        <h1 class="kinetic" id="heroTitle" data-kinetic>
+          <span class="sr-only">You dictate. It drafts. You sign.</span>
+          <span class="k-line" data-w="340" data-d="78" aria-hidden="true">You dictate.</span>
+          <span class="k-line k-outline" data-w="340" data-d="78" aria-hidden="true">It drafts.</span>
+          <span class="k-line k-sign" data-w="820" data-d="92" aria-hidden="true">You sign.</span>
+          <svg class="caliper" viewBox="0 0 200 70" aria-hidden="true"><line x1="14" y1="52" x2="176" y2="16"/><line x1="8" y1="44" x2="20" y2="60"/><line x1="170" y1="8" x2="182" y2="24"/><text x="104" y="64">4.1 mm</text></svg>
+        </h1>
+        <div class="hero-foot">
+          <div>
+            <p class="lead">RadioPad turns your dictation, priors, measurements and study metadata into a <b>validated draft report</b>. You review, correct and sign. The AI never signs for you.</p>
+            <div class="cta-row">
+              <span class="magnet"><a class="btn btn-primary" href="#demo">Book a demo <svg class="ic arr"><use href="#i-arrow"/></svg></a></span>
+              <span class="magnet"><a class="btn btn-ghost" href="#pricing"><svg class="ic"><use href="#i-download"/></svg>Download for Windows</a></span>
+            </div>
+            <p class="fine">Demo for hospitals and imaging groups. Free trial for individual radiologists.</p>
+          </div>
+          <aside class="status-card" aria-label="Example draft status">
+            <div class="sc-head"><span class="tag"><span class="live-dot" aria-hidden="true"></span>Example draft</span><span class="mono xs muted">CT chest · Se 3</span></div>
+            <ul class="sc-list">
+              <li><span class="sev-ic s-ok"><svg class="ic"><use href="#i-check"/></svg></span>Findings drafted from dictation</li>
+              <li><span class="sev-ic s-blocker"><svg class="ic"><use href="#i-alert"/></svg></span>Blocker: laterality mismatch</li>
+              <li><span class="sev-ic s-warn"><svg class="ic"><use href="#i-alert"/></svg></span>Impression is AI text, requires review</li>
+              <li><span class="sev-ic s-ink"><svg class="ic"><use href="#i-pen"/></svg></span>Awaiting your signature</li>
+            </ul>
+          </aside>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <section class="mq" aria-label="Supported modalities">
+    <p class="sr-only">Reporting for CT, MR, XR, US, MG, NM and PET.</p>
+    <div class="mq-track" aria-hidden="true">
+      <span class="mq-item"><span class="mq-code">CT</span><span class="mq-name">Computed tomography</span><span class="mq-dot"></span></span>
+      <span class="mq-item"><span class="mq-code o">MR</span><span class="mq-name">Magnetic resonance</span><span class="mq-dot"></span></span>
+      <span class="mq-item"><span class="mq-code">XR</span><span class="mq-name">Radiography</span><span class="mq-dot"></span></span>
+      <span class="mq-item"><span class="mq-code o">US</span><span class="mq-name">Ultrasound</span><span class="mq-dot"></span></span>
+      <span class="mq-item"><span class="mq-code">MG</span><span class="mq-name">Mammography</span><span class="mq-dot"></span></span>
+      <span class="mq-item"><span class="mq-code o">NM</span><span class="mq-name">Nuclear medicine</span><span class="mq-dot"></span></span>
+      <span class="mq-item"><span class="mq-code">PET</span><span class="mq-name">Positron emission tomography</span><span class="mq-dot"></span></span>
+    </div>
+    <div class="mq-track mq-sub" data-dir="rev" aria-hidden="true"><span>Templates</span><span>Findings library</span><span>Priors</span><span>Measurements</span><span>Rulebooks</span><span>Critical results</span><span>Peer review</span><span>Drift monitoring</span><span>Prompt overrides</span><span>Connector marketplace</span></div>
+  </section>
+
+  <section class="section" id="workflow" aria-labelledby="wfTitle">
+    <div class="wrap">
+      <div class="sec-head">
+        <p class="eyebrow">How it works</p>
+        <h2 id="wfTitle" data-split>Four steps from voice to a signed report.</h2>
+      </div>
+      <ol class="wf">
+        <li class="wf-line" aria-hidden="true"><span class="wf-fill"></span></li>
+        <li class="wf-step is-on"><span class="wf-num"><svg class="ic"><use href="#i-mic"/></svg></span><span class="wf-k">01</span><h3>Dictate</h3><p>Speak at the desktop or into your paired phone. The local engine transcribes while you read the study.</p></li>
+        <li class="wf-step is-on"><span class="wf-num"><svg class="ic"><use href="#i-doc"/></svg></span><span class="wf-k">02</span><h3>Draft</h3><p>Dictation, priors, measurements and study metadata become a structured draft in your template.</p></li>
+        <li class="wf-step is-on"><span class="wf-num"><svg class="ic"><use href="#i-shield"/></svg></span><span class="wf-k">03</span><h3>Validate</h3><p>Your rulebook checks laterality, required sections and critical results before anything is final.</p></li>
+        <li class="wf-step is-on"><span class="wf-num"><svg class="ic"><use href="#i-pen"/></svg></span><span class="wf-k">04</span><h3>Sign</h3><p>You review, edit and sign. Then export FHIR R4, PDF, DOCX or plain text.</p></li>
+      </ol>
+    </div>
+  </section>
+
+  <section class="section" id="product" aria-labelledby="bentoTitle" style="padding-top:0">
+    <div class="wrap">
+      <div class="sec-head">
+        <p class="eyebrow">Live demos · every tile works</p>
+        <h2 id="bentoTitle" data-split>Touch the product before you talk to us.</h2>
+        <p>Each tile below is a small working piece of RadioPad. Hover, click, press keys, and hold to sign.</p>
+      </div>
+      <div class="bento">
+        <div class="b b-d"><article class="cell cell-dict" aria-labelledby="t-dict">
+          <span class="spot" aria-hidden="true"></span>
+          <div class="cell-head"><span class="tag"><span class="rec-dot" aria-hidden="true"></span>Dictation · local engine</span><span class="mono xs muted" id="dictTime">00:00</span></div>
+          <h3 id="t-dict">Speak naturally. The draft keeps up.</h3>
+          <canvas id="wave" aria-hidden="true"></canvas>
+          <p class="transcript" id="transcript">CT chest without contrast. Compared with the prior of 12 March. Lungs are clear. No pleural effusion. Stable 4 millimeter nodule in the right lower lobe, series 3 image 112.</p>
+          <div class="draft-mini">
+            <div class="dm-row"><span class="dm-k">Findings</span><span>Stable 4 mm nodule, right lower lobe (Se 3, Im 112). No pleural effusion.</span></div>
+            <div class="dm-row"><span class="dm-k">Impression</span><span class="ai-text"><span class="ai-chip">AI draft</span><span class="rev-chip">Requires review</span>No acute cardiopulmonary process. Stable right lower lobe nodule.</span></div>
+          </div>
+          <p class="cell-note">Simulated demo. This page never uses your microphone.</p>
+        </article></div>
+
+        <div class="b b-v"><article class="cell cell-val" aria-labelledby="t-val">
+          <span class="spot" aria-hidden="true"></span>
+          <div class="cell-head"><span class="tag">Validation · chest_ct_v1</span><span class="mono xs muted">3 findings</span></div>
+          <h3 id="t-val">Your rulebook reads every draft.</h3>
+          <div class="val-doc" data-active="blocker">
+            <p><span class="vk">Findings</span>4 mm solid nodule in the <mark class="hl" data-g="blocker">left</mark> lower lobe. No pleural effusion.</p>
+            <p><span class="vk">Impression</span><mark class="hl" data-g="warn"><mark class="hl" data-g="blocker">Right</mark> lower lobe nodule.</mark> <mark class="hl" data-g="info">Recommend follow-up.</mark></p>
+          </div>
+          <div class="val-tabs" role="tablist" aria-label="Validation severity">
+            <button class="vt" type="button" role="tab" data-sev="blocker" aria-selected="true"><span class="sev" aria-hidden="true"></span>Blocker</button>
+            <button class="vt" type="button" role="tab" data-sev="warn" aria-selected="false" tabindex="-1"><span class="sev" aria-hidden="true"></span>Warning</button>
+            <button class="vt" type="button" role="tab" data-sev="info" aria-selected="false" tabindex="-1"><span class="sev" aria-hidden="true"></span>Info</button>
+          </div>
+          <p class="val-msg" id="valMsg" data-sev="blocker"><strong>Blocker</strong><span class="t">Laterality mismatch. Findings say left, impression says right. Fix it before signing.</span></p>
+        </article></div>
+
+        <div class="b b-f"><article class="cell strong cell-fhir" aria-labelledby="t-fhir">
+          <span class="spot" aria-hidden="true"></span>
+          <div class="cell-head"><span class="tag">Export · FHIR R4</span><span class="pill-st">status: <b id="fhirStatus">preliminary</b></span></div>
+          <h3 id="t-fhir">Structured output, ready for the EHR.</h3>
+          <div class="fmt-row" aria-label="Export formats"><span class="fmt on">FHIR R4</span><span class="fmt">PDF</span><span class="fmt">DOCX</span><span class="fmt">Plain text</span></div>
+<pre class="code" id="fhir" aria-label="Example FHIR DiagnosticReport">{
+  "resourceType": "DiagnosticReport",
+  "status": "preliminary",
+  "code": {
+    "text": "CT Chest without contrast"
+  },
+  "subject": {
+    "reference": "Patient/example"
+  },
+  "conclusion": "No acute cardiopulmonary process.",
+  "presentedForm": [
+    {
+      "contentType": "application/pdf"
+    }
+  ]
+}</pre>
+          <p class="cell-note">Sign the example draft below and watch the status change.</p>
+        </article></div>
+
+        <div class="b b-k"><article class="cell strong cell-keys" aria-labelledby="t-keys">
+          <span class="spot" aria-hidden="true"></span>
+          <div class="cell-head"><span class="tag">Desktop · example hotkeys</span></div>
+          <h3 id="t-keys">One hand on the mouse. The report on the keys.</h3>
+          <div class="keys">
+            <div class="krow"><span class="kcombo"><kbd class="kcap" data-k="F2">F2</kbd></span><span class="klabel">Start or stop dictation</span></div>
+            <div class="krow"><span class="kcombo"><kbd class="kcap" data-k="F4">F4</kbd></span><span class="klabel">Next field</span></div>
+            <div class="krow"><span class="kcombo"><kbd class="kcap" data-k="Alt">Alt</kbd><kbd class="kcap" data-k="V">V</kbd></span><span class="klabel">Run validation</span></div>
+            <div class="krow"><span class="kcombo"><kbd class="kcap" data-k="Alt">Alt</kbd><kbd class="kcap" data-k="I">I</kbd></span><span class="klabel">Insert from findings library</span></div>
+          </div>
+          <p class="cell-note">Try pressing them on your keyboard.</p>
+        </article></div>
+
+        <div class="b b-p"><article class="cell cell-prov" aria-labelledby="t-prov">
+          <span class="spot" aria-hidden="true"></span>
+          <div class="cell-head"><span class="tag">AI provider</span></div>
+          <h3 id="t-prov">Bring your model, or run one on site.</h3>
+          <div class="seg" role="radiogroup" aria-label="AI provider">
+            <span class="seg-pill" aria-hidden="true"></span>
+            <button type="button" role="radio" aria-checked="true" tabindex="0" aria-label="Anthropic Claude">Claude</button>
+            <button type="button" role="radio" aria-checked="false" tabindex="-1" aria-label="Azure OpenAI">Azure</button>
+            <button type="button" role="radio" aria-checked="false" tabindex="-1" aria-label="Local model">Local</button>
+          </div>
+          <dl class="prov-info">
+            <div><dt>Runs on</dt><dd id="provWhere">Anthropic API</dd></div>
+            <div><dt>Access</dt><dd id="provKey">Your API key</dd></div>
+            <div><dt>Record</dt><dd id="provData">Every call in the audit log</dd></div>
+          </dl>
+        </article></div>
+
+        <div class="b b-c"><article class="cell soft cell-comp" data-state="paired" aria-labelledby="t-comp">
+          <span class="spot" aria-hidden="true"></span>
+          <div class="cell-head"><span class="tag">Mobile companion</span><span class="mono xs muted">Android · iOS</span></div>
+          <h3 id="t-comp">Your phone becomes the mic.</h3>
+          <svg class="pair-svg" viewBox="0 0 320 140" aria-hidden="true">
+            <path class="link-base" d="M80 70 C 130 70, 150 57, 194 57"/>
+            <path class="link-draw" pathLength="1" d="M80 70 C 130 70, 150 57, 194 57"/>
+            <path class="link-pulse" pathLength="1" d="M80 70 C 130 70, 150 57, 194 57"/>
+            <rect class="dev" x="16" y="14" width="62" height="112" rx="13"/>
+            <rect class="dev-screen" x="22" y="24" width="50" height="92" rx="7"/>
+            <circle class="mic-ring" cx="47" cy="54" r="13"/>
+            <path class="mic" d="M47 48v9M42.5 54a4.5 4.5 0 0 0 9 0"/>
+            <g class="bars"><rect x="31" y="84" width="4" height="18" rx="2"/><rect x="38" y="80" width="4" height="26" rx="2"/><rect x="45" y="78" width="4" height="30" rx="2"/><rect x="52" y="81" width="4" height="24" rx="2"/><rect x="59" y="85" width="4" height="16" rx="2"/></g>
+            <rect class="dev" x="196" y="20" width="110" height="74" rx="8"/>
+            <rect class="dev-screen" x="203" y="27" width="96" height="60" rx="4"/>
+            <rect class="ln" x="211" y="36" width="60" height="5" rx="2.5"/>
+            <rect class="ln" x="211" y="47" width="78" height="5" rx="2.5"/>
+            <rect class="ln-new" x="211" y="58" width="56" height="5" rx="2.5"/>
+            <rect class="ln" x="211" y="69" width="68" height="5" rx="2.5"/>
+            <path class="stand" d="M251 94v14M232 112h38"/>
+          </svg>
+          <div class="pair-row"><span class="pair-status"><span class="pdot" aria-hidden="true"></span><span id="compStatus">Paired · desktop session, reading room 3</span></span><button class="mini-btn" id="pairBtn" type="button">Pair again</button></div>
+        </article></div>
+
+        <div class="b b-a"><article class="cell strong cell-audit" aria-labelledby="t-audit">
+          <span class="spot" aria-hidden="true"></span>
+          <div class="cell-head"><span class="tag"><svg class="ic"><use href="#i-lock"/></svg>Audit log · append-only</span><span class="mono xs" id="auditClock" style="color:var(--on-strong-2)">live</span></div>
+          <h3 id="t-audit">Every AI call, on the record.</h3>
+          <div class="audit" aria-label="Example audit log entries">
+            <ol class="audit-list" id="auditList">
+              <li class="audit-row"><span class="seq">#1046</span><span class="ev">ai.call</span><span class="meta">claude · phi flag logged</span></li>
+              <li class="audit-row"><span class="seq">#1045</span><span class="ev">validation.run</span><span class="meta">1 blocker · 1 warning</span></li>
+              <li class="audit-row"><span class="seq">#1044</span><span class="ev">report.draft.created</span><span class="meta">CT chest template</span></li>
+              <li class="audit-row"><span class="seq">#1043</span><span class="ev">companion.paired</span><span class="meta">reading room 3</span></li>
+              <li class="audit-row"><span class="seq">#1042</span><span class="ev">export.fhir</span><span class="meta">DiagnosticReport</span></li>
+              <li class="audit-row"><span class="seq">#1041</span><span class="ev">report.signed</span><span class="meta">radiologist R-104</span></li>
+              <li class="audit-row"><span class="seq">#1040</span><span class="ev">ai.mark.cleared</span><span class="meta">reviewed by radiologist</span></li>
+            </ol>
+          </div>
+        </article></div>
+
+        <div class="b b-s"><article class="cell accent cell-sign" aria-labelledby="t-sign">
+          <span class="spot" aria-hidden="true"></span>
+          <div class="sign-grid">
+            <div>
+              <span class="tag">Signature · radiologist only</span>
+              <h3 class="sign-big" id="t-sign">The AI never signs.</h3>
+              <p class="sign-sub">Every draft waits for a radiologist, and AI text stays marked until you review it. Try it on this example: press and hold to sign.</p>
+            </div>
+            <div class="zero" role="img" aria-label="Zero reports auto-signed">
+              <span class="slot" aria-hidden="true"><span class="slot-strip"><span>9</span><span>8</span><span>7</span><span>6</span><span>5</span><span>4</span><span>3</span><span>2</span><span>1</span><span>0</span></span></span>
+              <span class="zero-l" aria-hidden="true">reports auto-signed. There is no auto-sign.</span>
+            </div>
+            <div class="sign-panel">
+              <dl class="sp">
+                <div><dt>Report</dt><dd>CT chest w/o contrast · example</dd></div>
+                <div><dt>Checks</dt><dd>Blocker fixed · warning reviewed</dd></div>
+                <div><dt>Status</dt><dd id="signState">Draft · awaiting signature</dd></div>
+              </dl>
+              <button class="hold" id="holdBtn" type="button" aria-describedby="holdHint">
+                <span class="hold-label"><svg class="ic"><use href="#i-pen"/></svg>Hold to sign</span>
+                <span class="hold-fill" aria-hidden="true"><span class="hold-label"><svg class="ic"><use href="#i-check"/></svg><span id="holdFillLabel">Keep holding</span></span></span>
+              </button>
+              <p class="hold-hint" id="holdHint">Mouse, touch, Space or Enter.</p>
+            </div>
+          </div>
+        </article></div>
+      </div>
+    </div>
+  </section>
+
+  <section class="section" id="surfaces" aria-labelledby="surfTitle" style="padding-top:0">
+    <div class="wrap">
+      <div class="sec-head">
+        <p class="eyebrow">Three surfaces, one report</p>
+        <h2 id="surfTitle" data-split>Report on Windows. Dictate from your phone. Run it from the browser.</h2>
+      </div>
+      <div class="surf-grid">
+        <article class="surf" data-reveal>
+          <div class="surf-art" aria-hidden="true"><div class="win"><div class="win-bar"><i></i><i></i><i></i><span>RadioPad · CT chest</span></div><div class="win-body"><div class="win-side"><b></b><b></b><b></b><b></b></div><div class="win-main"><em class="l w70"></em><em class="l w90"></em><em class="l w60 ai"></em><em class="l w80"></em><em class="l w50"></em><span class="win-sign">Sign</span></div></div></div></div>
+          <p class="eyebrow">Windows desktop</p>
+          <h3>The whole reporting product</h3>
+          <p>Templates, dictation, validation and signing in one app built for long reading sessions.</p>
+          <ul class="ticks"><li>Global hotkeys</li><li>Secure clipboard</li><li>PACS/RIS bridge</li><li>Local dictation engine</li></ul>
+        </article>
+        <article class="surf" data-reveal>
+          <div class="surf-art" aria-hidden="true"><div class="phone"><span class="phone-mic"><svg class="ic"><use href="#i-mic"/></svg></span><span class="phone-bars"><i></i><i></i><i></i><i></i><i></i><i></i><i></i></span><span class="phone-cap">Paired to desktop</span></div></div>
+          <p class="eyebrow">Mobile companion</p>
+          <h3>A wireless mic you already own</h3>
+          <p>Pair your phone to a live desktop session and dictate from anywhere in the reading room.</p>
+          <ul class="ticks"><li>Android and iOS</li><li>Pairs to your desktop session</li><li>Voice dictation into the open report</li></ul>
+        </article>
+        <article class="surf" data-reveal>
+          <div class="surf-art" aria-hidden="true"><div class="tbl"><div class="tr"><span>Tenant</span><span>Provider</span><span>State</span></div><div class="tr"><em class="l w80"></em><em class="l w60"></em><span class="st st-ok">active</span></div><div class="tr"><em class="l w60"></em><em class="l w70"></em><span class="st st-info">local</span></div><div class="tr"><em class="l w90"></em><em class="l w50"></em><span class="st st-warn">review</span></div><div class="tr"><em class="l w70"></em><em class="l w60"></em><span class="st st-ok">active</span></div></div></div>
+          <p class="eyebrow">Web admin console</p>
+          <h3>Run it for the department</h3>
+          <p>Manage users, templates, rulebooks and AI providers, and pull the audit trail, from a browser.</p>
+          <ul class="ticks"><li>Users, SSO and MFA</li><li>Rulebooks and prompt overrides</li><li>Audit export and drift monitoring</li></ul>
+        </article>
+      </div>
+    </div>
+  </section>
+
+  <section class="section" id="integrations" aria-labelledby="intTitle" style="padding-top:0">
+    <div class="wrap">
+      <div class="sec-head">
+        <p class="eyebrow">Integrations</p>
+        <h2 id="intTitle" data-split>Plugs into the reading room you already have.</h2>
+      </div>
+      <ul class="intg" data-reveal>
+        <li class="ig-row"><span class="ig-group">Imaging</span><span class="ig-name"><span class="roll"><span>PACS / RIS</span><span aria-hidden="true">PACS / RIS</span></span></span><span class="ig-desc">The desktop app bridges to your viewer and RIS so the report opens on the right study.</span></li>
+        <li class="ig-row"><span class="ig-group">Imaging</span><span class="ig-name"><span class="roll"><span>DICOMweb + Orthanc</span><span aria-hidden="true">DICOMweb + Orthanc</span></span></span><span class="ig-desc">Pull study metadata over DICOMweb, or through the Orthanc bridge.</span></li>
+        <li class="ig-row"><span class="ig-group">Interop</span><span class="ig-name"><span class="roll"><span>FHIR R4 export</span><span aria-hidden="true">FHIR R4 export</span></span></span><span class="ig-desc">DiagnosticReport for the EHR, plus PDF, DOCX and plain text.</span></li>
+        <li class="ig-row"><span class="ig-group">Identity</span><span class="ig-name"><span class="roll"><span>OIDC SSO + MFA</span><span aria-hidden="true">OIDC SSO + MFA</span></span></span><span class="ig-desc">Sign in with your identity provider, with multi-factor on top.</span></li>
+        <li class="ig-row"><span class="ig-group">AI</span><span class="ig-name"><span class="roll"><span>Claude · Azure OpenAI</span><span aria-hidden="true">Claude · Azure OpenAI</span></span></span><span class="ig-desc">Hosted models with your own keys and agreements.</span></li>
+        <li class="ig-row"><span class="ig-group">AI</span><span class="ig-name"><span class="roll"><span>Ollama · vLLM</span><span aria-hidden="true">Ollama · vLLM</span></span></span><span class="ig-desc">Local models on your own hardware for fully on-prem reporting.</span></li>
+        <li class="ig-row"><span class="ig-group">Extend</span><span class="ig-name"><span class="roll"><span>Connectors + CLI</span><span aria-hidden="true">Connectors + CLI</span></span></span><span class="ig-desc">A connector marketplace, and a CLI for rulebook authoring and batch validation.</span></li>
+      </ul>
+    </div>
+  </section>
+
+  <section class="band" id="security" aria-labelledby="secTitle">
+    <div class="wrap section">
+      <div class="sec-head">
+        <p class="eyebrow">Security and governance</p>
+        <h2 id="secTitle" data-split>Built for the people who sign off on software.</h2>
+        <p>Your reports, your models, your audit trail. RadioPad runs where you need it and records what it does.</p>
+      </div>
+      <div class="sec-grid" data-reveal>
+        <div class="sec-item"><span class="sec-ic"><svg class="ic"><use href="#i-lock"/></svg></span><h3>Append-only audit log</h3><p>Every AI call, edit and signature is written to a log that can only grow.</p></div>
+        <div class="sec-item"><span class="sec-ic"><svg class="ic"><use href="#i-building"/></svg></span><h3>Tenant isolation</h3><p>Each institution's reports, rulebooks and prompts stay inside its own tenant.</p></div>
+        <div class="sec-item"><span class="sec-ic"><svg class="ic"><use href="#i-server"/></svg></span><h3>On-prem or private cloud</h3><p>Run the API in your data center or your own cloud account.</p></div>
+        <div class="sec-item"><span class="sec-ic"><svg class="ic"><use href="#i-key"/></svg></span><h3>Your model, your keys</h3><p>Anthropic Claude or Azure OpenAI with your keys, or Ollama and vLLM on site.</p></div>
+        <div class="sec-item"><span class="sec-ic"><svg class="ic"><use href="#i-shield"/></svg></span><h3>SSO and MFA</h3><p>Sign in through your identity provider over OIDC, with multi-factor authentication.</p></div>
+        <div class="sec-item"><span class="sec-ic"><svg class="ic"><use href="#i-sliders"/></svg></span><h3>Drift and prompt control</h3><p>Monitor how AI output drifts over time, and override prompts per institution.</p></div>
+      </div>
+      <div class="stats">
+        <div class="stat" data-reveal><div class="stat-n" data-count="4">4</div><p class="stat-l">export formats: FHIR R4, PDF, DOCX, text</p></div>
+        <div class="stat" data-reveal><div class="stat-n" data-count="7">7</div><p class="stat-l">modalities, CT through PET</p></div>
+        <div class="stat" data-reveal><div class="stat-n" data-count="3">3</div><p class="stat-l">surfaces: desktop, mobile, web</p></div>
+        <div class="stat" data-reveal><div class="stat-n" data-count="1">1</div><p class="stat-l">signer per report: the radiologist</p></div>
+      </div>
+    </div>
+  </section>
+
+  <section class="section" id="solutions" aria-labelledby="audTitle">
+    <div class="wrap">
+      <div class="sec-head">
+        <p class="eyebrow">Who it is for</p>
+        <h2 id="audTitle" data-split>One product for the department and the person reading.</h2>
+      </div>
+      <div class="split">
+        <article class="aud" data-reveal>
+          <p class="eyebrow">For hospitals and imaging groups</p>
+          <h3 class="aud-h">One reporting standard across every reader and site.</h3>
+          <ul class="ticks">
+            <li>Institution rulebooks, templates and report layouts</li>
+            <li>PACS/RIS bridge, DICOMweb and FHIR R4 export</li>
+            <li>On-prem deployment with local models</li>
+            <li>Peer review and a critical-results workflow</li>
+            <li>Admin console, SSO, MFA and audit export</li>
+          </ul>
+          <div class="cta-row"><span class="magnet"><a class="btn btn-primary" href="#demo">Book a demo <svg class="ic arr"><use href="#i-arrow"/></svg></a></span><a class="btn btn-ghost" href="#security">Security overview</a></div>
+        </article>
+        <article class="aud strong" data-reveal>
+          <p class="eyebrow">For radiologists</p>
+          <h3 class="aud-h">Read more. Type less. Sign with confidence.</h3>
+          <ul class="ticks">
+            <li>Dictate at the desk or from your phone</li>
+            <li>Hotkeys for every step of the report</li>
+            <li>Findings library and templates</li>
+            <li>Validation catches slips before you sign</li>
+            <li>Free trial on Windows</li>
+          </ul>
+          <div class="cta-row"><span class="magnet"><a class="btn btn-primary" href="#pricing"><svg class="ic"><use href="#i-download"/></svg>Download for Windows</a></span><a class="btn btn-ghost" href="#product">Try the demos</a></div>
+        </article>
+      </div>
+    </div>
+  </section>
+
+  <section class="section" id="pricing" aria-labelledby="priceTitle" style="padding-top:0">
+    <div class="wrap">
+      <div class="sec-head">
+        <p class="eyebrow">Pricing</p>
+        <h2 id="priceTitle" data-split>Start alone. Scale to the network.</h2>
+      </div>
+      <div class="price-grid">
+        <article class="price" data-reveal>
+          <p class="eyebrow">Radiologist</p>
+          <p class="price-v">Free trial</p>
+          <p class="desc">For an individual reader on Windows.</p>
+          <ul class="ticks"><li>Desktop app and mobile companion</li><li>Templates and findings library</li><li>Validation before you sign</li><li>FHIR, PDF, DOCX and text export</li></ul>
+          <a class="btn btn-primary" href="#demo"><svg class="ic"><use href="#i-download"/></svg>Download for Windows</a>
+        </article>
+        <article class="price strong" data-reveal>
+          <p class="eyebrow">Team</p>
+          <p class="price-v">Per seat</p>
+          <p class="desc">Talk to us. For reading groups that share templates and rulebooks.</p>
+          <ul class="ticks"><li>Everything in Radiologist</li><li>Shared templates and rulebooks</li><li>Peer review</li><li>Web admin console</li></ul>
+          <a class="btn btn-primary" href="#demo">Book a demo</a>
+        </article>
+        <article class="price" data-reveal>
+          <p class="eyebrow">Enterprise</p>
+          <p class="price-v">Custom</p>
+          <p class="desc">For hospitals and imaging networks.</p>
+          <ul class="ticks"><li>On-prem or private cloud</li><li>Local models with Ollama or vLLM</li><li>SSO via OIDC and MFA</li><li>PACS/RIS and FHIR integration</li><li>Audit export and drift monitoring</li></ul>
+          <a class="btn btn-ink" href="#demo">Book a demo</a>
+        </article>
+      </div>
+    </div>
+  </section>
+
+  <section class="section" id="faq" aria-labelledby="faqTitle" style="padding-top:0">
+    <div class="wrap faq-grid">
+      <div class="sec-head" style="margin-bottom:0">
+        <p class="eyebrow">FAQ</p>
+        <h2 id="faqTitle" data-split>Questions radiology teams ask first.</h2>
+      </div>
+      <div class="faq-list" data-reveal>
+        <div class="faq-item" data-open><button class="faq-q" type="button" aria-expanded="true" aria-controls="fa1" id="fq1">Does RadioPad ever sign a report?<span class="pm" aria-hidden="true"><svg class="ic"><use href="#i-plus"/></svg></span></button><div class="faq-a" id="fa1" role="region" aria-labelledby="fq1"><div><p>No. Drafts stay drafts until a radiologist signs them, and there is no auto-sign setting. AI-written text stays marked until you review or edit it.</p></div></div></div>
+        <div class="faq-item"><button class="faq-q" type="button" aria-expanded="false" aria-controls="fa2" id="fq2">Which AI models can we use?<span class="pm" aria-hidden="true"><svg class="ic"><use href="#i-plus"/></svg></span></button><div class="faq-a" id="fa2" role="region" aria-labelledby="fq2"><div><p>Anthropic Claude or Azure OpenAI with your own keys, or a local model through Ollama or vLLM on your own servers.</p></div></div></div>
+        <div class="faq-item"><button class="faq-q" type="button" aria-expanded="false" aria-controls="fa3" id="fq3">Can we run it on-premise?<span class="pm" aria-hidden="true"><svg class="ic"><use href="#i-plus"/></svg></span></button><div class="faq-a" id="fa3" role="region" aria-labelledby="fq3"><div><p>Yes. The API runs in your data center or private cloud, and pairs with a local model when reports must stay on site.</p></div></div></div>
+        <div class="faq-item"><button class="faq-q" type="button" aria-expanded="false" aria-controls="fa4" id="fq4">What does it export?<span class="pm" aria-hidden="true"><svg class="ic"><use href="#i-plus"/></svg></span></button><div class="faq-a" id="fa4" role="region" aria-labelledby="fq4"><div><p>FHIR R4 DiagnosticReport, PDF, DOCX and plain text.</p></div></div></div>
+        <div class="faq-item"><button class="faq-q" type="button" aria-expanded="false" aria-controls="fa5" id="fq5">Does it connect to our PACS and RIS?<span class="pm" aria-hidden="true"><svg class="ic"><use href="#i-plus"/></svg></span></button><div class="faq-a" id="fa5" role="region" aria-labelledby="fq5"><div><p>The Windows desktop app bridges to PACS and RIS, with DICOMweb and an Orthanc bridge for study context. Book a demo to go through your setup.</p></div></div></div>
+        <div class="faq-item"><button class="faq-q" type="button" aria-expanded="false" aria-controls="fa6" id="fq6">Which platforms are supported?<span class="pm" aria-hidden="true"><svg class="ic"><use href="#i-plus"/></svg></span></button><div class="faq-a" id="fa6" role="region" aria-labelledby="fq6"><div><p>Windows desktop for reporting, a mobile companion for Android and iOS that pairs to your desktop session for dictation, and a web console for administration.</p></div></div></div>
+        <div class="faq-item"><button class="faq-q" type="button" aria-expanded="false" aria-controls="fa7" id="fq7">Is every AI call recorded?<span class="pm" aria-hidden="true"><svg class="ic"><use href="#i-plus"/></svg></span></button><div class="faq-a" id="fa7" role="region" aria-labelledby="fq7"><div><p>Yes. Every AI call is written to an append-only audit log, so you can reconstruct what was sent where and when.</p></div></div></div>
+      </div>
+    </div>
+  </section>
+
+  <section class="final" id="demo" aria-labelledby="finalTitle">
+    <div class="wrap">
+      <p class="eyebrow">Start this week</p>
+      <h2 class="kinetic kinetic-final" id="finalTitle" data-kinetic>
+        <span class="sr-only">Your read. Your signature.</span>
+        <span class="k-line" data-w="300" data-d="80" aria-hidden="true">Your read.</span>
+        <span class="k-line k-sign" data-w="820" data-d="92" aria-hidden="true">Your signature.</span>
+      </h2>
+      <div class="final-foot">
+        <div>
+          <p class="lead">Book a walkthrough for your department, or install the desktop app and dictate your first draft today.</p>
+          <div class="cta-row">
+            <span class="magnet"><a class="btn btn-primary" href="#demo">Book a demo <svg class="ic arr"><use href="#i-arrow"/></svg></a></span>
+            <span class="magnet"><a class="btn btn-ghost" href="#pricing"><svg class="ic"><use href="#i-download"/></svg>Download for Windows</a></span>
+          </div>
+        </div>
+        <div>
+          <p class="eyebrow" style="margin-bottom:10px">Rulebooks from the command line</p>
+          <div class="cli"><code id="cliCode">radiopad rulebook validate chest_ct_v1.yaml</code><button class="copy" type="button" data-copy="radiopad rulebook validate chest_ct_v1.yaml" aria-label="Copy command"><svg class="ic"><use href="#i-copy"/></svg></button></div>
+        </div>
+      </div>
+    </div>
+  </section>
+</main>
+
+<footer class="foot">
+  <div class="wrap">
+    <div class="foot-top">
+      <div class="foot-brand">
+        <a class="brand" href="#top"><span class="brand-mark"><svg class="ic"><use href="#i-wave"/></svg></span>RadioPad</a>
+        <p>AI-assisted radiology reporting. The radiologist remains the final authority.</p>
+        <a class="btn btn-ink btn-sm" href="#demo">Book a demo</a>
+      </div>
+      <nav class="foot-cols" aria-label="Footer">
+        <div><h4>Product</h4><ul><li><a href="#product">Reporting workspace</a></li><li><a href="#product">Validation engine</a></li><li><a href="#product">Dictation</a></li><li><a href="#surfaces">Mobile companion</a></li><li><a href="#surfaces">Admin console</a></li><li><a href="#demo">CLI</a></li><li><a href="#integrations">Integrations</a></li></ul></div>
+        <div><h4>Solutions</h4><ul><li><a href="#solutions">Hospitals</a></li><li><a href="#solutions">Imaging groups</a></li><li><a href="#solutions">Radiologists</a></li><li><a href="#security">On-premise</a></li><li><a href="#pricing">Pricing</a></li></ul></div>
+        <div><h4>Resources</h4><ul><li><a href="#">Documentation</a></li><li><a href="#">Blog</a></li><li><a href="#">Rulebook guide</a></li><li><a href="#">FHIR export guide</a></li><li><a href="#">Changelog</a></li><li><a href="#">Status</a></li></ul></div>
+        <div><h4>Company</h4><ul><li><a href="#">About</a></li><li><a href="#">Careers</a></li><li><a href="#">Contact</a></li><li><a href="#">Press</a></li></ul></div>
+        <div><h4>Legal</h4><ul><li><a href="#">Privacy</a></li><li><a href="#">Terms</a></li><li><a href="#">Data processing</a></li><li><a href="#security">Security</a></li></ul></div>
+      </nav>
+    </div>
+    <p class="wordmark" data-kinetic aria-hidden="true"><span class="k-line" data-w="200" data-d="62">RadioPad</span></p>
+    <div class="foot-bot"><span>© 2026 RadioPad</span><span>RadioPad drafts reports for radiologist review. It does not sign them.</span></div>
+  </div>
+</footer>
+
+<div class="toast" id="toast" role="status" aria-live="polite"></div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.13.0/gsap.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.13.0/ScrollTrigger.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.13.0/SplitText.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/lenis@1.1.13/dist/lenis.min.js"></script>
+<script>
+(() => {
+  'use strict';
+  const RM = matchMedia('(prefers-reduced-motion: reduce)').matches;
+  const FINE = matchMedia('(hover: hover) and (pointer: fine)').matches;
+  const $ = (s, r = document) => r.querySelector(s);
+  const $$ = (s, r = document) => Array.from(r.querySelectorAll(s));
+  const G = window.gsap, ST = window.ScrollTrigger, SPLIT = window.SplitText;
+  if (G && ST) G.registerPlugin(ST);
+  if (G && SPLIT) G.registerPlugin(SPLIT);
+  const clamp = (v, a, b) => Math.min(b, Math.max(a, v));
+  const pad = n => String(n).padStart(2, '0');
+  const hms = () => { const d = new Date(); return `${pad(d.getHours())}:${pad(d.getMinutes())}:${pad(d.getSeconds())}`; };
+
+  /* one rAF loop; a job returning false is removed */
+  const jobs = new Set();
+  const loop = t => { jobs.forEach(j => { if (j(t) === false) jobs.delete(j); }); requestAnimationFrame(loop); };
+  requestAnimationFrame(loop);
+
+  /* visibility */
+  const seen = new WeakMap();
+  const vio = new IntersectionObserver(es => es.forEach(e => {
+    seen.set(e.target, e.isIntersecting);
+    if (e.isIntersecting && e.target._onVis) e.target._onVis();
+  }), { rootMargin: '60px 0px' });
+  const watch = (el, fn) => { if (!el) return; el._onVis = fn || null; vio.observe(el); };
+  const vis = el => seen.get(el) === true;
+
+  /* smooth scroll */
+  let lenis = null;
+  if (!RM && window.Lenis) {
+    try {
+      lenis = new window.Lenis({ lerp: 0.11 });
+      if (G) { if (ST) lenis.on('scroll', ST.update); G.ticker.add(t => lenis.raf(t * 1000)); G.ticker.lagSmoothing(0); }
+      else jobs.add(t => { lenis.raf(t); });
+    } catch (err) { lenis = null; }
+  }
+
+  /* drawer */
+  const burger = $('#burger'), drawer = $('#drawer');
+  const setDrawer = open => {
+    drawer.toggleAttribute('data-open', open);
+    burger.setAttribute('aria-expanded', String(open));
+    document.documentElement.classList.toggle('drawer-open', open);
+    if (lenis) open ? lenis.stop() : lenis.start();
+  };
+  const closeDrawer = () => { if (drawer.hasAttribute('data-open')) setDrawer(false); };
+  burger.addEventListener('click', () => setDrawer(!drawer.hasAttribute('data-open')));
+
+  /* anchors */
+  document.addEventListener('click', e => {
+    const a = e.target.closest('a[href^="#"]'); if (!a) return;
+    const id = a.getAttribute('href');
+    e.preventDefault();
+    closeDrawer(); megas.forEach(closeMega);
+    if (id.length < 2) return; // placeholder link for a future page
+    const t = document.querySelector(id); if (!t) return;
+    if (lenis) lenis.scrollTo(t, { offset: -72 }); else t.scrollIntoView({ behavior: RM ? 'auto' : 'smooth' });
+  });
+
+  /* mega menus */
+  const navIn = $('.nav-in');
+  const megas = $$('.has-mega');
+  const closeMega = li => { li.removeAttribute('data-open'); $('.nav-link', li).setAttribute('aria-expanded', 'false'); };
+  const openMega = li => {
+    megas.forEach(o => { if (o !== li) closeMega(o); });
+    const btn = $('.nav-link', li), m = $('.mega', li);
+    const nb = navIn.getBoundingClientRect(), bb = btn.getBoundingClientRect(), mw = m.offsetWidth;
+    const c = bb.left + bb.width / 2 - nb.left;
+    const left = clamp(c - mw / 2, 0, Math.max(0, nb.width - mw));
+    m.style.left = left + 'px';
+    m.style.setProperty('--ox', (c - left) + 'px');
+    li.setAttribute('data-open', ''); btn.setAttribute('aria-expanded', 'true'); li._at = performance.now();
+  };
+  megas.forEach(li => {
+    const btn = $('.nav-link', li); let tO, tC;
+    li.addEventListener('pointerenter', e => { if (e.pointerType !== 'mouse') return; clearTimeout(tC); tO = setTimeout(() => openMega(li), 70); });
+    li.addEventListener('pointerleave', e => { if (e.pointerType !== 'mouse') return; clearTimeout(tO); tC = setTimeout(() => closeMega(li), 160); });
+    btn.addEventListener('click', () => { if (!li.hasAttribute('data-open')) openMega(li); else if (performance.now() - li._at > 350) closeMega(li); });
+    li.addEventListener('focusout', e => { if (!li.contains(e.relatedTarget)) closeMega(li); });
+  });
+  document.addEventListener('keydown', e => {
+    if (e.key !== 'Escape') return;
+    const open = megas.find(li => li.hasAttribute('data-open'));
+    if (open) { closeMega(open); $('.nav-link', open).focus(); }
+    closeDrawer();
+  });
+  document.addEventListener('pointerdown', e => { if (!e.target.closest('.has-mega')) megas.forEach(closeMega); });
+
+  /* scroll velocity, nav state, slice counter */
+  const nav = $('.nav'), sliceEl = $('#sliceNo');
+  let lastY = scrollY, vel = 0, dir = 1, lastSlice = 112, navScrolled = null;
+  jobs.add(() => {
+    const y = scrollY, raw = y - lastY; lastY = y;
+    vel += (raw - vel) * 0.18;
+    if (Math.abs(raw) > 0.5) dir = raw > 0 ? 1 : -1;
+    const sc = y > 8; if (sc !== navScrolled) { navScrolled = sc; nav.toggleAttribute('data-scrolled', sc); }
+    if (sliceEl && raw !== 0) {
+      const max = document.documentElement.scrollHeight - innerHeight;
+      const s = 112 + Math.round(clamp(y / (max || 1), 0, 1) * 128);
+      if (s !== lastSlice) { lastSlice = s; sliceEl.textContent = s; }
+    }
+  });
+
+  /* kinetic type: letters swell toward the cursor and thicken with scroll speed */
+  const kGroups = RM ? [] : $$('[data-kinetic]');
+  let fontsReady = false;
+  kGroups.forEach(g => {
+    g._k = []; g._intro = -1; g._ready = false;
+    $$('.k-line', g).forEach((line, li) => {
+      const bw = +line.dataset.w || 340, bd = +line.dataset.d || 80;
+      const txt = line.textContent; line.textContent = '';
+      for (const ch of txt) {
+        const s = document.createElement('span'); s.className = 'k-ch'; s.textContent = ch === ' ' ? '\u00a0' : ch; line.appendChild(s);
+        g._k.push({ el: s, li, bw, bd, w: bw, d: bd, vw: 0, vd: 0, cx: 0, cy: 0, fs: 16, lw: bw, ld: bd });
+      }
+    });
+  });
+  const measureGroup = g => {
+    let x0 = 1e9, x1 = -1e9;
+    g._k.forEach(k => { const r = k.el.getBoundingClientRect(); k.cx = r.left + r.width / 2 + scrollX; k.cy = r.top + r.height / 2 + scrollY; x0 = Math.min(x0, r.left + scrollX); x1 = Math.max(x1, r.right + scrollX); });
+    const fs = parseFloat(getComputedStyle(g).fontSize) || 16;
+    g._k.forEach(k => { k.fs = fs; });
+    g._x0 = x0; g._x1 = x1; g._ready = true;
+  };
+  let ptX = -1e5, ptY = -1e5, ptOn = false;
+  if (FINE) {
+    addEventListener('pointermove', e => { ptX = e.clientX; ptY = e.clientY; ptOn = true; }, { passive: true });
+    document.documentElement.addEventListener('pointerleave', () => { ptOn = false; });
+  }
+  kGroups.forEach(g => {
+    watch(g, () => { measureGroup(g); if (fontsReady && g._intro < 0) g._intro = 0; });
+    let lastT = 0;
+    jobs.add(t => {
+      if (!g._ready || !vis(g)) { lastT = t; return; }
+      const dt = Math.min(48, (t - lastT) || 16); lastT = t;
+      if (g._intro >= 0 && g._intro < 1) g._intro = Math.min(1, g._intro + dt / 1600);
+      const intro = g._intro >= 0 && g._intro < 1;
+      const pX = ptX + scrollX, pY = ptY + scrollY, vb = clamp(Math.abs(vel) / 38, 0, 1);
+      for (const k of g._k) {
+        const R = k.fs * 1.35;
+        let inf = 0;
+        if (ptOn) { const dx = k.cx - pX, dy = (k.cy - pY) * 1.25; inf = clamp(1 - Math.sqrt(dx * dx + dy * dy) / R, 0, 1); inf = inf * inf * (3 - 2 * inf); }
+        if (intro) { const span = g._x1 - g._x0 + R * 2; const sx = g._x0 - R + (g._intro * 1.3 - k.li * 0.14) * span; const q = (k.cx - sx) / (R * 0.75); inf = Math.max(inf, Math.exp(-q * q)); }
+        const tw = Math.min(900, k.bw + (900 - k.bw) * Math.max(inf, vb * 0.6));
+        const td = clamp(k.bd + (124 - k.bd) * inf - 10 * vb, 50, 150);
+        k.vw = (k.vw + (tw - k.w) * 0.14) * 0.74; k.w += k.vw;
+        k.vd = (k.vd + (td - k.d) * 0.14) * 0.74; k.d += k.vd;
+        if (Math.abs(k.w - k.lw) > 0.5 || Math.abs(k.d - k.ld) > 0.25) {
+          k.lw = k.w; k.ld = k.d;
+          k.el.style.fontVariationSettings = `"wght" ${clamp(k.w, 100, 900).toFixed(0)}, "wdth" ${clamp(k.d, 50, 150).toFixed(1)}`;
+        }
+      }
+    });
+  });
+
+  /* velocity marquee */
+  const tracks = $$('.mq-track');
+  tracks.forEach(tr => { tr.insertAdjacentHTML('beforeend', tr.innerHTML); tr._x = 0; tr._sk = 0; });
+  const measureMarquees = () => tracks.forEach(tr => { tr._half = tr.scrollWidth / 2; });
+  measureMarquees();
+  if (!RM) tracks.forEach(tr => {
+    const rowDir = tr.dataset.dir === 'rev' ? -1 : 1;
+    watch(tr);
+    jobs.add(() => {
+      if (!vis(tr) || !tr._half) return;
+      const sp = (0.55 + Math.min(Math.abs(vel), 70) * 0.22) * dir * rowDir;
+      tr._x -= sp;
+      if (tr._x <= -tr._half) tr._x += tr._half; else if (tr._x > 0) tr._x -= tr._half;
+      tr._sk += (clamp(-vel * 0.3, -9, 9) * rowDir - tr._sk) * 0.12;
+      tr.style.transform = `translate3d(${tr._x.toFixed(2)}px,0,0) skewX(${tr._sk.toFixed(2)}deg)`;
+    });
+  });
+
+  /* scroll reveals (initial state set from JS, so no-JS shows everything) */
+  let revealsSet = false;
+  const setupReveals = () => {
+    if (revealsSet || RM || !G || !ST) return; revealsSet = true;
+    G.set('.b, [data-reveal]', { autoAlpha: 0, y: 44 });
+    ST.batch('.b, [data-reveal]', { start: 'top 92%', once: true, onEnter: els => G.to(els, { autoAlpha: 1, y: 0, duration: 0.95, ease: 'expo.out', stagger: 0.07, overwrite: true }) });
+    $$('[data-split]').forEach(h => {
+      if (SPLIT) {
+        try { const s = SPLIT.create(h, { type: 'lines', mask: 'lines' }); G.from(s.lines, { yPercent: 108, duration: 1.05, ease: 'expo.out', stagger: 0.08, scrollTrigger: { trigger: h, start: 'top 90%', once: true } }); return; } catch (err) { /* fall through */ }
+      }
+      G.from(h, { y: 30, autoAlpha: 0, duration: 0.9, ease: 'expo.out', scrollTrigger: { trigger: h, start: 'top 90%', once: true } });
+    });
+    const fill = $('.wf-fill'), steps = $$('.wf-step');
+    if (fill) {
+      steps.forEach(s => s.classList.remove('is-on'));
+      G.fromTo(fill, { scaleX: 0 }, { scaleX: 1, ease: 'none', scrollTrigger: { trigger: '.wf', start: 'top 78%', end: 'bottom 50%', scrub: 0.6, onUpdate: self => steps.forEach((s, i) => s.classList.toggle('is-on', self.progress >= i / steps.length + 0.02)) } });
+    }
+    ST.refresh();
+  };
+  const onFonts = () => {
+    if (fontsReady) return; fontsReady = true;
+    kGroups.forEach(g => { if (vis(g)) { measureGroup(g); if (g._intro < 0) g._intro = 0; } });
+    measureMarquees(); setupReveals();
+  };
+  if (document.fonts && document.fonts.ready) document.fonts.ready.then(onFonts); else setTimeout(onFonts, 600);
+  setTimeout(onFonts, 2500); // fonts.ready can stall on a blocked font host
+  let rT;
+  addEventListener('resize', () => { clearTimeout(rT); rT = setTimeout(() => { kGroups.forEach(g => { if (g._ready) measureGroup(g); }); measureMarquees(); }, 150); });
+
+  /* counters + zero slot */
+  $$('[data-count]').forEach(el => watch(el, () => {
+    if (el._c || RM) return; el._c = true;
+    const to = +el.dataset.count, t0 = performance.now(); el.textContent = '0';
+    jobs.add(t => { const p = clamp((t - t0) / 1100, 0, 1); el.textContent = Math.round(to * (1 - Math.pow(1 - p, 4))); return p < 1; });
+  }));
+  const slot = $('.slot-strip');
+  if (slot && !RM) watch(slot.parentElement, () => {
+    if (slot._done) return; slot._done = true;
+    slot.style.transition = 'none'; slot.style.transform = 'translateY(0)'; void slot.offsetHeight;
+    slot.style.transition = 'transform 1.8s cubic-bezier(.16,1,.3,1)'; slot.style.transform = 'translateY(-9em)';
+  });
+
+  /* dictation demo */
+  const dictCell = $('.cell-dict'), trEl = $('#transcript'), cv = $('#wave'), timeEl = $('#dictTime');
+  if (trEl && cv) {
+    const words = trEl.textContent.trim().split(/\s+/);
+    trEl.textContent = '';
+    const ws = words.map((w, i) => { const s = document.createElement('span'); s.className = 'w'; s.textContent = w; trEl.appendChild(s); if (i < words.length - 1) trEl.appendChild(document.createTextNode(' ')); return s; });
+    const ctx = cv.getContext('2d');
+    let W = 0, H = 0, samples = new Float32Array(0), frame = 0, amp = 0.3, ampT = 0.3, ink = '#111', acc = '#fc0';
+    const readCols = () => { const cs = getComputedStyle(document.documentElement); ink = cs.getPropertyValue('--ink').trim() || ink; acc = cs.getPropertyValue('--accent').trim() || acc; };
+    const draw = () => {
+      ctx.clearRect(0, 0, W, H);
+      const n = samples.length;
+      for (let i = 0; i < n; i++) {
+        const h = Math.max(2, samples[i] * H * 0.92), last = i >= n - 2;
+        ctx.globalAlpha = last ? 1 : 0.16 + 0.84 * (i / n);
+        ctx.fillStyle = last ? acc : ink;
+        ctx.fillRect(i * 6, (H - h) / 2, 3, h);
+      }
+      ctx.globalAlpha = 1;
+    };
+    const size = () => {
+      const dpr = Math.min(2, devicePixelRatio || 1); W = cv.clientWidth; H = cv.clientHeight;
+      if (!W || !H) return;
+      cv.width = Math.round(W * dpr); cv.height = Math.round(H * dpr); ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+      const n = Math.max(12, Math.floor(W / 6)), s = new Float32Array(n);
+      for (let i = 0; i < n; i++) s[i] = samples.length ? samples[Math.floor(i / n * samples.length)] : 0.1 + 0.75 * Math.abs(Math.sin(i * 0.37) * Math.sin(i * 0.11 + 1));
+      samples = s; draw();
+    };
+    readCols(); size();
+    new ResizeObserver(size).observe(cv);
+    matchMedia('(prefers-color-scheme: dark)').addEventListener('change', () => { readCols(); draw(); });
+    new MutationObserver(() => { readCols(); draw(); }).observe(document.documentElement, { attributes: true, attributeFilter: ['data-theme'] });
+    let state = 'idle', idx = 0, next = 0, wordEnd = 0, t0 = 0;
+    const startDict = t => { state = 'play'; idx = 0; next = t + 500; wordEnd = 0; t0 = t; trEl.classList.add('playing'); ws.forEach(w => w.classList.remove('on', 'cur')); };
+    watch(dictCell);
+    if (!RM) jobs.add(t => {
+      if (!vis(dictCell)) return;
+      if (state === 'idle' || (state === 'hold' && t >= next)) startDict(t);
+      if (state === 'play' && t >= next) {
+        if (idx > 0) ws[idx - 1].classList.remove('cur');
+        if (idx < ws.length) {
+          const w = ws[idx++]; w.classList.add('on', 'cur');
+          wordEnd = t + 140 + w.textContent.length * 26;
+          next = wordEnd + (/[.,]$/.test(w.textContent) ? 380 : 0);
+        } else { state = 'hold'; next = t + 3400; }
+      }
+      ampT = state === 'play' && t < wordEnd ? 0.95 : 0.1;
+      amp += (ampT - amp) * 0.15;
+      if ((frame++ & 1) === 0 && samples.length) { samples.copyWithin(0, 1); samples[samples.length - 1] = clamp(amp * (0.3 + Math.random() * 0.7), 0.04, 1); }
+      if (frame % 90 === 0) readCols();
+      draw();
+      if (timeEl && state === 'play') { const s = Math.floor((t - t0) / 1000); timeEl.textContent = `${pad(Math.floor(s / 60))}:${pad(s % 60)}`; }
+    });
+  }
+
+  /* roving arrow keys for tablists and radiogroups */
+  const arrows = (container, items, select) => container.addEventListener('keydown', e => {
+    const d = (e.key === 'ArrowRight' || e.key === 'ArrowDown') ? 1 : (e.key === 'ArrowLeft' || e.key === 'ArrowUp') ? -1 : 0;
+    if (!d) return; e.preventDefault();
+    const i = (items.indexOf(document.activeElement) + d + items.length) % items.length;
+    select(i, true);
+  });
+
+  /* validation demo */
+  const valCell = $('.cell-val'), vd = $('.val-doc'), vtabs = $$('.vt'), vmsg = $('#valMsg');
+  const MSG = {
+    blocker: ['Blocker', 'Laterality mismatch. Findings say left, impression says right. Fix it before signing.'],
+    warn: ['Warning', 'The impression is AI-drafted text. Review or edit it to clear the mark.'],
+    info: ['Info', 'Rulebook style: state the follow-up interval with the institution phrase.']
+  };
+  const order = ['blocker', 'warn', 'info'];
+  let vIdx = 0, vAuto = true, vNext = 0;
+  const setVal = (i, focus) => {
+    vIdx = i; const k = order[i];
+    vd.dataset.active = k;
+    vtabs.forEach((b, j) => { b.setAttribute('aria-selected', String(j === i)); b.tabIndex = j === i ? 0 : -1; });
+    if (focus) vtabs[i].focus();
+    vmsg.classList.add('swap');
+    setTimeout(() => { vmsg.querySelector('strong').textContent = MSG[k][0]; vmsg.querySelector('.t').textContent = MSG[k][1]; vmsg.dataset.sev = k; vmsg.classList.remove('swap'); }, 140);
+  };
+  vtabs.forEach((b, j) => b.addEventListener('click', () => { vAuto = false; setVal(j); }));
+  arrows($('.val-tabs'), vtabs, (i, f) => { vAuto = false; setVal(i, f); });
+  watch(valCell);
+  if (!RM) jobs.add(t => {
+    if (!vAuto || !vis(valCell) || valCell.matches(':hover')) { vNext = t + 2800; return; }
+    if (t >= vNext) { if (vNext) setVal((vIdx + 1) % 3); vNext = t + 2800; }
+  });
+
+  /* FHIR typing */
+  const fhirEl = $('#fhir'), fhirCell = $('.cell-fhir'), fhirStatus = $('#fhirStatus');
+  let fSpans = [], fTotal = 0, fShown = 0, fTyping = false;
+  const caret = document.createElement('span'); caret.className = 'caret'; caret.setAttribute('aria-hidden', 'true');
+  const fhirJson = signed => JSON.stringify(Object.assign(
+    { resourceType: 'DiagnosticReport', status: signed ? 'final' : 'preliminary' },
+    signed ? { resultsInterpreter: [{ reference: 'Practitioner/radiologist' }] } : {},
+    { code: { text: 'CT Chest without contrast' }, subject: { reference: 'Patient/example' }, conclusion: 'No acute cardiopulmonary process.', presentedForm: [{ contentType: 'application/pdf' }] }
+  ), null, 2);
+  const buildFhir = signed => {
+    const src = fhirJson(signed), re = /("(?:\\.|[^"\\])*")(\s*:)?|(-?\d+(?:\.\d+)?|true|false|null)|([{}\[\],:])|(\s+)/g;
+    fhirEl.textContent = ''; fSpans = [];
+    let m, prevKey = '';
+    const add = (c, t) => { const s = document.createElement('span'); if (c) s.className = c; s._t = t; s.textContent = t; fhirEl.appendChild(s); fSpans.push(s); };
+    while ((m = re.exec(src))) {
+      if (m[1]) { if (m[2]) { add('tk-k', m[1]); add('tk-p', m[2]); prevKey = m[1]; } else { add(prevKey === '"status"' ? 'tk-s tk-status' : 'tk-s', m[1]); prevKey = ''; } }
+      else if (m[3]) add('tk-n', m[3]);
+      else if (m[4]) add('tk-p', m[4]);
+      else if (m[5]) add('', m[5]);
+    }
+    fTotal = src.length; fhirEl.appendChild(caret);
+  };
+  const typeFhir = () => { fSpans.forEach(s => { s.textContent = ''; }); fShown = 0; fTyping = true; };
+  if (fhirEl) {
+    buildFhir(false);
+    watch(fhirCell, () => { if (!fhirCell._typed) { fhirCell._typed = true; if (!RM) typeFhir(); } });
+    jobs.add(() => {
+      if (!fTyping || !vis(fhirCell)) return;
+      fShown = Math.min(fTotal, fShown + 4);
+      let c = fShown;
+      for (const s of fSpans) { const L = s._t.length; const v = c >= L ? s._t : s._t.slice(0, Math.max(0, c)); if (s.textContent !== v) s.textContent = v; c -= L; }
+      if (fShown >= fTotal) fTyping = false;
+    });
+  }
+
+  /* hotkeys */
+  const KEYMAP = { F2: 'F2', F4: 'F4', Alt: 'Alt', v: 'V', V: 'V', i: 'I', I: 'I' };
+  const capsFor = k => $$(`.kcap[data-k="${k}"]`);
+  addEventListener('keydown', e => { const k = KEYMAP[e.key]; if (k) capsFor(k).forEach(c => c.classList.add('down')); });
+  addEventListener('keyup', e => { const k = KEYMAP[e.key]; if (k) capsFor(k).forEach(c => c.classList.remove('down')); });
+  addEventListener('blur', () => $$('.kcap.down').forEach(c => c.classList.remove('down')));
+
+  /* provider switcher */
+  const PROV = [
+    ['Anthropic API', 'Your API key', 'Every call in the audit log'],
+    ['Your Azure OpenAI deployment', 'Your Azure tenant', 'Every call in the audit log'],
+    ['Ollama or vLLM on your servers', 'No external key', 'Inference stays on your hardware']
+  ];
+  const seg = $('.seg');
+  if (seg) {
+    const btns = $$('[role="radio"]', seg), pill = $('.seg-pill', seg), info = $('.prov-info'), provCell = seg.closest('.cell');
+    const pw = $('#provWhere'), pk = $('#provKey'), pd = $('#provData');
+    let pi = 0, pAuto = true, pNext = 0;
+    const setP = (i, focus) => {
+      pi = i;
+      btns.forEach((b, j) => { b.setAttribute('aria-checked', String(j === i)); b.tabIndex = j === i ? 0 : -1; });
+      pill.style.transform = `translateX(${i * 100}%)`;
+      if (focus) btns[i].focus();
+      info.classList.add('swap');
+      setTimeout(() => { pw.textContent = PROV[i][0]; pk.textContent = PROV[i][1]; pd.textContent = PROV[i][2]; info.classList.remove('swap'); }, 130);
+    };
+    btns.forEach((b, j) => b.addEventListener('click', () => { pAuto = false; setP(j); }));
+    arrows(seg, btns, (i, f) => { pAuto = false; setP(i, f); });
+    watch(provCell);
+    if (!RM) jobs.add(t => {
+      if (!pAuto || !vis(provCell) || provCell.matches(':hover')) { pNext = t + 3000; return; }
+      if (t >= pNext) { if (pNext) setP((pi + 1) % 3); pNext = t + 3000; }
+    });
+  }
+
+  /* companion pairing */
+  const comp = $('.cell-comp'), compStatus = $('#compStatus'), pairBtn = $('#pairBtn');
+  let pT;
+  const pair = () => {
+    clearTimeout(pT);
+    comp.dataset.state = 'waiting'; compStatus.textContent = 'Waiting for phone · scan the pairing code';
+    pT = setTimeout(() => { comp.dataset.state = 'paired'; compStatus.textContent = 'Paired · desktop session, reading room 3'; pushAudit('companion.paired', 'reading room 3'); }, 1800);
+  };
+  if (comp) { watch(comp, () => { if (!comp._p) { comp._p = true; if (!RM) pair(); } }); pairBtn.addEventListener('click', pair); }
+
+  /* audit ticker */
+  const al = $('#auditList'), auditCell = $('.cell-audit'), auditClock = $('#auditClock');
+  const EV = [['ai.call', 'claude · phi flag logged'], ['report.draft.created', 'CT chest template'], ['validation.run', '1 blocker · 1 warning'], ['report.edited', 'impression'], ['ai.mark.cleared', 'reviewed by radiologist'], ['export.fhir', 'DiagnosticReport'], ['ai.call', 'local vLLM · on-prem'], ['critical.result.flagged', 'notify referrer']];
+  let seq = 1047, evI = 0, aNext = 0;
+  function pushAudit(ev, meta) {
+    if (!al) return;
+    const li = document.createElement('li'); li.className = 'audit-row is-new is-enter';
+    li.innerHTML = '<span class="seq"></span><span class="ev"></span><span class="meta"></span>';
+    li.children[0].textContent = '#' + seq++; li.children[1].textContent = ev; li.children[2].textContent = meta;
+    $$('.is-new', al).forEach(r => r.classList.remove('is-new'));
+    al.prepend(li);
+    if (!RM) { al.style.transition = 'none'; al.style.transform = 'translateY(-28px)'; void al.offsetHeight; al.style.transition = ''; al.style.transform = ''; }
+    requestAnimationFrame(() => requestAnimationFrame(() => li.classList.remove('is-enter')));
+    while (al.children.length > 9) al.lastElementChild.remove();
+  }
+  watch(auditCell);
+  jobs.add(t => {
+    if (!auditCell || !vis(auditCell)) return;
+    if (t >= aNext) { if (aNext) { const [e, m] = EV[evI++ % EV.length]; pushAudit(e, m); } aNext = t + 2400; }
+  });
+  setInterval(() => { if (auditClock && vis(auditCell)) auditClock.textContent = hms(); }, 1000);
+
+  /* hold to sign */
+  const hold = $('#holdBtn'), signState = $('#signState'), fillLabel = $('#holdFillLabel');
+  let holding = false, signed = false;
+  if (hold) {
+    const fillEl = $('.hold-fill', hold);
+    const startHold = () => { if (signed || holding) return; holding = true; hold.classList.add('holding'); };
+    const stopHold = () => { if (!holding) return; holding = false; hold.classList.remove('holding'); };
+    const announce = s => document.dispatchEvent(new CustomEvent('rp:sign', { detail: s }));
+    const complete = () => {
+      holding = false; signed = true;
+      hold.classList.remove('holding'); hold.classList.add('signed');
+      const d = new Date();
+      fillLabel.textContent = 'Signed by radiologist';
+      signState.textContent = `Signed · ${pad(d.getHours())}:${pad(d.getMinutes())}`;
+      toast('Signed. The FHIR status is now final.');
+      announce(true);
+      setTimeout(() => { signed = false; hold.classList.remove('signed'); fillLabel.textContent = 'Keep holding'; signState.textContent = 'Draft · awaiting signature'; announce(false); }, 7000);
+    };
+    fillEl.addEventListener('transitionend', e => { if (e.propertyName === 'clip-path' && holding) complete(); });
+    hold.addEventListener('pointerdown', e => { if (e.button !== 0) return; if (hold.setPointerCapture) hold.setPointerCapture(e.pointerId); startHold(); });
+    ['pointerup', 'pointercancel', 'lostpointercapture', 'blur'].forEach(n => hold.addEventListener(n, stopHold));
+    hold.addEventListener('keydown', e => { if ((e.key === ' ' || e.key === 'Enter') && !e.repeat) { e.preventDefault(); startHold(); } });
+    hold.addEventListener('keyup', e => { if (e.key === ' ' || e.key === 'Enter') stopHold(); });
+    hold.addEventListener('contextmenu', e => e.preventDefault());
+  }
+  document.addEventListener('rp:sign', e => {
+    const s = e.detail;
+    if (fhirEl) { buildFhir(s); fhirCell.classList.toggle('is-final', s); fhirStatus.textContent = s ? 'final' : 'preliminary'; if (!RM && vis(fhirCell)) typeFhir(); }
+    if (s) pushAudit('report.signed', 'radiologist R-104');
+  });
+
+  /* magnetic buttons + tilt/spotlight cells (springs) */
+  const spring = (x, v, target, k, damp) => { v = (v + (target - x) * k) * damp; return [x + v, v]; };
+  if (FINE && !RM) {
+    $$('.magnet').forEach(m => {
+      let tx = 0, ty = 0, x = 0, y = 0, vx = 0, vy = 0, running = false;
+      const step = () => {
+        [x, vx] = spring(x, vx, tx, 0.16, 0.7); [y, vy] = spring(y, vy, ty, 0.16, 0.7);
+        m.style.transform = `translate3d(${x.toFixed(2)}px,${y.toFixed(2)}px,0)`;
+        if (Math.abs(tx - x) < 0.05 && Math.abs(ty - y) < 0.05 && Math.abs(vx) < 0.05 && Math.abs(vy) < 0.05) { running = false; if (!tx && !ty) m.style.transform = ''; return false; }
+      };
+      const kick = () => { if (!running) { running = true; jobs.add(step); } };
+      m.addEventListener('pointermove', e => { const r = m.getBoundingClientRect(); tx = (e.clientX - r.left - r.width / 2) * 0.28; ty = (e.clientY - r.top - r.height / 2) * 0.4; kick(); });
+      m.addEventListener('pointerleave', () => { tx = 0; ty = 0; kick(); });
+    });
+    $$('.cell').forEach(c => {
+      const spot = $('.spot', c);
+      let trx = 0, tryy = 0, rx = 0, ry = 0, vrx = 0, vry = 0, running = false;
+      const step = () => {
+        [rx, vrx] = spring(rx, vrx, trx, 0.12, 0.72); [ry, vry] = spring(ry, vry, tryy, 0.12, 0.72);
+        c.style.transform = `perspective(1100px) rotateX(${rx.toFixed(3)}deg) rotateY(${ry.toFixed(3)}deg)`;
+        if (Math.abs(trx - rx) < 0.01 && Math.abs(tryy - ry) < 0.01 && Math.abs(vrx) < 0.01 && Math.abs(vry) < 0.01) { running = false; if (!trx && !tryy) c.style.transform = ''; return false; }
+      };
+      const kick = () => { if (!running) { running = true; jobs.add(step); } };
+      c.addEventListener('pointermove', e => {
+        if (e.pointerType !== 'mouse') return;
+        const r = c.getBoundingClientRect(), a = 4.5 * Math.min(1, 560 / r.width);
+        const px = (e.clientX - r.left) / r.width, py = (e.clientY - r.top) / r.height;
+        tryy = (px - 0.5) * a; trx = (0.5 - py) * a;
+        if (spot) spot.style.transform = `translate3d(${(e.clientX - r.left).toFixed(1)}px,${(e.clientY - r.top).toFixed(1)}px,0)`;
+        kick();
+      });
+      c.addEventListener('pointerleave', () => { trx = 0; tryy = 0; kick(); });
+    });
+  }
+
+  /* faq */
+  $$('.faq-q').forEach(b => b.addEventListener('click', () => {
+    const open = b.getAttribute('aria-expanded') === 'true';
+    b.setAttribute('aria-expanded', String(!open));
+    b.parentElement.toggleAttribute('data-open', !open);
+  }));
+
+  /* copy + toast */
+  const toastEl = $('#toast'); let toT;
+  function toast(msg) { toastEl.textContent = msg; toastEl.classList.add('show'); clearTimeout(toT); toT = setTimeout(() => toastEl.classList.remove('show'), 2000); }
+  $$('[data-copy]').forEach(b => b.addEventListener('click', () => {
+    const text = b.dataset.copy;
+    const done = msg => { toast(msg); b.classList.add('done'); setTimeout(() => b.classList.remove('done'), 1600); };
+    const fallback = () => { const code = $('#cliCode'); const r = document.createRange(); r.selectNodeContents(code); const sel = getSelection(); sel.removeAllRanges(); sel.addRange(r); done('Selected. Press Ctrl+C to copy.'); };
+    try { navigator.clipboard.writeText(text).then(() => done('Command copied'), fallback); } catch (err) { fallback(); }
+  }));
+})();
+</script>

@@ -1,0 +1,335 @@
+---
+import BaseLayout from "../../layouts/BaseLayout.astro";
+import PageHero from "../../components/PageHero.astro";
+import SectionHead from "../../components/SectionHead.astro";
+import Divider from "../../components/Divider.astro";
+import CtaBand from "../../components/CtaBand.astro";
+import Icon from "../../components/Icon.astro";
+import Validation from "../../components/home/Validation.astro";
+
+// Read the real rulebooks (RADIOPAD/rulebooks/*.yaml) at build time; Vite resolves the glob from this file,
+// so it works whatever directory dev or CI starts from.
+// ponytail: line-based YAML reading, enough for the flat keys used here; switch to a YAML parser if rulebooks start using flow style or multi-line rule fields.
+const RB = import.meta.glob("../../../../rulebooks/*.yaml", { query: "?raw", import: "default", eager: true }) as Record<string, string>;
+const byFile = Object.fromEntries(Object.entries(RB).map(([p, src]) => [p.slice(p.lastIndexOf("/") + 1), src.replace(/\r\n/g, "\n")]));
+const read = (f: string) => byFile[f];
+const unq = (s: string) => s.trim().replace(/^(["'])(.*)\1$/, "$2");
+const scalar = (src: string, key: string) => unq(src.match(new RegExp(`^${key}:[ \\t]*(.+)$`, "m"))?.[1] ?? "");
+const list = (src: string, key: string, indent = "") => {
+  const m = src.match(new RegExp(`^${indent}${key}:[ \\t]*\\n((?:${indent}  - .*(?:\\n|$))+)`, "m"));
+  return m ? m[1].trim().split("\n").map((l) => unq(l.replace(/^\s*- /, ""))) : [];
+};
+const field = (entry: string, key: string) => unq(entry.match(new RegExp(`(?:^|\\n)\\s*${key}:[ \\t]*(.*)`))?.[1] ?? "");
+
+// chest_ct_v1: the worked example
+const chestSrc = read("chest_ct_v1.yaml");
+const chest = {
+  id: scalar(chestSrc, "rulebook_id"),
+  name: scalar(chestSrc, "name"),
+  version: scalar(chestSrc, "version"),
+  owner: scalar(chestSrc, "owner"),
+  status: scalar(chestSrc, "status"),
+  sections: list(chestSrc, "required_sections"),
+  followups: list(chestSrc, "approved_followups", "  "),
+  rules: (chestSrc.split(/^rules:[ \t]*$/m)[1] ?? "").split(/^\S/m)[0].split(/^  - /m).slice(1).map((e) => ({
+    id: field(e, "id"),
+    severity: field(e, "severity"),
+    description: field(e, "description"),
+  })),
+};
+const trimDesc = (d: string) => {
+  let s = d.split("; ")[0];
+  if (!/[.]$/.test(s)) s += ".";
+  return s.length > 280 ? s.slice(0, s.lastIndexOf(" ", 277)) + "…" : s;
+};
+const chestCount = (sev: string) => chest.rules.filter((r) => r.severity === sev).length;
+
+// the whole library, grouped by modality (file prefix, else the first declared modality)
+const PREFIX: Record<string, string> = { ct: "CT", mr: "MR", us: "US", xr: "XR", nm: "NM", fl: "FL", pet: "PET" };
+const NORM: Record<string, string> = { MRI: "MR", Radiography: "XR", CR: "XR", DX: "XR", Ultrasound: "US", Mammography: "MG" };
+const LABEL: Record<string, string> = { CT: "CT", MR: "MR", US: "Ultrasound", XR: "Radiography", NM: "Nuclear medicine", PET: "PET", MG: "Mammography", FL: "Fluoroscopy" };
+const SEVS = ["blocker", "warning", "info"] as const;
+const files = Object.keys(byFile).filter((f) => !f.startsWith("_")).sort();
+const library = files.map((f) => {
+  const src = read(f);
+  const id = f.replace(/\.yaml$/, "");
+  const declared = list(src, "modalities", "  ")[0] ?? "";
+  const sev = Object.fromEntries(SEVS.map((s) => [s, (src.match(new RegExp(`^\\s+severity:[ \\t]*${s}\\b`, "gm")) ?? []).length])) as Record<string, number>;
+  return {
+    id,
+    mod: PREFIX[id.split("_")[0]] ?? NORM[declared] ?? declared,
+    name: scalar(src, "name").replace(/\s*(Reporting )?Rulebook\b/, "").trim(),
+    rules: SEVS.reduce((n, s) => n + sev[s], 0),
+    sev,
+  };
+});
+const totals = Object.fromEntries(SEVS.map((s) => [s, library.reduce((n, r) => n + r.sev[s], 0)])) as Record<string, number>;
+const mods = Object.entries(
+  library.reduce<Record<string, number>>((m, r) => ((m[r.mod] = (m[r.mod] ?? 0) + 1), m), {})
+).sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0]));
+
+// fail the build loudly instead of shipping an empty table
+if (!chest.rules.length || !chest.sections.length || !library.length || library.some((r) => !LABEL[r.mod] || !r.name))
+  throw new Error(`validation page: could not read rulebooks (found ${files.length} files)`);
+
+const sevMeta = {
+  blocker: { cls: "f-red", icon: "x", title: "Blocker", text: "Stops sign-off. The report cannot be signed until the issue is resolved in the draft.", eg: "Side terms disagree between Findings and Impression." },
+  warning: { cls: "f-amber", icon: "alert", title: "Warning", text: "Stays visible on the draft. The radiologist reads it and decides whether to change the text.", eg: "Nodule size differs between Findings and Impression." },
+  info: { cls: "f-blue", icon: "info", title: "Info", text: "Guidance that stays visible and never blocks, such as a reminder to document the comparison study.", eg: "No comparison study documented." },
+} as const;
+
+const authoring = [
+  { icon: "pen", title: "Write the YAML", text: "One file per study type: required sections, approved follow-up phrasing, and rules, each with an id, a severity and a description." },
+  { icon: "term", title: "Validate with the CLI", text: "Lint the file and run its golden cases before anyone sees it. Run the same commands in CI on every change." },
+  { icon: "monitor", title: "Publish from the admin console", text: "An administrator approves the new version from the web admin console, or with the CLI. Earlier approved versions stay available to roll back to." },
+  { icon: "shield", title: "Applied to every draft", text: "RadioPad selects the active rulebook by modality and body part, and checks every draft for that study type before sign-off." },
+];
+
+const cli = [
+  { label: "Lint a rulebook file", cmd: `radiopad rulebook validate ${chest.id}.yaml` },
+  { label: "Run its golden cases", cmd: `radiopad rulebook test ${chest.id}.yaml --cases _tests/${chest.id}` },
+  { label: "Promote a version to approved", cmd: "radiopad rulebook approve --id <rulebook-guid>" },
+  { label: "Validate an existing report", cmd: "radiopad report validate --id <report-id>" },
+  { label: "Draft an impression from a findings file", cmd: "radiopad generate --mode impression --template <template-id> --input findings.txt --out -" },
+];
+const NL = "\n"; // a "\n" literal inside template markup breaks the Astro compiler
+const readmeCmd = `dotnet run -- rulebook validate ../../rulebooks/${chest.id}.yaml`;
+---
+
+<BaseLayout
+  title="Validation engine"
+  description={`RadioPad checks every draft against your department's rulebook before sign-off. ${library.length} rulebooks, three severities, and a CLI to author and test them.`}
+>
+  <PageHero
+    crumbs={[{ label: "Product", href: "/product/" }, { label: "Validation engine", href: "/product/validation/" }]}
+    eyebrow="Validation engine"
+    lead="Your department writes the rules."
+    title="Every draft is checked before it is signed."
+    text="Rulebooks are YAML files, one per study type, versioned like code. Each rule carries a severity. A blocker stops sign-off until it is resolved. Warnings and info stay visible, and the radiologist decides."
+  />
+  <Divider />
+
+  <section class="sec" id="severities">
+    <div class="wrap">
+      <SectionHead
+        eyebrow="Severities"
+        title="Three severities. Only one of them blocks."
+        sub={`Counted across the ${library.length} rulebooks in the library: ${totals.blocker} blocker, ${totals.warning} warning and ${totals.info} info rules.`}
+      />
+      <div class="grid grid-3">
+        {SEVS.map((s) => (
+          <article class="card rb-sev" data-reveal>
+            <p class="rb-n mono">{totals[s]} <span>rules</span></p>
+            <h3>{sevMeta[s].title}</h3>
+            <p>{sevMeta[s].text}</p>
+            <div class:list={["flag", sevMeta[s].cls]}>
+              <Icon name={sevMeta[s].icon} class="sev" />
+              <div><b>{sevMeta[s].title}</b>{sevMeta[s].eg}</div>
+            </div>
+          </article>
+        ))}
+      </div>
+    </div>
+  </section>
+
+  <Divider />
+  <Validation />
+  <Divider />
+
+  <section class="sec" id="rules">
+    <div class="wrap">
+      <SectionHead
+        eyebrow="A real rulebook"
+        title={`${chest.name}, rule by rule.`}
+        sub={`${chest.id} version ${chest.version}, owned by the ${chest.owner}, status ${chest.status}. ${chest.rules.length} rules: ${chestCount("blocker")} blocker, ${chestCount("warning")} warning. This table is read from the YAML file when the site is built.`}
+      />
+      <div class="rb-meta" data-reveal>
+        <div>
+          <p class="tiny">REQUIRED SECTIONS · {chest.sections.length}</p>
+          <div class="inputs">{chest.sections.map((s) => <span class="chip">{s}</span>)}</div>
+        </div>
+        <div>
+          <p class="tiny">APPROVED FOLLOW-UP PHRASING · {chest.followups.length}</p>
+          <ul class="rb-fu">{chest.followups.map((f) => <li>{f}</li>)}</ul>
+        </div>
+      </div>
+      <div class="tbl-wrap" data-reveal>
+        <table class="dtable rb-table">
+          <caption class="tiny">Rules in {chest.id}.yaml</caption>
+          <thead><tr><th scope="col">Rule id</th><th scope="col">Severity</th><th scope="col">What it checks</th></tr></thead>
+          <tbody>
+            {chest.rules.map((r) => (
+              <tr>
+                <td class="mono">{r.id}</td>
+                <td><span class:list={["chip", `rb-${r.severity}`]}>{r.severity}</span></td>
+                <td>{trimDesc(r.description)}</td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </section>
+
+  <Divider />
+
+  <section class="sec" id="library">
+    <div class="wrap">
+      <SectionHead
+        eyebrow="Rulebook library"
+        title={`${library.length} rulebooks across ${mods.length} modalities.`}
+        sub="Every rulebook file in the repository, counted when the site is built. Filter by modality or search by name. Each one is a starting point your department adapts."
+      />
+      <div class="rb-lib" id="rbLib" data-reveal>
+        <div class="rb-bar">
+          <div class="rb-filters" role="group" aria-label="Filter by modality">
+            <button type="button" class="rb-f" data-mod="" aria-pressed="true">All <span>{library.length}</span></button>
+            {mods.map(([m, n]) => <button type="button" class="rb-f" data-mod={m} aria-pressed="false">{LABEL[m]} <span>{n}</span></button>)}
+          </div>
+          <label class="search rb-q">
+            <Icon name="search" />
+            <input id="rbQ" type="search" placeholder="Search, e.g. spine or lirads" autocomplete="off" spellcheck="false" aria-label="Search rulebooks" />
+          </label>
+        </div>
+        <p class="tiny rb-count" id="rbCount" aria-live="polite">Showing {library.length} of {library.length} rulebooks</p>
+        <ul class="rb-list" id="rbList" data-lenis-prevent>
+          {library.map((r) => (
+            <li data-mod={r.mod} data-q={`${r.name} ${r.id} ${LABEL[r.mod]}`.toLowerCase()}>
+              <span class="chip">{r.mod}</span>
+              <b>{r.name}</b>
+              <code>{r.id}</code>
+              <span class="rb-rc">{r.rules} rules{r.sev.blocker ? ` · ${r.sev.blocker} blocker` : ""}</span>
+            </li>
+          ))}
+        </ul>
+        <p class="rb-empty" id="rbEmpty" hidden>No rulebook matches that search. Try another term or modality.</p>
+      </div>
+    </div>
+  </section>
+
+  <Divider />
+
+  <section class="sec" id="authoring">
+    <div class="wrap">
+      <SectionHead
+        eyebrow="Authoring"
+        title="From a YAML file to every draft."
+        sub="Rulebooks change the way code does: written, tested, approved, then live."
+      />
+      <ol class="grid grid-4 rb-steps">
+        {authoring.map((s, i) => (
+          <li class="card" data-reveal>
+            <span class="ic"><Icon name={s.icon} /></span>
+            <p class="fs-n">{String(i + 1).padStart(2, "0")}</p>
+            <h3>{s.title}</h3>
+            <p>{s.text}</p>
+          </li>
+        ))}
+      </ol>
+<pre class="code rb-yaml" data-reveal><span class="c"># {chest.id}.yaml, first lines</span>
+<span class="k">rulebook_id</span>: <span class="s">{chest.id}</span>
+<span class="k">version</span>: <span class="v">{chest.version}</span>
+<span class="k">status</span>: <span class="s">{chest.status}</span>
+<span class="k">required_sections</span>:
+{chest.sections.map((s) => <span>{"  - "}<span class="s">{s}</span>{NL}</span>)}<span class="k">rules</span>:
+  - <span class="k">id</span>: <span class="s">{chest.rules[0].id}</span>
+    <span class="k">severity</span>: <span class="v">{chest.rules[0].severity}</span></pre>
+    </div>
+  </section>
+
+  <Divider />
+
+  <section class="sec" id="cli">
+    <div class="wrap">
+      <SectionHead
+        eyebrow="CLI reference"
+        title="Author and test rulebooks from the command line."
+        sub="The radiopad CLI is a .NET global tool. Commands that talk to your RadioPad server use the identity you set with radiopad login."
+      />
+      <div class="rb-cli">
+        <div class="rb-cmds">
+          {cli.map((c) => (
+            <div class="rb-cmd" data-reveal>
+              <p class="tiny">{c.label}</p>
+              <div class="cli"><code><i>$ </i>{c.cmd}</code><button class="copy" type="button" data-copy={c.cmd}><Icon name="copy" /><span>Copy</span></button></div>
+            </div>
+          ))}
+          <div class="rb-cmd" data-reveal>
+            <p class="tiny">From a source checkout, in cli/RadioPad.Cli</p>
+            <div class="cli"><code><i>$ </i>{readmeCmd}</code><button class="copy" type="button" data-copy={readmeCmd}><Icon name="copy" /><span>Copy</span></button></div>
+          </div>
+        </div>
+        <div class="term" data-reveal>
+          <div class="term-bar mono"><span>Terminal</span><span>Example output</span></div>
+<pre class="term-b"><span class="ln"><span class="c">&gt; </span>radiopad rulebook validate {chest.id}.yaml</span><span class="ln"><span class="ok">OK</span> — {chest.id} v{chest.version}</span><span class="ln"> </span><span class="ln"><span class="d"># a broken file exits 1</span></span><span class="ln"><span class="b">INVALID</span> — <span class="d">reason from the parser</span></span></pre>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <CtaBand
+    lead="Bring your department's rules."
+    title="See them checked on every draft."
+    text="Book a demo and we will walk through rulebooks for your modalities, or start a free trial on your own Windows workstation."
+  />
+</BaseLayout>
+
+<script>import "../../scripts/rulebook-library.js";</script>
+
+<style is:global>
+  .rb-sev{gap:10px}
+  .rb-sev h3{margin-top:0;padding-top:4px}
+  .rb-sev .flag{margin-top:auto}
+  .rb-n{font-size:1.9rem;line-height:1;color:var(--film);font-weight:500;letter-spacing:-.02em}
+  .rb-n span{font-size:.74rem;color:var(--fg-3);letter-spacing:.06em}
+
+  .rb-meta{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1.2fr);gap:14px;margin-bottom:14px}
+  .rb-meta > div{min-width:0;display:grid;gap:10px;align-content:start;padding:18px 20px;border:1px solid var(--line);border-radius:var(--r-lg);background:var(--bg-1)}
+  .rb-fu{list-style:none;margin:0;padding:0;display:grid;gap:6px;font-size:.9rem;color:var(--fg-2)}
+  @media (max-width:760px){.rb-meta{grid-template-columns:minmax(0,1fr)}}
+  .rb-table caption{caption-side:top;text-align:left;padding:12px 18px 0}
+  .rb-table td:first-child{white-space:nowrap}
+  .rb-blocker{color:#ffb7b7;border-color:rgba(255,107,107,.35);background:var(--red-bg)}
+  .rb-warning{color:var(--amber);border-color:rgba(243,181,74,.35);background:var(--amber-bg)}
+  .rb-info{color:var(--blue);border-color:rgba(130,169,255,.3);background:var(--blue-bg)}
+
+  .rb-lib{border:1px solid var(--line-2);border-radius:var(--r-lg);background:var(--bg-1);padding:clamp(14px,2.4vw,22px);display:grid;gap:12px;min-width:0}
+  .rb-bar{display:grid;gap:12px}
+  .rb-filters{display:flex;flex-wrap:wrap;gap:6px}
+  .rb-f{height:34px;padding:0 12px;border-radius:999px;border:1px solid var(--line-2);background:rgba(2,4,8,.35);color:var(--fg-2);font:500 .84rem var(--font-body);cursor:pointer;display:inline-flex;align-items:center;gap:8px;transition:transform 160ms var(--ease-out),color .2s ease,border-color .2s ease,background-color .2s ease}
+  .rb-f span{font:400 .72rem var(--font-mono);color:var(--fg-3)}
+  .rb-f:active{transform:scale(.97)}
+  .rb-f[aria-pressed="true"]{color:var(--film);border-color:rgba(134,197,255,.5);background:rgba(134,197,255,.1)}
+  .rb-f[aria-pressed="true"] span{color:var(--accent)}
+  @media (hover:hover) and (pointer:fine){.rb-f:hover{color:var(--fg);border-color:var(--line-3)}}
+  .rb-q{max-width:420px}
+  .rb-q:focus-within{border-color:rgba(134,197,255,.6);box-shadow:0 0 0 3px rgba(134,197,255,.16)}
+  .rb-q input{flex:1;min-width:0;border:0;background:none;color:var(--fg);font:400 16px var(--font-body);outline:none}
+  .rb-q input::placeholder{color:var(--fg-3)}
+  .rb-count{margin:0}
+  .rb-list{list-style:none;margin:0;padding:0 4px 0 0;display:grid;gap:6px;max-height:520px;overflow-y:auto;overscroll-behavior:contain;scrollbar-width:thin;scrollbar-color:var(--line-3) transparent}
+  .rb-list li{display:grid;grid-template-columns:48px minmax(0,1.4fr) minmax(0,1fr) auto;gap:12px;align-items:center;padding:9px 12px;border:1px solid var(--line);border-radius:10px;background:rgba(2,4,8,.35);font-size:.88rem}
+  .rb-list li[hidden]{display:none}
+  .rb-list .chip{justify-content:center}
+  .rb-list b{font-weight:500;color:var(--fg);min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  .rb-list code{font:400 .76rem var(--font-mono);color:var(--fg-3);min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  .rb-rc{font:400 .74rem var(--font-mono);color:var(--fg-3);white-space:nowrap}
+  @media (max-width:700px){
+    .rb-list li{grid-template-columns:48px minmax(0,1fr);row-gap:2px}
+    .rb-list code,.rb-rc{grid-column:2}
+  }
+  .rb-empty{padding:18px;text-align:center;color:var(--fg-3);font-size:.9rem;border:1px dashed var(--line-2);border-radius:12px}
+
+  .rb-steps{list-style:none;margin:0;padding:0}
+  .rb-steps .card{gap:8px}
+  .rb-steps .ic + .fs-n{padding-top:14px}
+  .rb-steps h3{margin-top:0;padding-top:0}
+  .rb-yaml{margin-top:14px;max-width:560px}
+
+  .rb-cli{display:grid;grid-template-columns:minmax(0,1.2fr) minmax(0,.8fr);gap:14px;align-items:start}
+  .rb-cmds{display:grid;gap:14px;min-width:0}
+  .rb-cmd{display:grid;gap:6px;min-width:0}
+  .rb-cmd .cli{margin-top:0}
+  .rb-cli .term-b{min-height:0}
+  @media (max-width:900px){.rb-cli{grid-template-columns:minmax(0,1fr)}}
+</style>

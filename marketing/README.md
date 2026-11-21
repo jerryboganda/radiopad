@@ -1,9 +1,9 @@
 # RadioPad Marketing Site
 
-Brand-locked marketing site (landing + blog) for RadioPad. Built with **Astro** (SSG),
-**Svelte islands**, **GSAP**, and **Tailwind v4**. Colors are locked to the product's
-Hallmark palette (see [BRAND-LOCK.md](./BRAND-LOCK.md)); fonts, layout, and motion are
-a from-scratch premium redesign built with the `design-taste-frontend` taste-skill.
+The public website for RadioPad at https://radiopadstudio.com. Static **Astro** site with **GSAP**
+(ScrollTrigger + SplitText from npm) and **Lenis** smooth scroll (vendored in `src/vendor/`).
+Dark "reading room" design locked in [BRAND-LOCK.md](./BRAND-LOCK.md); the approved homepage
+mockup lives in `mockups/v2/option-a-cinematic.html`.
 
 ## Commands
 
@@ -11,120 +11,59 @@ Run from the repo root (pnpm workspace) or from `marketing/`:
 
 ```bash
 pnpm --filter @radiopad/marketing dev       # dev server (HMR) at http://localhost:4321
-pnpm --filter @radiopad/marketing build      # static build -> marketing/dist
-pnpm --filter @radiopad/marketing preview     # serve the built dist locally
-
-# convenience scripts from repo root:
-pnpm marketing:dev
-pnpm marketing:build
+pnpm --filter @radiopad/marketing build     # static build -> marketing/dist (CI does this; see repo CLAUDE.md)
 ```
+
+Deploys: a push to `main` touching `marketing/**`, `CHANGELOG.md` or `rulebooks/*.yaml` runs
+`.github/workflows/hostinger-deploy.yml`, which builds and rsyncs `dist/` to Hostinger
+(`/changelog/` reads `../CHANGELOG.md`, `/product/validation/` reads `../rulebooks/*.yaml` at build time).
+
+## Pages
+
+| Route | Source | Live element |
+|---|---|---|
+| `/` | `pages/index.astro` + `components/home/*` | CT slice + self-typing report, pinned workflow, platform explorer, audit log |
+| `/product/` | `pages/product/index.astro` | Workflow, surfaces, platform explorer |
+| `/product/validation/` | `pages/product/validation.astro` | Real `chest_ct_v1` rules + filterable library of all rulebooks (`#cli` section) |
+| `/product/dictation/` | `pages/product/dictation.astro` | Phone pairing demo |
+| `/solutions/{hospitals,imaging-groups,radiologists}/` | `pages/solutions/[slug].astro` + `data/solutions.ts` | Role switcher / rule-impact demo |
+| `/integrations/` | `pages/integrations.astro` | One report as FHIR R4 JSON, PDF, DOCX, text |
+| `/security/` | `pages/security.astro` | Data-flow diagram, live audit log (`#ai`, `#disclosure`) |
+| `/pricing/` | `pages/pricing.astro` | Plan chooser (no prices) |
+| `/download/` | `pages/download.astro` | Latest GitHub release (.msi / .apk) fetched live, with fallback link |
+| `/demo/` | `pages/demo.astro` | Demo request form (`/contact` redirects here) |
+| `/about/` | `pages/about.astro` | Principles (`#careers`; `/careers` redirects here) |
+| `/changelog/` | `pages/changelog.astro` | Repo `CHANGELOG.md`, filter by change type |
+| `/blog/`, `/blog/<slug>/`, `/blog/tag/<tag>/` | `pages/blog/*`, `content/blog/*.mdx` | Tag filter, table of contents |
+| `/legal/{privacy,terms,dpa,responsible-ai}/` | `pages/legal/[slug].astro`, `content/legal/*.md` | Section list. **Drafts pending legal review.** |
+| 404 | `pages/404.astro` | |
 
 ## Structure
 
 ```
-marketing/
-  astro.config.mjs          # integrations (svelte, mdx, sitemap), tailwind vite plugin, markdown config
-  BRAND-LOCK.md             # the locked color palette (OKLCH + hex) + usage rules
-  scripts/gen-assets.mjs    # regenerates self-hosted fonts, blog covers, avatars, OG image
-  public/
-    fonts/                  # self-hosted woff2 (Clash Display, General Sans, JetBrains Mono)
-    authors/                # author avatars
-    og-default.png          # social share image
-    favicon.svg  robots.txt
-  src/
-    styles/                 # app.css (entry) -> fonts, tokens (alias layer), base, home, blog
-    lib/site.ts             # site config (name, url, nav, footer, cta)
-    layouts/BaseLayout.astro
-    components/
-      BaseHead.astro        # <head>: SEO, OG/Twitter, JSON-LD, font preloads
-      Nav.svelte            # nav island (mobile toggle + scrolled state)
-      Footer.astro
-      Motion.svelte         # headless motion island (GSAP loaded here only)
-      home/                 # Hero, TrustMarquee, Metrics, Features, HowItWorks, Safety,
-                            #   Security, Testimonials, Pricing, Faq, FinalCta
-      blog/PostCard.astro
-    content.config.ts       # blog collection schema (typed)
-    content/blog/*.mdx      # posts
-    pages/
-      index.astro           # home
-      blog/index.astro      # blog index
-      blog/[slug].astro     # post template
-      blog/tag/[tag].astro  # tag archive
-      rss.xml.ts            # RSS feed
-      404.astro
+src/
+  layouts/BaseLayout.astro   head, icon sprite, nav, <main>, footer, global script
+  lib/site.ts                origin, contact addresses, nav mega menus, footer columns
+  components/                Nav, Footer, Sprite + Icon, PageHero, SectionHead, Faq, CtaBand, Divider
+  components/home/           homepage sections, reusable on inner pages (each at most once per page)
+  scripts/site.js            global: Lenis, menus, anchors, magnetic buttons, spotlight, tabs, copy, FAQ, reveals
+  scripts/*.js               per-feature demos, imported by the component that renders them
+  styles/site.css            tokens, fonts, every shared component
+  styles/pages.css           inner-page patterns (grids, tables, prose, forms, notices)
+  styles/blog.css            blog and legal reading layout (all classes prefixed)
+public/fonts/                Bricolage Grotesque, Geist, Geist Mono (self-hosted woff2)
 ```
 
-## Design system
+## Configuration
 
-- **Colors are LOCKED** (see BRAND-LOCK.md). Canonical `--color-*` tokens live in the
-  Tailwind `@theme` block in `src/styles/app.css`; short aliases (`--paper`, `--accent`,
-  ...) mirror the product's `hallmark.css` pattern so component CSS and Tailwind utilities
-  resolve to the identical locked values. Do not introduce new brand hues.
-- **Fonts:** Clash Display (display), General Sans (body), JetBrains Mono (technical),
-  all self-hosted from `public/fonts`. Regenerate with `node scripts/gen-assets.mjs`.
-- **Motion:** GSAP + ScrollTrigger live only inside `Motion.svelte`, dynamically imported
-  so the blog index and static content never ship GSAP. Everything honors
-  `prefers-reduced-motion`, and reveal elements are visible without JS.
+- `src/lib/site.ts`: `email` and `securityEmail` are used everywhere on the site. Set real, monitored
+  mailboxes before launch.
+- `PUBLIC_DEMO_ENDPOINT` (build-time env): if set, the demo form POSTs JSON there and shows success
+  only on a 2xx response. If unset, the form opens the visitor's email app with the request prefilled.
 
-## Adding a blog post
+## Rules for new content
 
-Create `src/content/blog/<slug>.mdx`:
-
-```mdx
----
-title: "Your title"
-description: "One-line summary for cards and SEO."
-date: 2026-07-01
-tags: ["Product"]
-cover: "../../assets/blog/<slug>.jpg"     # local image, optimized by astro:assets
-coverAlt: "Describe the cover for screen readers"
-author:
-  name: "Author Name"
-  role: "Role"
-  avatar: "/authors/author.jpg"
-readingTime: "5 min read"
-featured: false
----
-
-## A section heading
-
-Body copy. Use `## H2` headings; the post template builds its table of contents from them.
-```
-
-Add the cover image to `src/assets/blog/` and the avatar to `public/authors/`.
-
-## Before deploying
-
-1. Set the real origin in `astro.config.mjs` (`site`) and `src/lib/site.ts` (`url`).
-   This drives canonical URLs, the sitemap, the RSS feed, and OG/Twitter absolute URLs.
-2. `pnpm marketing:build` outputs a static site to `marketing/dist` (deploy anywhere:
-   Netlify, Vercel static, S3, Nginx, or the product's own infra).
-
-## Delivery checklist
-
-**SEO**
-- [x] Per-page `<title>`, meta description, canonical
-- [x] Open Graph + Twitter card tags + `og-default.png`
-- [x] JSON-LD: Organization (home), BlogPosting + BreadcrumbList (posts)
-- [x] `@astrojs/sitemap` (`sitemap-index.xml`)
-- [x] RSS feed (`/rss.xml`) via `@astrojs/rss`
-- [x] `robots.txt` with sitemap reference
-- [x] Semantic HTML, single `<h1>` per page, correct heading hierarchy, alt text
-- [x] Clean trailing-slash URLs
-
-**Performance**
-- [x] Images via `astro:assets` `<Image>` (responsive webp, lazy below the fold)
-- [x] Fonts self-hosted + preloaded, `font-display: swap`
-- [x] GSAP loaded only in islands; static pages ship ~zero JS
-- [x] Local Core Web Vitals: LCP ~80ms, CLS 0
-
-**Accessibility**
-- [x] Keyboard nav + visible focus rings (`--color-focus-ring`)
-- [x] Contrast checked against the locked palette (accent-deep for small accent text)
-- [x] `prefers-reduced-motion` honored across all motion
-- [x] Reveal content visible without JS (no-JS / crawler safe)
-- [x] Skip-to-content link, `aria-current`, labeled controls
-
-**Quality**
-- [x] `npx impeccable detect src` clean (no AI-slop anti-patterns)
-- [x] Zero em-dashes in rendered output (taste-skill hard rule)
+- Colours only from the tokens in `site.css`; one accent; semantic colours only for meaning.
+- No fake customers, testimonials, certifications, prices or statistics.
+- Every page: one `<h1>` (PageHero), unique title and description, `data-reveal` on blocks, ends with `CtaBand`.
+- New client JS respects `prefers-reduced-motion` (import `reduce` from `scripts/site.js`).

@@ -1,53 +1,43 @@
 ---
 import { getCollection } from "astro:content";
 import BaseLayout from "../../../layouts/BaseLayout.astro";
-import PostCard from "../../../components/blog/PostCard.astro";
-import Motion from "../../../components/Motion.svelte";
+import PageHero from "../../../components/PageHero.astro";
+import Divider from "../../../components/Divider.astro";
+import CtaBand from "../../../components/CtaBand.astro";
+import PostList from "../../../components/blog/PostList.astro";
 
 export async function getStaticPaths() {
-  const posts = await getCollection("blog", ({ data }) => !data.draft);
+  const posts = (await getCollection("blog", ({ data }) => !data.draft)).sort(
+    (a, b) => b.data.date.valueOf() - a.data.date.valueOf()
+  );
   const tags = [...new Set(posts.flatMap((p) => p.data.tags))];
-  return tags.map((tag) => ({
-    params: { tag: tag.toLowerCase() },
-    props: {
-      tag,
-      posts: posts
-        .filter((p) => p.data.tags.includes(tag))
-        .sort((a, b) => b.data.date.valueOf() - a.data.date.valueOf()),
-      allTags: [...tags].sort(),
-    },
-  }));
+  return tags.map((tag) => ({ params: { tag: tag.toLowerCase() }, props: { tag, posts } }));
 }
 
-const { tag, posts, allTags } = Astro.props;
+const { tag, posts } = Astro.props;
+const n = posts.filter((p) => p.data.tags.includes(tag)).length;
 ---
 
-<BaseLayout title={`${tag} posts`} description={`RadioPad blog posts tagged ${tag}.`} navCurrent="Blog">
-  <main id="main">
-    <section class="blog-head">
-      <div class="wrap">
-        <p class="eyebrow">Tag</p>
-        <h1>Posts on {tag}.</h1>
-        <p>{posts.length} {posts.length === 1 ? "post" : "posts"} tagged {tag}.</p>
-      </div>
-    </section>
-
-    <nav class="filter" aria-label="Filter posts by tag">
-      <div class="wrap">
-        <a class="pill" href="/blog">All</a>
-        {allTags.map((t) => (
-          <a class="pill" href={`/blog/tag/${t.toLowerCase()}/`} aria-current={t === tag ? "page" : undefined}>{t}</a>
-        ))}
-      </div>
-    </nav>
-
-    <section class="grid-sec">
-      <div class="wrap">
-        <div class="post-grid">
-          {posts.map((post) => <PostCard post={post} />)}
-        </div>
-      </div>
-    </section>
-  </main>
-  <Motion client:visible mode="index" />
+<BaseLayout title={`${tag} posts`} description={`RadioPad blog posts tagged ${tag}: notes on AI-assisted radiology reporting.`}>
+  <PageHero
+    crumbs={[{ label: "Blog", href: "/blog/" }, { label: tag, href: `/blog/tag/${tag.toLowerCase()}/` }]}
+    eyebrow="The RadioPad blog"
+    lead="Posts tagged"
+    title={`${tag}.`}
+    text={`${n} ${n === 1 ? "note" : "notes"} tagged ${tag}. Switch tags below, or choose All to see every post.`}
+    ctas={false}
+  />
+  <Divider />
+  <section class="sec bl-sec">
+    <div class="wrap">
+      <h2 class="bl-sr">Posts</h2>
+      <PostList posts={posts} active={tag} />
+    </div>
+  </section>
+  <CtaBand />
 </BaseLayout>
+
+<style>
+  /* one-word tag titles ("Interoperability.") are wider than a 375px screen at hero size */
+  :global(.phero-title .l2){hyphens:auto;overflow-wrap:break-word}
+</style>

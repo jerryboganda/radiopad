@@ -1,16 +1,42 @@
 ---
 import BaseLayout from "../layouts/BaseLayout.astro";
+import CtaBand from "../components/CtaBand.astro";
+import Icon from "../components/Icon.astro";
 ---
+
 <BaseLayout title="Page not found" description="The page you were looking for could not be found." noindex={true}>
-  <main id="main" class="wrap" style="min-height:60vh;display:grid;place-items:center;text-align:center;padding-block:6rem;">
-    <div>
-      <p class="eyebrow" style="justify-content:center">Error 404</p>
-      <h1 style="font-size:var(--t-h1);margin:1rem 0 1rem;">This page could not be found.</h1>
-      <p class="lead" style="margin-inline:auto 0;margin-inline:auto;">The link may be broken, or the page may have moved.</p>
-      <div style="margin-top:2rem;display:flex;gap:.85rem;justify-content:center;flex-wrap:wrap;">
-        <a class="btn btn-primary btn-lg" href="/">Back to home</a>
-        <a class="btn btn-ghost btn-lg" href="/blog">Read the blog</a>
+  <section class="phero nf">
+    <div class="hero-bg" aria-hidden="true"></div>
+    <div class="wrap nf-grid">
+      <div>
+        <p class="eyebrow"><span class="pulse"></span>Error 404</p>
+        <h1 class="phero-title"><span class="l1">Series 404.</span><span class="l2">No images in this study.</span></h1>
+        <p class="lead">We checked the priors too. The page may have moved, or the link may be mistyped. Nothing here is waiting for your signature.</p>
+        <div class="cta-row">
+          <span class="mag"><a class="btn btn-primary btn-lg" href="/">Back to home <Icon name="arrow" class="arr" /></a></span>
+          <a class="btn btn-ghost btn-lg" href="/product/"><Icon name="doc" /> Product overview</a>
+          <a class="btn btn-ghost btn-lg" href="/blog/"><Icon name="book" /> Read the blog</a>
+        </div>
+      </div>
+      <div class="viewer nf-viewer" id="nfViewer" role="img" aria-label="An empty image viewer: series 404 has no images">
+        <div class="ov ov-tl">AX -- mm<br />Series 404</div>
+        <div class="ov ov-tr">IM 0 / 0</div>
+        <div class="ov ov-bl">W 404 &nbsp;L 404</div>
+        <div class="ov ov-a">A</div><div class="ov ov-r">R</div><div class="ov ov-l">L</div>
+        <p class="nf-empty">No pixel data</p>
+        <div class="xh"></div>
+        <div class="ov hu" hidden>HU <b>not found</b></div>
       </div>
     </div>
-  </main>
+  </section>
+  <CtaBand />
 </BaseLayout>
+
+<script>import "../scripts/not-found.js";</script>
+
+<style>
+  .nf-grid{display:grid;grid-template-columns:minmax(0,1.15fr) minmax(0,.85fr);gap:clamp(32px,5vw,72px);align-items:center}
+  .nf-viewer{width:100%;max-width:440px;justify-self:end;border:1px solid var(--line-2);border-radius:var(--r-lg);background:radial-gradient(circle at 50% 50%,rgba(134,197,255,.07),transparent 62%),#020304;box-shadow:0 40px 90px -40px rgba(0,0,0,.9),0 0 120px -50px var(--glow)}
+  .nf-empty{position:absolute;inset:0;display:grid;place-items:center;font:500 .74rem var(--font-mono);letter-spacing:.16em;text-transform:uppercase;color:var(--fg-3)}
+  @media (max-width:900px){.nf-grid{grid-template-columns:minmax(0,1fr)}.nf-viewer{justify-self:start}}
+</style>

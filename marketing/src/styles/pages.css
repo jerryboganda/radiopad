@@ -1,0 +1,103 @@
+/* Inner-page patterns shared across product, solutions, company, resources and legal pages.
+   Builds only on the tokens and components in site.css. */
+
+[hidden]{display:none!important}
+.nl[aria-current="page"]{color:var(--fg);background:rgba(160,190,225,.07)}
+.mnav a[aria-current="page"]{color:var(--accent)}
+.foot .about .foot-mail{margin-top:10px}
+.foot-mail a{color:var(--fg-2);text-decoration:none;font-size:.88rem}
+.foot-mail a:hover{color:var(--fg)}
+
+/* inner-page hero */
+.phero{position:relative;isolation:isolate;overflow:hidden;padding-block:clamp(48px,7vw,104px) clamp(48px,6vw,88px)}
+.phero .eyebrow{margin-bottom:20px}
+.phero-title{font-size:clamp(2.4rem,5.4vw,4.8rem);letter-spacing:-.045em;line-height:.98;max-width:16ch}
+.phero-title .l1{display:block;color:#7f8ea2}
+.phero-title .l2{display:block;color:var(--film)}
+.phero .lead{margin-top:22px;max-width:58ch}
+.phero .cta-row{margin-top:30px}
+.phero-vis{margin-top:clamp(40px,6vw,72px)}
+.crumbs{display:flex;align-items:center;flex-wrap:wrap;gap:6px;margin-bottom:26px;font:400 .78rem var(--font-mono);letter-spacing:.04em;color:var(--fg-3)}
+.crumbs a{color:var(--fg-3);text-decoration:none;transition:color .2s ease}
+.crumbs a:hover{color:var(--fg)}
+.crumbs a:last-child{color:var(--fg-2)}
+.crumbs .sepi{width:12px;height:12px;transform:rotate(-90deg)}
+
+/* generic grids of cards */
+.grid{display:grid;gap:14px}
+.grid-2{grid-template-columns:repeat(2,minmax(0,1fr))}
+.grid-3{grid-template-columns:repeat(3,minmax(0,1fr))}
+.grid-4{grid-template-columns:repeat(4,minmax(0,1fr))}
+@media (max-width:960px){.grid-3,.grid-4{grid-template-columns:repeat(2,minmax(0,1fr))}}
+@media (max-width:640px){.grid-2,.grid-3,.grid-4{grid-template-columns:minmax(0,1fr)}}
+.grid .card{grid-column:auto}
+.card .ic + h3{margin-top:0;padding-top:18px}
+.card .more{margin-top:14px;display:inline-flex;align-items:center;gap:6px;font-size:.88rem;color:var(--accent);text-decoration:none}
+.card .more .i{width:15px;height:15px;transition:transform .2s var(--ease-out)}
+@media (hover:hover) and (pointer:fine){.card .more:hover .i{transform:translateX(3px)}}
+
+/* two-column split: copy left, visual right */
+.split{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1.1fr);gap:clamp(28px,5vw,72px);align-items:center}
+.split.rev > :first-child{order:2}
+@media (max-width:900px){.split{grid-template-columns:minmax(0,1fr)}.split.rev > :first-child{order:0}}
+.split h3{font-size:clamp(1.6rem,2.6vw,2.2rem)}
+.split p.d{color:var(--fg-2);margin-top:12px;max-width:52ch}
+
+/* data table (comparisons, specs, rule lists) */
+.tbl-wrap{overflow-x:auto;border:1px solid var(--line);border-radius:var(--r-lg);background:var(--bg-1)}
+.dtable{width:100%;border-collapse:collapse;font-size:.9rem;min-width:560px}
+.dtable th,.dtable td{padding:14px 18px;text-align:left;border-bottom:1px solid var(--line);vertical-align:top}
+.dtable thead th{font:500 .68rem var(--font-mono);letter-spacing:.12em;text-transform:uppercase;color:var(--fg-3);background:rgba(2,4,8,.35)}
+.dtable tbody tr:last-child td{border-bottom:0}
+.dtable td{color:var(--fg-2)}
+.dtable td:first-child{color:var(--fg)}
+.dtable .mono{font-size:.82rem}
+.dtable .yes{color:var(--green)}.dtable .no{color:var(--fg-3)}
+
+/* long-form text: legal, about, changelog bodies */
+.prose{max-width:72ch;color:var(--fg-2);font-size:1.02rem;line-height:1.75}
+.prose > * + *{margin-top:1.1em}
+.prose h2{margin-top:2.2em;font-size:clamp(1.5rem,2.4vw,1.9rem);color:var(--fg)}
+.prose h3{margin-top:1.8em;font-size:1.2rem;color:var(--fg)}
+.prose a{color:var(--accent);text-underline-offset:3px}
+.prose strong{color:var(--fg);font-weight:600}
+.prose ul,.prose ol{padding-left:1.3em}
+.prose li + li{margin-top:.4em}
+.prose code{font:400 .86em var(--font-mono);padding:2px 6px;border-radius:6px;background:var(--bg-2);border:1px solid var(--line);color:var(--fg)}
+.prose pre{padding:16px 18px;border-radius:14px;background:#03060b;border:1px solid var(--line);overflow-x:auto;font:400 .84rem/1.7 var(--font-mono)}
+.prose pre code{padding:0;border:0;background:none}
+.prose blockquote{margin-inline:0;padding-left:18px;border-left:2px solid var(--line-3);color:var(--fg)}
+.prose hr{border:0;border-top:1px solid var(--line);margin-block:2.4em}
+.prose table{width:100%;border-collapse:collapse;font-size:.92rem}
+.prose th,.prose td{padding:10px 12px;border-bottom:1px solid var(--line);text-align:left}
+
+/* notice line (drafts, illustrative data) */
+.notice{display:flex;gap:12px;align-items:flex-start;padding:14px 16px;border-radius:14px;border:1px solid rgba(243,181,74,.3);background:var(--amber-bg);color:var(--fg-2);font-size:.9rem}
+.notice .i{color:var(--amber);margin-top:2px}
+.notice.info{border-color:rgba(130,169,255,.28);background:var(--blue-bg)}
+.notice.info .i{color:var(--blue)}
+
+/* forms */
+.form{display:grid;gap:16px}
+.form .row{display:grid;grid-template-columns:1fr 1fr;gap:16px}
+@media (max-width:560px){.form .row{grid-template-columns:1fr}}
+.field{display:grid;gap:7px;min-width:0}
+.field label{font-size:.86rem;font-weight:500;color:var(--fg)}
+.field .opt{color:var(--fg-3);font-weight:400}
+.field input,.field select,.field textarea{width:100%;min-height:46px;padding:11px 14px;border-radius:12px;border:1px solid var(--line-2);background:#03060b;color:var(--fg);font:400 .95rem var(--font-body);transition:border-color .2s ease,box-shadow .2s ease}
+.field textarea{min-height:120px;resize:vertical;line-height:1.55}
+.field input::placeholder,.field textarea::placeholder{color:var(--fg-3)}
+.field input:focus,.field select:focus,.field textarea:focus{outline:none;border-color:rgba(134,197,255,.6);box-shadow:0 0 0 3px rgba(134,197,255,.16)}
+.field [aria-invalid="true"]{border-color:rgba(255,107,107,.6)}
+.field .err{font-size:.8rem;color:var(--red)}
+.form .btn{justify-self:start}
+.form-note{font-size:.82rem;color:var(--fg-3)}
+.form-success{display:flex;gap:14px;align-items:flex-start;padding:22px;border-radius:var(--r-lg);border:1px solid rgba(88,211,160,.35);background:var(--green-bg);color:var(--fg)}
+.form-success .i{color:var(--green);width:22px;height:22px}
+
+/* key-value spec list */
+.specs{display:grid;gap:0;border-top:1px solid var(--line)}
+.specs div{display:grid;grid-template-columns:minmax(0,200px) minmax(0,1fr);gap:16px;padding:14px 0;border-bottom:1px solid var(--line);font-size:.92rem}
+.specs dt{color:var(--fg-3);font:400 .78rem var(--font-mono);letter-spacing:.06em;text-transform:uppercase;padding-top:2px}
+.specs dd{margin:0;color:var(--fg)}
+@media (max-width:520px){.specs div{grid-template-columns:1fr;gap:4px}}

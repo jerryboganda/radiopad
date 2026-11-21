@@ -1,39 +1,47 @@
----
-// Pricing — 3 tiers. INDICATIVE dummy prices (from $100), visibly tagged.
-// Operator replaces with real figures.
-const tiers = [
-  { name: "Practice", price: "$100", unit: "/ radiologist / mo", who: "For small practices getting started with assisted reporting.", popular: false,
-    features: ["Draft from dictation and findings", "Core validation checks", "PDF and DOCX export", "Web and desktop apps"] },
-  { name: "Department", price: "$300", unit: "/ radiologist / mo", who: "For departments standardizing reporting across a team.", popular: true,
-    features: ["Everything in Practice", "Custom rulebooks and templates", "Full validation engine", "FHIR export and audit log"] },
-  { name: "Health System", price: "$750", unit: "/ radiologist / mo", who: "For multi-site systems with on-premise and compliance needs.", popular: false,
-    features: ["Everything in Department", "On-premise or self-hosted", "SSO and role-based access", "Priority support and onboarding"] },
-];
----
-<section class="pricing" id="pricing">
-  <div class="wrap">
-    <div class="pricing-head reveal">
-      <p class="eyebrow">Pricing</p>
-      <h2>Pricing that scales with your department.</h2>
-      <p class="note">Indicative pricing shown for layout. Final pricing is set with your team.</p>
+  <section class="sec" id="pricing">
+    <div class="wrap">
+      <header class="sec-head">
+        <p class="eyebrow">Pricing</p>
+        <h2 data-split>Start alone. Scale to the whole department.</h2>
+      </header>
+      <div class="price">
+        <div class="card tier" data-reveal>
+          <span class="name">Radiologist</span>
+          <span class="amt">Free trial</span>
+          <p class="who">For an individual radiologist on a Windows workstation.</p>
+          <ul class="ticks">
+            <li><svg class="i"><use href="#i-check"/></svg>Windows desktop app</li>
+            <li><svg class="i"><use href="#i-check"/></svg>Local dictation engine</li>
+            <li><svg class="i"><use href="#i-check"/></svg>Mobile companion pairing</li>
+            <li><svg class="i"><use href="#i-check"/></svg>Templates and findings library</li>
+          </ul>
+          <a class="btn btn-ghost" href="/download/"><svg class="i"><use href="#i-win"/></svg> Download for Windows</a>
+        </div>
+        <div class="card tier feat beam" data-reveal>
+          <span class="badge">Most departments</span>
+          <span class="name">Team</span>
+          <span class="amt">Per seat</span>
+          <p class="who">For reading groups that share templates, rulebooks and review. Talk to us for seat pricing.</p>
+          <ul class="ticks">
+            <li><svg class="i"><use href="#i-check"/></svg>Everything in Radiologist</li>
+            <li><svg class="i"><use href="#i-check"/></svg>Shared rulebooks and templates</li>
+            <li><svg class="i"><use href="#i-check"/></svg>Peer review and critical results</li>
+            <li><svg class="i"><use href="#i-check"/></svg>Web admin console</li>
+          </ul>
+          <a class="btn btn-primary" href="/demo/">Talk to us</a>
+        </div>
+        <div class="card tier" data-reveal>
+          <span class="name">Enterprise</span>
+          <span class="amt">Custom</span>
+          <p class="who">For hospitals and imaging groups with integration and governance needs.</p>
+          <ul class="ticks">
+            <li><svg class="i"><use href="#i-check"/></svg>On-prem or private cloud</li>
+            <li><svg class="i"><use href="#i-check"/></svg>Your AI provider or a local model</li>
+            <li><svg class="i"><use href="#i-check"/></svg>PACS/RIS, DICOMweb, FHIR R4</li>
+            <li><svg class="i"><use href="#i-check"/></svg>SSO, MFA, audit log, tenant isolation</li>
+          </ul>
+          <a class="btn btn-ghost" href="/demo/">Book a demo</a>
+        </div>
+      </div>
     </div>
-    <div class="tiers">
-      {
-        tiers.map((t) => (
-          <div class={`tier reveal${t.popular ? " popular" : ""}`}>
-            {t.popular && <span class="badge">Most popular</span>}
-            <h3>{t.name}</h3>
-            <div class="price">{t.price}<small> {t.unit}</small></div>
-            <p class="who">{t.who}</p>
-            <ul>
-              {t.features.map((f) => (
-                <li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round"><path d="M5 13l4 4L19 7"/></svg> {f}</li>
-              ))}
-            </ul>
-            <a class="btn btn-ghost" href="/#demo">Book a demo</a>
-          </div>
-        ))
-      }
-    </div>
-  </div>
-</section>
+  </section>

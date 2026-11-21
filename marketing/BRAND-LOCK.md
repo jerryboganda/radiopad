@@ -1,154 +1,60 @@
-# BRAND-LOCK — RadioPad Marketing Site (RC design system)
+# BRAND-LOCK: RadioPad marketing site ("reading room" design)
 
-> **This palette is LOCKED.** Every color below is taken verbatim from the RadioPad
-> product's canonical token source, [`frontend/app/tokens.css`](../frontend/app/tokens.css)
-> (the **RC design system**, PRD v3.0 §20; reference mockups RC-01…RC-10 at
-> `UI UX SCREENS/Authentication/`). The marketing site reuses these values **exactly** —
-> no new brand hues, no shifted scheme, no re-tinting. Fonts, spacing, type scale,
-> layout, and motion remain free (see "Design direction" at the bottom).
+> **Locked on 2026-11-21** by owner decision. This replaces the earlier RC-palette lock (light clinical
+> white + RadioPad blue, 2026-07-13) and the Hallmark lock before it. The owner reviewed three
+> homepage directions (Dark Cinematic, Clinical Editorial, Kinetic Bento) and chose **Dark Cinematic**.
+> The approved homepage mockup is `mockups/v2/option-a-cinematic.html`.
 >
-> **Locked on 2026-07-13. This lock SUPERSEDES the previous Hallmark lock**
-> (warm-paper / terracotta, sourced from the retired `frontend/app/hallmark.css`).
-> No Hallmark value may appear anywhere on the site.
->
-> Hex is canonical here (the product ships hex). The marketing token names keep the
-> site's original surface vocabulary (`paper` / `ink` / `rule` / `accent`) but every
-> value is an RC primitive: `paper`=canvas, `paper-soft`=surface, `paper-warm`=surface-subtle.
+> Scope: the marketing site only (`marketing/`). The product UI keeps its own RC design system
+> (`frontend/app/tokens.css`, see the repo `CLAUDE.md`); the two no longer share a palette.
 
----
+## Concept
 
-## 1. Locked palette — LIGHT (default) and DARK (first-class)
+Radiologists read in dark rooms on grayscale monitors. The site is that room: a deep blue-black
+canvas, film-white type, one pale ice-blue accent for light and focus, and clinical state colours
+used only where they mean something (validation severities, AI-draft marking, signed state).
+Bands are separated by thin animated light beams instead of colour changes.
 
-Both schemes are mandatory. The site follows the visitor's OS preference via
-`@media (prefers-color-scheme: dark)` — no toggle on marketing. Dark is the RC
-deep-navy theme, **never pure black**.
+The site is **dark only** by design (`color-scheme: dark`, `theme-color #04070c`). There is no light
+theme and no toggle.
 
-### Surfaces (clinical white / deep navy)
-| Token | Light | Dark | Role | RC source name |
-|---|---|---|---|---|
-| `--color-paper` | `#f5f8fb` | `#0b1422` | Page background | `--color-canvas` |
-| `--color-paper-soft` | `#ffffff` | `#111d2d` | Card / panel / elevated surface | `--color-surface` |
-| `--color-paper-warm` | `#eef3f8` | `#152235` | Subtle section bg / hover fill | `--color-surface-subtle` |
+## Tokens (canonical source: `src/styles/site.css` `:root`)
 
-### Ink (text)
-| Token | Light | Dark | Role |
-|---|---|---|---|
-| `--color-ink` | `#0f1f38` | `#edf6ff` | Primary text / headlines |
-| `--color-ink-soft` | `#40536b` | `#b9c7d7` | Secondary / body text |
-| `--color-ink-mute` | `#5d7085` | `#8ca0b5` | Faint / caption text |
+| Token | Value | Role |
+|---|---|---|
+| `--bg` | `#04070c` | Page background |
+| `--bg-1` / `--bg-2` / `--bg-3` | `#070b12` / `#0b111b` / `#111a27` | Raised surfaces, tiles, inputs |
+| `--line` / `--line-2` / `--line-3` | `rgba(160,190,225,.10/.17/.28)` | Hairlines, borders, hover borders |
+| `--fg` | `#e8eef6` | Primary text |
+| `--fg-2` | `#a7b4c4` | Body / secondary text |
+| `--fg-3` | `#6e7d90` | Captions, labels, mono readouts |
+| `--film` | `#f3f7fb` | Headline white, primary button fill |
+| `--accent` | `#86c5ff` | The single accent: icons, links, focus ring, beams |
+| `--accent-deep` | `#4d9df0` | Accent gradients |
+| `--red` / `--amber` / `--blue` / `--green` | `#ff6b6b` / `#f3b54a` / `#82a9ff` / `#58d3a0` | Blocker / warning / info / validated-signed only |
+| `--ai` | `#9cc9ff` | "AI draft, requires review" marking |
 
-### Rules (borders)
-| Token | Light | Dark | Role |
-|---|---|---|---|
-| `--color-rule` | `#d8e2eb` | `#2b3d52` | Primary border / hairline |
-| `--color-rule-soft` | `#e7eef4` | `#223349` | Soft divider |
+Every semantic colour has a matching `*-bg` tint at 9% for chips and flags.
 
-### Brand accent (RadioPad blue) — the single accent, used site-wide
-| Token | Light | Dark | Role |
-|---|---|---|---|
-| `--color-accent` | `#2f88d8` | `#3b82f6` | Primary CTA fill, brand mark |
-| `--color-accent-deep` | `#1f6fb8` | `#619bf8` | CTA hover; **accent-colored small text & links** (dark hover/link is deliberately LIGHTER, per RC) |
-| `--color-accent-soft` | `#bbdcf6` | `#1e3a5f` | Soft accent fill / tint block |
-| `--color-accent-tint` | `#eaf3fc` | `#16283f` | Tinted chip / selected background |
-| `--color-accent-fg` | `#ffffff` | `#ffffff` | Text/icon ON accent fills (both schemes) |
+## Type
 
-### Semantic states (only where they carry meaning — validation storytelling)
-| Token | Light | Dark | Role |
-|---|---|---|---|
-| `--color-success` | `#11845b` | `#2fbf87` | Success / "validated" |
-| `--color-success-soft` | `#dcf2e8` | `#0e2b22` | Success tint |
-| `--color-warning` | `#a65e00` | `#e5a43b` | Warning amber |
-| `--color-warning-soft` | `#fbf1de` | `#33270f` | Warning tint |
-| `--color-danger` | `#c43d3d` | `#e36868` | Error / "blocker" |
-| `--color-danger-soft` | `#fae3e3` | `#351619` | Error tint |
-| `--color-info` | `#2565ae` | `#6fa8e8` | Info blue |
-| `--color-info-soft` | `#dfecfa` | `#12263c` | Info tint |
+Self-hosted variable fonts in `public/fonts/` (latin subset, from Google Fonts):
 
-### Clinical-safety marker (AI blue — distinct from accent and info)
-| Token | Light | Dark | Role |
-|---|---|---|---|
-| `--color-ai` | `#1d63c2` | `#7cb8f5` | "AI-generated" disclosure |
-| `--color-ai-soft` | `#e8f1fd` | `#142943` | AI tint |
+- **Bricolage Grotesque** (display, 400 to 700, optical size axis): headlines, tight tracking (-0.03 to -0.05em).
+- **Geist** (body and UI, 300 to 700).
+- **Geist Mono** (400 to 500): eyebrows, DICOM-style overlays, code, data labels; uppercase with 0.1 to 0.14em tracking.
 
-### Focus
-| Token | Light | Dark | Role |
-|---|---|---|---|
-| `--color-focus` | `#5eaaf0` | `#83c4ff` | Keyboard focus outline (2px) |
+## Motion
 
-### Reverse "band" surfaces (marketing-only composite tokens)
-The site's high-contrast reverse sections (final CTA band, demo band, dark bento cell,
-code blocks) do **not** use raw `--ink` as a background — ink flips light in dark mode.
-They use dedicated band tokens built from RC values:
+- Easing: `--ease-out: cubic-bezier(0.23,1,0.32,1)` for UI, `--ease-io: cubic-bezier(0.77,0,0.175,1)` for on-screen travel.
+- Press feedback `scale(.97)` on every pressable element; hover effects only under `(hover:hover) and (pointer:fine)`.
+- Scroll motion (GSAP + ScrollTrigger + SplitText from npm, Lenis smooth scroll vendored in `src/vendor/lenis.mjs`): `data-reveal` fade-up, `data-split` line-mask headings, the pinned Dictate → Draft → Validate → Sign sequence.
+- Signature moments: the synthetic CT slice + self-typing report in the home hero, and the auto-advancing Platform explorer.
+- `prefers-reduced-motion`: no smooth scroll, no movement, demos render their final state.
 
-| Token | Light | Dark | Role |
-|---|---|---|---|
-| `--color-band` | `#0f1f38` (ink navy) | `#16273b` (RC elevated) | Reverse band background |
-| `--color-band-ink` | `#f5f8fb` | `#edf6ff` | Text on the band |
-| `--color-band-accent` | `#bbdcf6` | `#7cb8f5` | Accent marks ON the band |
+## Guardrails
 
-Shadows tint to a fixed navy shade (`--shadow-ink`: light `#0f1f38`, dark `#020812`),
-never `var(--ink)` and never pure black.
-
----
-
-## 2. Usage notes & guardrails
-
-- **One accent, locked:** RadioPad blue `--color-accent` is the *only* accent across the
-  entire site. No terracotta, teal, or rose anywhere. Semantic colors (green/amber/red/
-  info-blue/AI-blue) appear **only** where they carry real meaning (validation engine:
-  blocker=red, warning=amber, info=blue, validated=green; the AI-disclosure treatment).
-  They are never decorative accents.
-
-- **Accent contrast rule (matches the product):**
-  - Small accent-colored text and inline links use `--color-accent-deep`
-    (light `#1f6fb8` = 4.9:1 on canvas, AA ✓; dark `#619bf8` = 6.6:1 on canvas, AA ✓).
-  - Bright `--color-accent` is reserved for button *fills*, icon fills, and large display
-    accents. Labels on accent fills always use `--color-accent-fg` (white) — never a
-    surface token, which would go dark in the dark scheme.
-  - Tinted chips (e.g. blog tags) pair `--color-accent-deep` text on
-    `--color-accent-tint` backgrounds (AA ✓ in both schemes); `--color-accent-soft` is
-    too strong a background for small text.
-
-- **Both schemes are mandatory.** Every new section/component must be checked in light
-  AND dark before it ships. Never hardcode a hex in `.astro`/`.svelte`/section CSS —
-  always `var(--*)` aliases (or the mapped Tailwind utility), so both schemes resolve.
-
-- **Backgrounds:** alternate only within the RC surface family — `--color-paper` ↔
-  `--color-paper-soft` ↔ `--color-paper-warm`, plus occasional `--color-accent-soft` /
-  `--color-accent-tint`, or a deliberate `--color-band` reverse band. Never flip to a
-  warm hue or a different color family mid-page.
-
-- **Brand mark:** blue rounded square (`--color-accent`) with the white waveform stroke
-  (`#ffffff` = `--color-accent-fg`). Works unchanged on both schemes.
-
----
-
-## 3. Reference-only (NOT locked — marketing's own system, unchanged by this re-lock)
-
-- **Fonts (marketing):** display **Clash Display**, body **General Sans**, mono
-  **JetBrains Mono** — self-hosted woff2. Marketing typography was always free and is
-  deliberately NOT switched to the product's Inter. (Product fonts for reference:
-  Inter Variable everywhere, Cascadia Mono for IDs.)
-- **Spacing / type scale / radii:** marketing's fluid scale in `src/styles/tokens.css`
-  stays as-is.
-- **Motion:** primary easing stays `cubic-bezier(0.16, 1, 0.3, 1)` — the product's
-  signature `--ease-out` curve (still shipped in `frontend/app/tokens.css`).
-
----
-
-## 4. How these tokens ship into the Astro site
-
-Mirrors the product's pattern:
-
-1. **Canonical values** live in the Tailwind v4 `@theme` block in
-   [`src/styles/app.css`](src/styles/app.css) (light values), emitted as `:root`
-   custom properties AND utilities (`bg-paper`, `text-ink`, `bg-accent`, …).
-2. **Dark scheme** overrides the same `--color-*` custom properties in a
-   `@media (prefers-color-scheme: dark)` block directly below `@theme`.
-3. **Alias layer** in [`src/styles/tokens.css`](src/styles/tokens.css) re-points the
-   short names (`--paper`, `--accent`, `--band`, …) used by all section CSS.
-4. No hardcoded hex in components — always `var(--color-*)` / aliases / utilities.
-
-Asset debt from the re-brand (generated art, tracked separately): `public/og-default.png`
-still renders the old terracotta OG card — regenerate via `scripts/gen-assets.mjs`
-(template already re-pointed to RC in this lock).
+- One accent. Semantic colours never decorate.
+- AI-drafted text always wears the `.ai-tag` / `.ai-text` treatment until a radiologist reviews it.
+- No fake logos, testimonials, certifications, prices or statistics. Numbers are product-intrinsic or labelled illustrative.
+- No hardcoded colours in new components: use the tokens above.

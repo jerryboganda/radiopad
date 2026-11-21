@@ -24,7 +24,7 @@ const ogImage = new URL(image, site.url).href;
 // Home passes title === site.name -> use the full tagline title.
 const fullTitle =
   title === site.name
-    ? `${site.name}: Radiology reports, drafted in seconds. Signed by you.`
+    ? `${site.name}: AI radiology reporting. The signature is yours.`
     : `${title} | ${site.name}`;
 ---
 
@@ -39,9 +39,11 @@ const fullTitle =
 
 <link rel="icon" href="/favicon.svg" type="image/svg+xml" />
 
-<!-- Preload the two critical display/body faces for LCP -->
-<link rel="preload" as="font" type="font/woff2" href="/fonts/clash-display-600.woff2" crossorigin />
-<link rel="preload" as="font" type="font/woff2" href="/fonts/general-sans-400.woff2" crossorigin />
+<meta name="theme-color" content="#04070c" />
+<meta name="color-scheme" content="dark" />
+<!-- Preload the display and body faces for LCP -->
+<link rel="preload" as="font" type="font/woff2" href="/fonts/bricolage-grotesque.woff2" crossorigin />
+<link rel="preload" as="font" type="font/woff2" href="/fonts/geist.woff2" crossorigin />
 
 <!-- Open Graph -->
 <meta property="og:type" content={type} />

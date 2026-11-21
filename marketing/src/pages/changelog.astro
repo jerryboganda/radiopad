@@ -1,0 +1,172 @@
+---
+// Imported relative to this file so it resolves the same whatever cwd the dev server or CI build uses.
+import changelogMd from "../../../CHANGELOG.md?raw";
+import BaseLayout from "../layouts/BaseLayout.astro";
+import PageHero from "../components/PageHero.astro";
+import Divider from "../components/Divider.astro";
+import CtaBand from "../components/CtaBand.astro";
+import Icon from "../components/Icon.astro";
+import { site } from "../lib/site";
+
+// Keep a Changelog parser: "## [version] - date - label", "### Type" groups, "- " items with indented
+// continuation lines and "  - " sub-items. Same-type groups inside one release are merged.
+type Item = { text: string; sub: string[] };
+type Release = { version: string; date?: string; label?: string; groups: Map<string, Item[]> };
+
+const esc = (s: string) => s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
+
+// Inline markdown to safe HTML: `code`, **bold**, *em*. Links keep their text only (they point into the repo).
+function inline(src: string): string {
+  const codes: string[] = [];
+  const s = src
+    .replace(/\[([^\]]*)\]\([^)\s]*\)/g, "$1")
+    .replace(/`([^`]+)`/g, (_, c) => `\u0000${codes.push(c) - 1}\u0000`);
+  return esc(s)
+    .replace(/\*\*(.+?)\*\*/g, "<strong>$1</strong>")
+    .replace(/(^|[\s(])\*(?!\s)([^*]+?)\*(?=[\s.,;:)]|$)/g, "$1<em>$2</em>")
+    .replace(/\u0000(\d+)\u0000/g, (_, i) => `<code>${esc(codes[Number(i)])}</code>`);
+}
+
+function parse(md: string): Release[] {
+  const out: Release[] = [];
+  let rel: Release | undefined, items: Item[] | undefined, item: Item | undefined, inSub = false;
+  for (const raw of md.split(/\r?\n/)) {
+    const line = raw.trimEnd();
+    let m: RegExpExecArray | null;
+    if ((m = /^## \[?([^\]\s]+)\]?(?:\s+(.*))?$/.exec(line))) {
+      const parts = (m[2] || "").replace(/^[—–-]\s*/, "").split(/\s+[—–-]\s+/).map((p) => p.trim()).filter(Boolean);
+      rel = { version: m[1], date: parts.find((p) => /^\d{4}-\d{2}-\d{2}$/.test(p)), label: parts.find((p) => !/^\d{4}-\d{2}-\d{2}$/.test(p)), groups: new Map() };
+      out.push(rel);
+      items = item = undefined;
+    } else if ((m = /^### (.+)$/.exec(line)) && rel) {
+      const type = m[1].trim();
+      items = rel.groups.get(type) ?? [];
+      rel.groups.set(type, items);
+      item = undefined;
+    } else if ((m = /^[-*] (.*)$/.exec(line)) && items) {
+      item = { text: m[1], sub: [] };
+      items.push(item);
+      inSub = false;
+    } else if ((m = /^\s+[-*] (.*)$/.exec(line)) && item) {
+      item.sub.push(m[1]);
+      inSub = true;
+    } else if (/^\s+\S/.test(line) && item) {
+      if (inSub) item.sub[item.sub.length - 1] += " " + line.trim();
+      else item.text += " " + line.trim();
+    }
+  }
+  return out;
+}
+
+// Self-check: the formatter must escape raw HTML and keep code literal.
+const probe = inline("**a `<b>**`** *c* [d](e) <x>");
+if (probe !== "<strong>a <code>&lt;b&gt;**</code></strong> <em>c</em> d &lt;x&gt;") throw new Error(`changelog inline formatter self-check failed: ${probe}`);
+
+const ORDER = ["Added", "Changed", "Deprecated", "Removed", "Fixed", "Security"];
+const rank = (t: string) => (ORDER.indexOf(t) === -1 ? ORDER.length : ORDER.indexOf(t));
+const slug = (s: string) => s.toLowerCase().replace(/[^a-z0-9.]+/g, "-");
+
+// Keep a Changelog lists the newest release first; the file order is kept.
+const releases = parse(changelogMd).map((r) => ({
+  ...r,
+  groups: [...r.groups].filter(([, it]) => it.length).sort(([a], [b]) => rank(a) - rank(b)),
+}));
+const counts = new Map<string, number>();
+for (const r of releases) for (const [t, it] of r.groups) counts.set(t, (counts.get(t) ?? 0) + it.length);
+const types = [...counts.keys()].sort((a, b) => rank(a) - rank(b));
+const total = [...counts.values()].reduce((a, b) => a + b, 0);
+const fmtDate = (d: string) => new Date(`${d}T00:00:00Z`).toLocaleDateString("en-GB", { day: "numeric", month: "long", year: "numeric", timeZone: "UTC" });
+---
+
+<BaseLayout title="Changelog" description="Every notable change to RadioPad, release by release: what was added, changed, fixed and removed.">
+  <PageHero
+    crumbs={[{ label: "Changelog", href: "/changelog/" }]}
+    eyebrow="Changelog"
+    lead="What shipped."
+    title="Release by release."
+    text="Every notable change to RadioPad, newest first, rendered from the project's own changelog. Recent work is listed under Unreleased until it is given a version number."
+    ctas={false}
+  >
+    <div class="cta-row" slot="actions">
+      <span class="mag"><a class="btn btn-primary btn-lg" href={site.releases}><Icon name="win" /> Download the latest build</a></span>
+      <a class="btn btn-ghost btn-lg" href="/download/">Download page <Icon name="arrow" class="arr" /></a>
+    </div>
+  </PageHero>
+  <Divider />
+
+  <section class="sec" id="log">
+    <div class="wrap">
+      <div class="filter-bar" data-reveal>
+        <div class="tabs" role="group" aria-label="Filter changes by type" id="clFilter">
+          <button class="tab" type="button" aria-pressed="true" data-type="all">All <span class="n">{total}</span></button>
+          {types.map((t) => <button class="tab" type="button" aria-pressed="false" data-type={slug(t)}>{t} <span class="n">{counts.get(t)}</span></button>)}
+        </div>
+        <p class="mono dim" id="clCount" role="status">Showing all {total} changes</p>
+      </div>
+
+      <div class="rels">
+        {releases.map((r) => (
+          <article class="rel" id={`v-${slug(r.version)}`}>
+            <header class="rel-h">
+              <h2>{r.version === "Unreleased" ? "Unreleased" : `v${r.version}`}</h2>
+              <div class="rel-meta">
+                {r.date ? <time class="chip" datetime={r.date}>{fmtDate(r.date)}</time> : <span class="chip chip-draft">In progress</span>}
+                {r.label && <span class="mono dim">{r.label}</span>}
+              </div>
+            </header>
+            <div class="rel-b">
+              {r.groups.map(([t, it]) => (
+                <section class="grp" data-type={slug(t)}>
+                  <h3><span class={`ty ty-${slug(t)}`}>{t}</span><span class="mono dim">{it.length}</span></h3>
+                  <ul>
+                    {it.map((x) => (
+                      <li>
+                        <Fragment set:html={inline(x.text)} />
+                        {x.sub.length > 0 && <ul>{x.sub.map((s) => <li set:html={inline(s)} />)}</ul>}
+                      </li>
+                    ))}
+                  </ul>
+                </section>
+              ))}
+            </div>
+          </article>
+        ))}
+      </div>
+    </div>
+  </section>
+
+  <CtaBand lead="Every release, signed off by you." title="Try the latest build." text="Download RadioPad for Windows and it keeps itself current. Book a demo to see what changed with your own rulebooks." />
+</BaseLayout>
+
+<script>import "../scripts/changelog-filter.js";</script>
+
+<style>
+  [hidden]{display:none !important}
+  .filter-bar{display:flex;flex-wrap:wrap;align-items:center;justify-content:space-between;gap:14px;margin-bottom:clamp(28px,4vw,48px)}
+  .tab[aria-pressed="true"]{background:var(--film);color:var(--on-film)}
+  .tab:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+  .tab .n{font:400 .72rem var(--font-mono);opacity:.7;margin-left:4px}
+  #clCount{font-size:.78rem}
+
+  .rels{display:grid;gap:clamp(40px,6vw,72px)}
+  .rel{display:grid;grid-template-columns:minmax(0,220px) minmax(0,1fr);gap:clamp(20px,4vw,56px);align-items:start}
+  @media (max-width:820px){.rel{grid-template-columns:minmax(0,1fr)}}
+  .rel-h{position:sticky;top:96px;display:grid;gap:10px}
+  @media (max-width:820px){.rel-h{position:static}}
+  .rel-h h2{font-size:clamp(1.8rem,3vw,2.4rem);letter-spacing:-.03em}
+  .rel-meta{display:flex;flex-wrap:wrap;gap:8px;align-items:center;font-size:.8rem}
+  .rel-b{display:grid;gap:28px;min-width:0}
+  .grp h3{display:flex;align-items:center;gap:10px;margin-bottom:14px;font-size:1rem}
+  .ty{display:inline-flex;align-items:center;height:26px;padding:0 12px;border-radius:999px;font:500 .74rem var(--font-mono);letter-spacing:.06em;text-transform:uppercase;border:1px solid var(--line-2);color:var(--fg-2)}
+  .ty-added{color:var(--green);border-color:rgba(88,211,160,.38);background:var(--green-bg)}
+  .ty-changed{color:var(--blue);border-color:rgba(130,169,255,.35);background:var(--blue-bg)}
+  .ty-fixed{color:var(--amber);border-color:rgba(243,181,74,.35);background:var(--amber-bg)}
+  .ty-removed{color:var(--red);border-color:rgba(255,107,107,.35);background:var(--red-bg)}
+  .ty-security{color:var(--accent);border-color:rgba(134,197,255,.4);background:rgba(134,197,255,.08)}
+  .grp > ul{list-style:none;margin:0;padding:0;border-top:1px solid var(--line)}
+  .grp > ul > li{padding:16px 0;border-bottom:1px solid var(--line);color:var(--fg-2);font-size:.94rem;line-height:1.65;overflow-wrap:anywhere}
+  .grp li ul{margin:10px 0 0;padding-left:1.2em;display:grid;gap:6px;font-size:.9rem}
+  .grp :global(strong){color:var(--fg);font-weight:600}
+  .grp :global(code){font:400 .84em var(--font-mono);padding:1px 6px;border-radius:6px;background:var(--bg-2);border:1px solid var(--line);color:var(--fg)}
+  .grp :global(em){color:var(--fg)}
+</style>

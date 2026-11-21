@@ -4,6 +4,39 @@
 
 ---
 
+## Marketing site redesign: dark "reading room", full multi-page site (2026-11-21)
+
+Owner reviewed three homepage concepts (published as private artifacts: Dark Cinematic, Clinical
+Editorial, Kinetic Bento), chose **Dark Cinematic**, asked for its stats/feature-card section to be
+replaced (now the interactive Platform explorer), then approved building every page.
+
+- **Design lock replaced:** `marketing/BRAND-LOCK.md` now documents the dark-only palette, Bricolage
+  Grotesque / Geist / Geist Mono (self-hosted in `public/fonts/`), motion rules. The RC-palette lock no
+  longer applies to marketing (product UI unchanged). Mockups kept in `marketing/mockups/v2/`.
+- **Stack:** Astro + GSAP 3.15 (ScrollTrigger, SplitText via npm) + Lenis vendored in
+  `src/vendor/lenis.mjs` (no new dependencies, lockfile untouched). Svelte islands removed
+  (`Nav`, `Motion`, `DemoForm`, `Newsletter`); the Svelte integration/deps are now unused but left in
+  `package.json` to avoid a lockfile change.
+- **Pages (25 routes):** home, product (overview, validation, dictation), solutions (hospitals,
+  imaging groups, radiologists), integrations, security, pricing, download, demo, about, changelog,
+  blog (index, posts, tags), legal (privacy, terms, dpa, responsible-ai), 404; redirects
+  `/contact → /demo/`, `/careers → /about/`. Route table in `marketing/README.md`.
+- **Real data at build time:** `/changelog/` renders repo `CHANGELOG.md`; `/product/validation/`
+  reads `rulebooks/*.yaml` (114 rulebooks, real `chest_ct_v1` rules); `/download/` fetches the latest
+  GitHub release (.msi/.apk) in the browser with a fallback link.
+- **Verified locally (dev server only):** all routes 200 / 301 / 404 as expected, one h1 each, no
+  console errors, no horizontal overflow at 375px. No `astro build` run locally (CI builds on deploy).
+- **Open before launch:** `site.email` / `site.securityEmail` in `marketing/src/lib/site.ts` are
+  placeholders on radiopadstudio.com; legal pages are drafts with `[RadioPad legal entity]`
+  placeholders and a visible "pending legal review" notice; blog authors "Dr. Priya Nair" and
+  "Tomas Rieder" need confirming as real people or replacing; `PUBLIC_DEMO_ENDPOINT` unset (demo form
+  falls back to the visitor's email app); `scripts/gen-assets.mjs` still references the retired fonts
+  and the old OG image palette (`public/og-default.png` still shows the old look).
+- **Deploy trigger widened:** `hostinger-deploy.yml` now also runs on `CHANGELOG.md` and
+  `rulebooks/*.yaml` changes so `/changelog/` and the rulebook library stay current.
+
+---
+
 ## Website + admin web app moved to Hostinger; API at api.radiopadstudio.com (2026-11-21)
 
 Operator chose the hybrid layout: Hostinger web hosting cannot run .NET/Docker/background jobs,

@@ -1,0 +1,166 @@
+---
+import BaseLayout from "../layouts/BaseLayout.astro";
+import PageHero from "../components/PageHero.astro";
+import Divider from "../components/Divider.astro";
+import CtaBand from "../components/CtaBand.astro";
+import Icon from "../components/Icon.astro";
+import { site } from "../lib/site";
+
+const endpoint = import.meta.env.PUBLIC_DEMO_ENDPOINT;
+const roles = ["Radiologist", "Resident or fellow", "Department lead", "IT or informatics", "PACS or RIS administrator", "Quality and safety", "Other"];
+const modalities = ["CT", "MR", "XR", "US", "MG", "NM", "PET", "Fluoroscopy"];
+---
+
+<BaseLayout title="Book a demo" description="Book a RadioPad demo on your own modalities, templates and rulebooks, or get in touch with the RadioPad team.">
+  <PageHero
+    crumbs={[{ label: "Book a demo", href: "/demo/" }]}
+    eyebrow="Book a demo"
+    lead="Bring your study types."
+    title="We'll show you the draft."
+    text="Tell us what you read and how your department reports. We will walk through RadioPad on your modalities, your templates and a rulebook run before sign-off."
+    ctas={false}
+  />
+  <Divider />
+
+  <section class="sec" id="request">
+    <div class="wrap demo-grid">
+      <div class="panel form-card" data-reveal>
+        <h2>Request a demo</h2>
+        <form class="form" id="demoForm" novalidate>
+          <div class="row">
+            <div class="field">
+              <label for="df-name">Full name</label>
+              <input id="df-name" name="name" type="text" autocomplete="name" required aria-invalid="false" />
+              <span class="err" id="df-name-err" hidden></span>
+            </div>
+            <div class="field">
+              <label for="df-email">Work email</label>
+              <input id="df-email" name="email" type="email" autocomplete="email" inputmode="email" placeholder="you@hospital.org" required aria-invalid="false" />
+              <span class="err" id="df-email-err" hidden></span>
+            </div>
+          </div>
+          <div class="row">
+            <div class="field">
+              <label for="df-organization">Organization</label>
+              <input id="df-organization" name="organization" type="text" autocomplete="organization" required aria-invalid="false" />
+              <span class="err" id="df-organization-err" hidden></span>
+            </div>
+            <div class="field">
+              <label for="df-role">Role</label>
+              <select id="df-role" name="role" required aria-invalid="false">
+                <option value="">Choose your role</option>
+                {roles.map((r) => <option value={r}>{r}</option>)}
+              </select>
+              <span class="err" id="df-role-err" hidden></span>
+            </div>
+          </div>
+          <fieldset class="field mods">
+            <legend>Modalities you read <span class="opt">(optional)</span></legend>
+            <div class="chips">
+              {modalities.map((m) => (
+                <label class="mchip"><input type="checkbox" name="modalities" value={m} /><span><Icon name="check" />{m}</span></label>
+              ))}
+            </div>
+          </fieldset>
+          <div class="field">
+            <label for="df-message">What would you like to see? <span class="opt">(optional)</span></label>
+            <textarea id="df-message" name="message" maxlength="1500" placeholder="For example: chest CT reporting with our critical-results rules, or an on-prem deployment with a local model."></textarea>
+          </div>
+          <div class="notice" id="df-alert" role="alert" hidden></div>
+          <button class="btn btn-primary btn-lg" id="df-submit" type="submit"><span id="df-submit-l">Request a demo</span> <Icon name="arrow" class="arr" /></button>
+          <p class="form-note">
+            {endpoint
+              ? "Your request is sent to the RadioPad team. We reply to the work email you give us."
+              : <>Sending opens your email app with the request filled in, addressed to <span class="addr">{site.email}</span>.</>}
+          </p>
+        </form>
+        <div class="notice info" id="df-mailto" role="status" hidden>
+          <Icon name="info" />
+          <div>Your email app should open with your request. If it did not, email <span class="addr">{site.email}</span>.</div>
+        </div>
+        <div class="form-success" id="df-success" role="status" tabindex="-1" hidden>
+          <Icon name="okc" />
+          <div><strong>Request sent.</strong><p>We will reply to <span id="df-success-email"></span>.</p></div>
+        </div>
+      </div>
+
+      <aside class="side" aria-labelledby="reach-h" data-reveal>
+        <h2 id="reach-h">Other ways to reach us</h2>
+        <ul class="reach">
+          <li>
+            <Icon name="doc" />
+            <div>
+              <h3>Email</h3>
+              <p>Questions about the product, pricing or a pilot.</p>
+              <a href={`mailto:${site.email}`}>{site.email}</a>
+            </div>
+          </li>
+          <li>
+            <Icon name="shield" />
+            <div>
+              <h3>Security reports</h3>
+              <p>Found a vulnerability? Follow our disclosure process.</p>
+              <a href="/security/#disclosure">How to report a vulnerability</a>
+            </div>
+          </li>
+          <li>
+            <Icon name="win" />
+            <div>
+              <h3>Try it first</h3>
+              <p>Start the free trial on your own Windows workstation.</p>
+              <a href="/download/">Download for Windows</a>
+            </div>
+          </li>
+        </ul>
+        <div class="mini">
+          <h5>What a demo covers</h5>
+          <ul class="ticks">
+            <li><Icon name="check" />Dictation to draft on your modalities</li>
+            <li><Icon name="check" />A rulebook run with blockers and warnings</li>
+            <li><Icon name="check" />Review, sign-off and FHIR R4, PDF, DOCX or text export</li>
+            <li><Icon name="check" />Deployment and AI provider options, including local models</li>
+          </ul>
+        </div>
+      </aside>
+    </div>
+  </section>
+
+  <CtaBand lead="Rather see it yourself?" title="Start on your workstation." text="Download RadioPad for Windows and read with it today. Book a demo when you want to see it with your department's rulebooks." />
+</BaseLayout>
+
+<script>import "../scripts/demo-form.js";</script>
+
+<style>
+  [hidden]{display:none !important}
+  .demo-grid{display:grid;grid-template-columns:minmax(0,1.45fr) minmax(0,1fr);gap:clamp(20px,4vw,56px);align-items:start}
+  @media (max-width:900px){.demo-grid{grid-template-columns:minmax(0,1fr)}}
+  .form-card{padding:clamp(20px,3.5vw,36px);gap:22px}
+  .form-card h2,.side h2{font-size:clamp(1.5rem,2.4vw,1.9rem);letter-spacing:-.02em}
+  .mods{margin:0;padding:0;border:0}
+  .mods legend{padding:0;margin-bottom:7px;font-size:.86rem;font-weight:500;color:var(--fg)}
+  .chips{display:flex;flex-wrap:wrap;gap:8px}
+  .mchip{position:relative;cursor:pointer}
+  .mchip input{position:absolute;opacity:0;width:1px;height:1px}
+  .mchip span{display:inline-flex;align-items:center;gap:6px;min-height:38px;padding:0 14px;border-radius:999px;border:1px solid var(--line-2);background:rgba(160,190,225,.04);color:var(--fg-2);font:500 .84rem var(--font-mono);transition:color .2s ease,background-color .2s ease,border-color .2s ease}
+  .mchip .i{width:0;height:14px;opacity:0;transition:width .2s var(--ease-out),opacity .2s ease}
+  .mchip:hover span{color:var(--fg);border-color:var(--line-3)}
+  .mchip input:checked + span{color:var(--accent);border-color:rgba(134,197,255,.5);background:rgba(134,197,255,.1)}
+  .mchip input:checked + span .i{width:14px;opacity:1}
+  .mchip input:focus-visible + span{outline:2px solid var(--accent);outline-offset:2px}
+  @media (prefers-reduced-motion:reduce){.mchip .i,.mchip span{transition:none}}
+  .addr{font-family:var(--font-mono);color:var(--fg);user-select:all;overflow-wrap:anywhere}
+  .form-success p{margin-top:.3rem;color:var(--fg-2)}
+  #df-success-email{color:var(--fg);overflow-wrap:anywhere}
+  .notice > div{min-width:0}
+
+  .side{display:grid;gap:24px;min-width:0}
+  .reach{list-style:none;margin:0;padding:0;display:grid;gap:0;border-top:1px solid var(--line)}
+  .reach li{display:flex;gap:14px;align-items:flex-start;padding:18px 0;border-bottom:1px solid var(--line)}
+  .reach li > .i{flex:none;width:20px;height:20px;color:var(--accent);margin-top:3px}
+  .reach li > div{display:grid;gap:4px;min-width:0}
+  .reach h3{font:600 1.02rem var(--font-display);letter-spacing:-.01em}
+  .reach p{color:var(--fg-2);font-size:.9rem}
+  .reach a{color:var(--accent);text-underline-offset:3px;font-size:.92rem;overflow-wrap:anywhere}
+  .side .ticks{margin-top:4px}
+  .side .ticks li{font-size:.9rem}
+</style>

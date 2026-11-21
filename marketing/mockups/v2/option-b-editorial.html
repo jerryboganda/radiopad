@@ -1,0 +1,1611 @@
+<title>RadioPad Editorial</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Schibsted+Grotesk:wght@400;500;600;700;800&family=Inter:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500&display=swap">
+<style>
+/* Layout: editorial 12-col page on optical "lightbox" white; sticky chapter rail left, content right; film-viewer motif in hero */
+:root{
+  --bg:#F3F6F8; --surface:#FFFFFF; --surface-2:#E9EEF2;
+  --ink:#0A1722; --ink-2:#435260; --ink-3:#5F6E7B;
+  --rule:#D3DCE2; --rule-2:#E3E9ED;
+  --accent:#007A88; --accent-hi:#14B4C8; --accent-tint:#DDF2F4; --on-accent:#FFFFFF;
+  --block:#C4302A; --block-tint:#FBE5E3;
+  --warn:#975800; --warn-tint:#FAEFD9;
+  --info:#2357D3; --info-tint:#E4ECFC;
+  --ok:#0E7653; --ok-tint:#DDF2E8;
+  --ai:#5A44D4; --ai-tint:#EDE9FD;
+  --band:#0A1722; --band-2:#122130; --band-ink:#E7EDF1; --band-ink-2:#9AAAB7; --band-rule:#22323F;
+  --film:#0E1012; --lightbox:#FFFFFF; --lightbox-glow:rgb(255 255 255 / .95);
+  --bezel:#0B1116;
+  --nav-bg:rgb(243 246 248 / .8);
+  --shadow-rgb:10 23 34;
+  --font-display:"Schibsted Grotesk", "Helvetica Neue", Arial, sans-serif;
+  --font-body:"Inter", "Segoe UI", system-ui, -apple-system, sans-serif;
+  --font-mono:"IBM Plex Mono", ui-monospace, "Cascadia Mono", Consolas, monospace;
+  --ease-out:cubic-bezier(0.23, 1, 0.32, 1);
+  --ease-in-out:cubic-bezier(0.77, 0, 0.175, 1);
+  --nav-h:68px;
+  --max:1280px;
+  color-scheme:light;
+}
+@media (prefers-color-scheme: dark){
+  :root:not([data-theme="light"]){
+    --bg:#070C11; --surface:#0D141B; --surface-2:#121B24;
+    --ink:#E6ECF0; --ink-2:#A3B1BC; --ink-3:#7F8D99;
+    --rule:#1F2B36; --rule-2:#17222C;
+    --accent:#3ACBDC; --accent-hi:#62DEEC; --accent-tint:#0C2A30; --on-accent:#03181C;
+    --block:#EE6D66; --block-tint:#361513;
+    --warn:#E6A644; --warn-tint:#30220B;
+    --info:#86ABFF; --info-tint:#13224A;
+    --ok:#45C493; --ok-tint:#0D2B20;
+    --ai:#AE9EFF; --ai-tint:#201B44;
+    --band:#0D141B; --band-2:#121B24; --band-ink:#E6ECF0; --band-ink-2:#93A3B0; --band-rule:#1F2B36;
+    --film:#0B0C0E; --lightbox:#B9C6CF; --lightbox-glow:rgb(120 210 225 / .22);
+    --nav-bg:rgb(7 12 17 / .74);
+    --shadow-rgb:0 0 0;
+    color-scheme:dark;
+  }
+}
+:root[data-theme="dark"]{
+  --bg:#070C11; --surface:#0D141B; --surface-2:#121B24;
+  --ink:#E6ECF0; --ink-2:#A3B1BC; --ink-3:#7F8D99;
+  --rule:#1F2B36; --rule-2:#17222C;
+  --accent:#3ACBDC; --accent-hi:#62DEEC; --accent-tint:#0C2A30; --on-accent:#03181C;
+  --block:#EE6D66; --block-tint:#361513;
+  --warn:#E6A644; --warn-tint:#30220B;
+  --info:#86ABFF; --info-tint:#13224A;
+  --ok:#45C493; --ok-tint:#0D2B20;
+  --ai:#AE9EFF; --ai-tint:#201B44;
+  --band:#0D141B; --band-2:#121B24; --band-ink:#E6ECF0; --band-ink-2:#93A3B0; --band-rule:#1F2B36;
+  --film:#0B0C0E; --lightbox:#B9C6CF; --lightbox-glow:rgb(120 210 225 / .22);
+  --nav-bg:rgb(7 12 17 / .74);
+  --shadow-rgb:0 0 0;
+  color-scheme:dark;
+}
+
+*,*::before,*::after{box-sizing:border-box}
+html{-webkit-text-size-adjust:100%}
+@media (prefers-reduced-motion: no-preference){ html:not(.lenis){scroll-behavior:smooth} }
+body{background:var(--bg);color:var(--ink);font-family:var(--font-body);font-size:1.0625rem;line-height:1.6;-webkit-font-smoothing:antialiased;text-rendering:optimizeLegibility;overflow-x:clip}
+body::before{content:"";position:fixed;inset:0 0 auto;height:env(safe-area-inset-top,0px);z-index:60;background:var(--bg)}
+a{color:inherit;text-decoration:none}
+button{font:inherit;color:inherit;background:none;border:0;cursor:pointer;padding:0}
+svg{display:block}
+h1,h2,h3,h4{font-family:var(--font-display);margin:0;text-wrap:balance;font-weight:700}
+p{margin:0}
+ul,ol{margin:0;padding:0;list-style:none}
+[id]{scroll-margin-top:calc(var(--nav-h) + 16px)}
+:focus-visible{outline:2px solid var(--accent);outline-offset:3px;border-radius:6px}
+.wrap{max-width:var(--max);margin-inline:auto;padding-left:max(clamp(16px,4vw,40px), env(safe-area-inset-left,0px));padding-right:max(clamp(16px,4vw,40px), env(safe-area-inset-right,0px))}
+.mono{font-family:var(--font-mono);font-size:.75rem;letter-spacing:.02em}
+.eyebrow{display:inline-flex;align-items:center;gap:10px;font-family:var(--font-mono);font-size:.75rem;letter-spacing:.12em;text-transform:uppercase;color:var(--ink-2)}
+.live-dot{width:8px;height:8px;border-radius:50%;background:var(--accent-hi);box-shadow:0 0 0 0 color-mix(in srgb, var(--accent-hi) 55%, transparent);animation:ping 2.4s var(--ease-out) infinite}
+@keyframes ping{0%{box-shadow:0 0 0 0 color-mix(in srgb, var(--accent-hi) 55%, transparent)}70%,100%{box-shadow:0 0 0 10px transparent}}
+.skip{position:absolute;left:12px;top:-60px;z-index:100;background:var(--ink);color:var(--bg);padding:10px 14px;border-radius:8px}
+.skip:focus{top:12px}
+.sr{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0);white-space:nowrap}
+
+/* Buttons */
+.btn{--h:44px;display:inline-flex;align-items:center;justify-content:center;gap:10px;height:var(--h);padding:0 20px;border-radius:999px;font-weight:600;font-size:.95rem;letter-spacing:-.005em;white-space:nowrap;transition:transform 160ms var(--ease-out), background-color 200ms ease, color 200ms ease, border-color 200ms ease, box-shadow 200ms ease}
+.btn:active{transform:scale(.97)}
+.btn svg{width:18px;height:18px;flex:none}
+.btn-lg{--h:54px;padding:0 26px;font-size:1rem}
+.btn-sm{--h:38px;padding:0 16px;font-size:.875rem}
+.btn-ink{background:var(--ink);color:var(--bg)}
+.btn-line{border:1px solid var(--rule);background:var(--surface);color:var(--ink)}
+.btn .arr{transition:transform 200ms var(--ease-out)}
+@media (hover:hover) and (pointer:fine){
+  .btn-ink:hover{box-shadow:0 10px 30px -10px rgb(var(--shadow-rgb) / .45), 0 0 0 4px color-mix(in srgb, var(--accent-hi) 22%, transparent)}
+  .btn-line:hover{border-color:var(--ink-3)}
+  .btn:hover .arr{transform:translateX(3px)}
+}
+
+/* Nav */
+.nav{position:sticky;top:env(safe-area-inset-top,0px);z-index:50;background:var(--nav-bg);-webkit-backdrop-filter:saturate(1.6) blur(16px);backdrop-filter:saturate(1.6) blur(16px);border-bottom:1px solid transparent;transition:border-color 240ms ease}
+.nav.scrolled{border-bottom-color:var(--rule)}
+.nav-in{height:var(--nav-h);display:flex;align-items:center;gap:24px}
+.brand{display:flex;align-items:center;gap:10px;font-family:var(--font-display);font-weight:700;font-size:1.2rem;letter-spacing:-.03em;--mark-fg:var(--bg);color:var(--ink)}
+.brand svg{width:30px;height:30px}
+.menu{flex:1;display:flex;justify-content:center}
+.menu-list{display:flex;gap:2px}
+.mi{position:relative}
+.mi-btn{display:flex;align-items:center;gap:6px;height:38px;padding:0 13px;border-radius:999px;font-size:.92rem;font-weight:500;color:var(--ink-2);transition:color 160ms ease, background-color 160ms ease}
+.mi-btn .chev{width:12px;height:12px;transition:transform 200ms var(--ease-out)}
+.mi.open .mi-btn{color:var(--ink);background:var(--surface-2)}
+.mi.open .chev{transform:rotate(180deg)}
+@media (hover:hover) and (pointer:fine){.mi-btn:hover{color:var(--ink);background:var(--surface-2)}}
+.mega{position:absolute;top:calc(100% + 12px);left:-12px;width:min(620px, 92vw);background:var(--surface);border:1px solid var(--rule);border-radius:18px;padding:12px;box-shadow:0 30px 60px -20px rgb(var(--shadow-rgb) / .28), 0 2px 6px rgb(var(--shadow-rgb) / .06);display:grid;grid-template-columns:1.35fr 1fr;gap:10px;opacity:0;visibility:hidden;transform:translateY(-6px) scale(.97);transform-origin:40px 0;transition:opacity 180ms var(--ease-out), transform 220ms var(--ease-out), visibility 0s linear 220ms;z-index:5}
+.mega::before{content:"";position:absolute;inset:-14px 0 auto;height:14px}
+.mega.right{left:auto;right:-12px;transform-origin:calc(100% - 40px) 0}
+.mega.narrow{grid-template-columns:1fr;width:340px}
+.mi.open .mega{opacity:1;visibility:visible;transform:none;transition-delay:0s}
+.menu.instant .mega{transition:none}
+.mega-col{display:grid;gap:2px;align-content:start}
+.mega-link{display:flex;gap:12px;padding:10px;border-radius:12px;transition:background-color 150ms ease}
+.mega-link svg{width:20px;height:20px;flex:none;margin-top:2px;color:var(--accent)}
+.mega-link b{display:block;font-size:.92rem;font-weight:600;color:var(--ink)}
+.mega-link small{display:block;font-size:.8rem;color:var(--ink-3);line-height:1.45}
+.mega-link:hover,.mega-link:focus-visible{background:var(--surface-2)}
+.mega-feature{display:flex;flex-direction:column;justify-content:flex-end;gap:6px;min-height:200px;padding:16px;border-radius:12px;background:var(--film);color:#E7EDF1;position:relative;overflow:hidden}
+.mega-feature canvas{position:absolute;inset:0;width:100%;height:100%;opacity:.75}
+.mega-feature::after{content:"";position:absolute;inset:0;background:linear-gradient(to top, rgb(5 8 11 / .92), rgb(5 8 11 / 0) 70%)}
+.mega-feature > *:not(canvas){position:relative;z-index:1}
+.mega-feature b{font-family:var(--font-display);font-size:1.15rem;letter-spacing:-.02em;line-height:1.15}
+.mega-feature small{font-family:var(--font-mono);font-size:.7rem;letter-spacing:.08em;text-transform:uppercase;color:#9fe7ef}
+.nav-cta{display:flex;align-items:center;gap:8px}
+.signin{font-size:.92rem;font-weight:500;color:var(--ink-2);padding:0 10px}
+@media (hover:hover) and (pointer:fine){.signin:hover{color:var(--ink)}}
+.burger{display:none;width:42px;height:42px;border-radius:50%;align-items:center;justify-content:center;flex-direction:column;gap:5px}
+.burger span{display:block;width:18px;height:1.5px;background:var(--ink);transition:transform 220ms var(--ease-out)}
+.burger[aria-expanded="true"] span:first-child{transform:translateY(3.25px) rotate(45deg)}
+.burger[aria-expanded="true"] span:last-child{transform:translateY(-3.25px) rotate(-45deg)}
+.mobile-menu{border-top:1px solid var(--rule);background:var(--surface);padding-block:12px 20px}
+.mobile-menu:not([hidden]){animation:drop 260ms var(--ease-out)}
+@keyframes drop{from{opacity:0;transform:translateY(-6px)}}
+.mobile-menu ul{display:grid}
+.mobile-menu li a{display:block;padding:12px 0;border-bottom:1px solid var(--rule-2);font-weight:500}
+.mobile-menu .cta-pair{margin-top:16px}
+@media (max-width:1060px){
+  .menu{display:none}
+  .burger{display:inline-flex}
+  .nav-in{justify-content:space-between}
+}
+@media (max-width:560px){ .signin,.nav-cta .btn{display:none} }
+
+/* Hero */
+.hero{padding-block:clamp(48px,8vw,104px) clamp(40px,6vw,72px)}
+.display{font-size:clamp(2.6rem,6.6vw,6.25rem);line-height:.95;letter-spacing:-.045em;font-weight:700;margin-top:22px}
+.display .ln{display:block}
+.display em{font-style:normal;color:var(--accent)}
+.hero-row{display:grid;grid-template-columns:minmax(0,1.1fr) minmax(0,1fr);gap:clamp(24px,5vw,80px);align-items:end;margin-top:clamp(28px,4vw,48px)}
+.lead{font-size:clamp(1.05rem,1.4vw,1.25rem);line-height:1.55;color:var(--ink-2);max-width:56ch}
+.cta-pair{display:flex;flex-wrap:wrap;gap:12px}
+.cta-note{grid-column:2;font-size:.85rem;color:var(--ink-3);margin-top:-8px}
+.hero-ctas{display:grid;gap:14px;justify-items:start}
+@media (max-width:820px){ .hero-row{grid-template-columns:1fr} }
+
+.lightbox{margin:clamp(40px,6vw,72px) 0 0;position:relative;border-radius:22px;padding:clamp(10px,1.4vw,16px);background:var(--lightbox);box-shadow:0 0 0 1px var(--rule), 0 40px 80px -40px rgb(var(--shadow-rgb) / .35), 0 0 80px -10px var(--lightbox-glow)}
+.lightbox::after{content:"";position:absolute;inset:0;border-radius:inherit;background:var(--ink);opacity:0;pointer-events:none}
+.js .lightbox.power::after{animation:power 1.2s steps(1,end) .15s both}
+@keyframes power{0%{opacity:.55}12%{opacity:.25}18%{opacity:.5}26%{opacity:.08}32%{opacity:.3}40%,100%{opacity:0}}
+.lb-head{display:flex;gap:18px;flex-wrap:wrap;padding:4px 6px 12px;color:var(--ink-2)}
+.lb-head .push{margin-left:auto}
+.lb-frames{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:clamp(8px,1vw,12px)}
+.frame{position:relative;aspect-ratio:1;max-width:100%;background:var(--film);border-radius:8px;overflow:hidden;cursor:crosshair}
+.frame canvas{position:absolute;inset:0;width:100%;height:100%}
+.ov{position:absolute;font-family:var(--font-mono);font-size:clamp(.55rem,.8vw,.68rem);color:#cfd8de;letter-spacing:.04em;pointer-events:none;text-shadow:0 1px 2px #000}
+.ov.tl{top:8px;left:10px}.ov.tr{top:8px;right:10px}.ov.bl{bottom:8px;left:10px}.ov.br{bottom:8px;right:10px}
+.ov.ml{top:50%;left:8px;transform:translateY(-50%)}.ov.mr{top:50%;right:8px;transform:translateY(-50%)}
+.xh{position:absolute;inset:0;pointer-events:none;opacity:0;transition:opacity 160ms ease}
+.xh i{position:absolute;background:color-mix(in srgb, var(--accent-hi) 70%, transparent)}
+.xh .h{left:0;right:0;top:0;height:1px;transform:translateY(var(--y,50%))}
+.xh .v{top:0;bottom:0;left:0;width:1px;transform:translateX(var(--x,50%))}
+@media (hover:hover) and (pointer:fine){ .frame:hover .xh{opacity:1} }
+.lb-cap{display:flex;justify-content:space-between;gap:16px;flex-wrap:wrap;padding:12px 6px 2px;font-family:var(--font-mono);font-size:.7rem;color:var(--ink-3);letter-spacing:.04em}
+@media (max-width:700px){ .lb-frames{grid-template-columns:repeat(2,minmax(0,1fr))} .lb-head .push{margin-left:0} }
+
+/* Modality strip */
+.strip{border-block:1px solid var(--rule);padding-block:26px;overflow:hidden}
+.strip-label{font-family:var(--font-mono);font-size:.72rem;letter-spacing:.12em;text-transform:uppercase;color:var(--ink-3);margin-bottom:18px}
+.marquee{display:flex;overflow:hidden;-webkit-mask-image:linear-gradient(90deg,transparent,#000 8%,#000 92%,transparent);mask-image:linear-gradient(90deg,transparent,#000 8%,#000 92%,transparent)}
+.mq-track{display:flex;gap:56px;padding-right:56px;flex:none;animation:mq 48s linear infinite}
+.marquee:hover .mq-track{animation-play-state:paused}
+@keyframes mq{to{transform:translateX(-100%)}}
+.mq-item{display:flex;align-items:baseline;gap:12px;white-space:nowrap}
+.mq-item b{font-family:var(--font-display);font-size:clamp(1.6rem,3vw,2.4rem);letter-spacing:-.04em;font-weight:700}
+.mq-item span{font-family:var(--font-mono);font-size:.78rem;color:var(--ink-3)}
+
+/* Walkthrough (pinned) */
+.walk{position:relative}
+.walk-pin{display:flex;flex-direction:column;padding-block:clamp(56px,7vw,96px)}
+.js.motion .walk-pin{height:100svh;padding-block:calc(var(--nav-h) + 18px) 22px}
+.walk-inner{flex:1;min-height:0;display:flex;flex-direction:column;gap:clamp(14px,2vh,26px);width:100%}
+.walk-head{display:flex;justify-content:space-between;align-items:end;gap:24px;flex-wrap:wrap}
+.h2{font-size:clamp(2.1rem,4.6vw,4.25rem);line-height:1;letter-spacing:-.04em}
+.js.motion .walk .h2{font-size:clamp(1.8rem,3.4vw,3.2rem)}
+.walk-head p{max-width:42ch;color:var(--ink-2);font-size:.98rem}
+.walk-stage{flex:1;min-height:0;display:grid;grid-template-columns:210px minmax(0,1fr);gap:clamp(16px,2.4vw,32px)}
+.walk-steps{position:relative;display:grid;align-content:start;gap:6px;padding-left:18px}
+.walk-progress{position:absolute;left:0;top:6px;bottom:6px;width:2px;background:var(--rule);border-radius:2px;overflow:hidden}
+.walk-progress i{position:absolute;inset:0;background:var(--accent);transform-origin:top;transform:scaleY(var(--p,1))}
+.step{padding:10px 0;color:var(--ink-3);transition:color 240ms ease}
+.step .n{font-family:var(--font-mono);font-size:.7rem;letter-spacing:.1em;display:block;margin-bottom:2px}
+.step b{display:block;font-family:var(--font-display);font-size:1.3rem;letter-spacing:-.03em;color:inherit}
+.step span.d{display:block;font-size:.85rem;line-height:1.45;margin-top:4px;max-height:0;opacity:0;overflow:hidden;transition:opacity 300ms ease, max-height 400ms var(--ease-out)}
+.step.on{color:var(--ink)}
+.step.on span.d{max-height:80px;opacity:1;color:var(--ink-2)}
+.step.past{color:var(--ink-2)}
+html:not(.motion) .step span.d{max-height:none;opacity:1}
+
+.win{min-height:0;display:flex;flex-direction:column;background:var(--surface);border:1px solid var(--rule);border-radius:14px;overflow:hidden;box-shadow:0 50px 100px -50px rgb(var(--shadow-rgb) / .45), 0 1px 0 rgb(var(--shadow-rgb) / .04);margin:0}
+.win-bar{display:flex;align-items:center;gap:10px;height:38px;padding-left:12px;border-bottom:1px solid var(--rule);background:var(--surface-2);font-size:.78rem;color:var(--ink-2)}
+.win-bar .brand-sm{width:16px;height:16px;--mark-fg:var(--bg);color:var(--ink)}
+.win-title{flex:1;min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.win-ctrl{display:flex;height:100%}
+.win-ctrl span{width:44px;display:grid;place-items:center;color:var(--ink-3)}
+.win-ctrl svg{width:10px;height:10px}
+.win-tool{display:flex;align-items:center;gap:8px;flex-wrap:wrap;padding:10px 14px;border-bottom:1px solid var(--rule-2)}
+.chip{display:inline-flex;align-items:center;gap:6px;height:24px;padding:0 9px;border-radius:6px;background:var(--surface-2);font-size:.72rem;font-weight:500;color:var(--ink-2);white-space:nowrap}
+.chip.mono{font-family:var(--font-mono);font-size:.68rem}
+.status{margin-left:auto;display:inline-flex;align-items:center;gap:8px;font-size:.75rem;font-weight:600;color:var(--ink-2)}
+.status i{width:7px;height:7px;border-radius:50%;background:var(--warn)}
+.win.ready .status i{background:var(--ok)}
+.win-body{flex:1;min-height:0;display:grid;grid-template-columns:minmax(0,220px) minmax(0,1fr) minmax(0,270px)}
+.pane{min-height:0;min-width:0;display:flex;flex-direction:column}
+.pane-h{display:flex;align-items:center;gap:8px;font-family:var(--font-mono);font-size:.68rem;letter-spacing:.1em;text-transform:uppercase;color:var(--ink-3);padding:14px 16px 10px}
+.dict{border-right:1px solid var(--rule-2);background:color-mix(in srgb, var(--surface-2) 45%, var(--surface))}
+.rec{width:8px;height:8px;border-radius:50%;background:var(--ink-3);transition:background-color 200ms ease}
+.dict.live .rec{background:var(--block);animation:ping 1.6s var(--ease-out) infinite}
+.wave{display:flex;align-items:center;gap:3px;height:34px;padding:0 16px}
+.wave i{flex:1;height:100%;background:var(--accent);border-radius:2px;transform:scaleY(.12);transform-origin:center;opacity:.55;transition:transform 240ms var(--ease-out)}
+.dict.live .wave i{animation:bar 900ms ease-in-out infinite alternate;opacity:.9}
+@keyframes bar{0%{transform:scaleY(.15)}100%{transform:scaleY(var(--s,.8))}}
+.transcript{padding:10px 16px;font-size:.82rem;line-height:1.55;color:var(--ink-2);flex:1;min-height:0;overflow:hidden}
+.sources{padding:0 16px 16px;display:grid;gap:6px}
+.sources li{display:flex;gap:8px;align-items:center;font-size:.74rem;color:var(--ink-3)}
+.sources svg{width:13px;height:13px;color:var(--accent);flex:none}
+.rep{min-width:0}
+.rep-scroll{flex:1;min-height:0;overflow:auto;padding:18px clamp(16px,2vw,28px) 24px;font-size:.88rem;line-height:1.6}
+.js.motion .rep-scroll{overflow:hidden}
+.rep-meta{color:var(--ink-3);margin-bottom:10px}
+.rs{margin-bottom:12px}
+.rs h4{display:flex;align-items:center;gap:10px;flex-wrap:wrap;font-family:var(--font-body);font-size:.7rem;font-weight:600;letter-spacing:.12em;text-transform:uppercase;color:var(--ink-3);margin-bottom:3px}
+.rs p{color:var(--ink)}
+.rs p b{font-weight:600}
+.caret::after{content:"";display:inline-block;width:2px;height:1.05em;margin-left:1px;vertical-align:-2px;background:var(--accent);animation:blink 1s steps(1) infinite}
+@keyframes blink{50%{opacity:0}}
+.imp{list-style:decimal;padding:8px 10px 8px 30px;border-radius:8px;transition:background-color 300ms ease}
+.imp.is-draft{background:var(--ai-tint)}
+.ai-chip{display:inline-flex;align-items:center;gap:5px;height:20px;padding:0 8px;border-radius:999px;font-size:.66rem;letter-spacing:.04em;text-transform:none;font-weight:600;background:var(--ok-tint);color:var(--ok);transition:opacity 240ms ease, background-color 240ms ease, color 240ms ease}
+.ai-chip svg{width:11px;height:11px}
+.ai-chip.draft{background:var(--ai-tint);color:var(--ai)}
+.ai-chip.hide{opacity:0}
+.lat{white-space:nowrap}
+.lat-old{border-radius:3px;transition:background-color 200ms ease, opacity 200ms ease}
+.lat.flag .lat-old{background:var(--block-tint);text-decoration:underline wavy var(--block);text-underline-offset:3px}
+.lat.fixed .lat-old{text-decoration:line-through;opacity:.45}
+.lat-new{display:none;text-decoration:none;color:var(--ok);background:var(--ok-tint);padding:0 4px;border-radius:3px;margin-left:4px}
+.lat.fixed .lat-new{display:inline-block;transition:opacity 300ms var(--ease-out), transform 300ms var(--ease-out)}
+@starting-style{ .lat.fixed .lat-new{opacity:0;transform:translateY(4px)} }
+.val{border-left:1px solid var(--rule-2)}
+.count{margin-left:auto;font-family:var(--font-mono);letter-spacing:.04em;text-transform:none;color:var(--ink-2)}
+.checks{display:grid;gap:8px;padding:0 12px;flex:1;min-height:0;align-content:start;overflow:hidden}
+.ck{display:grid;grid-template-columns:18px minmax(0,1fr);gap:4px 10px;padding:10px 12px;border-radius:10px;background:var(--tint);border:1px solid transparent;opacity:0;transform:translateY(6px);transition:opacity 280ms var(--ease-out), transform 280ms var(--ease-out), background-color 280ms ease, border-color 280ms ease}
+.ck.on{opacity:1;transform:none}
+.ck.block{--c:var(--block);--tint:var(--block-tint)}
+.ck.warn{--c:var(--warn);--tint:var(--warn-tint)}
+.ck.info{--c:var(--info);--tint:var(--info-tint)}
+.ck .sev{width:18px;height:18px;color:var(--c);margin-top:1px}
+.ck b{font-size:.74rem;font-weight:600;color:var(--c);display:block}
+.ck p{font-size:.78rem;line-height:1.45;color:var(--ink)}
+.ck .res{grid-column:2;display:none;font-size:.7rem;font-weight:600;color:var(--ok)}
+.ck.done{background:transparent;border-color:var(--rule)}
+.ck.done .res{display:block}
+.ck.done p{color:var(--ink-3);text-decoration:line-through;text-decoration-color:var(--ink-3)}
+.ck.done .sev{color:var(--ok)}
+.sign{padding:12px;border-top:1px solid var(--rule-2);display:grid;gap:8px}
+.btn-sign{height:44px;border-radius:10px;background:var(--ink);color:var(--bg);font-weight:600;font-size:.9rem;display:flex;align-items:center;justify-content:center;gap:8px;transition:transform 160ms var(--ease-out), opacity 240ms ease, box-shadow 240ms ease}
+.btn-sign svg{width:16px;height:16px}
+.btn-sign:disabled{opacity:.28;cursor:not-allowed}
+.btn-sign:not(:disabled):active{transform:scale(.97)}
+.win.ready .btn-sign{box-shadow:0 0 0 4px color-mix(in srgb, var(--accent-hi) 28%, transparent)}
+.btn-sign.signed{background:var(--ok);color:#fff}
+.sign-note{font-size:.72rem;color:var(--ink-3);text-align:center}
+@media (max-width:1100px){
+  .win-body{grid-template-columns:minmax(0,190px) minmax(0,1fr) minmax(0,240px)}
+  .sources{display:none}
+}
+@media (max-width:860px){
+  .walk-stage{grid-template-columns:1fr;grid-template-rows:auto minmax(0,1fr)}
+  .walk-steps{grid-template-columns:repeat(4,minmax(0,1fr));padding-left:0;padding-top:10px;gap:8px}
+  .walk-progress{left:0;right:0;top:0;bottom:auto;width:auto;height:2px}
+  .walk-progress i{transform-origin:left;transform:scaleX(var(--p,1))}
+  .step{padding:6px 0}
+  .step b{font-size:1rem}
+  .step span.d{display:none}
+  .walk-head p{display:none}
+  .win-body{grid-template-columns:1fr;grid-template-rows:auto minmax(0,1fr) auto}
+  .dict{border-right:0;border-bottom:1px solid var(--rule-2);flex-direction:row;align-items:center}
+  .dict .pane-h{padding:10px 12px;flex:none}
+  .dict .wave{flex:1;height:24px;padding:0 12px 0 0}
+  .transcript{display:none}
+  .val{border-left:0;border-top:1px solid var(--rule-2)}
+  .val .pane-h{padding:10px 12px 6px}
+  .checks{grid-auto-flow:column;grid-auto-columns:minmax(0,1fr);gap:6px;padding:0 10px}
+  .ck{grid-template-columns:1fr;padding:8px}
+  .ck .sev{display:none}
+  .ck p{display:none}
+  .ck .res{grid-column:1}
+  .win-tool .chip:not(:first-child){display:none}
+}
+
+/* Chapters */
+.chapter{padding-block:clamp(72px,10vw,140px)}
+.ch-grid{display:grid;grid-template-columns:180px minmax(0,1fr);gap:clamp(20px,4vw,56px)}
+.ch-label{position:sticky;top:calc(var(--nav-h) + env(safe-area-inset-top,0px) + 28px);align-self:start;display:grid;gap:4px;padding-top:6px;border-top:1px solid var(--ink)}
+.ch-label .mono{color:var(--ink-3)}
+.ch-label span:last-child{font-family:var(--font-display);font-weight:600;font-size:1rem;letter-spacing:-.02em}
+.ch-body{min-width:0}
+.ch-intro{display:grid;gap:20px;max-width:880px;margin-bottom:clamp(36px,5vw,64px)}
+.sub{font-size:clamp(1.02rem,1.3vw,1.18rem);color:var(--ink-2);max-width:60ch}
+@media (max-width:860px){
+  .ch-grid{grid-template-columns:1fr}
+  .ch-label{position:static;grid-auto-flow:column;justify-content:start;gap:12px;align-items:baseline}
+}
+
+/* Validation */
+.val-show{display:grid;grid-template-columns:minmax(0,1fr);gap:16px}
+.tabs{position:relative;display:flex;gap:4px;border-bottom:1px solid var(--rule);overflow-x:auto;scrollbar-width:none}
+.tabs::-webkit-scrollbar{display:none}
+.tab{position:relative;padding:12px 14px;font-weight:500;font-size:.95rem;color:var(--ink-3);white-space:nowrap;transition:color 160ms ease}
+.tab[aria-selected="true"]{color:var(--ink)}
+@media (hover:hover) and (pointer:fine){ .tab:hover{color:var(--ink)} }
+.tab-ind{position:absolute;left:0;bottom:-1px;height:2px;width:100px;background:var(--ink);transform-origin:left;transition:transform 320ms var(--ease-out)}
+.tp{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:16px}
+.tp[hidden]{display:none}
+.tp:not([hidden]){animation:tpin 360ms var(--ease-out)}
+@keyframes tpin{from{opacity:0;transform:translateY(6px)}}
+.yaml{margin:0;background:var(--film);color:#cfd8de;border-radius:14px;padding:22px;font-family:var(--font-mono);font-size:.82rem;line-height:1.7;overflow-x:auto;white-space:pre}
+.yaml .k{color:#8fdde7}.yaml .s{color:#f0b9b4}.yaml .w{color:#f1cf94}.yaml .c{color:#6c7a85}
+.catch{border-radius:14px;padding:22px;background:var(--surface);border:1px solid var(--rule);display:grid;gap:14px;align-content:start}
+.sev-pill{justify-self:start;display:inline-flex;align-items:center;gap:6px;height:26px;padding:0 10px;border-radius:999px;font-size:.75rem;font-weight:600;background:var(--tint);color:var(--c)}
+.sev-pill svg{width:14px;height:14px}
+.catch.block{--c:var(--block);--tint:var(--block-tint)}
+.catch.warn{--c:var(--warn);--tint:var(--warn-tint)}
+.catch p{font-size:1rem}
+.catch p b{font-family:var(--font-display);font-size:1.25rem;letter-spacing:-.02em;display:block;margin-bottom:4px;line-height:1.25}
+.excerpt{border-top:1px dashed var(--rule);padding-top:14px;font-size:.88rem;color:var(--ink-2);display:grid;gap:4px}
+.excerpt span{font-family:var(--font-mono);font-size:.68rem;letter-spacing:.1em;text-transform:uppercase;color:var(--ink-3);margin-right:8px}
+mark{border-radius:3px;padding:0 3px;color:inherit}
+mark.bad{background:var(--block-tint);color:var(--block);text-decoration:underline wavy;text-underline-offset:3px}
+mark.good{background:var(--ok-tint);color:var(--ok)}
+mark.wn{background:var(--warn-tint);color:var(--warn)}
+.cli{margin-top:16px;border-radius:14px;background:var(--film);color:#cfd8de;overflow:hidden}
+.cli-bar{display:flex;align-items:center;justify-content:space-between;padding:10px 12px 10px 18px;border-bottom:1px solid #1c2329;color:#7e8c97}
+.copy{display:inline-flex;align-items:center;gap:6px;height:30px;padding:0 12px;border-radius:8px;background:#1a2229;color:#cfd8de;font-size:.78rem;font-weight:500;transition:transform 160ms var(--ease-out), background-color 160ms ease}
+.copy:active{transform:scale(.97)}
+.copy svg{width:14px;height:14px}
+.copy .lbl{transition:filter 200ms ease, opacity 200ms ease}
+.copy.swap .lbl{filter:blur(2px);opacity:.4}
+.copy.done{color:#7ee2b8}
+@media (hover:hover) and (pointer:fine){ .copy:hover{background:#232d36} }
+.cli pre{margin:0;padding:18px;font-family:var(--font-mono);font-size:.82rem;line-height:1.75;overflow-x:auto}
+.cli .pr{color:#62deec;user-select:none}.cli .ok{color:#7ee2b8}.cli .dm{color:#6c7a85}
+@media (max-width:860px){ .tp{grid-template-columns:1fr} }
+
+/* Capabilities */
+.caps{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));border-top:1px solid var(--rule);border-left:1px solid var(--rule)}
+.cap{position:relative;padding:28px 26px 30px;border-right:1px solid var(--rule);border-bottom:1px solid var(--rule);display:grid;gap:10px;align-content:start;transition:background-color 240ms ease}
+.cap svg{width:24px;height:24px;color:var(--ink-2);transition:color 240ms ease, transform 300ms var(--ease-out)}
+.cap h3{font-size:1.22rem;letter-spacing:-.025em;font-weight:600}
+.cap p{font-size:.93rem;color:var(--ink-2);line-height:1.55}
+.cap .tag{font-family:var(--font-mono);font-size:.68rem;letter-spacing:.08em;text-transform:uppercase;color:var(--ink-3)}
+@media (hover:hover) and (pointer:fine){
+  .cap:hover{background:var(--surface)}
+  .cap:hover svg{color:var(--accent);transform:translateY(-2px)}
+}
+@media (max-width:960px){ .caps{grid-template-columns:repeat(2,minmax(0,1fr))} }
+@media (max-width:600px){ .caps{grid-template-columns:1fr} }
+
+/* Surfaces */
+.devices{position:relative;padding:clamp(20px,4vw,48px) clamp(0px,6vw,90px) clamp(40px,6vw,80px) 0;margin-bottom:clamp(36px,5vw,64px)}
+.monitor{position:relative;border-radius:16px;background:var(--bezel);border:1px solid var(--rule);padding:10px;box-shadow:0 60px 120px -60px rgb(var(--shadow-rgb) / .55)}
+.screen{position:relative;border-radius:9px;overflow:hidden;background:var(--surface);aspect-ratio:16/9;max-width:100%;display:grid;grid-template-rows:28px minmax(0,1fr)}
+.sc-bar{display:flex;align-items:center;gap:8px;padding:0 10px;border-bottom:1px solid var(--rule);background:var(--surface-2);font-size:.68rem;color:var(--ink-2)}
+.sc-bar .paired{margin-left:auto;display:inline-flex;align-items:center;gap:6px;height:18px;padding:0 8px;border-radius:999px;background:var(--ok-tint);color:var(--ok);font-weight:600;opacity:0;transform:translateY(-4px);transition:opacity 300ms var(--ease-out), transform 300ms var(--ease-out)}
+.sc-body{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1.1fr);min-height:0}
+.sc-img{position:relative;background:var(--film)}
+.sc-img canvas{position:absolute;inset:0;width:100%;height:100%}
+.sc-text{padding:clamp(10px,2vw,22px);display:grid;align-content:start;gap:8px;font-size:clamp(.62rem,1.1vw,.9rem)}
+.sc-text .mono{color:var(--ink-3);font-size:clamp(.55rem,.9vw,.7rem)}
+.sc-line{opacity:0;transform:translateY(6px);transition:opacity 400ms var(--ease-out), transform 400ms var(--ease-out)}
+.sc-line.ai{background:var(--ai-tint);border-radius:4px;padding:2px 6px}
+.qr-panel{position:absolute;inset:28px 0 0;display:grid;place-content:center;justify-items:center;gap:10px;background:color-mix(in srgb, var(--surface) 94%, transparent);text-align:center;transition:opacity 400ms ease, filter 400ms ease}
+.qr-panel b{font-family:var(--font-display);font-size:clamp(.9rem,1.6vw,1.25rem);letter-spacing:-.02em}
+.qr-panel small{font-size:clamp(.6rem,1vw,.78rem);color:var(--ink-3)}
+.qr-panel canvas{width:clamp(80px,12vw,140px);height:clamp(80px,12vw,140px);image-rendering:pixelated}
+.stand{width:22%;height:34px;margin:0 auto;background:linear-gradient(var(--ink-2),var(--ink-3));clip-path:polygon(18% 0,82% 0,100% 100%,0 100%);opacity:.6}
+.phone{position:absolute;right:0;bottom:0;width:clamp(130px,19vw,230px);aspect-ratio:9/19;border-radius:clamp(22px,3vw,36px);background:var(--bezel);border:1px solid var(--rule);padding:clamp(5px,.7vw,8px);box-shadow:0 40px 80px -30px rgb(var(--shadow-rgb) / .6)}
+.ph-screen{position:relative;height:100%;border-radius:clamp(17px,2.4vw,29px);overflow:hidden;background:#05080B;color:#E7EDF1}
+.ph-notch{position:absolute;top:8px;left:50%;width:30%;height:clamp(10px,1.4vw,16px);border-radius:999px;background:#000;transform:translateX(-50%);z-index:3}
+.ph-view{position:absolute;inset:0;display:grid;align-content:center;justify-items:center;gap:10px;padding:14px;text-align:center;transition:opacity 400ms ease, filter 400ms ease}
+.ph-view small{font-size:clamp(.55rem,.9vw,.72rem);color:#9AAAB7}
+.ph-view b{font-family:var(--font-display);font-size:clamp(.75rem,1.2vw,1rem);letter-spacing:-.02em}
+.vf{position:relative;width:72%;aspect-ratio:1;display:grid;place-items:center}
+.vf::before,.vf::after{content:"";position:absolute;inset:0;border:2px solid #62deec;border-radius:12px;-webkit-mask:linear-gradient(#000 0 0) top left/26% 26% no-repeat,linear-gradient(#000 0 0) top right/26% 26% no-repeat,linear-gradient(#000 0 0) bottom left/26% 26% no-repeat,linear-gradient(#000 0 0) bottom right/26% 26% no-repeat;mask:linear-gradient(#000 0 0) top left/26% 26% no-repeat,linear-gradient(#000 0 0) top right/26% 26% no-repeat,linear-gradient(#000 0 0) bottom left/26% 26% no-repeat,linear-gradient(#000 0 0) bottom right/26% 26% no-repeat}
+.vf canvas{width:70%;height:70%;opacity:0;transition:opacity 300ms ease;image-rendering:pixelated;border-radius:4px}
+.vf .scan{position:absolute;left:8%;right:8%;height:2px;top:12%;background:#62deec;box-shadow:0 0 12px #62deec;opacity:0}
+.mic{width:clamp(44px,6vw,68px);height:clamp(44px,6vw,68px);border-radius:50%;background:#C4302A;display:grid;place-items:center;position:relative}
+.mic svg{width:44%;height:44%;color:#fff}
+.mic::after{content:"";position:absolute;inset:0;border-radius:50%;border:2px solid #EE6D66;animation:ring 1.8s var(--ease-out) infinite}
+@keyframes ring{from{transform:scale(1);opacity:.9}to{transform:scale(1.7);opacity:0}}
+.ph-wave{display:flex;gap:2px;height:22px;width:70%;align-items:center}
+.ph-wave i{flex:1;height:100%;background:#62deec;border-radius:2px;animation:bar 800ms ease-in-out infinite alternate}
+/* device states */
+.devices[data-state="pair"] .ph-live,.devices[data-state="scan"] .ph-live{opacity:0;filter:blur(6px);pointer-events:none}
+.devices[data-state="live"] .ph-pair{opacity:0;filter:blur(6px);pointer-events:none}
+.devices[data-state="scan"] .vf canvas{opacity:1}
+.devices[data-state="scan"] .vf .scan{opacity:1;animation:scan 1.1s var(--ease-in-out) infinite alternate}
+@keyframes scan{to{top:86%}}
+.devices[data-state="live"] .qr-panel{opacity:0;filter:blur(8px);pointer-events:none}
+.devices[data-state="live"] .sc-bar .paired{opacity:1;transform:none}
+.devices[data-state="live"] .sc-line{opacity:1;transform:none}
+.devices[data-state="live"] .sc-line:nth-child(3){transition-delay:.25s}
+.devices[data-state="live"] .sc-line:nth-child(4){transition-delay:.5s}
+.devices[data-state="live"] .sc-line:nth-child(5){transition-delay:.75s}
+.replay{position:absolute;left:0;bottom:0;display:inline-flex;align-items:center;gap:8px;height:34px;padding:0 14px;border-radius:999px;border:1px solid var(--rule);background:var(--surface);font-size:.8rem;font-weight:500;color:var(--ink-2);transition:transform 160ms var(--ease-out), border-color 160ms ease}
+.replay:active{transform:scale(.97)}
+.replay svg{width:14px;height:14px}
+@media (hover:hover) and (pointer:fine){ .replay:hover{border-color:var(--ink-3);color:var(--ink)} }
+.surf-cols{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:clamp(20px,3vw,40px)}
+.surf{display:grid;gap:12px;align-content:start;padding-top:20px;border-top:1px solid var(--rule)}
+.surf .plat{font-family:var(--font-mono);font-size:.7rem;letter-spacing:.1em;text-transform:uppercase;color:var(--accent)}
+.surf h3{font-size:1.5rem;letter-spacing:-.03em}
+.surf p{color:var(--ink-2);font-size:.95rem}
+.ticks{display:grid;gap:8px;margin-top:4px}
+.ticks li{display:flex;gap:10px;font-size:.9rem;color:var(--ink)}
+.ticks svg{width:16px;height:16px;flex:none;color:var(--accent);margin-top:4px}
+.keys{display:flex;gap:6px;align-items:center;margin-top:6px}
+.key{min-width:34px;height:32px;padding:0 9px;display:grid;place-items:center;border-radius:7px;background:var(--surface);border:1px solid var(--rule);box-shadow:0 2px 0 var(--rule);font-family:var(--font-mono);font-size:.72rem;color:var(--ink-2);transition:transform 120ms var(--ease-out), box-shadow 120ms var(--ease-out)}
+.keys:hover .key,.key.press{transform:translateY(2px);box-shadow:0 0 0 var(--rule)}
+.keys small{font-size:.75rem;color:var(--ink-3);margin-left:6px}
+@media (max-width:860px){ .surf-cols{grid-template-columns:1fr} .phone{width:clamp(110px,30vw,170px)} .devices{padding-right:clamp(40px,14vw,90px)} }
+
+/* Integrations */
+.flow{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,.9fr) minmax(0,1fr);align-items:center;gap:clamp(28px,5vw,72px)}
+.flow-col{display:grid;gap:10px}
+.node{position:relative;display:grid;gap:2px;padding:14px 16px;border-radius:12px;background:var(--surface);border:1px solid var(--rule);transition:border-color 200ms ease, transform 200ms var(--ease-out)}
+.node b{font-weight:600;font-size:.95rem}
+.node small{font-size:.8rem;color:var(--ink-3)}
+.node::after{content:"";position:absolute;top:50%;height:2px;width:clamp(28px,5vw,72px);background:repeating-linear-gradient(90deg,var(--accent) 0 6px,transparent 6px 12px);background-size:12px 2px;opacity:.6;animation:dash 900ms linear infinite}
+.in .node::after{left:100%}
+.out .node::after{right:100%}
+@keyframes dash{to{background-position:12px 0}}
+.out .node::after{animation-direction:normal}
+@media (hover:hover) and (pointer:fine){ .node:hover{border-color:var(--accent);transform:translateY(-2px)} }
+.core{position:relative;aspect-ratio:1;max-width:100%;border-radius:50%;display:grid;place-content:center;justify-items:center;gap:8px;text-align:center;background:radial-gradient(circle at 50% 40%, var(--surface), var(--surface-2));border:1px solid var(--rule);--mark-fg:var(--bg);color:var(--ink)}
+.core::before,.core::after{content:"";position:absolute;inset:-14px;border-radius:50%;border:1px dashed var(--rule)}
+.core::after{inset:-30px;border-style:solid;border-color:var(--rule-2)}
+.core svg{width:48px;height:48px}
+.core b{font-family:var(--font-display);font-size:1.4rem;letter-spacing:-.03em}
+.core small{font-family:var(--font-mono);font-size:.7rem;color:var(--ink-3);letter-spacing:.06em}
+.core .orbit{position:absolute;inset:-30px;border-radius:50%;animation:spin 18s linear infinite}
+.core .orbit i{position:absolute;top:-4px;left:50%;width:8px;height:8px;margin-left:-4px;border-radius:50%;background:var(--accent-hi);box-shadow:0 0 12px var(--accent-hi)}
+@keyframes spin{to{transform:rotate(360deg)}}
+.int-row{display:grid;grid-template-columns:minmax(0,1.4fr) minmax(0,1fr);gap:16px;margin-top:clamp(40px,6vw,72px)}
+.panel{border-radius:16px;background:var(--surface);border:1px solid var(--rule);padding:24px;display:grid;gap:16px;align-content:start}
+.panel h3{font-size:1.3rem;letter-spacing:-.025em}
+.panel p{font-size:.93rem;color:var(--ink-2)}
+.seg{position:relative;display:inline-grid;grid-auto-flow:column;grid-auto-columns:1fr;padding:4px;border-radius:999px;background:var(--surface-2);justify-self:start}
+.seg button{position:relative;z-index:1;height:36px;padding:0 16px;border-radius:999px;font-size:.85rem;font-weight:600;color:var(--ink-3);transition:color 200ms ease}
+.seg button[aria-checked="true"]{color:var(--ink)}
+.seg-ind{position:absolute;top:4px;bottom:4px;left:4px;width:calc(50% - 4px);border-radius:999px;background:var(--surface);box-shadow:0 1px 3px rgb(var(--shadow-rgb) / .14);transition:transform 320ms var(--ease-out)}
+.seg[data-mode="local"] .seg-ind{transform:translateX(100%)}
+.pills{display:flex;flex-wrap:wrap;gap:8px}
+.pill{display:inline-flex;align-items:center;gap:8px;height:34px;padding:0 14px;border-radius:999px;border:1px solid var(--rule);font-size:.88rem;font-weight:500}
+.pill i{width:7px;height:7px;border-radius:50%;background:var(--accent-hi)}
+.pills:not([hidden]) .pill{animation:tpin 320ms var(--ease-out) both}
+.pills .pill:nth-child(2){animation-delay:50ms}
+@media (max-width:860px){
+  .flow{grid-template-columns:1fr;justify-items:stretch}
+  .node::after{display:none}
+  .core{width:min(260px,70%);justify-self:center;margin-block:16px}
+  .int-row{grid-template-columns:1fr}
+}
+
+/* Governance band */
+.band{background:var(--band);color:var(--band-ink);border-block:1px solid var(--band-rule)}
+.band .ch-label{border-top-color:var(--band-ink)}
+.band .ch-label .mono,.band .sub{color:var(--band-ink-2)}
+.gov{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:clamp(24px,4vw,56px);align-items:start}
+.gov-list{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:28px 24px}
+.gov-item{display:grid;gap:8px}
+.gov-item svg{width:22px;height:22px;color:var(--accent-hi)}
+.gov-item h3{font-size:1.06rem;font-weight:600;letter-spacing:-.015em;color:var(--band-ink)}
+.gov-item p{font-size:.88rem;color:var(--band-ink-2);line-height:1.55}
+.log{border-radius:16px;background:var(--band-2);border:1px solid var(--band-rule);overflow:hidden}
+.log-h{display:flex;justify-content:space-between;align-items:center;padding:14px 18px;border-bottom:1px solid var(--band-rule);font-family:var(--font-mono);font-size:.7rem;letter-spacing:.1em;text-transform:uppercase;color:var(--band-ink-2)}
+.log-h span:last-child{display:inline-flex;gap:8px;align-items:center;text-transform:none;letter-spacing:.02em}
+.log-rows{display:grid;padding:6px 0;min-height:300px;align-content:start}
+.log-row{display:grid;grid-template-columns:76px minmax(0,1.1fr) minmax(0,.8fr) minmax(0,1.2fr);gap:12px;padding:9px 18px;font-family:var(--font-mono);font-size:.72rem;color:var(--band-ink-2);border-bottom:1px solid color-mix(in srgb, var(--band-rule) 60%, transparent);transition:opacity 400ms var(--ease-out), transform 400ms var(--ease-out), background-color 1.2s ease}
+.log-row b{font-weight:500;color:var(--band-ink)}
+.log-row .hu{color:#7ee2b8}
+.log-row.new{background:color-mix(in srgb, var(--accent-hi) 10%, transparent)}
+@starting-style{ .log-row.new{opacity:0;transform:translateY(-8px)} }
+.log-row > span{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.stats{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:16px;margin-top:clamp(48px,6vw,80px);padding-top:28px;border-top:1px solid var(--band-rule)}
+.stat b{display:block;font-family:var(--font-display);font-size:clamp(2.6rem,5vw,4.4rem);line-height:1;letter-spacing:-.05em;font-variant-numeric:tabular-nums;color:var(--band-ink)}
+.stat span{display:block;margin-top:8px;font-size:.88rem;color:var(--band-ink-2)}
+.stat.zero b{color:var(--accent-hi)}
+@media (max-width:960px){ .gov{grid-template-columns:1fr} .stats{grid-template-columns:repeat(2,minmax(0,1fr))} }
+@media (max-width:560px){ .gov-list{grid-template-columns:1fr} .log-row{grid-template-columns:64px minmax(0,1fr) minmax(0,.9fr)} .log-row > span:last-child{display:none} }
+
+/* Audience split */
+.aud{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:16px}
+.aud-card{position:relative;border-radius:22px;padding:clamp(24px,3.4vw,44px);display:grid;gap:20px;align-content:start;background:var(--surface);border:1px solid var(--rule);transition:opacity 300ms ease, transform 300ms var(--ease-out), box-shadow 300ms ease}
+.aud-card .plat{font-family:var(--font-mono);font-size:.72rem;letter-spacing:.1em;text-transform:uppercase;color:var(--accent);display:flex;align-items:center;gap:8px}
+.aud-card .plat svg{width:18px;height:18px}
+.aud-card h3{font-size:clamp(1.7rem,3vw,2.5rem);letter-spacing:-.04em;line-height:1.02}
+.aud-card .ticks li{font-size:.95rem}
+.aud-card .cta-pair{margin-top:6px}
+.aud-card.dark{background:var(--band);color:var(--band-ink);border-color:var(--band-rule)}
+.aud-card.dark .ticks li{color:var(--band-ink)}
+.aud-card.dark .plat{color:var(--accent-hi)}
+.aud-card.dark .ticks svg{color:var(--accent-hi)}
+.aud-card.dark .btn-ink{background:var(--band-ink);color:var(--band)}
+@media (hover:hover) and (pointer:fine){
+  .aud:hover .aud-card:not(:hover){opacity:.62}
+  .aud-card:hover{transform:translateY(-4px);box-shadow:0 40px 80px -40px rgb(var(--shadow-rgb) / .4)}
+}
+@media (max-width:860px){ .aud{grid-template-columns:1fr} }
+
+/* Pricing */
+.tiers{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:16px}
+.tier{border-radius:20px;padding:28px;background:var(--surface);border:1px solid var(--rule);display:grid;gap:16px;align-content:start;grid-template-rows:auto auto auto 1fr auto;transition:transform 300ms var(--ease-out), box-shadow 300ms ease, border-color 300ms ease}
+.tier .who{font-family:var(--font-mono);font-size:.72rem;letter-spacing:.1em;text-transform:uppercase;color:var(--ink-3)}
+.tier h3{font-size:1.6rem;letter-spacing:-.03em}
+.tier .price{font-family:var(--font-display);font-size:1.25rem;font-weight:600;letter-spacing:-.02em;padding-bottom:16px;border-bottom:1px solid var(--rule-2)}
+.tier .ticks li{font-size:.9rem}
+.tier .btn{justify-self:start}
+.tier.feat{border-color:var(--ink);box-shadow:0 0 0 1px var(--ink)}
+@media (hover:hover) and (pointer:fine){ .tier:hover{transform:translateY(-4px);box-shadow:0 30px 60px -30px rgb(var(--shadow-rgb) / .35)} .tier.feat:hover{box-shadow:0 0 0 1px var(--ink), 0 30px 60px -30px rgb(var(--shadow-rgb) / .35)} }
+.fine{margin-top:16px;font-size:.8rem;color:var(--ink-3)}
+@media (max-width:960px){ .tiers{grid-template-columns:1fr} }
+
+/* FAQ */
+.faq{border-top:1px solid var(--rule)}
+.faq-item{border-bottom:1px solid var(--rule)}
+.faq-q{width:100%;display:flex;justify-content:space-between;align-items:center;gap:20px;padding:22px 0;text-align:left;font-family:var(--font-display);font-size:clamp(1.1rem,1.8vw,1.4rem);font-weight:600;letter-spacing:-.02em}
+.plus{position:relative;width:30px;height:30px;flex:none;border-radius:50%;border:1px solid var(--rule);transition:transform 300ms var(--ease-out), background-color 200ms ease}
+.plus::before,.plus::after{content:"";position:absolute;left:50%;top:50%;width:12px;height:1.5px;margin:-.75px 0 0 -6px;background:var(--ink);transition:transform 300ms var(--ease-out)}
+.plus::after{transform:rotate(90deg)}
+.faq-item.open .plus{transform:rotate(180deg);background:var(--surface-2)}
+.faq-item.open .plus::after{transform:rotate(0)}
+@media (hover:hover) and (pointer:fine){ .faq-q:hover .plus{background:var(--surface-2)} }
+.faq-a{display:grid;grid-template-rows:0fr;transition:grid-template-rows 360ms var(--ease-out)}
+.faq-a > div{overflow:hidden;visibility:hidden;transition:visibility 0s linear 360ms}
+.faq-a p{padding-bottom:24px;max-width:70ch;color:var(--ink-2)}
+.faq-item.open .faq-a{grid-template-rows:1fr}
+.faq-item.open .faq-a > div{visibility:visible;transition-delay:0s}
+html:not(.js) .faq-a{grid-template-rows:1fr}
+html:not(.js) .faq-a > div{visibility:visible}
+
+/* Final CTA */
+.final{position:relative;padding-block:clamp(88px,12vw,180px);overflow:hidden;text-align:left}
+.final::before{content:"";position:absolute;inset:auto -10% -40% -10%;height:80%;background:radial-gradient(ellipse at 50% 100%, color-mix(in srgb, var(--accent-hi) 22%, transparent), transparent 65%);pointer-events:none}
+.final .display{font-size:clamp(2.6rem,7.4vw,7rem);margin:20px 0 32px}
+.final .lead{margin-bottom:28px}
+
+/* Footer */
+.foot{border-top:1px solid var(--rule);padding-block:56px 32px;font-size:.88rem}
+.foot-grid{display:grid;grid-template-columns:minmax(0,1.4fr) repeat(5,minmax(0,1fr));gap:28px}
+.foot h4{font-family:var(--font-mono);font-size:.7rem;font-weight:500;letter-spacing:.1em;text-transform:uppercase;color:var(--ink-3);margin-bottom:14px}
+.foot ul{display:grid;gap:9px}
+.foot ul a{color:var(--ink-2);transition:color 150ms ease}
+@media (hover:hover) and (pointer:fine){ .foot ul a:hover{color:var(--ink)} }
+.foot-brand p{color:var(--ink-2);margin-top:14px;max-width:32ch}
+.foot-bottom{display:flex;justify-content:space-between;flex-wrap:wrap;gap:12px;margin-top:48px;padding-top:20px;border-top:1px solid var(--rule-2);color:var(--ink-3);font-size:.8rem}
+@media (max-width:960px){ .foot-grid{grid-template-columns:repeat(3,minmax(0,1fr))} .foot-brand{grid-column:1/-1} }
+@media (max-width:520px){ .foot-grid{grid-template-columns:repeat(2,minmax(0,1fr))} }
+
+/* Reveal (initial state set by JS only) */
+.rv-run{transition:none !important}
+@media (prefers-reduced-motion: reduce){
+  *,*::before,*::after{animation-duration:.01ms !important;animation-iteration-count:1 !important;transition-duration:.01ms !important}
+  .mq-track{animation:none}
+}
+</style>
+
+<svg width="0" height="0" style="position:absolute" aria-hidden="true">
+  <defs>
+    <symbol id="i-mark" viewBox="0 0 32 32"><rect x="1" y="1" width="30" height="30" rx="9" fill="currentColor"/><circle cx="16" cy="16" r="8.6" fill="none" stroke="var(--mark-fg)" stroke-width="1.8"/><path d="M4.5 16h5.2l2.1-4.4 3.3 9 2.6-6.6 1.6 2h8.2" fill="none" stroke="var(--mark-fg)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></symbol>
+    <symbol id="i-arrow" viewBox="0 0 20 20"><path d="M4 10h12m-5-5 5 5-5 5" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></symbol>
+    <symbol id="i-chev" viewBox="0 0 12 12"><path d="m3 4.5 3 3 3-3" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></symbol>
+    <symbol id="i-win" viewBox="0 0 20 20"><path d="M2.5 4.2 8.8 3.3v6.2H2.5zM9.8 3.2 17.5 2v7.5H9.8zM2.5 10.5h6.3v6.2l-6.3-.9zM9.8 10.5h7.7V18l-7.7-1.1z" fill="currentColor"/></symbol>
+    <symbol id="i-desktop" viewBox="0 0 24 24"><g fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="12" rx="2"/><path d="M8 20h8M12 16v4"/></g></symbol>
+    <symbol id="i-phone" viewBox="0 0 24 24"><g fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"><rect x="7" y="2.5" width="10" height="19" rx="2.5"/><path d="M11 18.5h2"/></g></symbol>
+    <symbol id="i-console" viewBox="0 0 24 24"><g fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="16" rx="2"/><path d="M3 9h18M8 13h5M8 16h8"/></g></symbol>
+    <symbol id="i-shield" viewBox="0 0 24 24"><g fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3 5 6v5.5c0 4.4 3 7.9 7 9.5 4-1.6 7-5.1 7-9.5V6z"/><path d="m9 12 2 2 4-4"/></g></symbol>
+    <symbol id="i-check" viewBox="0 0 20 20"><path d="m5 10.5 3 3 7-7" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></symbol>
+    <symbol id="i-ck-circle" viewBox="0 0 20 20"><circle cx="10" cy="10" r="8.2" fill="none" stroke="currentColor" stroke-width="1.6"/><path d="m6.5 10.2 2.4 2.4 4.6-4.8" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"/></symbol>
+    <symbol id="i-block" viewBox="0 0 20 20"><circle cx="10" cy="10" r="8.2" fill="none" stroke="currentColor" stroke-width="1.6"/><path d="M5.5 14.5l9-9" stroke="currentColor" stroke-width="1.6"/></symbol>
+    <symbol id="i-warn" viewBox="0 0 20 20"><path d="M10 2.8 18 17H2z" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round"/><path d="M10 8v4" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"/><circle cx="10" cy="14.4" r="1" fill="currentColor"/></symbol>
+    <symbol id="i-info" viewBox="0 0 20 20"><circle cx="10" cy="10" r="8.2" fill="none" stroke="currentColor" stroke-width="1.6"/><path d="M10 9v5" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"/><circle cx="10" cy="6.2" r="1" fill="currentColor"/></symbol>
+    <symbol id="i-spark" viewBox="0 0 20 20"><path d="M10 2.5c.5 3.8 1.7 5 5.5 5.5-3.8.5-5 1.7-5.5 5.5-.5-3.8-1.7-5-5.5-5.5 3.8-.5 5-1.7 5.5-5.5zM15.5 13c.2 1.4.6 1.9 2 2-1.4.2-1.8.6-2 2-.2-1.4-.6-1.8-2-2 1.4-.1 1.8-.6 2-2z" fill="currentColor"/></symbol>
+    <symbol id="i-pen" viewBox="0 0 20 20"><path d="M3 17h3.5L16 7.5 12.5 4 3 13.5zM11 5.5 14.5 9" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round"/></symbol>
+    <symbol id="i-lock" viewBox="0 0 24 24"><g fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"><rect x="5" y="10.5" width="14" height="10" rx="2"/><path d="M8.5 10.5V8a3.5 3.5 0 0 1 7 0v2.5"/></g></symbol>
+    <symbol id="i-log" viewBox="0 0 24 24"><g fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"><path d="M6 3h9l4 4v14H6z"/><path d="M9 11h7M9 14.5h7M9 18h4"/></g></symbol>
+    <symbol id="i-server" viewBox="0 0 24 24"><g fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"><rect x="4" y="4" width="16" height="7" rx="1.5"/><rect x="4" y="13" width="16" height="7" rx="1.5"/><path d="M8 7.5h.01M8 16.5h.01"/></g></symbol>
+    <symbol id="i-key" viewBox="0 0 24 24"><g fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><circle cx="8" cy="15" r="4"/><path d="m11 12 8-8m-3 3 2.5 2.5M14 9l2 2"/></g></symbol>
+    <symbol id="i-tenant" viewBox="0 0 24 24"><g fill="none" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round"><rect x="3" y="3" width="8" height="8" rx="1.5"/><rect x="13" y="3" width="8" height="8" rx="1.5"/><rect x="3" y="13" width="8" height="8" rx="1.5"/><rect x="13" y="13" width="8" height="8" rx="1.5"/></g></symbol>
+    <symbol id="i-layout" viewBox="0 0 24 24"><g fill="none" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round"><rect x="3.5" y="3.5" width="17" height="17" rx="2"/><path d="M3.5 9h17M10 9v11.5"/></g></symbol>
+    <symbol id="i-book" viewBox="0 0 24 24"><g fill="none" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round"><path d="M4 5.5A2.5 2.5 0 0 1 6.5 3H20v15H6.5A2.5 2.5 0 0 0 4 20.5z"/><path d="M4 20.5A2.5 2.5 0 0 1 6.5 18H20v3H6.5"/></g></symbol>
+    <symbol id="i-siren" viewBox="0 0 24 24"><g fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M7 18v-6a5 5 0 0 1 10 0v6"/><path d="M5 18h14v3H5zM12 3v2M4.2 6.2l1.4 1.4M19.8 6.2l-1.4 1.4"/></g></symbol>
+    <symbol id="i-users" viewBox="0 0 24 24"><g fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"><circle cx="9" cy="8" r="3.5"/><path d="M2.5 20c.6-3.6 3.2-5.5 6.5-5.5s5.9 1.9 6.5 5.5"/><path d="M16 4.7a3.5 3.5 0 0 1 0 6.6M18.5 14.8c1.6.8 2.6 2.5 3 5.2"/></g></symbol>
+    <symbol id="i-scan" viewBox="0 0 24 24"><g fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"><circle cx="12" cy="12" r="8.5"/><circle cx="12" cy="12" r="4.5"/><path d="M12 3.5v3M12 17.5v3"/></g></symbol>
+    <symbol id="i-drift" viewBox="0 0 24 24"><g fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M3 17l5-5 4 3 8-8"/><path d="M15 7h5v5"/><path d="M3 21h18" opacity=".5"/></g></symbol>
+    <symbol id="i-sliders" viewBox="0 0 24 24"><g fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"><path d="M4 6h10M18 6h2M4 12h4M12 12h8M4 18h12M20 18h0"/><circle cx="16" cy="6" r="2"/><circle cx="10" cy="12" r="2"/><circle cx="18" cy="18" r="2"/></g></symbol>
+    <symbol id="i-plug" viewBox="0 0 24 24"><g fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M9 3v5M15 3v5M6 8h12v3a6 6 0 0 1-12 0zM12 17v4"/></g></symbol>
+    <symbol id="i-term" viewBox="0 0 24 24"><g fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="16" rx="2"/><path d="m7 9 3 3-3 3M12 15h5"/></g></symbol>
+    <symbol id="i-copy" viewBox="0 0 20 20"><g fill="none" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round"><rect x="7" y="7" width="10" height="10" rx="2"/><path d="M13 7V5a2 2 0 0 0-2-2H5a2 2 0 0 0-2 2v6a2 2 0 0 0 2 2h2"/></g></symbol>
+    <symbol id="i-hosp" viewBox="0 0 24 24"><g fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M4 21V7l8-4 8 4v14M2 21h20"/><path d="M12 8v6M9 11h6M9 21v-3h6v3"/></g></symbol>
+    <symbol id="i-user" viewBox="0 0 24 24"><g fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"><circle cx="12" cy="8" r="4"/><path d="M4 21c.9-4 4-6 8-6s7.1 2 8 6"/></g></symbol>
+    <symbol id="i-mic" viewBox="0 0 24 24"><g fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><rect x="9" y="3" width="6" height="11" rx="3"/><path d="M5.5 11a6.5 6.5 0 0 0 13 0M12 17.5V21"/></g></symbol>
+    <symbol id="i-doc" viewBox="0 0 20 20"><g fill="none" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round"><path d="M5 2.5h7l3.5 3.5v11.5H5z"/><path d="M12 2.5V6h3.5"/></g></symbol>
+    <symbol id="i-replay" viewBox="0 0 20 20"><path d="M4 10a6 6 0 1 0 1.8-4.3M4 3v3.5h3.5" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"/></symbol>
+    <symbol id="i-min" viewBox="0 0 10 10"><path d="M1 5h8" stroke="currentColor" stroke-width="1"/></symbol>
+    <symbol id="i-max" viewBox="0 0 10 10"><rect x="1.5" y="1.5" width="7" height="7" fill="none" stroke="currentColor" stroke-width="1"/></symbol>
+    <symbol id="i-x" viewBox="0 0 10 10"><path d="m1.5 1.5 7 7m0-7-7 7" stroke="currentColor" stroke-width="1"/></symbol>
+  </defs>
+</svg>
+
+<a class="skip" href="#main">Skip to content</a>
+
+<header class="nav" id="nav">
+  <div class="wrap nav-in">
+    <a class="brand" href="#top" aria-label="RadioPad home"><svg aria-hidden="true"><use href="#i-mark"/></svg><span>RadioPad</span></a>
+    <nav class="menu" id="menu" aria-label="Primary">
+      <ul class="menu-list">
+        <li class="mi" data-mega>
+          <button class="mi-btn" type="button" aria-expanded="false" aria-controls="mg-product">Product <svg class="chev" aria-hidden="true"><use href="#i-chev"/></svg></button>
+          <div class="mega" id="mg-product">
+            <div class="mega-col">
+              <a class="mega-link" href="#surfaces"><svg aria-hidden="true"><use href="#i-desktop"/></svg><span><b>Desktop app</b><small>Windows. Hotkeys, PACS/RIS bridge, local dictation.</small></span></a>
+              <a class="mega-link" href="#surfaces"><svg aria-hidden="true"><use href="#i-phone"/></svg><span><b>Mobile companion</b><small>Android and iOS. Dictate into a live desktop session.</small></span></a>
+              <a class="mega-link" href="#surfaces"><svg aria-hidden="true"><use href="#i-console"/></svg><span><b>Web admin</b><small>Tenants, rulebooks, AI providers, audit export.</small></span></a>
+              <a class="mega-link" href="#validation"><svg aria-hidden="true"><use href="#i-shield"/></svg><span><b>Validation engine</b><small>Your rulebooks, checked on every draft.</small></span></a>
+              <a class="mega-link" href="#validation"><svg aria-hidden="true"><use href="#i-term"/></svg><span><b>CLI</b><small>Author and batch-validate rulebooks.</small></span></a>
+            </div>
+            <a class="mega-feature" href="#workflow"><canvas data-level="2" data-nodule="1" aria-hidden="true"></canvas><small>Walkthrough</small><b>Watch a read become a report</b></a>
+          </div>
+        </li>
+        <li class="mi" data-mega>
+          <button class="mi-btn" type="button" aria-expanded="false" aria-controls="mg-sol">Solutions <svg class="chev" aria-hidden="true"><use href="#i-chev"/></svg></button>
+          <div class="mega narrow" id="mg-sol">
+            <div class="mega-col">
+              <a class="mega-link" href="#audience"><svg aria-hidden="true"><use href="#i-hosp"/></svg><span><b>Hospitals</b><small>Department rulebooks, SSO, on-prem deployment.</small></span></a>
+              <a class="mega-link" href="#audience"><svg aria-hidden="true"><use href="#i-tenant"/></svg><span><b>Imaging groups</b><small>Shared templates and peer review across sites.</small></span></a>
+              <a class="mega-link" href="#audience"><svg aria-hidden="true"><use href="#i-phone"/></svg><span><b>Teleradiology</b><small>Desktop reporting with your phone as the mic.</small></span></a>
+              <a class="mega-link" href="#audience"><svg aria-hidden="true"><use href="#i-user"/></svg><span><b>Radiologists</b><small>Download, dictate, sign. Free trial.</small></span></a>
+            </div>
+          </div>
+        </li>
+        <li class="mi"><a class="mi-btn" href="#integrations">Integrations</a></li>
+        <li class="mi"><a class="mi-btn" href="#security">Security</a></li>
+        <li class="mi"><a class="mi-btn" href="#pricing">Pricing</a></li>
+        <li class="mi" data-mega>
+          <button class="mi-btn" type="button" aria-expanded="false" aria-controls="mg-res">Resources <svg class="chev" aria-hidden="true"><use href="#i-chev"/></svg></button>
+          <div class="mega narrow right" id="mg-res">
+            <div class="mega-col">
+              <a class="mega-link" href="#faq"><svg aria-hidden="true"><use href="#i-book"/></svg><span><b>Documentation</b><small>Install, configure, integrate.</small></span></a>
+              <a class="mega-link" href="#validation"><svg aria-hidden="true"><use href="#i-layout"/></svg><span><b>Rulebook guide</b><small>Write rules your committee can own.</small></span></a>
+              <a class="mega-link" href="#validation"><svg aria-hidden="true"><use href="#i-term"/></svg><span><b>CLI reference</b><small>Every command, with examples.</small></span></a>
+              <a class="mega-link" href="#faq"><svg aria-hidden="true"><use href="#i-log"/></svg><span><b>Blog and changelog</b><small>What shipped and why.</small></span></a>
+            </div>
+          </div>
+        </li>
+      </ul>
+    </nav>
+    <div class="nav-cta">
+      <a class="signin" href="#top">Sign in</a>
+      <a class="btn btn-ink btn-sm magnetic" href="#demo">Book a demo</a>
+      <button class="burger" id="burger" type="button" aria-expanded="false" aria-controls="mobile-menu" aria-label="Open menu"><span></span><span></span></button>
+    </div>
+  </div>
+  <div class="mobile-menu" id="mobile-menu" hidden>
+    <div class="wrap">
+      <ul>
+        <li><a href="#workflow">Product</a></li>
+        <li><a href="#audience">Solutions</a></li>
+        <li><a href="#integrations">Integrations</a></li>
+        <li><a href="#security">Security</a></li>
+        <li><a href="#pricing">Pricing</a></li>
+        <li><a href="#faq">Resources</a></li>
+        <li><a href="#top">Sign in</a></li>
+      </ul>
+      <div class="cta-pair">
+        <a class="btn btn-ink" href="#demo">Book a demo</a>
+        <a class="btn btn-line" href="#demo"><svg aria-hidden="true"><use href="#i-win"/></svg>Download for Windows</a>
+      </div>
+    </div>
+  </div>
+</header>
+
+<main id="main">
+  <!-- HERO -->
+  <section class="hero" id="top">
+    <div class="wrap">
+      <p class="eyebrow"><span class="live-dot" aria-hidden="true"></span>AI-assisted radiology reporting</p>
+      <h1 class="display" id="heroTitle"><span class="ln">The draft writes itself.</span><span class="ln">The signature <em>stays yours.</em></span></h1>
+      <div class="hero-row">
+        <p class="lead">RadioPad turns dictation, findings, priors and measurements into a draft report, checks it against your institution's rulebook, and hands it back to you. You review. You sign. The AI never does.</p>
+        <div class="hero-ctas">
+          <div class="cta-pair">
+            <a class="btn btn-ink btn-lg magnetic" href="#demo">Book a demo <svg class="arr" aria-hidden="true"><use href="#i-arrow"/></svg></a>
+            <a class="btn btn-line btn-lg magnetic" href="#demo"><svg aria-hidden="true"><use href="#i-win"/></svg>Download for Windows</a>
+          </div>
+          <p class="cta-note" style="grid-column:auto;margin:0">Free trial for radiologists. Guided demos for hospitals and imaging groups.</p>
+        </div>
+      </div>
+
+      <figure class="lightbox power" id="lightbox">
+        <div class="lb-head">
+          <span class="mono">CT CHEST WITHOUT CONTRAST</span>
+          <span class="mono">Lung window</span>
+          <span class="mono push">Series 3 · axial · 5.0 mm</span>
+        </div>
+        <div class="lb-frames">
+          <div class="frame" data-depth="6"><canvas data-level="0" aria-hidden="true"></canvas><span class="ov tl">Im 18</span><span class="ov tr">5.0 mm</span><span class="ov ml">R</span><span class="ov mr">L</span><span class="ov bl">W 1500 L −600</span><div class="xh"><i class="h"></i><i class="v"></i></div></div>
+          <div class="frame" data-depth="14"><canvas data-level="1" aria-hidden="true"></canvas><span class="ov tl">Im 30</span><span class="ov tr">5.0 mm</span><span class="ov ml">R</span><span class="ov mr">L</span><span class="ov bl">W 1500 L −600</span><div class="xh"><i class="h"></i><i class="v"></i></div></div>
+          <div class="frame" data-depth="9"><canvas data-level="2" data-nodule="1" aria-hidden="true"></canvas><span class="ov tl">Im 42</span><span class="ov tr">5.0 mm</span><span class="ov ml">R</span><span class="ov mr">L</span><span class="ov bl">W 1500 L −600</span><div class="xh"><i class="h"></i><i class="v"></i></div></div>
+          <div class="frame" data-depth="18"><canvas data-level="3" aria-hidden="true"></canvas><span class="ov tl">Im 54</span><span class="ov tr">5.0 mm</span><span class="ov ml">R</span><span class="ov mr">L</span><span class="ov bl">W 1500 L −600</span><div class="xh"><i class="h"></i><i class="v"></i></div></div>
+        </div>
+        <figcaption class="lb-cap"><span>Illustrative images drawn in your browser. Not patient data.</span><span>6 mm solid nodule, right lower lobe, Im 42</span></figcaption>
+      </figure>
+    </div>
+  </section>
+
+  <!-- MODALITY STRIP -->
+  <section class="strip" aria-label="Supported modalities">
+    <p class="wrap strip-label">One reporting workspace for every modality on your worklist</p>
+    <div class="marquee">
+      <div class="mq-track">
+        <div class="mq-item"><b>CT</b><span>Chest without contrast</span></div>
+        <div class="mq-item"><b>MR</b><span>Brain with and without</span></div>
+        <div class="mq-item"><b>XR</b><span>Chest PA and lateral</span></div>
+        <div class="mq-item"><b>US</b><span>Abdomen complete</span></div>
+        <div class="mq-item"><b>MG</b><span>Screening, bilateral</span></div>
+        <div class="mq-item"><b>NM</b><span>Whole-body bone scan</span></div>
+        <div class="mq-item"><b>PET</b><span>FDG, skull base to mid-thigh</span></div>
+      </div>
+      <div class="mq-track" aria-hidden="true">
+        <div class="mq-item"><b>CT</b><span>Chest without contrast</span></div>
+        <div class="mq-item"><b>MR</b><span>Brain with and without</span></div>
+        <div class="mq-item"><b>XR</b><span>Chest PA and lateral</span></div>
+        <div class="mq-item"><b>US</b><span>Abdomen complete</span></div>
+        <div class="mq-item"><b>MG</b><span>Screening, bilateral</span></div>
+        <div class="mq-item"><b>NM</b><span>Whole-body bone scan</span></div>
+        <div class="mq-item"><b>PET</b><span>FDG, skull base to mid-thigh</span></div>
+      </div>
+    </div>
+  </section>
+
+  <!-- WALKTHROUGH (pinned, scroll-scrubbed) -->
+  <section class="walk" id="workflow" aria-labelledby="walk-h">
+    <div class="walk-pin" id="walkPin">
+      <div class="wrap walk-inner">
+        <header class="walk-head">
+          <div>
+            <p class="eyebrow">01 · The read, end to end</p>
+            <h2 class="h2 split" id="walk-h" style="margin-top:10px">Watch a read become a report.</h2>
+          </div>
+          <p>Scroll to dictate, draft, validate and sign one CT chest. The report types itself as you go, and stops at the one step only you can take.</p>
+        </header>
+        <div class="walk-stage">
+          <ol class="walk-steps" id="steps">
+            <li class="walk-progress" aria-hidden="true"><i id="walkBar"></i></li>
+            <li class="step past"><span class="n">01</span><b>Dictate</b><span class="d">Speak at the desktop, or from your paired phone.</span></li>
+            <li class="step past"><span class="n">02</span><b>Draft</b><span class="d">RadioPad drafts from dictation, priors and measurements.</span></li>
+            <li class="step past"><span class="n">03</span><b>Validate</b><span class="d">Your rulebook checks laterality, sections and critical results.</span></li>
+            <li class="step on"><span class="n">04</span><b>Sign</b><span class="d">You review and sign. The AI never does.</span></li>
+          </ol>
+
+          <figure class="win ready" id="win">
+            <div class="win-bar">
+              <svg class="brand-sm" aria-hidden="true"><use href="#i-mark"/></svg>
+              <span class="win-title">RadioPad · CT Chest without contrast · Example study</span>
+              <span class="win-ctrl" aria-hidden="true"><span><svg><use href="#i-min"/></svg></span><span><svg><use href="#i-max"/></svg></span><span><svg><use href="#i-x"/></svg></span></span>
+            </div>
+            <div class="win-tool">
+              <span class="chip">CT CHEST W/O</span>
+              <span class="chip">Priors · 2</span>
+              <span class="chip">Template · Chest CT</span>
+              <span class="chip mono">rulebook chest_ct_v1</span>
+              <span class="status"><i></i><span id="wStatus">Ready for your signature</span></span>
+            </div>
+            <div class="win-body">
+              <aside class="pane dict" id="dict">
+                <div class="pane-h"><span class="rec"></span>Dictation</div>
+                <div class="wave" aria-hidden="true">
+                  <i style="--s:.5"></i><i style="--s:.9;animation-delay:-.2s"></i><i style="--s:.6;animation-delay:-.5s"></i><i style="--s:1;animation-delay:-.1s"></i><i style="--s:.7;animation-delay:-.7s"></i><i style="--s:.4;animation-delay:-.3s"></i><i style="--s:.85;animation-delay:-.6s"></i><i style="--s:.55;animation-delay:-.15s"></i><i style="--s:.95;animation-delay:-.45s"></i><i style="--s:.6;animation-delay:-.8s"></i><i style="--s:.75;animation-delay:-.25s"></i><i style="--s:.45;animation-delay:-.55s"></i><i style="--s:.8;animation-delay:-.35s"></i><i style="--s:.5;animation-delay:-.65s"></i><i style="--s:.9;animation-delay:-.05s"></i><i style="--s:.6;animation-delay:-.4s"></i>
+                </div>
+                <p class="transcript"><span data-type="t">Comparison CT chest fourteen March. Six millimeter solid nodule right lower lobe, series three image forty two, unchanged. Mild centrilobular emphysema both upper lobes. No effusion, no pneumothorax. Heart size normal, no adenopathy.</span></p>
+                <ul class="sources">
+                  <li><svg aria-hidden="true"><use href="#i-doc"/></svg>Prior report · 14 Mar 2026</li>
+                  <li><svg aria-hidden="true"><use href="#i-doc"/></svg>Measurement · 6 mm, Se 3 Im 42</li>
+                  <li><svg aria-hidden="true"><use href="#i-doc"/></svg>Study metadata · DICOM</li>
+                </ul>
+              </aside>
+
+              <div class="pane rep">
+                <div class="rep-scroll" id="repScroll">
+                  <p class="mono rep-meta">DRAFT · NOT SIGNED</p>
+                  <section class="rs"><h4>Indication</h4><p><span data-type="d">Follow-up of a right lower lobe nodule.</span></p></section>
+                  <section class="rs"><h4>Technique</h4><p><span data-type="d">Axial CT of the chest without intravenous contrast. Coronal and sagittal reformats reviewed.</span></p></section>
+                  <section class="rs"><h4>Comparison</h4><p><span data-type="d">CT chest, 14 March 2026.</span></p></section>
+                  <section class="rs"><h4>Findings</h4>
+                    <p><b>Lungs.</b> <span data-type="d">6 mm solid nodule in the right lower lobe (series 3, image 42), unchanged. Mild centrilobular emphysema in both upper lobes. No consolidation.</span></p>
+                    <p><b>Pleura.</b> <span data-type="d">No pleural effusion or pneumothorax.</span></p>
+                    <p><b>Heart and mediastinum.</b> <span data-type="d">Normal heart size. No mediastinal lymphadenopathy.</span></p>
+                  </section>
+                  <section class="rs" id="impSec"><h4>Impression <span class="ai-chip" id="aiChip"><svg aria-hidden="true"><use href="#i-check"/></svg><span id="aiChipT">AI draft reviewed by radiologist</span></span></h4>
+                    <ol class="imp" id="imp">
+                      <li><span data-type="d">Stable 6 mm solid </span><span class="lat fixed" id="lat"><span class="lat-old" data-type="d">left</span><ins class="lat-new">right</ins></span><span data-type="d"> lower lobe nodule.</span></li>
+                      <li><span data-type="d">Mild centrilobular emphysema.</span></li>
+                    </ol>
+                  </section>
+                </div>
+              </div>
+
+              <aside class="pane val">
+                <div class="pane-h">Validation <span class="count" id="vCount">0 open</span></div>
+                <ul class="checks">
+                  <li class="ck block on done" id="ckB"><svg class="sev" aria-hidden="true"><use href="#i-block"/></svg><div><b>Blocker · laterality_consistency</b><p>Impression says left, findings say right.</p><span class="res">Resolved by radiologist</span></div></li>
+                  <li class="ck warn on done" id="ckW"><svg class="sev" aria-hidden="true"><use href="#i-warn"/></svg><div><b>Warning · AI-drafted text</b><p>Impression is an AI draft and requires review.</p><span class="res">Reviewed</span></div></li>
+                  <li class="ck info on" id="ckI"><svg class="sev" aria-hidden="true"><use href="#i-info"/></svg><div><b>Info · measurement_consistency</b><p>6 mm matches across findings, impression and prior.</p></div></li>
+                </ul>
+                <div class="sign">
+                  <button class="btn-sign" id="signBtn" type="button"><svg aria-hidden="true"><use href="#i-pen"/></svg><span id="signT">Sign report</span></button>
+                  <p class="sign-note">Only a radiologist can sign. RadioPad never does.</p>
+                </div>
+              </aside>
+            </div>
+          </figure>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- VALIDATION -->
+  <section class="chapter" id="validation">
+    <div class="wrap ch-grid">
+      <div class="ch-label"><span class="mono">02</span><span>Validation</span></div>
+      <div class="ch-body">
+        <div class="ch-intro">
+          <h2 class="h2 split">Your rulebook reads every draft before you do.</h2>
+          <p class="sub">Rulebooks are plain YAML that your thoracic, neuro or body committee owns. RadioPad checks every draft against them, and a blocker keeps the sign button off until it is fixed.</p>
+        </div>
+        <div class="val-show">
+          <div class="tabs" role="tablist" aria-label="Example rules" id="vtabs">
+            <button class="tab" role="tab" id="tb-1" aria-selected="true" aria-controls="tp-1" tabindex="0">Laterality</button>
+            <button class="tab" role="tab" id="tb-2" aria-selected="false" aria-controls="tp-2" tabindex="-1">Required sections</button>
+            <button class="tab" role="tab" id="tb-3" aria-selected="false" aria-controls="tp-3" tabindex="-1">Critical results</button>
+            <button class="tab" role="tab" id="tb-4" aria-selected="false" aria-controls="tp-4" tabindex="-1">Measurements</button>
+            <i class="tab-ind" id="tabInd" aria-hidden="true"></i>
+          </div>
+          <div class="tp" role="tabpanel" id="tp-1" aria-labelledby="tb-1">
+            <pre class="yaml"><code><span class="c"># rulebooks/chest_ct_v1.yaml</span>
+<span class="k">- id:</span> laterality_consistency
+  <span class="k">severity:</span> <span class="s">blocker</span>
+  <span class="k">description:</span> Side-specific findings must
+    agree between the Findings and the
+    Impression.</code></pre>
+            <div class="catch block">
+              <span class="sev-pill"><svg aria-hidden="true"><use href="#i-block"/></svg>Blocker</span>
+              <p><b>Impression says left, findings say right.</b>Signing stays disabled until the side is corrected.</p>
+              <div class="excerpt"><div><span>Findings</span>6 mm solid nodule, <mark class="good">right</mark> lower lobe.</div><div><span>Impression</span>Stable 6 mm <mark class="bad">left</mark> lower lobe nodule.</div></div>
+            </div>
+          </div>
+          <div class="tp" role="tabpanel" id="tp-2" aria-labelledby="tb-2" hidden>
+            <pre class="yaml"><code><span class="c"># rulebooks/chest_ct_v1.yaml</span>
+<span class="k">required_sections:</span>
+  - Indication
+  - Technique
+  - Comparison
+  - Findings
+  - Impression</code></pre>
+            <div class="catch block">
+              <span class="sev-pill"><svg aria-hidden="true"><use href="#i-block"/></svg>Blocker</span>
+              <p><b>Comparison section is missing.</b>Add the prior study or state that none is available.</p>
+              <div class="excerpt"><div><span>Present</span>Indication, Technique, Findings, Impression</div><div><span>Missing</span><mark class="bad">Comparison</mark></div></div>
+            </div>
+          </div>
+          <div class="tp" role="tabpanel" id="tp-3" aria-labelledby="tb-3" hidden>
+            <pre class="yaml"><code><span class="c"># rulebooks/chest_ct_v1.yaml</span>
+<span class="k">- id:</span> critical_result_language
+  <span class="k">severity:</span> <span class="s">blocker</span>
+  <span class="k">description:</span> Time-critical findings need
+    documented communication with read-back,
+    naming the recipient and the time.</code></pre>
+            <div class="catch block">
+              <span class="sev-pill"><svg aria-hidden="true"><use href="#i-siren"/></svg>Critical result</span>
+              <p><b>Large right pneumothorax with no communication recorded.</b>Name who was told, confirm read-back, and add the time.</p>
+              <div class="excerpt"><div><span>Findings</span><mark class="bad">Large right pneumothorax</mark> with mediastinal shift.</div><div><span>Needs</span>Recipient · read-back · time</div></div>
+            </div>
+          </div>
+          <div class="tp" role="tabpanel" id="tp-4" aria-labelledby="tb-4" hidden>
+            <pre class="yaml"><code><span class="c"># rulebooks/chest_ct_v1.yaml</span>
+<span class="k">- id:</span> measurement_consistency
+  <span class="k">severity:</span> <span class="w">warning</span>
+  <span class="k">description:</span> Every nodule dimension must
+    be reported identically wherever it
+    appears.</code></pre>
+            <div class="catch warn">
+              <span class="sev-pill"><svg aria-hidden="true"><use href="#i-warn"/></svg>Warning</span>
+              <p><b>Findings say 6 mm, impression says 8 mm.</b>Pick one size and use it everywhere, including the comparison sentence.</p>
+              <div class="excerpt"><div><span>Findings</span><mark class="good">6 mm</mark> solid nodule, right lower lobe.</div><div><span>Impression</span>Stable <mark class="wn">8 mm</mark> right lower lobe nodule.</div></div>
+            </div>
+          </div>
+        </div>
+        <div class="cli">
+          <div class="cli-bar"><span class="mono">Terminal · RadioPad CLI</span><button class="copy" id="copyBtn" type="button" data-copy="radiopad rulebook validate chest_ct_v1.yaml"><svg aria-hidden="true"><use href="#i-copy"/></svg><span class="lbl" id="copyLbl">Copy</span></button></div>
+<pre><code id="cliCode"><span class="pr">$ </span>radiopad rulebook validate chest_ct_v1.yaml
+<span class="ok">✓</span> chest_ct_v1 · Chest CT Reporting Rulebook · 1.1.0
+<span class="ok">✓</span> required_sections: Indication, Technique, Comparison, Findings, Impression
+<span class="ok">✓</span> laterality_consistency · measurement_consistency · critical_result_language
+<span class="dm">Example output. Rulebook is valid.</span></code></pre>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- CAPABILITIES -->
+  <section class="chapter" id="capabilities" style="padding-top:0">
+    <div class="wrap ch-grid">
+      <div class="ch-label"><span class="mono">03</span><span>Capabilities</span></div>
+      <div class="ch-body">
+        <div class="ch-intro">
+          <h2 class="h2 split">Everything a reading room runs on, in one workspace.</h2>
+        </div>
+        <div class="caps">
+          <article class="cap rv"><svg aria-hidden="true"><use href="#i-layout"/></svg><span class="tag">Reporting</span><h3>Templates and layouts</h3><p>Structured templates per modality and body part, laid out the way your referrers expect to read them.</p></article>
+          <article class="cap rv"><svg aria-hidden="true"><use href="#i-book"/></svg><span class="tag">Reporting</span><h3>Findings library</h3><p>Insert standard phrasing for common findings, then edit it like any other text.</p></article>
+          <article class="cap rv"><svg aria-hidden="true"><use href="#i-siren"/></svg><span class="tag">Safety</span><h3>Critical results</h3><p>Flag, communicate and document critical findings inside the reporting workflow.</p></article>
+          <article class="cap rv"><svg aria-hidden="true"><use href="#i-users"/></svg><span class="tag">Quality</span><h3>Peer review</h3><p>Sample signed reports for review and track agreement across your team.</p></article>
+          <article class="cap rv"><svg aria-hidden="true"><use href="#i-scan"/></svg><span class="tag">Coverage</span><h3>Every modality</h3><p>CT, MR, XR, US, MG, NM and PET, each with its own templates and rules.</p></article>
+          <article class="cap rv"><svg aria-hidden="true"><use href="#i-drift"/></svg><span class="tag">AI oversight</span><h3>Drift monitoring</h3><p>Watch AI output over time and catch changes before they reach a report.</p></article>
+          <article class="cap rv"><svg aria-hidden="true"><use href="#i-sliders"/></svg><span class="tag">AI oversight</span><h3>Prompt overrides</h3><p>Tune drafting instructions per institution without touching code.</p></article>
+          <article class="cap rv"><svg aria-hidden="true"><use href="#i-plug"/></svg><span class="tag">Platform</span><h3>Connector marketplace</h3><p>Add signed plugins and clinical data connectors as your stack grows.</p></article>
+          <article class="cap rv"><svg aria-hidden="true"><use href="#i-term"/></svg><span class="tag">Platform</span><h3>RadioPad CLI</h3><p>Author rulebooks, validate them, and run batch checks from the terminal.</p></article>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- SURFACES -->
+  <section class="chapter" id="surfaces" style="padding-top:0">
+    <div class="wrap ch-grid">
+      <div class="ch-label"><span class="mono">04</span><span>Surfaces</span></div>
+      <div class="ch-body">
+        <div class="ch-intro">
+          <h2 class="h2 split">Report at the workstation. Dictate from anywhere in the room.</h2>
+          <p class="sub">The Windows app is where reports get written. Pair your phone to the live session and it becomes a wireless dictation mic. Administrators run everything else from the browser.</p>
+        </div>
+        <div class="devices" id="devices" data-state="live">
+          <div class="monitor" id="monitor">
+            <div class="screen">
+              <div class="sc-bar"><svg class="brand-sm" style="width:14px;height:14px;--mark-fg:var(--bg);color:var(--ink)" aria-hidden="true"><use href="#i-mark"/></svg><span>RadioPad · Workstation 04</span><span class="paired"><svg style="width:10px;height:10px" aria-hidden="true"><use href="#i-check"/></svg>Phone paired</span></div>
+              <div class="sc-body">
+                <div class="sc-img"><canvas data-level="1" aria-hidden="true"></canvas></div>
+                <div class="sc-text">
+                  <span class="mono">DICTATION · FROM PHONE</span>
+                  <span class="mono" style="color:var(--accent)">Live</span>
+                  <span class="sc-line">Six millimeter solid nodule, right lower lobe,</span>
+                  <span class="sc-line">unchanged from March.</span>
+                  <span class="sc-line ai">No pleural effusion or pneumothorax.</span>
+                </div>
+              </div>
+              <div class="qr-panel" aria-hidden="true">
+                <b>Pair your phone</b>
+                <canvas class="qr" width="25" height="25"></canvas>
+                <small>Open RadioPad Companion and scan this code</small>
+              </div>
+            </div>
+          </div>
+          <div class="stand" aria-hidden="true"></div>
+          <div class="phone" id="phone" aria-hidden="true">
+            <div class="ph-screen">
+              <span class="ph-notch"></span>
+              <div class="ph-view ph-pair">
+                <small>RadioPad Companion</small>
+                <div class="vf"><canvas class="qr" width="25" height="25"></canvas><span class="scan"></span></div>
+                <b>Scan the code on your workstation</b>
+              </div>
+              <div class="ph-view ph-live">
+                <small>Paired · Workstation 04</small>
+                <b>CT Chest · dictating</b>
+                <div class="mic"><svg><use href="#i-mic"/></svg></div>
+                <div class="ph-wave"><i style="--s:.6"></i><i style="--s:.9;animation-delay:-.3s"></i><i style="--s:.5;animation-delay:-.6s"></i><i style="--s:1;animation-delay:-.1s"></i><i style="--s:.7;animation-delay:-.45s"></i><i style="--s:.4;animation-delay:-.2s"></i><i style="--s:.85;animation-delay:-.7s"></i><i style="--s:.55;animation-delay:-.35s"></i></div>
+                <small>Tap to pause</small>
+              </div>
+            </div>
+          </div>
+          <button class="replay" id="replay" type="button"><svg aria-hidden="true"><use href="#i-replay"/></svg>Replay pairing</button>
+        </div>
+        <div class="surf-cols">
+          <article class="surf rv">
+            <span class="plat">Windows</span>
+            <h3>Desktop app</h3>
+            <p>The full reporting workspace, built for long reading sessions.</p>
+            <ul class="ticks">
+              <li><svg aria-hidden="true"><use href="#i-check"/></svg>Hotkeys for every reporting action</li>
+              <li><svg aria-hidden="true"><use href="#i-check"/></svg>Secure clipboard for pasting into your RIS</li>
+              <li><svg aria-hidden="true"><use href="#i-check"/></svg>PACS/RIS bridge for study context</li>
+              <li><svg aria-hidden="true"><use href="#i-check"/></svg>Local dictation engine</li>
+            </ul>
+            <div class="keys" aria-label="Example hotkey"><span class="key">Ctrl</span><span class="key">Shift</span><span class="key">D</span><small>Example hotkey</small></div>
+          </article>
+          <article class="surf rv">
+            <span class="plat">Android and iOS</span>
+            <h3>Mobile companion</h3>
+            <p>Pairs to a live desktop session. It is a dictation companion, not a second reporting app.</p>
+            <ul class="ticks">
+              <li><svg aria-hidden="true"><use href="#i-check"/></svg>Pair by scanning a code on the workstation</li>
+              <li><svg aria-hidden="true"><use href="#i-check"/></svg>Voice goes straight into the open report</li>
+              <li><svg aria-hidden="true"><use href="#i-check"/></svg>Walk the room while you dictate</li>
+            </ul>
+          </article>
+          <article class="surf rv">
+            <span class="plat">Browser</span>
+            <h3>Web admin console</h3>
+            <p>Where administrators and clinical leads configure the platform.</p>
+            <ul class="ticks">
+              <li><svg aria-hidden="true"><use href="#i-check"/></svg>Tenants, users, SSO and MFA</li>
+              <li><svg aria-hidden="true"><use href="#i-check"/></svg>Rulebooks, templates and prompt overrides</li>
+              <li><svg aria-hidden="true"><use href="#i-check"/></svg>AI providers and audit log export</li>
+            </ul>
+          </article>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- INTEGRATIONS -->
+  <section class="chapter" id="integrations" style="padding-top:0">
+    <div class="wrap ch-grid">
+      <div class="ch-label"><span class="mono">05</span><span>Integrations</span></div>
+      <div class="ch-body">
+        <div class="ch-intro">
+          <h2 class="h2 split">Plugs into the imaging stack you already run.</h2>
+          <p class="sub">Study context comes in from PACS and RIS. Signed reports go out in the format each downstream system expects.</p>
+        </div>
+        <div class="flow">
+          <ul class="flow-col in" aria-label="Inputs">
+            <li class="node rv"><b>PACS / RIS</b><small>Worklist and study context</small></li>
+            <li class="node rv"><b>DICOMweb</b><small>Study and series metadata</small></li>
+            <li class="node rv"><b>Orthanc bridge</b><small>For Orthanc-based archives</small></li>
+            <li class="node rv"><b>Dictation and priors</b><small>Voice, prior reports, measurements</small></li>
+          </ul>
+          <div class="core" aria-label="RadioPad">
+            <span class="orbit" aria-hidden="true"><i></i></span>
+            <svg aria-hidden="true"><use href="#i-mark"/></svg>
+            <b>RadioPad</b>
+            <small>DRAFT · VALIDATE · REVIEW</small>
+          </div>
+          <ul class="flow-col out" aria-label="Outputs">
+            <li class="node rv"><b>FHIR R4</b><small>DiagnosticReport</small></li>
+            <li class="node rv"><b>PDF</b><small>Report layouts for referrers</small></li>
+            <li class="node rv"><b>DOCX</b><small>Editable documents</small></li>
+            <li class="node rv"><b>Plain text</b><small>For any RIS field</small></li>
+          </ul>
+        </div>
+        <div class="int-row">
+          <div class="panel">
+            <h3>Your AI, your choice</h3>
+            <p>Bring your own provider or keep every request on your own hardware.</p>
+            <div class="seg" role="radiogroup" aria-label="AI deployment" id="seg" data-mode="cloud">
+              <button type="button" role="radio" aria-checked="true" data-mode="cloud">Your cloud provider</button>
+              <button type="button" role="radio" aria-checked="false" data-mode="local" tabindex="-1">On-prem model</button>
+              <i class="seg-ind" aria-hidden="true"></i>
+            </div>
+            <div class="pills" data-for="cloud"><span class="pill"><i></i>Anthropic Claude</span><span class="pill"><i></i>Azure OpenAI</span></div>
+            <div class="pills" data-for="local" hidden><span class="pill"><i></i>Ollama</span><span class="pill"><i></i>vLLM</span></div>
+          </div>
+          <div class="panel">
+            <h3>Identity</h3>
+            <p>Sign in with your organization's identity provider and require a second factor.</p>
+            <div class="pills"><span class="pill"><i></i>SSO via OIDC</span><span class="pill"><i></i>MFA</span></div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- GOVERNANCE -->
+  <section class="chapter band" id="security">
+    <div class="wrap ch-grid">
+      <div class="ch-label"><span class="mono">06</span><span>Governance</span></div>
+      <div class="ch-body">
+        <div class="ch-intro">
+          <h2 class="h2 split">Governed like clinical software should be.</h2>
+          <p class="sub">Every AI call leaves a record. Every signature belongs to a person. Your data stays where you deploy it.</p>
+        </div>
+        <div class="gov">
+          <div class="gov-list">
+            <div class="gov-item rv"><svg aria-hidden="true"><use href="#i-log"/></svg><h3>Append-only audit log</h3><p>Every AI call is recorded and cannot be edited after the fact.</p></div>
+            <div class="gov-item rv"><svg aria-hidden="true"><use href="#i-pen"/></svg><h3>Human signature only</h3><p>Reports stay drafts until a radiologist signs. The AI has no sign action.</p></div>
+            <div class="gov-item rv"><svg aria-hidden="true"><use href="#i-spark"/></svg><h3>AI text stays marked</h3><p>Drafted text is visibly marked until you review or edit it.</p></div>
+            <div class="gov-item rv"><svg aria-hidden="true"><use href="#i-tenant"/></svg><h3>Tenant isolation</h3><p>Departments and sites are separated at the data layer.</p></div>
+            <div class="gov-item rv"><svg aria-hidden="true"><use href="#i-server"/></svg><h3>On-prem or private cloud</h3><p>Deploy where your governance requires, including local models.</p></div>
+            <div class="gov-item rv"><svg aria-hidden="true"><use href="#i-key"/></svg><h3>SSO and MFA</h3><p>OIDC single sign-on with multi-factor authentication.</p></div>
+          </div>
+          <div class="log" aria-label="Example audit log">
+            <div class="log-h"><span>Audit log · example</span><span><span class="live-dot" aria-hidden="true"></span>append-only</span></div>
+            <div class="log-rows" id="logRows">
+              <div class="log-row"><span>09:41:02</span><span><b>export.fhir</b></span><span>system</span><span>DiagnosticReport R4</span></div>
+              <div class="log-row"><span>09:40:58</span><span><b>report.sign</b></span><span class="hu">radiologist</span><span>signed by a person</span></div>
+              <div class="log-row"><span>09:40:51</span><span><b>ai.text.reviewed</b></span><span class="hu">radiologist</span><span>impression</span></div>
+              <div class="log-row"><span>09:40:44</span><span><b>report.edit</b></span><span class="hu">radiologist</span><span>laterality corrected</span></div>
+              <div class="log-row"><span>09:40:39</span><span><b>validation.run</b></span><span>system</span><span>chest_ct_v1 · 1 blocker</span></div>
+              <div class="log-row"><span>09:40:36</span><span><b>ai.draft.generate</b></span><span>system</span><span>impression · provider logged</span></div>
+            </div>
+          </div>
+        </div>
+        <div class="stats">
+          <div class="stat zero"><b>0</b><span>reports signed by the AI</span></div>
+          <div class="stat"><b data-count="4">4</b><span>export formats</span></div>
+          <div class="stat"><b data-count="7">7</b><span>modalities</span></div>
+          <div class="stat"><b data-count="3">3</b><span>surfaces: desktop, mobile, web</span></div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- AUDIENCE -->
+  <section class="chapter" id="audience">
+    <div class="wrap ch-grid">
+      <div class="ch-label"><span class="mono">07</span><span>Who it's for</span></div>
+      <div class="ch-body">
+        <div class="ch-intro">
+          <h2 class="h2 split">Built for the department. Loved by the person dictating.</h2>
+        </div>
+        <div class="aud">
+          <article class="aud-card dark rv">
+            <span class="plat"><svg aria-hidden="true"><use href="#i-hosp"/></svg>For hospitals and imaging groups</span>
+            <h3>One standard across every reader and every site.</h3>
+            <ul class="ticks">
+              <li><svg aria-hidden="true"><use href="#i-check"/></svg>Institution rulebooks your committees own</li>
+              <li><svg aria-hidden="true"><use href="#i-check"/></svg>Peer review and critical-results workflow</li>
+              <li><svg aria-hidden="true"><use href="#i-check"/></svg>SSO, MFA and tenant isolation</li>
+              <li><svg aria-hidden="true"><use href="#i-check"/></svg>On-prem or private cloud, with local models</li>
+              <li><svg aria-hidden="true"><use href="#i-check"/></svg>Append-only audit log on every AI call</li>
+            </ul>
+            <div class="cta-pair"><a class="btn btn-ink magnetic" href="#demo">Book a demo <svg class="arr" aria-hidden="true"><use href="#i-arrow"/></svg></a></div>
+          </article>
+          <article class="aud-card rv">
+            <span class="plat"><svg aria-hidden="true"><use href="#i-user"/></svg>For radiologists</span>
+            <h3>Dictate the way you think. Sign when it reads right.</h3>
+            <ul class="ticks">
+              <li><svg aria-hidden="true"><use href="#i-check"/></svg>Drafts from your dictation, priors and measurements</li>
+              <li><svg aria-hidden="true"><use href="#i-check"/></svg>Hotkeys, templates and a findings library</li>
+              <li><svg aria-hidden="true"><use href="#i-check"/></svg>Your phone as a wireless mic</li>
+              <li><svg aria-hidden="true"><use href="#i-check"/></svg>Laterality and section checks before you sign</li>
+              <li><svg aria-hidden="true"><use href="#i-check"/></svg>Local dictation engine on your workstation</li>
+            </ul>
+            <div class="cta-pair"><a class="btn btn-ink magnetic" href="#demo"><svg aria-hidden="true"><use href="#i-win"/></svg>Download for Windows</a></div>
+          </article>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- PRICING -->
+  <section class="chapter" id="pricing" style="padding-top:0">
+    <div class="wrap ch-grid">
+      <div class="ch-label"><span class="mono">08</span><span>Pricing</span></div>
+      <div class="ch-body">
+        <div class="ch-intro">
+          <h2 class="h2 split">Start with one reader. Scale to the whole network.</h2>
+        </div>
+        <div class="tiers">
+          <article class="tier rv">
+            <span class="who">Radiologist</span>
+            <h3>Solo</h3>
+            <p class="price">Free trial</p>
+            <ul class="ticks">
+              <li><svg aria-hidden="true"><use href="#i-check"/></svg>Windows desktop app</li>
+              <li><svg aria-hidden="true"><use href="#i-check"/></svg>Mobile companion</li>
+              <li><svg aria-hidden="true"><use href="#i-check"/></svg>Templates and findings library</li>
+              <li><svg aria-hidden="true"><use href="#i-check"/></svg>Local dictation engine</li>
+            </ul>
+            <a class="btn btn-line" href="#demo"><svg aria-hidden="true"><use href="#i-win"/></svg>Download for Windows</a>
+          </article>
+          <article class="tier feat rv">
+            <span class="who">Team</span>
+            <h3>Department</h3>
+            <p class="price">Per seat, talk to us</p>
+            <ul class="ticks">
+              <li><svg aria-hidden="true"><use href="#i-check"/></svg>Everything in Solo</li>
+              <li><svg aria-hidden="true"><use href="#i-check"/></svg>Shared templates and rulebooks</li>
+              <li><svg aria-hidden="true"><use href="#i-check"/></svg>Peer review and critical results</li>
+              <li><svg aria-hidden="true"><use href="#i-check"/></svg>Web admin console</li>
+            </ul>
+            <a class="btn btn-ink" href="#demo">Book a demo</a>
+          </article>
+          <article class="tier rv">
+            <span class="who">Enterprise</span>
+            <h3>Network</h3>
+            <p class="price">Custom</p>
+            <ul class="ticks">
+              <li><svg aria-hidden="true"><use href="#i-check"/></svg>On-prem or private cloud</li>
+              <li><svg aria-hidden="true"><use href="#i-check"/></svg>SSO, MFA and tenant isolation</li>
+              <li><svg aria-hidden="true"><use href="#i-check"/></svg>Your AI provider or local models</li>
+              <li><svg aria-hidden="true"><use href="#i-check"/></svg>PACS/RIS integration and connectors</li>
+            </ul>
+            <a class="btn btn-line" href="#demo">Talk to sales</a>
+          </article>
+        </div>
+        <p class="fine">Plan packaging shown for illustration. Final plans and pricing on request.</p>
+      </div>
+    </div>
+  </section>
+
+  <!-- FAQ -->
+  <section class="chapter" id="faq" style="padding-top:0">
+    <div class="wrap ch-grid">
+      <div class="ch-label"><span class="mono">09</span><span>Questions</span></div>
+      <div class="ch-body">
+        <div class="ch-intro"><h2 class="h2 split">Questions radiologists ask first.</h2></div>
+        <div class="faq" id="faqList">
+          <div class="faq-item open"><h3><button class="faq-q" type="button" aria-expanded="true" aria-controls="fa1" id="fq1">Does RadioPad ever sign a report?<span class="plus" aria-hidden="true"></span></button></h3><div class="faq-a" id="fa1" role="region" aria-labelledby="fq1"><div><p>No. Every report stays a draft until a radiologist reviews and signs it. AI-drafted text stays marked until you review or edit it, and only a person can sign.</p></div></div></div>
+          <div class="faq-item"><h3><button class="faq-q" type="button" aria-expanded="false" aria-controls="fa2" id="fq2">Which AI models does it use?<span class="plus" aria-hidden="true"></span></button></h3><div class="faq-a" id="fa2" role="region" aria-labelledby="fq2"><div><p>Your choice. Connect your own provider, such as Anthropic Claude or Azure OpenAI, or run a local model with Ollama or vLLM on your own hardware. Every AI call is written to an append-only audit log.</p></div></div></div>
+          <div class="faq-item"><h3><button class="faq-q" type="button" aria-expanded="false" aria-controls="fa3" id="fq3">Can we deploy it on-prem?<span class="plus" aria-hidden="true"></span></button></h3><div class="faq-a" id="fa3" role="region" aria-labelledby="fq3"><div><p>Yes. RadioPad runs on-prem or in a private cloud, with tenant isolation between departments and sites.</p></div></div></div>
+          <div class="faq-item"><h3><button class="faq-q" type="button" aria-expanded="false" aria-controls="fa4" id="fq4">Does it work with our PACS and RIS?<span class="plus" aria-hidden="true"></span></button></h3><div class="faq-a" id="fa4" role="region" aria-labelledby="fq4"><div><p>The desktop app includes a PACS/RIS bridge, and RadioPad supports DICOMweb and an Orthanc bridge. Reports export as FHIR R4 DiagnosticReport, PDF, DOCX or plain text.</p></div></div></div>
+          <div class="faq-item"><h3><button class="faq-q" type="button" aria-expanded="false" aria-controls="fa5" id="fq5">Is the mobile app a full reporting app?<span class="plus" aria-hidden="true"></span></button></h3><div class="faq-a" id="fa5" role="region" aria-labelledby="fq5"><div><p>No. The Android and iOS companion pairs to a live desktop session and turns your phone into a dictation mic. Reporting happens on the Windows workstation.</p></div></div></div>
+          <div class="faq-item"><h3><button class="faq-q" type="button" aria-expanded="false" aria-controls="fa6" id="fq6">Who writes the rulebooks?<span class="plus" aria-hidden="true"></span></button></h3><div class="faq-a" id="fa6" role="region" aria-labelledby="fq6"><div><p>Your clinical leads. Rulebooks are YAML files that set required sections, rule severities and style. Author and validate them with the RadioPad CLI, then publish them from the web admin console.</p></div></div></div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- FINAL CTA -->
+  <section class="final" id="demo">
+    <div class="wrap">
+      <p class="eyebrow"><span class="live-dot" aria-hidden="true"></span>Get started</p>
+      <h2 class="display split">Your read. Your words. Your signature.</h2>
+      <p class="lead">Book a guided demo for your department, or download the Windows app and start a free trial today.</p>
+      <div class="cta-pair">
+        <a class="btn btn-ink btn-lg magnetic" href="#demo">Book a demo <svg class="arr" aria-hidden="true"><use href="#i-arrow"/></svg></a>
+        <a class="btn btn-line btn-lg magnetic" href="#demo"><svg aria-hidden="true"><use href="#i-win"/></svg>Download for Windows</a>
+      </div>
+    </div>
+  </section>
+</main>
+
+<footer class="foot">
+  <div class="wrap">
+    <div class="foot-grid">
+      <div class="foot-brand">
+        <a class="brand" href="#top" aria-label="RadioPad home"><svg aria-hidden="true"><use href="#i-mark"/></svg><span>RadioPad</span></a>
+        <p>AI-assisted radiology reporting. RadioPad drafts and validates. Radiologists sign.</p>
+      </div>
+      <div><h4>Product</h4><ul><li><a href="#workflow">Overview</a></li><li><a href="#surfaces">Desktop app</a></li><li><a href="#surfaces">Mobile companion</a></li><li><a href="#surfaces">Web admin</a></li><li><a href="#validation">Validation engine</a></li><li><a href="#integrations">Integrations</a></li><li><a href="#pricing">Pricing</a></li><li><a href="#faq">Changelog</a></li></ul></div>
+      <div><h4>Solutions</h4><ul><li><a href="#audience">Hospitals</a></li><li><a href="#audience">Imaging groups</a></li><li><a href="#audience">Teleradiology</a></li><li><a href="#audience">Radiologists</a></li><li><a href="#capabilities">By modality</a></li></ul></div>
+      <div><h4>Resources</h4><ul><li><a href="#faq">Documentation</a></li><li><a href="#validation">Rulebook guide</a></li><li><a href="#validation">CLI reference</a></li><li><a href="#integrations">FHIR export guide</a></li><li><a href="#faq">Blog</a></li><li><a href="#faq">Status</a></li></ul></div>
+      <div><h4>Company</h4><ul><li><a href="#top">About</a></li><li><a href="#top">Careers</a></li><li><a href="#demo">Contact</a></li><li><a href="#top">Press kit</a></li></ul></div>
+      <div><h4>Legal</h4><ul><li><a href="#top">Privacy</a></li><li><a href="#top">Terms</a></li><li><a href="#top">Data processing</a></li><li><a href="#security">Security overview</a></li><li><a href="#security">Responsible AI</a></li></ul></div>
+    </div>
+    <div class="foot-bottom"><span>© 2026 RadioPad</span><span>Design option B · Clinical editorial</span></div>
+  </div>
+</footer>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.13.0/gsap.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.13.0/ScrollTrigger.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.13.0/SplitText.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/lenis@1.1.13/dist/lenis.min.js"></script>
+<script>
+(function(){
+  const root = document.documentElement;
+  root.classList.add('js');
+  const reduce = matchMedia('(prefers-reduced-motion: reduce)').matches;
+  const fine = matchMedia('(hover: hover) and (pointer: fine)').matches;
+  const G = window.gsap, ST = window.ScrollTrigger;
+  const motion = !reduce && !!(G && ST);
+  if (motion) { root.classList.add('motion'); G.registerPlugin(ST); if (window.SplitText) G.registerPlugin(SplitText); }
+  const $ = (s, el) => (el || document).querySelector(s);
+  const $$ = (s, el) => [...(el || document).querySelectorAll(s)];
+  const safe = (name, fn) => { try { fn(); } catch (e) { console.warn('[' + name + ']', e); } };
+
+  /* Smooth scroll */
+  let lenis = null;
+  safe('lenis', () => {
+    if (reduce || !window.Lenis) return;
+    lenis = new Lenis({ lerp: 0.1, smoothWheel: true });
+    root.classList.add('lenis');
+    if (motion) { lenis.on('scroll', ST.update); G.ticker.add(t => lenis.raf(t * 1000)); G.ticker.lagSmoothing(0); }
+    else { const raf = t => { lenis.raf(t); requestAnimationFrame(raf); }; requestAnimationFrame(raf); }
+  });
+  document.addEventListener('click', e => {
+    const a = e.target.closest('a[href^="#"]'); if (!a) return;
+    const id = a.getAttribute('href'); const t = id.length > 1 && document.querySelector(id); if (!t) return;
+    e.preventDefault(); closeAllMega(); closeMobile();
+    if (lenis) lenis.scrollTo(t, { offset: -76 }); else t.scrollIntoView({ behavior: reduce ? 'auto' : 'smooth' });
+  });
+
+  /* Nav: scrolled state, mega menus, mobile */
+  const nav = $('#nav'), menu = $('#menu');
+  const onScroll = () => nav.classList.toggle('scrolled', window.scrollY > 8);
+  addEventListener('scroll', onScroll, { passive: true }); onScroll();
+  const megas = $$('[data-mega]');
+  let closeTimer = 0;
+  function setOpen(li, open, instant) {
+    const btn = $('.mi-btn', li);
+    if (instant) { menu.classList.add('instant'); requestAnimationFrame(() => requestAnimationFrame(() => menu.classList.remove('instant'))); }
+    li.classList.toggle('open', open); btn.setAttribute('aria-expanded', String(open));
+  }
+  function closeAllMega(except) { megas.forEach(li => { if (li !== except && li.classList.contains('open')) setOpen(li, false); }); }
+  megas.forEach(li => {
+    const btn = $('.mi-btn', li);
+    btn.addEventListener('click', () => { const o = !li.classList.contains('open'); const switching = megas.some(m => m !== li && m.classList.contains('open')); closeAllMega(li); setOpen(li, o, switching); });
+    if (fine) {
+      li.addEventListener('pointerenter', () => { clearTimeout(closeTimer); const switching = megas.some(m => m !== li && m.classList.contains('open')); if (switching) { menu.classList.add('instant'); requestAnimationFrame(() => requestAnimationFrame(() => menu.classList.remove('instant'))); } closeAllMega(li); setOpen(li, true); });
+      li.addEventListener('pointerleave', () => { closeTimer = setTimeout(() => setOpen(li, false), 140); });
+    }
+    li.addEventListener('focusout', e => { if (!li.contains(e.relatedTarget)) setOpen(li, false); });
+    li.addEventListener('keydown', e => { if (e.key === 'Escape' && li.classList.contains('open')) { setOpen(li, false); btn.focus(); } });
+  });
+  document.addEventListener('pointerdown', e => { if (!e.target.closest('[data-mega]')) closeAllMega(); });
+  const burger = $('#burger'), mm = $('#mobile-menu');
+  function closeMobile() { if (!mm.hidden) { mm.hidden = true; burger.setAttribute('aria-expanded', 'false'); burger.setAttribute('aria-label', 'Open menu'); } }
+  burger.addEventListener('click', () => { const open = mm.hidden; mm.hidden = !open; burger.setAttribute('aria-expanded', String(open)); burger.setAttribute('aria-label', open ? 'Close menu' : 'Open menu'); });
+  addEventListener('keydown', e => { if (e.key === 'Escape') closeMobile(); });
+
+  /* Illustrative axial CT slices (lung window), drawn procedurally */
+  function seeded(s) { return () => (s = s * 16807 % 2147483647) / 2147483647; }
+  function accent() { return getComputedStyle(root).getPropertyValue('--accent-hi').trim() || '#14B4C8'; }
+  function drawSlice(cv) {
+    const w = cv.clientWidth, h = cv.clientHeight; if (!w || !h) return;
+    const lvl = +cv.dataset.level || 0, r = seeded(97 + lvl * 31);
+    const dpr = Math.min(window.devicePixelRatio || 1, 2);
+    cv.width = Math.round(w * dpr); cv.height = Math.round(h * dpr);
+    const c = cv.getContext('2d'); c.setTransform(dpr, 0, 0, dpr, 0, 0);
+    const ell = (x, y, rx, ry, fill, rot) => { c.beginPath(); c.ellipse(x, y, Math.max(rx, .1), Math.max(ry, .1), rot || 0, 0, Math.PI * 2); c.fillStyle = fill; c.fill(); };
+    c.fillStyle = '#111213'; c.fillRect(0, 0, w, h);
+    const s = Math.min(w, h), cx = w / 2, cy = h * .5, R = s * .43;
+    c.strokeStyle = 'rgba(190,190,190,.4)'; c.lineWidth = Math.max(1, s * .012);
+    c.beginPath(); c.moveTo(cx - R * 1.05, cy + R * .84); c.quadraticCurveTo(cx, cy + R * .97, cx + R * 1.05, cy + R * .84); c.stroke();
+    const bw = R * (1 - lvl * .015), bh = R * .72;
+    ell(cx, cy, bw, bh, '#a7a7a7');
+    ell(cx, cy + R * .01, bw * .93, bh * .9, '#c8c8c8');
+    const lungW = R * (.31 + lvl * .025), lungH = R * (.4 + lvl * .035);
+    [-1, 1].forEach(sd => {
+      const lx = cx + sd * R * .42, ly = cy - R * .03;
+      const g = c.createRadialGradient(lx, ly, lungW * .2, lx, ly, lungW * 1.15);
+      g.addColorStop(0, '#3c3c3c'); g.addColorStop(1, '#262626');
+      c.beginPath(); c.ellipse(lx, ly, lungW, lungH, sd * .14, 0, Math.PI * 2); c.fillStyle = g; c.fill();
+    });
+    ell(cx + R * .1, cy + R * .06, R * (.13 + lvl * .06), R * (.16 + lvl * .05), '#c4c4c4', -.35);
+    [-1, 1].forEach(sd => {
+      const lx = cx + sd * R * .42, ly = cy - R * .03;
+      for (let i = 0; i < 80; i++) {
+        const a = r() * Math.PI * 2, d = Math.sqrt(r());
+        const x = lx + Math.cos(a) * d * lungW * .88, y = ly + Math.sin(a) * d * lungH * .88;
+        c.beginPath(); c.arc(x, y, (1 - d) * s * .008 + .35, 0, Math.PI * 2);
+        c.fillStyle = 'rgba(214,214,214,' + (.3 + (1 - d) * .45).toFixed(2) + ')'; c.fill();
+      }
+      if (lvl < 2) for (let i = 0; i < 5; i++) { const a = r() * Math.PI * 2, d = r() * .7; ell(lx + Math.cos(a) * d * lungW, ly - lungH * .3 + Math.sin(a) * d * lungH * .4, s * .012, s * .01, '#1d1d1d'); }
+    });
+    if (lvl < 2) ell(cx, cy - R * .3, R * .07, R * .06, '#1a1a1a');
+    else { ell(cx - R * .1, cy - R * .14, R * .04, R * .035, '#1a1a1a'); ell(cx + R * .1, cy - R * .14, R * .04, R * .035, '#1a1a1a'); }
+    ell(cx, cy + R * .5, R * .13, R * .11, '#f0f0f0'); ell(cx, cy + R * .5, R * .085, R * .07, '#d9d9d9'); ell(cx, cy + R * .66, R * .03, R * .06, '#ececec');
+    for (let i = 0; i < 16; i++) { const a = (i / 16) * Math.PI * 2 + .1; ell(cx + Math.cos(a) * bw * .87, cy + Math.sin(a) * bh * .86, R * .034, R * .018, '#ebebeb', a + Math.PI / 2); }
+    for (let i = 0; i < 1400; i++) { c.fillStyle = 'rgba(255,255,255,' + (r() * .06).toFixed(3) + ')'; c.fillRect(r() * w, r() * h, 1, 1); }
+    if (cv.dataset.nodule) {
+      const nx = cx - R * .5, ny = cy + R * .17, ac = accent();
+      ell(nx, ny, R * .034, R * .031, '#ededed');
+      c.strokeStyle = ac; c.lineWidth = 1.25;
+      c.beginPath(); c.moveTo(nx - R * .045, ny + R * .045); c.lineTo(nx + R * .045, ny - R * .045); c.stroke();
+      c.setLineDash([3, 3]); c.beginPath(); c.arc(nx, ny, R * .09, 0, Math.PI * 2); c.stroke(); c.setLineDash([]);
+      c.font = '500 ' + Math.max(9, s * .048).toFixed(1) + 'px "IBM Plex Mono", monospace'; c.fillStyle = ac;
+      c.fillText('6 mm', nx + R * .11, ny - R * .1);
+    }
+  }
+  /* QR-like pairing pattern (illustrative) */
+  function drawQR(cv) {
+    const n = 25, c = cv.getContext('2d'), r = seeded(4242);
+    c.fillStyle = '#fff'; c.fillRect(0, 0, n, n); c.fillStyle = '#0A1722';
+    const finder = (x, y) => { c.fillRect(x, y, 7, 7); c.fillStyle = '#fff'; c.fillRect(x + 1, y + 1, 5, 5); c.fillStyle = '#0A1722'; c.fillRect(x + 2, y + 2, 3, 3); };
+    for (let y = 0; y < n; y++) for (let x = 0; x < n; x++) { const inF = (x < 8 && y < 8) || (x > n - 9 && y < 8) || (x < 8 && y > n - 9); if (!inF && r() > .52) c.fillRect(x, y, 1, 1); }
+    finder(0, 0); finder(n - 7, 0); finder(0, n - 7);
+  }
+  safe('canvas', () => {
+    const cvs = $$('canvas[data-level]');
+    const draw = () => cvs.forEach(drawSlice);
+    (document.fonts && document.fonts.ready ? document.fonts.ready : Promise.resolve()).then(draw);
+    draw();
+    if ('ResizeObserver' in window) { let t; const ro = new ResizeObserver(() => { clearTimeout(t); t = setTimeout(draw, 120); }); cvs.forEach(cv => ro.observe(cv)); }
+    matchMedia('(prefers-color-scheme: dark)').addEventListener('change', draw);
+    new MutationObserver(draw).observe(root, { attributes: true, attributeFilter: ['data-theme'] });
+    $$('canvas.qr').forEach(drawQR);
+  });
+
+  /* Crosshair on hero frames */
+  safe('crosshair', () => {
+    if (!fine) return;
+    $$('.frame').forEach(f => {
+      const h = $('.xh .h', f), v = $('.xh .v', f);
+      f.addEventListener('pointermove', e => { const b = f.getBoundingClientRect(); h.style.transform = 'translateY(' + (e.clientY - b.top) + 'px)'; v.style.transform = 'translateX(' + (e.clientX - b.left) + 'px)'; });
+    });
+  });
+
+  /* Magnetic buttons */
+  safe('magnetic', () => {
+    if (!fine || reduce) return;
+    $$('.magnetic').forEach(el => {
+      let tx = 0, ty = 0, x = 0, y = 0, raf = 0;
+      const tick = () => { x += (tx - x) * .18; y += (ty - y) * .18; el.style.translate = x.toFixed(2) + 'px ' + y.toFixed(2) + 'px'; raf = (Math.abs(tx - x) > .05 || Math.abs(ty - y) > .05) ? requestAnimationFrame(tick) : 0; };
+      const go = () => { if (!raf) raf = requestAnimationFrame(tick); };
+      el.addEventListener('pointermove', e => { const b = el.getBoundingClientRect(); tx = (e.clientX - b.left - b.width / 2) * .2; ty = (e.clientY - b.top - b.height / 2) * .32; go(); });
+      el.addEventListener('pointerleave', () => { tx = 0; ty = 0; go(); });
+    });
+  });
+
+  /* Hero entrance (from a visible state) and parallax */
+  safe('hero', () => {
+    if (!motion) return;
+    G.from('#heroTitle .ln', { y: 40, duration: 1.3, ease: 'expo.out', stagger: .09 });
+    G.from('.hero-row > *', { y: 18, duration: 1.1, ease: 'expo.out', stagger: .08, delay: .15 });
+    G.from('.lb-frames .frame', { y: 34, duration: 1.4, ease: 'expo.out', stagger: .07, delay: .2 });
+    $$('.lb-frames .frame').forEach(f => {
+      G.to(f, { yPercent: -(+f.dataset.depth || 8) * .6, ease: 'none', scrollTrigger: { trigger: '#lightbox', start: 'top 80%', end: 'bottom top', scrub: true } });
+    });
+  });
+
+  /* Split heading reveals (initial state from JS only) */
+  safe('split', () => {
+    if (!motion) return;
+    $$('.split').forEach(el => {
+      if (window.SplitText) {
+        SplitText.create(el, { type: 'lines', mask: 'lines', autoSplit: true, onSplit(self) {
+          return G.from(self.lines, { yPercent: 105, duration: 1.1, ease: 'expo.out', stagger: .08, scrollTrigger: { trigger: el, start: 'top 88%', once: true } });
+        } });
+      } else {
+        G.from(el, { y: 30, opacity: 0, duration: 1, ease: 'expo.out', scrollTrigger: { trigger: el, start: 'top 88%', once: true } });
+      }
+    });
+    // .rv-run turns off CSS transform/opacity transitions so they don't fight the tween
+    $$('.rv').forEach(el => el.classList.add('rv-run'));
+    G.set('.rv', { opacity: 0, y: 26 });
+    ST.batch('.rv', { start: 'top 92%', once: true, onEnter: b => G.to(b, { opacity: 1, y: 0, duration: .9, ease: 'expo.out', stagger: .06, overwrite: true, onComplete: () => { G.set(b, { clearProps: 'transform,opacity' }); b.forEach(el => el.classList.remove('rv-run')); } }) });
+  });
+
+  /* Pinned walkthrough: everything derives from scroll progress, so it scrubs both ways */
+  safe('walkthrough', () => {
+    const walk = $('#workflow'), win = $('#win'), dict = $('#dict'), rep = $('#repScroll');
+    const tNodes = $$('[data-type="t"]', walk), dNodes = $$('[data-type="d"]', walk);
+    [...tNodes, ...dNodes].forEach(n => { n._full = n.textContent; n._k = n._full.length; });
+    const sum = a => a.reduce((s, n) => s + n._full.length, 0);
+    const tTotal = sum(tNodes), dTotal = sum(dNodes);
+    const impSec = $('#impSec'); const impStart = sum(dNodes.filter(n => !impSec.contains(n))) / dTotal;
+    const imp = $('#imp'), lat = $('#lat'), chip = $('#aiChip'), chipT = $('#aiChipT');
+    const ckB = $('#ckB'), ckW = $('#ckW'), ckI = $('#ckI'), vCount = $('#vCount'), sign = $('#signBtn'), status = $('#wStatus');
+    const steps = $$('.step', walk), bar = $('#walkBar');
+    const seg = (p, a, b) => Math.min(1, Math.max(0, (p - a) / (b - a)));
+    function type(nodes, total, f) {
+      let n = Math.round(f * total), cur = null;
+      for (const nd of nodes) {
+        const L = nd._full.length, k = Math.max(0, Math.min(L, n));
+        if (nd._k !== k) { nd.textContent = nd._full.slice(0, k); nd._k = k; }
+        const typing = k > 0 && k < L; nd.classList.toggle('caret', typing); if (typing) cur = nd;
+        n -= L;
+      }
+      return cur;
+    }
+    let last = -1;
+    function render(p) {
+      if (Math.abs(p - last) < .0005) return; last = p;
+      const ft = seg(p, .03, .27), fd = seg(p, .30, .60);
+      type(tNodes, tTotal, ft);
+      const cur = type(dNodes, dTotal, fd);
+      if (cur) { const a = cur.getBoundingClientRect(), b = rep.getBoundingClientRect(); if (a.bottom > b.bottom - 20) rep.scrollTop += a.bottom - b.bottom + 20; else if (a.top < b.top + 10) rep.scrollTop -= b.top + 10 - a.top; }
+      dict.classList.toggle('live', p > .02 && p < .28);
+      const fixed = p >= .79, reviewed = p >= .85, ready = p >= .92, aiOn = fd > impStart;
+      lat.classList.toggle('flag', p >= .63 && !fixed); lat.classList.toggle('fixed', fixed);
+      imp.classList.toggle('is-draft', aiOn && !reviewed);
+      chip.classList.toggle('hide', !aiOn); chip.classList.toggle('draft', !reviewed);
+      const chipText = reviewed ? 'AI draft reviewed by radiologist' : 'AI draft, requires review';
+      if (chipT.textContent !== chipText) chipT.textContent = chipText;
+      ckB.classList.toggle('on', p >= .63); ckW.classList.toggle('on', p >= .68); ckI.classList.toggle('on', p >= .73);
+      ckB.classList.toggle('done', fixed); ckW.classList.toggle('done', reviewed);
+      const open = (p >= .63 && !fixed ? 1 : 0) + (p >= .68 && !reviewed ? 1 : 0);
+      vCount.textContent = open + ' open';
+      sign.disabled = !ready; win.classList.toggle('ready', ready);
+      const st = p < .30 ? 'Listening' : p < .62 ? 'Drafting' : p < .79 ? (open ? 'Validating · ' + open + ' open' : 'Validating') : p < .92 ? 'Reviewing' : 'Ready for your signature';
+      if (status.textContent !== st) status.textContent = st;
+      const idx = p < .30 ? 0 : p < .62 ? 1 : p < .90 ? 2 : 3;
+      steps.forEach((s, i) => { s.classList.toggle('on', i === idx); s.classList.toggle('past', i < idx); });
+      bar.style.setProperty('--p', p.toFixed(4));
+    }
+    sign.addEventListener('click', () => {
+      const t = $('#signT'); sign.classList.add('signed'); t.textContent = 'Signed by you';
+      setTimeout(() => { sign.classList.remove('signed'); t.textContent = 'Sign report'; }, 2200);
+    });
+    if (!motion) return; // reduced motion / no GSAP: finished report stays as authored
+    render(0);
+    ST.create({ trigger: walk, start: 'top top', end: () => '+=' + Math.round(innerHeight * 3.2), pin: '#walkPin', anticipatePin: 1, invalidateOnRefresh: true, onUpdate: s => render(s.progress), onRefresh: s => render(s.progress) });
+  });
+
+  /* Validation tabs */
+  safe('tabs', () => {
+    const tabs = $$('#vtabs .tab'), ind = $('#tabInd');
+    const place = t => { ind.style.transform = 'translateX(' + t.offsetLeft + 'px) scaleX(' + (t.offsetWidth / 100) + ')'; };
+    const select = (t, focus) => {
+      tabs.forEach(x => { const on = x === t; x.setAttribute('aria-selected', String(on)); x.tabIndex = on ? 0 : -1; $('#' + x.getAttribute('aria-controls')).hidden = !on; });
+      place(t); if (focus) t.focus();
+    };
+    tabs.forEach((t, i) => {
+      t.addEventListener('click', () => select(t));
+      t.addEventListener('keydown', e => { const d = e.key === 'ArrowRight' ? 1 : e.key === 'ArrowLeft' ? -1 : 0; if (d) { e.preventDefault(); select(tabs[(i + d + tabs.length) % tabs.length], true); } });
+    });
+    place(tabs[0]); addEventListener('resize', () => place(tabs.find(t => t.getAttribute('aria-selected') === 'true')));
+    (document.fonts ? document.fonts.ready : Promise.resolve()).then(() => place(tabs.find(t => t.getAttribute('aria-selected') === 'true')));
+  });
+
+  /* Copy button */
+  safe('copy', () => {
+    const b = $('#copyBtn'), lbl = $('#copyLbl');
+    const flash = txt => { b.classList.add('swap'); setTimeout(() => { lbl.textContent = txt; b.classList.remove('swap'); b.classList.toggle('done', txt === 'Copied'); }, 120); setTimeout(() => { b.classList.add('swap'); setTimeout(() => { lbl.textContent = 'Copy'; b.classList.remove('swap', 'done'); }, 120); }, 1800); };
+    b.addEventListener('click', () => {
+      const text = b.dataset.copy;
+      const fallback = () => { const s = getSelection(), rg = document.createRange(); rg.selectNodeContents($('#cliCode')); s.removeAllRanges(); s.addRange(rg); flash('Selected'); };
+      if (navigator.clipboard && navigator.clipboard.writeText) navigator.clipboard.writeText(text).then(() => flash('Copied'), fallback); else fallback();
+    });
+  });
+
+  /* Phone pairing sequence */
+  safe('pairing', () => {
+    const dev = $('#devices'); let timers = [];
+    const play = () => { timers.forEach(clearTimeout); dev.dataset.state = 'pair'; timers = [setTimeout(() => dev.dataset.state = 'scan', 900), setTimeout(() => dev.dataset.state = 'live', 2600)]; };
+    $('#replay').addEventListener('click', () => { if (reduce) return; play(); });
+    if (reduce || !('IntersectionObserver' in window)) return;
+    dev.dataset.state = 'pair';
+    const io = new IntersectionObserver(es => { if (es[0].isIntersecting) { play(); io.disconnect(); } }, { threshold: .45 });
+    io.observe(dev);
+    if (motion) {
+      G.to('#phone', { y: -70, ease: 'none', scrollTrigger: { trigger: dev, start: 'top bottom', end: 'bottom top', scrub: true } });
+      G.to('#monitor', { y: -18, ease: 'none', scrollTrigger: { trigger: dev, start: 'top bottom', end: 'bottom top', scrub: true } });
+    }
+  });
+
+  /* Desktop keycap demo */
+  safe('keys', () => {
+    if (reduce) return;
+    const keys = $$('.keys .key'); let i = 0;
+    setInterval(() => { keys.forEach(k => k.classList.remove('press')); if (i % 4 !== 3) keys.slice(0, (i % 4) + 1).forEach(k => k.classList.add('press')); i++; }, 650);
+  });
+
+  /* AI deployment switch */
+  safe('seg', () => {
+    const seg = $('#seg'), btns = $$('button', seg);
+    const set = (b, focus) => { const m = b.dataset.mode; seg.dataset.mode = m; btns.forEach(x => { const on = x === b; x.setAttribute('aria-checked', String(on)); x.tabIndex = on ? 0 : -1; }); $$('.pills[data-for]').forEach(p => p.hidden = p.dataset.for !== m); if (focus) b.focus(); };
+    btns.forEach((b, i) => { b.addEventListener('click', () => set(b)); b.addEventListener('keydown', e => { if (['ArrowRight', 'ArrowLeft', 'ArrowUp', 'ArrowDown'].includes(e.key)) { e.preventDefault(); set(btns[(i + 1) % 2], true); } }); });
+  });
+
+  /* Audit log ticker */
+  safe('log', () => {
+    if (reduce || !('IntersectionObserver' in window)) return;
+    const rows = $('#logRows');
+    const ev = [['ai.draft.generate', 'system', 'impression · provider logged'], ['validation.run', 'system', 'chest_ct_v1 · 1 blocker'], ['report.edit', 'radiologist', 'laterality corrected'], ['ai.text.reviewed', 'radiologist', 'impression'], ['report.sign', 'radiologist', 'signed by a person'], ['export.fhir', 'system', 'DiagnosticReport R4']];
+    let i = 0, t = new Date(); t.setHours(9, 41, 2); let timer = 0;
+    const add = () => {
+      t = new Date(t.getTime() + 4000 + Math.random() * 5000);
+      const e = ev[i++ % ev.length], row = document.createElement('div');
+      row.className = 'log-row new';
+      row.innerHTML = '<span>' + t.toTimeString().slice(0, 8) + '</span><span><b>' + e[0] + '</b></span><span' + (e[1] === 'radiologist' ? ' class="hu"' : '') + '>' + e[1] + '</span><span>' + e[2] + '</span>';
+      rows.prepend(row); setTimeout(() => row.classList.remove('new'), 1400);
+      while (rows.children.length > 7) rows.lastElementChild.remove();
+    };
+    new IntersectionObserver(es => { clearInterval(timer); if (es[0].isIntersecting) timer = setInterval(add, 2400); }, { threshold: .2 }).observe(rows);
+  });
+
+  /* Counters on product-intrinsic numbers */
+  safe('counters', () => {
+    if (!motion) return;
+    $$('[data-count]').forEach(el => {
+      const n = +el.dataset.count, o = { v: 0 }; el.textContent = '0';
+      G.to(o, { v: n, duration: 1.4, ease: 'power2.out', onUpdate: () => el.textContent = Math.round(o.v), scrollTrigger: { trigger: el, start: 'top 92%', once: true } });
+    });
+  });
+
+  /* FAQ accordion */
+  safe('faq', () => {
+    $$('.faq-q').forEach(q => q.addEventListener('click', () => {
+      const item = q.closest('.faq-item'), open = !item.classList.contains('open');
+      item.classList.toggle('open', open); q.setAttribute('aria-expanded', String(open));
+    }));
+  });
+
+  if (motion) { addEventListener('load', () => ST.refresh()); if (document.fonts) document.fonts.ready.then(() => ST.refresh()); }
+})();
+</script>

@@ -1,22 +1,48 @@
 ---
+// Blog post card. The title link stretches over the whole card; tag chips sit above it and stay clickable.
+// big: the featured layout on the blog index (cover beside copy, h2). featured/hidden: used by PostList filtering.
 import { Image } from "astro:assets";
 import type { CollectionEntry } from "astro:content";
+import Icon from "../Icon.astro";
 
 interface Props {
   post: CollectionEntry<"blog">;
+  big?: boolean;
+  featured?: boolean;
+  hidden?: boolean;
 }
-const { post } = Astro.props;
+const { post, big = false, featured = false, hidden = false } = Astro.props;
 const { data, id } = post;
-const dateStr = data.date.toLocaleDateString("en-US", { year: "numeric", month: "long", day: "numeric" });
+const date = data.date.toLocaleDateString("en-US", { year: "numeric", month: "short", day: "numeric", timeZone: "UTC" });
+const H = big ? "h2" : "h3";
 ---
-<article class="card">
-  <a href={`/blog/${id}/`} class="cover" aria-label={data.title}>
-    <Image src={data.cover} alt={data.coverAlt} widths={[320, 640]} sizes="(max-width: 900px) 100vw, 33vw" loading="lazy" />
-  </a>
-  <div class="body">
-    <div class="post-meta">{data.tags[0] && <span class="tag">{data.tags[0]}</span>}</div>
-    <h3><a href={`/blog/${id}/`}>{data.title}</a></h3>
-    <p class="excerpt">{data.description}</p>
-    <div class="post-meta foot"><span>{dateStr}</span><span>&middot;</span><span>{data.readingTime}</span></div>
+<article
+  class:list={["card", "pc", { "pc-big": big }]}
+  data-tags={data.tags.join("|")}
+  data-featured={featured ? "" : undefined}
+  hidden={hidden}
+>
+  <div class="pc-cover">
+    <Image
+      src={data.cover}
+      alt={data.coverAlt}
+      widths={big ? [640, 1000] : [360, 720]}
+      sizes={big ? "(max-width: 860px) 100vw, 55vw" : "(max-width: 640px) 100vw, (max-width: 960px) 50vw, 33vw"}
+      loading={big ? "eager" : "lazy"}
+    />
+  </div>
+  <div class="pc-body">
+    <p class="pc-meta">
+      {big && <span class="chip pc-feat">Featured</span>}
+      <time datetime={data.date.toISOString().slice(0, 10)}>{date}</time><span>{data.readingTime}</span>
+    </p>
+    <H class="pc-title"><a href={`/blog/${id}/`}>{data.title}</a></H>
+    <p class="pc-desc">{data.description}</p>
+    <div class="pc-foot">
+      <ul class="pc-tags" aria-label="Tags">
+        {data.tags.map((t) => <li><a class="chip" href={`/blog/tag/${t.toLowerCase()}/`}>{t}</a></li>)}
+      </ul>
+      <span class="pc-go" aria-hidden="true"><Icon name="arrow" /></span>
+    </div>
   </div>
 </article>

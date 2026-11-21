@@ -1,0 +1,235 @@
+---
+import BaseLayout from "../layouts/BaseLayout.astro";
+import PageHero from "../components/PageHero.astro";
+import SectionHead from "../components/SectionHead.astro";
+import Divider from "../components/Divider.astro";
+import CtaBand from "../components/CtaBand.astro";
+import Faq from "../components/Faq.astro";
+import Icon from "../components/Icon.astro";
+import Pricing from "../components/home/Pricing.astro";
+
+// Comparison rows mirror the tier cards in home/Pricing.astro. true = included, false = not, string = shown as text.
+const compare: { group: string; rows: [string, boolean | string, boolean | string, boolean | string][] }[] = [
+  { group: "Pricing", rows: [["How it is priced", "Free trial", "Per seat", "Custom"]] },
+  {
+    group: "At the workstation",
+    rows: [
+      ["Windows desktop app", true, true, true],
+      ["Local dictation engine", true, true, true],
+      ["Mobile companion pairing", true, true, true],
+      ["Templates and findings library", true, true, true],
+    ],
+  },
+  {
+    group: "Across the department",
+    rows: [
+      ["Shared rulebooks and templates", false, true, true],
+      ["Peer review and critical results", false, true, true],
+      ["Web admin console", false, true, true],
+    ],
+  },
+  {
+    group: "Deployment and governance",
+    rows: [
+      ["On-prem or private cloud", false, false, true],
+      ["Your AI provider or a local model", false, false, true],
+      ["PACS/RIS, DICOMweb, FHIR R4", false, false, true],
+      ["SSO, MFA, audit log, tenant isolation", false, false, true],
+    ],
+  },
+  {
+    group: "On every plan",
+    rows: [
+      ["Only a radiologist can sign", true, true, true],
+      ["AI-drafted text stays marked until reviewed", true, true, true],
+    ],
+  },
+];
+
+const questions = [
+  {
+    legend: "Who will report with RadioPad?",
+    opts: [
+      { label: "Just me", tier: 0, why: "You are reporting on your own workstation." },
+      { label: "A reading group", tier: 1, why: "Your readers will share templates and rulebooks." },
+      { label: "A hospital or imaging group", tier: 2, why: "You are rolling out across a hospital or several sites." },
+    ],
+  },
+  {
+    legend: "What do you need to share or oversee?",
+    opts: [
+      { label: "Nothing yet", tier: 0, why: "You do not need shared configuration yet." },
+      { label: "Rulebooks, peer review, critical results", tier: 1, why: "Shared rulebooks, peer review and critical results are part of Team." },
+      { label: "SSO, MFA and an audit trail for IT", tier: 2, why: "SSO, MFA, the audit log and tenant isolation come with Enterprise." },
+    ],
+  },
+  {
+    legend: "Where does it need to run?",
+    opts: [
+      { label: "On my Windows workstation", tier: 0, why: "The Windows desktop app is all you need to start." },
+      { label: "On our group's workstations", tier: 1, why: "Several workstations, managed from the web admin console." },
+      { label: "On-prem, or with a local model", tier: 2, why: "On-prem, private cloud and local models are Enterprise deployments." },
+    ],
+  },
+];
+
+const steps = [
+  { n: "01", icon: "win", title: "Trial", text: "Install the Windows app and read with it on your own workstation. Dictate, review the draft, and see the rulebook checks before you sign." },
+  { n: "02", icon: "shield", title: "Pilot with your rulebooks", text: "Bring your department's rulebooks and templates. Author and validate them with the radiopad CLI, then run a pilot with a group of readers on your modalities." },
+  { n: "03", icon: "building", title: "Rollout", text: "Add readers and sites. Connect SSO, the PACS/RIS bridge and FHIR R4 export, and choose a hosted AI provider or a local model." },
+];
+
+const faq = [
+  { q: "How much does RadioPad cost?", a: "The Radiologist plan starts as a free trial. Team is priced per seat and Enterprise is custom, so we quote both with you based on your readers, sites and deployment." },
+  { q: "Can we pilot RadioPad with our own rulebooks?", a: "Yes. Rulebooks are institution-specific. Your department writes them, the radiopad CLI validates them, and the pilot runs them against reports on your own modalities and templates." },
+  { q: "Can we deploy on-prem with a local model?", a: "Yes, on Enterprise. RadioPad can run on-prem or in a private cloud, and drafting can use a local model through Ollama or vLLM." },
+  { q: "Which AI providers can we use?", a: "Anthropic Claude, Azure OpenAI, or a local model through Ollama or vLLM. Every AI call is written to the append-only audit log, whichever provider you choose." },
+  { q: "Does any plan let the AI sign reports?", a: "No. On every plan the radiologist reviews and signs. AI-drafted text stays marked until it has been reviewed or edited." },
+  { q: "Which platforms are included?", a: "Every plan uses the Windows desktop app for reporting and the mobile companion for voice dictation. Team and Enterprise add the web admin console for users, roles, rulebooks, templates and AI settings." },
+];
+
+const cell = (v: boolean | string) => (typeof v === "string" ? v : v ? "Included" : "Not included");
+---
+
+<BaseLayout title="Pricing" description="RadioPad pricing: a free trial for individual radiologists, per-seat Team plans for reading groups, and custom Enterprise plans for hospitals and imaging groups.">
+  <PageHero
+    crumbs={[{ label: "Pricing", href: "/pricing/" }]}
+    eyebrow="Pricing"
+    lead="Start on one workstation."
+    title="Grow into the department."
+    text="Try RadioPad on your own Windows workstation for free. When your group is ready to share rulebooks, templates and review, we price Team and Enterprise with you."
+  />
+  <Divider />
+  <Pricing />
+  <Divider />
+
+  <section class="sec" id="chooser">
+    <div class="wrap">
+      <SectionHead eyebrow="Which plan fits" title="Three questions. One recommendation." sub="Pick the answer closest to how you will use RadioPad. The most demanding answer decides the plan." />
+      <form class="chooser" id="planChooser" data-reveal>
+        <div class="qs">
+          {questions.map((q, qi) => (
+            <fieldset class="q">
+              <legend><span class="qn">{`0${qi + 1}`}</span>{q.legend}</legend>
+              <div class="opts">
+                {q.opts.map((o) => (
+                  <label class="opt">
+                    <input type="radio" name={`q${qi}`} value={o.tier} data-why={o.why} />
+                    <span>{o.label}</span>
+                  </label>
+                ))}
+              </div>
+            </fieldset>
+          ))}
+        </div>
+        <div class="panel result" id="planResult">
+          <div class="panel-h"><span>Recommendation</span><span class="chip" id="planProgress">0 of 3 answered</span></div>
+          <div aria-live="polite">
+            <p class="r-name" id="planName">Answer all three</p>
+            <p class="r-note" id="planNote">Your recommended plan appears here.</p>
+            <ul class="ticks r-why" id="planWhy"></ul>
+          </div>
+          <div class="r-cta">
+            <a class="btn btn-primary" id="planCta" href="/demo/" hidden>Talk to us</a>
+            <a class="btn btn-ghost" href="#compare">Compare plans</a>
+          </div>
+        </div>
+      </form>
+    </div>
+  </section>
+  <Divider />
+
+  <section class="sec" id="compare">
+    <div class="wrap">
+      <SectionHead eyebrow="Compare plans" title="What each plan includes." sub="Features only. Seat counts and terms for Team and Enterprise are agreed with you." />
+      <div class="tbl-wrap" data-reveal>
+        <table class="dtable cmp">
+          <caption class="sr">RadioPad plan comparison</caption>
+          <thead>
+            <tr><th scope="col">Feature</th><th scope="col">Radiologist</th><th scope="col">Team</th><th scope="col">Enterprise</th></tr>
+          </thead>
+          {compare.map((g) => (
+            <tbody>
+              <tr class="grp"><th scope="rowgroup" colspan="4">{g.group}</th></tr>
+              {g.rows.map(([label, ...vals]) => (
+                <tr>
+                  <th scope="row">{label}</th>
+                  {vals.map((v) =>
+                    typeof v === "string" ? (
+                      <td class="txt">{v}</td>
+                    ) : (
+                      <td class={v ? "yes" : "no"}>
+                        <Icon name={v ? "check" : "x"} /><span class="sr">{cell(v)}</span>
+                      </td>
+                    )
+                  )}
+                </tr>
+              ))}
+            </tbody>
+          ))}
+        </table>
+      </div>
+    </div>
+  </section>
+  <Divider />
+
+  <section class="sec" id="buying">
+    <div class="wrap">
+      <SectionHead eyebrow="How buying works" title="Trial, pilot, rollout." sub="Each step answers a different question: does it fit your reading, does it fit your rules, does it fit your department." />
+      <ol class="grid grid-3 steps">
+        {steps.map((s) => (
+          <li class="card" data-reveal>
+            <div class="step-top"><span class="ic"><Icon name={s.icon} /></span><span class="sn">{s.n}</span></div>
+            <h3>{s.title}</h3>
+            <p>{s.text}</p>
+          </li>
+        ))}
+      </ol>
+    </div>
+  </section>
+  <Divider />
+
+  <Faq eyebrow="Pricing FAQ" title="Questions buyers ask before the pilot." items={faq} />
+  <CtaBand lead="Bring your rulebooks." title="We'll scope the pilot." text="Tell us how many readers, which modalities and where it has to run. Or start the free trial on your own Windows workstation today." />
+</BaseLayout>
+
+<script>import "../scripts/plan-chooser.js";</script>
+
+<style>
+  [hidden]{display:none !important}
+  .sr{position:absolute;width:1px;height:1px;padding:0;margin:-1px;overflow:hidden;clip:rect(0 0 0 0);white-space:nowrap;border:0}
+
+  .chooser{display:grid;grid-template-columns:minmax(0,1.35fr) minmax(0,1fr);gap:clamp(20px,3vw,36px);align-items:start}
+  @media (max-width:900px){.chooser{grid-template-columns:minmax(0,1fr)}}
+  .qs{display:grid;gap:14px;min-width:0}
+  .q{margin:0;padding:20px 22px;border:1px solid var(--line);border-radius:var(--r-lg);background:var(--bg-1);min-width:0}
+  .q legend{float:left;width:100%;display:flex;gap:12px;align-items:baseline;margin-bottom:14px;font:600 1.06rem var(--font-display);letter-spacing:-.01em;color:var(--fg)}
+  .qn{font:400 .74rem var(--font-mono);letter-spacing:.1em;color:var(--fg-3)}
+  .opts{clear:both;display:flex;flex-wrap:wrap;gap:8px}
+  .opt{position:relative;cursor:pointer}
+  .opt input{position:absolute;opacity:0;width:1px;height:1px}
+  .opt span{display:inline-flex;align-items:center;min-height:40px;padding:8px 16px;border-radius:999px;border:1px solid var(--line-2);background:rgba(160,190,225,.04);color:var(--fg-2);font-size:.9rem;line-height:1.3;transition:color .2s ease,background-color .2s ease,border-color .2s ease}
+  .opt:hover span{color:var(--fg);border-color:var(--line-3)}
+  .opt input:checked + span{background:var(--film);color:var(--on-film);border-color:transparent}
+  .opt input:focus-visible + span{outline:2px solid var(--accent);outline-offset:2px}
+
+  .result{position:sticky;top:96px}
+  @media (max-width:900px){.result{position:static}}
+  .r-name{font:600 clamp(1.7rem,2.6vw,2.2rem) var(--font-display);letter-spacing:-.03em;color:var(--film)}
+  .r-note{color:var(--fg-2);font-size:.92rem;margin-top:4px}
+  .r-why{margin-top:14px}
+  .r-why:empty{display:none}
+  .r-cta{display:flex;flex-wrap:wrap;gap:10px;margin-top:6px}
+  :global(#pricing .tier.pick){border-color:rgba(134,197,255,.55);box-shadow:0 0 0 1px rgba(134,197,255,.35),0 18px 60px -24px var(--glow)}
+
+  .cmp tbody th[scope="row"]{font-weight:400;color:var(--fg)}
+  .cmp td{width:18%}
+  .cmp .grp th{padding-top:20px;font:500 .68rem var(--font-mono);letter-spacing:.12em;text-transform:uppercase;color:var(--accent);background:rgba(134,197,255,.03)}
+  .cmp td .i{width:17px;height:17px}
+  .cmp .txt{color:var(--fg);font-weight:500}
+
+  .steps{list-style:none;margin:0;padding:0;counter-reset:none}
+  .step-top{display:flex;justify-content:space-between;align-items:center}
+  .sn{font:400 .8rem var(--font-mono);letter-spacing:.1em;color:var(--fg-3)}
+  .steps h3{margin-top:0;padding-top:22px}
+</style>

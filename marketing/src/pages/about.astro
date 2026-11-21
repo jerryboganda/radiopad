@@ -1,0 +1,173 @@
+---
+import BaseLayout from "../layouts/BaseLayout.astro";
+import PageHero from "../components/PageHero.astro";
+import SectionHead from "../components/SectionHead.astro";
+import Divider from "../components/Divider.astro";
+import CtaBand from "../components/CtaBand.astro";
+import Icon from "../components/Icon.astro";
+import { site } from "../lib/site";
+
+const inputs = ["Dictation", "Structured findings", "Prior reports", "Measurements", "Study metadata"];
+---
+
+<BaseLayout title="About RadioPad" description="Why RadioPad exists and the principles it is built on: the radiologist is the final authority, the AI never signs, and every AI call is recorded.">
+  <PageHero
+    crumbs={[{ label: "About", href: "/about/" }]}
+    eyebrow="About RadioPad"
+    lead="The radiologist signs."
+    title="Everything before that can be faster."
+    text="RadioPad takes the typing, the formatting and the consistency checks off the radiologist's desk. The read, the decisions and the signature stay with the radiologist."
+  />
+  <Divider />
+
+  <section class="sec" id="why">
+    <div class="wrap">
+      <SectionHead eyebrow="Why RadioPad exists" title="A report should be quick to write and hard to get wrong." />
+      <div class="split">
+        <div class="prose" data-reveal>
+          <p>The report is how a read reaches the referring clinician. Writing it means dictating, reformatting, pulling in priors and measurements, and checking the details: the correct side, every required section, a critical result that was communicated and documented.</p>
+          <p>RadioPad brings the dictation, structured findings, prior reports, measurements and study metadata together into a draft. It checks that draft against your department's rulebook before you sign, so a laterality conflict or an undocumented critical result is caught while the report is still a draft.</p>
+          <p>RadioPad does not decide. The radiologist reads the study, edits the draft and signs. That line is built into the product, and no setting moves it.</p>
+        </div>
+        <div class="panel flow" data-reveal>
+          <div class="panel-h"><span>From inputs to a signed report</span></div>
+          <div class="inputs">{inputs.map((i) => <span class="chip">{i}</span>)}</div>
+          <ol class="checks">
+            <li><span>RadioPad writes a draft</span><span class="chip chip-draft">Draft</span></li>
+            <li><span>Checked against your rulebook</span><span class="chip">Validated</span></li>
+            <li><span>Reviewed, edited and signed by the radiologist</span><span class="chip chip-final">Final</span></li>
+          </ol>
+          <p class="mono dim fl-note">Exported as FHIR R4 DiagnosticReport, PDF, DOCX or plain text.</p>
+        </div>
+      </div>
+    </div>
+  </section>
+  <Divider />
+
+  <section class="sec" id="principles">
+    <div class="wrap">
+      <SectionHead eyebrow="Principles" title="Six principles, each one enforced by the product." sub="Open a principle to see the behaviour in RadioPad that backs it up." />
+      <div class="grid grid-3 prin">
+        <article class="card" data-reveal>
+          <span class="ic"><Icon name="user" /></span>
+          <h3>The radiologist is the final authority.</h3>
+          <p>RadioPad drafts and validates. The radiologist reads, decides and signs.</p>
+          <details>
+            <summary>How the product enforces it <Icon name="chev" /></summary>
+            <div class="enf">
+              <p>Every report stays a draft until a radiologist signs it. Rulebook blockers stop sign-off until they are resolved. Warnings and info stay visible.</p>
+              <div class="vis"><span class="chip chip-draft">Draft</span><Icon name="arrow" class="dim" /><span class="chip chip-final">Signed by the radiologist</span></div>
+            </div>
+          </details>
+        </article>
+        <article class="card" data-reveal>
+          <span class="ic"><Icon name="pen" /></span>
+          <h3>The AI never signs.</h3>
+          <p>Signing is a radiologist action, on every plan and every deployment.</p>
+          <details>
+            <summary>How the product enforces it <Icon name="chev" /></summary>
+            <div class="enf">
+              <p>RadioPad has no auto-sign, and no setting adds one. The phone companion cannot sign either. It streams dictation, and signing stays on the desktop.</p>
+              <p class="vis mono">report.sign actor=radiologist ai.signed=false</p>
+            </div>
+          </details>
+        </article>
+        <article class="card" data-reveal>
+          <span class="ic"><Icon name="spark" /></span>
+          <h3>AI text is marked.</h3>
+          <p>You can always tell which words the model wrote.</p>
+          <details>
+            <summary>How the product enforces it <Icon name="chev" /></summary>
+            <div class="enf">
+              <p>AI-drafted text carries a visible marker until a radiologist reviews or edits it.</p>
+              <div class="vis col"><span class="ai-tag"><svg aria-hidden="true"><use href="#i-spark" /></svg><span>AI draft, requires review</span></span><p class="ai-text">No pulmonary embolism. Illustrative impression.</p></div>
+            </div>
+          </details>
+        </article>
+        <article class="card" data-reveal>
+          <span class="ic"><Icon name="shield" /></span>
+          <h3>Rules belong to the department.</h3>
+          <p>Your institution decides what a complete report looks like.</p>
+          <details>
+            <summary>How the product enforces it <Icon name="chev" /></summary>
+            <div class="enf">
+              <p>Rulebooks are institution-specific: laterality, required sections, critical results, measurement consistency, negation conflicts and approved follow-up phrasing. Your team authors and validates them with the radiopad CLI. Prompt overrides are set per institution, and tenant isolation keeps each institution's rulebooks and prompts in its own tenant.</p>
+              <div class="cli"><code><i>$ </i>radiopad rulebook validate chest_ct_v1.yaml</code><button class="copy" type="button" data-copy="radiopad rulebook validate chest_ct_v1.yaml"><Icon name="copy" /><span>Copy</span></button></div>
+            </div>
+          </details>
+        </article>
+        <article class="card" data-reveal>
+          <span class="ic"><Icon name="server" /></span>
+          <h3>Choose your model, including local.</h3>
+          <p>Which AI provider drafts your reports is your decision.</p>
+          <details>
+            <summary>How the product enforces it <Icon name="chev" /></summary>
+            <div class="enf">
+              <p>Drafting runs on Anthropic Claude, Azure OpenAI, or a local model through Ollama or vLLM. Deploy on-prem or in a private cloud when nothing should leave your network.</p>
+              <div class="vis"><span class="chip">Anthropic Claude</span><span class="chip">Azure OpenAI</span><span class="chip">Ollama</span><span class="chip">vLLM</span></div>
+            </div>
+          </details>
+        </article>
+        <article class="card" data-reveal>
+          <span class="ic"><Icon name="doc" /></span>
+          <h3>Every AI call is recorded.</h3>
+          <p>Oversight starts with a complete record.</p>
+          <details>
+            <summary>How the product enforces it <Icon name="chev" /></summary>
+            <div class="enf">
+              <p>Each AI call is written to an append-only audit log, including whether the request contained patient data. Entries are written, never edited or deleted. Drift monitoring watches AI output over time.</p>
+              <p class="vis mono">ai.draft.generate provider=ollama local=true phi=false <span class="dim">(illustrative)</span></p>
+            </div>
+          </details>
+        </article>
+      </div>
+    </div>
+  </section>
+  <Divider />
+
+  <section class="sec" id="careers">
+    <div class="wrap split">
+      <SectionHead eyebrow="Careers" title="Open roles are posted here." />
+      <div class="card careers" data-reveal>
+        <span class="ic"><Icon name="users" /></span>
+        <h3>No roles are posted right now.</h3>
+        <p>When a role opens, it will be listed on this page. If you build clinical software, or you report studies and want to shape how RadioPad works, write to us.</p>
+        <a class="btn btn-ghost" href={`mailto:${site.email}`}><Icon name="doc" /> {site.email}</a>
+      </div>
+    </div>
+  </section>
+
+  <CtaBand lead="See the principles at work." title="Book a demo." text="We will run RadioPad on your modalities and your rulebooks, from dictation to a signed report." />
+</BaseLayout>
+
+<style>
+  .flow{gap:16px}
+  .inputs{display:flex;flex-wrap:wrap;gap:6px}
+  .flow .checks li span:last-child{flex:none}
+  .fl-note{font-size:.76rem}
+
+  .prin{align-items:start}
+  .prin .card{gap:8px}
+  .prin h3{margin-top:0;padding-top:18px}
+  details{margin-top:10px;border-top:1px solid var(--line);padding-top:12px}
+  summary{list-style:none;display:inline-flex;align-items:center;gap:6px;cursor:pointer;font-size:.88rem;color:var(--accent);border-radius:6px}
+  summary::-webkit-details-marker{display:none}
+  summary .i{width:15px;height:15px;transition:transform .25s var(--ease-out)}
+  details[open] summary .i{transform:rotate(180deg)}
+  summary:focus-visible{outline:2px solid var(--accent);outline-offset:3px}
+  .enf{display:grid;gap:12px;margin-top:12px}
+  details[open] .enf{animation:enfIn .35s var(--ease-out)}
+  @keyframes enfIn{from{opacity:0;transform:translateY(-4px)}to{opacity:1;transform:none}}
+  @media (prefers-reduced-motion:reduce){details[open] .enf{animation:none}summary .i{transition:none}}
+  .vis{display:flex;flex-wrap:wrap;align-items:center;gap:6px}
+  .vis.col{flex-direction:column;align-items:flex-start}
+  .vis .i{width:14px;height:14px}
+  p.vis.mono{display:block;font-size:.76rem;line-height:1.6;padding:10px 12px;border-radius:10px;border:1px solid var(--line);background:#03060b;color:var(--fg-2);overflow-wrap:anywhere}
+  .enf .cli{margin-top:0;font-size:.78rem}
+  .enf .ai-text{font-size:.88rem;color:var(--fg)}
+
+  #careers .sec-head{margin-bottom:0}
+  .careers{gap:8px}
+  .careers h3{margin-top:0}
+  .careers .btn{align-self:flex-start;margin-top:14px;max-width:100%;overflow:hidden;text-overflow:ellipsis}
+</style>

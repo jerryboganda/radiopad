@@ -1,0 +1,40 @@
+---
+// Inner-page hero: eyebrow, two-tone headline (dim lead line + bright line), lead, CTAs.
+// The default slot renders a full-width visual under the copy.
+import Icon from "./Icon.astro";
+interface Props {
+  eyebrow: string;
+  lead?: string;          // dim first line of the h1
+  title: string;          // bright line of the h1
+  text: string;
+  crumbs?: { label: string; href: string }[];
+  ctas?: boolean;         // show Book a demo + Download (default true)
+}
+const { eyebrow, lead, title, text, crumbs = [], ctas = true } = Astro.props;
+---
+
+<section class="phero">
+  <div class="hero-bg" aria-hidden="true"></div>
+  <div class="wrap">
+    {crumbs.length > 0 && (
+      <nav class="crumbs" aria-label="Breadcrumb">
+        <a href="/">Home</a>
+        {crumbs.map((c) => <><Icon name="chev" class="sepi" /><a href={c.href}>{c.label}</a></>)}
+      </nav>
+    )}
+    <p class="eyebrow"><span class="pulse"></span>{eyebrow}</p>
+    <h1 class="phero-title">
+      {lead && <span class="l1">{lead}</span>}
+      <span class="l2">{title}</span>
+    </h1>
+    <p class="lead">{text}</p>
+    {ctas && (
+      <div class="cta-row">
+        <span class="mag"><a class="btn btn-primary btn-lg" href="/demo/">Book a demo <Icon name="arrow" class="arr" /></a></span>
+        <a class="btn btn-ghost btn-lg" href="/download/"><Icon name="win" /> Download for Windows</a>
+      </div>
+    )}
+    <slot name="actions" />
+    {Astro.slots.has("default") && <div class="phero-vis"><slot /></div>}
+  </div>
+</section>

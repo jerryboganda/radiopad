@@ -1,0 +1,6 @@
+---
+// Inline reference to a symbol in Sprite.astro (rendered once per page in BaseLayout).
+interface Props { name: string; class?: string }
+const { name, class: cls } = Astro.props;
+---
+<svg class:list={["i", cls]} aria-hidden="true"><use href={`#i-${name}`} /></svg>

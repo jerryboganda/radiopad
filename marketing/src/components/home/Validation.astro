@@ -1,0 +1,74 @@
+  <section class="sec" id="validation">
+    <div class="wrap">
+      <header class="sec-head">
+        <p class="eyebrow">Validation engine</p>
+        <h2 data-split>Your department's rules, checked before every signature.</h2>
+        <p class="sub">Rulebooks are written per institution and versioned like code. RadioPad flags the draft, the radiologist decides.</p>
+      </header>
+      <div data-tabs>
+        <div class="tabs" role="tablist" aria-label="Rule examples">
+          <span class="tab-ind" aria-hidden="true"></span>
+          <button class="tab" role="tab" id="vt1" aria-selected="true" aria-controls="vp1">Laterality</button>
+          <button class="tab" role="tab" id="vt2" aria-selected="false" aria-controls="vp2" tabindex="-1">Required sections</button>
+          <button class="tab" role="tab" id="vt3" aria-selected="false" aria-controls="vp3" tabindex="-1">Critical results</button>
+        </div>
+        <div class="tp" role="tabpanel" id="vp1" aria-labelledby="vt1">
+          <div class="val-grid">
+            <div class="panel">
+              <div class="panel-h"><span>Draft</span><span class="chip chip-draft">1 blocker</span></div>
+              <div class="snippet"><b>FINDINGS</b>6 mm solid nodule in the <mark class="ok">right</mark> lower lobe.<b>IMPRESSION</b>6 mm solid nodule, <mark class="bad">left</mark> lower lobe.</div>
+              <div class="flag f-red"><svg class="i sev"><use href="#i-x"/></svg><div><b>Blocker</b>Side terms disagree between findings and impression.</div></div>
+            </div>
+            <div class="panel">
+              <div class="panel-h"><span>Rulebook excerpt, shortened</span><span>chest_ct_v1.yaml</span></div>
+<pre class="code"><span class="k">rules</span>:
+  - <span class="k">id</span>: <span class="s">laterality_consistency</span>
+    <span class="k">severity</span>: <span class="v">blocker</span>
+    <span class="k">description</span>: <span class="s">Side-specific findings must agree
+      between the Findings and the Impression.</span></pre>
+            </div>
+          </div>
+        </div>
+        <div class="tp" role="tabpanel" id="vp2" aria-labelledby="vt2" hidden>
+          <div class="val-grid">
+            <div class="panel">
+              <div class="panel-h"><span>Draft</span><span class="chip chip-draft">1 blocker</span></div>
+              <div class="snippet"><b>TECHNIQUE</b><mark class="miss">Section missing</mark><b>FINDINGS</b>Lungs are clear. No pleural effusion.<b>IMPRESSION</b>No acute cardiopulmonary process.</div>
+              <div class="flag f-red"><svg class="i sev"><use href="#i-x"/></svg><div><b>Blocker</b>Required section missing: Technique.</div></div>
+            </div>
+            <div class="panel">
+              <div class="panel-h"><span>Rulebook excerpt</span><span>chest_ct_v1.yaml</span></div>
+<pre class="code"><span class="k">required_sections</span>:
+  - <span class="s">Indication</span>
+  - <span class="s">Technique</span>
+  - <span class="s">Comparison</span>
+  - <span class="s">Findings</span>
+  - <span class="s">Impression</span></pre>
+            </div>
+          </div>
+        </div>
+        <div class="tp" role="tabpanel" id="vp3" aria-labelledby="vt3" hidden>
+          <div class="val-grid">
+            <div class="panel">
+              <div class="panel-h"><span>Draft</span><span class="chip chip-draft">1 blocker</span></div>
+              <div class="snippet"><b>FINDINGS</b>Filling defects in the right lower lobe segmental arteries, consistent with <mark class="bad">acute pulmonary embolism</mark>.<b>IMPRESSION</b>Acute right lower lobe pulmonary embolism.</div>
+              <div class="flag f-red"><svg class="i sev"><use href="#i-x"/></svg><div><b>Blocker</b>Critical result. Document communication to the referring clinician before signing.</div></div>
+            </div>
+            <div class="panel">
+              <div class="panel-h"><span>Rulebook excerpt, shortened</span><span>chest_ct_v1.yaml</span></div>
+<pre class="code"><span class="k">rules</span>:
+  - <span class="k">id</span>: <span class="s">critical_result_language</span>
+    <span class="k">severity</span>: <span class="v">blocker</span>
+    <span class="k">description</span>: <span class="s">Time-critical findings require documented
+      communication to the responsible clinician with
+      read-back, naming the recipient and the time.</span></pre>
+            </div>
+          </div>
+        </div>
+      </div>
+      <div class="cli">
+        <code id="cliCmd"><i>$ </i>radiopad rulebook validate chest_ct_v1.yaml</code>
+        <button class="copy" type="button" data-copy="radiopad rulebook validate chest_ct_v1.yaml"><svg class="i"><use href="#i-copy"/></svg><span>Copy</span></button>
+      </div>
+    </div>
+  </section>

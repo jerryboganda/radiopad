@@ -10,6 +10,7 @@ import tailwindcss from '@tailwindcss/vite';
 export default defineConfig({
   site: 'https://radiopadstudio.com',
   integrations: [svelte(), mdx(), sitemap()],
+  redirects: { "/contact": "/demo/", "/careers": "/about/" },
   // Brand-consistent code blocks: use our own .prose pre styling, not Shiki's theme.
   markdown: {
     syntaxHighlight: false,

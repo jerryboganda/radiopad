@@ -1,29 +1,25 @@
----
-// Security & compliance — the single image+text split, with a checklist panel.
-const checks = [
-  "FHIR DiagnosticReport export",
-  "Append-only audit log",
-  "On-premise or self-hosted deployment",
-  "Patient data stays in your environment",
-  "Role-based access control",
-];
----
-<section class="security" id="security">
-  <div class="wrap">
-    <div class="reveal">
-      <p class="eyebrow" style="margin-bottom:.9rem">Security and compliance</p>
-      <h2>Built for the constraints radiology actually has.</h2>
-      <p>Run RadioPad on-premise or fully local, so patient data stays inside your environment. Reports export as FHIR DiagnosticReport, and access is scoped by role.</p>
+  <section class="sec" id="security">
+    <div class="wrap">
+      <header class="sec-head">
+        <p class="eyebrow">Security and governance</p>
+        <h2 data-split>Every AI call leaves a record. No report leaves unsigned.</h2>
+      </header>
+      <div class="sec-grid">
+        <div class="gov">
+          <div data-reveal><svg class="i"><use href="#i-pen"/></svg><b>The AI never signs</b><p>Signing is a radiologist action. There is no setting that changes that.</p></div>
+          <div data-reveal><svg class="i"><use href="#i-spark"/></svg><b>AI text stays marked</b><p>Drafted text is labeled until a radiologist reviews or edits it.</p></div>
+          <div data-reveal><svg class="i"><use href="#i-doc"/></svg><b>Append-only audit log</b><p>Every AI call is recorded, including whether the request contained patient data.</p></div>
+          <div data-reveal><svg class="i"><use href="#i-stack"/></svg><b>Tenant isolation</b><p>Each institution's data, rulebooks and prompts stay inside its own tenant.</p></div>
+          <div data-reveal><svg class="i"><use href="#i-server"/></svg><b>On-prem or private cloud</b><p>Deploy inside your network, with a local model if you want nothing to leave it.</p></div>
+          <div data-reveal><svg class="i"><use href="#i-key"/></svg><b>SSO and MFA</b><p>Sign in through your identity provider over OIDC, with multi-factor authentication.</p></div>
+        </div>
+        <div class="console" data-reveal>
+          <div class="console-h"><span>audit.log</span><span>append-only, illustrative</span></div>
+          <ul class="log" id="log" aria-label="Illustrative audit log entries"></ul>
+          <div class="console-f">Entries are written, never edited or deleted.</div>
+        </div>
+      </div>
     </div>
-    <ul class="checklist reveal">
-      {
-        checks.map((c) => (
-          <li>
-            <span class="tick"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round"><path d="M5 13l4 4L19 7"/></svg></span>
-            {c}
-          </li>
-        ))
-      }
-    </ul>
-  </div>
-</section>
+  </section>
+
+<script>import "../../scripts/audit-log.js";</script>

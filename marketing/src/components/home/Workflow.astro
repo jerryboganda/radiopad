@@ -1,0 +1,56 @@
+  <section class="sec" id="workflow">
+    <div class="wrap">
+      <header class="sec-head">
+        <p class="eyebrow">Workflow</p>
+        <h2 data-split>Four steps from dictation to a signed report.</h2>
+        <p class="sub">RadioPad does the drafting and the checking. Reading the study and signing the report stay with the radiologist.</p>
+      </header>
+      <div class="flow-stage" id="flowStage">
+        <div class="flow-rail" aria-hidden="true"><span id="railFill"></span></div>
+        <article class="fstep">
+          <div class="fs-text"><span class="fs-n">01</span><h3>Dictate</h3><p>Speak at the workstation with a hotkey, or pair your phone to the live desktop session and dictate from the reading room chair.</p></div>
+          <div class="fs-vis">
+            <div class="vh"><span class="chip chip-live"><i></i>Dictating</span><span class="mono dim">Mobile companion, paired to desktop</span></div>
+            <div class="wave" aria-hidden="true"><i style="--i:1;--h:.5"></i><i style="--i:2;--h:.8"></i><i style="--i:3;--h:.35"></i><i style="--i:4;--h:.9"></i><i style="--i:5;--h:.6"></i><i style="--i:6;--h:.45"></i><i style="--i:7;--h:1"></i><i style="--i:8;--h:.7"></i><i style="--i:9;--h:.3"></i><i style="--i:10;--h:.85"></i><i style="--i:11;--h:.55"></i><i style="--i:12;--h:.95"></i><i style="--i:13;--h:.4"></i><i style="--i:14;--h:.75"></i><i style="--i:15;--h:.5"></i><i style="--i:16;--h:.9"></i><i style="--i:17;--h:.35"></i><i style="--i:18;--h:.65"></i><i style="--i:19;--h:.8"></i><i style="--i:20;--h:.45"></i><i style="--i:21;--h:.7"></i><i style="--i:22;--h:.3"></i><i style="--i:23;--h:.6"></i><i style="--i:24;--h:.85"></i></div>
+            <p class="transcript">"Six millimeter solid nodule, right lower lobe, image one forty two. No consolidation. No effusion.<span class="caret"></span></p>
+            <p class="kbd-row"><kbd>Hotkey</kbd> hold to dictate on desktop, or tap the mic on your phone.</p>
+          </div>
+        </article>
+        <article class="fstep">
+          <div class="fs-text"><span class="fs-n">02</span><h3>Draft</h3><p>Dictation, structured findings, prior reports, measurements and study metadata go in. A complete draft comes out, in your template.</p></div>
+          <div class="fs-vis">
+            <div class="vh"><span class="mono dim">Inputs</span><span class="mono dim">Template: Chest CT, standard</span></div>
+            <div class="inputs"><span class="chip">Dictation</span><span class="chip">Structured findings</span><span class="chip">Prior report</span><span class="chip">Measurements</span><span class="chip">Study metadata</span></div>
+            <div class="flow-arrow" aria-hidden="true"><svg class="i"><use href="#i-chev"/></svg></div>
+            <div class="mini">
+              <h5>Findings</h5>
+              <p>6 mm solid nodule in the right lower lobe (IM 142). Stable compared with prior. No consolidation or effusion.</p>
+              <h5>Impression <span class="ai-tag"><svg><use href="#i-spark"/></svg><span>AI draft, requires review</span></span></h5>
+              <p class="ai-text">6 mm solid nodule, right lower lobe. Follow-up per institutional protocol.</p>
+            </div>
+          </div>
+        </article>
+        <article class="fstep">
+          <div class="fs-text"><span class="fs-n">03</span><h3>Validate</h3><p>Every draft runs against your institution's rulebook. Blockers stop sign-off until they are resolved. Warnings and info stay visible.</p></div>
+          <div class="fs-vis">
+            <div class="vh"><span class="mono dim">Rulebook chest_ct_v1</span><span class="chip chip-draft">1 blocker</span></div>
+            <ul class="checks">
+              <li><svg class="i st-ok"><use href="#i-okc"/></svg><span>Required sections present</span><span class="mono dim">technique, findings, impression</span></li>
+              <li><svg class="i st-bad"><use href="#i-x"/></svg><span>Laterality consistent across sections</span><span class="mono st-bad">blocker</span></li>
+              <li><svg class="i st-info"><use href="#i-info"/></svg><span>Critical result callback</span><span class="mono dim">not triggered</span></li>
+              <li><svg class="i st-ok"><use href="#i-okc"/></svg><span>Measurements carry units</span><span class="mono dim">mm</span></li>
+            </ul>
+          </div>
+        </article>
+        <article class="fstep">
+          <div class="fs-text"><span class="fs-n">04</span><h3>Sign</h3><p>You review, edit and sign. Then export a FHIR R4 DiagnosticReport, PDF, DOCX or plain text. Every AI call is already in the audit log.</p></div>
+          <div class="fs-vis">
+            <div class="vh"><span class="mono dim">Sign-off</span><span class="chip chip-final">Final</span></div>
+            <div class="sig-row"><span class="sig">Your signature</span><span class="mono dim">Signed by the reading radiologist</span></div>
+            <div class="exports"><span class="chip">FHIR R4 DiagnosticReport</span><span class="chip">PDF</span><span class="chip">DOCX</span><span class="chip">Plain text</span></div>
+            <p class="audit-line"><b>report.sign</b> actor=radiologist &nbsp;ai.signed=false &nbsp;export=fhir.DiagnosticReport</p>
+          </div>
+        </article>
+      </div>
+    </div>
+  </section>

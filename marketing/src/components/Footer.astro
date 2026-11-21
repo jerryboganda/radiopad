@@ -1,36 +1,23 @@
 ---
-import { site } from "../lib/site";
-const year = 2026;
+import { footer, site, BRAND_PATH } from "../lib/site";
+const year = new Date().getFullYear();
 ---
 
-<footer class="footer">
+<footer>
   <div class="wrap">
-    <div class="cols">
-      <div class="brand-col">
-        <a class="brand" href="/" aria-label="RadioPad home">
-          <span class="mark" aria-hidden="true">
-            <svg viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2.4" stroke-linecap="round"><path d="M4 12h3l2 5 4-12 2 7h5" /></svg>
-          </span>
-          RadioPad
-        </a>
-        <p class="about">{site.tagline}</p>
+    <div class="foot">
+      <div class="about">
+        <a class="brand" href="/"><span class="mark"><svg viewBox="0 0 24 24"><path d={BRAND_PATH} /></svg></span>RadioPad</a>
+        <p>AI-assisted radiology reporting. RadioPad drafts and validates. The radiologist reviews and signs.</p>
+        <p class="foot-mail"><a href={`mailto:${site.email}`}>{site.email}</a></p>
       </div>
-      {
-        Object.entries(site.footer).map(([heading, links]) => (
-          <div>
-            <h4>{heading}</h4>
-            <ul>
-              {links.map((l) => (
-                <li><a href={l.href}>{l.label}</a></li>
-              ))}
-            </ul>
-          </div>
-        ))
-      }
+      {Object.entries(footer).map(([group, links]) => (
+        <div>
+          <h5>{group}</h5>
+          <ul>{links.map((l) => <li><a href={l.href}>{l.label}</a></li>)}</ul>
+        </div>
+      ))}
     </div>
-    <div class="base">
-      <span>&copy; {year} {site.name}. Licensed under Apache 2.0.</span>
-      <span>{site.email}</span>
-    </div>
+    <div class="foot-b"><span>© {year} RadioPad</span><span>Drafted by RadioPad. Signed by radiologists.</span></div>
   </div>
 </footer>

@@ -1,0 +1,22 @@
+---
+// FAQ accordion (behaviour in scripts/site.js). The first item starts open.
+interface Props { id?: string; eyebrow?: string; title: string; items: { q: string; a: string }[] }
+const { id = "faq", eyebrow = "FAQ", title, items } = Astro.props;
+---
+
+<section class="sec" id={id}>
+  <div class="wrap faq">
+    <header class="sec-head">
+      <p class="eyebrow">{eyebrow}</p>
+      <h2 data-split>{title}</h2>
+    </header>
+    <div class="qas">
+      {items.map((it, i) => (
+        <div class:list={["qa", { open: i === 0 }]}>
+          <button type="button" aria-expanded={i === 0 ? "true" : "false"} aria-controls={`${id}-a${i}`} id={`${id}-q${i}`}>{it.q}<span class="pm" aria-hidden="true"></span></button>
+          <div class="qa-b" id={`${id}-a${i}`} role="region" aria-labelledby={`${id}-q${i}`}><div><p>{it.a}</p></div></div>
+        </div>
+      ))}
+    </div>
+  </div>
+</section>

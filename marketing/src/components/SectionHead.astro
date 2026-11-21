@@ -1,0 +1,9 @@
+---
+interface Props { eyebrow: string; title: string; sub?: string }
+const { eyebrow, title, sub } = Astro.props;
+---
+<header class="sec-head">
+  <p class="eyebrow">{eyebrow}</p>
+  <h2 data-split>{title}</h2>
+  {sub && <p class="sub">{sub}</p>}
+</header>

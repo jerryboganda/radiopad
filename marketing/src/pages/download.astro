@@ -1,0 +1,153 @@
+---
+import BaseLayout from "../layouts/BaseLayout.astro";
+import PageHero from "../components/PageHero.astro";
+import SectionHead from "../components/SectionHead.astro";
+import Divider from "../components/Divider.astro";
+import CtaBand from "../components/CtaBand.astro";
+import Icon from "../components/Icon.astro";
+import { site } from "../lib/site";
+---
+
+<BaseLayout title="Download RadioPad for Windows" description="Download the RadioPad desktop app for Windows (x64 .msi) and the phone companion that streams voice dictation into the report open on your workstation.">
+  <PageHero
+    crumbs={[{ label: "Download", href: "/download/" }]}
+    eyebrow="Download"
+    lead="RadioPad for Windows."
+    title="Install it. Read with it."
+    text="The full reporting workstation as a Windows installer. Draft, validate and sign next to your PACS viewer, and keep it current with automatic updates."
+    ctas={false}
+  >
+    <div class="dl-grid">
+      <div class="panel dl" id="dl" data-api={site.releasesApi}>
+        <div class="panel-h"><span>Latest release</span><span class="chip" id="dl-chip">Checking GitHub</span></div>
+        <div class="dl-head">
+          <span class="dl-ic"><Icon name="win" /></span>
+          <div>
+            <h2>Windows desktop app</h2>
+            <p class="mono dim">Windows x64, .msi installer</p>
+          </div>
+        </div>
+        <dl class="specs">
+          <div><dt>Version</dt><dd id="dl-ver">Checking</dd></div>
+          <div><dt>Published</dt><dd id="dl-date">Checking</dd></div>
+          <div><dt>File</dt><dd id="dl-file" class="mono">.msi</dd></div>
+        </dl>
+        <div class="cta-row">
+          <span class="mag"><a class="btn btn-primary btn-lg" id="dl-btn" href={site.releases}><Icon name="win" /> <span id="dl-btn-l">Download for Windows</span></a></span>
+          <a class="btn btn-ghost btn-lg" href={site.releases}>All releases <Icon name="arrow" class="arr" /></a>
+        </div>
+        <p class="dl-status" id="dl-status" role="status">Looking up the latest release. The button already opens the release page, where the .msi is listed.</p>
+      </div>
+      <ul class="dl-side">
+        <li><Icon name="replay" /><div><b>Updates itself</b><span>Checks for a new release each time it starts.</span></div></li>
+        <li><Icon name="mic" /><div><b>Dictation on the workstation</b><span>Local dictation engine, plus your phone as a microphone.</span></div></li>
+        <li><Icon name="pen" /><div><b>You sign, always</b><span>The AI drafts and validates. Only a radiologist signs.</span></div></li>
+      </ul>
+    </div>
+  </PageHero>
+  <Divider />
+
+  <section class="sec" id="companion">
+    <div class="wrap split">
+      <div>
+        <p class="eyebrow">Phone companion</p>
+        <h2 class="sh">Your phone becomes the microphone.</h2>
+        <p class="d">The companion for Android and iOS pairs to a live desktop session with a short code or a QR code. Your dictation travels through a cloud relay into the report open on that desktop. Editing and signing stay on the workstation.</p>
+        <ol class="checks pair">
+          <li><span class="mono dim">01</span><span>On the desktop, open <b>Pair phone</b> to show a short code and a QR code.</span></li>
+          <li><span class="mono dim">02</span><span>On the phone, enter the code or scan the QR code.</span></li>
+          <li><span class="mono dim">03</span><span>Dictate. The text lands in the report section you have focused on the desktop.</span></li>
+        </ol>
+      </div>
+      <div class="panel" id="apk" data-reveal>
+        <div class="panel-h"><span>Companion builds</span><span class="chip" id="apk-chip">Checking</span></div>
+        <div class="dl-head">
+          <span class="dl-ic"><Icon name="phone" /></span>
+          <div>
+            <h3 id="apk-title">Phone companion</h3>
+            <p class="dim" id="apk-text">The companion pairs to the desktop app. Phone builds that are published are listed on the releases page.</p>
+          </div>
+        </div>
+        <div class="cta-row">
+          <a class="btn btn-ghost" id="apk-btn" href={site.releases}><Icon name="phone" /> <span id="apk-btn-l">Open the releases page</span></a>
+        </div>
+        <p class="form-note">For the iOS companion, <a href="/demo/">talk to us</a>.</p>
+      </div>
+    </div>
+  </section>
+  <Divider />
+
+  <section class="sec" id="requirements">
+    <div class="wrap split">
+      <div>
+        <SectionHead eyebrow="System requirements" title="What the installer needs." sub="RadioPad ships one desktop build: Windows on 64-bit x64. macOS and Linux desktop builds are not offered." />
+      </div>
+      <dl class="specs" data-reveal>
+        <div><dt>Operating system</dt><dd>Windows, 64-bit (x64)</dd></div>
+        <div><dt>Installer</dt><dd>Windows Installer package (.msi), English (en-US)</dd></div>
+        <div><dt>Web runtime</dt><dd>Microsoft Edge WebView2, which renders the app window</dd></div>
+        <div><dt>Display</dt><dd>Room for a window of at least 980 by 640 pixels</dd></div>
+        <div><dt>Included</dt><dd>The local RadioPad service, plus the rulebooks and report templates that ship with RadioPad</dd></div>
+        <div><dt>Phone</dt><dd>Optional. The companion pairs to a running desktop session</dd></div>
+      </dl>
+    </div>
+  </section>
+  <Divider />
+
+  <section class="sec" id="updates">
+    <div class="wrap">
+      <SectionHead eyebrow="Automatic updates" title="Install once. It keeps itself current." sub="Desktop releases are published on GitHub. The app finds them on its own." />
+      <div class="grid grid-3">
+        <div class="card" data-reveal>
+          <span class="ic"><Icon name="search" /></span>
+          <h3>Checks on launch</h3>
+          <p>Each time RadioPad starts it quietly checks for a newer release. A waiting update shows on the Check for updates button.</p>
+        </div>
+        <div class="card" data-reveal>
+          <span class="ic"><Icon name="shield" /></span>
+          <h3>Verified, then installed</h3>
+          <p>One click downloads the update, verifies its signature, installs it and relaunches RadioPad. No file pickers, no browser.</p>
+        </div>
+        <div class="card" data-reveal>
+          <span class="ic"><Icon name="pulse" /></span>
+          <h3>See what changed</h3>
+          <p>Every notable change is listed in the changelog, release by release.</p>
+          <a class="more" href="/changelog/">Read the changelog <Icon name="arrow" /></a>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <CtaBand lead="Want it on every workstation?" title="Let's plan the rollout." text="Book a demo to see RadioPad with your rulebooks and templates, or download it now and start the free trial." />
+</BaseLayout>
+
+<script>import "../scripts/download.js";</script>
+
+<style>
+  .dl-grid{display:grid;grid-template-columns:minmax(0,1.5fr) minmax(0,1fr);gap:clamp(20px,3vw,36px);align-items:start}
+  @media (max-width:900px){.dl-grid{grid-template-columns:minmax(0,1fr)}}
+  .dl{padding:clamp(20px,3vw,30px)}
+  .dl-head{display:flex;gap:16px;align-items:center;min-width:0}
+  .dl-head > div{min-width:0}
+  .dl-ic{flex:none;width:52px;height:52px;border-radius:14px;display:grid;place-items:center;border:1px solid var(--line-2);background:var(--bg-2);color:var(--accent)}
+  .dl-ic .i{width:24px;height:24px}
+  .dl h2{font-size:clamp(1.4rem,2.2vw,1.8rem);letter-spacing:-.02em}
+  .dl-head h3{font:600 1.15rem var(--font-display);letter-spacing:-.01em}
+  .dl-head p{font-size:.86rem;margin-top:4px}
+  #dl-file{overflow-wrap:anywhere}
+  .dl .cta-row{margin-top:4px}
+  .dl-status{font-size:.84rem;color:var(--fg-3)}
+  .dl-status.bad{color:var(--amber)}
+  .dl-side{list-style:none;margin:0;padding:0;display:grid;gap:18px}
+  .dl-side li{display:flex;gap:14px;align-items:flex-start}
+  .dl-side .i{flex:none;width:20px;height:20px;color:var(--accent);margin-top:2px}
+  .dl-side div{display:grid;gap:4px;min-width:0}
+  .dl-side b{font:600 1rem var(--font-display);letter-spacing:-.01em}
+  .dl-side span{color:var(--fg-2);font-size:.9rem}
+  .pair{margin-top:22px}
+  .pair li span:first-child{flex:none}
+  .pair li span + span{flex:1;min-width:0}
+  .sh{margin-top:16px;font-size:clamp(1.8rem,3.4vw,2.8rem)}
+  .pair b{color:var(--fg);font-weight:600}
+  #requirements .sec-head{margin-bottom:0}
+</style>

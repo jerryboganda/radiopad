@@ -1,0 +1,109 @@
+---
+import BaseLayout from "../../layouts/BaseLayout.astro";
+import PageHero from "../../components/PageHero.astro";
+import SectionHead from "../../components/SectionHead.astro";
+import Divider from "../../components/Divider.astro";
+import CtaBand from "../../components/CtaBand.astro";
+import Icon from "../../components/Icon.astro";
+import { BRAND_PATH } from "../../lib/site";
+import Workflow from "../../components/home/Workflow.astro";
+import Surfaces from "../../components/home/Surfaces.astro";
+import Platform from "../../components/home/Platform.astro";
+
+const inputs = [
+  { icon: "mic", label: "Dictation", small: "hotkey or phone" },
+  { icon: "grid", label: "Structured findings", small: "per template" },
+  { icon: "replay", label: "Prior reports", small: "comparison" },
+  { icon: "scan", label: "Measurements", small: "with units" },
+  { icon: "info", label: "Study metadata", small: "modality, body part" },
+];
+const outputs = [
+  { icon: "globe", label: "FHIR R4", small: "DiagnosticReport" },
+  { icon: "doc", label: "PDF", small: "document" },
+  { icon: "pen", label: "DOCX", small: "document" },
+  { icon: "term", label: "Plain text", small: "text" },
+];
+const deeper = [
+  { icon: "shield", title: "Validation engine", text: "Rulebooks your department writes, the severities they carry, and the CLI that tests them.", href: "/product/validation/", cta: "See the rulebooks", beam: true },
+  { icon: "mic", title: "Dictation", text: "On-device speech on the Windows workstation, and a phone companion that pairs to the live session.", href: "/product/dictation/", cta: "See dictation" },
+  { icon: "server", title: "Integrations", text: "PACS/RIS bridge, DICOMweb, Orthanc and FHIR export into the systems you already run.", href: "/integrations/", cta: "See integrations" },
+  { icon: "lock", title: "Security", text: "Append-only audit log on every AI call, tenant isolation, SSO and on-prem deployment.", href: "/security/", cta: "See security" },
+];
+---
+
+<BaseLayout
+  title="Product overview"
+  description="How RadioPad works: dictate, draft, validate against your rulebook, then review and sign. Exports FHIR R4 DiagnosticReport, PDF, DOCX and plain text."
+>
+  <PageHero
+    crumbs={[{ label: "Product", href: "/product/" }]}
+    eyebrow="Product overview"
+    lead="Dictate, draft, validate, sign."
+    title="One workstation for the whole report."
+    text="RadioPad turns dictation, structured findings, priors, measurements and study metadata into a draft report, checks it against your department's rulebook, and hands it back to you. The radiologist reviews and signs. The AI never signs."
+  />
+  <Divider />
+  <Workflow />
+  <Divider />
+
+  <section class="sec" id="io">
+    <div class="wrap">
+      <SectionHead
+        eyebrow="Inputs and outputs"
+        title="What goes in, what comes out."
+        sub="Everything you already have for the study feeds the draft. The finished report leaves in the format the next system needs."
+      />
+      <div class="hub pv-io" data-reveal>
+        <div class="hub-col l">
+          <h3>What goes in</h3>
+          {inputs.map((n) => <div class="node"><Icon name={n.icon} />{n.label}<small>{n.small}</small></div>)}
+        </div>
+        <div class="core">
+          <div>
+            <span class="mark"><svg viewBox="0 0 24 24" aria-hidden="true"><path d={BRAND_PATH} /></svg></span>
+            <b>RadioPad</b><small>Draft, then validate</small>
+          </div>
+        </div>
+        <div class="hub-col r">
+          <h3>What comes out</h3>
+          {outputs.map((n) => <div class="node"><Icon name={n.icon} />{n.label}<small>{n.small}</small></div>)}
+        </div>
+      </div>
+      <p class="notice info pv-note" data-reveal>
+        <Icon name="info" />
+        <span>AI-drafted text stays marked until you review or edit it. Final exports require the radiologist's sign-off.</span>
+      </p>
+    </div>
+  </section>
+
+  <Divider />
+  <Surfaces />
+  <Divider />
+  <Platform />
+  <Divider />
+
+  <section class="sec" id="more">
+    <div class="wrap">
+      <SectionHead eyebrow="Go deeper" title="The parts radiologists and IT ask about first." />
+      <div class="grid grid-4 pv-more">
+        {deeper.map((c) => (
+          <article class:list={["card", { beam: c.beam }]} data-reveal>
+            <span class="ic"><Icon name={c.icon} /></span>
+            <h3>{c.title}</h3>
+            <p>{c.text}</p>
+            <a class="more" href={c.href}>{c.cta} <Icon name="arrow" /></a>
+          </article>
+        ))}
+      </div>
+    </div>
+  </section>
+
+  <CtaBand />
+</BaseLayout>
+
+<style is:global>
+  /* the shared hub uses h4 column labels; this page keeps h2 > h3 order */
+  .pv-io .hub-col h3{font:500 .7rem var(--font-mono);letter-spacing:.12em;text-transform:uppercase;color:var(--fg-3);margin-bottom:4px}
+  .pv-note{margin-top:28px;max-width:720px}
+  .pv-more .card p{flex:1}
+</style>

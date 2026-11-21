@@ -1,0 +1,263 @@
+---
+import { site } from "../lib/site";
+import BaseLayout from "../layouts/BaseLayout.astro";
+import PageHero from "../components/PageHero.astro";
+import SectionHead from "../components/SectionHead.astro";
+import Divider from "../components/Divider.astro";
+import CtaBand from "../components/CtaBand.astro";
+import Icon from "../components/Icon.astro";
+import Security from "../components/home/Security.astro";
+
+// Data flow, drawn twice from one list: a row on wide screens, a column on phones.
+const flow = [
+  { t: "Dictation", s: "Workstation or phone", tone: "var(--accent)", d: "On-device on the Windows app, or from the paired phone through the cloud relay." },
+  { t: "RadioPad API", s: "Tenant and rules", tone: "var(--fg-2)", audit: true, d: "Resolves your tenant, applies the approved prompt and rulebook, and logs the AI request." },
+  { t: "AI provider", s: "or a local model", tone: "var(--ai)", audit: true, d: "Anthropic Claude or Azure OpenAI, or Ollama or vLLM inside your network." },
+  { t: "Draft", s: "AI text marked", tone: "var(--amber)", d: "Returns to the workstation, marked as AI text until a radiologist reviews or edits it." },
+  { t: "Validation", s: "Rulebook checks", tone: "var(--amber)", audit: true, d: "Laterality, required sections, critical results, measurements, negation and follow-up phrasing." },
+  { t: "Radiologist", s: "reviews and signs", tone: "var(--green)", audit: true, d: "The radiologist resolves blockers and signs. RadioPad never signs." },
+  { t: "Export", s: "FHIR, PDF, DOCX, text", tone: "var(--fg)", audit: true, d: "FHIR R4 DiagnosticReport, PDF, DOCX or plain text." },
+];
+const H = { w: 140, h: 88, step: 170, lane: 150 };
+const V = { w: 250, h: 56, step: 80, lane: 290 };
+const vh = (flow.length - 1) * V.step + V.h;
+
+const deploy = [
+  ["Who operates it", "RadioPad", "Your team, in your cloud account", "Your team, in your data centre"],
+  ["How it ships", "Managed service", "Container images and migration scripts, run with Docker Compose", "Container images and migration scripts, run with Docker Compose"],
+  ["Upgrades", "Rolled out by RadioPad", "You drive promotion", "You drive promotion"],
+  ["Secrets", "Managed by RadioPad", "Your secret manager", "Your secret manager, or restricted env files"],
+  ["AI providers", "Anthropic Claude or Azure OpenAI", "Hosted providers, or a local model you run", "Hosted providers, or a local model inside your network"],
+  ["Backups and recovery", "RadioPad", "Your team, with our runbook", "Your team, with our runbook"],
+  ["SSO over OIDC and MFA", "Yes", "Yes", "Yes"],
+  ["Tenant isolation and audit log", "Yes", "Yes", "Yes"],
+];
+---
+
+<BaseLayout
+  title="Security and governance"
+  description="How RadioPad handles AI and clinical data: the AI never signs, AI text stays marked, every AI call is audited, tenants are isolated, and you can deploy on-prem with a local model."
+>
+  <PageHero
+    crumbs={[{ label: "Security", href: "/security/" }]}
+    eyebrow="Security and governance"
+    lead="The radiologist signs."
+    title="Everything else is on the record."
+    text="RadioPad drafts and validates. Signing stays a radiologist action, AI text stays marked until it is reviewed, and every AI call is written to an append-only audit log. Run it in our cloud, your private cloud or your own data centre."
+  />
+  <Divider />
+  <Security />
+  <Divider />
+
+  <section class="sec" id="audit">
+    <div class="wrap">
+      <SectionHead eyebrow="Audit log" title="A record you can check yourself." sub="The log is written by one append-only path and chained with SHA-256, per tenant." />
+      <div class="grid grid-3">
+        <article class="card" data-reveal>
+          <span class="ic"><Icon name="key" /></span>
+          <h3>Hash-chained</h3>
+          <p>Each entry stores the hash of the entry before it. Changing a past entry breaks the chain from that point on.</p>
+        </article>
+        <article class="card" data-reveal>
+          <span class="ic"><Icon name="doc" /></span>
+          <h3>Append-only</h3>
+          <p>Entries are written, never edited or deleted. There is a single write path, and it only appends.</p>
+        </article>
+        <article class="card" data-reveal>
+          <span class="ic"><Icon name="spark" /></span>
+          <h3>What an AI entry holds</h3>
+          <p>Tenant, provider and model, prompt version, rulebook version, input and output hashes, latency, token counts, and whether the request contained PHI.</p>
+        </article>
+        <article class="card" data-reveal>
+          <span class="ic"><Icon name="shield" /></span>
+          <h3>No patient data in the log</h3>
+          <p>The log records whether a request contained PHI. The PHI itself stays out of the log, and accession numbers are kept as a short hash prefix.</p>
+        </article>
+        <article class="card s-wide" data-reveal>
+          <span class="ic"><Icon name="term" /></span>
+          <h3>Verify it offline</h3>
+          <p>The CLI recomputes the chain locally and reports any break, or pulls new events to a local NDJSON file you can keep.</p>
+          <div class="cli">
+            <code><i>$ </i>radiopad audit verify</code>
+            <button class="copy" type="button" data-copy="radiopad audit verify"><Icon name="copy" /><span>Copy</span></button>
+          </div>
+        </article>
+      </div>
+    </div>
+  </section>
+  <Divider />
+
+  <section class="sec" id="ai">
+    <div class="wrap">
+      <SectionHead eyebrow="AI oversight" title="You choose the model. You see every call." sub="Which provider runs, which prompt it sees and whether its output has drifted are decisions your institution controls and can review." />
+      <div class="grid grid-2">
+        <article class="card beam" data-reveal>
+          <span class="ic"><Icon name="server" /></span>
+          <h3>Provider choice, local models included</h3>
+          <p>Administrators decide which providers are enabled. To keep clinical text inside your network, run a local model.</p>
+          <div class="provs"><span class="prov"><i></i>Anthropic Claude</span><span class="prov"><i></i>Azure OpenAI</span><span class="prov local"><i></i>Ollama, local</span><span class="prov local"><i></i>vLLM, local</span></div>
+        </article>
+        <article class="card" data-reveal>
+          <span class="ic"><Icon name="pulse" /></span>
+          <h3>Drift monitoring</h3>
+          <p>A scheduled job replays your approved validation packs against sandbox providers and raises an alert in the audit log when the quality score drops past a threshold. By default it runs every 6 hours and alerts on a 15-point drop.</p>
+        </article>
+        <article class="card" data-reveal>
+          <span class="ic"><Icon name="pen" /></span>
+          <h3>Per-institution prompt overrides</h3>
+          <p>An institution can override the prompts behind drafting. An override starts as a draft and reaches the AI only after a medical director approves it. The approval is audited with a hash of the prompt.</p>
+        </article>
+        <article class="card" data-reveal>
+          <span class="ic"><Icon name="doc" /></span>
+          <h3>Every AI call audited</h3>
+          <p>Every call is written to the append-only log with the provider, model, prompt version and rulebook version, and whether the request contained PHI. Blocked calls are logged too.</p>
+        </article>
+      </div>
+    </div>
+  </section>
+  <Divider />
+
+  <section class="sec" id="data-flow">
+    <div class="wrap">
+      <SectionHead eyebrow="Data flow" title="Where a report goes, step by step." sub="From the first dictated word to the exported report. Steps marked in green write to the audit log." />
+      <figure class="df" data-reveal>
+        <svg class="df-h" viewBox={`0 0 ${(flow.length - 1) * H.step + H.w} ${H.lane + 44}`} aria-hidden="true">
+          <defs><marker id="dfa-h" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path class="ah" d="M0 0L10 5L0 10z" /></marker></defs>
+          {flow.map((n, i) => {
+            const x = i * H.step, cx = x + H.w / 2;
+            return (
+              <g class="n" style={`--tone:${n.tone}`}>
+                {n.audit && <><line class="tap" x1={cx} y1={H.h + 2} x2={cx} y2={H.lane} /><circle class="dot" cx={cx} cy={H.lane} r="3.5" /></>}
+                <rect x={x + 1} y="1" width={H.w - 2} height={H.h} rx="14" />
+                <text class="t" x={cx} y="42" text-anchor="middle">{n.t}</text>
+                <text class="s" x={cx} y="64" text-anchor="middle">{n.s}</text>
+                {i < flow.length - 1 && <line class="ar" x1={x + H.w + 2} y1={H.h / 2 + 1} x2={x + H.step - 4} y2={H.h / 2 + 1} marker-end="url(#dfa-h)" />}
+              </g>
+            );
+          })}
+          <g class="lane"><rect x="1" y={H.lane} width={(flow.length - 1) * H.step + H.w - 2} height="36" rx="10" /><text x="16" y={H.lane + 23}>audit.log · append-only, hash-chained</text></g>
+        </svg>
+        <svg class="df-v" viewBox={`0 0 ${V.lane + 40} ${vh + 2}`} aria-hidden="true">
+          <defs><marker id="dfa-v" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path class="ah" d="M0 0L10 5L0 10z" /></marker></defs>
+          {flow.map((n, i) => {
+            const y = i * V.step + 1, cy = y + V.h / 2;
+            return (
+              <g class="n" style={`--tone:${n.tone}`}>
+                {n.audit && <><line class="tap" x1={V.w + 2} y1={cy} x2={V.lane} y2={cy} /><circle class="dot" cx={V.lane} cy={cy} r="3.5" /></>}
+                <rect x="1" y={y} width={V.w} height={V.h} rx="12" />
+                <text class="t" x="18" y={y + 24}>{n.t}</text>
+                <text class="s" x="18" y={y + 43}>{n.s}</text>
+                {i < flow.length - 1 && <line class="ar" x1={V.w / 2} y1={y + V.h + 2} x2={V.w / 2} y2={y + V.step - 4} marker-end="url(#dfa-v)" />}
+              </g>
+            );
+          })}
+          <g class="lane"><rect x={V.lane} y="1" width="36" height={vh} rx="10" /><text transform={`translate(${V.lane + 23} 16) rotate(90)`}>audit.log · append-only</text></g>
+        </svg>
+        <figcaption>
+          <ol class="steps">
+            {flow.map((n) => <li><b>{n.t === "AI provider" ? "AI provider or local model" : n.t === "Radiologist" ? "Radiologist signs" : n.t}</b><span>{n.d}</span></li>)}
+          </ol>
+        </figcaption>
+      </figure>
+    </div>
+  </section>
+  <Divider />
+
+  <section class="sec" id="deployment">
+    <div class="wrap">
+      <SectionHead eyebrow="Deployment" title="Three ways to run it." sub="The same product in each. What changes is who runs the servers and where the data lives." />
+      <div class="tbl-wrap" data-reveal>
+        <table class="dtable">
+          <caption class="sr">Deployment options compared</caption>
+          <thead><tr><th scope="col"><span class="sr">Aspect</span></th><th scope="col">RadioPad cloud</th><th scope="col">Private cloud</th><th scope="col">On-prem</th></tr></thead>
+          <tbody>
+            {deploy.map(([k, ...v]) => (
+              <tr><th scope="row">{k}</th>{v.map((c) => <td class:list={{ yes: c === "Yes" }}>{c}</td>)}</tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+      <p class="notice info dep-note" data-reveal><Icon name="info" /><span>This page describes what RadioPad does. It is not a certification or a compliance statement. The regulatory obligations of your deployment, including any agreements with AI providers, remain yours to establish.</span></p>
+    </div>
+  </section>
+  <Divider />
+
+  <section class="sec" id="disclosure">
+    <div class="wrap">
+      <SectionHead eyebrow="Responsible disclosure" title="Found a vulnerability? Tell us privately." />
+      <div class="split disc">
+        <div data-reveal>
+          <p class="d">Please do not open a public issue. Email us with:</p>
+          <ul class="ticks">
+            <li><Icon name="check" />A description and an assessment of impact</li>
+            <li><Icon name="check" />Reproduction steps or a proof of concept</li>
+            <li><Icon name="check" />Affected versions or commits</li>
+            <li><Icon name="check" />Your preferred disclosure timeline</li>
+          </ul>
+          <div class="cta-row"><a class="btn btn-primary" href={`mailto:${site.securityEmail}`}><Icon name="lock" /> {site.securityEmail}</a></div>
+          <h3 class="disc-h">How we handle a report</h3>
+          <ol class="steps">
+            <li><b>You tell us privately</b><span>By email, before any public disclosure.</span></li>
+            <li><b>We confirm and rate it</b><span>A severity under CVSS v3.1, and a private fix branch.</span></li>
+            <li><b>We ship the fix</b><span>An advisory is published, with credit if you want it.</span></li>
+            <li><b>CVE for serious issues</b><span>We request a CVE for anything rated CVSS 7.0 or higher.</span></li>
+          </ol>
+        </div>
+        <div class="panel" data-reveal>
+          <div class="panel-h"><span>Response times</span><span>from SECURITY.md</span></div>
+          <dl class="specs">
+            <div><dt>Acknowledgement</dt><dd>Within 3 business days</dd></div>
+            <div><dt>Triage</dt><dd>Within 7 days</dd></div>
+            <div><dt>Fix, High and Critical</dt><dd>Aim: within 30 days</dd></div>
+            <div><dt>Fix, Medium</dt><dd>Aim: within 90 days</dd></div>
+            <div><dt>Fix, Low</dt><dd>Best effort</dd></div>
+          </dl>
+          <div class="mini">
+            <h5>Out of scope</h5>
+            <p>Misconfiguration of a self-hosted deployment by its operator, theoretical attacks against the 127.0.0.1-only development mode, and social engineering of staff.</p>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <CtaBand lead="Bring your security team." title="We'll walk the whole path." text="Book a demo with your IT and governance leads to go through deployment, identity, audit and AI routing on your terms." />
+</BaseLayout>
+
+<style>
+  .sr{position:absolute;width:1px;height:1px;overflow:hidden;clip-path:inset(50%);white-space:nowrap}
+  .card .provs{display:flex;flex-wrap:wrap;gap:8px;margin-top:14px}
+  .card .cli{margin-top:14px}
+  .grid .card.s-wide{grid-column:span 2}
+  @media (max-width:640px){.grid .card.s-wide{grid-column:auto}}
+  /* data flow */
+  .df{margin:0;display:grid;gap:32px}
+  .df svg{display:block;width:100%;height:auto;overflow:visible}
+  .df-v{display:none;max-width:360px}
+  @media (max-width:760px){.df-h{display:none}.df .df-v{display:block}}
+  .n rect{fill:var(--bg-1);stroke:var(--tone);stroke-opacity:.6;stroke-width:1.2}
+  .n .t{fill:var(--fg);font:600 15px var(--font-display);letter-spacing:-.01em}
+  .n .s{fill:var(--fg-3);font:400 12px var(--font-body)}
+  .ar{stroke:var(--line-3);stroke-width:1.5;stroke-dasharray:4 4;animation:dfFlow 1.1s linear infinite}
+  .ah{fill:var(--line-3)}
+  .tap{stroke:var(--green);stroke-opacity:.55;stroke-dasharray:2 3}
+  .dot{fill:var(--green)}
+  .lane rect{fill:var(--bg-1);stroke:var(--line-2);stroke-dasharray:3 4}
+  .lane text{fill:var(--fg-3);font:400 12px var(--font-mono);letter-spacing:.04em}
+  @keyframes dfFlow{to{stroke-dashoffset:-16}}
+  @media (prefers-reduced-motion:reduce){.ar{animation:none}}
+  .steps{list-style:none;margin:0;padding:0;display:grid;gap:10px;counter-reset:st}
+  .df .steps{grid-template-columns:repeat(auto-fit,minmax(min(100%,240px),1fr))}
+  .steps li{counter-increment:st;display:grid;grid-template-columns:28px minmax(0,1fr);column-gap:12px;row-gap:2px;font-size:.9rem;color:var(--fg-2);line-height:1.5}
+  .steps li::before{content:counter(st);grid-row:span 2;width:28px;height:28px;border-radius:50%;display:grid;place-items:center;border:1px solid var(--line-2);font:500 .74rem var(--font-mono);color:var(--fg-2)}
+  .steps b{color:var(--fg);font-weight:600}
+  /* deployment and disclosure */
+  .dtable th[scope="row"]{color:var(--fg);font-weight:500;text-align:left;background:none;font-family:var(--font-body);font-size:.9rem;letter-spacing:0;text-transform:none}
+  .dep-note{margin-top:16px}
+  .disc{align-items:start}
+  .disc .ticks{margin-top:14px}
+  .disc .cta-row{margin-top:24px}
+  .disc-h{margin-top:40px;margin-bottom:18px;font-size:1.3rem}
+  .disc .btn{white-space:normal;height:auto;min-height:44px;padding-block:10px}
+  .disc .mini{margin-top:6px}
+</style>
