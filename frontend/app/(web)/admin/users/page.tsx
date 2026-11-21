@@ -144,6 +144,7 @@ export default function UsersAdminPage() {
         tempPassword: newTempPw.trim() || undefined,
       });
       setCredential({ kind: 'created', email: r.email, tempPassword: r.tempPassword });
+      if (r.inviteSent) flash(`Invite email sent to ${r.email}. Give them the temporary password yourself — it is not in the email.`);
       setNewEmail('');
       setNewName('');
       setNewTempPw('');

@@ -322,7 +322,8 @@ public class UsersController : TenantedController
 {
     private readonly RadioPadDbContext _db;
     private readonly IAuditLog _audit;
-    public UsersController(RadioPadDbContext db, IAuditLog audit) { _db = db; _audit = audit; }
+    private readonly IEmailSender _email;
+    public UsersController(RadioPadDbContext db, IAuditLog audit, IEmailSender email) { _db = db; _audit = audit; _email = email; }
 
     public record CreateUserDto(string Email, string? DisplayName, string Role, string? TempPassword);
     public record UpdateUserDto(string? DisplayName, string? Role, bool? IsActive);
@@ -412,7 +413,36 @@ public class UsersController : TenantedController
                 role = role.ToString(),
             }),
         }, ct);
-        return Ok(new { id = created.Id, email = created.Email, displayName = created.DisplayName, role = role.ToString(), tempPassword });
+        // Best-effort invite: tells the new user they have an account and where to sign
+        // in. It never carries the temporary password — the admin hands that over
+        // separately — and a mail failure must not fail the creation.
+        var inviteSent = await TrySendInviteAsync(created.Email, tenant.DisplayName, ct);
+        return Ok(new { id = created.Id, email = created.Email, displayName = created.DisplayName, role = role.ToString(), tempPassword, inviteSent });
+    }
+
+    private async Task<bool> TrySendInviteAsync(string to, string orgName, CancellationToken ct)
+    {
+        orgName = orgName.ReplaceLineEndings(" "); // it goes into the Subject header
+        const string download = "https://radiopadstudio.com/download";
+        var plain = $"You have been added to \"{orgName}\" on RadioPad.\r\n\r\n"
+            + $"1. Download the desktop app: {download}\r\n"
+            + $"2. Sign in with this email address ({to}) and the temporary password your administrator gives you.\r\n"
+            + "3. Set up your authenticator app when prompted.\r\n\r\n"
+            + "This email does not contain your password. If you were not expecting it, you can ignore it.\r\n\r\n-- RadioPad\r\n";
+        var org = System.Net.WebUtility.HtmlEncode(orgName);
+        var html = $"<p>You have been added to <strong>{org}</strong> on RadioPad.</p>"
+            + $"<ol><li><a href=\"{download}\">Download the desktop app</a></li>"
+            + $"<li>Sign in with this email address ({System.Net.WebUtility.HtmlEncode(to)}) and the temporary password your administrator gives you.</li>"
+            + "<li>Set up your authenticator app when prompted.</li></ol>"
+            + "<p>This email does not contain your password. If you were not expecting it, you can ignore it.</p>";
+        try
+        {
+            return await _email.SendAsync(new EmailMessage(To: to, Subject: $"You have been added to {orgName} on RadioPad", HtmlBody: html, PlainBody: plain), ct);
+        }
+        catch (Exception)
+        {
+            return false;
+        }
     }
 
     /// <summary>Master-admin profile/role/active-state update.</summary>

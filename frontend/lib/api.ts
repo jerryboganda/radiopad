@@ -2839,7 +2839,7 @@ export const api = {
     list: () => request<UserRow[]>('/api/users'),
     roles: () => request<{ roles: Array<{ value: string; permissions: number }> }>('/api/users/roles'),
     create: (body: { email: string; displayName?: string; role: string; tempPassword?: string }) =>
-      request<{ id: string; email: string; displayName: string; role: string; tempPassword: string }>(
+      request<{ id: string; email: string; displayName: string; role: string; tempPassword: string; inviteSent?: boolean }>(
         '/api/users',
         { method: 'POST', body: JSON.stringify(body) },
       ),

@@ -91,7 +91,7 @@ export default function ReportingPage() {
           </h1>
           <p className="rp-page-sub">Radiology audio dictation &amp; positive findings</p>
         </div>
-        <button type="button" className="primary" onClick={() => setIsModalOpen(true)} data-testid="new-report-btn">
+        <button type="button" className="primary whitespace-nowrap shrink-0" onClick={() => setIsModalOpen(true)} data-testid="new-report-btn">
           <Plus size={16} aria-hidden />
           New Report
         </button>

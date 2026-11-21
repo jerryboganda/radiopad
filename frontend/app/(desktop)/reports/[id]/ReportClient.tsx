@@ -1792,7 +1792,7 @@ export default function ReportPage() {
         meta={demographics || undefined}
         chips={
           <>
-            <ReportLifecycle status={report.status} />
+            <span className={`rp-status ${statusTone(report.status)}`}>{statusLabel(report.status)}</span>
             {primarySigned && <span className="rp-status success">Signed</span>}
           </>
         }
@@ -1851,7 +1851,7 @@ export default function ReportPage() {
         <div className="rp-composer-main">
           <div className="rp-composer-head">
             <h1 className="rp-composer-title">Report Composer</h1>
-            <span className={`rp-status ${statusTone(report.status)}`}>{statusLabel(report.status)}</span>
+            <ReportLifecycle status={report.status} />
           </div>
 
           <div className="rp-tabs mb-4" role="tablist" aria-label="Report workspace tabs">

@@ -339,6 +339,7 @@ export default function NewReportWizard() {
               key={`intake-history-${formKey}`}
               sectionKey="intake-history"
               ariaLabel="Clinical history"
+              className="rp-rte-short"
               onChange={setHistory}
             />
           </div>

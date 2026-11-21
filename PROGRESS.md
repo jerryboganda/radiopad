@@ -2778,3 +2778,12 @@ Total tracked PRD ids: **129** (was 112; iter-32 added 17 finer-grained sub-ids)
 - **Still open**: email invites for new users (backend has `IEmailSender` and a magic-link flow, but what the invite may contain — never the temporary password — is an owner decision); deeper mobile layout polish (not viewable in this session).
 - **Not verified**: no visual check in either theme (no backend + login in this session).
 - **Scope**: frontend → desktop release required (DESK-001) once the operator asks to ship it; pushing also redeploys the web admin build.
+
+## Iter-61 - Workflow streamlining, part 4: visual verification, intake polish, invite email
+
+- **Date**: 2026-11-21
+- **Visual verification (first time in this series)**: no .NET SDK is installed on the dev machine and the bundled sidecar binaries are placeholders, so the screens were viewed with `next dev --webpack` against a throwaway mock API on 127.0.0.1:7457 (kept out of the repo). Checked in **light and dark**: dashboard + first-run checklist, sidebar (folded and expanded groups), one-screen intake, report editor (queue-first rail, folded study details, lifecycle steps), settings hub, the confirm dialog styling, and mobile Reporting + Companion at 375x812. Real data, sign/export and dictation were NOT exercised — the mock returns canned rows.
+- **Fixes found by looking**: (1) the lifecycle steps made the patient bar scroll sideways — moved to the composer heading, patient bar keeps its single status pill; (2) Generate sat below the fold on the intake — the footer row is now sticky above the dictation bar and the clinical-history editor is shorter (`.rp-rte-short`); (3) mobile Reporting header button wrapped to two lines — `whitespace-nowrap`.
+- **Invite email** (`UsersController.Create`): after creating a user the API sends a best-effort email — organisation name, desktop download link, "sign in with this address and the temporary password your administrator gives you", authenticator note. It never contains the password, and a mail failure never fails the creation. Response gains `inviteSent`; the web Users page confirms when it was sent. **Backend change not compiled or tested locally (no dotnet)** — CI decides.
+- **Dev tooling note**: Turbopack panics ("Next.js package not found") when `next dev` is launched from the outer `D:\Projects\RadioPad` folder; use `--webpack` there.
+- **Scope**: backend + frontend → API image deploy and desktop release required once the operator asks to ship.
