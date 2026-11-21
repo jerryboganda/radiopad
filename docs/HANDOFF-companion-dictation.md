@@ -5,6 +5,10 @@
 > A fresh session can start from this file. Persistent memory
 > `radiopad-companion-qr-login` (auto-loads) covers the same ground.
 
+> **Update 2026-11-21 (ops):** production lives at `/opt/docker/radiopad` (not `/opt/radiopad`),
+> `_deploy-images.sh` no longer exists, and `radiopadstudio.com` is behind Cloudflare. Deploy
+> commands in §7 are corrected; see `PROGRESS.md` (2026-11-21) for the full change.
+
 Repo root: `E:\RadioPad MEGA Folder\RADIOPAD` · GitHub: `jerryboganda/radiopad` (branch `main`)
 
 ---
@@ -137,15 +141,18 @@ mobile-bundle can finish after desktop-bundle.
 
 ## 7. Deploy / build / verify playbook (unchanged from repo)
 
-- **Backend:** commit+push `main` → `web-deploy-images` CI builds api image; then
-  `ssh root@185.252.233.186 "/opt/radiopad/_deploy-images.sh [run_id]"`. (Round 4 had NO backend
-  change; Rounds 1+3 did.)
+- **Backend:** commit+push `main` → `web-deploy-images` CI builds the api/web/marketing images
+  and its `deploy` job ships them to `/opt/docker/radiopad` (skipped if the `VPS_*` secrets are
+  unset). Manual fallback, on the VPS:
+  `gh run download <run_id> --repo jerryboganda/radiopad -n radiopad-images -D /tmp/rpimg &&
+  gunzip -c /tmp/rpimg/radiopad-images.tar.gz | docker load &&
+  cd /opt/docker/radiopad && docker compose up -d`. (Round 4 had NO backend change; Rounds 1+3 did.)
 - **Desktop release:** `pnpm release:desktop` (bumps tauri.conf+Cargo, tags `vX.Y.Z`, pushes).
   NEEDS A CLEAN TREE — move the two untracked items aside first (they otherwise block it):
   `UI UX SCREENS/` and `docs/HANDOFF-*.md`. Then restore them after.
 - **APK:** `gh run download <mobile-bundle run id> -n radiopad-android-debug -D <dir>`.
   NOTE: `gh run download` and `gh release upload` OFTEN TIME OUT here — just retry.
-- **VPS:** `root@185.252.233.186`, `/opt/radiopad`. To refresh the `/api/mobile/latest` 30-min
+- **VPS:** `root@185.252.233.186`, `/opt/docker/radiopad`. To refresh the `/api/mobile/latest` 30-min
   cache immediately: `docker restart radiopad-api`.
 
 ## 8. Local dev / test tips proven this session

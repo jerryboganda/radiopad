@@ -5,6 +5,12 @@
 > Persistent memories also cover this: `radiopad-surface-specialization`,
 > `radiopad-web-topology`, `radiopad-npm-vhost-clobber` (auto-load next session).
 
+> **Update 2026-11-21 (ops):** production moved to `radiopadstudio.com` (marketing) +
+> `admin.radiopadstudio.com` (admin app), behind Cloudflare → NPM, compose project
+> `/opt/docker/radiopad`. `/opt/radiopad`, `_deploy-images.sh`, the compose override and the
+> separate `radiopad-admin` container are gone. §4, §6 and §10 are corrected; the
+> `radiopad.polytronx.com` notes in §4 are kept as history. See `PROGRESS.md` (2026-11-21).
+
 Repo root: `E:\RadioPad MEGA Folder\RADIOPAD`  ·  GitHub: `jerryboganda/radiopad` (branch `main`)
 Approved plan: `C:\Users\Admin\.claude\plans\please-i-want-to-lexical-sunset.md`
 
@@ -81,7 +87,14 @@ Cloudflare→NPM→web→api chain (401 = auth reached; would be 101 with a vali
 ## 4. Prod infrastructure facts (VPS)
 
 - **VPS:** `root@185.252.233.186` (SSH key already works: `ssh root@185.252.233.186`). Shared
-  multi-app box. App dir `/opt/radiopad`.
+  multi-app box. App dir `/opt/docker/radiopad` (compose + `.secrets.env` + `data/`; images
+  only, no source checkout).
+- **Current topology (2026-11-21):** Cloudflare (Full strict) → NPM proxy host 42
+  (`radiopadstudio.com`, `www`) → `radiopad-marketing`, and host 43
+  (`admin.radiopadstudio.com`) → `radiopad-web`; both → `radiopad-api:7457`. Both hosts set
+  `real_ip_header CF-Connecting-IP;` in NPM's advanced config — keep it, or the API sees
+  Cloudflare IPs. No compose override file.
+- **Historical (July, `radiopad.polytronx.com`) — superseded, kept for reference:**
 - **Topology:** Cloudflare → NPM (`nginx-proxy-manager-app-1`, host :443) → containers.
   `radiopad.polytronx.com` is a **Cloudflare origin**; its NPM vhost is a HAND-MAINTAINED
   custom file: inside the NPM container `/data/nginx/custom/radiopad-origin.conf`
@@ -123,9 +136,12 @@ If a typecheck fails with `Cannot find module '../../app/.../page.js'`, run `rm 
 1. **Commit + push to `main`.** Any change under `backend/** frontend/** deploy/vps/**
    package.json …` triggers the **`web-deploy-images`** CI (builds `radiopad-api` +
    `radiopad-web` images → uploads a `radiopad-images` artifact). No registry.
-2. **Pull onto the VPS:** `ssh root@185.252.233.186 "/opt/radiopad/_deploy-images.sh [run_id]"`
-   (defaults to latest successful web-deploy-images run). It `gh run download`s the artifact,
-   `docker load`s, `docker compose up -d`. Recreates api + web + admin containers.
+2. **Deploy to the VPS:** the same workflow's `deploy` job ships the images to
+   `/opt/docker/radiopad` and runs `docker compose up -d` (skipped if the `VPS_*` secrets are
+   unset). Manual fallback, on the VPS:
+   `gh run download <run_id> --repo jerryboganda/radiopad -n radiopad-images -D /tmp/rpimg &&
+   gunzip -c /tmp/rpimg/radiopad-images.tar.gz | docker load &&
+   cd /opt/docker/radiopad && docker compose up -d`. Recreates api + web + marketing.
    Backend runs EF migrations on startup.
 3. **Desktop release:** `pnpm release:desktop` (bumps `tauri.conf.json`+`Cargo.toml`, commits,
    tags `vX.Y.Z`, pushes → `desktop-bundle` builds+signs MSI/AppImage + creates the release,
@@ -176,14 +192,14 @@ build + 799 tests green.
 
 ```bash
 ssh root@185.252.233.186 '
-Rm="--resolve radiopad.polytronx.com:443:127.0.0.1"; Ra="--resolve admin.radiopad.polytronx.com:443:127.0.0.1"
+Rm="--resolve radiopadstudio.com:443:127.0.0.1"; Ra="--resolve admin.radiopadstudio.com:443:127.0.0.1"
 WS="-H Connection:Upgrade -H Upgrade:websocket -H Sec-WebSocket-Version:13 -H Sec-WebSocket-Key:dGhlIHNhbXBsZSBub25jZQ=="
-curl -sk $Rm -o /dev/null -w "marketing/ %{http_code}\n" https://radiopad.polytronx.com/
-curl -sk $Rm -o /dev/null -w "api %{http_code}\n" https://radiopad.polytronx.com/api/health
-curl -sk --http1.1 $Rm $WS -o /dev/null -w "ws %{http_code}(401=ok)\n" https://radiopad.polytronx.com/ws/companion
-curl -sk $Ra -o /dev/null -w "admin/ %{http_code}\n" https://admin.radiopad.polytronx.com/
-curl -sk $Ra -o /dev/null -w "admin/admin/users %{http_code}\n" https://admin.radiopad.polytronx.com/admin/users/
-cd /opt/radiopad && docker compose ps --format "{{.Name}}: {{.State}}"'
+curl -sk $Rm -o /dev/null -w "marketing/ %{http_code}\n" https://radiopadstudio.com/
+curl -sk $Rm -o /dev/null -w "api %{http_code}\n" https://radiopadstudio.com/api/health
+curl -sk --http1.1 $Rm $WS -o /dev/null -w "ws %{http_code}(401=ok)\n" https://radiopadstudio.com/ws/companion
+curl -sk $Ra -o /dev/null -w "admin/ %{http_code}\n" https://admin.radiopadstudio.com/
+curl -sk $Ra -o /dev/null -w "admin/admin/users %{http_code}\n" https://admin.radiopadstudio.com/admin/users/
+cd /opt/docker/radiopad && docker compose ps --format "{{.Name}}: {{.State}}"'
 ```
 
 Expected: 200 / 200 / 401 / 200 / 200, three containers running.

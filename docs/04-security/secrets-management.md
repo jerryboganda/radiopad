@@ -20,7 +20,7 @@
 - **Hosted:** Cloud-secret-manager (AWS Secrets Manager / GCP Secret Manager / Azure Key Vault) injected as env vars.
 - **VPS production:** provider secret store or OS-level secret manager; inject `RADIOPAD_DB`, OIDC, SMTP, Stripe, KMS, and webhook secrets as environment variables readable only by the RadioPad service account. Do not bake secrets into compose files or images.
 - **On-prem:** Customer's secret manager or `/etc/radiopad/secrets/*.env` with `chmod 600`.
-- **VPS compose:** `/opt/radiopad/.secrets.env` with `chmod 600`; see `deploy/vps/README.md`. Do not commit this file or copy it into the source tree.
+- **VPS compose:** `/opt/docker/radiopad/.secrets.env` with `chmod 600`; see `deploy/vps/README.md`. Do not commit this file or copy it into the source tree.
 
 ## In-code reference
 
