@@ -14,6 +14,7 @@ import ErrorState from '@/components/ui/ErrorState';
 import StatusBadge, { reportStatusTone } from '@/components/ui/StatusBadge';
 import AnimatedNumber from '@/components/ui/AnimatedNumber';
 import GettingStarted from '@/components/ui/GettingStarted';
+import { AUDIT_ACTION_LABEL } from '@/lib/auditLabels';
 
 /**
  * Dashboard — the landing page of the desktop app. One glance answers:
@@ -27,19 +28,6 @@ type AuditEvent = {
   createdAt: string;
 };
 
-const ACTION_LABEL: Record<number, string> = {
-  0: 'AI request',
-  1: 'AI response',
-  2: 'Report edited',
-  3: 'Report exported',
-  4: 'Report acknowledged',
-  5: 'Provider blocked',
-  6: 'Rulebook approved',
-  7: 'Rulebook deprecated',
-  8: 'User login',
-  9: 'Policy violation',
-  54: 'Provider configured',
-};
 
 export default function DashboardPage() {
   const router = useRouter();
@@ -310,7 +298,7 @@ function waitTime(iso: string): string {
 
 function actionLabel(a: AuditEvent['action']): string {
   if (typeof a === 'string') return a;
-  return ACTION_LABEL[a] ?? `Action ${a}`;
+  return AUDIT_ACTION_LABEL[a] ?? `Action ${a}`;
 }
 
 function badgeFor(a: AuditEvent['action']): string {

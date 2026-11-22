@@ -7,6 +7,7 @@ import PageHeader from '@/components/shell/PageHeader';
 import { TableSkeleton } from '@/components/ui/Skeleton';
 import EmptyState from '@/components/ui/EmptyState';
 import ErrorState from '@/components/ui/ErrorState';
+import { AUDIT_ACTION_LABEL } from '@/lib/auditLabels';
 
 type AuditEvent = {
   id: string;
@@ -19,19 +20,6 @@ type AuditEvent = {
   integrityChain: string;
 };
 
-const ACTION_LABEL: Record<number, string> = {
-  0: 'AI request',
-  1: 'AI response',
-  2: 'Report edited',
-  3: 'Report exported',
-  4: 'Report acknowledged',
-  5: 'Provider blocked',
-  6: 'Rulebook approved',
-  7: 'Rulebook deprecated',
-  8: 'User login',
-  9: 'Policy violation',
-  54: 'Provider configured',
-};
 
 export default function AuditPage() {
   const [events, setEvents] = useState<AuditEvent[]>([]);
@@ -107,7 +95,7 @@ export default function AuditPage() {
 
 function actionLabel(a: AuditEvent['action']) {
   if (typeof a === 'string') return a;
-  return ACTION_LABEL[a] ?? `Action ${a}`;
+  return AUDIT_ACTION_LABEL[a] ?? `Action ${a}`;
 }
 function badgeFor(a: AuditEvent['action']) {
   const n = typeof a === 'number' ? a : -1;
