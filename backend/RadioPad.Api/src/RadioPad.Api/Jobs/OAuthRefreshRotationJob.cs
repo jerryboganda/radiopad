@@ -24,6 +24,7 @@ namespace RadioPad.Api.Jobs;
 /// queue). The <see cref="ScanOnceAsync"/> body is byte-identical and stays public
 /// so tests can drive a pass deterministically.
 /// </summary>
+[Hangfire.Queue(HangfireSetup.QueueMaintenance)]
 public sealed class OAuthRefreshRotationJob
 {
     private readonly IServiceScopeFactory _scopeFactory;

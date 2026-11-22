@@ -28,6 +28,7 @@ namespace RadioPad.Api.Jobs;
 /// <see cref="SweepAsync"/> body is byte-identical, and stays <c>internal</c> so
 /// the existing reflection-driven tests re-point with only a type-name change.
 /// </summary>
+[Hangfire.Queue(HangfireSetup.QueueMaintenance)]
 public sealed class RetentionSweepJob
 {
     private readonly IServiceScopeFactory _scopeFactory;

@@ -22,6 +22,7 @@ namespace RadioPad.Api.Jobs;
 /// <see cref="BatchCap"/> per pass as a storm guard. <see cref="ScanOnceAsync"/>
 /// stays public so tests can drive a pass deterministically.
 /// </summary>
+[Hangfire.Queue(HangfireSetup.QueueMaintenance)]
 public sealed class CriticalResultEscalationJob
 {
     /// <summary>

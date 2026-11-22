@@ -31,6 +31,7 @@ namespace RadioPad.Api.Jobs;
 /// so moving to Hangfire changes nothing. <see cref="ScanOnceAsync"/> stays public
 /// so tests can drive a pass deterministically.
 /// </summary>
+[Hangfire.Queue(HangfireSetup.QueueMaintenance)]
 public sealed class AnomalyScanJob
 {
     private static readonly TimeSpan Window = TimeSpan.FromMinutes(5);

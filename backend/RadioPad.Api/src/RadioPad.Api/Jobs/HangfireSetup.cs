@@ -120,19 +120,19 @@ public static class HangfireSetup
         // AddOrUpdate expression body is a direct method call (Hangfire rejects a
         // Convert-wrapped Task<T> body from the sweep methods that return values).
         RecurringJob.AddOrUpdate<RetentionSweepJob>(
-            "retention-sweep", QueueMaintenance,
+            "retention-sweep",
             j => j.RunRecurringAsync(CancellationToken.None), "0 */6 * * *");
 
         RecurringJob.AddOrUpdate<CriticalResultEscalationJob>(
-            "critical-result-escalation", QueueMaintenance,
+            "critical-result-escalation",
             j => j.RunRecurringAsync(CancellationToken.None), "* * * * *");
 
         RecurringJob.AddOrUpdate<AnomalyScanJob>(
-            "anomaly-scan", QueueMaintenance,
+            "anomaly-scan",
             j => j.RunRecurringAsync(CancellationToken.None), "* * * * *");
 
         RecurringJob.AddOrUpdate<OAuthRefreshRotationJob>(
-            "oauth-refresh-rotation", QueueMaintenance,
+            "oauth-refresh-rotation",
             j => j.RunRecurringAsync(CancellationToken.None), "*/15 * * * *");
 
         // Model drift: cron derived from ResolveInterval() hours so the
@@ -140,7 +140,7 @@ public static class HangfireSetup
         // valid 1..24 hour-of-day step.
         var driftHours = Math.Clamp((int)Math.Round(ModelDriftDetectionJob.ResolveInterval().TotalHours), 1, 24);
         RecurringJob.AddOrUpdate<ModelDriftDetectionJob>(
-            "model-drift-detection", QueueMaintenance,
+            "model-drift-detection",
             j => j.RunRecurringAsync(CancellationToken.None), $"0 */{driftHours} * * *");
 
         // PR-N2 — the three recurring cron-platform jobs. (WebhookDispatchJob is enqueue-only,
@@ -148,15 +148,15 @@ public static class HangfireSetup
         // AI cost rollup aggregates the prior day at 01:30 UTC (before retention can purge it);
         // orphaned-draft cleanup runs weekly on Sunday at 03:00 UTC.
         RecurringJob.AddOrUpdate<AuditExportRollupJob>(
-            "audit-export-rollup", QueueMaintenance,
+            "audit-export-rollup",
             j => j.RunRecurringAsync(CancellationToken.None), "0 2 * * *");
 
         RecurringJob.AddOrUpdate<AiCostRollupJob>(
-            "ai-cost-rollup", QueueMaintenance,
+            "ai-cost-rollup",
             j => j.RunRecurringAsync(CancellationToken.None), "30 1 * * *");
 
         RecurringJob.AddOrUpdate<OrphanedDraftCleanupJob>(
-            "orphaned-draft-cleanup", QueueMaintenance,
+            "orphaned-draft-cleanup",
             j => j.RunRecurringAsync(CancellationToken.None), "0 3 * * 0");
     }
 }

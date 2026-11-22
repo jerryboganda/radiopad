@@ -24,6 +24,7 @@ namespace RadioPad.Api.Jobs;
 /// <see cref="RunAllTenantsAsync"/> and <see cref="GetStatusAsync"/> stay public
 /// because <c>DriftController</c> invokes them for the admin drift endpoints.
 /// </summary>
+[Hangfire.Queue(HangfireSetup.QueueMaintenance)]
 public sealed class ModelDriftDetectionJob
 {
     private readonly IServiceScopeFactory _scopeFactory;
