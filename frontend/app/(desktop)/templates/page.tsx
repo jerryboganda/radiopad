@@ -47,7 +47,7 @@ type UsageState = {
 const EMPTY: Draft = {
   templateId: '',
   name: '',
-  modality: 'CT',
+  modality: '',
   bodyPart: '',
   contrast: '',
   subspecialty: '',
@@ -119,6 +119,17 @@ export default function TemplatesPage() {
   }, []);
 
   useEffect(() => { load(); }, [load]);
+
+  // Modality / body-part options come from the admin-managed catalogs (the same codes reports use,
+  // so a template's modality always matches a report's). Empty on fetch failure → free-text body part.
+  const [modalityCodes, setModalityCodes] = useState<string[]>([]);
+  const [bodyPartCodes, setBodyPartCodes] = useState<string[]>([]);
+  useEffect(() => {
+    api.modalities.list().then((rows) => setModalityCodes(rows.filter((m) => m.active).map((m) => m.code))).catch(() => {});
+    api.bodyParts.list().then((rows) => setBodyPartCodes(rows.filter((b) => b.active).map((b) => b.code))).catch(() => {});
+  }, []);
+  /** Catalog codes plus the draft's saved value, so editing never displays a wrong selection. */
+  const withSaved = (codes: string[], saved: string) => (saved && !codes.includes(saved) ? [saved, ...codes] : codes);
 
   function newTemplate() {
     setDraft({ ...EMPTY, sections: EMPTY.sections.map((s) => ({ ...s })) });
@@ -343,13 +354,25 @@ export default function TemplatesPage() {
             <div className="rp-row" style={{ gap: 12 }}>
               <label className="rp-field" style={{ flex: 1 }}>
                 <span>Modality</span>
-                <select className="rp-input" value={draft.modality} onChange={(e) => setDraft({ ...draft, modality: e.target.value })}>
-                  {['CT', 'MRI', 'XR', 'US', 'NM', 'PET', 'MG'].map((m) => <option key={m}>{m}</option>)}
-                </select>
+                {modalityCodes.length > 0 ? (
+                  <select className="rp-input" value={draft.modality} onChange={(e) => setDraft({ ...draft, modality: e.target.value })}>
+                    <option value="">—</option>
+                    {withSaved(modalityCodes, draft.modality).map((m) => <option key={m}>{m}</option>)}
+                  </select>
+                ) : (
+                  <input className="rp-input" value={draft.modality} onChange={(e) => setDraft({ ...draft, modality: e.target.value })} />
+                )}
               </label>
               <label className="rp-field" style={{ flex: 1 }}>
                 <span>Body part</span>
-                <input className="rp-input" value={draft.bodyPart} onChange={(e) => setDraft({ ...draft, bodyPart: e.target.value })} />
+                {bodyPartCodes.length > 0 ? (
+                  <select className="rp-input" value={draft.bodyPart} onChange={(e) => setDraft({ ...draft, bodyPart: e.target.value })}>
+                    <option value="">—</option>
+                    {withSaved(bodyPartCodes, draft.bodyPart).map((b) => <option key={b}>{b}</option>)}
+                  </select>
+                ) : (
+                  <input className="rp-input" value={draft.bodyPart} onChange={(e) => setDraft({ ...draft, bodyPart: e.target.value })} />
+                )}
               </label>
               <label className="rp-field" style={{ flex: 1 }}>
                 <span>Contrast</span>

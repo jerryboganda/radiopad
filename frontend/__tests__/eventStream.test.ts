@@ -204,6 +204,19 @@ describe('EventStreamManager — event mapping', () => {
     off();
   });
 
+  it('delivers tenant-wide `dictation` signals as typed events', () => {
+    const { connect, state } = makeConnect();
+    const mgr = new EventStreamManager({ connect });
+    const seen: AppEvent[] = [];
+    const off = mgr.subscribe((e) => seen.push(e));
+    const data = { kind: 'uploaded', reportId: 'r1', dictationId: 'd1', status: 'Pending' };
+
+    state.fireLast({ event: 'dictation', data: JSON.stringify(data) });
+
+    expect(seen).toEqual([{ type: 'dictation', data }]);
+    off();
+  });
+
   it('ignores unknown/`message` event names', () => {
     const { connect, state } = makeConnect();
     const mgr = new EventStreamManager({ connect });

@@ -40,7 +40,9 @@ export default function SignAndSendButton({
   /** Open the worklist's suggested next read (STAT first, then longest wait), or the worklist when the queue is empty. */
   async function nextCase() {
     try {
-      const next = pickNextCase(await api.reports.list(), reportId, { history: getSessionReads() });
+      // list() is capped at the 100 most recent rows and would skip an older STAT case.
+      const { items } = await api.reports.listAll();
+      const next = pickNextCase(items, reportId, { history: getSessionReads() });
       router.push(next ? reportHref(next.id) : '/worklist');
     } catch {
       router.push('/worklist');

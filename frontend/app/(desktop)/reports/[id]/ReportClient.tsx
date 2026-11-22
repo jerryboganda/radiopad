@@ -27,6 +27,7 @@ import { useJobs, useJobsForReport } from '@/components/jobs/JobsProvider';
 import GenerationBanner from '@/components/reports/GenerationBanner';
 import AiStreamPreview from '@/components/reports/AiStreamPreview';
 import { jobPartials } from '@/lib/jobStream';
+import { hostedEvents } from '@/lib/events';
 import { useToast } from '@/components/ui/ToastProvider';
 import EmptyState from '@/components/ui/EmptyState';
 import Link from 'next/link';
@@ -263,6 +264,7 @@ export default function ReportPage() {
   const [pairOpen, setPairOpen] = useState(false);
   const [workspaceTab, setWorkspaceTab] = useState<'editor' | 'positive-findings'>('editor');
   const [dictations, setDictations] = useState<DictationAudioDto[]>([]);
+  const [dictationsError, setDictationsError] = useState<string | null>(null);
 
   const refreshDictations = useCallback(async () => {
     if (!id) return;
@@ -271,14 +273,29 @@ export default function ReportPage() {
       if (res && res.dictations) {
         setDictations(res.dictations);
       }
-    } catch {
-      /* ignore fetch error in offline/unmocked test scenarios */
+      setDictationsError(null);
+    } catch (e) {
+      // Keep the last good list and say so — an empty tab must never mean "the fetch failed".
+      setDictationsError(e instanceof Error ? e.message : 'Could not load dictations.');
     }
   }, [id]);
 
   useEffect(() => {
     void refreshDictations();
   }, [refreshDictations]);
+
+  // Mobile takes land live: the server pushes a tenant-scoped "dictation" signal (ids only) on the
+  // shared SSE stream; refetch via the authenticated GET, and tell the tab so it can show its toast.
+  useEffect(() => {
+    if (!id) return;
+    return hostedEvents.subscribe((e) => {
+      if (e.type !== 'dictation' || e.data.reportId !== id) return;
+      void refreshDictations();
+      if (e.data.kind === 'uploaded') {
+        window.dispatchEvent(new CustomEvent('radiopad:dictation-uploaded', { detail: { reportId: id } }));
+      }
+    });
+  }, [id, refreshDictations]);
   /**
    * Whether unresolved Blockers should stop acknowledge/export in the UI.
    * Mirrors the tenant's `RequireZeroBlockers`, which the API enforces on
@@ -1920,6 +1937,7 @@ export default function ReportPage() {
             <PositiveFindingsTab
               reportId={report.id}
               dictations={dictations}
+              loadError={dictationsError}
               onAppendToFindings={handleAppendToFindings}
               onRefreshDictations={refreshDictations}
               onRetranscribe={handleRetranscribe}

@@ -2829,3 +2829,12 @@ Total tracked PRD ids: **129** (was 112; iter-32 added 17 finer-grained sub-ids)
 - **Report editor below 1100 px**: the two-column fallback stacked the case queue and study panel full-width on top, so the report started ~730 px down at 1024 px and Export scrolled out of the patient bar. Narrow windows now start with the study rail folded (44 px strip, the « toggle still opens it), giving three columns with the report on the first screen; the patient bar wraps instead of scrolling. 1100 / 1024 px checked in both themes, nothing off-screen.
 - **Tests**: new `__tests__/copyToRisButton.test.tsx` (save-before-copy, failed save copies nothing, clears despite `\r\n`, leaves a user's newer clipboard alone). Targeted files re-run locally; the full suite, typecheck, lint and the Rust build are CI's job.
 - **Scope**: frontend + desktop → desktop release required once the operator asks to ship.
+
+## Iter-66 - Production-readiness audit (mock/demo/hard-coded sweep)
+
+- **Date**: 2026-11-22
+- **Audit**: six read-only audits plus a route-by-route trace of 259 frontend calls (all match a backend route). Full findings, fixed and open, in [docs/_reports/production-readiness-audit-2026-11-22.md](docs/_reports/production-readiness-audit-2026-11-22.md).
+- **Fixed (uncommitted)**: cross-tenant PHI broadcast over SignalR (hub no longer mapped; dictation push now rides the tenant SSE stream); fake `{1,2,3,4}` audio transcribed as Completed; mobile recorder uploading a fabricated blob; `MockAiAdapter` reachable in Production; golden-case endpoint that always passed; 1024-token output cap; inverted regulated-feature display; placeholder Stripe price ids; `X-Total-Count` not exposed through CORS; blank signature author; unplayable dictation audio; plus ~20 desktop/web/mobile page fixes and `openapi.yaml` drift.
+- **Open**: see the report (desktop sidecar runs as Development, in-memory Hangfire/SQLite in prod, plan self-upgrade, signature hash excludes text, ingest routes 401 in prod, legal/marketing placeholders).
+- **Tests**: 40 touched frontend test files (229 tests) re-run locally. New: `securityPage`, `auditVerifyPage`, `billingStatusBanner`, `offlineDrafts`, `dictationAudioPlayback`, recorder failure paths, tenant-wide SSE bus test, missing-audio transcription test. **All C# is uncompiled** (no dotnet locally) - CI decides. Typecheck/lint/build are CI.
+- **Scope**: backend + frontend -> deploy and desktop release only when the operator asks (11 local commits on main are already unpushed).

@@ -133,6 +133,25 @@ describe('PositiveFindingsTab component', () => {
     expect(cards.length).toBe(2);
   });
 
+  it('shows an error with a retry — not the empty notice — when the dictation fetch failed', () => {
+    const onRefresh = vi.fn();
+    render(
+      <PositiveFindingsTab
+        reportId="report-101"
+        dictations={[]}
+        loadError="Network down"
+        onAppendToFindings={vi.fn()}
+        onRefreshDictations={onRefresh}
+      />
+    );
+
+    expect(screen.queryByTestId('empty-dictations-notice')).toBeNull();
+    expect(screen.getByRole('alert').textContent).toContain('Network down');
+
+    fireEvent.click(screen.getByRole('button', { name: /try again/i }));
+    expect(onRefresh).toHaveBeenCalledTimes(1);
+  });
+
   it('displays real-time toast notification on radiopad:dictation-uploaded event', () => {
     render(
       <PositiveFindingsTab

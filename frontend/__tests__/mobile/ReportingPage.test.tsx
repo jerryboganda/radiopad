@@ -155,6 +155,29 @@ describe('Mobile ReportingPage & NewReportModal', () => {
       expect(screen.getByTestId('new-report-radiology-id')).toBeInTheDocument();
       expect(screen.getByTestId('new-report-patient-name')).toBeInTheDocument();
     });
+    // The Radiology ID is the key the desktop matches dictations on: never pre-filled with a
+    // generated value, and gender is a real choice rather than a silent "Male".
+    expect(screen.getByTestId('new-report-radiology-id')).toHaveValue('');
+    expect(screen.getByTestId('new-report-patient-gender')).toHaveValue('');
+  });
+
+  it('refuses to create a report until a gender is chosen', async () => {
+    render(<ReportingPage />);
+    await waitFor(() => {
+      expect(screen.getByRole('heading', { name: /reporting/i })).toBeInTheDocument();
+    });
+    fireEvent.click(screen.getByTestId('new-report-btn'));
+    await waitFor(() => {
+      expect(screen.getByText('Create New Report')).toBeInTheDocument();
+    });
+
+    fireEvent.change(screen.getByTestId('new-report-radiology-id'), { target: { value: 'RAD-2026-999' } });
+    fireEvent.change(screen.getByTestId('new-report-patient-name'), { target: { value: 'Alice Johnson' } });
+    fireEvent.change(screen.getByTestId('new-report-patient-age'), { target: { value: '38' } });
+    fireEvent.submit(screen.getByTestId('new-report-submit').closest('form')!);
+
+    expect(await screen.findByRole('alert')).toHaveTextContent(/required fields/i);
+    expect(reportingClientModule.createReport).not.toHaveBeenCalled();
   });
 
   it('submits New Report modal form and navigates to dictate route', async () => {

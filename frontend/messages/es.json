@@ -122,7 +122,7 @@
     },
     "search": "Buscar",
     "hipaa": "Conforme a HIPAA",
-    "hipaaTitle": "Protección de PHI activa — registro de auditoría, aislamiento de inquilinos, políticas de proveedores",
+    "hipaaTitle": "Protección de PHI activa — registro de auditoría, aislamiento de inquilinos",
     "collapse": "Contraer",
     "palette": {
       "title": "Paleta de comandos",

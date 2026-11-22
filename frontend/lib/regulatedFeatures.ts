@@ -1,7 +1,7 @@
 // Phase 3 — regulated (assist-only) feature registry for the admin governance surface. Mirrors the
 // backend `RegulatedFeatures` catalog. Flags live in Tenant.featureFlagsJson under the `regulated.`
-// prefix and default OFF (regulatory review required). Pure helpers so the parse/toggle logic is
-// unit-tested independently of React.
+// prefix and default ON (opt-out; only an explicit false disables one — same as the backend gate).
+// Pure helpers so the parse/toggle logic is unit-tested independently of React.
 
 export const REGULATED_PREFIX = 'regulated.';
 
@@ -55,9 +55,11 @@ export function parseFlags(featureFlagsJson: string | null | undefined): Record<
   }
 }
 
-/** True only when the flag is explicitly enabled — absent / false / malformed → OFF (fail safe). */
+/** True unless the flag is explicitly false — absent / malformed → ON. Must match the backend gate
+ *  (`RegulatedFeatures.IsEnabled`), which is opt-out: showing OFF here while the server enforces ON
+ *  would mislead the admin, and the first click would write the opposite of what they meant. */
 export function isRegulatedEnabled(featureFlagsJson: string | null | undefined, key: string): boolean {
-  return parseFlags(featureFlagsJson)[key] === true;
+  return parseFlags(featureFlagsJson)[key] !== false;
 }
 
 /** A new featureFlagsJson string with `key` set to `enabled`, preserving every other flag. */

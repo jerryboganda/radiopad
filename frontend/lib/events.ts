@@ -19,6 +19,19 @@
 
 import { api, type JobKind, type JobSummary, type SseEvent } from './api';
 
+/** A tenant-wide "a mobile dictation changed" signal. Ids and status only — never clinical
+ *  text or storage paths; consumers refetch the report through the authenticated GET. */
+export interface DictationEventData {
+  kind: 'uploaded' | 'transcribed';
+  reportId: string;
+  dictationId: string;
+  status: string;
+  transcriptionEngine?: string;
+  durationSeconds?: number;
+  uploadedAt?: string;
+  transcribedAt?: string | null;
+}
+
 /** A decoded, typed bus event fanned out to subscribers. `data` is already
  *  JSON-parsed; malformed events are dropped inside the manager and never reach
  *  a subscriber. */
@@ -36,7 +49,8 @@ export type AppEvent =
       };
     }
   | { type: 'partial'; data: { jobId: string; delta: string; tokens?: number } }
-  | { type: 'notification'; data: unknown };
+  | { type: 'notification'; data: unknown }
+  | { type: 'dictation'; data: DictationEventData };
 
 /**
  * Connection status.
@@ -58,6 +72,7 @@ const KNOWN_EVENT_TYPES = new Set<AppEvent['type']>([
   'progress',
   'partial',
   'notification',
+  'dictation',
 ]);
 
 // Backoff / liveness tuning (documented in the plan §2.3).

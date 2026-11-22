@@ -105,7 +105,10 @@ public class AnthropicAiAdapter : IAiProviderAdapter
         var body = new
         {
             model,
-            max_tokens = 1024,
+            max_tokens = AiCompletionRequest.DefaultMaxOutputTokens,
+            // The audit row records request.Temperature; without this the provider default (1.0)
+            // applied and bypassed the clinical 0.4 ceiling.
+            temperature = request.Temperature,
             system = request.SystemPrompt,
             messages,
         };
@@ -147,7 +150,8 @@ public class AnthropicAiAdapter : IAiProviderAdapter
         var body = new
         {
             model,
-            max_tokens = 1024,
+            max_tokens = AiCompletionRequest.DefaultMaxOutputTokens,
+            temperature = request.Temperature,
             system = systemPrompt,
             messages = new[] { new { role = "user", content = request.UserPrompt } },
             stream = true,

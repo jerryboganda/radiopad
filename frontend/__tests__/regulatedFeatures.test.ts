@@ -1,6 +1,6 @@
-// Phase 3 — the admin surface must read regulated flags as OFF unless explicitly enabled, and
-// toggling one must never disturb the others. A default-on bug would surface an unvalidated
-// clinical-assist feature.
+// Phase 3 — the admin surface must show exactly what the backend gate enforces
+// (RegulatedFeatures.IsEnabled: ON unless explicitly false), and toggling one must never disturb
+// the others.
 import { describe, it, expect } from 'vitest';
 import {
   parseFlags,
@@ -10,17 +10,23 @@ import {
 } from '@/lib/regulatedFeatures';
 
 describe('isRegulatedEnabled', () => {
-  it('is off by default (absent / empty / malformed)', () => {
-    expect(isRegulatedEnabled(undefined, 'regulated.autoImpression')).toBe(false);
-    expect(isRegulatedEnabled('{}', 'regulated.autoImpression')).toBe(false);
-    expect(isRegulatedEnabled('{bad', 'regulated.autoImpression')).toBe(false);
-    expect(isRegulatedEnabled('[]', 'regulated.autoImpression')).toBe(false);
+  it('is on by default (absent / empty / malformed) — same as the backend gate', () => {
+    expect(isRegulatedEnabled(undefined, 'regulated.autoImpression')).toBe(true);
+    expect(isRegulatedEnabled('{}', 'regulated.autoImpression')).toBe(true);
+    expect(isRegulatedEnabled('{bad', 'regulated.autoImpression')).toBe(true);
+    expect(isRegulatedEnabled('[]', 'regulated.autoImpression')).toBe(true);
   });
 
-  it('is on only when the flag is explicitly true (bool or "true")', () => {
+  it('is off only when the flag is explicitly false (bool or "false")', () => {
+    expect(isRegulatedEnabled('{"regulated.autoImpression": false}', 'regulated.autoImpression')).toBe(false);
+    expect(isRegulatedEnabled('{"regulated.autoImpression": "false"}', 'regulated.autoImpression')).toBe(false);
     expect(isRegulatedEnabled('{"regulated.autoImpression": true}', 'regulated.autoImpression')).toBe(true);
     expect(isRegulatedEnabled('{"regulated.autoImpression": "true"}', 'regulated.autoImpression')).toBe(true);
-    expect(isRegulatedEnabled('{"regulated.autoImpression": false}', 'regulated.autoImpression')).toBe(false);
+  });
+
+  it('one flag being off leaves the others on', () => {
+    const json = '{"regulated.autoImpression": false}';
+    expect(isRegulatedEnabled(json, 'regulated.criticalFindingFlagging')).toBe(true);
   });
 });
 

@@ -117,9 +117,15 @@ export default function BillingDashboardPage() {
   }
 
   async function upgradeTeam() {
+    // No price id baked into this build (NEXT_PUBLIC_STRIPE_PRICE_TEAM): never post a stand-in id.
+    const priceId = publicEnv('NEXT_PUBLIC_STRIPE_PRICE_TEAM');
+    if (!priceId) {
+      setError('Online checkout is not configured for this workspace. Contact support to change plan.');
+      return;
+    }
     try {
       const { url } = await api.billing.checkout(
-        publicEnv('NEXT_PUBLIC_STRIPE_PRICE_TEAM') ?? 'price_team_placeholder',
+        priceId,
         window.location.origin + '/admin/billing?billing=success',
         window.location.origin + '/admin/billing?billing=cancelled',
       );

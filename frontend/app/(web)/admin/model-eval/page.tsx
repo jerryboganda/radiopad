@@ -37,12 +37,11 @@ type ValidationPackRow = Awaited<ReturnType<typeof api.validationPacks.list>>[nu
 type SandboxCompareResult = Awaited<ReturnType<typeof api.ai.sandboxCompare>>;
 type SandboxRun = SandboxCompareResult['runs'][number];
 
+// Per-provider validation and cost are not measured here (sandbox-compare returns neither), so the
+// table shows "—" for them rather than a made-up figure.
 type EvalRow = {
   packCaseLabel: string;
   run: SandboxRun;
-  validationPassed: boolean | null;
-  validationFailed: boolean | null;
-  costUsd: number | null;
 };
 
 const MODES = ['impression', 'cleanup', 'draft', 'concise', 'formal'] as const;
@@ -130,13 +129,7 @@ export default function AdminModelEvalPage() {
           mode,
           providerIds: selectedProviders,
         });
-        const rows: EvalRow[] = result.runs.map((run) => ({
-          packCaseLabel: reportId,
-          run,
-          validationPassed: null,
-          validationFailed: null,
-          costUsd: estimateCost(run, providers),
-        }));
+        const rows: EvalRow[] = result.runs.map((run) => ({ packCaseLabel: reportId, run }));
         setEvalRows(rows);
       } catch (e) {
         newErrors.push(`sandbox compare: ${(e as Error).message}`);
@@ -192,6 +185,10 @@ export default function AdminModelEvalPage() {
     selectedProviders.length > 0 &&
     !!reportId &&
     !!rulebookId;
+  // Approving a rulebook for clinical use needs evidence from a finished run of THIS selection:
+  // a provider produced output or the golden-case set ran, and no golden case failed.
+  const hasEvidence =
+    (evalRows.some((r) => !r.run.error) || packResult !== null) && (packResult?.failed ?? 0) === 0;
 
   return (
     <div className="rp-container">
@@ -214,7 +211,13 @@ export default function AdminModelEvalPage() {
             <select
               className="rp-input"
               value={rulebookId}
-              onChange={(e) => { setRulebookId(e.target.value); setPackId(''); }}
+              onChange={(e) => {
+                setRulebookId(e.target.value);
+                setPackId('');
+                // Results belong to the rulebook they were run for.
+                setEvalRows([]);
+                setPackResult(null);
+              }}
               data-testid="select-rulebook"
             >
               <option value="">— select —</option>
@@ -364,14 +367,10 @@ export default function AdminModelEvalPage() {
                     <td>
                       {err
                         ? <span className="badge danger">skipped</span>
-                        : <span className="badge ok">candidate</span>}
-                    </td>
-                    <td><span className="rp-faint">n/a</span></td>
-                    <td>
-                      {row.costUsd != null
-                        ? <code>${row.costUsd.toFixed(4)}</code>
                         : <span className="rp-faint">—</span>}
                     </td>
+                    <td><span className="rp-faint">—</span></td>
+                    <td><span className="rp-faint">—</span></td>
                   </tr>
                 );
               })}
@@ -391,7 +390,7 @@ export default function AdminModelEvalPage() {
           <div className="rp-actions">
             <button
               className="ghost"
-              disabled={!rulebookId || promoteState.status === 'pending'}
+              disabled={!rulebookId || !hasEvidence || promoteState.status === 'pending'}
               onClick={promoteToProduction}
               data-testid="promote-btn"
               aria-busy={promoteState.status === 'pending'}
@@ -399,6 +398,13 @@ export default function AdminModelEvalPage() {
               {promoteState.status === 'pending' && <span className="rp-spinner sm" aria-hidden />}
               {promoteState.status === 'pending' ? 'Promoting…' : 'Promote rulebook'}
             </button>
+            {rulebookId && !hasEvidence && (
+              <span className="rp-page-sub" data-testid="promote-needs-run">
+                {packResult && packResult.failed > 0
+                  ? 'Golden cases failed — fix them and run again before promoting.'
+                  : 'Run an evaluation first — promotion needs a finished run.'}
+              </span>
+            )}
           </div>
         ) : (
           <div className="banner info" data-testid="promote-locked">
@@ -419,19 +425,4 @@ export default function AdminModelEvalPage() {
       </div>
     </div>
   );
-}
-
-/**
- * Best-effort cost estimate using the price columns on the matching
- * provider config. The backend returns authoritative cost rollups via
- * `/api/usage/summary`; this is only for the inline comparison table.
- */
-function estimateCost(run: SandboxRun, providers: Provider[]): number | null {
-  const provider = providers.find((p) => p.id === run.providerId);
-  if (!provider) return null;
-  // Provider type does not expose price columns; backend uses them.
-  // Without them, return 0.0 as a sentinel so the column still renders.
-  void provider;
-  if (run.error) return null;
-  return 0;
 }

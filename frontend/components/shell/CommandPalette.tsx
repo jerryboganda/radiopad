@@ -13,7 +13,7 @@ import { useTranslations } from 'next-intl';
 import { Search, FileText, CornerDownLeft } from 'lucide-react';
 import { navGroups, type NavItem } from './nav.config';
 import { usePermissions } from '@/lib/permissions';
-import { surfaceAllows } from '@/lib/surface';
+import { isDesktopSurface, surfaceAllows } from '@/lib/surface';
 import { api, type Report } from '@/lib/api';
 
 interface PaletteEntry {
@@ -56,10 +56,14 @@ export default function CommandPalette({
     setQuery('');
     setCursor(0);
     const t = window.setTimeout(() => inputRef.current?.focus(), 10);
-    api.reports
-      .list()
-      .then((r) => setReports(r.slice(0, 25)))
-      .catch(() => setReports([]));
+    // Reports (PHI) and the /reports/view route exist only in the desktop bundle; on web/mobile
+    // the palette is navigation-only.
+    if (isDesktopSurface) {
+      api.reports
+        .list()
+        .then((r) => setReports(r.slice(0, 25)))
+        .catch(() => setReports([]));
+    }
     return () => window.clearTimeout(t);
   }, [open]);
 

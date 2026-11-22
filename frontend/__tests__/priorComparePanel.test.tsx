@@ -53,6 +53,20 @@ describe('PriorComparePanel — F5 comparison statement', () => {
     await findByText(/inserted/i);
   });
 
+  it('shows an error with retry — never a substitute diff — when /compare-prior fails', async () => {
+    comparePrior.mockRejectedValueOnce(new Error('boom'));
+    prior.mockResolvedValue({ current: { id: 'r1', bodyPart: 'Chest' }, prior: { id: 'x', study: { bodyPart: 'Chest' } } });
+    const { findByText, getByRole, queryByRole } = render(<PriorComparePanel reportId="r1" />);
+    await findByText('boom');
+    expect(prior).not.toHaveBeenCalled();
+    expect(queryByRole('button', { name: /insert into comparison/i })).toBeNull();
+
+    withPrior();
+    fireEvent.click(getByRole('button', { name: /try again/i }));
+    await findByText(STATEMENT);
+    expect(comparePrior).toHaveBeenCalledTimes(2);
+  });
+
   it('does not render a statement when there is no prior', async () => {
     comparePrior.mockResolvedValue({
       current: { id: 'r1', bodyPart: 'Chest' },

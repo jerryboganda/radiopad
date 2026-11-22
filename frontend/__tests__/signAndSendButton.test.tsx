@@ -6,7 +6,8 @@ import { render, screen, fireEvent, waitFor } from '@testing-library/react';
 import * as React from 'react';
 import { api } from '@/lib/api';
 
-vi.mock('next/navigation', () => ({ useRouter: () => ({ push: vi.fn() }) }));
+const push = vi.hoisted(() => vi.fn());
+vi.mock('next/navigation', () => ({ useRouter: () => ({ push }) }));
 
 import SignAndSendButton from '@/app/(desktop)/reports/[id]/SignAndSendButton';
 
@@ -16,7 +17,7 @@ async function confirm() {
 }
 
 describe('SignAndSendButton', () => {
-  beforeEach(() => vi.restoreAllMocks());
+  beforeEach(() => { vi.restoreAllMocks(); push.mockClear(); });
 
   it('saves on-screen edits before signing, then tells the editor to refresh', async () => {
     const order: string[] = [];
@@ -28,6 +29,27 @@ describe('SignAndSendButton', () => {
     await waitFor(() => expect(onDone).toHaveBeenCalled());
     expect(order).toEqual(['save', 'signAndSend', 'refresh']);
     expect(screen.getByRole('button', { name: 'Next case' })).toBeTruthy();
+  });
+
+  it('Next case reads the full worklist (listAll), not the 100-row recent list', async () => {
+    vi.spyOn(api.reports, 'signAndSend').mockResolvedValue({} as never);
+    const list = vi.spyOn(api.reports, 'list');
+    const listAll = vi.spyOn(api.reports, 'listAll').mockResolvedValue({
+      items: [{
+        id: 'older-stat', status: 'Draft', updatedAt: '2026-01-01T00:00:00Z',
+        study: { modality: 'CT', bodyPart: 'Head', priority: 'Stat' },
+      }] as never,
+      total: 1,
+      truncated: false,
+    });
+    const onDone = vi.fn();
+    render(<SignAndSendButton reportId="r1" onDone={onDone} />);
+    await confirm();
+    await waitFor(() => expect(onDone).toHaveBeenCalled());
+    fireEvent.click(screen.getByRole('button', { name: 'Next case' }));
+    await waitFor(() => expect(push).toHaveBeenCalledWith(expect.stringContaining('older-stat')));
+    expect(listAll).toHaveBeenCalled();
+    expect(list).not.toHaveBeenCalled();
   });
 
   it('signs nothing when the save fails', async () => {

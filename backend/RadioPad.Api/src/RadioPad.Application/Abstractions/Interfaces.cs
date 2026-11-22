@@ -52,6 +52,13 @@ public sealed record AiCompletionRequest(
     /// </summary>
     public const double MaxTemperature = 0.4;
 
+    /// <summary>
+    /// Output-token ceiling sent to hosted providers. The old hard-coded 1024 (~750 words) cut a long
+    /// multi-section report off mid-sentence and the truncated text came back as a successful result.
+    /// A ceiling, not a target — models stop on their own well before it.
+    /// </summary>
+    public const int DefaultMaxOutputTokens = 4096;
+
     private readonly double _temperature = DefaultTemperature;
 
     /// <summary>

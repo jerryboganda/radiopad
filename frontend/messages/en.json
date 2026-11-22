@@ -124,7 +124,7 @@
     },
     "search": "Search",
     "hipaa": "HIPAA Compliant",
-    "hipaaTitle": "PHI safeguards active — audit log, tenant isolation, provider policy gates",
+    "hipaaTitle": "PHI safeguards active — audit log, tenant isolation",
     "collapse": "Collapse",
     "palette": {
       "title": "Command palette",

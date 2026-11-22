@@ -8,7 +8,7 @@ import { api, setActiveAuthToken } from '@/lib/api';
 import { clearAuthToken } from '@/lib/secureAuth';
 import { useSttMode } from '@/lib/dictation/sttMode';
 import { useCrossCheckEnabled, useUseUbag } from '@/lib/dictation/crossCheckPrefs';
-import { isDesktopSurface, isWebSurface } from '@/lib/surface';
+import { isDesktopSurface, isMobileSurface, isWebSurface } from '@/lib/surface';
 import LocalePicker from '../LocalePicker';
 
 type Me = {
@@ -99,12 +99,13 @@ export default function ProfileMenu({ variant = 'sidebar' }: { variant?: 'sideba
           {/* Both of these pointed unconditionally at `(web)` routes, which build-surface.mjs
               stages out of the desktop and mobile bundles — so on every screen that renders the
               topbar (i.e. nearly all of them) they landed a radiologist on "Page not found" and
-              lost their place. Settings exists on both surfaces at different paths; billing is a
+              lost their place. Settings exists on web and desktop at different paths (the mobile
+              bundle has neither, so it gets the shared sign-in & devices page); billing is a
               master-admin concern that only the web console ships. */}
           <Link
             className="rp-profile-popover-item"
             role="menuitem"
-            href={isWebSurface ? '/admin/settings' : '/settings'}
+            href={isWebSurface ? '/admin/settings' : isMobileSurface ? '/account/security' : '/settings'}
             onClick={() => setOpen(false)}
           >
             {tNav('settings')}

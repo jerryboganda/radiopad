@@ -3,7 +3,7 @@
  * section count, create button, and approval status badges.
  */
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { render, waitFor, screen } from '@testing-library/react';
+import { render, waitFor, screen, fireEvent } from '@testing-library/react';
 import * as React from 'react';
 
 const templatesListMock = vi.fn();
@@ -31,6 +31,9 @@ vi.mock('@/lib/api', () => ({
       create: (...args: unknown[]) => reportsCreateMock(...args),
       patch: (...args: unknown[]) => reportsPatchMock(...args),
     },
+    // Admin-managed catalogs the template modality / body-part pickers read.
+    modalities: { list: () => Promise.resolve([{ id: 'm1', code: 'CT', name: 'CT', active: true, sortOrder: 1 }, { id: 'm2', code: 'MR', name: 'MR', active: true, sortOrder: 2 }]) },
+    bodyParts: { list: () => Promise.resolve([{ id: 'b1', code: 'Chest', name: 'Chest', active: true, sortOrder: 1 }]) },
   },
 }));
 
@@ -167,6 +170,19 @@ describe('templates page', () => {
     });
     expect(screen.getByText('brain_mri_v1')).toBeInTheDocument();
     expect(screen.getByText('abdomen_us_v1')).toBeInTheDocument();
+  });
+
+  it('modality picker lists the admin catalog and keeps a saved value that is not in it', async () => {
+    templatesListMock.mockResolvedValue(SAMPLE_TEMPLATES);
+    render(<TemplatesPage />);
+    await waitFor(() => expect(screen.getByText('Brain MRI')).toBeInTheDocument());
+
+    // The sample "Brain MRI" row was saved with the legacy code "MRI"; the catalog only has CT / MR.
+    fireEvent.click(screen.getAllByText('Edit')[1]);
+    const select = await screen.findByDisplayValue('MRI');
+    const options = Array.from((select as HTMLSelectElement).options).map((o) => o.value);
+    expect(options).toEqual(expect.arrayContaining(['MRI', 'CT', 'MR']));
+    expect(options).not.toContain('PET');
   });
 
   it('"Create" button exists', async () => {

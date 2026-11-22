@@ -55,6 +55,23 @@ public class AiJobEventBusTests
     }
 
     [Fact]
+    public void PublishTenantEvent_ReachesEveryUserOfTheTenantAndNoOtherTenant()
+    {
+        var bus = NewBus();
+        var tenant = Guid.NewGuid();
+        using var userA = bus.Subscribe(tenant, Guid.NewGuid());
+        using var userB = bus.Subscribe(tenant, Guid.NewGuid());
+        using var otherTenant = bus.Subscribe(Guid.NewGuid(), Guid.NewGuid());
+
+        bus.PublishTenantEvent(tenant, "dictation", new { kind = "uploaded" });
+
+        Assert.True(userA.Reader.TryRead(out var a));
+        Assert.Equal("dictation", a!.EventType);
+        Assert.True(userB.Reader.TryRead(out _));
+        Assert.False(otherTenant.Reader.TryRead(out _));
+    }
+
+    [Fact]
     public void PublishProgress_WithDelta_EmitsProgressThenPartial()
     {
         var bus = NewBus();

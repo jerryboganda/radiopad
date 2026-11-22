@@ -199,6 +199,47 @@ public class TranscriptionEngineTests
         return (report, tenant, user);
     }
 
+    /// <summary>A real file on disk — the orchestrator refuses to transcribe a take whose audio is missing.</summary>
+    private static string TempAudioFile()
+    {
+        var path = Path.Combine(Path.GetTempPath(), $"radiopad-test-{Guid.NewGuid():N}.wav");
+        File.WriteAllBytes(path, new byte[] { 1, 2, 3, 4 });
+        return path;
+    }
+
+    [Fact]
+    public async Task TranscriptionOrchestrator_ProcessDictationAsync_MissingAudio_FailsWithoutTranscribing()
+    {
+        using var db = CreateInMemoryDb();
+        var (report, _, _) = SeedTenantedReport(db, "RAD-TEST-000", "No Audio", 50, "Male");
+
+        var dictation = new DictationAudio
+        {
+            Id = Guid.NewGuid(),
+            ReportId = report.Id,
+            StoragePath = Path.Combine(Path.GetTempPath(), $"radiopad-missing-{Guid.NewGuid():N}.wav"),
+            DurationSeconds = 3,
+            TranscriptionEngine = "medASR-6gram",
+            Status = "Pending"
+        };
+        db.DictationAudios.Add(dictation);
+        await db.SaveChangesAsync();
+
+        var localStt = new FakeLocalSttClient(available: true);
+        var engines = new ITranscriptionEngine[]
+        {
+            new MedAsrTranscriptionEngine(localStt, NullLogger<MedAsrTranscriptionEngine>.Instance),
+        };
+        var orchestrator = new TranscriptionOrchestrator(
+            engines, db, NullLogger<TranscriptionOrchestrator>.Instance, new DummyNotifier());
+
+        var dto = await orchestrator.ProcessDictationAsync(dictation.Id, "medASR-6gram");
+
+        Assert.Equal("Failed", dto.Status);
+        Assert.False(localStt.WasCalled, "no engine may run against placeholder bytes");
+        Assert.True(string.IsNullOrEmpty(dto.TranscribedText));
+    }
+
     [Fact]
     public async Task TranscriptionOrchestrator_ProcessDictationAsync_LocalEngine_UpdatesDictationState()
     {
@@ -209,7 +250,7 @@ public class TranscriptionEngineTests
         {
             Id = Guid.NewGuid(),
             ReportId = report.Id,
-            StoragePath = "test_audio.wav",
+            StoragePath = TempAudioFile(),
             DurationSeconds = 12.5,
             TranscriptionEngine = "medASR-6gram",
             Status = "Pending"
@@ -253,7 +294,7 @@ public class TranscriptionEngineTests
         {
             Id = Guid.NewGuid(),
             ReportId = report.Id,
-            StoragePath = "test_audio.wav",
+            StoragePath = TempAudioFile(),
             DurationSeconds = 8.0,
             TranscriptionEngine = "medASR-6gram",
             Status = "Pending"

@@ -122,7 +122,7 @@ describe('AdminDictationSettingsPage', () => {
     });
   });
 
-  it('runs live audio transcription test utility', async () => {
+  it('has no simulated transcription test (it invented engine, WER and latency)', async () => {
     dictationSettingsGetMock.mockResolvedValue({
       activeEngine: 'medASR-6gram',
       ubagModel: 'ubag-gemini-audio',
@@ -135,18 +135,7 @@ describe('AdminDictationSettingsPage', () => {
       expect(screen.getByTestId('dictation-settings-page')).toBeInTheDocument();
     });
 
-    const testInput = screen.getByTestId('test-audio-input');
-    fireEvent.change(testInput, { target: { value: 'Chest CT shows clear lungs.' } });
-
-    const runButton = screen.getByTestId('run-test-dictation-btn');
-    fireEvent.click(runButton);
-
-    await waitFor(
-      () => {
-        expect(screen.getByTestId('live-transcription-result')).toBeInTheDocument();
-        expect(screen.getByTestId('live-transcription-result')).toHaveTextContent('Chest CT shows clear lungs.');
-      },
-      { timeout: 2000 }
-    );
+    expect(screen.queryByTestId('live-transcription-test-utility')).toBeNull();
+    expect(screen.queryByTestId('run-test-dictation-btn')).toBeNull();
   });
 });

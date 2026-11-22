@@ -103,22 +103,22 @@ public class TranscriptionOrchestrator
             return MapToDto(dictation);
         }
 
+        // Never transcribe a stand-in payload: with the audio gone there is nothing real to transcribe,
+        // and a fabricated transcript would be marked Completed and reach the radiologist.
+        if (string.IsNullOrWhiteSpace(dictation.StoragePath) || !File.Exists(dictation.StoragePath))
+        {
+            _logger.LogError("Audio file missing from storage for dictation {DictationId}", dictationId);
+            dictation.Status = "Failed";
+            dictation.ErrorMessage = "Audio file is missing from storage; re-upload the take.";
+            await _db.SaveChangesAsync(ct);
+            return MapToDto(dictation);
+        }
+
         dictation.Status = "Processing";
         await _db.SaveChangesAsync(ct);
 
-        Stream audioStream;
-        bool isFileStream = false;
-        long sizeBytes = 0;
-        if (!string.IsNullOrWhiteSpace(dictation.StoragePath) && File.Exists(dictation.StoragePath))
-        {
-            audioStream = new FileStream(dictation.StoragePath, FileMode.Open, FileAccess.Read, FileShare.Read);
-            isFileStream = true;
-            sizeBytes = audioStream.Length;
-        }
-        else
-        {
-            audioStream = new MemoryStream(new byte[] { 1, 2, 3, 4 });
-        }
+        Stream audioStream = new FileStream(dictation.StoragePath, FileMode.Open, FileAccess.Read, FileShare.Read);
+        long sizeBytes = audioStream.Length;
 
         try
         {
@@ -193,10 +193,7 @@ public class TranscriptionOrchestrator
         }
         finally
         {
-            if (isFileStream)
-            {
-                await audioStream.DisposeAsync();
-            }
+            await audioStream.DisposeAsync();
         }
 
         await _db.SaveChangesAsync(ct);

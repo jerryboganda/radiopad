@@ -15,7 +15,7 @@ function daysUntil(iso: string): number {
 /**
  * Sticky notice rendered above the topbar when the tenant is in a Stripe
  * grace period or has been suspended. Polls every 5 minutes; failures are
- * swallowed (the dashboard surfaces detailed errors itself).
+ * swallowed and the last known status stays up (the dashboard surfaces detailed errors itself).
  */
 export default function BillingStatusBanner() {
   const [status, setStatus] = useState<BillingStatus | null>(null);
@@ -27,7 +27,7 @@ export default function BillingStatusBanner() {
         const next = await api.billing.status();
         if (!cancelled) setStatus(next);
       } catch {
-        if (!cancelled) setStatus(null);
+        // Keep the last known status: a transient error must not hide a suspension / grace notice.
       }
     }
     load();

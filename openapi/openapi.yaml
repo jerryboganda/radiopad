@@ -12,8 +12,8 @@ info:
 servers:
   - url: http://127.0.0.1:7457
     description: Local dev
-  - url: https://app.radiopad.example
-    description: Hosted (planned)
+  - url: https://api.radiopadstudio.com
+    description: Production API (behind Cloudflare)
 
 security:
   - RadioPadBearer: []
@@ -869,9 +869,9 @@ paths:
               schema:
                 type: array
                 items: { $ref: "#/components/schemas/Rulebook" }
-
-  /api/rulebooks/save:
     post:
+      # The route is POST /api/rulebooks (there is no /save sub-route). The live body is `{ yaml }`;
+      # the Rulebook schema below is the stored shape, not the request shape.
       summary: Save a rulebook
       requestBody:
         required: true
@@ -949,9 +949,9 @@ paths:
               schema:
                 type: array
                 items: { $ref: "#/components/schemas/ReportTemplate" }
-
-  /api/templates/save:
     post:
+      # The route is POST /api/templates (there is no /save sub-route). The live body is
+      # `{ templateId, name, modality, bodyPart, subspecialty, sectionsJson }`.
       summary: Save a report template
       requestBody:
         required: true

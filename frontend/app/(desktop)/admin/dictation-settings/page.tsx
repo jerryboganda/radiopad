@@ -3,7 +3,7 @@
 import { useState, useEffect } from 'react';
 import { api, type DictationSettings } from '@/lib/api';
 import Banner from '@/components/ui/Banner';
-import { Mic, RefreshCw, Save, Sparkles, CheckCircle2, Cpu, Cloud, Sliders } from 'lucide-react';
+import { Mic, RefreshCw, Save, Cpu, Cloud, Sliders } from 'lucide-react';
 
 const DEFAULT_PROMPT =
   'You are an expert medical radiology transcription assistant. The speaker is a senior radiologist dictating positive findings...';
@@ -17,18 +17,6 @@ export default function AdminDictationSettingsPage() {
   const [saving, setSaving] = useState<boolean>(false);
   const [saveSuccess, setSaveSuccess] = useState<boolean>(false);
   const [error, setError] = useState<string | null>(null);
-
-  // Live audio test state
-  const [testAudioText, setTestAudioText] = useState<string>(
-    'Patient presents with acute left flank pain. Non-contrast CT reveals 4mm calculus at left UVJ with mild hydronephrosis.'
-  );
-  const [testing, setTesting] = useState<boolean>(false);
-  const [testResult, setTestResult] = useState<{
-    text: string;
-    engine: string;
-    model: string;
-    latencyMs: number;
-  } | null>(null);
 
   useEffect(() => {
     async function loadSettings() {
@@ -72,35 +60,6 @@ export default function AdminDictationSettingsPage() {
 
   function handleResetPrompt() {
     setRadiologySystemPrompt(DEFAULT_PROMPT);
-  }
-
-  async function handleRunTest() {
-    setTesting(true);
-    setTestResult(null);
-
-    const startTime = performance.now();
-    // Simulate real-time audio STT processing based on chosen engine & prompt
-    setTimeout(() => {
-      const endTime = performance.now();
-      const latencyMs = Math.round(endTime - startTime + (activeEngine === 'medASR-6gram' ? 140 : 320));
-
-      let formattedText = testAudioText;
-      if (activeEngine === 'medASR-6gram') {
-        formattedText = `[medASR 4.4% WER] ${testAudioText}`;
-      } else if (activeEngine === 'ubag-cloud') {
-        formattedText = `[UBAG Cloud / ${ubagModel === 'ubag-gemini-audio' ? 'Gemini Audio' : 'ChatGPT Audio'}] ${testAudioText}`;
-      } else {
-        formattedText = `[OpenAI Direct STT] ${testAudioText}`;
-      }
-
-      setTestResult({
-        text: formattedText,
-        engine: activeEngine,
-        model: activeEngine === 'ubag-cloud' ? ubagModel : activeEngine,
-        latencyMs,
-      });
-      setTesting(false);
-    }, 600);
   }
 
   if (loading) {
@@ -300,77 +259,6 @@ export default function AdminDictationSettingsPage() {
               placeholder="Enter radiology system prompt instructions..."
               style={{ fontFamily: 'monospace', fontSize: '13px', lineHeight: '1.5' }}
             />
-          </div>
-
-          {/* Live Audio Transcription Test Utility */}
-          <div className="rp-panel" data-testid="live-transcription-test-utility">
-            <div className="rp-panel-title" style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '12px' }}>
-              <Sparkles size={18} className="text-accent" />
-              Live Audio Transcription Test Utility
-            </div>
-            <p className="rp-page-sub" style={{ marginBottom: '16px' }}>
-              Test dictation audio transcription and view live output using current active engine settings.
-            </p>
-
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
-              <label htmlFor="test-audio-input" style={{ fontWeight: 500, fontSize: '14px' }}>
-                Dictation Sample Input Text / Audio Payload:
-              </label>
-              <textarea
-                id="test-audio-input"
-                className="rp-input"
-                rows={3}
-                value={testAudioText}
-                onChange={(e) => setTestAudioText(e.target.value)}
-                data-testid="test-audio-input"
-                placeholder="Enter sample dictation speech text to simulate audio transcription..."
-              />
-
-              <div>
-                <button
-                  type="button"
-                  className="secondary"
-                  onClick={handleRunTest}
-                  disabled={testing || !testAudioText.trim()}
-                  data-testid="run-test-dictation-btn"
-                  style={{ display: 'inline-flex', alignItems: 'center', gap: '6px' }}
-                >
-                  {testing ? <span className="rp-spinner sm" aria-hidden="true" /> : <Mic size={16} />}
-                  {testing ? 'Transcribing Test Audio...' : 'Run Live Audio Test'}
-                </button>
-              </div>
-
-              {testResult && (
-                <div
-                  className="rp-card bg-accent-soft rp-mt-sm rp-anim-fade-in-up"
-                  data-testid="live-transcription-result"
-                  style={{ padding: '16px' }}
-                >
-                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '8px' }}>
-                    <div style={{ fontWeight: 600, display: 'flex', alignItems: 'center', gap: '6px' }}>
-                      <CheckCircle2 size={16} className="text-success" />
-                      Live Transcription Output
-                    </div>
-                    <div style={{ display: 'flex', gap: '8px' }}>
-                      <span className="rp-badge info">{testResult.engine}</span>
-                      <span className="rp-badge ghost">{testResult.latencyMs} ms</span>
-                    </div>
-                  </div>
-                  <div
-                    style={{
-                      background: 'var(--rp-bg-card, #ffffff)',
-                      padding: '12px',
-                      borderRadius: '6px',
-                      fontFamily: 'monospace',
-                      fontSize: '13px',
-                      whiteSpace: 'pre-wrap',
-                    }}
-                  >
-                    {testResult.text}
-                  </div>
-                </div>
-              )}
-            </div>
           </div>
         </div>
 

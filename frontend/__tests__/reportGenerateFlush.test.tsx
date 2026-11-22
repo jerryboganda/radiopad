@@ -15,7 +15,7 @@
  * to the DB at the instant `submit` is called.
  */
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { render, fireEvent, screen, waitFor } from '@testing-library/react';
+import { render, fireEvent, screen, waitFor, act } from '@testing-library/react';
 import * as React from 'react';
 
 // Shared mutable state for the fake backend, created in hoisted scope so the
@@ -47,7 +47,27 @@ const h = vi.hoisted(() => {
     state.submitFindings = String(state.db.findings ?? '');
     return 'job1';
   });
-  return { initialReport, state, submit };
+  // The shared SSE stream: tests push `dictation` signals through the captured listener.
+  const events = { listener: null as null | ((e: unknown) => void) };
+  const getReportById = vi.fn(async (_id: string) => ({ id: 'r1', dictations: [] as unknown[] }));
+  return { initialReport, state, submit, events, getReportById };
+});
+
+vi.mock('@/lib/events', () => ({
+  hostedEvents: {
+    subscribe: (fn: (e: unknown) => void) => {
+      h.events.listener = fn;
+      return () => {
+        h.events.listener = null;
+      };
+    },
+  },
+}));
+
+// Dictation list loads through reportingClient.getReportById; keep the rest of the client real.
+vi.mock('@/lib/api/reportingClient', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('@/lib/api/reportingClient')>();
+  return { ...actual, default: { ...actual.default, getReportById: h.getReportById } };
 });
 
 vi.mock('next/navigation', () => ({
@@ -133,6 +153,7 @@ beforeEach(() => {
   h.state.db = { ...h.initialReport };
   h.state.submitFindings = null;
   h.submit.mockClear();
+  h.getReportById.mockClear();
   // This test exercises the flush-before-AI logic, which is identical for both
   // editors; pin the plain-textarea path so it doesn't depend on driving Tiptap.
   window.localStorage.setItem('radiopad:rich-editor', '0');
@@ -169,5 +190,28 @@ describe('Generate impression — flush before submit (HANDOFF gotcha #3)', () =
     expect(h.submit).toHaveBeenCalledWith(
       expect.objectContaining({ origin: 'hosted', kind: 'ai', reportId: 'r1', mode: 'impression' }),
     );
+  });
+});
+
+describe('Mobile dictations — live push over the shared SSE stream', () => {
+  const dictation = {
+    id: 'd1', reportId: 'r1', storagePath: '', durationSeconds: 12,
+    transcriptionEngine: 'medASR-6gram', status: 'Pending', uploadedAt: '2026-01-01T00:00:00Z',
+  };
+
+  it('refetches the dictation list when a `dictation` signal arrives for this report only', async () => {
+    render(<ReportPage />);
+    await waitFor(() => expect(h.events.listener).not.toBeNull());
+    await waitFor(() => expect(h.getReportById).toHaveBeenCalledTimes(1)); // initial load
+
+    // Another report's signal is ignored.
+    act(() => h.events.listener!({ type: 'dictation', data: { kind: 'uploaded', reportId: 'other', dictationId: 'x', status: 'Pending' } }));
+    expect(h.getReportById).toHaveBeenCalledTimes(1);
+
+    // This report's signal triggers a refetch, and the new take shows on the tab badge.
+    h.getReportById.mockResolvedValueOnce({ id: 'r1', dictations: [dictation] });
+    act(() => h.events.listener!({ type: 'dictation', data: { kind: 'uploaded', reportId: 'r1', dictationId: 'd1', status: 'Pending' } }));
+    await waitFor(() => expect(h.getReportById).toHaveBeenCalledTimes(2));
+    await waitFor(() => expect(screen.getByTestId('tab-positive-findings').textContent).toContain('1'));
   });
 });

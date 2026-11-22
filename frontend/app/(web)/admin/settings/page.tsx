@@ -131,7 +131,12 @@ export default function SettingsPage() {
     }
   }
 
-  async function checkout(priceId: string) {
+  async function checkout(priceId: string | undefined) {
+    // No price id baked into this build (NEXT_PUBLIC_STRIPE_PRICE_*): never post a stand-in id.
+    if (!priceId) {
+      setError('Online checkout is not configured for this workspace. Contact support to change plan.');
+      return;
+    }
     try {
       const { url } = await api.billing.checkout(
         priceId,
@@ -341,13 +346,13 @@ export default function SettingsPage() {
             <div className="rp-row" style={{ gap: 8, marginTop: 8, flexWrap: 'wrap' }}>
               <button
                 className="primary-ghost"
-                onClick={() => checkout(publicEnv('NEXT_PUBLIC_STRIPE_PRICE_TEAM') ?? 'price_team_placeholder')}
+                onClick={() => checkout(publicEnv('NEXT_PUBLIC_STRIPE_PRICE_TEAM'))}
               >
                 Upgrade to Team
               </button>
               <button
                 className="primary-ghost"
-                onClick={() => checkout(publicEnv('NEXT_PUBLIC_STRIPE_PRICE_ENTERPRISE') ?? 'price_enterprise_placeholder')}
+                onClick={() => checkout(publicEnv('NEXT_PUBLIC_STRIPE_PRICE_ENTERPRISE'))}
               >
                 Upgrade to Enterprise
               </button>
@@ -517,7 +522,7 @@ export default function SettingsPage() {
                       <span style={{ display: 'block', fontWeight: 600 }}>
                         {f.title}
                         <span className="badge" style={{ marginLeft: 8 }}>
-                          {on ? 'Enabled' : 'Off — review required'}
+                          {on ? 'Enabled' : 'Off'}
                         </span>
                       </span>
                       <span className="rp-page-sub">{f.description}</span>

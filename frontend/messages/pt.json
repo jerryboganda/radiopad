@@ -122,7 +122,7 @@
     },
     "search": "Pesquisar",
     "hipaa": "Conforme HIPAA",
-    "hipaaTitle": "Proteções de PHI ativas — log de auditoria, isolamento de tenants, políticas de provedores",
+    "hipaaTitle": "Proteções de PHI ativas — log de auditoria, isolamento de tenants",
     "collapse": "Recolher",
     "palette": {
       "title": "Paleta de comandos",

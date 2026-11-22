@@ -1,8 +1,8 @@
 'use client';
 
 /**
- * BILL-004 — per-month usage dashboard. Surfaces seat / AI-request /
- * token / report-generation totals from `GET /api/usage/analytics` (windowed)
+ * BILL-004 — per-month usage dashboard. Surfaces active-user / AI-request /
+ * token totals from `GET /api/usage/analytics` (windowed)
  * + `GET /api/usage/summary` (lifetime). Tenant-scoped server-side.
  *
  * Locked design tokens only.
@@ -37,8 +37,6 @@ function lastNMonths(n: number): Month[] {
 type MonthRow = {
   month: Month;
   ai: UsageSummary | null;
-  reportsTotal: number;
-  reportsExported: number;
   activeUsers: number;
   error: string | null;
 };
@@ -77,8 +75,6 @@ export default function UsageDashboardPage() {
               return {
                 month: m,
                 ai,
-                reportsTotal: 0, // full KPIs available on main analytics page
-                reportsExported: 0,
                 activeUsers: analytics.product.activeRadiologists,
                 error: null,
               };
@@ -86,8 +82,6 @@ export default function UsageDashboardPage() {
               return {
                 month: m,
                 ai: null,
-                reportsTotal: 0,
-                reportsExported: 0,
                 activeUsers: 0,
                 error: (e as Error).message,
               };
@@ -132,7 +126,7 @@ export default function UsageDashboardPage() {
     <Container>
       <PageHeader
         title="Usage"
-        description="How much your workspace has used RadioPad each month — active radiologists, AI requests, and reports."
+        description="How much your workspace has used RadioPad each month — active radiologists and AI requests."
       />
 
       <div aria-live="polite" aria-busy={loading}>
@@ -173,8 +167,6 @@ export default function UsageDashboardPage() {
             <tr>
               <th>Month</th>
               <th>Active users</th>
-              <th>Reports</th>
-              <th>Exported</th>
               <th>AI requests</th>
               <th>Words in</th>
               <th>Words out</th>
@@ -183,15 +175,18 @@ export default function UsageDashboardPage() {
           <tbody className="rp-stagger">
             {rows.length === 0 && !loading && (
               <tr>
-                <td colSpan={7} className="rp-page-sub">No data yet.</td>
+                <td colSpan={5} className="rp-page-sub">No data yet.</td>
               </tr>
             )}
-            {rows.map((r) => (
+            {rows.map((r) => r.error ? (
+              <tr key={r.month.label}>
+                <td>{r.month.label}</td>
+                <td colSpan={4} className="rp-page-sub">Couldn&apos;t load this month: {r.error}</td>
+              </tr>
+            ) : (
               <tr key={r.month.label}>
                 <td>{r.month.label}</td>
                 <td>{r.activeUsers}</td>
-                <td>{r.reportsTotal}</td>
-                <td>{r.reportsExported}</td>
                 <td>{r.ai?.totalRequests ?? '—'}</td>
                 <td>{r.ai?.inputTokens.toLocaleString() ?? '—'}</td>
                 <td>{r.ai?.outputTokens.toLocaleString() ?? '—'}</td>

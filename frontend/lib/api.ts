@@ -846,7 +846,7 @@ async function requestPaged<T>(path: string): Promise<{ items: T[]; total: numbe
   return { items, total };
 }
 
-async function requestBlob(path: string, init?: RequestInit): Promise<Blob> {
+export async function requestBlob(path: string, init?: RequestInit): Promise<Blob> {
   const headers = new Headers(init?.headers || {});
   if (init?.body && !headers.has('Content-Type')) headers.set('Content-Type', 'application/json');
   applyTenantHeaders(headers);
@@ -2603,6 +2603,13 @@ export const api = {
       if (params.to) q.set('to', params.to);
       if (params.take) q.set('take', String(params.take));
       return request<unknown[]>(`/api/audit?${q}`);
+    },
+    /** Server-side filtered search; `action` is the AuditAction enum NAME (rows serialise it as a number). */
+    search: (params: { action?: string; take?: number } = {}) => {
+      const q = new URLSearchParams();
+      if (params.action) q.set('action', params.action);
+      if (params.take) q.set('take', String(params.take));
+      return request<unknown[]>(`/api/audit/search?${q}`);
     },
     /**
      * Iter-34 GOV-001 — recompute the SHA-256 integrity chain on the

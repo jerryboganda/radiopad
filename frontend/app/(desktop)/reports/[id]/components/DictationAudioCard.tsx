@@ -3,7 +3,7 @@
 import { useState, useRef, useEffect } from 'react';
 import { Play, Pause, Check, RefreshCw, Volume2 } from 'lucide-react';
 import type { DictationAudioDto, TranscriptionEngineDto } from '@/lib/api/reportingClient';
-import { getDictationAudioUrl } from '@/lib/api/reportingClient';
+import { getDictationAudioBlob } from '@/lib/api/reportingClient';
 
 export interface DictationAudioCardProps {
   dictation: DictationAudioDto;
@@ -37,9 +37,30 @@ export default function DictationAudioCard({
     setEditedText(dictation.transcribedText || '');
   }, [dictation.transcribedText]);
 
-  const audioUrl = dictation.storagePath?.startsWith('http') || dictation.storagePath?.startsWith('/')
-    ? dictation.storagePath
-    : getDictationAudioUrl(dictation.reportId, dictation.id);
+  // `storagePath` is a server filesystem path, never a playable URL, and <audio src> cannot send the
+  // Bearer header — so fetch the bytes through the authenticated client and play a blob URL.
+  const [audioUrl, setAudioUrl] = useState<string | undefined>(undefined);
+  const [audioError, setAudioError] = useState(false);
+  useEffect(() => {
+    let cancelled = false;
+    let objectUrl: string | undefined;
+    setAudioUrl(undefined);
+    setAudioError(false);
+    Promise.resolve()
+      .then(() => getDictationAudioBlob(dictation.reportId, dictation.id))
+      .then((blob) => {
+        if (cancelled) return;
+        objectUrl = URL.createObjectURL(blob);
+        setAudioUrl(objectUrl);
+      })
+      .catch(() => {
+        if (!cancelled) setAudioError(true);
+      });
+    return () => {
+      cancelled = true;
+      if (objectUrl) URL.revokeObjectURL(objectUrl);
+    };
+  }, [dictation.reportId, dictation.id]);
 
   const togglePlay = () => {
     if (!audioRef.current) return;
@@ -131,6 +152,11 @@ export default function DictationAudioCard({
         >
           {isPlaying ? <Pause size={16} /> : <Play size={16} />}
         </button>
+        {audioError && (
+          <span className="rp-page-sub" role="alert" data-testid="audio-load-error">
+            Audio unavailable — the recording could not be loaded.
+          </span>
+        )}
 
         <div className="rp-audio-seek-wrap">
           <input

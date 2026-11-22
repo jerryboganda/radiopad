@@ -122,7 +122,7 @@
     },
     "search": "Suchen",
     "hipaa": "HIPAA-konform",
-    "hipaaTitle": "PHI-Schutz aktiv — Audit-Log, Mandantentrennung, Provider-Richtlinien",
+    "hipaaTitle": "PHI-Schutz aktiv — Audit-Log, Mandantentrennung",
     "collapse": "Einklappen",
     "palette": {
       "title": "Befehlspalette",

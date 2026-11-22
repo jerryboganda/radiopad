@@ -16,13 +16,15 @@ import {
 import { api, type RadLexHit, type RadsEntry } from '@/lib/api';
 import Container from '@/components/shell/Container';
 
+// ids are the keys of backend rulebooks/_terminology/rads.yaml (GET /api/terminology/rads?system=) —
+// the lookup is exact-match, so a display name like "BI-RADS" 404s.
 const RADS_SYSTEMS = [
-  { id: 'BI-RADS', label: 'BI-RADS (breast)' },
-  { id: 'LI-RADS', label: 'LI-RADS (liver)' },
-  { id: 'TI-RADS', label: 'TI-RADS (thyroid)' },
-  { id: 'PI-RADS', label: 'PI-RADS (prostate)' },
-  { id: 'Lung-RADS', label: 'Lung-RADS' },
-  { id: 'O-RADS', label: 'O-RADS (ovarian)' },
+  { id: 'bi_rads', label: 'BI-RADS (breast)' },
+  { id: 'li_rads', label: 'LI-RADS (liver)' },
+  { id: 'tirads', label: 'TI-RADS (thyroid)' },
+  { id: 'pi_rads', label: 'PI-RADS (prostate)' },
+  { id: 'lung_rads', label: 'Lung-RADS' },
+  { id: 'c_rads', label: 'C-RADS (CT colonography)' },
 ];
 
 // The bundled RadLex subset's real taxonomy (RadLexService.cs / radlex_subset.yaml) —

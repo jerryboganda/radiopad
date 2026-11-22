@@ -8,54 +8,39 @@ import ErrorState from '@/components/ui/ErrorState';
 
 type AuditEvent = {
   id: string;
-  tenantId: string;
   action: number | string;
-  detailsJson: string;
   integrityChain: string;
   createdAt: string;
 };
 
-/**
- * Recompute the SHA-256 hash chain client-side and flag any rows that
- * disagree with the server-stored `integrityChain`. The server uses the
- * canonical payload `{id}|{tenantId}|{(int)action}|{detailsJson}|{prev}`.
- */
-async function sha256Hex(text: string): Promise<string> {
-  const buf = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(text));
-  return Array.from(new Uint8Array(buf)).map((b) => b.toString(16).padStart(2, '0')).join('');
-}
+type Verdict = Awaited<ReturnType<typeof api.audit.verify>>;
 
 export default function AuditVerifyPage() {
+  // Display only: the verdict comes from the server, which walks the tenant's WHOLE chain. A
+  // browser recompute over a recent window can't — row 1 of a window has an unknown predecessor, so
+  // any tenant with more events than the window would see a false "broken" row.
   const [events, setEvents] = useState<AuditEvent[]>([]);
-  const [results, setResults] = useState<Array<{ id: string; ok: boolean; expected: string; actual: string }>>([]);
+  const [verdict, setVerdict] = useState<Verdict | null>(null);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
     api.audit.query({ take: 500 })
-      .then((e) => setEvents((e as AuditEvent[]).slice().reverse())) // oldest first
+      .then((e) => setEvents(e as AuditEvent[]))
       .catch((e: Error) => setError(e.message));
   }, []);
 
   async function verify() {
     setBusy(true);
+    setError(null);
     try {
-      let prev = '';
-      const out: typeof results = [];
-      for (const e of events) {
-        const action = typeof e.action === 'number' ? e.action : Number(e.action);
-        const payload = `${e.id}|${e.tenantId}|${action}|${e.detailsJson}|${prev}`;
-        const computed = await sha256Hex(payload);
-        out.push({ id: e.id, ok: computed === e.integrityChain, expected: e.integrityChain, actual: computed });
-        prev = e.integrityChain;
-      }
-      setResults(out);
+      setVerdict(await api.audit.verify());
+    } catch (e) {
+      setError((e as Error).message);
     } finally {
       setBusy(false);
     }
   }
-
-  const broken = results.filter((r) => !r.ok).length;
 
   return (
     <Container>
@@ -63,47 +48,46 @@ export default function AuditVerifyPage() {
         title="Audit chain verifier"
         description={
           <>
-            Recomputes the SHA-256 hash chain in your browser and flags any row whose stored{' '}
-            <code>integrityChain</code> diverges from the recomputed value. Tampering with any prior
-            row breaks the chain at that row and at every row after it.
+            Asks the server to recompute the SHA-256 hash chain over this workspace&apos;s entire audit
+            log. Tampering with any row breaks the chain at that row and at every row after it.
           </>
         }
       />
 
-      {error && <ErrorState message={error} />}
+      {error && <ErrorState message={error} onRetry={verify} />}
 
       <div className="rp-toolbar">
-        <button
-          className="primary"
-          onClick={verify}
-          disabled={busy || events.length === 0}
-          aria-busy={busy}
-        >
+        <button className="primary" onClick={verify} disabled={busy} aria-busy={busy}>
           {busy && <span className="rp-spinner sm" aria-hidden />}
-          {busy ? 'Verifying…' : `Verify ${events.length} events`}
+          {busy ? 'Verifying…' : 'Verify audit chain'}
         </button>
         <span aria-live="polite">
-          {results.length > 0 && (
-            broken === 0
-              ? <span className="badge ok">Chain intact ({results.length} rows)</span>
-              : <span className="badge danger">{broken} broken row{broken === 1 ? '' : 's'}</span>
+          {verdict && (
+            verdict.intact
+              ? <span className="badge ok">Chain intact ({verdict.eventCount} events)</span>
+              : <span className="badge danger">Chain broken — {verdict.eventCount} events checked</span>
           )}
         </span>
       </div>
 
-      {results.length > 0 && (
+      {events.length > 0 && (
         <div className="rp-panel rp-anim-fade-in-up">
+          <div className="rp-panel-title">Latest {events.length} events</div>
           <table className="rp-table">
             <thead>
-              <tr><th>Event</th><th>Expected (stored)</th><th>Computed</th><th>Status</th></tr>
+              <tr><th>Event</th><th>When</th><th>Chain hash</th><th>Status</th></tr>
             </thead>
             <tbody>
-              {results.map((r) => (
+              {events.map((r) => (
                 <tr key={r.id}>
                   <td><code style={{ fontSize: 11 }}>{r.id.slice(0, 8)}…</code></td>
-                  <td><code style={{ fontSize: 11 }}>{r.expected.slice(0, 12)}…</code></td>
-                  <td><code style={{ fontSize: 11 }}>{r.actual.slice(0, 12)}…</code></td>
-                  <td>{r.ok ? <span className="badge ok">ok</span> : <span className="badge danger">mismatch</span>}</td>
+                  <td>{new Date(r.createdAt).toLocaleString()}</td>
+                  <td><code style={{ fontSize: 11 }}>{r.integrityChain.slice(0, 12)}…</code></td>
+                  <td>
+                    {verdict && !verdict.intact && verdict.firstBrokenEventId === r.id
+                      ? <span className="badge danger">first broken row</span>
+                      : null}
+                  </td>
                 </tr>
               ))}
             </tbody>

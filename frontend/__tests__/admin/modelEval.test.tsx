@@ -231,6 +231,53 @@ describe('admin/model-eval', () => {
     expect(screen.queryByTestId('promote-locked')).toBeNull();
   });
 
+  it('keeps promote disabled until an evaluation has finished, and shows no invented cost/validation', async () => {
+    seed(2);
+    render(<AdminModelEvalPage />);
+    await waitFor(() => {
+      expect(screen.getByTestId('promote-btn')).toBeInTheDocument();
+    });
+    fireEvent.change(screen.getByTestId('select-rulebook'), { target: { value: 'chest_ct_v1' } });
+    // Rulebook picked, but nothing has been run yet → no evidence to approve on.
+    expect(screen.getByTestId('promote-btn')).toBeDisabled();
+    expect(screen.getByTestId('promote-needs-run')).toBeInTheDocument();
+
+    fireEvent.change(screen.getByTestId('select-report'), { target: { value: 'rep-1' } });
+    fireEvent.click(screen.getByTestId('provider-openai-sandbox'));
+    fireEvent.click(screen.getByTestId('run-eval'));
+
+    await waitFor(() => {
+      expect(screen.getByTestId('panel-eval-results')).toBeInTheDocument();
+    });
+    expect(screen.getByTestId('promote-btn')).toBeEnabled();
+    // No "$0.0000" and no green "candidate" badge for figures nobody measured.
+    expect(screen.queryByText(/\$0\.0000/)).toBeNull();
+    expect(screen.queryByText('candidate')).toBeNull();
+  });
+
+  it('blocks promotion when a golden case failed, and when the rulebook changes after a run', async () => {
+    seed(2); // validationPacksRun → 5 passed, 1 failed
+    render(<AdminModelEvalPage />);
+    await waitFor(() => {
+      expect(screen.getByTestId('promote-btn')).toBeInTheDocument();
+    });
+    fireEvent.change(screen.getByTestId('select-rulebook'), { target: { value: 'chest_ct_v1' } });
+    fireEvent.change(screen.getByTestId('select-pack'), { target: { value: 'pack-1' } });
+    fireEvent.change(screen.getByTestId('select-report'), { target: { value: 'rep-1' } });
+    fireEvent.click(screen.getByTestId('provider-openai-sandbox'));
+    fireEvent.click(screen.getByTestId('run-eval'));
+    await waitFor(() => {
+      expect(screen.getByTestId('panel-pack-result')).toBeInTheDocument();
+    });
+    expect(screen.getByTestId('promote-btn')).toBeDisabled();
+    expect(screen.getByTestId('promote-needs-run')).toHaveTextContent(/golden cases failed/i);
+
+    // Changing the rulebook discards results that were gathered for another one.
+    fireEvent.change(screen.getByTestId('select-rulebook'), { target: { value: '' } });
+    expect(screen.queryByTestId('panel-pack-result')).toBeNull();
+    expect(screen.queryByTestId('panel-eval-results')).toBeNull();
+  });
+
   it('hides the promote button for Compliance Reviewer', async () => {
     seed(3);
     render(<AdminModelEvalPage />);

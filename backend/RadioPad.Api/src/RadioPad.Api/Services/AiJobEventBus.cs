@@ -21,7 +21,7 @@ public sealed record AiJobProgressEvent(
 /// <summary>An inbox/notification snapshot destined for one recipient (NOTIF producer).</summary>
 public sealed record NotificationEvent(Guid TenantId, Guid RecipientUserId, object Snapshot);
 
-/// <summary>One bus event as seen by a subscriber. EventType ∈ "job"|"progress"|"partial"|"notification".</summary>
+/// <summary>One bus event as seen by a subscriber. EventType ∈ "job"|"progress"|"partial"|"notification"|"dictation".</summary>
 public sealed record AiJobBusEvent(string EventType, object Payload);
 
 public interface IAiJobEventBus
@@ -34,6 +34,14 @@ public interface IAiJobEventBus
 
     /// <summary>Publishes a "notification" event to the recipient user.</summary>
     void PublishNotification(NotificationEvent evt);
+
+    /// <summary>
+    /// Publishes a tenant-wide signal — every connected user of <paramref name="tenantId"/>, not one
+    /// owner (a consultant's mobile dictation must reach the resident who has the report open).
+    /// For "something changed, refetch" pings only: the client resolves the data through its own
+    /// authenticated, permission-checked GET, so the payload must carry NO clinical text or storage paths.
+    /// </summary>
+    void PublishTenantEvent(Guid tenantId, string eventType, object payload);
 
     /// <summary>
     /// Subscribes to the bus. A subscriber receives an event when
@@ -143,6 +151,16 @@ public sealed class AiJobEventBus : IAiJobEventBus
 
     public void PublishNotification(NotificationEvent evt) =>
         Deliver(evt.TenantId, evt.RecipientUserId, new AiJobBusEvent("notification", evt.Snapshot));
+
+    public void PublishTenantEvent(Guid tenantId, string eventType, object payload)
+    {
+        var busEvent = new AiJobBusEvent(eventType, payload);
+        foreach (var sub in _subs.Values)
+        {
+            if (sub.TenantId is null || sub.TenantId == tenantId)
+                sub.Channel.Writer.TryWrite(busEvent);
+        }
+    }
 
     private void Deliver(Guid tenantId, Guid userId, AiJobBusEvent busEvent)
     {

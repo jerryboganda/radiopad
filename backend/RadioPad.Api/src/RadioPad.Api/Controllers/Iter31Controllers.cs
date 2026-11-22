@@ -198,10 +198,12 @@ public class PromptStudioController : TenantedController
 {
     private readonly RadioPadDbContext _db;
     private readonly ReportingService _reporting;
-    public PromptStudioController(RadioPadDbContext db, ReportingService reporting)
+    private readonly RadioPad.Api.Services.ValidationPackService _packs;
+    public PromptStudioController(RadioPadDbContext db, ReportingService reporting, RadioPad.Api.Services.ValidationPackService packs)
     {
         _db = db;
         _reporting = reporting;
+        _packs = packs;
     }
 
     public record TestGoldenDto(string RulebookId, Guid? PromptOverrideId);
@@ -263,50 +265,37 @@ public class PromptStudioController : TenantedController
         if (packs.Count == 0)
             return Ok(Array.Empty<object>());
 
+        // Every case runs through the real ReportValidator against the rulebook. The validator does
+        // not read prompt overrides (they shape generation, which is not re-run here), so
+        // PromptOverrideId does not change these results.
         var results = new List<object>();
         foreach (var pack in packs)
         {
-            List<GoldenCaseEntry>? cases;
+            IReadOnlyList<RadioPad.Api.Services.ValidationPackService.GoldenCaseResultDto> evaluated;
             try
             {
-                cases = System.Text.Json.JsonSerializer.Deserialize<List<GoldenCaseEntry>>(
-                    pack.GoldenCasesJson,
-                    new System.Text.Json.JsonSerializerOptions { PropertyNameCaseInsensitive = true });
+                evaluated = await _packs.EvaluateAsync(tenant, pack, ct);
             }
-            catch
+            catch (Exception ex) when (ex is System.Text.Json.JsonException or KeyNotFoundException or InvalidOperationException)
             {
+                // A malformed pack (bad JSON / a case without a "report") is skipped, as before.
                 continue;
             }
-            if (cases is null) continue;
 
-            foreach (var gc in cases)
+            foreach (var c in evaluated)
             {
-                var expected = gc.ExpectFlagged ?? new List<string>();
-                // Simplified: in a full implementation, the validation engine
-                // would run each case's report through the rulebook + prompt
-                // override. Here we return a deterministic result based on
-                // whether expected rules are defined.
-                var actual = expected; // placeholder: would come from validation engine
-                var passed = expected.Count == actual.Count;
                 results.Add(new
                 {
-                    caseName = gc.Name ?? $"case-{results.Count + 1}",
-                    passed,
-                    expectedRules = expected,
-                    actualRules = actual,
-                    qualityScore = passed ? 1.0 : 0.0,
+                    caseName = c.CaseName,
+                    passed = c.Passed,
+                    expectedRules = c.ExpectedRules,
+                    actualRules = c.ActualRules,
+                    qualityScore = c.QualityScore / 100.0,
                 });
             }
         }
 
         return Ok(results);
-    }
-
-    private class GoldenCaseEntry
-    {
-        public string? Name { get; set; }
-        public object? Report { get; set; }
-        public List<string>? ExpectFlagged { get; set; }
     }
 }
 

@@ -167,7 +167,15 @@ builder.Services.AddHttpClient(RadioPad.Infrastructure.Providers.Ubag.UbagClient
 });
 
 // AI provider adapters
-builder.Services.AddSingleton<IAiProviderAdapter, MockAiAdapter>();
+// MockAiAdapter returns canned impression text. It is registered only for dev/test (same gate as
+// DevSeed): in Production a provider row with adapter "mock" fails closed in AiGateway
+// ("adapter 'mock' is not registered") instead of putting invented findings into a report.
+if (builder.Environment.IsDevelopment()
+    || builder.Environment.IsEnvironment("Testing")
+    || Environment.GetEnvironmentVariable("RADIOPAD_DEV_SEED") == "1")
+{
+    builder.Services.AddSingleton<IAiProviderAdapter, MockAiAdapter>();
+}
 builder.Services.AddSingleton<IAiProviderAdapter, AnthropicAiAdapter>();
 builder.Services.AddSingleton<IAiProviderAdapter, OllamaAiAdapter>();
 // Iter-31 production adapters.
@@ -650,6 +658,9 @@ builder.Services.AddCors(o => o.AddDefaultPolicy(p => p
         "http://tauri.localhost", "https://tauri.localhost",
         .. (Environment.GetEnvironmentVariable("RADIOPAD_CORS_ORIGINS") ?? "")
             .Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)])
+    // X-Total-Count must be exposed or a cross-origin client (hosted web, Tauri, Capacitor) reads it
+    // as null and the worklist's "load every page" loop stops after the first page, silently.
+    .WithExposedHeaders("X-Total-Count")
     .AllowAnyHeader().AllowAnyMethod().AllowCredentials()));
 
 builder.Services.AddControllers().AddJsonOptions(o =>
@@ -889,7 +900,11 @@ if (!app.Environment.IsProduction() || Environment.GetEnvironmentVariable("RADIO
     app.UseSwaggerUI();
 }
 app.MapControllers();
-app.MapHub<RadioPad.Api.Hubs.ReportingHub>("/hubs/reporting");
+// ponytail: /hubs/reporting is deliberately NOT mapped. It sat outside /api (so the bearer middleware
+// never ran) and JoinReportGroup had no tenant check, so any anonymous socket could subscribe to a
+// report's dictation/transcript traffic. No client connects to it — dictation events now reach the
+// desktop over the authenticated, tenant-scoped SSE stream (EventsController, "dictation" event).
+// Re-map only together with bearer auth on connect and an ownership check inside JoinReportGroup.
 app.MapGet("/api/health", () => Results.Ok(new { status = "ok", service = "radiopad-api", time = DateTimeOffset.UtcNow }));
 app.MapGet("/api/health/ready", async (RadioPadDbContext db, CancellationToken ct) =>
 {

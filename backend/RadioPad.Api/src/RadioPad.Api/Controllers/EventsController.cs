@@ -7,7 +7,9 @@ namespace RadioPad.Api.Controllers;
 /// <summary>
 /// Server-Sent-Events stream (PR-B1) — one long-lived GET per signed-in client that
 /// pushes the caller's own terminal job transitions, streamed progress/partials, and
-/// notifications as they happen, replacing the jobs-widget poll.
+/// notifications as they happen, replacing the jobs-widget poll. It also carries tenant-wide
+/// <c>dictation</c> signals (a mobile take was uploaded / transcribed — ids and status only, no
+/// clinical text) so an open report refreshes live.
 ///
 /// <para>Authenticated (via <see cref="TenantedController.ResolveContextAsync"/>) but
 /// with NO extra permission gate: notifications must reach every role, and job/progress/

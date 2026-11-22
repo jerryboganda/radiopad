@@ -19,7 +19,7 @@ export default function NewReportModal({ isOpen, onClose, onSuccess }: NewReport
   const [radiologyId, setRadiologyId] = useState('');
   const [patientName, setPatientName] = useState('');
   const [patientAge, setPatientAge] = useState<number | string>('');
-  const [patientGender, setPatientGender] = useState('Male');
+  const [patientGender, setPatientGender] = useState('');
   const [modality, setModality] = useState('');
   const [bodyPart, setBodyPart] = useState('');
   const [modalityOptions, setModalityOptions] = useState<CatalogItem[]>([]);
@@ -29,11 +29,8 @@ export default function NewReportModal({ isOpen, onClose, onSuccess }: NewReport
 
   useEffect(() => {
     if (!isOpen) return;
-    // Auto-suggest a default Radiology ID if empty.
-    if (!radiologyId) {
-      const randId = Math.floor(1000 + Math.random() * 9000);
-      setRadiologyId(`RAD-${new Date().getFullYear()}-${randId}`);
-    }
+    // No suggested Radiology ID: the desktop matches dictations to the report by this id, so it
+    // must be the real RIS/accession number the radiologist types — never a generated one.
     setError(null);
     // Same tenant-managed catalog the desktop app uses for template/rulebook
     // auto-resolution — keeps mobile-created reports consistent with desktop.
@@ -53,7 +50,7 @@ export default function NewReportModal({ isOpen, onClose, onSuccess }: NewReport
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!radiologyId.trim() || !patientName.trim() || !patientAge) {
+    if (!radiologyId.trim() || !patientName.trim() || !patientAge || !patientGender) {
       setError('Please fill in all required fields.');
       return;
     }
@@ -151,8 +148,10 @@ export default function NewReportModal({ isOpen, onClose, onSuccess }: NewReport
               <select
                 value={patientGender}
                 onChange={(e) => setPatientGender(e.target.value)}
+                required
                 data-testid="new-report-patient-gender"
               >
+                <option value="">Select…</option>
                 <option value="Male">Male</option>
                 <option value="Female">Female</option>
                 <option value="Other">Other</option>

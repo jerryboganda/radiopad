@@ -5,11 +5,14 @@ import type { DictationAudioDto, TranscriptionEngineDto } from '@/lib/api/report
 import { getTranscriptionEngines } from '@/lib/api/reportingClient';
 import DictationAudioCard from './DictationAudioCard';
 import EmptyState from '@/components/ui/EmptyState';
+import ErrorState from '@/components/ui/ErrorState';
 import { Volume2, Sparkles, X, RefreshCw } from 'lucide-react';
 
 export interface PositiveFindingsTabProps {
   reportId: string;
   dictations?: DictationAudioDto[];
+  /** Set when the last dictation fetch failed — shown instead of the "none recorded yet" empty state. */
+  loadError?: string | null;
   onAppendToFindings: (text: string) => void;
   onRefreshDictations?: () => Promise<void> | void;
   onRetranscribe?: (dictationId: string, engine: string) => void;
@@ -18,6 +21,7 @@ export interface PositiveFindingsTabProps {
 export default function PositiveFindingsTab({
   reportId,
   dictations = [],
+  loadError = null,
   onAppendToFindings,
   onRefreshDictations,
   onRetranscribe,
@@ -47,7 +51,8 @@ export default function PositiveFindingsTab({
   useEffect(() => {
     if (typeof window === 'undefined') return;
 
-    // SignalR / Real-time window event listeners
+    // Window events re-dispatched by ReportClient from the SSE `dictation` signal. ReportClient
+    // owns the refetch (it also feeds the tab badge), so these only update the toast / local rows.
     const handleDictationUploaded = (e: Event) => {
       const detail = (e as CustomEvent<{ reportId: string; dictation?: DictationAudioDto }>).detail;
       if (!detail || (detail.reportId && detail.reportId !== reportId)) return;
@@ -59,10 +64,6 @@ export default function PositiveFindingsTab({
           if (prev.some((x) => x.id === detail.dictation?.id)) return prev;
           return [detail.dictation!, ...prev];
         });
-      }
-
-      if (onRefreshDictations) {
-        void onRefreshDictations();
       }
     };
 
@@ -77,25 +78,16 @@ export default function PositiveFindingsTab({
             : item
         )
       );
-
-      if (onRefreshDictations) {
-        void onRefreshDictations();
-      }
     };
 
     window.addEventListener('radiopad:dictation-uploaded', handleDictationUploaded);
     window.addEventListener('radiopad:transcription-completed', handleTranscriptionCompleted);
-    // Also listen for SignalR global events if dispatched
-    window.addEventListener('DictationUploaded', handleDictationUploaded);
-    window.addEventListener('TranscriptionCompleted', handleTranscriptionCompleted);
 
     return () => {
       window.removeEventListener('radiopad:dictation-uploaded', handleDictationUploaded);
       window.removeEventListener('radiopad:transcription-completed', handleTranscriptionCompleted);
-      window.removeEventListener('DictationUploaded', handleDictationUploaded);
-      window.removeEventListener('TranscriptionCompleted', handleTranscriptionCompleted);
     };
-  }, [reportId, onRefreshDictations]);
+  }, [reportId]);
 
   return (
     <div className="rp-panel rp-positive-findings-tab">
@@ -121,7 +113,7 @@ export default function PositiveFindingsTab({
         )}
       </div>
 
-      {/* Real-time SignalR toast / banner */}
+      {/* Real-time toast / banner (driven by the SSE `dictation` signal) */}
       {toastNotice && (
         <div
           className="banner info rp-dictation-toast"
@@ -143,15 +135,25 @@ export default function PositiveFindingsTab({
         </div>
       )}
 
+      {loadError && (
+        <ErrorState
+          title="Couldn't load mobile dictations"
+          message={loadError}
+          onRetry={onRefreshDictations ? () => void onRefreshDictations() : undefined}
+        />
+      )}
+
       {/* Dictation cards list */}
       {items.length === 0 ? (
-        <div data-testid="empty-dictations-notice">
-          <EmptyState
-            icon={<Volume2 size={18} aria-hidden />}
-            title="No Mobile Dictations Recorded Yet"
-            description="Audio dictations uploaded from the mobile reporting app will automatically hand off here in real time with AI transcription."
-          />
-        </div>
+        loadError ? null : (
+          <div data-testid="empty-dictations-notice">
+            <EmptyState
+              icon={<Volume2 size={18} aria-hidden />}
+              title="No Mobile Dictations Recorded Yet"
+              description="Audio dictations uploaded from the mobile reporting app will automatically hand off here in real time with AI transcription."
+            />
+          </div>
+        )
       ) : (
         <div className="rp-takes-list" data-testid="dictation-cards-list">
           {items.map((item) => (

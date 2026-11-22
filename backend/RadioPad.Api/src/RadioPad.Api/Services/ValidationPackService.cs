@@ -195,30 +195,19 @@ public class ValidationPackService
         int passed = 0;
         int total = 0;
 
-        using (var doc = JsonDocument.Parse(pack.GoldenCasesJson))
+        foreach (var (name, expected, actual, _) in EvaluateCases(pack, spec))
         {
-            foreach (var caseEl in doc.RootElement.EnumerateArray())
+            total++;
+            var missing = expected.Except(actual).ToArray();
+            var unexpected = actual.Except(expected).ToArray();
+
+            if (missing.Length == 0 && unexpected.Length == 0)
             {
-                total++;
-                var name = caseEl.TryGetProperty("name", out var nEl) ? (nEl.GetString() ?? "") : $"case-{total}";
-                var report = ParseReport(caseEl.GetProperty("report"));
-                var expected = caseEl.TryGetProperty("expectFlagged", out var eEl)
-                    ? eEl.EnumerateArray().Select(x => x.GetString() ?? "").ToArray()
-                    : Array.Empty<string>();
-
-                ValidationResult v = _validator.Validate(report, spec);
-                var actual = v.Findings.Select(f => f.RuleId).Distinct().ToArray();
-                var missing = expected.Except(actual).ToArray();
-                var unexpected = actual.Except(expected).ToArray();
-
-                if (missing.Length == 0 && unexpected.Length == 0)
-                {
-                    passed++;
-                }
-                else
-                {
-                    failures.Add(new RunFailureDto(name, missing, unexpected));
-                }
+                passed++;
+            }
+            else
+            {
+                failures.Add(new RunFailureDto(name, missing, unexpected));
             }
         }
 
@@ -239,6 +228,48 @@ public class ValidationPackService
             }),
         }, ct);
         return summary;
+    }
+
+    /// <summary>One golden case run through the real validator (Prompt Studio's per-case rows).</summary>
+    public record GoldenCaseResultDto(string CaseName, bool Passed, string[] ExpectedRules, string[] ActualRules, int QualityScore);
+
+    /// <summary>
+    /// Runs every golden case of <paramref name="pack"/> through <see cref="ReportValidator"/> against the
+    /// tenant's latest rulebook with the pack's <c>RulebookId</c>. Empty when that rulebook does not exist.
+    /// </summary>
+    public async Task<IReadOnlyList<GoldenCaseResultDto>> EvaluateAsync(Tenant tenant, ValidationPack pack, CancellationToken ct)
+    {
+        var rulebookEntity = await _rulebooks.GetAsync(tenant.Id, pack.RulebookId, ct);
+        if (rulebookEntity is null) return Array.Empty<GoldenCaseResultDto>();
+        var spec = RulebookSpec.FromYaml(rulebookEntity.SourceYaml);
+        return EvaluateCases(pack, spec)
+            .Select(c => new GoldenCaseResultDto(
+                c.Name,
+                !c.Expected.Except(c.Actual).Any() && !c.Actual.Except(c.Expected).Any(),
+                c.Expected,
+                c.Actual,
+                c.QualityScore))
+            .ToList();
+    }
+
+    // The single place a golden case is executed: shared by RunAsync (pass/fail summary) and EvaluateAsync.
+    private IEnumerable<(string Name, string[] Expected, string[] Actual, int QualityScore)> EvaluateCases(
+        ValidationPack pack, RulebookSpec spec)
+    {
+        using var doc = JsonDocument.Parse(pack.GoldenCasesJson);
+        var index = 0;
+        foreach (var caseEl in doc.RootElement.EnumerateArray())
+        {
+            index++;
+            var name = caseEl.TryGetProperty("name", out var nEl) ? (nEl.GetString() ?? "") : $"case-{index}";
+            var report = ParseReport(caseEl.GetProperty("report"));
+            var expected = caseEl.TryGetProperty("expectFlagged", out var eEl)
+                ? eEl.EnumerateArray().Select(x => x.GetString() ?? "").ToArray()
+                : Array.Empty<string>();
+
+            ValidationResult v = _validator.Validate(report, spec);
+            yield return (name, expected, v.Findings.Select(f => f.RuleId).Distinct().ToArray(), v.QualityScore);
+        }
     }
 
     private async Task<ValidationPack> Require(Tenant tenant, Guid packId, CancellationToken ct)

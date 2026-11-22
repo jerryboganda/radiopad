@@ -65,10 +65,14 @@ const PRESETS: Preset[] = [
   { id: 'ubag',         label: 'UBAG automation hub',     patch: { adapter: 'ubag',         endpointUrl: '',                       compliance: 1, model: 'gemini_web', retentionLabel: 'non-phi-browser-automation' } },
 ];
 
+// The canned-output "mock" adapter only exists on dev/test API builds; a production API rejects it.
+// `next build` inlines NODE_ENV=production, so the shipped admin never offers or defaults to it.
+const ALLOW_MOCK_ADAPTER = process.env.NODE_ENV !== 'production';
+
 const EMPTY_DRAFT: Editable = {
   id: undefined,
   name: '',
-  adapter: 'mock',
+  adapter: ALLOW_MOCK_ADAPTER ? 'mock' : 'anthropic',
   model: '',
   endpointUrl: '',
   compliance: 1,
@@ -286,8 +290,8 @@ export default function ProvidersPage() {
 
             <label className="rp-field">
               <span>Adapter</span>
-              <select className="rp-input" value={draft.adapter ?? 'mock'} onChange={(e) => setDraft({ ...draft, adapter: e.target.value })}>
-                <option value="mock">mock</option>
+              <select className="rp-input" value={draft.adapter ?? EMPTY_DRAFT.adapter} onChange={(e) => setDraft({ ...draft, adapter: e.target.value })}>
+                {(ALLOW_MOCK_ADAPTER || draft.adapter === 'mock') && <option value="mock">mock</option>}
                 <option value="anthropic">anthropic</option>
                 <option value="openai">openai</option>
                 <option value="openai-compatible">openai-compatible</option>

@@ -167,6 +167,10 @@ export async function syncOfflineDrafts(): Promise<{ synced: number; failed: num
           accessionNumber: d.accessionNumber,
         });
         serverId = created.id;
+        // Persist now: if the patch below fails, the next sync must patch THIS report instead of
+        // creating a duplicate.
+        d.serverId = serverId;
+        await saveOfflineDraft(d);
       }
       await api.reports.patch(serverId!, {
         indication: d.indication,

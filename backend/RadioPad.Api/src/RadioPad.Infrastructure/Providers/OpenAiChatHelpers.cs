@@ -50,7 +50,7 @@ public static class OpenAiChatHelpers
                     model,
                     messages,
                     temperature,
-                    max_tokens = maxTokens ?? 1024,
+                    max_tokens = maxTokens ?? AiCompletionRequest.DefaultMaxOutputTokens,
                     stream = true,
                     stream_options = new { include_usage = true },
                     response_format = new
@@ -67,7 +67,7 @@ public static class OpenAiChatHelpers
                 messages,
                 // Iter-0b (AI-014) — temperature already clamped to [0, 0.4] upstream.
                 temperature,
-                max_tokens = maxTokens ?? 1024,
+                max_tokens = maxTokens ?? AiCompletionRequest.DefaultMaxOutputTokens,
                 stream = false,
                 response_format = new
                 {
@@ -84,7 +84,7 @@ public static class OpenAiChatHelpers
                 model,
                 messages,
                 temperature,
-                max_tokens = maxTokens ?? 1024,
+                max_tokens = maxTokens ?? AiCompletionRequest.DefaultMaxOutputTokens,
                 stream = true,
                 stream_options = new { include_usage = true },
             };
@@ -95,7 +95,7 @@ public static class OpenAiChatHelpers
             model,
             messages,
             temperature,
-            max_tokens = maxTokens ?? 1024,
+            max_tokens = maxTokens ?? AiCompletionRequest.DefaultMaxOutputTokens,
             stream = false,
         };
     }

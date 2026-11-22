@@ -5,15 +5,11 @@ import Container from '@/components/shell/Container';
 import QRCode from 'qrcode';
 import {
   Check,
-  ChevronRight,
   Fingerprint,
   KeyRound,
   Lock,
-  Mail,
   MonitorSmartphone,
   MoreVertical,
-  Ticket,
-  Usb,
 } from 'lucide-react';
 import { api, type AuthSessionRow, type WebAuthnCredentialRow } from '@/lib/api';
 import { registerPasskey, isPlatformAuthenticatorAvailable } from '@/lib/webauthn';
@@ -157,11 +153,6 @@ export default function AccountSecurityPage() {
     }
   }
 
-  function backupMethodStub(name: string) {
-    setErr(null);
-    setInfo(`${name} isn't available yet.`);
-  }
-
   const visibleSessions = sessions && !showAllSessions ? sessions.slice(0, 4) : sessions;
 
   return (
@@ -192,7 +183,7 @@ export default function AccountSecurityPage() {
           {helloAvailable === false ? (
             <p className="rp-page-sub">
               This device has no built-in fingerprint reader or face camera that RadioPad can use.
-              You can still sign in with an email magic link.
+              You can still sign in with your password, plus an authenticator-app code if you set one up below.
             </p>
           ) : (
             <div className="rp-security-split">
@@ -341,61 +332,6 @@ export default function AccountSecurityPage() {
               </div>
             </div>
           )}
-        </div>
-
-        {/* Backup methods — visual only; none of these have a backend yet. */}
-        <div className="rp-panel rp-security-card">
-          <div className="rp-panel-title">Backup methods</div>
-          <ul className="rp-security-method-list">
-            <li className="rp-security-method-row">
-              <span className="rp-security-illustration sm" aria-hidden><Mail size={18} strokeWidth={1.8} /></span>
-              <div className="rp-security-method-text">
-                <strong>Recovery email</strong>
-                <p className="rp-page-sub">Add a recovery email to regain access.</p>
-              </div>
-              <span className="badge">Not set</span>
-              <button
-                type="button"
-                className="icon-btn"
-                aria-label="Recovery email"
-                onClick={() => backupMethodStub('Recovery email')}
-              >
-                <ChevronRight size={16} strokeWidth={2} aria-hidden />
-              </button>
-            </li>
-            <li className="rp-security-method-row">
-              <span className="rp-security-illustration sm" aria-hidden><Ticket size={18} strokeWidth={1.8} /></span>
-              <div className="rp-security-method-text">
-                <strong>Backup codes</strong>
-                <p className="rp-page-sub">Generate and store backup codes.</p>
-              </div>
-              <span className="badge">Not set</span>
-              <button
-                type="button"
-                className="icon-btn"
-                aria-label="Backup codes"
-                onClick={() => backupMethodStub('Backup codes')}
-              >
-                <ChevronRight size={16} strokeWidth={2} aria-hidden />
-              </button>
-            </li>
-            <li className="rp-security-method-row">
-              <span className="rp-security-illustration sm" aria-hidden><Usb size={18} strokeWidth={1.8} /></span>
-              <div className="rp-security-method-text">
-                <strong>Security key (FIDO2)</strong>
-                <p className="rp-page-sub">Use a physical security key for sign-in.</p>
-              </div>
-              <span className="badge">Not set</span>
-              <button
-                type="button"
-                className="icon-btn"
-                aria-label="Security key (FIDO2)"
-                onClick={() => backupMethodStub('Security key (FIDO2)')}
-              >
-                <ChevronRight size={16} strokeWidth={2} aria-hidden />
-              </button>
-            </li>
-          </ul>
         </div>
       </div>
 

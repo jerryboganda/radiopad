@@ -474,6 +474,7 @@ public sealed class AiJobCoordinatorTests : IDisposable
         public void PublishTerminal(AiJob job) => Terminals.Add(job);
         public void PublishProgress(AiJobProgressEvent evt) => Progress.Add(evt);
         public void PublishNotification(NotificationEvent evt) { }
+        public void PublishTenantEvent(Guid tenantId, string eventType, object payload) { }
         public IAiJobEventSubscription Subscribe(Guid? tenantId, Guid? userId) => throw new NotSupportedException();
     }
 }

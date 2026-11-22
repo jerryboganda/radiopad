@@ -124,14 +124,14 @@ public sealed class AwsBedrockProvider : IAiProviderAdapter
             return new
             {
                 inputText = $"{systemPrompt}\n\n{userPrompt}",
-                textGenerationConfig = new { maxTokenCount = 1024, temperature = 0.2, topP = 0.9 },
+                textGenerationConfig = new { maxTokenCount = AiCompletionRequest.DefaultMaxOutputTokens, temperature = 0.2, topP = 0.9 },
             };
         }
         // Anthropic / default
         return new
         {
             anthropic_version = "bedrock-2023-05-31",
-            max_tokens = 1024,
+            max_tokens = AiCompletionRequest.DefaultMaxOutputTokens,
             system = systemPrompt,
             messages = new object[]
             {

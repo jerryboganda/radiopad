@@ -85,11 +85,9 @@ function SecurityAdminPageInner() {
       const json = settings.ipAllowlistJson ?? '';
       setAllowlistJson(json);
       setSavedSummary(summarise(json));
-      const recent = (await api.audit.query({ take: 200 })) as AuditRow[];
-      const securityAlerts = recent.filter((r) =>
-        String(r.action).toLowerCase().includes('securityalert'),
-      );
-      setAlerts(securityAlerts.slice(0, 50));
+      // Filter on the server: rows carry the enum as a number, and a 200-row window of mixed
+      // events is too small to be sure an alert is in it.
+      setAlerts((await api.audit.search({ action: 'SecurityAlert', take: 50 })) as AuditRow[]);
     } catch (e) {
       setError((e as Error).message);
     }
@@ -255,12 +253,18 @@ function SecurityAdminPageInner() {
             )}
             <div className="rp-grid-3">
               <div className="rp-stat-tile">
-                <div className="rp-stat-label">Uptime (last 5 minutes)</div>
+                <div className="rp-stat-label">
+                  Uptime (last {Math.max(1, Math.round(availability.windowSec / 60))} min)
+                </div>
                 <div className="rp-stat-value">
-                  {(100 - availability.errorRate * 100).toFixed(2)}%
+                  {availability.totalProbes === 0
+                    ? '—'
+                    : `${(100 - availability.errorRate * 100).toFixed(2)}%`}
                 </div>
                 <div className="rp-stat-sub">
-                  {availability.totalProbes - availability.errorCount} of {availability.totalProbes} checks passed
+                  {availability.totalProbes === 0
+                    ? 'No probes yet'
+                    : `${availability.totalProbes - availability.errorCount} of ${availability.totalProbes} checks passed`}
                 </div>
               </div>
               <div className="rp-stat-tile">

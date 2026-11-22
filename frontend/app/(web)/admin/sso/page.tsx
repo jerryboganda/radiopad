@@ -3,7 +3,7 @@
 import PermissionGate from '@/components/ui/PermissionGate';
 
 import { useCallback, useEffect, useState } from 'react';
-import { api, type WebAuthnCredentialRow } from '@/lib/api';
+import { api, apiUrl, type WebAuthnCredentialRow } from '@/lib/api';
 import Container from '@/components/shell/Container';
 import PageHeader from '@/components/shell/PageHeader';
 import Banner from '@/components/ui/Banner';
@@ -62,6 +62,12 @@ function SsoAdminPageInner() {
   const [selected, setSelected] = useState<string>('keycloak');
   const [creds, setCreds] = useState<Credential[]>([]);
   const [error, setError] = useState<string | null>(null);
+  // The admin host is static: a relative /saml/metadata would be served the SPA's index.html, so
+  // point at the API origin (same-origin relative stays as the pre-resolve fallback).
+  const [samlMetadataUrl, setSamlMetadataUrl] = useState('/saml/metadata');
+  useEffect(() => {
+    apiUrl('/saml/metadata').then(setSamlMetadataUrl).catch(() => undefined);
+  }, []);
   const profile = PRESETS.find((p) => p.name === selected) ?? PRESETS[0];
 
   const loadCreds = useCallback(() => {
@@ -136,12 +142,12 @@ function SsoAdminPageInner() {
         <summary className="rp-panel-title" style={{ cursor: 'pointer' }}>SAML 2.0 (IT team only)</summary>
         <p className="rp-page-sub">
           The service-provider metadata document is at{' '}
-          <a href="/saml/metadata" target="_blank" rel="noreferrer"><code>/saml/metadata</code></a>.
+          <a href={samlMetadataUrl} target="_blank" rel="noreferrer"><code>/saml/metadata</code></a>.
           Configure <code>RADIOPAD_SAML_IDP_CERT_PEM</code> and{' '}
           <code>RADIOPAD_SAML_TENANT_ATTRIBUTE</code> (default <code>tenant_slug</code>).
           The ACS endpoint is <code>POST /saml/acs</code>.
         </p>
-        <a className="primary" href="/saml/metadata" target="_blank" rel="noreferrer">
+        <a className="primary" href={samlMetadataUrl} target="_blank" rel="noreferrer">
           Download metadata
         </a>
       </details>

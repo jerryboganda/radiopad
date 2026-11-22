@@ -1,4 +1,4 @@
-import { request } from '@/lib/api';
+import { request, requestBlob } from '@/lib/api';
 
 export interface CreateReportRequestDto {
   radiologyId: string;
@@ -129,12 +129,13 @@ export async function transcribeDictation(
 }
 
 /**
-  URL for streaming a dictation's stored audio bytes (range-enabled) — pass directly to
-  an <audio> element's `src`. Relative so it resolves through the same API base as every
-  other reportingClient call (desktop proxy, or the mobile Capacitor companion base).
+  A dictation's stored audio bytes. Fetched through the authenticated client (API base + Bearer
+  header) because an <audio src> URL can send neither — a root-relative src resolves against the app
+  origin on the hosted web / Tauri / Capacitor builds and is rejected as unauthenticated. Play the
+  result as a blob URL.
  */
-export function getDictationAudioUrl(reportId: string, dictationId: string): string {
-  return `/api/v1/reporting/reports/${reportId}/dictations/${dictationId}/audio`;
+export async function getDictationAudioBlob(reportId: string, dictationId: string): Promise<Blob> {
+  return requestBlob(`/api/v1/reporting/reports/${reportId}/dictations/${dictationId}/audio`);
 }
 
 export const reportingClient = {
@@ -144,7 +145,7 @@ export const reportingClient = {
   uploadDictation,
   getTranscriptionEngines,
   transcribeDictation,
-  getDictationAudioUrl,
+  getDictationAudioBlob,
 };
 
 export default reportingClient;

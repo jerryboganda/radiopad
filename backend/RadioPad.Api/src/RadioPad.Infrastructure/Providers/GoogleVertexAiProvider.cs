@@ -64,7 +64,7 @@ public sealed class GoogleVertexAiProvider : IAiProviderAdapter
                 new { role = "user", parts = new object[] { new { text = request.UserPrompt } } },
             },
             systemInstruction = new { parts = new object[] { new { text = request.SystemPrompt } } },
-            generationConfig = new { temperature = 0.2, maxOutputTokens = 1024 },
+            generationConfig = new { temperature = request.Temperature, maxOutputTokens = AiCompletionRequest.DefaultMaxOutputTokens },
         };
 
         var client = _http.CreateClient("ai");

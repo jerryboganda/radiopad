@@ -205,7 +205,10 @@ public class ReportsLifecycleController : TenantedController
         return Ok(new
         {
             id = sig.Id,
+            reportId = report.Id,
+            radiologistEmail = user.Email,
             role = sig.Role.ToString(),
+            note = sig.Note,
             signedAt = sig.SignedAt,
             hash = sig.Hash,
         });
@@ -276,7 +279,10 @@ public class ReportsLifecycleController : TenantedController
             .Select(s => new
             {
                 id = s.Id,
+                reportId = s.ReportId,
                 userId = s.UserId,
+                // The UI shows who signed ("Report author" / Radiologist column) from this field.
+                radiologistEmail = _db.Users.Where(u => u.Id == s.UserId).Select(u => u.Email).FirstOrDefault(),
                 role = s.Role.ToString(),
                 signedAt = s.SignedAt,
                 note = s.Note,

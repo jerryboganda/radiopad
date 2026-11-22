@@ -6,13 +6,13 @@
  * Side-by-side diff of the current report against the most-recent prior:
  * current column marks additive changes with blue "Changed" / "New" chips,
  * the prior column marks superseded text with amber "Different" chips, and a
- * sync-scroll toggle keeps the two columns aligned. Data flow is unchanged —
- * `/compare-prior` first, `/prior` + client diff as fallback.
+ * sync-scroll toggle keeps the two columns aligned. Data comes from `/compare-prior` only; a
+ * failure shows an error with retry rather than a substitute diff.
  */
 
 import { useEffect, useRef, useState } from 'react';
 import { api, type ComparePriorResult, type Report } from '@/lib/api';
-import Banner from '@/components/ui/Banner';
+import ErrorState from '@/components/ui/ErrorState';
 import StatusBadge from '@/components/ui/StatusBadge';
 import Skeleton from '@/components/ui/Skeleton';
 import EmptyState from '@/components/ui/EmptyState';
@@ -33,17 +33,11 @@ const SECTIONS: Array<{ key: keyof Report; label: string }> = [
   { key: 'recommendations', label: 'Recommendations' },
 ];
 
-type SectionDiff = {
-  section: string;
-  current: string;
-  prior: string;
-  changed: boolean;
-};
-
 export default function PriorComparePanel({ reportId }: Props) {
   const [data, setData] = useState<ComparePriorResult | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [attempt, setAttempt] = useState(0);
   const [syncScroll, setSyncScroll] = useState(true);
   const [cmpState, setCmpState] = useState<'idle' | 'inserted' | 'copied'>('idle');
 
@@ -54,16 +48,12 @@ export default function PriorComparePanel({ reportId }: Props) {
   useEffect(() => {
     let cancelled = false;
     setLoading(true);
+    setError(null);
     (async () => {
       try {
-        // Try /compare-prior first (richer); fall back to /prior + client diff.
-        let result: ComparePriorResult;
-        try {
-          result = await api.reports.comparePrior(reportId);
-        } catch {
-          const fallback = await api.reports.prior(reportId);
-          result = fromPriorOnly(reportId, fallback);
-        }
+        // No client-side fallback: a prior-only "diff" has no current text and would present every
+        // prior section as changed, plus a ready-to-insert comparison sentence built from it.
+        const result = await api.reports.comparePrior(reportId);
         if (!cancelled) setData(result);
       } catch (e) {
         if (!cancelled) setError((e as Error).message);
@@ -72,7 +62,7 @@ export default function PriorComparePanel({ reportId }: Props) {
       }
     })();
     return () => { cancelled = true; };
-  }, [reportId]);
+  }, [reportId, attempt]);
 
   function mirrorScroll(from: HTMLDivElement | null, to: HTMLDivElement | null) {
     if (!syncScroll || !from || !to || syncingRef.current) return;
@@ -94,7 +84,14 @@ export default function PriorComparePanel({ reportId }: Props) {
       </div>
     );
   }
-  if (error) return <Banner tone="warn" className="rp-anim-scale-in">{error}</Banner>;
+  if (error) {
+    return (
+      <div className="rp-panel rp-priorcmp rp-anim-scale-in">
+        <div className="rp-panel-title">Priors comparison</div>
+        <ErrorState title="Couldn't load the prior comparison" message={error} onRetry={() => setAttempt((n) => n + 1)} />
+      </div>
+    );
+  }
   if (!data) return null;
 
   if (!data.prior) {
@@ -248,32 +245,4 @@ function sectionLabel(section: string): string {
 
 function fmtDate(iso: string): string {
   try { return new Date(iso).toLocaleDateString(); } catch { return iso; }
-}
-
-function fromPriorOnly(
-  reportId: string,
-  payload: { current: { id: string; bodyPart: string }; prior: Report | null },
-): ComparePriorResult {
-  if (!payload.prior) {
-    return {
-      current: { id: reportId, bodyPart: payload.current.bodyPart },
-      prior: null,
-      sections: [],
-    };
-  }
-  const prior = payload.prior;
-  const sections: SectionDiff[] = SECTIONS.map(({ key }) => {
-    const priorVal = String((prior as Record<string, unknown>)[key as string] ?? '');
-    return {
-      section: key as string,
-      current: '', // unknown without a fetch; the page passes its own current values via a richer endpoint.
-      prior: priorVal,
-      changed: priorVal.length > 0,
-    };
-  });
-  return {
-    current: payload.current,
-    prior: { id: prior.id, bodyPart: prior.study.bodyPart, createdAt: prior.updatedAt },
-    sections,
-  };
 }

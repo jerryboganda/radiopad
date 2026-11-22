@@ -25,19 +25,22 @@ public class MobileReportingService : IReportingService
     private readonly ILogger<MobileReportingService> _logger;
     private readonly IServiceProvider? _serviceProvider;
     private readonly TranscriptionOrchestrator? _orchestrator;
+    private readonly IAiJobEventBus? _bus;
 
     public MobileReportingService(
         RadioPadDbContext db,
         IHubContext<ReportingHub> hubContext,
         ILogger<MobileReportingService> logger,
         IServiceProvider? serviceProvider = null,
-        TranscriptionOrchestrator? orchestrator = null)
+        TranscriptionOrchestrator? orchestrator = null,
+        IAiJobEventBus? bus = null)
     {
         _db = db;
         _hubContext = hubContext;
         _logger = logger;
         _serviceProvider = serviceProvider;
         _orchestrator = orchestrator;
+        _bus = bus;
     }
 
     public async Task<ReportDto> CreateReportAsync(CreateReportRequestDto dto, Guid tenantId, Guid createdByUserId, CancellationToken ct = default)
@@ -147,11 +150,24 @@ public class MobileReportingService : IReportingService
 
         var dto = MapToDictationDto(dictation);
 
+        // Live push over the SSE stream the desktop already holds open — tenant-scoped, and a pure
+        // signal (no storage path, no transcript): the desktop refetches through the authenticated GET.
+        _bus?.PublishTenantEvent(tenantId, "dictation", new
+        {
+            kind = "uploaded",
+            reportId,
+            dictationId = dto.Id,
+            status = dto.Status,
+            transcriptionEngine = dto.TranscriptionEngine,
+            durationSeconds = dto.DurationSeconds,
+            uploadedAt = dto.UploadedAt,
+        });
+
         try
         {
+            // Report-scoped only: the DTO carries the server storage path and (later) the transcript,
+            // so it must never be broadcast to every connected client.
             await _hubContext.Clients.Group($"report-{reportId}")
-                .SendAsync("DictationUploaded", dto, cancellationToken: ct);
-            await _hubContext.Clients.All
                 .SendAsync("DictationUploaded", dto, cancellationToken: ct);
         }
         catch (Exception ex)
