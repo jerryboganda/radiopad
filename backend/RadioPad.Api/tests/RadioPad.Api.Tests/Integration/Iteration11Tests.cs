@@ -253,6 +253,7 @@ public class PriorReportTests : IClassFixture<RadioPadAppFactory>
 
         var resp = await client.GetAsync($"/api/reports/{current}/prior");
         var doc = await JsonDocument.ParseAsync(await resp.Content.ReadAsStreamAsync());
-        Assert.Equal(JsonValueKind.Null, doc.RootElement.GetProperty("prior").ValueKind);
+        // The API omits null properties, so "no prior" is an absent (or null) `prior`.
+        Assert.True(!doc.RootElement.TryGetProperty("prior", out var prior) || prior.ValueKind == JsonValueKind.Null);
     }
 }
