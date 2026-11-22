@@ -3619,7 +3619,8 @@
   box-shadow: inset 2px 0 0 var(--accent);
 }
 .rp-queue-table tbody tr:focus-visible { outline: 2px solid var(--accent); outline-offset: -2px; }
-.rp-queue-id { font: 500 10.5px/1 var(--mono); color: var(--text-muted); white-space: nowrap; }
+/* Long real accession numbers wrap at their hyphens rather than pushing Status out of the rail. */
+.rp-queue-id { font: 500 10.5px/1.3 var(--mono); color: var(--text-muted); }
 /* max-width 0 + width 100%: the procedure column takes the slack and ellipsizes, so the queue fits a narrow rail. */
 .rp-queue-proc { max-width: 0; width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .rp-queue-table .badge, .rp-queue-table .status-badge { white-space: nowrap; }

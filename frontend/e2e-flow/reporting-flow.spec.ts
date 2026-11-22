@@ -32,7 +32,8 @@ async function createCase(api: APIRequestContext, accession: string, indication:
       technique: 'Axial CT images of the chest were obtained after intravenous contrast.',
       comparison: 'None.',
       findings: 'Lungs are clear. No pleural effusion or pneumothorax. Heart size is normal.',
-      impression: 'No acute cardiopulmonary abnormality.',
+      // The bundled Chest CT rulebook blocks sign-off without a Lung-RADS category.
+      impression: 'No acute cardiopulmonary abnormality. Lung-RADS category 1, negative.',
       recommendations: 'No follow-up imaging is required.',
     },
   });
@@ -108,10 +109,11 @@ test.describe.serial('reporting flow on the real API', () => {
     await typeIntoFindings(page, marker);
     // No waiting for autosave: sign-off must save first by itself.
     await mainButton(page, /^Validate$/).click();
-    await expect(page.locator('main .rp-inspector')).not.toContainText('Validation has not been run yet', { timeout: 30_000 });
+    const inspector = page.locator('main .rp-inspector');
+    await expect(inspector).toContainText('Validation summary', { timeout: 30_000 });
     await shot(page, 'validated');
-    const blockers = await page.locator('main .rp-inspector').innerText();
-    expect(blockers, 'validation reported a blocker on a complete report').not.toMatch(/\bBlocker\b/);
+    const summary = (await inspector.innerText()).replace(/\s+/g, ' ');
+    expect(summary, `validation found blockers on a complete report: ${summary.slice(0, 600)}`).toMatch(/\b0 Blockers\b/i);
 
     await mainButton(page, /^Acknowledge$/).click();
     await confirmInAppDialog(page);
