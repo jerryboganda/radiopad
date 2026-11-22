@@ -1,6 +1,6 @@
 # Database on Hostinger MySQL (API stays on the VPS) — runbook
 
-**Status (2026-11-23): CUT OVER.** Production runs on Hostinger MariaDB (`srv1864.hstgr.io`, db `u372263031_radiopad`) with Hangfire in the same database. Latency gate failed (170-290 ms RTT) but the owner accepted it; steady-state API calls take ~2-2.5 s (`/api/tenant/me` ~2.1 s). Rollback files on the VPS: `docker-compose.yml.bak-pre-mysql`, `.secrets.env.bak-pre-mysql`, SQLite backup `backups/radiopad.db.pre-mysql2-*`; writes made on MySQL are not copied back.
+**Status (2026-11-23): cut over, then ROLLED BACK the same day.** Production runs SQLite again. The Hostinger MariaDB user has `max_connections_per_hour = 500` and the server `wait_timeout = 20 s` (idle connections die), on top of the 170-290 ms round trip. Keep-alive plus short idle timeouts churned connections past the hourly cap, the API crash-looped ("User has exceeded the max_connections_per_hour resource"), and service was restored by switching back to SQLite (writes made on MariaDB between 20:32 and ~21:45 UTC were not copied back: test data only). Do not retry on Hostinger shared MySQL unless the cap is lifted (or use a database host with no per-hour connection cap and low latency to the VPS).
 All C# for this was written without a compiler (no `dotnet` on the dev machine) — **CI is the first real build.** Nothing in this
 runbook has been executed against Hostinger. Do not start the cutover until the three gates below pass.
 
