@@ -38,6 +38,9 @@ jobs:
       # Unset on purpose, as in ui-layout-audit: the API answers /api/tenant/me as the
       # seeded test user, so no password or token is ever involved.
       NEXT_TELEMETRY_DISABLED: '1'
+      # localhost, not 127.0.0.1: Next 16 blocks its dev scripts for any other origin
+      # (allowedDevOrigins), so a 127.0.0.1 page never hydrates and sits on "Loading…".
+      RADIOPAD_WEB_BASE: 'http://localhost:3000'
 
     steps:
       - uses: actions/checkout@v4
