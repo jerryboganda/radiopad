@@ -230,4 +230,29 @@ public class PriorReportTests : IClassFixture<RadioPadAppFactory>
         Assert.Equal(JsonValueKind.Object, prior.ValueKind);
         Assert.Equal(firstId, prior.GetProperty("id").GetGuid());
     }
+
+    [Fact]
+    public async Task Prior_IsNotOfferedFromAnUnrelatedStudy_EvenWithTheSameBodyPart()
+    {
+        using var client = _factory.CreateTenantClient();
+        async Task<Guid> CreateAsync(string accession, bool acknowledge)
+        {
+            var created = await client.PostAsJsonAsync("/api/reports", new { modality = "MRI", bodyPart = "Spine", indication = "pain", accessionNumber = accession });
+            var id = (await JsonDocument.ParseAsync(await created.Content.ReadAsStreamAsync())).RootElement.GetProperty("id").GetGuid();
+            if (acknowledge)
+            {
+                await client.PatchAsJsonAsync($"/api/reports/{id}", new { indication = "pain", technique = "MRI.", comparison = "None.", findings = "Normal.", impression = "Normal study." });
+                await client.PostAsync($"/api/reports/{id}/validate", null);
+                await client.PostAsync($"/api/reports/{id}/acknowledge", null);
+            }
+            return id;
+        }
+
+        await CreateAsync("OTHERPATIENT-1", acknowledge: true);   // acknowledged, same body part, different study family
+        var current = await CreateAsync("UNRELATED-9", acknowledge: false);
+
+        var resp = await client.GetAsync($"/api/reports/{current}/prior");
+        var doc = await JsonDocument.ParseAsync(await resp.Content.ReadAsStreamAsync());
+        Assert.Equal(JsonValueKind.Null, doc.RootElement.GetProperty("prior").ValueKind);
+    }
 }

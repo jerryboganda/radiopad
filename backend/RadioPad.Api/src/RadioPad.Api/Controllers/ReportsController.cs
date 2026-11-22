@@ -706,11 +706,11 @@ public class ReportsController : TenantedController
         // Use accession number prefix (everything before the last '-') as a
         // stable patient/study key. Customers with a true MRN can swap this
         // for `report.Study.PatientMrn` when that field is populated.
-        var stem = report.Study.AccessionNumber;
-        if (!string.IsNullOrEmpty(stem) && stem.Contains('-'))
-            stem = stem[..stem.LastIndexOf('-')];
+        // An empty stem used to match EVERY report (StartsWith("")), so a report with no accession number
+        // was compared against whichever report anyone had created last. No stem = no prior.
+        var stem = AccessionStem(report);
 
-        var prior = await _db.Reports
+        var prior = string.IsNullOrEmpty(stem) ? null : await _db.Reports
             .Where(r => r.TenantId == tenant.Id
                 && r.Id != report.Id
                 && r.Study.AccessionNumber.StartsWith(stem)
@@ -749,6 +749,15 @@ public class ReportsController : TenantedController
             },
             sections,
         });
+    }
+
+    /// <summary>Everything before the last '-' of the accession number (the whole number when it has none); empty when unset.</summary>
+    private static string AccessionStem(Report report)
+    {
+        var accession = report.Study.AccessionNumber;
+        if (string.IsNullOrEmpty(accession)) return string.Empty;
+        var dash = accession.LastIndexOf('-');
+        return dash > 0 ? accession[..dash] : accession;
     }
 
     /// <summary>
@@ -1410,10 +1419,14 @@ public class ReportsController : TenantedController
         if (deny is not null) return deny;
         var report = await _db.Reports.FirstOrDefaultAsync(r => r.Id == id && r.TenantId == tenant.Id, ct);
         if (report is null) return NotFound();
-        var prior = await _db.Reports
+        // "Prior" must be the same study family (accession stem), not merely the same body part: matching on
+        // body part alone offered another patient's report as this patient's prior. No stem = no prior.
+        var stem = AccessionStem(report);
+        var prior = string.IsNullOrEmpty(stem) ? null : await _db.Reports
             .Where(r => r.TenantId == tenant.Id
                 && r.Id != report.Id
                 && r.Status >= ReportStatus.Acknowledged
+                && r.Study.AccessionNumber.StartsWith(stem)
                 && r.Study.BodyPart == report.Study.BodyPart)
             .OrderByDescending(r => r.UpdatedAt)
             .Select(r => new
