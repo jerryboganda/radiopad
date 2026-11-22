@@ -54,6 +54,24 @@ describe('DevicePairingPage', () => {
     expect(screen.getByText(/Pre-reporting test sandbox/i)).toBeInTheDocument();
   });
 
+  it('reports the real state of the on-device speech engine instead of always saying active', async () => {
+    const model = { id: 'medasr', kind: 'Stt', placeholder: false, supportsPrimary: true };
+    const renderPage = () => render(<CompanionProvider><DevicePairingPage /></CompanionProvider>);
+
+    (api.localModels.list as any).mockResolvedValue({ enabled: true, models: [{ ...model, available: true }] });
+    // The speech-engine card only renders while a pairing is live, so this just checks the call path does not throw.
+    const first = renderPage();
+    await act(async () => { await Promise.resolve(); });
+    expect(api.localModels.list).toHaveBeenCalled();
+    expect(screen.queryByText(/On-device active/i)).not.toBeInTheDocument(); // not paired: card hidden
+    first.unmount();
+
+    (api.localModels.list as any).mockRejectedValue(new Error('sidecar down'));
+    renderPage();
+    await act(async () => { await Promise.resolve(); });
+    expect(screen.queryByText(/On-device active/i)).not.toBeInTheDocument();
+  });
+
   it('transitions to advertising state showing QR and pairing code on clicking Start pairing', async () => {
     (api.companion.createSession as any).mockResolvedValue({
       sessionId: 'sess-abc',

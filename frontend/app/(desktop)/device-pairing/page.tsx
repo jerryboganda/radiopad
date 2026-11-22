@@ -9,7 +9,8 @@
  * interactive sandbox, and manage active companion pairings.
  */
 
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
+import { api } from '@/lib/api';
 import Link from 'next/link';
 import { useCompanion } from '@/components/companion/CompanionContext';
 import CompanionTestSandbox from '@/components/companion/CompanionTestSandbox';
@@ -53,6 +54,23 @@ export default function DevicePairingPage() {
 
   const [copied, setCopied] = useState(false);
   const [busyStarting, setBusyStarting] = useState(false);
+  // Real state of the on-device speech engine (this badge used to say "active" unconditionally).
+  const [sttState, setSttState] = useState<'checking' | 'ready' | 'not-ready' | 'unreachable'>('checking');
+  useEffect(() => {
+    let cancelled = false;
+    void (async () => {
+      try {
+        const res = await api.localModels.list();
+        const usable = res.enabled && res.models.some((m) => m.supportsPrimary !== false && !m.placeholder && m.available);
+        if (!cancelled) setSttState(usable ? 'ready' : 'not-ready');
+      } catch {
+        if (!cancelled) setSttState('unreachable');
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, []);
 
   const handleStartPairing = async () => {
     setBusyStarting(true);
@@ -341,12 +359,24 @@ export default function DevicePairingPage() {
                   <div className="rounded-lg bg-surface-muted/50 border border-border/60 p-3">
                     <div className="flex items-center justify-between mb-1">
                       <span className="text-xs font-semibold text-foreground">Speech engine</span>
-                      <span className="text-[11px] text-emerald-600 dark:text-emerald-400 font-medium flex items-center gap-1">
-                        <Check size={13} /> On-device active
-                      </span>
+                      {sttState === 'ready' ? (
+                        <span className="text-[11px] text-emerald-600 dark:text-emerald-400 font-medium flex items-center gap-1">
+                          <Check size={13} /> On-device active
+                        </span>
+                      ) : (
+                        <span className="text-[11px] text-muted-foreground font-medium">
+                          {sttState === 'checking'
+                            ? 'Checking…'
+                            : sttState === 'not-ready'
+                              ? 'Speech model not ready'
+                              : 'Speech engine unreachable'}
+                        </span>
+                      )}
                     </div>
                     <p className="text-[11px] text-muted-foreground leading-snug">
-                      Speech audio is transcribed by the local speech sidecar on this machine.
+                      {sttState === 'ready'
+                        ? 'Speech audio is transcribed by the local speech sidecar on this machine.'
+                        : 'Phone dictation needs the on-device speech engine; download or start it under Manage speech models.'}
                     </p>
                     <Link
                       href="/settings/models"
