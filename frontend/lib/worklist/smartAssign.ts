@@ -17,6 +17,7 @@
 // Pure functions over data the caller already has; no network, no storage.
 
 import { computeFatigue, wRvuFor, type ReadEvent } from '@/lib/worklist/readerLoad';
+import type { Report } from '@/lib/api';
 
 export interface AssignCandidate {
   reportId: string;
@@ -105,4 +106,48 @@ export function suggestNext(
   opts: { now?: number; history?: ReadEvent[] } = {},
 ): AssignSuggestion | null {
   return rankCandidates(candidates, opts)[0] ?? null;
+}
+
+/** Prefer the authoritative backend priority (RIS-fed or PATCH-set) when it is a real
+ * escalation; a default Routine falls back to reading the clinical indication honestly:
+ * a whole-word "stat" means STAT, urgent/emergency language means Urgent. Word boundaries
+ * keep "status", "prostate" or "metastatic" from triggering STAT. */
+export function derivePriority(r: Report): AssignCandidate['priority'] {
+  const p = (r as { priority?: number | string }).priority;
+  const name =
+    p === undefined || p === null ? null
+    : typeof p === 'string' ? p
+    : (['Routine', 'Urgent', 'Stat'][p] ?? null);
+  if (name === 'Stat') return 'STAT';
+  if (name === 'Urgent') return 'Urgent';
+
+  const text = r.indication || '';
+  if (/\bstat\b/i.test(text)) return 'STAT';
+  if (/\b(urgent(ly)?|emergen\w*|immediate\w*|asap)\b/i.test(text)) return 'Urgent';
+  return 'Routine';
+}
+
+/**
+ * "Next case" after sign-off: the same ranking the worklist's suggested next read uses
+ * (STAT before Urgent before Routine, then longest wait), over the open cases —
+ * everything not yet exported, except the report just finished.
+ */
+export function pickNextCase(
+  reports: Report[],
+  currentId: string,
+  opts: { now?: number; history?: ReadEvent[] } = {},
+): Report | null {
+  const exported = (s: Report['status']) => s === 'Exported' || s === 3;
+  const open = reports.filter((r) => r.id !== currentId && !exported(r.status));
+  const pick = suggestNext(
+    open.map((r) => ({
+      reportId: r.id,
+      priority: derivePriority(r),
+      modality: r.study.modality,
+      bodyPart: r.study.bodyPart,
+      waitingSince: new Date(r.updatedAt).getTime(),
+    })),
+    opts,
+  );
+  return open.find((r) => r.id === pick?.reportId) ?? null;
 }

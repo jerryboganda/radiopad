@@ -2807,3 +2807,16 @@ Total tracked PRD ids: **129** (was 112; iter-32 added 17 finer-grained sub-ids)
 - **Not bugs** (checked): the worklist's 8-character id chip is deliberate; `/reports/compose` redirects to the latest draft by design; the device-pairing "Report Composer" button uses that redirect.
 - **Tests**: new `__tests__/closeOnEscape.test.tsx` (hook + `denied` mode) and `__tests__/mobile/DictateClient.test.tsx`. Targeted files re-run locally; the full suite, typecheck and lint are CI's job.
 - **Scope**: frontend → desktop release required once the operator asks to ship.
+
+## Iter-64 - Workflow streamlining, part 7: sign-off safety, Next case, exports, mobile
+
+- **Date**: 2026-11-22
+- **Sign-off now acts on what is on screen**: Validate, Acknowledge, Sign as Primary, Add Co-Signer and Sign & Send all `await flushEdits()` first. Before, they acted on whatever the server last stored, so anything typed in the last ≤20 s (the autosave interval) or still mid-save could be left out of the validated/signed report while showing on screen. If the save fails, the action stops with the error and nothing is signed. `SignAndSendButton` takes `beforeRun` / `onDone`.
+- **Report editor remounts per report**: `/reports/view` read `?id=` once on mount, so "Next case" and the case-queue rail changed the URL but kept the previous report on screen. The page now keys `ReportClient` on the id. It also saves unsaved typing when the editor unmounts, which previously relied on the 20 s timer.
+- **Status refreshes after Sign & Send**: the header stayed on DRAFT after a successful sign, acknowledge and export; `onDone` now reloads the report and signatures.
+- **"Next case" follows the worklist's ranking**: it opened the oldest *Draft*, ignoring STAT, and skipped validated cases awaiting sign-off. It now uses `pickNextCase` (`lib/worklist/smartAssign.ts`): open cases, STAT → Urgent → Routine, then longest wait — the same as the worklist's suggested next read. `derivePriority` moved there from the worklist page, behaviour unchanged.
+- **Exports checked** (mock data): report PDF / TXT / DOCX / JSON / FHIR download as `ACC-<n>.<ext>` with a confirmation; a draft shows "Acknowledge report before exporting"; reports-list CSV, layout sample PDF/DOCX and billing invoices CSV download. There is no print feature (no `window.print`); printing is via the PDF. RIS clipboard copy not verified (mock text export, headless clipboard).
+- **Sign-out checked**: calls logout and lands on `/login`; the profile menu closes on Escape.
+- **Mobile companion at 375×812, both themes**: no horizontal overflow on companion, login, pair, reporting list, New report sheet or dictate. Icon buttons and the theme toggle get a 44 px hit area on touch screens (`@media (pointer: coarse)` in `shell.css`); mouse layouts are unchanged.
+- **Tests**: new `__tests__/signAndSendButton.test.tsx` (save-before-sign, failed save signs nothing, refresh after) and `pickNextCase` / `derivePriority` cases in `__tests__/worklist/readerLoadAndAssign.test.ts`. Targeted files re-run locally; the full suite, typecheck and lint are CI's job.
+- **Scope**: frontend → desktop release required once the operator asks to ship.

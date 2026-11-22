@@ -13,12 +13,23 @@ import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { api } from '@/lib/api';
 import { reportHref } from '@/lib/routes';
-import { statusLabel } from './reportShared';
+import { pickNextCase } from '@/lib/worklist/smartAssign';
+import { getSessionReads } from '@/lib/worklist/readerLoad';
 import Banner from '@/components/ui/Banner';
 
 type ExportFmt = 'text' | 'fhir' | 'hl7' | 'json';
 
-export default function SignAndSendButton({ reportId }: { reportId: string }) {
+export default function SignAndSendButton({
+  reportId,
+  beforeRun,
+  onDone,
+}: {
+  reportId: string;
+  /** Save on-screen edits first, so what gets signed is what the radiologist sees. Throws → nothing is signed. */
+  beforeRun?: () => Promise<void>;
+  /** Let the editor refresh its status badges and signatures. */
+  onDone?: () => void;
+}) {
   const [format, setFormat] = useState<ExportFmt>('text');
   const [busy, setBusy] = useState(false);
   const [confirming, setConfirming] = useState(false);
@@ -26,13 +37,11 @@ export default function SignAndSendButton({ reportId }: { reportId: string }) {
   const [done, setDone] = useState(false);
   const router = useRouter();
 
-  /** Open the longest-waiting other draft, or the worklist when the queue is empty. */
+  /** Open the worklist's suggested next read (STAT first, then longest wait), or the worklist when the queue is empty. */
   async function nextCase() {
     try {
-      const drafts = (await api.reports.list())
-        .filter((r) => r.id !== reportId && statusLabel(r.status) === 'Draft')
-        .sort((a, b) => new Date(a.updatedAt).getTime() - new Date(b.updatedAt).getTime());
-      router.push(drafts[0] ? reportHref(drafts[0].id) : '/worklist');
+      const next = pickNextCase(await api.reports.list(), reportId, { history: getSessionReads() });
+      router.push(next ? reportHref(next.id) : '/worklist');
     } catch {
       router.push('/worklist');
     }
@@ -42,9 +51,11 @@ export default function SignAndSendButton({ reportId }: { reportId: string }) {
     setBusy(true);
     setError(null);
     try {
+      await beforeRun?.();
       await api.reports.signAndSend(reportId, { format });
       setDone(true);
       setConfirming(false);
+      onDone?.();
     } catch (e) {
       const err = e as { body?: { error?: string; detail?: string }; message: string };
       setError(err.body?.error || err.body?.detail || err.message || 'Sign & Send failed.');

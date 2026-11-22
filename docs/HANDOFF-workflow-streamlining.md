@@ -1,8 +1,8 @@
-# HANDOFF — Workflow streamlining (Iter-58 → Iter-63)
+# HANDOFF — Workflow streamlining (Iter-58 → Iter-64)
 
 **Written:** 2026-11-21, **updated** 2026-11-22 · **Branch:** `main` · **State:** commits local, **nothing pushed, nothing released**
 
-Read this first, then `PROGRESS.md` Iter-58 … Iter-63 for the per-change detail.
+Read this first, then `PROGRESS.md` Iter-58 … Iter-64 for the per-change detail.
 
 ## 1. What the owner asked for
 
@@ -65,7 +65,7 @@ API (`web-deploy-images.yml`); the desktop release needs `pnpm release:desktop` 
 | Backend compile + tests (invite email) | **Not run — cannot run here**, see §6 |
 | Visual, light + dark, mock data | All 65 routes screenshotted in both themes (Iter-63); editor re-checked at 1280 / 1366 / 1920 px |
 | Every in-page control clicked, mock data | All 65 routes (Iter-63); export/download/print/sign-out skipped |
-| Reporting flow, mock data | Worklist → validate → acknowledge → sign as primary walked; "Next case" not |
+| Reporting flow, mock data | Worklist → validate → acknowledge → sign as primary, and Send → Next case, walked |
 | Real data, sign, export, generate, dictation, autosave against a real server | **Never exercised** |
 
 ## 5. The click-through (Iter-63, done)
@@ -77,12 +77,15 @@ worklist → open case → edit → validate → acknowledge (in-app confirm) �
 co-signer / addendum offered. Fixes are listed in `PROGRESS.md` Iter-63: Escape on every modal, "No access"
 vs "Sign in required", the editor fitting 1280–1440 px laptops, and id-less dead ends.
 
-Still open after the sweep:
+Follow-up checks (Iter-64): Send → Next case, every export format, sign-out and the mobile companion at
+375 px were exercised, which turned up and fixed sign-off acting on stale server text, a stale report
+staying on screen after "Next case", and "Next case" ignoring STAT. See `PROGRESS.md` Iter-64.
 
-- **"Next case"** (on the Send path, `SignAndSendButton`) was not exercised: the walk used "Sign as Primary".
-- **Export / download / print / sign-out** were skipped by the automated pass and not tested by hand.
-- **Mobile surface at phone width** was only seen inside the desktop shell at 1366 px, not at 375 px.
-- **Below 1180 px** the composer drops to two columns (existing breakpoint, viewport-based, ignores the
+Still open:
+
+- **Real backend**: none of the above ran against the real API; it was all mock data.
+- **RIS clipboard copy** not verified.
+- **Below 1180 px** the composer drops to two columns (viewport-based breakpoint that ignores the
   248 px sidebar); not re-tuned.
 
 ## 6. How to view the app on this machine

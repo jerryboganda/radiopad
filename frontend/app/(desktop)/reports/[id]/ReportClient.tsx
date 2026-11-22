@@ -547,7 +547,15 @@ export default function ReportPage() {
         })
         .catch((e: Error) => setSaveError(e.message || 'Changes are not yet synced.'));
     }, 20_000);
-    return () => clearInterval(t);
+    return () => {
+      clearInterval(t);
+      // Leaving the report (worklist, case queue, "Next case") must not drop up to 20 s of
+      // typing: send what is on screen one last time. Fire-and-forget — the component is gone.
+      const sent = reportRef.current;
+      if (sent && dirtyRef.current) {
+        void api.reports.patch(sent.id, draftBody(sent, aiHighlightsRef.current)).catch(() => {});
+      }
+    };
   }, []);
 
   const flushEdits = useCallback(async () => {
@@ -1063,6 +1071,8 @@ export default function ReportPage() {
     setValidationState('running');
     setValidationError(null);
     try {
+      // Sign-off acts on what is on screen: save it first (throws → nothing is signed).
+      await flushEdits();
       const v = await api.reports.validate(report.id);
       setFindings(v.findings);
       setQualityScore(v.qualityScore);
@@ -1265,6 +1275,8 @@ export default function ReportPage() {
     // the ribbon button looked like it did nothing.
     setError(null);
     try {
+      // Sign-off acts on what is on screen: save it first (throws → nothing is signed).
+      await flushEdits();
       const next = await api.reports.acknowledge(report.id);
       setAiHighlights({});
       setAiUndo({});
@@ -1554,6 +1566,8 @@ export default function ReportPage() {
     setSignBusy(true);
     setError(null);
     try {
+      // Sign-off acts on what is on screen: save it first (throws → nothing is signed).
+      await flushEdits();
       await api.reports.sign(report.id, { role: 'Primary', note: signNote || undefined });
       setSignNote('');
       await refreshSignatures();
@@ -1569,6 +1583,8 @@ export default function ReportPage() {
     setSignBusy(true);
     setError(null);
     try {
+      // Sign-off acts on what is on screen: save it first (throws → nothing is signed).
+      await flushEdits();
       await api.reports.sign(report.id, { role: 'CoSigner', note: signNote || undefined });
       setSignNote('');
       await refreshSignatures();
@@ -2068,7 +2084,11 @@ export default function ReportPage() {
 
               {showSignSend && canSign && canExport && (
                 <div ref={signSendPanelRef}>
-                  <SignAndSendButton reportId={report.id} />
+                  <SignAndSendButton
+                    reportId={report.id}
+                    beforeRun={flushEdits}
+                    onDone={() => { void reloadReport(); void refreshSignatures(); }}
+                  />
                 </div>
               )}
 

@@ -62,12 +62,21 @@ function body(url) {
 }
 // Writes that change state, so the reporting flow can be walked end to end.
 const signatures = {};
+const take = (id, rid, secs, status, text) => ({ id, reportId: rid, storagePath: '', durationSeconds: secs, transcriptionEngine: 'medasr-6gram', status, transcribedText: text, uploadedAt: new Date(now - 30 * 60000).toISOString(), transcribedAt: text ? new Date(now - 25 * 60000).toISOString() : null, errorMessage: null });
+const mobileReports = [
+  { id: 'm1', radiologyId: 'RAD-2026-4411', patientName: 'Jane Doe', patientAge: 64, patientGender: 'Female', createdAt: new Date(now - 40 * 60000).toISOString(), status: 'Pending', modality: 'CT', bodyPart: 'Abdomen', dictations: [take('d1', 'm1', 42, 'Transcribed', 'Liver normal in size. No focal lesion.'), take('d2', 'm1', 18, 'Uploaded', null)] },
+  { id: 'm2', radiologyId: 'RAD-2026-4412', patientName: 'Mohammed Al-Rashidi Abdulrahman', patientAge: 7, patientGender: 'Male', createdAt: new Date(now - 300 * 60000).toISOString(), status: 'Completed', modality: 'XR', bodyPart: 'Chest', dictations: [] },
+];
 function mutate(method, p, j) {
   const iso = new Date().toISOString();
   const r = (id) => reports.find((x) => x.id === id);
   let m;
   if (method === 'GET' && p === '/api/ubag/status') return { health: { ok: false, status: 'unreachable', error: 'Mock: no gateway' }, browser: { instances: 0, contexts: 0, tabs: 0 }, targets: [], allowedTargets: [], orderedTargets: [], alerts: [] };
   if (method === 'GET' && (m = p.match(/^\/api\/reports\/(r\d)\/signatures$/))) return signatures[m[1]] || [];
+  // Mobile companion "Reporting" tab (lib/api/reportingClient.ts).
+  if (method === 'GET' && p === '/api/v1/reporting/reports/transcription-engines') return [{ engineId: 'medasr-6gram', displayName: 'medASR 6-gram (on-device)', isLocal: true, isAvailable: true, isDefault: true }];
+  if (method === 'GET' && p === '/api/v1/reporting/reports') return mobileReports;
+  if (method === 'GET' && (m = p.match(/^\/api\/v1\/reporting\/reports\/([^/]+)$/))) return mobileReports.find((x) => x.id === m[1]);
   if ((m = p.match(/^\/api\/rulebooks\/([^/]+)\/(approve|deprecate)$/))) return { id: m[1], rulebookId: 'chest-ct', name: 'Chest CT', version: '1.0.0', owner: 'Dr Lee', status: m[2] === 'approve' ? 'Approved' : 'Deprecated', appliesToModalities: 'CT', appliesToBodyParts: 'Chest' };
   if ((method === 'PUT' || method === 'PATCH') && (m = p.match(/^\/api\/reports\/(r\d)$/)) && r(m[1])) return Object.assign(r(m[1]), j, { updatedAt: iso });
   if (method !== 'POST') return undefined;

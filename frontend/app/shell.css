@@ -848,6 +848,12 @@ details.rp-sidebar-group > a.rp-sidebar-item { margin-left: 14px; }
   transition: color var(--transition-fast);
 }
 .rp-theme-toggle:hover { color: var(--text); }
+/* Touch screens (phone companion, tablets): give small controls a finger-sized hit area
+   (~44px) without changing how they look with a mouse. */
+@media (pointer: coarse) {
+  .rp-theme-toggle,
+  button.icon-btn { min-height: 44px; min-width: 44px; justify-content: center; }
+}
 .rp-theme-toggle-track {
   position: relative;
   width: 34px;

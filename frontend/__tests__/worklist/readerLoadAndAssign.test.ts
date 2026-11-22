@@ -11,7 +11,8 @@ import {
   BREAK_GAP_MS,
   type ReadEvent,
 } from '@/lib/worklist/readerLoad';
-import { rankCandidates, suggestNext, type AssignCandidate } from '@/lib/worklist/smartAssign';
+import { derivePriority, pickNextCase, rankCandidates, suggestNext, type AssignCandidate } from '@/lib/worklist/smartAssign';
+import type { Report } from '@/lib/api';
 
 const MIN = 60_000;
 const T0 = 1_700_000_000_000;
@@ -113,5 +114,46 @@ describe('smart assign (WL-003)', () => {
 
   it('returns null for an empty queue', () => {
     expect(suggestNext([], { now })).toBeNull();
+  });
+});
+
+// "Next case" after Sign & Send must follow the worklist's own ranking, not just the oldest draft.
+describe('pickNextCase', () => {
+  const at = Date.UTC(2026, 10, 22, 12);
+  const rep = (id: string, status: string, minsAgo: number, indication = 'Routine follow-up'): Report =>
+    ({
+      id,
+      status,
+      indication,
+      updatedAt: new Date(at - minsAgo * 60_000).toISOString(),
+      study: { modality: 'CT', bodyPart: 'Chest' },
+    }) as unknown as Report;
+
+  it('opens a STAT case before an older routine draft', () => {
+    const next = pickNextCase(
+      [rep('cur', 'Draft', 1), rep('old', 'Draft', 300), rep('stat', 'Draft', 5, 'Chest pain. STAT.')],
+      'cur',
+      { now: at, history: [] },
+    );
+    expect(next?.id).toBe('stat');
+  });
+
+  it('skips the current and exported reports, and keeps validated ones awaiting sign-off', () => {
+    const next = pickNextCase(
+      [rep('cur', 'Draft', 500), rep('done', 'Exported', 400), rep('val', 'Validated', 60), rep('new', 'Draft', 10)],
+      'cur',
+      { now: at, history: [] },
+    );
+    expect(next?.id).toBe('val');
+  });
+
+  it('returns null when nothing else is open', () => {
+    expect(pickNextCase([rep('cur', 'Draft', 1), rep('done', 3 as unknown as string, 9)], 'cur', { now: at })).toBeNull();
+  });
+
+  it('reads priority from the indication with word boundaries', () => {
+    expect(derivePriority(rep('a', 'Draft', 1, 'Persistent cough. STAT.'))).toBe('STAT');
+    expect(derivePriority(rep('b', 'Draft', 1, 'Known prostate cancer, status post'))).toBe('Routine');
+    expect(derivePriority(rep('c', 'Draft', 1, 'Urgent: query PE'))).toBe('Urgent');
   });
 });
