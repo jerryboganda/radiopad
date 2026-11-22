@@ -600,6 +600,36 @@ public class AuthSurfaceHardeningTests
     }
 
     [Fact]
+    public async Task MfaStatus_WorksForTheSignedInUser_ButNotForAnonymousOrStaleBearers()
+    {
+        var factory = new NoDevHeadersFactory();
+        await factory.InitializeAsync();
+        try
+        {
+            var url = $"/api/auth/mfa/status?tenant={Uri.EscapeDataString(factory.SeedTenant.Slug)}&email={Uri.EscapeDataString(factory.SeedUser.Email)}";
+
+            // Anonymous: still 401 (the route stays reachable pre-session, but it must not answer for an identity it cannot verify).
+            Assert.Equal(HttpStatusCode.Unauthorized, (await factory.CreateClient().GetAsync(url)).StatusCode);
+
+            // A valid session bearer lets the Security page ask about its own account.
+            var token = RadioPadBearerTokens.Mint(factory.SeedTenant.Slug, factory.SeedUser.Email, factory.SeedUser.SessionEpoch);
+            var http = factory.CreateClient();
+            http.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", token);
+            Assert.Equal(HttpStatusCode.OK, (await http.GetAsync(url)).StatusCode);
+
+            // A bearer minted for an older session epoch is ignored (anonymous again), not honoured and not an error page.
+            var stale = RadioPadBearerTokens.Mint(factory.SeedTenant.Slug, factory.SeedUser.Email, factory.SeedUser.SessionEpoch + 1);
+            var staleClient = factory.CreateClient();
+            staleClient.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", stale);
+            Assert.Equal(HttpStatusCode.Unauthorized, (await staleClient.GetAsync(url)).StatusCode);
+        }
+        finally
+        {
+            await factory.DisposeAsync();
+        }
+    }
+
+    [Fact]
     public async Task DeviceApprove_RequiresVerifiedIdentity_WhenDevHeadersDisabled()
     {
         var factory = new NoDevHeadersFactory();

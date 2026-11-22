@@ -25,6 +25,11 @@ public sealed class RadioPadBearerMiddleware
     {
         if (!ctx.Request.Path.StartsWithSegments("/api") || IsPublicApi(ctx.Request.Path))
         {
+            // /api/auth/mfa is anonymous for the pre-session sign-in steps, but it is ALSO what a signed-in user
+            // calls from the Security page (status, re-enrol). Without an identity those calls 401 in production,
+            // so resolve one softly when a valid session is presented; a missing or stale one changes nothing.
+            if (ctx.Request.Path.StartsWithSegments("/api/auth/mfa"))
+                await TrySoftIdentityAsync(ctx, db);
             await _next(ctx);
             return;
         }
@@ -194,6 +199,40 @@ public sealed class RadioPadBearerMiddleware
         // separately by RADIOPAD_ALLOW_SELF_SIGNUP inside the controller.
         path.StartsWithSegments("/api/registration/create-organization") ||
         path.StartsWithSegments("/api/billing/webhook");
+
+    /// <summary>Best-effort identity for a public route: same checks as the gated path, but any failure just leaves the request anonymous.</summary>
+    private async Task TrySoftIdentityAsync(HttpContext ctx, RadioPadDbContext db)
+    {
+        try
+        {
+            var auth = ctx.Request.Headers.Authorization.FirstOrDefault();
+            var token = auth is not null && auth.StartsWith("Bearer ", StringComparison.OrdinalIgnoreCase)
+                ? auth["Bearer ".Length..].Trim()
+                : ctx.Request.Cookies[RadioPadSessionCookies.CookieName];
+            if (string.IsNullOrWhiteSpace(token) || !token.StartsWith("rp_", StringComparison.Ordinal)) return;
+            if (!RadioPadBearerTokens.TryReadUnvalidatedContext(token, out var slug, out var email)) return;
+
+            var tenant = await RequestLookups.TenantAsync(ctx, db, slug, ctx.RequestAborted);
+            if (tenant is null) return;
+            var user = await RequestLookups.UserAsync(ctx, db, tenant.Id, email, ctx.RequestAborted);
+            if (user is null || !user.IsActive || user.LockedUntil > DateTimeOffset.UtcNow) return;
+            if (!RadioPadBearerTokens.TryValidate(token, slug, email, user.SessionEpoch, _env, out _)) return;
+
+            var tokenHash = EnterpriseIdentityBridge.Sha256Hex(token);
+            var session = await db.AuthSessions.AsNoTracking()
+                .Where(x => x.TokenHash == tokenHash && x.TenantId == tenant.Id && x.UserId == user.Id)
+                .Select(x => new { x.ExpiresAt, x.RevokedAt, x.SessionEpochAtIssue })
+                .FirstOrDefaultAsync(ctx.RequestAborted);
+            if (session is not null
+                && (session.RevokedAt is not null || session.ExpiresAt <= DateTimeOffset.UtcNow || session.SessionEpochAtIssue != user.SessionEpoch))
+                return;
+
+            RadioPadRequestIdentity.Set(ctx, slug, email, "rp-bearer");
+            ctx.Items["RadioPad.Identity.Validated"] = true;
+        }
+        catch (OperationCanceledException) { throw; }
+        catch { /* anonymous is the safe default */ }
+    }
 
     private static async Task RejectAsync(HttpContext ctx, string kind, string message)
     {

@@ -36,20 +36,28 @@ export default function AccountSecurityPage() {
   const [statusCheckFailed, setStatusCheckFailed] = useState(false);
   // AUTH-009 — the caller's own active sessions.
   const [sessions, setSessions] = useState<AuthSessionRow[] | null>(null);
+  const [sessionsFailed, setSessionsFailed] = useState(false); // null + not failed = still loading
   const [showAllSessions, setShowAllSessions] = useState(false);
   const [revokingId, setRevokingId] = useState<string | null>(null);
 
   const refresh = useCallback(async () => {
-    try {
-      setCreds(await api.auth.webAuthnCredentials());
-    } catch (e) {
-      setErr((e as Error).message);
-    }
+    // The three reads are independent: run them together (each costs a full round trip to the hosted database).
+    const loadCreds = async () => {
+      try {
+        setCreds(await api.auth.webAuthnCredentials());
+      } catch (e) {
+        setErr((e as Error).message);
+      }
+    };
     // Reflect persisted TOTP enrolment so the card doesn't offer "Set up"
     // again after a reload / fresh sign-in (status lives in the backend, not
     // in this component's session-scoped state).
-    const id = currentIdentity();
-    if (id) {
+    const loadMfa = async () => {
+      const id = currentIdentity();
+      if (!id) {
+        setStatusCheckFailed(true);
+        return;
+      }
       try {
         const { mfaEnabled } = await api.auth.mfaStatus(id.tenant, id.user);
         setTotpDone(mfaEnabled);
@@ -60,14 +68,17 @@ export default function AccountSecurityPage() {
         // cost a support cycle once. Surface it instead of guessing.
         setStatusCheckFailed(true);
       }
-    } else {
-      setStatusCheckFailed(true);
-    }
-    try {
-      setSessions((await api.auth.sessions()).sessions);
-    } catch {
-      setSessions(null);
-    }
+    };
+    const loadSessions = async () => {
+      try {
+        setSessions((await api.auth.sessions()).sessions);
+        setSessionsFailed(false);
+      } catch {
+        setSessions(null);
+        setSessionsFailed(true);
+      }
+    };
+    await Promise.all([loadCreds(), loadMfa(), loadSessions()]);
   }, []);
 
   useEffect(() => {
@@ -339,7 +350,7 @@ export default function AccountSecurityPage() {
       <div className="rp-panel">
         <div className="rp-panel-title">Active sessions</div>
         {sessions === null ? (
-          <p className="rp-page-sub">Couldn&apos;t load your active sessions.</p>
+          <p className="rp-page-sub">{sessionsFailed ? 'Couldn’t load your active sessions.' : 'Loading your active sessions…'}</p>
         ) : sessions.length === 0 ? (
           <p className="rp-page-sub">No active sessions.</p>
         ) : (
