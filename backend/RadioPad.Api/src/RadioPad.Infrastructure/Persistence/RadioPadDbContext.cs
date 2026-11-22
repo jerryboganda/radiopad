@@ -9,6 +9,9 @@ public class RadioPadDbContext : DbContext
 {
     public RadioPadDbContext(DbContextOptions<RadioPadDbContext> options) : base(options) { }
 
+    /// <summary>For <see cref="MySqlRadioPadDbContext"/>, whose options are typed to the derived context.</summary>
+    protected RadioPadDbContext(DbContextOptions options) : base(options) { }
+
     public DbSet<Tenant> Tenants => Set<Tenant>();
     public DbSet<User> Users => Set<User>();
     public DbSet<GlobalUser> GlobalUsers => Set<GlobalUser>();
@@ -286,6 +289,54 @@ public class RadioPadDbContext : DbContext
         b.Entity<TenantWebhookEndpoint>().Property(w => w.Secret).HasConversion(enc);
 
         ConfigureSqliteDateTimeOffsetConverters(b);
+        ConfigureMySql(b);
+    }
+
+    /// <summary>
+    /// MySQL/MariaDB-only model shaping. Everything is behind the provider check, so the SQLite and Postgres
+    /// models stay exactly as they were. The shape is decided here because MySQL cannot index an unbounded
+    /// string (TEXT) and caps an index key at 3072 bytes.
+    /// </summary>
+    private void ConfigureMySql(ModelBuilder b)
+    {
+        if (!Database.IsMySql()) return;
+
+        b.UseCollation("utf8mb4_unicode_ci");
+
+        // SQLite compares BINARY (case- and accent-sensitive); the default _ci collation would make these unique
+        // keys collide on case. Explicit lengths run first so the generic cap below leaves them alone.
+        b.Entity<UserCorrection>().Property(x => x.From).UseCollation("utf8mb4_bin");
+        b.Entity<TenantLexicon>().Property(x => x.Term).UseCollation("utf8mb4_bin");
+        b.Entity<PushDevice>().Property(x => x.Token).HasMaxLength(512).UseCollation("utf8mb4_bin");
+        b.Entity<ExternalIdentity>(e =>
+        {
+            e.Property(x => x.ProviderKey).HasMaxLength(64).UseCollation("utf8mb4_bin");
+            e.Property(x => x.Issuer).HasMaxLength(255).UseCollation("utf8mb4_bin");
+            e.Property(x => x.Subject).HasMaxLength(255).UseCollation("utf8mb4_bin");
+        });
+
+        // The filter only exists to let SQLite/Postgres ignore NULL DedupeKeys; MySQL has no filtered indexes,
+        // and its unique indexes already treat NULLs as distinct.
+        b.Entity<Notification>().HasIndex(x => new { x.TenantId, x.UserId, x.DedupeKey }).HasFilter(null);
+
+        foreach (var entityType in b.Model.GetEntityTypes())
+        {
+            // 190 chars x 4 bytes (utf8mb4) = 760 B per indexed column: every composite index stays well
+            // under InnoDB's 3072 B key limit (Guid columns are char(36) = 144 B).
+            var keyProperties = entityType.GetIndexes().SelectMany(i => i.Properties)
+                .Concat(entityType.GetKeys().SelectMany(k => k.Properties))
+                .Concat(entityType.GetForeignKeys().SelectMany(f => f.Properties));
+            foreach (var property in keyProperties.Where(p => p.ClrType == typeof(string) && p.GetMaxLength() is null))
+                property.SetMaxLength(190);
+
+            // The four cost/quality decimals have no precision; Pomelo's default (65,30) is absurdly wide.
+            foreach (var property in entityType.GetProperties()
+                         .Where(p => (p.ClrType == typeof(decimal) || p.ClrType == typeof(decimal?)) && p.GetPrecision() is null))
+            {
+                property.SetPrecision(18);
+                property.SetScale(6);
+            }
+        }
     }
 
     private void ConfigureSqliteDateTimeOffsetConverters(ModelBuilder b)

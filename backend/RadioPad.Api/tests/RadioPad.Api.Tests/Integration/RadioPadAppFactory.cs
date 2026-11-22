@@ -2,6 +2,7 @@ using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Mvc.Testing;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
+using RadioPad.Api.Tests.MariaDb;
 using RadioPad.Domain.Entities;
 using RadioPad.Domain.Enums;
 using RadioPad.Infrastructure.Identity;
@@ -26,10 +27,24 @@ public class RadioPadAppFactory : WebApplicationFactory<Program>, IAsyncLifetime
     public User SeedComplianceReviewer { get; private set; } = null!;
     public ProviderConfig MockProvider { get; private set; } = null!;
 
+    private MySqlTestDatabase? _mysql;
+
     protected override void ConfigureWebHost(IWebHostBuilder builder)
     {
         builder.UseEnvironment("Testing");
-        builder.UseSetting("ConnectionStrings:RadioPad", $"Data Source={DbPath}");
+        if (MySqlFactAttribute.Enabled)
+        {
+            // Whole-API run on MariaDB (the informational ci-mysql step sets RADIOPAD_TEST_MYSQL): this host gets its
+            // own throw-away database. The provider is chosen per host via configuration, not a process-wide env
+            // var, so SQLite-based hosts running in parallel in the same process are untouched.
+            _mysql ??= MySqlTestDatabase.CreateAsync().GetAwaiter().GetResult();
+            builder.UseSetting("ConnectionStrings:RadioPad", _mysql.ConnectionString);
+            builder.UseSetting(DbProviderSelector.ProviderEnvVar, "mysql");
+        }
+        else
+        {
+            builder.UseSetting("ConnectionStrings:RadioPad", $"Data Source={DbPath}");
+        }
         builder.UseSetting("RadioPad:DevHeaders", "true");
     }
 
@@ -91,10 +106,11 @@ public class RadioPadAppFactory : WebApplicationFactory<Program>, IAsyncLifetime
         await EnterpriseIdentityBridge.EnsureForAllUsersAsync(db, CancellationToken.None);
     }
 
-    public new Task DisposeAsync()
+    public new async Task DisposeAsync()
     {
         try { if (File.Exists(DbPath)) File.Delete(DbPath); } catch { /* best effort */ }
-        return base.DisposeAsync().AsTask();
+        await base.DisposeAsync();
+        if (_mysql is not null) await _mysql.DisposeAsync();
     }
 
     public HttpClient CreateTenantClient()

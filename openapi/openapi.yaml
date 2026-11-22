@@ -2453,8 +2453,7 @@ paths:
           ScimBearer: []
       summary: |
         SCIM 2.0 patch user. Supports `replace` of `active`, `displayName`,
-        and
-ame.formatted`. Used by Okta / Azure AD on deprovision.
+        and `name.formatted`. Used by Okta / Azure AD on deprovision.
       responses:
         "200": { description: Patched. }
     delete:
@@ -2657,8 +2656,7 @@ ame.formatted`. Used by Okta / Azure AD on deprovision.
       summary: |
         Iter-35 i18n - set or clear the per-user locale override on
         ``User.PreferredLocale``. Any tenant member may write their own
-        override; `
-ull`` clears the override and the UI falls back to
+        override; ``null`` clears the override and the UI falls back to
         the tenant default.
       requestBody:
         required: true
@@ -3886,181 +3884,6 @@ ull`` clears the override and the UI falls back to
                       configured: { type: boolean }
                       reachable: { type: boolean }
                       url: { type: string, nullable: true }
-
-  # --- MCP tool registry ---
-  /api/mcp/tools:
-    get:
-      summary: Iter-31/32 MCP-001 - list registered MCP tools for the current tenant.
-      responses:
-        '200':
-          description: OK
-          content:
-            application/json:
-              schema:
-                type: array
-                items:
-                  type: object
-                  properties:
-                    id: { type: string, format: uuid }
-                    name: { type: string }
-                    version: { type: string }
-                    kind: { type: string, enum: [BuiltIn, Custom] }
-                    isBuiltIn: { type: boolean }
-                    scope: { type: string, enum: [ReadOnly, ReadWrite, External] }
-                    scopeString: { type: string }
-                    status: { type: string, enum: [Submitted, Approved, Blocked] }
-                    approved: { type: boolean }
-                    approvedBy: { type: string, format: uuid, nullable: true }
-                    approvedAt: { type: string, format: date-time, nullable: true }
-                    manifestSha256: { type: string }
-                    manifestSigned: { type: boolean }
-                    allowedConnectorPaths:
-                      type: array
-                      items: { type: string }
-                    createdAt: { type: string, format: date-time }
-    post:
-      summary: Iter-31/32 MCP-001 - register a new MCP tool. RBAC ReportingAdmin / MedicalDirector / ItAdmin. Audited as `McpToolRegistered`.
-      requestBody:
-        required: true
-        content:
-          application/json:
-            schema:
-              type: object
-              required: [name]
-              properties:
-                name: { type: string }
-                version: { type: string }
-                kind: { type: string, enum: [BuiltIn, Custom] }
-                scope: { type: string, enum: [ReadOnly, ReadWrite, External] }
-                scopeString: { type: string }
-                isBuiltIn: { type: boolean }
-                manifestJson: { type: string }
-                manifestSig: { type: string }
-                allowedConnectorPaths:
-                  type: array
-                  items: { type: string }
-      responses:
-        '200': { description: Registered. }
-        '400': { description: name is required (kind=validation). }
-        '403': { description: RBAC denied. }
-        '409': { description: Tool name already registered (kind=conflict). }
-
-  /api/mcp/tools/{id}:
-    get:
-      summary: Get a single MCP tool registration by id.
-      parameters:
-        - { in: path, name: id, required: true, schema: { type: string, format: uuid } }
-      responses:
-        '200': { description: OK }
-        '404': { description: Not found. }
-    delete:
-      summary: Delete an MCP tool. RBAC MedicalDirector / ItAdmin. Audited as `McpToolBlocked` with reason=deleted.
-      parameters:
-        - { in: path, name: id, required: true, schema: { type: string, format: uuid } }
-      responses:
-        '204': { description: Deleted. }
-        '403': { description: RBAC denied. }
-        '404': { description: Not found. }
-
-  /api/mcp/tools/{id}/approve:
-    post:
-      summary: Iter-31 MCP-002 - approve a tool (Submittedâ†’Approved). RBAC MedicalDirector / ItAdmin. Audited as `McpToolApproved`.
-      parameters:
-        - { in: path, name: id, required: true, schema: { type: string, format: uuid } }
-      responses:
-        '200': { description: Approved. }
-        '403': { description: RBAC denied. }
-        '404': { description: Not found. }
-
-  /api/mcp/tools/{id}/block:
-    post:
-      summary: Iter-32 MCP-002 - block a tool (anyâ†’Blocked). RBAC MedicalDirector / ItAdmin. Audited as `McpToolBlocked`.
-      parameters:
-        - { in: path, name: id, required: true, schema: { type: string, format: uuid } }
-      requestBody:
-        content:
-          application/json:
-            schema:
-              type: object
-              properties:
-                reason: { type: string, nullable: true }
-      responses:
-        '200': { description: Blocked. }
-        '403': { description: RBAC denied. }
-        '404': { description: Not found. }
-
-  /api/mcp/tools/{id}/revoke:
-    post:
-      summary: Back-compat alias for /block. Audits `McpToolRevoked` instead. RBAC ReportingAdmin / MedicalDirector / ItAdmin.
-      parameters:
-        - { in: path, name: id, required: true, schema: { type: string, format: uuid } }
-      responses:
-        '200': { description: Revoked (blocked). }
-        '403': { description: RBAC denied. }
-        '404': { description: Not found. }
-
-  /api/mcp/tools/{id}/invoke:
-    post:
-      summary: Iter-31 MCP-004 - invoke an approved MCP tool. Subject to scope policy, lifecycle gate, and external-mcp gate. Audited in the invocation ledger.
-      parameters:
-        - { in: path, name: id, required: true, schema: { type: string, format: uuid } }
-      requestBody:
-        required: true
-        content:
-          application/json:
-            schema:
-              type: object
-              required: [inputJson]
-              properties:
-                inputJson: { type: string }
-                outputJson: { type: string, nullable: true }
-                reportId: { type: string, format: uuid, nullable: true }
-      responses:
-        '200':
-          description: Invocation result.
-          content:
-            application/json:
-              schema:
-                type: object
-                properties:
-                  status: { type: string, enum: [ok, blocked, error, timeout] }
-                  inputHash: { type: string }
-                  outputHash: { type: string }
-                  latencyMs: { type: integer }
-        '403': { description: Scope blocked (kind=mcp_scope_blocked) or tool not approved (kind=mcp_blocked) or external denied (kind=mcp_blocked). }
-        '404': { description: Tool not found. }
-        '504': { description: Sandbox timeout (kind=mcp_timeout). }
-
-  /api/mcp/tools/{id}/test:
-    post:
-      summary: Iter-32 MCP-006 - sandboxed test-run for an admin. 5s wall-clock, 256 MiB soft cap, BelowNormal priority. RBAC MedicalDirector / ItAdmin / ReportingAdmin.
-      parameters:
-        - { in: path, name: id, required: true, schema: { type: string, format: uuid } }
-      requestBody:
-        required: true
-        content:
-          application/json:
-            schema:
-              type: object
-              required: [inputJson]
-              properties:
-                inputJson: { type: string }
-                outputJson: { type: string, nullable: true }
-                reportId: { type: string, format: uuid, nullable: true }
-      responses:
-        '200':
-          description: Test result.
-          content:
-            application/json:
-              schema:
-                type: object
-                properties:
-                  status: { type: string, enum: [ok, timeout, error, memory_exceeded] }
-                  output: { type: string }
-                  latencyMs: { type: integer }
-                  memoryBytes: { type: integer, format: int64 }
-        '403': { description: RBAC denied or scope blocked. }
-        '404': { description: Tool not found. }
 
   # --- SIEM status ---
   /api/siem/status:

@@ -91,7 +91,6 @@ vi.mock('@/components/ui/ToastProvider', () => ({
 }));
 
 // Sub-components are irrelevant to this flow and pull in extra weight; stub them.
-vi.mock('@/app/(desktop)/reports/[id]/RewriteStylePanel', () => ({ default: () => null }));
 vi.mock('@/app/(desktop)/reports/[id]/PriorComparePanel', () => ({ default: () => null }));
 vi.mock('@/app/(desktop)/reports/[id]/CopyToRisButton', () => ({ default: () => null }));
 

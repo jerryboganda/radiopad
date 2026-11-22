@@ -789,7 +789,7 @@ reporting-workspace anatomy (PRD §20.9) — pixel-faithful to the mockups:
   tools and AI actions into three icon-button groups: Review (Dictate/Voice
   cmds/Validate/Compare/Format draft), AI Compose (Generate Draft, blue
   filled/Generate Impression/Rewrite ▾ — Concise/Formal/Patient-friendly/
-  Referring summary/Custom edit, each iconed/In my style/scope chip), and
+  Referring summary/Custom edit, each iconed/scope chip), and
   Sign-off (Sign & send/Acknowledge & lock/Review & sign). AI activity rail.
 - **Right rail tabs** — Review checklist (progress ring) / Details /
   Validation (RC-04) / AI activity / Export (RC-09: destinations with Ready

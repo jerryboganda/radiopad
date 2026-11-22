@@ -65,8 +65,6 @@ tsconfig.tsbuildinfo
 *.pfx
 *.p12
 *.sec
-# Private signing material (also matched by *.sec above; kept explicit).
-mcp-connectors/_signing/release.sec
 
 # Generated gap-analysis / audit scratch artifacts.
 .gap_*

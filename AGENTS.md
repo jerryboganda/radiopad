@@ -114,7 +114,6 @@ cli/RadioPad.Cli/       .NET 8 global tool
 rulebooks/              YAML rulebooks (chest_ct_v1, brain_mri_v1, …)
 templates/              JSON report templates
 subagents/              Portable AI subagent roles (explorer, code-reviewer, test-runner, feature-dev)
-mcp-connectors/         Signed clinical data connectors (DICOM/FHIR/PACS) — a PRODUCT feature, not developer MCP
 docs/                   Documentation (00-product, 02-design, 03-architecture, 04-security, …)
 ```
 

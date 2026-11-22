@@ -14,6 +14,35 @@ using RadioPad.Infrastructure.Repositories;
 using RadioPad.Infrastructure.Seeding;
 using RadioPad.Validation.Engine;
 
+// One-shot SQLite -> MySQL data copy for the cutover (docs/07-devops/mysql-hostinger.md). It runs INSTEAD of
+// the web host and exits; nothing below executes in this mode.
+if (!string.IsNullOrWhiteSpace(Environment.GetEnvironmentVariable("RADIOPAD_COPY_FROM_SQLITE")))
+{
+    var copyTarget = Environment.GetEnvironmentVariable("ConnectionStrings__RadioPad")
+        ?? Environment.GetEnvironmentVariable("RADIOPAD_DB") ?? "";
+    var copyExit = 1;
+    try
+    {
+        if (DbProviderSelector.Resolve(copyTarget) != DbProvider.MySql)
+            throw new InvalidOperationException(
+                "Copy mode needs RADIOPAD_DB_PROVIDER=mysql and the MySQL connection string in ConnectionStrings__RadioPad.");
+        var copyReport = await SqliteToMySqlCopier.RunAsync(
+            Environment.GetEnvironmentVariable("RADIOPAD_COPY_FROM_SQLITE")!, copyTarget,
+            new CopyOptions(DryRun: Environment.GetEnvironmentVariable("RADIOPAD_COPY_DRY_RUN") == "1", Log: Console.WriteLine),
+            CancellationToken.None);
+        Console.WriteLine(!copyReport.Ok ? "COPY FAILED: row counts differ (see MISMATCH above)."
+            : copyReport.DryRun ? "DRY RUN complete: nothing was written." : "COPY OK: every table matches.");
+        copyExit = copyReport.Ok ? 0 : 1;
+    }
+    catch (InvalidOperationException ex) { Console.Error.WriteLine($"Copy aborted: {ex.Message}"); }
+    catch (Exception ex)
+    {
+        // Provider messages can quote row values (PHI): print only the error class / MySQL error number.
+        Console.Error.WriteLine($"Copy failed: {(ex is MySqlConnector.MySqlException my ? $"MySQL error {my.Number}" : ex.GetType().Name)}");
+    }
+    Environment.Exit(copyExit);
+}
+
 var builder = WebApplication.CreateBuilder(args);
 
 // Iter-32 AUTH-001 — apply named OIDC presets (keycloak / auth0 / okta) to
@@ -45,35 +74,49 @@ var bindUrl = Environment.GetEnvironmentVariable("RADIOPAD_BIND") ?? "http://127
 if (!bindUrl.Contains("://", StringComparison.Ordinal)) bindUrl = $"http://{bindUrl}";
 builder.WebHost.UseUrls(bindUrl);
 
-// Connection string is resolved once at top level so both EF Core and Hangfire
-// share the exact same sniff (Host=/Server= => Postgres, else SQLite / Hangfire
-// InMemory). The AddDbContext lambda below closes over this outer `conn`.
+// Connection string and provider are resolved once at top level so both EF Core and
+// Hangfire share the exact same decision (DbProviderSelector: RADIOPAD_DB_PROVIDER, else
+// the legacy sniff Host=/Server= => Postgres, anything else SQLite / Hangfire InMemory).
+// The AddDbContext lambda below closes over this outer `conn`.
 var conn = builder.Configuration.GetConnectionString("RadioPad")
     ?? Environment.GetEnvironmentVariable("RADIOPAD_DB")
     ?? "Data Source=radiopad.dev.db";
-builder.Services.AddDbContext<RadioPadDbContext>(opt =>
+// Read through IConfiguration (env vars are a source) so a test host can pick MySQL per host with UseSetting
+// instead of a process-wide env var that would flip every parallel SQLite host. "" = unset => legacy sniff.
+var dbProvider = DbProviderSelector.Resolve(conn, builder.Configuration[DbProviderSelector.ProviderEnvVar] ?? "");
+if (dbProvider == DbProvider.MySql)
 {
-    // Connection-string sniff: "Host=..." or "Server=...;Port=..." => Postgres,
-    // anything else falls back to SQLite for the dev workstation case.
-    if (conn.Contains("Host=", StringComparison.OrdinalIgnoreCase) ||
-        conn.Contains("Server=", StringComparison.OrdinalIgnoreCase))
+    // Rejects an unencrypted link in production, forces UseAffectedRows=false, caps the pool.
+    conn = DbProviderSelector.PrepareMySqlConnectionString(
+        conn, !builder.Environment.IsDevelopment() && !builder.Environment.IsEnvironment("Testing"));
+    // The derived context carries its own (CI-generated) MySQL migrations; consumers still resolve
+    // RadioPadDbContext. No EnableRetryOnFailure: BillingController/MarketplaceController open manual transactions.
+    builder.Services.AddDbContext<RadioPadDbContext, MySqlRadioPadDbContext>(opt =>
+        opt.UseMySql(conn, DbProviderSelector.MySqlServerVersion));
+}
+else
+{
+    builder.Services.AddDbContext<RadioPadDbContext>(opt =>
     {
-        opt.UseNpgsql(conn);
-    }
-    else
-    {
-        opt.UseSqlite(conn);
-        // SqliteConnectionStringBuilder.DefaultTimeout defaults to 30s, but that setting does
-        // not translate into libSQL's sqlite3_busy_timeout the way it appears to — this app was
-        // observing near-instant "database is locked" failures (single-digit ms) rather than a
-        // multi-second wait, which is only possible if no busy handler is actually registered.
-        // PRAGMA busy_timeout on every connection open is the unambiguous, driver-independent fix:
-        // a writer blocked by another connection's lock (HTTP request vs. the background
-        // AiJobCoordinator runner, Hangfire's in-memory sweeper, etc.) waits and retries instead of
-        // failing immediately. See RadioPad.Api.Services.SqliteBusyTimeoutInterceptor.
-        opt.AddInterceptors(new RadioPad.Api.Services.SqliteBusyTimeoutInterceptor());
-    }
-});
+        if (dbProvider == DbProvider.Postgres)
+        {
+            opt.UseNpgsql(conn);
+        }
+        else
+        {
+            opt.UseSqlite(conn);
+            // SqliteConnectionStringBuilder.DefaultTimeout defaults to 30s, but that setting does
+            // not translate into libSQL's sqlite3_busy_timeout the way it appears to — this app was
+            // observing near-instant "database is locked" failures (single-digit ms) rather than a
+            // multi-second wait, which is only possible if no busy handler is actually registered.
+            // PRAGMA busy_timeout on every connection open is the unambiguous, driver-independent fix:
+            // a writer blocked by another connection's lock (HTTP request vs. the background
+            // AiJobCoordinator runner, Hangfire's in-memory sweeper, etc.) waits and retries instead of
+            // failing immediately. See RadioPad.Api.Services.SqliteBusyTimeoutInterceptor.
+            opt.AddInterceptors(new RadioPad.Api.Services.SqliteBusyTimeoutInterceptor());
+        }
+    });
+}
 
 // PR-N1 — Hangfire cron platform bootstrap (storage + processing server + global
 // retry policy). Storage mirrors the EF sniff above (Postgres => PostgreSql in its
@@ -267,7 +310,6 @@ builder.Services.AddSignalR();
 builder.Services.AddSingleton<ReportValidator>();
 builder.Services.AddScoped<RadioPad.Application.Services.ReportingService>();
 builder.Services.AddScoped<RadioPad.Application.Reporting.Services.IReportingService, RadioPad.Api.Services.MobileReportingService>();
-builder.Services.AddSingleton<RadioPad.Application.Reporting.Services.IDictationSettingsService, RadioPad.Application.Reporting.Services.DictationSettingsService>();
 builder.Services.AddScoped<RadioPad.Application.Transcription.ITranscriptionEngine, RadioPad.Infrastructure.Transcription.MedAsrTranscriptionEngine>();
 builder.Services.AddScoped<RadioPad.Application.Transcription.ITranscriptionEngine, RadioPad.Infrastructure.Transcription.UbagTranscriptionEngine>();
 builder.Services.AddScoped<RadioPad.Application.Transcription.ITranscriptionNotifier, RadioPad.Api.Hubs.SignalRTranscriptionNotifier>();
@@ -553,24 +595,6 @@ builder.Services.AddSingleton<RadioPad.Application.Abstractions.IColumnEncryptor
     return enc;
 });
 
-// Iter-31 MCP-001..007 — Model Context Protocol sandbox + registry. The
-// in-process sandbox is the v0.1 implementation (a future iter swaps in a
-// WASM sandbox via Wasmtime without changing the controller surface).
-builder.Services.AddSingleton<RadioPad.Application.Abstractions.IMcpSandbox,
-    RadioPad.Application.Services.Mcp.InProcessMcpSandbox>();
-// Iter-32 MCP-005 — default-deny scope policy + invocation service.
-builder.Services.AddSingleton<RadioPad.Application.Abstractions.IMcpScopePolicy,
-    RadioPad.Application.Services.Mcp.McpScopePolicy>();
-builder.Services.AddSingleton<RadioPad.Application.Services.Mcp.McpManifestVerifier>();
-builder.Services.AddScoped<RadioPad.Api.Services.McpInvocationService>();
-
-// Iter-33 MCP-007 — plugin trust + capability gate + per-OS sandbox.
-builder.Services.AddScoped<RadioPad.Application.Services.Mcp.PluginManifestSignatureVerifier>();
-builder.Services.AddSingleton<RadioPad.Application.Abstractions.IMcpCapabilityRegistry,
-    RadioPad.Application.Services.Mcp.InMemoryMcpCapabilityRegistry>();
-builder.Services.AddSingleton<RadioPad.Application.Abstractions.IPluginSandbox>(
-    _ => RadioPad.Application.Services.Mcp.PluginSandboxFactory.CreateForCurrentOs());
-
 // Iter-35 AUTH-001 — FIDO MDS3 trusted-root pinning for packed-attestation
 // x5c chains. The embedded source ships with the build; the HTTP source is
 // disabled by default (gated on RADIOPAD_FIDO_MDS3_URL + JWT verification
@@ -780,6 +804,20 @@ if (!app.Environment.IsEnvironment("Testing"))
     // initial migration (InitialCreate) materialises every entity in the model
     // including auth flows (MagicLinkToken, DeviceAuthRequest), retention,
     // CMK and SCIM additions.
+    if (dbProvider == DbProvider.MySql && !db.Database.GetMigrations().Any())
+        throw new InvalidOperationException(
+            "MySQL migrations have not been generated yet — run the 'mysql-migrations' workflow (see docs/07-devops/mysql-hostinger.md).");
+    // A hosted database (Postgres / MySQL) can be briefly unreachable at boot; wait up to ~25 s instead of
+    // crash-looping the container. SQLite is a local file, so it never waits.
+    if (dbProvider != DbProvider.Sqlite)
+    {
+        var dbLog = app.Services.GetRequiredService<ILoggerFactory>().CreateLogger("RadioPad.Startup");
+        for (var attempt = 1; attempt <= 5 && !await db.Database.CanConnectAsync(); attempt++)
+        {
+            dbLog.LogWarning("Database is not reachable (attempt {Attempt}/5); retrying in 5 s.", attempt);
+            await Task.Delay(TimeSpan.FromSeconds(5));
+        }
+    }
     await db.Database.MigrateAsync();
     // PR-N1 — (re)register the recurring Hangfire crons now that storage exists.
     // This whole block is already gated on !IsEnvironment("Testing"), which is the

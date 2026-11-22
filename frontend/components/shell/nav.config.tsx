@@ -10,7 +10,7 @@ import {
   FileInput, WifiOff, Scale, FlaskConical, ShieldCheck, Flag, CreditCard,
   Activity, Settings2, Fingerprint, Users, ScanLine, Bone, Cpu,
   LayoutDashboard, ListTodo, Layers, Sparkles, Library, BadgeCheck,
-  KeyRound, Plug, GraduationCap, UsersRound, AlertTriangle, Bell, FileStack, Smartphone,
+  KeyRound, GraduationCap, UsersRound, AlertTriangle, Bell, FileStack, Smartphone,
 } from 'lucide-react';
 import type { PermissionKey } from '@/lib/permissions';
 import { UBAG_HUB_ROLES } from '@/lib/roles';
@@ -96,7 +96,6 @@ export const Icons: Record<string, NavIcon> = {
   signInDevices: Fingerprint,
   users: Users,
   sso: KeyRound,
-  mcp: Plug,
 };
 
 export const navGroups: NavGroup[] = [
@@ -153,7 +152,7 @@ export const navGroups: NavGroup[] = [
     ],
   },
   {
-    // Provider / PACS / MCP wiring is platform administration → web.
+    // Provider / PACS wiring is platform administration → web.
     labelKey: 'integrations',
     surfaces: ['web'],
     items: [
@@ -162,7 +161,6 @@ export const navGroups: NavGroup[] = [
       // / ComplianceReviewer), not a permission key — mirror that here.
       { href: '/admin/ubag', labelKey: 'ubag', icon: Icons.ubag, roles: UBAG_HUB_ROLES },
       { href: '/admin/pacs', labelKey: 'pacs', icon: Icons.pacs, permission: 'tenant_settings.manage' },
-      { href: '/admin/mcp', labelKey: 'mcp', icon: Icons.mcp, permission: 'mcp_tools.manage' },
     ],
   },
   {

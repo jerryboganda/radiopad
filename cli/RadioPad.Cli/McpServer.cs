@@ -1,5 +1,4 @@
 using System.Net.Http.Headers;
-using System.Net.Http.Json;
 using System.Text.Json;
 using System.Text.Json.Nodes;
 
@@ -128,14 +127,7 @@ public static class McpServer
         var name = p?["name"]?.GetValue<string>();
         var args = p?["arguments"] as JsonObject ?? new JsonObject();
 
-        // Iter-32 MCP-005/007 — consult the registry. Only Approved tools
-        // (or built-in tools with no registry row at all) may run. We also
-        // refuse any tool whose registered scope string contains a
-        // dangerous prefix unless the tenant has flipped the override.
-        var registryDecision = await ConsultRegistryAsync(http, name);
-        if (!registryDecision.Allowed)
-            throw new InvalidOperationException($"mcp_blocked: {registryDecision.Reason}");
-
+        // Only the four fixed read-only tools below exist; anything else is rejected by the switch.
         string body = name switch
         {
             "list_rulebooks" => await GetText(http, "/api/rulebooks"),
@@ -162,55 +154,6 @@ public static class McpServer
                 },
             },
         };
-    }
-
-    private record RegistryDecision(bool Allowed, string? Reason);
-
-    private static readonly string[] DangerousScopePrefixes = { "shell:", "fs:", "net:" };
-
-    private static async Task<RegistryDecision> ConsultRegistryAsync(HttpClient http, string? toolName)
-    {
-        if (string.IsNullOrWhiteSpace(toolName))
-            return new RegistryDecision(false, "missing_tool_name");
-        try
-        {
-            var resp = await http.GetAsync("/api/mcp/tools");
-            if (!resp.IsSuccessStatusCode) return new RegistryDecision(true, null); // registry unreachable → fall back to built-ins
-            var rows = await resp.Content.ReadFromJsonAsync<List<JsonElement>>() ?? new();
-            JsonElement? match = null;
-            foreach (var row in rows)
-            {
-                if (row.TryGetProperty("name", out var n) && string.Equals(n.GetString(), toolName, StringComparison.Ordinal))
-                {
-                    match = row; break;
-                }
-            }
-            if (match is null) return new RegistryDecision(true, null); // built-in, no row
-            var status = match.Value.TryGetProperty("status", out var st) ? st.GetInt32() : 0;
-            if (status != 1) return new RegistryDecision(false, status == 2 ? "blocked" : "not_approved");
-            var scope = match.Value.TryGetProperty("scopeString", out var sc) ? sc.GetString() ?? "" : "";
-            if (HasDangerousScope(scope))
-            {
-                var allowEnv = string.Equals(Environment.GetEnvironmentVariable("RADIOPAD_MCP_ALLOW_DANGEROUS"), "1", StringComparison.Ordinal);
-                if (!allowEnv) return new RegistryDecision(false, "mcp_scope_blocked");
-            }
-            return new RegistryDecision(true, null);
-        }
-        catch
-        {
-            // Network failure: fall back to default-allow for built-ins so an
-            // offline radiologist can still use the safe read-only tools.
-            return new RegistryDecision(true, null);
-        }
-    }
-
-    private static bool HasDangerousScope(string scope)
-    {
-        if (string.IsNullOrWhiteSpace(scope)) return false;
-        foreach (var token in scope.Split(new[] { ',', ' ', '\n', '\r', '\t' }, StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries))
-            foreach (var p in DangerousScopePrefixes)
-                if (token.StartsWith(p, StringComparison.OrdinalIgnoreCase)) return true;
-        return false;
     }
 
     private static async Task<string> GetText(HttpClient http, string url)

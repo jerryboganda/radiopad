@@ -1,5 +1,6 @@
 using Hangfire;
 using Hangfire.InMemory;
+using Hangfire.MySql;
 using Hangfire.PostgreSql;
 
 namespace RadioPad.Api.Jobs;
@@ -36,11 +37,28 @@ public static class HangfireSetup
     /// The job CLASSES themselves are registered separately and unconditionally in
     /// <c>Program.cs</c> so tests can resolve them even when this is skipped.
     /// </summary>
+    /// <summary>The one place the MySQL job storage is built; the MariaDB CI smoke test builds it through here too.</summary>
+    internal static MySqlStorage CreateMySqlStorage(string conn) => new(
+        new MySqlConnector.MySqlConnectionStringBuilder(conn) { AllowUserVariables = true }.ConnectionString,
+        new MySqlStorageOptions { TablesPrefix = "hangfire_", PrepareSchemaIfNecessary = true });
+
     public static void AddRadioPadHangfire(this WebApplicationBuilder builder, string conn)
     {
         builder.Services.AddHangfire(config =>
         {
-            if (HangfireStorageSelector.Select(conn) == HangfireStorageSelector.Kind.Postgres)
+            var storageKind = HangfireStorageSelector.Select(conn);
+            if (storageKind == HangfireStorageSelector.Kind.MySql)
+            {
+                // Persistent storage: queued push/email/webhook jobs and schedules survive a restart.
+                // Hangfire.MySqlStorage keeps its own `hangfire_`-prefixed tables and creates them on first
+                // use (PrepareSchemaIfNecessary), independent of EF's migrations. Its SQL uses user variables.
+                // ponytail: unverified against 2.0.3 (unmaintained since 2020, built for Hangfire 1.6 and
+                // MySqlConnector 1.x; we run 1.8.24 and 2.3.x) — the MariaDB CI smoke test covers it.
+                config
+                    .UseStorage(CreateMySqlStorage(conn))
+                    .WithJobExpirationTimeout(TimeSpan.FromDays(30));
+            }
+            else if (storageKind == HangfireStorageSelector.Kind.Postgres)
             {
                 // Hangfire provisions and owns its own `hangfire` schema
                 // (PrepareSchemaIfNecessary defaults true) — independent of EF Core's

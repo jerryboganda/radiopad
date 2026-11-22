@@ -1,0 +1,84 @@
+name: ci-mysql
+
+# MariaDB compatibility gate for the MySQL provider (RADIOPAD_DB_PROVIDER=mysql — Hostinger MariaDB).
+# The normal `ci` workflow runs on SQLite only; nothing there can catch a MySQL-only break (index key lengths,
+# collations, matched-row semantics, Hangfire.MySqlStorage). This workflow starts a MariaDB 10.11 service
+# container and runs the Category=MySql tests plus the SQLite -> MySQL copier test against it.
+#
+# This is the "heavy work runs on GitHub Actions" rule from CLAUDE.md applied to the MySQL path: no local dotnet.
+# It only runs CI — it never deploys (deploys are path-filtered workflows: web-deploy-images, hostinger-deploy).
+
+on:
+  pull_request:
+    paths:
+      - 'backend/**'
+      - '.github/workflows/ci-mysql.yml'
+  push:
+    branches: [main]
+    paths:
+      - 'backend/**'
+      - '.github/workflows/ci-mysql.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-mysql-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  mariadb:
+    name: mariadb 10.11 (MySQL provider)
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    services:
+      mariadb:
+        image: mariadb:10.11
+        env:
+          MARIADB_ROOT_PASSWORD: ci-root-password
+        ports:
+          - 3306:3306
+        options: >-
+          --health-cmd="healthcheck.sh --connect --innodb_initialized"
+          --health-interval=5s
+          --health-timeout=5s
+          --health-retries=30
+    env:
+      # An admin connection to the service container (no Database=: every test creates and drops its own
+      # radiopad_test_<guid> database). Presence of this variable un-skips the [MySqlFact] tests.
+      RADIOPAD_TEST_MYSQL: 'Server=127.0.0.1;Port=3306;User ID=root;Password=ci-root-password;'
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '8.0.x'
+
+      - name: Restore
+        working-directory: backend/RadioPad.Api
+        run: dotnet restore
+
+      - name: Build
+        working-directory: backend/RadioPad.Api
+        run: dotnet build --configuration Release --no-restore
+
+      # REQUIRED. Model DDL on a blank MariaDB, migrations (once generated), case-sensitive unique indexes,
+      # DateTimeOffset round trip, matched-row concurrency token, Hangfire.MySqlStorage restart survival,
+      # SQLite -> MySQL copier.
+      - name: MySQL tests (Category=MySql)
+        working-directory: backend/RadioPad.Api
+        run: dotnet test --configuration Release --no-build --filter "Category=MySql" --logger "trx;LogFileName=mysql-tests.trx"
+
+      # INFORMATIONAL. With RADIOPAD_TEST_MYSQL set, every RadioPadAppFactory host runs the WHOLE API on its own
+      # MariaDB database. Failures here are a to-do list of SQLite-isms, not a red build.
+      - name: Whole integration suite on MariaDB (informational)
+        continue-on-error: true
+        working-directory: backend/RadioPad.Api
+        run: dotnet test --configuration Release --no-build --filter "Category!=MySql" --logger "trx;LogFileName=mysql-suite.trx"
+
+      - name: Upload test results
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: mysql-test-results
+          path: backend/RadioPad.Api/**/TestResults/*.trx

@@ -26,7 +26,7 @@ vi.mock('@/lib/api/reportingClient', () => ({
 // which wipes any `mockResolvedValue(...)` baked directly into a `vi.fn()`
 // inside this factory — so delegate to module-level mocks re-armed in
 // `beforeEach` instead (matches the pattern used by other `@/lib/api` mocks
-// in this suite, e.g. `__tests__/admin/DictationSettings.test.tsx`).
+// in this suite).
 const modalitiesListMock = vi.fn();
 const bodyPartsListMock = vi.fn();
 vi.mock('@/lib/api', () => ({

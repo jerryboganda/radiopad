@@ -8,7 +8,7 @@
 // independently of AI drafting rights. Every button maps to an EXISTING
 // backend action: Generate Draft -> POST /generate/jobs, Generate Impression
 // -> ai jobs (mode: impression), Rewrite modes -> the rewrite endpoint's four
-// modes + custom free-text edit, "In my style" -> rewriteInMyStyle. Provider
+// modes + custom free-text edit. Provider
 // selection happens at report creation (NewReportWizard) and is remembered
 // via providerPref -- this bar only needs to know whether a provider is
 // resolved, not offer a picker.
@@ -19,7 +19,6 @@ import type { RewriteMode } from '@/lib/api';
 import {
   Sparkles,
   Wand2,
-  PenLine,
   Mic,
   AudioLines,
   ShieldCheck,
@@ -91,8 +90,6 @@ export interface ComposerRibbonProps {
   /** Controlled popover state — the global `radiopad:rewrite` event opens it. */
   rewriteOpen: boolean;
   onRewriteOpenChange: (open: boolean) => void;
-  stylePanelOpen: boolean;
-  onToggleStylePanel: () => void;
   providerId: string;
   /** Enabled providers available to run a rewrite against — lets the radiologist
    * re-run a rewrite through a different engine than the report's own default. */
@@ -428,16 +425,6 @@ export default function ComposerRibbon(p: ComposerRibbonProps) {
               document.body,
             )}
           </div>
-
-          <RibbonButton
-            icon={<PenLine size={16} />}
-            label="In my style"
-            short="My style"
-            className={p.stylePanelOpen ? 'active' : ''}
-            aria-expanded={p.stylePanelOpen}
-            onClick={p.onToggleStylePanel}
-          />
-
         </RibbonGroup>
       )}
 

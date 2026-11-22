@@ -8,8 +8,8 @@ const path = require('path');
 const OUT = path.join(require('os').tmpdir(), 'radiopad-sweep');
 fs.mkdirSync(path.join(OUT, 'shots'), { recursive: true });
 const BASE = 'http://localhost:3000';
-const ALL = `/ /account/security /admin/billing /admin/dictation-settings /admin/feature-flags /admin/fhir-import
-/admin/governance /admin/mcp /admin/model-eval /admin/pacs /admin/providers/oauth?id=p1 /admin/security
+const ALL = `/ /account/security /admin/billing /admin/feature-flags /admin/fhir-import
+/admin/governance /admin/model-eval /admin/pacs /admin/providers/oauth?id=p1 /admin/security
 /admin/settings /admin/sso /admin/ubag /admin/usage /admin/users /admin/validation-packs /ai-assistant
 /analytics /analytics/quality /audit /audit/verify /body-parts /companion /critical-results /dashboard
 /design/motion /device-pairing /findings-library /governance /login /marketplace /modalities

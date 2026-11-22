@@ -78,13 +78,6 @@ export type DictationDraftResult = {
   latencyMs: number;
 };
 
-/** Dictation & Audio AI settings shape for admin configuration. */
-export type DictationSettings = {
-  activeEngine: string;
-  ubagModel: string;
-  radiologySystemPrompt: string;
-};
-
 /** Desktop-created companion session (returned to the desktop host). */
 export type CompanionSessionInit = {
   sessionId: string;
@@ -1267,7 +1260,6 @@ export type RewriteMode =
   | 'formal'
   | 'patient_friendly'
   | 'referring_summary'
-  | 'in_my_style'
   | 'custom';
 
 export type RewriteViolation = { reason: string; detail: string };
@@ -1280,7 +1272,6 @@ export type RewriteResult = {
   sections?: string[] | null;
   promptVersion?: string;
   latencyMs?: number;
-  styleFingerprint?: string;
   /** F12 — §5.3 fabrication findings on a custom rewrite (empty/undefined when clean). */
   violations?: RewriteViolation[];
 };
@@ -1445,25 +1436,6 @@ export type AuthSessionRow = {
   deviceCategory: string | null;
   deviceDetail: string | null;
   ipAddress: string | null;
-};
-
-/** Iter-32 MCP-001..007 — admin registry row. `status` is `0=Submitted | 1=Approved | 2=Blocked`. */
-export type McpToolRow = {
-  id: string;
-  name: string;
-  version: string;
-  kind: number;
-  isBuiltIn: boolean;
-  scope: number;
-  scopeString: string;
-  status: 0 | 1 | 2;
-  approved: boolean;
-  approvedBy?: string | null;
-  approvedAt?: string | null;
-  manifestSha256: string;
-  manifestSigned: boolean;
-  allowedConnectorPaths: string[];
-  createdAt: string;
 };
 
 /** PRD Beta #7 — structured measurement extracted from report text. */
@@ -1880,7 +1852,6 @@ export const api = {
         mode: RewriteMode;
         sections?: string[] | null;
         providerId?: string;
-        samples?: string[];
         /** F12 — required for mode: 'custom' — the radiologist's free-text edit instruction. */
         instruction?: string;
       },
@@ -1888,14 +1859,6 @@ export const api = {
       request<RewriteResult>(`/api/reports/${id}/rewrite`, {
         method: 'POST',
         body: JSON.stringify(body),
-      }),
-    rewriteInMyStyle: (
-      id: string,
-      body: { samples: string[]; sections?: string[] | null; providerId?: string },
-    ) =>
-      request<RewriteResult>(`/api/reports/${id}/rewrite?mode=in_my_style`, {
-        method: 'POST',
-        body: JSON.stringify({ ...body, mode: 'in_my_style' }),
       }),
     comparePrior: (id: string) =>
       request<ComparePriorResult>(`/api/reports/${id}/compare-prior`),
@@ -2362,14 +2325,6 @@ export const api = {
       ),
     delete: (id: string) =>
       request<void>(`/api/prompts/overrides/${id}`, { method: 'DELETE' }),
-    /** PRD §16.4 — list all versions of a prompt override. */
-    listVersions: (id: string) =>
-      request<PromptOverrideVersion[]>(`/api/prompts/overrides/${id}/versions`),
-    /** PRD §16.4 — text diff between two versions of a prompt override. */
-    diffVersions: (id: string, v1: number, v2: number) =>
-      request<PromptVersionDiff>(
-        `/api/prompts/overrides/${id}/diff?v1=${v1}&v2=${v2}`,
-      ),
   },
   /** PRD §16.4 — Prompt Studio: run golden cases against a prompt override. */
   promptStudio: {
@@ -2520,15 +2475,6 @@ export const api = {
       request<CatalogItem>('/api/body-parts', { method: 'POST', body: JSON.stringify(body) }),
     remove: (id: string) =>
       request<void>(`/api/body-parts/${id}`, { method: 'DELETE' }),
-  },
-  /** Admin panel dictation & audio AI settings endpoints. */
-  dictationSettings: {
-    get: () => request<DictationSettings>('/api/v1/admin/dictation-settings'),
-    update: (body: DictationSettings) =>
-      request<DictationSettings>('/api/v1/admin/dictation-settings', {
-        method: 'POST',
-        body: JSON.stringify(body),
-      }),
   },
   /**
    * Iter-35 — versioned clinical validation packs (rulebook golden suites).
@@ -3369,35 +3315,6 @@ export const api = {
         },
       ),
   },
-  mcp: {
-    list: () => request<McpToolRow[]>('/api/mcp/tools'),
-    register: (body: {
-      name: string;
-      version?: string;
-      kind?: number;
-      scope?: number;
-      scopeString?: string;
-      isBuiltIn?: boolean;
-      manifestJson?: string;
-      manifestSig?: string;
-      allowedConnectorPaths?: string[];
-    }) =>
-      request<McpToolRow>('/api/mcp/tools', { method: 'POST', body: JSON.stringify(body) }),
-    approve: (id: string) =>
-      request<McpToolRow>(`/api/mcp/tools/${id}/approve`, { method: 'POST' }),
-    block: (id: string, reason?: string) =>
-      request<McpToolRow>(`/api/mcp/tools/${id}/block`, {
-        method: 'POST',
-        body: JSON.stringify({ reason: reason ?? 'manual' }),
-      }),
-    delete: (id: string) =>
-      request<void>(`/api/mcp/tools/${id}`, { method: 'DELETE' }),
-    test: (id: string, inputJson: string) =>
-      request<{ status: string; output: string; latencyMs: number; memoryBytes: number }>(
-        `/api/mcp/tools/${id}/test`,
-        { method: 'POST', body: JSON.stringify({ inputJson }) },
-      ),
-  },
   /**
    * PRD §14.13 (PR-001..010) — RADPEER-aligned peer review & quality.
    * `mine` is the reviewer's own queue; while an assignment is still open the
@@ -3757,21 +3674,6 @@ export type GoldenCaseResult = {
   expectedRules: string[];
   actualRules: string[];
   qualityScore: number;
-};
-
-export type PromptOverrideVersion = {
-  version: number;
-  body: string;
-  status: 'Draft' | 'Approved';
-  updatedAt: string;
-  updatedBy: string | null;
-};
-
-export type PromptVersionDiff = {
-  v1: number;
-  v2: number;
-  oldBody: string;
-  newBody: string;
 };
 
 /* ── PRD §14.15 (CR-001..010) — critical-results communication tracking ───── */

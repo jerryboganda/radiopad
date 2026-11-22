@@ -150,9 +150,7 @@ Express/Fastify/NestJS/etc. for the backend.**
 
 ## Repo map
 
-The tree is self-describing; one non-obvious entry is worth stating:
-
-- `mcp-connectors/` — signed clinical data connectors (DICOM/FHIR/PACS) — a **product** feature, not developer MCP
+The tree is self-describing.
 
 ## Commands
 

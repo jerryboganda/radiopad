@@ -47,5 +47,8 @@
     <PackageReference Include="Hangfire.AspNetCore" Version="1.8.24" />
     <PackageReference Include="Hangfire.PostgreSql" Version="1.21.1" />
     <PackageReference Include="Hangfire.InMemory" Version="1.0.0" />
+    <!-- MySQL deployments (RADIOPAD_DB_PROVIDER=mysql): persistent job storage. 2.0.3 is the only real MySQL
+         storage and has not been published since 2020 — covered by the MariaDB CI smoke test, not by local runs. -->
+    <PackageReference Include="Hangfire.MySqlStorage" Version="2.0.3" />
   </ItemGroup>
 </Project>

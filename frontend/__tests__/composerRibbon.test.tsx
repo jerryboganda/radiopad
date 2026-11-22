@@ -32,8 +32,6 @@ function baseProps(onRewrite: (mode: RewriteMode, instruction?: string) => void)
     rewriteBusy: false,
     rewriteOpen: true,
     onRewriteOpenChange: vi.fn(),
-    stylePanelOpen: false,
-    onToggleStylePanel: vi.fn(),
     providerId: '',
     canSign: false,
     canExport: false,

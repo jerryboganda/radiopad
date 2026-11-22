@@ -39,7 +39,6 @@ public class RbacMatrixEnforcementTests : IClassFixture<RadioPadAppFactory>
         ["POST /api/reports/{id}/rewrite"] = "{\"mode\":\"concise\"}",
         ["POST /api/reports/{id}/sign"] = "{\"role\":\"Primary\"}",
         ["POST /api/reports/{id}/addendum"] = "{\"body\":\"x\"}",
-        ["POST /api/mcp/tools/{id}/invoke"] = "{\"inputJson\":\"{}\"}",
     };
 
     public RbacMatrixEnforcementTests(RadioPadAppFactory factory) => _factory = factory;

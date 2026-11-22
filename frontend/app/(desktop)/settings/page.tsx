@@ -37,7 +37,6 @@ import type { SttMode } from '@/lib/api';
 // Every personal settings screen, so this page is the one place to look.
 const MORE_SETTINGS = [
   { href: '/settings/models', label: 'On-device AI models', Icon: Cpu },
-  { href: '/admin/dictation-settings', label: 'Dictation engine settings', Icon: Mic },
   { href: '/settings/corrections', label: 'Dictation corrections', Icon: SpellCheck },
   { href: '/settings/snippets', label: 'Snippets', Icon: Type },
   { href: '/settings/hotkeys', label: 'Hotkeys', Icon: Keyboard },

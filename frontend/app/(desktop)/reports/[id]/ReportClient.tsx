@@ -59,7 +59,6 @@ import {
   getLastFocusedSectionEditor,
   getSectionEditor,
 } from '@/lib/editor/sectionEditorRegistry';
-import RewriteStylePanel from './RewriteStylePanel';
 import PriorComparePanel from './PriorComparePanel';
 import DictationDraftPanel from './DictationDraftPanel';
 import SignAndSendButton from './SignAndSendButton';
@@ -255,9 +254,6 @@ export default function ReportPage() {
   const [signNote, setSignNote] = useState('');
   const [addendumBody, setAddendumBody] = useState('');
   const [addendumOpen, setAddendumOpen] = useState(false);
-  const [stylePanelOpen, setStylePanelOpen] = useState(false);
-  const [styleSection, setStyleSection] =
-    useState<'findings' | 'impression' | 'recommendations'>('impression');
   const [showPrior, setShowPrior] = useState(false);
   const [showDictationDraft, setShowDictationDraft] = useState(false);
   const [showSignSend, setShowSignSend] = useState(false);
@@ -2033,8 +2029,6 @@ export default function ReportPage() {
                 rewriteBusy={rewriteBusy}
                 rewriteOpen={rewriteOpen}
                 onRewriteOpenChange={setRewriteOpen}
-                stylePanelOpen={stylePanelOpen}
-                onToggleStylePanel={() => setStylePanelOpen((v) => !v)}
                 providerId={providerId}
                 providers={providers.filter((x) => x.enabled).map((x) => ({ id: x.id, name: x.name }))}
                 rewriteProviderId={rewriteProviderId}
@@ -2061,47 +2055,6 @@ export default function ReportPage() {
                   read-back. RadioPad never communicates on the radiologist's
                   behalf; every transition here is an explicit human action. */}
               <CriticalResultPanel reportId={report.id} />
-
-              {/* Transient AI working surfaces — appear between the AI bar and the cards. */}
-              {stylePanelOpen && (
-                <div className="rp-panel">
-                  <div className="rp-panel-title">Style rewrite</div>
-                  <div className="section-block">
-                    <label htmlFor="rp-style-section">Apply to</label>
-                    <select
-                      id="rp-style-section"
-                      className="rp-input"
-                      value={styleSection}
-                      onChange={(e) =>
-                        setStyleSection(e.target.value as 'findings' | 'impression' | 'recommendations')
-                      }
-                    >
-                      <option value="findings">Findings</option>
-                      <option value="impression">Impression</option>
-                      <option value="recommendations">Recommendations</option>
-                    </select>
-                  </div>
-                  <RewriteStylePanel
-                    reportId={report.id}
-                    section={styleSection}
-                    currentText={String((report as Record<string, unknown>)[styleSection] ?? '')}
-                    providerId={providerId || undefined}
-                    onAccept={async (text) => {
-                      setAiUndo((prev) => ({
-                        ...prev,
-                        [styleSection]: String((reportRef.current as Record<string, unknown> | null)?.[styleSection] ?? ''),
-                      }));
-                      const next = { ...aiHighlights, [styleSection]: true };
-                      setAiHighlights(next);
-                      await update({
-                        [styleSection]: text,
-                        aiHighlightsJson: JSON.stringify(next),
-                      } as Partial<Report>);
-                      setStylePanelOpen(false);
-                    }}
-                  />
-                </div>
-              )}
 
               {showPrior && <PriorComparePanel reportId={report.id} />}
 
@@ -2295,13 +2248,6 @@ export default function ReportPage() {
                     { label: 'Formal register', onClick: () => { void runRewrite('formal', key); } },
                     { label: 'Patient-friendly', onClick: () => { void runRewrite('patient_friendly', key); } },
                     { label: 'Referring summary', onClick: () => { void runRewrite('referring_summary', key); } },
-                    {
-                      label: 'Rewrite in my style',
-                      onClick: () => {
-                        setStyleSection(keyStr as 'findings' | 'impression' | 'recommendations');
-                        setStylePanelOpen(true);
-                      },
-                    },
                   );
                 }
                 if (canEdit && generated) {

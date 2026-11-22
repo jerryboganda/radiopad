@@ -58,42 +58,11 @@ The Tauri desktop shell ships with an embedded **ed25519** public key and the
 auto-updater verifies every manifest signature against it before any bytes are
 written to disk. See [`desktop/UPDATE_SIGNING.md`](../../desktop/UPDATE_SIGNING.md).
 
-## Plugin trust + capability sandbox (MCP-007, iter-33)
+## Plugin trust (desktop)
 
-PACS / MCP plugins are an explicit code-execution boundary inside the
-radiologist's session. The hardening pipeline is:
-
-1. **Manifest signing chain.** Every plugin ships `manifest.json` plus a
-   detached ed25519 `manifest.json.sig` over the canonical-JSON
-   serialisation of `manifest.json`. The verifier
-   (`PluginManifestSignatureVerifier`) accepts the signature only when it
-   validates against an **active** row in the per-tenant
-   `TrustedPluginPublisher` table (revoked rows ignored, deny-by-default
-   when no key is configured).
-2. **Capability allow-list.** The manifest declares a `capabilities[]`
-   array; after a successful signature check the host registers the
-   `(pluginId, capability)` tuples in `InMemoryMcpCapabilityRegistry`.
-   Any tool call whose capability is not registered is refused with
-   `PluginPolicyException(reason="capability_not_registered")`.
-3. **Per-OS sandbox.** Plugin executables launch only through
-   `IPluginSandbox` — `WindowsAppContainerSandbox` (AppContainer SID),
-   `LinuxNamespaceSandbox` (`unshare --net --pid --user --map-root-user`),
-   or the documented `MacOsNoopSandbox` placeholder. Cross-OS
-   instantiation throws `PlatformNotSupportedException` so a misconfigured
-   runtime cannot fall through to an unsandboxed launch.
-4. **Audit.** Every block path appends one
-   `AuditAction.ProviderBlocked{kind=plugin_policy,pluginId,reason}` row
-   before `PluginPolicyException` is rethrown — the append-only SHA-256
-   chain covers these events.
-
-| Threat | Mitigation | Residual risk |
-| --- | --- | --- |
-| Plugin binary tampered after signing | Canonical-JSON ed25519 signature; verifier blocks + audits | Low |
-| Capability creep at runtime | Deny-by-default `(pluginId, capability)` registry; capability list inside the signed manifest | Low |
-| Stolen publisher key | Append-only `RevokedAt`; verifier ignores revoked rows | Low after revocation |
-| Plugin filesystem / network escape | AppContainer (Windows) / namespaces (Linux) | Medium on macOS until `sandbox-exec` profile lands |
-
-Full operator runbook: [`desktop/PLUGIN_TRUST.md`](../../desktop/PLUGIN_TRUST.md).
+Desktop PACS/RIS plugins are verified in the Tauri shell (SHA-256 + Ed25519 signed manifest, per-OS sandbox);
+see [`desktop/PLUGIN_TRUST.md`](../../desktop/PLUGIN_TRUST.md). The backend-side MCP tool registry, plugin-signature
+verifier, capability registry and plugin sandbox (MCP-007, iter-33) were removed on 2026-11-22 (owner decision).
 
 | Threat | Surface | Mitigation | Residual risk |
 | --- | --- | --- | --- |

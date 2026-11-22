@@ -44,8 +44,6 @@ export type PermissionKey =
   | 'validation_packs.read'
   | 'validation_packs.manage'
   | 'validation_packs.run'
-  | 'mcp_tools.invoke'
-  | 'mcp_tools.manage'
   | 'prompt_overrides.manage'
   | 'prompt_overrides.approve'
   | 'modalities.read'
@@ -76,7 +74,7 @@ export function can(
  * read/draft/edit permissions a reporting radiologist also holds.
  */
 // IMPORTANT: keep this list to unambiguous ADMIN capabilities only. A plain
-// Radiologist holds `users.read`, `billing.read`, `mcp_tools.invoke`, and
+// Radiologist holds `users.read`, `billing.read`, and
 // `audit.read` (see backend RolePermissionMap), so including any of those here
 // would fail OPEN and let a clinical user into the admin console. Every entry
 // below is a manage/approve/verify/export capability that no purely-clinical
@@ -90,7 +88,6 @@ export const WEB_ADMIN_PERMISSIONS: readonly PermissionKey[] = [
   'security.manage',
   'billing.manage',
   'providers.manage',
-  'mcp_tools.manage',
   'validation_packs.manage',
   'audit.verify',
   'audit.export',

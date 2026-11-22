@@ -1,0 +1,145 @@
+name: mysql-migrations
+
+# Generates the EF Core migrations for MySqlRadioPadDbContext (RADIOPAD_DB_PROVIDER=mysql).
+#
+# Why a workflow: the dev machine has no dotnet SDK, and the existing SQLite migrations cannot be reused on MySQL
+# (TEXT primary keys). The MySQL history is a separate, model-derived set that lives in
+# backend/RadioPad.Api/src/RadioPad.Infrastructure/Migrations/MySql/ and is NEVER hand-written.
+#
+# Run it from Actions > mysql-migrations > Run workflow. It
+#   1. generates the migration with dotnet-ef against the app's own host (no database connection is needed),
+#   2. rebuilds, and applies the migrations to a blank MariaDB via the Category=MySql tests,
+#   3. only if all of that is green, pushes the result to a NEW branch `bot/mysql-migrations-<run id>`
+#      (it never touches main) and always uploads the files as an artifact.
+# Then open a PR from that branch, review the generated SQL types, and merge.
+#
+# Every later schema change needs TWO migrations: one for SQLite/Postgres (--context RadioPadDbContext) and one
+# from this workflow (the first run is `InitialMySql`; later runs use a descriptive name).
+
+on:
+  workflow_dispatch:
+    inputs:
+      name:
+        description: 'Migration name (letters/digits/underscore), e.g. InitialMySql'
+        required: true
+        default: InitialMySql
+  # workflow_dispatch only appears in the Actions UI once this file is on the default branch. Pushing ANY commit to
+  # a branch named `mysql-migrations-request` runs the same job (migration name InitialMySql), so the first
+  # generation does not have to wait for a merge to main.
+  push:
+    branches: ['mysql-migrations-request']
+
+permissions:
+  contents: write   # pushes the generated migration to a new bot/ branch; nothing else
+
+jobs:
+  generate:
+    name: generate + verify MySQL migration
+    runs-on: ubuntu-latest
+    timeout-minutes: 40
+    services:
+      mariadb:
+        image: mariadb:10.11
+        env:
+          MARIADB_ROOT_PASSWORD: ci-root-password
+        ports:
+          - 3306:3306
+        options: >-
+          --health-cmd="healthcheck.sh --connect --innodb_initialized"
+          --health-interval=5s
+          --health-timeout=5s
+          --health-retries=30
+    env:
+      MIGRATION_NAME: ${{ inputs.name || 'InitialMySql' }}
+      MIGRATIONS_DIR: backend/RadioPad.Api/src/RadioPad.Infrastructure/Migrations/MySql
+      RADIOPAD_TEST_MYSQL: 'Server=127.0.0.1;Port=3306;User ID=root;Password=ci-root-password;'
+    steps:
+      - name: Validate the migration name
+        run: |
+          [[ "$MIGRATION_NAME" =~ ^[A-Za-z][A-Za-z0-9_]{0,60}$ ]] || { echo "::error::Invalid migration name '$MIGRATION_NAME' (letters, digits, underscore; max 61 chars)."; exit 1; }
+
+      - uses: actions/checkout@v4
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '8.0.x'
+
+      - name: Install dotnet-ef (matches the EF Core 8.0.10 pins)
+        run: |
+          dotnet tool install --global dotnet-ef --version 8.0.10
+          echo "$HOME/.dotnet/tools" >> "$GITHUB_PATH"
+
+      - name: Restore
+        working-directory: backend/RadioPad.Api
+        run: dotnet restore
+
+      - name: Generate the MySQL migration
+        # Testing environment: the host builds (secret/key checks and Hangfire are skipped, no database is
+        # contacted) and then dotnet-ef stops it right after Build(). The connection string is a dummy.
+        env:
+          ASPNETCORE_ENVIRONMENT: Testing
+          RADIOPAD_DB_PROVIDER: mysql
+          ConnectionStrings__RadioPad: 'Server=localhost;Database=radiopad;User ID=u;Password=p;SslMode=None'
+        run: |
+          dotnet ef migrations add "$MIGRATION_NAME" \
+            --context MySqlRadioPadDbContext \
+            --project backend/RadioPad.Api/src/RadioPad.Infrastructure \
+            --startup-project backend/RadioPad.Api/src/RadioPad.Api \
+            --output-dir Migrations/MySql
+
+      - name: Show what was generated
+        run: |
+          ls -la "$MIGRATIONS_DIR"
+          echo "Files: $(ls "$MIGRATIONS_DIR"/*.cs | wc -l)"
+
+      - name: Build (compiles the generated migration)
+        working-directory: backend/RadioPad.Api
+        run: dotnet build --configuration Release --no-restore
+
+      - name: Apply the migrations to a blank MariaDB (Category=MySql tests)
+        working-directory: backend/RadioPad.Api
+        run: dotnet test --configuration Release --no-build --filter "Category=MySql" --logger "trx;LogFileName=mysql-tests.trx"
+
+      - name: Commit the migration to a new branch
+        id: commit
+        run: |
+          branch="bot/mysql-migrations-${GITHUB_RUN_ID}"
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git checkout -b "$branch"
+          git add "$MIGRATIONS_DIR"
+          if git diff --cached --quiet; then echo "::error::The generator produced no changes."; exit 1; fi
+          git commit -m "chore(db): generated MySQL migration ${MIGRATION_NAME}"
+          git push origin "$branch"
+          echo "branch=$branch" >> "$GITHUB_OUTPUT"
+
+      - name: Upload the generated files
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: mysql-migration-${{ env.MIGRATION_NAME }}
+          path: backend/RadioPad.Api/src/RadioPad.Infrastructure/Migrations/MySql
+          if-no-files-found: warn
+
+      - name: Next steps (green)
+        if: success()
+        run: |
+          {
+            echo "### MySQL migration \`${MIGRATION_NAME}\` generated and verified"
+            echo
+            echo "Pushed to branch \`${{ steps.commit.outputs.branch }}\`."
+            echo
+            echo "1. Open a pull request from that branch into \`main\` and review the generated column types."
+            echo "2. \`ci-mysql\` re-runs on the PR (applies the migration to a blank MariaDB)."
+            echo "3. Merge, then follow \`docs/07-devops/mysql-hostinger.md\` for the cutover."
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Next steps (failed)
+        if: failure()
+        run: |
+          {
+            echo "### MySQL migration generation FAILED"
+            echo
+            echo "Nothing was pushed. Open the failed step above: a generator error usually means a model type"
+            echo "Pomelo cannot map; a test failure means the generated schema does not apply to MariaDB."
+            echo "The downloaded artifact (if any) holds whatever was generated before the failure."
+          } >> "$GITHUB_STEP_SUMMARY"

@@ -11,4 +11,4 @@ export type PromptOverride = {
   updatedAt: string;
 };
 
-export type TabId = 'test' | 'diff' | 'golden' | 'approval';
+export type TabId = 'test' | 'golden' | 'approval';

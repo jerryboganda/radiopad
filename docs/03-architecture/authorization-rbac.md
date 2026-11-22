@@ -93,7 +93,7 @@ source for endpoint migration planning; where an endpoint has not yet moved to
 | Tenant security settings, KMS verify, security webhooks | `security.manage` | MedicalDirector, ComplianceReviewer, ItAdmin | Yes |
 | Validation pack manage/approve | `validation_packs.manage` | MedicalDirector, ItAdmin | Yes |
 | Validation pack run | `validation_packs.run` | Radiologist, ReportingAdmin, MedicalDirector, ItAdmin | No |
-| MCP invoke/manage | `mcp_tools.invoke` / `mcp_tools.manage` | Invoke: Radiologist, ReportingAdmin, MedicalDirector, ItAdmin. Manage: ReportingAdmin, MedicalDirector, ItAdmin. | Manage: Yes |
+| MCP invoke/manage (reserved; registry removed 2026-11-22 (owner decision)) | `mcp_tools.invoke` / `mcp_tools.manage` | Invoke: Radiologist, ReportingAdmin, MedicalDirector, ItAdmin. Manage: ReportingAdmin, MedicalDirector, ItAdmin. | Manage: Yes |
 | `GET /api/critical-results*` | `critical_results.read` | Radiologist, Resident, Fellow, Subspecialist, ReportingAdmin, MedicalDirector, ComplianceReviewer, ItAdmin, Auditor | No |
 | Critical-result log/communicate/acknowledge/escalate/close | `critical_results.manage` | Radiologist, Resident, Fellow, Subspecialist, MedicalDirector | No |
 | `GET /api/teaching-cases*` | `teaching_cases.read` | Radiologist, Resident, Fellow, Subspecialist, ReportingAdmin, MedicalDirector, ComplianceReviewer, ItAdmin, Researcher, Auditor | No |
@@ -122,7 +122,7 @@ checks MFA freshness.
 | Users/sessions | `users.read`, `users.manage`, `users.revoke_sessions` |
 | Billing | `billing.read`, `billing.manage` |
 | Validation packs | `validation_packs.read`, `validation_packs.manage`, `validation_packs.run` |
-| MCP tools | `mcp_tools.invoke`, `mcp_tools.manage` |
+| MCP tools (reserved; registry removed 2026-11-22 (owner decision)) | `mcp_tools.invoke`, `mcp_tools.manage` |
 
 ## Migration rules
 

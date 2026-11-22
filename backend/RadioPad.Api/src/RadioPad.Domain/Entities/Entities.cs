@@ -25,11 +25,8 @@ public class Tenant : Entity
     /// receive marketplace payouts. Null until the publisher onboards.</summary>
     public string? StripeConnectAccountId { get; set; }
     /// <summary>
-    /// Iter-31 MCP-005 — when false (default), the MCP tool registry rejects
-    /// invocations of tools whose <c>Scope == External</c> regardless of
-    /// approval. When true, an approved External tool may be called. This
-    /// gate is independent of tenant-level RBAC and exists so a customer can
-    /// disable all outbound MCP egress with a single switch.
+    /// Unused: the MCP tool registry that read this switch was removed (2026-11-22, owner decision).
+    /// Column kept until a drop migration; do not reuse.
     /// </summary>
     public bool AllowExternalMcp { get; set; } = false;
     /// <summary>
@@ -897,11 +894,8 @@ public class TenantSettings : Entity
     public bool WarnAsBlocker { get; set; } = false;
 
     /// <summary>
-    /// Iter-32 MCP-005 — when false (default), every MCP tool whose scope
-    /// string contains <c>shell:</c>, <c>fs:</c>, or <c>net:</c> is rejected
-    /// at runtime regardless of approval. When true AND the operator has
-    /// also set <c>RADIOPAD_MCP_ALLOW_DANGEROUS=1</c> in the environment,
-    /// dangerous-scope tools that have been approved may be invoked.
+    /// Unused: the MCP tool registry that read this switch was removed (2026-11-22, owner decision).
+    /// Column kept until a drop migration; do not reuse.
     /// </summary>
     public bool AllowDangerousMcp { get; set; } = false;
 
@@ -1226,10 +1220,9 @@ public class WebAuthnCredential : Entity
 
 /// <summary>
 /// Iter-33 MCP-007 — per-tenant ed25519 publisher key trusted to sign
-/// plugin <c>manifest.json</c> bodies. The
-/// <see cref="Application.Services.Mcp.PluginManifestSignatureVerifier"/>
-/// rejects any plugin whose detached <c>manifest.json.sig</c> does not
-/// verify against an active row in this table. Rows are append-only:
+/// plugin <c>manifest.json</c> bodies. The plugin-signature verifier that used
+/// this table was removed (2026-11-22, owner decision); the table is kept until
+/// a drop migration. Rows are append-only:
 /// rotating a key adds a new row; revoking sets <see cref="RevokedAt"/>
 /// without deleting so we keep the audit history of what used to be
 /// trusted.

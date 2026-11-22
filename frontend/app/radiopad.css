@@ -1320,17 +1320,6 @@
   .rp-grid-2 { grid-template-columns: 1fr; }
 }
 .rp-grid-2-row { display: contents; }
-.rp-diff-add {
-  background: var(--green-bg);
-  border-left: 3px solid var(--green-border);
-  color: var(--text);
-}
-.rp-diff-remove {
-  background: var(--red-bg);
-  border-left: 3px solid var(--red-border);
-  color: var(--text);
-}
-
 /* ----------- Terminology page tabs (locked tokens only) --------------- */
 .rp-tabs {
   display: inline-flex;
@@ -2492,25 +2481,6 @@
 .rp-stat-strip { display: flex; flex-wrap: wrap; gap: 10px; }
 .rp-stat-strip .rp-stat-tile { flex: 1 1 120px; }
 .rp-stat-strip .rp-stat-value { display: flex; align-items: baseline; gap: 8px; }
-
-/* Output diff — version controls, legend, and mono diff panel. */
-.rp-diff-controls { display: flex; flex-wrap: wrap; align-items: flex-end; gap: 12px; margin-bottom: 12px; }
-.rp-diff-controls .section-block { margin-bottom: 0; }
-.rp-diff-legend { display: flex; gap: 14px; margin-bottom: 6px; font: 500 11.5px/1 var(--sans); }
-.rp-diff-legend-item.added { color: var(--green); }
-.rp-diff-legend-item.removed { color: var(--red); }
-.rp-diff-panel {
-  font: 400 12px/1.5 var(--mono);
-  background: var(--bg-subtle);
-  border: 1px solid var(--border);
-  border-radius: var(--radius-sm);
-  padding: 8px 0;
-  overflow: auto;
-  max-height: 420px;
-}
-.rp-diff-line { display: flex; gap: 8px; padding: 0 12px; white-space: pre-wrap; word-break: break-word; }
-.rp-diff-gutter { flex: none; width: 1ch; color: var(--text-faint); user-select: none; }
-.rp-diff-line code { padding: 0; background: none; }
 
 /* Approval — drafts-first rows with status + approve gate. */
 .rp-approval-list { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 8px; }

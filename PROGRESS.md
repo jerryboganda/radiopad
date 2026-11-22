@@ -2854,3 +2854,14 @@ Total tracked PRD ids: **129** (was 112; iter-32 added 17 finer-grained sub-ids)
   Screenshots, report and both server logs are uploaded as the `e2e-reporting-flow` artifact.
 - **Where**: branch `e2e/reporting-flow` (pushed with the owner's OK; it carries all local `main` commits, and `main` itself is not pushed). First run: https://github.com/jerryboganda/radiopad/actions/runs/44999508705 — result not yet read.
 - **Not covered**: real sign-in (no password involved by design), Generate with a real AI provider, the mobile companion.
+
+## Iter-67 - Stub-feature removal, durability fixes, MySQL (Hostinger) provider stage 1+2
+
+- **Date**: 2026-11-22
+- **Removed (owner decision, "remove completely incl. references")**: dictation settings (page, API, service, tests), Prompt Studio version history/diff, the whole MCP tool registry (admin page, controller, sandbox, `mcp-connectors/`, tests, OpenAPI), and Rewrite "in my style". DB tables, enum values and migrations for MCP were left for a later drop migration. CLI `mcp serve` lost its registry pre-check (fixed read-only tool list).
+- **Durability**: dictation audio defaults to the persistent `/data/uploads` (`RADIOPAD_UPLOADS_DIR` overrides). Re-queue-on-startup was NOT built: pending push/email/webhook work has no durable marker (needs `*DeliveredAt` columns + a `WebhookDelivery` table = EF migration, which needs CI). Superseded if the DB moves to MySQL (Hangfire persists there).
+- **VPS (owner-approved)**: deleted three stale root-owned production DB copies in `/opt/docker/radiopad/data`; live `radiopad.db` untouched. `radiopad.db.bak-20260724-014221` is still world-readable (left alone).
+- **MySQL provider (owner decision: DB on Hostinger MariaDB, API stays on the VPS)**: `RADIOPAD_DB_PROVIDER=sqlite|postgres|mysql` selector (legacy sniff when unset), `MySqlRadioPadDbContext` with its own CI-generated migration set, TLS-required-in-production guard, pool cap 20, Hangfire.MySqlStorage, startup DB wait, SQLite->MySQL copier mode, `mysql-migrations` and `ci-mysql` workflows, MariaDB smoke tests. Runbook and go/no-go gates: [docs/07-devops/mysql-hostinger.md](docs/07-devops/mysql-hostinger.md). **Nothing is cut over; production still runs SQLite.**
+- **openapi.yaml** now parses (two corrupted line breaks repaired).
+- **Tests**: frontend removals re-run (9 more files, 30 tests, pass); all C# including the whole MySQL path is uncompiled - CI decides, and `ci-mysql` is expected to need 1-3 iterations.
+- **Scope**: backend + frontend + docs; no deploy, no desktop release until the operator asks. Merging to main deploys the API image (default provider unchanged).

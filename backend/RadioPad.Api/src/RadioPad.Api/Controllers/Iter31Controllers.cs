@@ -139,52 +139,6 @@ public class PromptOverridesController : TenantedController
         await _db.SaveChangesAsync(ct);
         return NoContent();
     }
-
-    /// <summary>
-    /// PRD §16.4 — list all versions of a prompt override. Because the current
-    /// schema does not store a version history table, we return the single
-    /// current state as version 1. Future iterations may add a
-    /// <c>PromptOverrideHistory</c> entity.
-    /// </summary>
-    [HttpGet("{id:guid}/versions")]
-    public async Task<IActionResult> ListVersions(Guid id, CancellationToken ct)
-    {
-        var (tenant, user) = await ResolveContextAsync(_db, ct);
-        var deny = RequirePermission(user, RbacPermission.PromptOverridesManage);
-        if (deny is not null) return deny;
-        var row = await _db.PromptOverrides.FirstOrDefaultAsync(
-            p => p.Id == id && p.TenantId == tenant.Id, ct);
-        if (row is null) return NotFound();
-        // Return current row as the single version entry
-        return Ok(new[]
-        {
-            new
-            {
-                version = 1,
-                body = row.Body,
-                status = row.Status.ToString(),
-                updatedAt = row.UpdatedAt,
-                updatedBy = row.ApprovedByUserId?.ToString(),
-            }
-        });
-    }
-
-    /// <summary>
-    /// PRD §16.4 — text diff between two versions of a prompt override.
-    /// Returns the raw bodies so the frontend can render a line diff.
-    /// </summary>
-    [HttpGet("{id:guid}/diff")]
-    public async Task<IActionResult> Diff(Guid id, [FromQuery] int v1, [FromQuery] int v2, CancellationToken ct)
-    {
-        var (tenant, user) = await ResolveContextAsync(_db, ct);
-        var deny = RequirePermission(user, RbacPermission.PromptOverridesManage);
-        if (deny is not null) return deny;
-        var row = await _db.PromptOverrides.FirstOrDefaultAsync(
-            p => p.Id == id && p.TenantId == tenant.Id, ct);
-        if (row is null) return NotFound();
-        // With single-version schema, both versions point to the current body
-        return Ok(new { v1, v2, oldBody = row.Body, newBody = row.Body });
-    }
 }
 
 /// <summary>

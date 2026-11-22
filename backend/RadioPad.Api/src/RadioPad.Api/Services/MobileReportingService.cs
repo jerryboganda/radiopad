@@ -107,6 +107,33 @@ public class MobileReportingService : IReportingService
         return report is null ? null : MapToDto(report);
     }
 
+    /// <summary>
+    /// Where uploaded dictation audio lives. <c>RADIOPAD_UPLOADS_DIR</c> wins; otherwise it sits next to the
+    /// SQLite database file — the volume that survives a redeploy (<c>/data</c> in production). The old
+    /// default, <c>./uploads</c> under the container's working directory, was thrown away with every new image.
+    /// A MySQL/Postgres deployment has no local database file, so it uses <c>/data</c> when that mounted
+    /// directory exists (the production compose mounts it), else <c>./uploads</c>.
+    /// </summary>
+    private static string UploadsRoot(RadioPadDbContext db)
+    {
+        var configured = Environment.GetEnvironmentVariable("RADIOPAD_UPLOADS_DIR");
+        if (!string.IsNullOrWhiteSpace(configured)) return configured.Trim();
+
+        string? anchor = null;
+        // Only SQLite's "Data Source" is a file path (it is a server name for MySQL).
+        if (string.Equals(db.Database.ProviderName, "Microsoft.EntityFrameworkCore.Sqlite", StringComparison.Ordinal))
+        {
+            var cs = db.Database.GetConnectionString();
+            var m = cs is null
+                ? null
+                : System.Text.RegularExpressions.Regex.Match(cs, @"Data Source\s*=\s*([^;]+)", System.Text.RegularExpressions.RegexOptions.IgnoreCase);
+            var dbFile = m is { Success: true } ? m.Groups[1].Value.Trim() : null;
+            anchor = string.IsNullOrEmpty(dbFile) || dbFile == ":memory:" ? null : Path.GetDirectoryName(Path.GetFullPath(dbFile));
+        }
+        anchor ??= Directory.Exists("/data") ? "/data" : Directory.GetCurrentDirectory();
+        return Path.Combine(anchor, "uploads");
+    }
+
     public async Task<DictationAudioDto> AddDictationAudioAsync(
         Guid reportId,
         Guid tenantId,
@@ -121,7 +148,7 @@ public class MobileReportingService : IReportingService
             throw new KeyNotFoundException($"Report with Id '{reportId}' was not found.");
         }
 
-        var uploadsFolder = Path.Combine(Directory.GetCurrentDirectory(), "uploads", "dictations", reportId.ToString());
+        var uploadsFolder = Path.Combine(UploadsRoot(_db), "dictations", reportId.ToString());
         Directory.CreateDirectory(uploadsFolder);
 
         var safeFileName = $"{Guid.NewGuid()}_{Path.GetFileName(fileName)}";

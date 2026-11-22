@@ -9,6 +9,9 @@
     <PackageReference Include="Microsoft.EntityFrameworkCore" Version="8.0.10" />
     <PackageReference Include="Microsoft.EntityFrameworkCore.Sqlite" Version="8.0.10" />
     <PackageReference Include="Npgsql.EntityFrameworkCore.PostgreSQL" Version="8.0.8" />
+    <!-- MySQL/MariaDB (Hostinger) provider. 8.0.2 accepts EF Core Relational [8.0.2, 8.0.999], so the
+         8.0.10 pins above stay as they are. Opt-in via RADIOPAD_DB_PROVIDER=mysql (see DbProviderSelector). -->
+    <PackageReference Include="Pomelo.EntityFrameworkCore.MySql" Version="8.0.2" />
     <PackageReference Include="Microsoft.EntityFrameworkCore.Design" Version="8.0.10">
       <PrivateAssets>all</PrivateAssets>
     </PackageReference>
