@@ -2820,3 +2820,12 @@ Total tracked PRD ids: **129** (was 112; iter-32 added 17 finer-grained sub-ids)
 - **Mobile companion at 375×812, both themes**: no horizontal overflow on companion, login, pair, reporting list, New report sheet or dictate. Icon buttons and the theme toggle get a 44 px hit area on touch screens (`@media (pointer: coarse)` in `shell.css`); mouse layouts are unchanged.
 - **Tests**: new `__tests__/signAndSendButton.test.tsx` (save-before-sign, failed save signs nothing, refresh after) and `pickNextCase` / `derivePriority` cases in `__tests__/worklist/readerLoadAndAssign.test.ts`. Targeted files re-run locally; the full suite, typecheck and lint are CI's job.
 - **Scope**: frontend → desktop release required once the operator asks to ship.
+
+## Iter-65 - Workflow streamlining, part 8: RIS copy and narrow windows
+
+- **Date**: 2026-11-22
+- **RIS clipboard never auto-cleared on Windows** (browser path): Windows stores `\n` as `\r\n` on the clipboard, so the 30 s clean-up's exact-match check ("is this still our text?") failed and the report text (PHI) stayed on the clipboard while the "auto-clears in 30s" badge went away. The comparison is now line-ending-blind, in `CopyToRisButton` and, defensively, in the native `secure_copy` clean-up (`desktop/src-tauri/src/main.rs` — **not compiled locally**, CI builds it). A clipboard the user has since overwritten is still left alone.
+- **RIS copy saves on-screen edits first** (`beforeCopy={flushEdits}`), as sign-off does since Iter-64. It previously worked only because clicking the Export tab blur-saved first, a race; a failed save now copies nothing.
+- **Report editor below 1100 px**: the two-column fallback stacked the case queue and study panel full-width on top, so the report started ~730 px down at 1024 px and Export scrolled out of the patient bar. Narrow windows now start with the study rail folded (44 px strip, the « toggle still opens it), giving three columns with the report on the first screen; the patient bar wraps instead of scrolling. 1100 / 1024 px checked in both themes, nothing off-screen.
+- **Tests**: new `__tests__/copyToRisButton.test.tsx` (save-before-copy, failed save copies nothing, clears despite `\r\n`, leaves a user's newer clipboard alone). Targeted files re-run locally; the full suite, typecheck, lint and the Rust build are CI's job.
+- **Scope**: frontend + desktop → desktop release required once the operator asks to ship.

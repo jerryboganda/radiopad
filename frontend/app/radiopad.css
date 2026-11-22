@@ -3458,9 +3458,12 @@
   grid-template-columns: 44px minmax(0, 1fr) minmax(260px, min(340px, 28%));
 }
 @media (max-width: 1100px) {
-  .rp-composer-grid,
-  .rp-composer-grid.left-collapsed { grid-template-columns: minmax(0, 1fr) minmax(260px, 320px); }
-  .rp-studyctx { grid-column: 1 / -1; position: static; }
+  .rp-composer-grid { grid-template-columns: minmax(0, 1fr) minmax(260px, 320px); }
+  .rp-composer-grid:not(.left-collapsed) .rp-studyctx { grid-column: 1 / -1; position: static; }
+  /* Folded rail (the default at this width): keep three columns so the report stays on the first screen. */
+  .rp-composer-grid.left-collapsed { grid-template-columns: 44px minmax(0, 1fr) minmax(240px, 300px); }
+  /* Patient bar wraps instead of scrolling Save/Export out of view. */
+  .rp-patientbar { flex-wrap: wrap; row-gap: 8px; }
 }
 @media (max-width: 960px) {
   .rp-composer-grid,

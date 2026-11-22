@@ -1,8 +1,8 @@
-# HANDOFF — Workflow streamlining (Iter-58 → Iter-64)
+# HANDOFF — Workflow streamlining (Iter-58 → Iter-65)
 
 **Written:** 2026-11-21, **updated** 2026-11-22 · **Branch:** `main` · **State:** commits local, **nothing pushed, nothing released**
 
-Read this first, then `PROGRESS.md` Iter-58 … Iter-64 for the per-change detail.
+Read this first, then `PROGRESS.md` Iter-58 … Iter-65 for the per-change detail.
 
 ## 1. What the owner asked for
 
@@ -81,12 +81,13 @@ Follow-up checks (Iter-64): Send → Next case, every export format, sign-out an
 375 px were exercised, which turned up and fixed sign-off acting on stale server text, a stale report
 staying on screen after "Next case", and "Next case" ignoring STAT. See `PROGRESS.md` Iter-64.
 
+RIS copy and windows below 1180 px were checked in Iter-65 (clipboard never cleared on Windows; report
+pushed below the fold at 1024 px; both fixed).
+
 Still open:
 
-- **Real backend**: none of the above ran against the real API; it was all mock data.
-- **RIS clipboard copy** not verified.
-- **Below 1180 px** the composer drops to two columns (viewport-based breakpoint that ignores the
-  248 px sidebar); not re-tuned.
+- **Real backend**: everything above ran against mock data, never the real API.
+- **Rust change uncompiled**: `secure_copy` clean-up in `desktop/src-tauri/src/main.rs` (Iter-65); CI builds it.
 
 ## 6. How to view the app on this machine
 

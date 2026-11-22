@@ -96,6 +96,14 @@ http.createServer((req, res) => {
   req.on('data', (c) => (raw += c));
   req.on('end', () => {
   let json = {}; try { json = raw ? JSON.parse(raw) : {}; } catch {}
+  const tm = req.url.split('?')[0].replace(/\/$/, '').match(/^\/api\/reports\/(r\d)\/export\/text$/);
+  if (tm && reports.find((x) => x.id === tm[1])) {
+    // Plain-text export (RIS copy, .txt download): built from what the server has stored.
+    const r = reports.find((x) => x.id === tm[1]);
+    res.setHeader('Content-Type', 'text/plain; charset=utf-8');
+    return res.end(['indication', 'technique', 'comparison', 'findings', 'impression', 'recommendations']
+      .filter((k) => r[k]).map((k) => k.toUpperCase() + ':\n' + r[k]).join('\n\n'));
+  }
   const b = mutate(req.method, req.url.split('?')[0].replace(/\/$/, ''), json) ?? body(req.url);
   require('fs').appendFileSync(require('os').tmpdir() + '/radiopad-mock-requests.log', req.method + ' ' + req.url.split('?')[0] + ' ' + (Array.isArray(b) && !b.length ? 'EMPTY[]' : JSON.stringify(b) === '{}' ? 'EMPTY{}' : 'ok') + '\n');
   res.end(JSON.stringify(b));

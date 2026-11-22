@@ -17,11 +17,13 @@ type Props = {
   reportId: string;
   /** Disable when the report cannot be exported (e.g. validation failing). */
   disabled?: boolean;
+  /** Save on-screen edits first so the RIS gets what the radiologist sees. Throws → nothing is copied. */
+  beforeCopy?: () => Promise<void>;
 };
 
 const CLEAR_MS = 30_000;
 
-export default function CopyToRisButton({ reportId, disabled }: Props) {
+export default function CopyToRisButton({ reportId, disabled, beforeCopy }: Props) {
   const [busy, setBusy] = useState(false);
   const [status, setStatus] = useState<'idle' | 'copied' | 'error'>('idle');
   const [error, setError] = useState<string | null>(null);
@@ -45,12 +47,13 @@ export default function CopyToRisButton({ reportId, disabled }: Props) {
       window.removeEventListener('radiopad:copy-to-ris', runCopy);
       window.removeEventListener('radiopad:clipboard-cleared', clearStatus);
     };
-  }, [disabled, reportId]);
+  }, [disabled, reportId, beforeCopy]);
 
   async function copy() {
     setBusy(true);
     setError(null);
     try {
+      await beforeCopy?.();
       const text = await api.reports.exportText(reportId, { preview: true });
       const invoke = getTauriInvoke();
       if (invoke) {
@@ -110,7 +113,10 @@ function clearBrowserClipboardLater(copiedText: string): void {
     try {
       if (!navigator.clipboard?.readText || !navigator.clipboard?.writeText) return;
       const current = await navigator.clipboard.readText();
-      if (current !== copiedText) return;
+      // Windows turns \n into \r\n on the clipboard; compare line-ending-blind or the
+      // report text (PHI) is never cleared. Anything else the user copied since is left alone.
+      const norm = (t: string) => t.replace(/\r\n/g, '\n');
+      if (norm(current) !== norm(copiedText)) return;
       await navigator.clipboard.writeText('');
       window.dispatchEvent(new CustomEvent('radiopad:clipboard-cleared'));
     } catch {

@@ -69,7 +69,9 @@ fn clear_secure_clipboard_if_owned(app: &tauri::AppHandle) -> bool {
     let still_ours = app
         .clipboard()
         .read_text()
-        .map(|current| current == expected)
+        // Line-ending-blind: Windows may hand the text back with \r\n, and an exact
+        // match would then never clear the report text (PHI) off the clipboard.
+        .map(|current| current.replace("\r\n", "\n") == expected.replace("\r\n", "\n"))
         .unwrap_or(false);
     if !still_ours {
         forget_secure_clipboard_text(&expected);

@@ -351,6 +351,11 @@ export default function ReportPage() {
     if (inspectorTab === 'signoff') inspectorRef.current?.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
   }, [inspectorTab]);
   const [leftCollapsed, setLeftCollapsed] = useState(false);
+  // Narrow windows (<=1100 px): start with the study rail folded so the report, not the
+  // case queue, fills the first screen. The rail's toggle still opens it.
+  useEffect(() => {
+    if (window.innerWidth <= 1100) setLeftCollapsed(true);
+  }, []);
   // RC-04 validation lifecycle.
   const [validationState, setValidationState] = useState<'idle' | 'running' | 'done' | 'error'>('idle');
   const [validationError, setValidationError] = useState<string | null>(null);
@@ -2418,7 +2423,7 @@ export default function ReportPage() {
           onExport={runExport}
           risSlot={
             <>
-              <CopyToRisButton reportId={report.id} />
+              <CopyToRisButton reportId={report.id} beforeCopy={flushEdits} />
               {/* PRD §14.14 TF-001 — start a teaching case from this report.
                   De-identification runs server-side; the button states what
                   will be stripped before the radiologist commits. */}
