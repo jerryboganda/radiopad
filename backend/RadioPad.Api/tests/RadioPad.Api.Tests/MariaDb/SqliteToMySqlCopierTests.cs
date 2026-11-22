@@ -58,9 +58,14 @@ public class SqliteToMySqlCopierTests
             }
             SqliteConnection.ClearAllPools(); // release the file handle before the copier reopens it read-only
 
-            // ---- blank target (schema from the model; production would use the generated migrations)
+            // ---- blank target, built the way production builds it: the generated migrations when they exist
+            // (EnsureCreated records no migration history, so the copier would rightly report them as pending),
+            // otherwise straight from the model.
             await using (var blank = mysql.CreateContext())
-                await blank.Database.EnsureCreatedAsync();
+            {
+                if (blank.Database.GetMigrations().Any()) await blank.Database.MigrateAsync();
+                else await blank.Database.EnsureCreatedAsync();
+            }
 
             // ---- dry run: counts only, writes nothing
             var dry = await SqliteToMySqlCopier.RunAsync(sqlitePath, mysql.ConnectionString,
