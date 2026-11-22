@@ -131,6 +131,11 @@ public static class DevSeed
     {
         if (Directory.Exists(rulebooksDir))
         {
+            // One query for the tenant's existing keys instead of one per file: against a remote database
+            // (Hostinger MySQL, ~170 ms per round trip) the per-file lookup made every boot take minutes.
+            var haveRulebooks = (await db.Rulebooks.Where(r => r.TenantId == tenant.Id)
+                .Select(r => new { r.RulebookId, r.Version }).ToListAsync(ct))
+                .Select(r => $"{r.RulebookId}{r.Version}").ToHashSet(StringComparer.Ordinal);
             foreach (var path in Directory.EnumerateFiles(rulebooksDir, "*.yaml"))
             {
                 // Per-file resilience: a single malformed bundled rulebook must never
@@ -140,9 +145,7 @@ public static class DevSeed
                     var yaml = await File.ReadAllTextAsync(path, ct);
                     var spec = RadioPad.Validation.Rulebook.RulebookSpec.FromYaml(yaml);
                     if (string.IsNullOrEmpty(spec.RulebookId)) continue;
-                    var existing = await db.Rulebooks.FirstOrDefaultAsync(
-                        r => r.TenantId == tenant.Id && r.RulebookId == spec.RulebookId && r.Version == spec.Version, ct);
-                    if (existing is not null) continue;
+                    if (!haveRulebooks.Add($"{spec.RulebookId}{spec.Version}")) continue;
                     db.Rulebooks.Add(new Rulebook
                     {
                         TenantId = tenant.Id,
@@ -175,6 +178,8 @@ public static class DevSeed
         // "id" (no subspecialty). Accept either identifier so every bundled template seeds.
         if (Directory.Exists(templatesDir))
         {
+            var haveTemplates = (await db.Templates.Where(t => t.TenantId == tenant.Id)
+                .Select(t => t.TemplateId).ToListAsync(ct)).ToHashSet(StringComparer.Ordinal);
             foreach (var path in Directory.EnumerateFiles(templatesDir, "*.json"))
             {
                 try
@@ -193,9 +198,7 @@ public static class DevSeed
                     if (string.IsNullOrEmpty(templateId)) templateId = Str("id");
                     if (string.IsNullOrEmpty(templateId)) continue;
 
-                    var existing = await db.Templates.FirstOrDefaultAsync(
-                        t => t.TenantId == tenant.Id && t.TemplateId == templateId, ct);
-                    if (existing is not null) continue;
+                    if (!haveTemplates.Add(templateId)) continue;
 
                     db.Templates.Add(new ReportTemplate
                     {
