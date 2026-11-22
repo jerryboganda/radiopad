@@ -142,6 +142,17 @@ cd /opt/docker/radiopad && docker compose ps
 
 ## Backup and restore (SQLite)
 
+**Automatic (since 2026-11-23):** `/usr/local/sbin/radiopad-backup.sh`, run from `/etc/cron.d/radiopad-backup` at 02:30 UTC,
+takes a consistent online copy (`sqlite3 .backup`, safe while the API runs), checks `PRAGMA integrity_check`, gzips and
+AES-256 encrypts it to `/opt/docker/radiopad/backups/nightly/radiopad-<ts>.db.gz.enc` (plus `uploads-<ts>.tar.gz.enc` for dictation audio).
+It keeps **only the newest** backup of each kind (the new one is verified before older ones are removed), so it never grows.
+The key is `/opt/docker/radiopad/.backup.key` (root, 600): **copy it somewhere off the server** or the backups cannot be read after a disk loss.
+Restore: `openssl enc -d -aes-256-cbc -pbkdf2 -pass file:/opt/docker/radiopad/.backup.key -in <file>.db.gz.enc | gunzip > radiopad.db`
+(stop `radiopad-api`, replace `data/radiopad.db`, remove stale `-wal`/`-shm`, start). Log: `/var/log/radiopad-backup.log`.
+The backups live on the same disk as the database; they do not cover loss of the server.
+
+**Manual copy:**
+
 ```bash
 cd /opt/docker/radiopad
 docker compose stop radiopad-api
