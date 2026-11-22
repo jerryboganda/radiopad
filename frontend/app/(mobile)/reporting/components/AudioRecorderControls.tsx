@@ -73,27 +73,31 @@ export default function AudioRecorderControls({ report, takes, onUploadSuccess, 
     setRecordingTime(0);
     setAudioBlob(null);
 
+    // Never enter the "recording" state without a live microphone: a timer that runs over
+    // silence would upload an empty take as if it were a real dictation.
     try {
-      if (typeof navigator !== 'undefined' && navigator.mediaDevices?.getUserMedia) {
-        const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-        streamRef.current = stream;
-
-        if (typeof MediaRecorder !== 'undefined') {
-          const recorder = new MediaRecorder(stream);
-          mediaRecorderRef.current = recorder;
-
-          recorder.ondataavailable = (e) => {
-            if (e.data && e.data.size > 0) chunksRef.current.push(e.data);
-          };
-          recorder.onstop = () => {
-            const mimeType = recorder.mimeType || 'audio/webm';
-            setAudioBlob(new Blob(chunksRef.current, { type: mimeType }));
-          };
-          recorder.start(100);
-        }
+      if (typeof navigator === 'undefined' || !navigator.mediaDevices?.getUserMedia || typeof MediaRecorder === 'undefined') {
+        setErrorMessage('Audio recording is not supported on this device or browser.');
+        return;
       }
+      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      streamRef.current = stream;
+
+      const recorder = new MediaRecorder(stream);
+      mediaRecorderRef.current = recorder;
+
+      recorder.ondataavailable = (e) => {
+        if (e.data && e.data.size > 0) chunksRef.current.push(e.data);
+      };
+      recorder.onstop = () => {
+        const mimeType = recorder.mimeType || 'audio/webm';
+        setAudioBlob(new Blob(chunksRef.current, { type: mimeType }));
+      };
+      recorder.start(100);
     } catch (err) {
-      console.warn('Microphone access warning:', err);
+      console.warn('Microphone access error:', err);
+      setErrorMessage('Microphone access was denied or is unavailable. Allow microphone access and try again.');
+      return;
     }
 
     setStatus('recording');
@@ -123,8 +127,6 @@ export default function AudioRecorderControls({ report, takes, onUploadSuccess, 
     }
     if (chunksRef.current.length > 0) {
       setAudioBlob(new Blob(chunksRef.current, { type: 'audio/webm' }));
-    } else if (!audioBlob) {
-      setAudioBlob(new Blob(['mock audio binary content'], { type: 'audio/webm' }));
     }
     setStatus('stopped');
   };
@@ -139,8 +141,8 @@ export default function AudioRecorderControls({ report, takes, onUploadSuccess, 
   };
 
   const handleSubmit = async () => {
-    if (!audioBlob) {
-      setErrorMessage('No audio recorded to upload.');
+    if (!audioBlob || audioBlob.size === 0) {
+      setErrorMessage('No audio was captured. Record the take again.');
       return;
     }
     setIsUploading(true);

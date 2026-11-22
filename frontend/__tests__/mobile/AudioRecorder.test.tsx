@@ -43,15 +43,44 @@ const MOCK_REPORT: ReportDto = {
   dictations: [],
 };
 
+// jsdom has no microphone: stand in for the browser's recorder so the component is exercised
+// against the same API surface a phone provides. Each stop() delivers one real (non-empty) chunk.
+class FakeMediaRecorder {
+  state: 'inactive' | 'recording' | 'paused' = 'inactive';
+  mimeType = 'audio/webm';
+  ondataavailable: ((e: { data: Blob }) => void) | null = null;
+  onstop: (() => void) | null = null;
+  constructor(public stream: MediaStream) {}
+  start() { this.state = 'recording'; }
+  pause() { this.state = 'paused'; }
+  resume() { this.state = 'recording'; }
+  stop() {
+    this.state = 'inactive';
+    this.ondataavailable?.({ data: new Blob(['voice'], { type: 'audio/webm' }) });
+    this.onstop?.();
+  }
+}
+
+function setMicrophone(getUserMedia: unknown) {
+  Object.defineProperty(navigator, 'mediaDevices', {
+    value: getUserMedia ? { getUserMedia } : undefined,
+    configurable: true,
+  });
+}
+
 describe('AudioRecorderControls & DictateClient', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     vi.useFakeTimers();
+    vi.stubGlobal('MediaRecorder', FakeMediaRecorder);
+    setMicrophone(vi.fn().mockResolvedValue({ getTracks: () => [{ stop: vi.fn() }] }));
     (reportingClientModule.getReportById as any).mockResolvedValue(MOCK_REPORT);
   });
 
   afterEach(() => {
     vi.useRealTimers();
+    vi.unstubAllGlobals();
+    setMicrophone(undefined);
   });
 
   it('renders patient info banner correctly', () => {
@@ -71,8 +100,8 @@ describe('AudioRecorderControls & DictateClient', () => {
     const recordBtn = screen.getByRole('button', { name: /start recording/i });
     expect(recordBtn).toBeInTheDocument();
 
-    // Click Record
-    fireEvent.click(recordBtn);
+    // Click Record (the microphone grant is async)
+    await act(async () => { fireEvent.click(recordBtn); });
 
     expect(screen.getByRole('button', { name: /stop recording/i })).toBeInTheDocument();
 
@@ -131,7 +160,7 @@ describe('AudioRecorderControls & DictateClient', () => {
     render(<AudioRecorderControls report={MOCK_REPORT} takes={[]} onUploadSuccess={onUploadSuccess} />);
 
     // Start & Stop recording
-    fireEvent.click(screen.getByRole('button', { name: /start recording/i }));
+    await act(async () => { fireEvent.click(screen.getByRole('button', { name: /start recording/i })); });
     fireEvent.click(screen.getByRole('button', { name: /stop recording/i }));
 
     // Click Submit Dictation
@@ -145,6 +174,9 @@ describe('AudioRecorderControls & DictateClient', () => {
         expect.any(Number),
       );
     });
+    // The upload carries what the recorder captured — never a stand-in payload.
+    const uploaded = (reportingClientModule.uploadDictation as any).mock.calls[0][1] as Blob;
+    expect(uploaded.size).toBeGreaterThan(0);
 
     await waitFor(() => {
       expect(onUploadSuccess).toHaveBeenCalledWith(mockDictationResult);
@@ -154,6 +186,45 @@ describe('AudioRecorderControls & DictateClient', () => {
     await waitFor(() => {
       expect(screen.getByRole('button', { name: /start recording/i })).toBeInTheDocument();
     });
+  });
+
+  it('refuses to start (and never fabricates audio) when the device has no microphone support', async () => {
+    setMicrophone(undefined);
+    render(<AudioRecorderControls report={MOCK_REPORT} takes={[]} />);
+
+    await act(async () => { fireEvent.click(screen.getByRole('button', { name: /start recording/i })); });
+
+    expect(screen.getByRole('alert')).toHaveTextContent(/not supported/i);
+    expect(screen.getByRole('button', { name: /start recording/i })).toBeInTheDocument();
+    expect(reportingClientModule.uploadDictation).not.toHaveBeenCalled();
+  });
+
+  it('stays idle with a clear error when microphone access is denied', async () => {
+    setMicrophone(vi.fn().mockRejectedValue(new DOMException('denied', 'NotAllowedError')));
+    vi.spyOn(console, 'warn').mockImplementation(() => {});
+    render(<AudioRecorderControls report={MOCK_REPORT} takes={[]} />);
+
+    await act(async () => { fireEvent.click(screen.getByRole('button', { name: /start recording/i })); });
+
+    expect(screen.getByRole('alert')).toHaveTextContent(/microphone access was denied/i);
+    expect(screen.getByRole('button', { name: /start recording/i })).toBeInTheDocument();
+    expect(screen.getByLabelText('Recording Timer')).toHaveTextContent('00:00');
+  });
+
+  it('does not upload an empty take', async () => {
+    vi.useRealTimers();
+    // A recorder that yields no audio data at all.
+    vi.stubGlobal('MediaRecorder', class extends FakeMediaRecorder {
+      stop() { this.state = 'inactive'; this.onstop?.(); }
+    });
+    render(<AudioRecorderControls report={MOCK_REPORT} takes={[]} />);
+
+    await act(async () => { fireEvent.click(screen.getByRole('button', { name: /start recording/i })); });
+    fireEvent.click(screen.getByRole('button', { name: /stop recording/i }));
+    fireEvent.click(screen.getByRole('button', { name: /submit dictation/i }));
+
+    expect(screen.getByRole('alert')).toHaveTextContent(/no audio was captured/i);
+    expect(reportingClientModule.uploadDictation).not.toHaveBeenCalled();
   });
 
   it('shows a running list of already-uploaded takes for the case', () => {
