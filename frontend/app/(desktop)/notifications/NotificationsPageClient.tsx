@@ -89,9 +89,10 @@ export default function NotificationsPageClient() {
   const [now, setNow] = useState(() => Date.now());
 
   // --- fetch the filtered list (re-created — and re-run — on filter change) ----
-  const load = useCallback(async () => {
-    setLoading(true);
-    setError(null);
+  // `silent` = live refresh from an SSE event: no skeleton flash, and a failure keeps the current rows.
+  const load = useCallback(async (silent?: boolean) => {
+    if (!silent) setLoading(true);
+    if (!silent) setError(null);
     try {
       const res = await api.notifications.list({
         limit: 50,
@@ -103,7 +104,7 @@ export default function NotificationsPageClient() {
       setRows(res.notifications);
       setLastFetchAt(Date.now());
     } catch (e) {
-      setError((e as Error).message);
+      if (!silent) setError((e as Error).message);
     } finally {
       setLoading(false);
     }
@@ -112,6 +113,12 @@ export default function NotificationsPageClient() {
   useEffect(() => {
     void load();
   }, [load]);
+
+  // Live inbox: a new `notification` event on the shared SSE stream re-pulls the (filtered) list.
+  useEffect(
+    () => hostedEvents.subscribe((e) => { if (e.type === 'notification') void load(true); }),
+    [load],
+  );
 
   // --- liveness wiring for the stale banner ----------------------------------
   useEffect(() => {

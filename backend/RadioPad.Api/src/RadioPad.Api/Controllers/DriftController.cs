@@ -40,17 +40,18 @@ public class DriftController : TenantedController
     }
 
     /// <summary>
-    /// Manually triggers a drift check across all tenants and returns
-    /// the aggregated results. MedicalDirector / ItAdmin only.
+    /// Manually triggers a drift check for the caller's tenant only and returns
+    /// its results. MedicalDirector / ItAdmin only. (The scheduled Hangfire job still
+    /// covers every tenant.)
     /// </summary>
     [HttpPost("run")]
     public async Task<IActionResult> Run(CancellationToken ct)
     {
-        var (_, user) = await ResolveContextAsync(_db, ct);
+        var (tenant, user) = await ResolveContextAsync(_db, ct);
         var deny = RequireRole(user, UserRole.MedicalDirector, UserRole.ItAdmin);
         if (deny is not null) return deny;
 
-        var results = await _driftService.RunAllTenantsAsync(ct);
+        var results = await _driftService.RunForTenantAsync(tenant.Id, ct);
         return Ok(results);
     }
 }

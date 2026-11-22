@@ -192,7 +192,7 @@ public class MobileReportingService : IReportingService
 
         try
         {
-            // Report-scoped only: the DTO carries the server storage path and (later) the transcript,
+            // Report-scoped only: the DTO carries the (later) transcript,
             // so it must never be broadcast to every connected client.
             await _hubContext.Clients.Group($"report-{reportId}")
                 .SendAsync("DictationUploaded", dto, cancellationToken: ct);
@@ -271,7 +271,7 @@ public class MobileReportingService : IReportingService
         return new DictationAudioDto(
             audio.Id,
             audio.ReportId,
-            audio.StoragePath,
+            "", // never expose the server file path; clients fetch audio via GET .../dictations/{id}/audio
             audio.DurationSeconds,
             audio.TranscriptionEngine,
             audio.Status,

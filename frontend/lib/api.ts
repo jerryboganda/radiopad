@@ -279,8 +279,8 @@ function activeUser(): string | null {
  */
 let cachedAuthToken: string | null = null;
 export function setActiveAuthToken(token: string | null): void {
+  if (token !== cachedAuthToken) meMemo = null; // a different sign-in must never see the previous /me
   cachedAuthToken = token;
-  meMemo = null; // a different sign-in must never see the previous /me
 }
 
 // One page load asks /api/tenant/me from the auth gate, the shell, the profile menu and the page itself — four
@@ -1705,7 +1705,9 @@ export const api = {
         body: JSON.stringify({ findings: next }),
       });
     },
-    validate: (id: string) => request<ValidationResult>(`/api/reports/${id}/validate`, { method: 'POST' }),
+    /** `persist: false` reads the findings without letting the server advance a clean Draft to Validated. */
+    validate: (id: string, opts: { persist?: boolean } = {}) =>
+      request<ValidationResult>(`/api/reports/${id}/validate${opts.persist === false ? '?persist=false' : ''}`, { method: 'POST' }),
     /**
      * AI section generation via the async job endpoints (submit + poll,
      * 2026-07-12). The old synchronous POST held the connection open for the
@@ -2891,8 +2893,10 @@ export const api = {
       const q = returnUrl ? `?returnUrl=${encodeURIComponent(returnUrl)}` : '';
       return request<{ url: string }>(`/api/auth/oidc/authorize-url${q}`).then((r) => r.url);
     },
-    logout: () =>
-      request<void>('/api/auth/logout/', { method: 'POST' }),
+    logout: () => {
+      meMemo = null; // cookie sessions keep a null token, so the token check in setActiveAuthToken cannot see a sign-out
+      return request<void>('/api/auth/logout/', { method: 'POST' });
+    },
     session: () =>
       request<{ tenant: { slug: string; displayName: string }; user: { email: string; role?: number } }>(
         '/api/auth/session',

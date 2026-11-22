@@ -59,6 +59,51 @@ public class ReportsFlowTests : IClassFixture<RadioPadAppFactory>
     }
 
     [Fact]
+    public async Task Validate_PersistFalse_ReturnsFindingsWithoutAdvancingStatus()
+    {
+        using var client = _factory.CreateTenantClient();
+        var create = await client.PostAsJsonAsync("/api/reports", new
+        {
+            modality = "CT",
+            bodyPart = "Chest",
+            indication = "Cough",
+            comparison = "None",
+            accessionNumber = "ACC-IT-PERSIST",
+        });
+        Assert.Equal(HttpStatusCode.Created, create.StatusCode);
+        var doc = await JsonDocument.ParseAsync(await create.Content.ReadAsStreamAsync());
+        var id = doc.RootElement.GetProperty("id").GetGuid();
+
+        var patch = await client.PatchAsJsonAsync($"/api/reports/{id}", new
+        {
+            indication = "Persistent cough.",
+            technique = "Non-contrast CT.",
+            comparison = "None.",
+            findings = "Lungs clear. No nodules.",
+            impression = "1. No acute pulmonary findings.",
+        });
+        Assert.True(patch.IsSuccessStatusCode, await patch.Content.ReadAsStringAsync());
+
+        // Read-only validation: findings come back, status must not move.
+        var peek = await client.PostAsync($"/api/reports/{id}/validate?persist=false", null);
+        Assert.Equal(HttpStatusCode.OK, peek.StatusCode);
+        Assert.Equal(ReportStatus.Draft, await StatusOfAsync(id));
+
+        // Default (persist omitted) keeps the existing side effect.
+        var real = await client.PostAsync($"/api/reports/{id}/validate", null);
+        Assert.Equal(HttpStatusCode.OK, real.StatusCode);
+        Assert.Equal(ReportStatus.Validated, await StatusOfAsync(id));
+    }
+
+    private async Task<ReportStatus> StatusOfAsync(Guid id)
+    {
+        using var scope = _factory.Services.CreateScope();
+        var db = scope.ServiceProvider.GetRequiredService<RadioPadDbContext>();
+        var report = await db.Reports.FindAsync(id);
+        return report!.Status;
+    }
+
+    [Fact]
     public async Task Tenant_Isolation_Other_Tenant_Cannot_See_Reports()
     {
         using var c1 = _factory.CreateTenantClient();

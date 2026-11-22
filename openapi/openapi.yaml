@@ -729,7 +729,10 @@ paths:
   /api/reports/{id}/validate:
     post:
       summary: Validate a report against its rulebook
-      parameters: [{ in: path, name: id, required: true, schema: { type: string, format: uuid } }]
+      description: With persist=false the findings are returned without advancing the report to Validated (pure read).
+      parameters:
+        - { in: path, name: id, required: true, schema: { type: string, format: uuid } }
+        - { in: query, name: persist, required: false, schema: { type: boolean, default: true } }
       responses:
         "200":
           description: Findings grouped by severity.

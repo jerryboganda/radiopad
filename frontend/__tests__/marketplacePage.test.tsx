@@ -13,6 +13,12 @@ const installMock = vi.fn();
 const submitForReviewMock = vi.fn();
 const approveSubmissionMock = vi.fn();
 const rejectSubmissionMock = vi.fn();
+// Numeric UserRole ordinal served by usePermissions(): 0 Radiologist, 2 MedicalDirector.
+const perms = vi.hoisted(() => ({ role: 2 as number | null }));
+
+vi.mock('@/lib/permissions', () => ({
+  usePermissions: () => ({ loading: false, signedOut: false, permissions: [], role: perms.role, roleName: null, can: () => false }),
+}));
 
 vi.mock('@/lib/api', () => ({
   api: {
@@ -59,6 +65,7 @@ describe('marketplace page', () => {
     submitForReviewMock.mockReset();
     listMock.mockResolvedValue(SAMPLE_LISTINGS);
     listSubmissionsMock.mockResolvedValue([]);
+    perms.role = 2;
   });
 
   it('Browse/My Submissions/Review tabs render', async () => {
@@ -69,6 +76,31 @@ describe('marketplace page', () => {
     expect(screen.getByText('My Submissions')).toBeInTheDocument();
     // Review tab shows pending count
     expect(screen.getByText('Review (0)')).toBeInTheDocument();
+  });
+
+  it('hides the Review tab from roles the backend would 403', async () => {
+    perms.role = 0;
+    render(<MarketplacePage />);
+    await waitFor(() => expect(screen.getByText('Chest CT Rulebook')).toBeInTheDocument());
+    expect(screen.getByText('My Submissions')).toBeInTheDocument();
+    expect(screen.queryByText(/^Review \(/)).toBeNull();
+  });
+
+  it('shows a skeleton while loading, then an empty state for no listings', async () => {
+    listMock.mockResolvedValue([]);
+    render(<MarketplacePage />);
+    expect(screen.getByText('Loading…')).toBeInTheDocument();
+    expect(await screen.findByText('No approved listings yet')).toBeInTheDocument();
+  });
+
+  it('shows an error with retry, not the empty state, when the listing fetch fails', async () => {
+    listMock.mockRejectedValueOnce(new Error('API 500'));
+    render(<MarketplacePage />);
+    expect(await screen.findByRole('alert')).toHaveTextContent('API 500');
+    expect(screen.queryByText('No approved listings yet')).toBeNull();
+
+    fireEvent.click(screen.getByRole('button', { name: /try again/i }));
+    expect(await screen.findByText('Chest CT Rulebook')).toBeInTheDocument();
   });
 
   it('listing cards show install count badges', async () => {

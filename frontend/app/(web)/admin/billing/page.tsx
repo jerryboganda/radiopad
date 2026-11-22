@@ -68,6 +68,7 @@ export default function BillingDashboardPage() {
   const [usageError, setUsageError] = useState<string | null>(null);
   const [invoices, setInvoices] = useState<BillingInvoice[]>([]);
   const [invoicesError, setInvoicesError] = useState<string | null>(null);
+  const [invoicesNotice, setInvoicesNotice] = useState<string | null>(null);
   const [credits, setCredits] = useState<BillingCredits | null>(null);
   const [creditsError, setCreditsError] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -96,8 +97,9 @@ export default function BillingDashboardPage() {
       if (isAuthError(e)) setUsageError('Insufficient permissions for usage analytics.');
       else setUsageError(e.message);
     });
-    api.billing.invoices().then(setInvoices).catch((e: Error & { status?: number }) => {
-      if (e.status === 503) setInvoicesError('Stripe is not configured for this tenant.');
+    api.billing.invoices().then(setInvoices).catch((e: Error & { status?: number; body?: { error?: string } }) => {
+      // 503 = Stripe not configured for this tenant: an expected state, not a failure.
+      if (e.status === 503) setInvoicesNotice(e.body?.error ?? 'Invoices are not available for this workspace yet.');
       else if (isAuthError(e)) setInvoicesError('Invoices require the Billing Admin, IT Admin, or Medical Director role.');
       else setInvoicesError(e.message);
     });
@@ -421,7 +423,8 @@ export default function BillingDashboardPage() {
       <section className="rp-panel rp-anim-fade-in-up">
         <div className="rp-panel-title">Invoices</div>
         {invoicesError && <Banner tone="warn">{invoicesError}</Banner>}
-        {!invoicesError && invoices.length === 0 && (
+        {invoicesNotice && <EmptyState title="Invoices aren't available yet" description={invoicesNotice} />}
+        {!invoicesError && !invoicesNotice && invoices.length === 0 && (
           <EmptyState
             title="No invoices issued yet"
             description="Invoices will appear here once your first billing period closes."

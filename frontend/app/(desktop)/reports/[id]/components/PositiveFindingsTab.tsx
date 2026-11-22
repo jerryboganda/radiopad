@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import type { DictationAudioDto, TranscriptionEngineDto } from '@/lib/api/reportingClient';
 import { getTranscriptionEngines } from '@/lib/api/reportingClient';
 import DictationAudioCard from './DictationAudioCard';
@@ -29,20 +29,19 @@ export default function PositiveFindingsTab({
   const [items, setItems] = useState<DictationAudioDto[]>(dictations);
   const [toastNotice, setToastNotice] = useState<string | null>(null);
   const [engines, setEngines] = useState<TranscriptionEngineDto[]>([]);
+  const [enginesError, setEnginesError] = useState<string | null>(null);
+
+  // Server list only (no invented fallback); a failure surfaces on each card with a retry.
+  const loadEngines = useCallback(() => {
+    setEnginesError(null);
+    getTranscriptionEngines()
+      .then(setEngines)
+      .catch((e: Error) => setEnginesError(e.message || 'Request failed'));
+  }, []);
 
   useEffect(() => {
-    let cancelled = false;
-    getTranscriptionEngines()
-      .then((list) => {
-        if (!cancelled) setEngines(list);
-      })
-      .catch(() => {
-        // Dropdown falls back to the dictation's own engine in DictationAudioCard.
-      });
-    return () => {
-      cancelled = true;
-    };
-  }, []);
+    loadEngines();
+  }, [loadEngines]);
 
   useEffect(() => {
     setItems(dictations);
@@ -163,6 +162,8 @@ export default function PositiveFindingsTab({
               onAppendToFindings={onAppendToFindings}
               onRetranscribe={onRetranscribe}
               engines={engines}
+              enginesError={enginesError}
+              onRetryEngines={loadEngines}
             />
           ))}
         </div>

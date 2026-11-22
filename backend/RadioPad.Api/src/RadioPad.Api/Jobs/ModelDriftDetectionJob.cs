@@ -78,7 +78,17 @@ public sealed class ModelDriftDetectionJob
     /// Public entry point for manual trigger via API. Runs drift checks
     /// across all tenants immediately and returns aggregated results.
     /// </summary>
-    public async Task<IReadOnlyList<DriftCheckResult>> RunAllTenantsAsync(CancellationToken ct)
+    public Task<IReadOnlyList<DriftCheckResult>> RunAllTenantsAsync(CancellationToken ct)
+        => RunAsync(null, ct);
+
+    /// <summary>
+    /// Manual-trigger entry point for the admin endpoint: same run, restricted to one
+    /// tenant so a tenant admin never sees (or advances baselines for) other tenants.
+    /// </summary>
+    public Task<IReadOnlyList<DriftCheckResult>> RunForTenantAsync(Guid tenantId, CancellationToken ct)
+        => RunAsync(tenantId, ct);
+
+    private async Task<IReadOnlyList<DriftCheckResult>> RunAsync(Guid? onlyTenantId, CancellationToken ct)
     {
         var allResults = new List<DriftCheckResult>();
         using var scope = _scopeFactory.CreateScope();
@@ -88,12 +98,15 @@ public sealed class ModelDriftDetectionJob
 
         var threshold = ResolveThreshold();
 
-        // Find tenants that have at least one approved validation pack.
-        var tenantIds = await db.ValidationPacks
-            .Where(p => p.Status == ValidationPackStatus.Approved)
-            .Select(p => p.TenantId)
-            .Distinct()
-            .ToListAsync(ct);
+        // Find tenants that have at least one approved validation pack (or just the caller's
+        // tenant; RunTenantAsync is a no-op when that tenant has no approved pack).
+        var tenantIds = onlyTenantId is { } only
+            ? new List<Guid> { only }
+            : await db.ValidationPacks
+                .Where(p => p.Status == ValidationPackStatus.Approved)
+                .Select(p => p.TenantId)
+                .Distinct()
+                .ToListAsync(ct);
 
         foreach (var tenantId in tenantIds)
         {

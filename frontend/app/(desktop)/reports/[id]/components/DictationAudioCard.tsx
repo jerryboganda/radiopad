@@ -10,9 +10,12 @@ export interface DictationAudioCardProps {
   onAppendToFindings: (text: string) => void;
   onRetranscribe?: (dictationId: string, engine: string) => void;
   /** Transcription engines available for the dropdown (fetched once by the parent tab
-   *  via getTranscriptionEngines() and shared across every card). Falls back to just the
-   *  dictation's own engine if the list hasn't loaded yet. */
+   *  via getTranscriptionEngines() and shared across every card). Server list only — while
+   *  it is empty the card shows a loading note, or `enginesError` with a retry. */
   engines?: TranscriptionEngineDto[];
+  /** Set when the engine-list request failed. */
+  enginesError?: string | null;
+  onRetryEngines?: () => void;
 }
 
 const SPEED_OPTIONS = [1.0, 1.25, 1.5, 2.0];
@@ -21,16 +24,16 @@ export default function DictationAudioCard({
   dictation,
   onAppendToFindings,
   onRetranscribe,
-  engines,
+  engines = [],
+  enginesError = null,
+  onRetryEngines,
 }: DictationAudioCardProps) {
   const [isPlaying, setIsPlaying] = useState(false);
   const [currentTime, setCurrentTime] = useState(0);
   const [duration, setDuration] = useState(dictation.durationSeconds || 0);
   const [speed, setSpeed] = useState(1.0);
   const [editedText, setEditedText] = useState(dictation.transcribedText || '');
-  const [selectedEngine, setSelectedEngine] = useState<string>(
-    dictation.transcriptionEngine || 'medASR-6gram'
-  );
+  const [pickedEngine, setPickedEngine] = useState<string>(dictation.transcriptionEngine || '');
   const audioRef = useRef<HTMLAudioElement | null>(null);
 
   useEffect(() => {
@@ -100,13 +103,10 @@ export default function DictationAudioCard({
 
   const isMedAsr = (dictation.transcriptionEngine || '').toLowerCase().includes('medasr');
   const engineBadgeLabel = isMedAsr ? 'medASR (4.4% WER)' : dictation.transcriptionEngine || 'UBAG Gemini';
-  const engineOptions: TranscriptionEngineDto[] =
-    engines && engines.length > 0
-      ? engines
-      : [
-          { engineId: 'medASR-6gram', displayName: 'medASR (Local 4.4% WER)', isLocal: true, isAvailable: true, isDefault: true },
-          { engineId: 'UBAG Gemini', displayName: 'UBAG Gemini', isLocal: false, isAvailable: true, isDefault: false },
-        ];
+  // The take's own engine when the server still lists it, else the server's default.
+  const selectedEngine = engines.some((e) => e.engineId === pickedEngine)
+    ? pickedEngine
+    : (engines.find((e) => e.isDefault) ?? engines[0])?.engineId ?? '';
 
   return (
     <div className="rp-panel rp-dictation-card" data-testid="dictation-audio-card">
@@ -211,23 +211,39 @@ export default function DictationAudioCard({
       {/* Action Buttons */}
       <div className="rp-dictation-actions">
         <div className="rp-dictation-actions-left">
-          <select
-            value={selectedEngine}
-            onChange={(e) => setSelectedEngine(e.target.value)}
-            aria-label="Select transcription engine"
-            data-testid="engine-select"
-          >
-            {engineOptions.map((eng) => (
-              <option key={eng.engineId} value={eng.engineId} disabled={!eng.isAvailable}>
-                {eng.displayName}
-                {eng.isLocal ? ' (Local)' : ' (Cloud)'}
-              </option>
-            ))}
-          </select>
+          {engines.length > 0 ? (
+            <select
+              value={selectedEngine}
+              onChange={(e) => setPickedEngine(e.target.value)}
+              aria-label="Select transcription engine"
+              data-testid="engine-select"
+            >
+              {engines.map((eng) => (
+                <option key={eng.engineId} value={eng.engineId} disabled={!eng.isAvailable}>
+                  {eng.displayName}
+                  {eng.isLocal ? ' (Local)' : ' (Cloud)'}
+                </option>
+              ))}
+            </select>
+          ) : enginesError ? (
+            <span className="rp-page-sub" role="alert" data-testid="engines-load-error">
+              Couldn&apos;t load transcription engines.{' '}
+              {onRetryEngines && (
+                <button type="button" className="ghost" onClick={onRetryEngines}>
+                  Retry
+                </button>
+              )}
+            </span>
+          ) : (
+            <span className="rp-page-sub" role="status">
+              Loading engines…
+            </span>
+          )}
           <button
             type="button"
             className="ghost"
             data-testid="retranscribe-btn"
+            disabled={!selectedEngine}
             onClick={() => onRetranscribe?.(dictation.id, selectedEngine)}
           >
             <RefreshCw size={12} />

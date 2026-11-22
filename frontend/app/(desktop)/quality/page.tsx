@@ -100,7 +100,7 @@ export default function QualityHubPage() {
         const rows: OutcomeRow[] = [];
         for (const r of recent) {
           try {
-            const result = await api.reports.validate(r.id);
+            const result = await api.reports.validate(r.id, { persist: false });
             rows.push({ report: r, result });
           } catch (e) {
             rows.push({ report: r, result: null, err: (e as Error).message });

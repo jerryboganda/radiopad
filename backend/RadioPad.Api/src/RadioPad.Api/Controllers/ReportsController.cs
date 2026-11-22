@@ -614,8 +614,13 @@ public class ReportsController : TenantedController
         return Ok(report);
     }
 
+    /// <summary>
+    /// Validates the report against its rulebook. By default a report with no blocking
+    /// findings is advanced to <see cref="ReportStatus.Validated"/>; pass <c>?persist=false</c>
+    /// for a pure read of the findings (no status change, nothing saved).
+    /// </summary>
     [HttpPost("{id:guid}/validate")]
-    public async Task<IActionResult> Validate(Guid id, CancellationToken ct)
+    public async Task<IActionResult> Validate(Guid id, CancellationToken ct, [FromQuery] bool persist = true)
     {
         var (tenant, user) = await ResolveContextAsync(_db, ct);
         var deny = RequirePermission(user, RbacPermission.ReportsValidate);
@@ -634,7 +639,7 @@ public class ReportsController : TenantedController
         // (RequireZeroBlockers == false), advance Status to Validated even
         // when blocker findings remain so /export/* can proceed.
         var requireZero = settings?.RequireZeroBlockers ?? true;
-        if (!result.BlockerPresent || !requireZero)
+        if (persist && (!result.BlockerPresent || !requireZero))
         {
             if (report.Status < ReportStatus.Validated)
             {

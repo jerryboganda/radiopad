@@ -78,6 +78,7 @@ public class MultiSignTests : IClassFixture<RadioPadAppFactory>
         var add = await client.PostAsJsonAsync($"/api/reports/{id}/addendum", new
         {
             body = "Late finding: small left pleural effusion.",
+            note = "Called referrer at 14:05.",
         });
         Assert.Equal(HttpStatusCode.OK, add.StatusCode);
 
@@ -87,6 +88,10 @@ public class MultiSignTests : IClassFixture<RadioPadAppFactory>
             .Where(v => v.ReportId == id)
             .ToListAsync();
         Assert.Contains(versions, v => v.IsAddendum);
+        // The optional note is persisted with the addendum (and so returned by GET .../versions).
+        var addendum = versions.Single(v => v.IsAddendum);
+        using var snapshot = JsonDocument.Parse(addendum.SnapshotJson);
+        Assert.Equal("Called referrer at 14:05.", snapshot.RootElement.GetProperty("note").GetString());
         var audited = await db.AuditEvents.AnyAsync(a =>
             a.ReportId == id && a.Action == AuditAction.ReportAddendumAppended);
         Assert.True(audited);

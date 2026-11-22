@@ -266,7 +266,7 @@ public class TranscriptionOrchestrator
         return new DictationAudioDto(
             audio.Id,
             audio.ReportId,
-            audio.StoragePath,
+            "", // never expose the server file path; clients fetch audio via GET .../dictations/{id}/audio
             audio.DurationSeconds,
             audio.TranscriptionEngine,
             audio.Status,

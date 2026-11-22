@@ -62,6 +62,11 @@ export function canPromoteRulebook(role: number | undefined | null): boolean {
   return role === UserRole.MedicalDirector;
 }
 
+/** Marketplace submission review (approve / reject) — mirrors backend MarketplaceController RequireRole. */
+export function canReviewMarketplace(role: number | undefined | null): boolean {
+  return role === UserRole.MedicalDirector || role === UserRole.ItAdmin;
+}
+
 export const ROLE_LABELS: Record<number, string> = {
   0: 'Radiologist',
   1: 'Reporting Admin',

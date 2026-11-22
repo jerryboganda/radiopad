@@ -13,6 +13,7 @@ import { usePermissions, type PermissionKey } from '@/lib/permissions';
 import Container from '@/components/shell/Container';
 import PageHeader from '@/components/shell/PageHeader';
 import EmptyState from '@/components/ui/EmptyState';
+import ErrorState from '@/components/ui/ErrorState';
 import Banner from '@/components/ui/Banner';
 import { TableSkeleton } from '@/components/ui/Skeleton';
 import { confirmDialog } from '@/lib/confirmDialog';
@@ -38,6 +39,8 @@ export default function CatalogManager({ title, subtitle, itemNoun, client, mana
 
   const [items, setItems] = useState<CatalogItem[] | null>(null);
   const [error, setError] = useState<string | null>(null);
+  // List-fetch failure — rendered as ErrorState (never as an empty list); `error` stays for form/mutation messages.
+  const [loadError, setLoadError] = useState<string | null>(null);
   const [code, setCode] = useState('');
   const [name, setName] = useState('');
   const [editingId, setEditingId] = useState<string | null>(null);
@@ -47,7 +50,8 @@ export default function CatalogManager({ title, subtitle, itemNoun, client, mana
 
   const reload = useCallback(() => {
     setError(null);
-    client.list().then(setItems).catch((e: Error) => { setItems([]); setError(e.message); });
+    setLoadError(null);
+    client.list().then(setItems).catch((e: Error) => setLoadError(e.message));
   }, [client]);
 
   useEffect(() => { reload(); }, [reload]);
@@ -145,9 +149,11 @@ export default function CatalogManager({ title, subtitle, itemNoun, client, mana
         </div>
       )}
 
-      <div className="rp-panel" aria-live="polite" aria-busy={items === null}>
+      <div className="rp-panel" aria-live="polite" aria-busy={items === null && !loadError}>
         <div className="rp-panel-title">{title}</div>
-        {items === null ? (
+        {loadError ? (
+          <ErrorState message={loadError} onRetry={reload} />
+        ) : items === null ? (
           <TableSkeleton rows={5} cols={canManage ? 3 : 2} />
         ) : items.length === 0 ? (
           <EmptyState

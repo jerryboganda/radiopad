@@ -46,7 +46,7 @@ services:
       RADIOPAD_TRUSTED_PROXY_CIDRS: ${RADIOPAD_TRUSTED_PROXY_CIDRS:-}
       # SQLite database — change to a Postgres connection string for production scale
       # Database: Hostinger MariaDB (remote, TLS VerifyFull) since 2026-11-23. The connection string with the password lives in
-      # .secrets.env as ConnectionStrings__RadioPad (it sets ConnectionIdleTimeout=15 because Hostinger closes idle connections after 20 s; do NOT set ConnectionReset=false).
+      # .secrets.env as ConnectionStrings__RadioPad (it sets ConnectionReset=false + ConnectionIdleTimeout=10: Hostinger closes idle connections after 20 s, and DbKeepAliveService keeps 4 warm; the default reset costs a round trip per query).
       # Rollback = restore the SQLite line `ConnectionStrings__RadioPad: Data Source=/data/radiopad.db` and drop the two lines below;
       # see docs/07-devops/mysql-hostinger.md.
       RADIOPAD_DB_PROVIDER: mysql

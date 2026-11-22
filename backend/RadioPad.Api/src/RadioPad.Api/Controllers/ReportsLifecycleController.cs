@@ -214,7 +214,7 @@ public class ReportsLifecycleController : TenantedController
         });
     }
 
-    public record AddendumDto(string Body);
+    public record AddendumDto(string Body, string? Note = null);
 
     /// <summary>Append an addendum body to a previously-signed report. Creates
     /// a new <see cref="ReportVersion"/> with <c>IsAddendum=true</c>; the
@@ -250,7 +250,13 @@ public class ReportsLifecycleController : TenantedController
             Action = "addendum",
             IsAddendum = true,
             RulebookId = report.RulebookId,
-            SnapshotJson = JsonSerializer.Serialize(new { addendum = dto.Body, appendedAt = DateTimeOffset.UtcNow }),
+            // The optional note rides in SnapshotJson (no schema change); GET .../versions returns it.
+            SnapshotJson = JsonSerializer.Serialize(new
+            {
+                addendum = dto.Body,
+                note = string.IsNullOrWhiteSpace(dto.Note) ? null : dto.Note.Trim(),
+                appendedAt = DateTimeOffset.UtcNow,
+            }),
         };
         _db.ReportVersions.Add(version);
         await _db.SaveChangesAsync(ct);

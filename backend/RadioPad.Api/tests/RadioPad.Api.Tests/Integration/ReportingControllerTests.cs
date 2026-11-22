@@ -48,6 +48,18 @@ public class ReportingControllerTests : IClassFixture<RadioPadAppFactory>
         return doc.RootElement.Clone();
     }
 
+    /// <summary>The on-disk path lives only on the entity now (the DTO returns ""), so tests that
+    /// need the file read it straight from the DB.</summary>
+    private string? StoragePathOf(Guid dictationId)
+    {
+        using var scope = _factory.Services.CreateScope();
+        var db = scope.ServiceProvider.GetRequiredService<RadioPadDbContext>();
+        return db.DictationAudios.AsNoTracking()
+            .Where(d => d.Id == dictationId)
+            .Select(d => d.StoragePath)
+            .FirstOrDefault();
+    }
+
     [Fact]
     public async Task CreateReport_ReturnsCreatedAtAction_WithReportDto()
     {
@@ -149,7 +161,9 @@ public class ReportingControllerTests : IClassFixture<RadioPadAppFactory>
         Assert.Equal(15.5, dictation.GetProperty("durationSeconds").GetDouble());
         Assert.Equal("medASR-6gram", dictation.GetProperty("transcriptionEngine").GetString());
 
-        var storagePath = dictation.GetProperty("storagePath").GetString();
+        // The server file path must never reach the client; resolve the real one from the DB.
+        Assert.Equal("", dictation.GetProperty("storagePath").GetString());
+        var storagePath = StoragePathOf(dictation.GetProperty("id").GetGuid());
         Assert.True(File.Exists(storagePath));
         if (storagePath is not null && File.Exists(storagePath)) File.Delete(storagePath);
     }
@@ -227,7 +241,7 @@ public class ReportingControllerTests : IClassFixture<RadioPadAppFactory>
             $"/api/v1/reporting/reports/{idB}/dictations/{dictationId}/transcribe", new { engine = (string?)null });
         Assert.Equal(HttpStatusCode.NotFound, resp.StatusCode);
 
-        var storagePath = uploadDoc.RootElement.GetProperty("storagePath").GetString();
+        var storagePath = StoragePathOf(dictationId);
         if (storagePath is not null && File.Exists(storagePath)) File.Delete(storagePath);
     }
 
@@ -247,7 +261,7 @@ public class ReportingControllerTests : IClassFixture<RadioPadAppFactory>
         var upload = await client.PostAsync($"/api/v1/reporting/reports/{id}/dictations", form);
         using var uploadDoc = await JsonDocument.ParseAsync(await upload.Content.ReadAsStreamAsync());
         var dictationId = uploadDoc.RootElement.GetProperty("id").GetGuid();
-        var storagePath = uploadDoc.RootElement.GetProperty("storagePath").GetString();
+        var storagePath = StoragePathOf(dictationId);
 
         var resp = await client.GetAsync($"/api/v1/reporting/reports/{id}/dictations/{dictationId}/audio");
         Assert.Equal(HttpStatusCode.OK, resp.StatusCode);

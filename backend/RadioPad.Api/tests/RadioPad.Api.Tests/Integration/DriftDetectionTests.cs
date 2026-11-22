@@ -201,6 +201,36 @@ prompt_blocks:
     }
 
     [Fact]
+    public async Task AdminEndpoint_Run_IsScopedToCallerTenant()
+    {
+        using var scope = _factory.Services.CreateScope();
+        var db = scope.ServiceProvider.GetRequiredService<RadioPadDbContext>();
+        var tenantId = _factory.SeedTenant.Id;
+
+        await EnsureRulebookAsync(db, tenantId);
+        await EnsureSandboxProviderAsync(db, tenantId);
+        await EnsureApprovedPackAsync(db, tenantId, _factory.SeedAdmin.Id);
+        var ownProviderId = (await db.Providers.FirstAsync(
+            p => p.TenantId == tenantId && p.Compliance == ProviderComplianceClass.Sandbox)).Id.ToString();
+
+        // A second tenant with its own approved pack + sandbox provider.
+        var other = new Tenant { Slug = $"drift-other-{Guid.NewGuid():N}", DisplayName = "Drift other" };
+        db.Tenants.Add(other);
+        await db.SaveChangesAsync();
+        await EnsureRulebookAsync(db, other.Id);
+        await EnsureSandboxProviderAsync(db, other.Id);
+        await EnsureApprovedPackAsync(db, other.Id, _factory.SeedAdmin.Id);
+        var otherProviderId = (await db.Providers.FirstAsync(p => p.TenantId == other.Id)).Id.ToString();
+
+        var resp = await _factory.CreateAdminClient().PostAsync("/api/admin/drift/run", null);
+        Assert.Equal(HttpStatusCode.OK, resp.StatusCode);
+        var body = await resp.Content.ReadAsStringAsync();
+
+        Assert.Contains(ownProviderId, body);
+        Assert.DoesNotContain(otherProviderId, body);
+    }
+
+    [Fact]
     public async Task NonAdmin_Gets403_ForDriftEndpoints()
     {
         var client = _factory.CreateTenantClient(); // Radiologist

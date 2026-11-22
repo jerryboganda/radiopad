@@ -43,7 +43,7 @@ export default function ValidationCenterPage() {
       const out: Row[] = [];
       for (const r of drafts) {
         try {
-          const result = await api.reports.validate(r.id);
+          const result = await api.reports.validate(r.id, { persist: false });
           out.push({ report: r, result });
         } catch (e) {
           out.push({ report: r, result: null, err: (e as Error).message });

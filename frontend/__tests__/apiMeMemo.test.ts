@@ -41,6 +41,19 @@ describe('api.me memo', () => {
     expect(fetchFn).toHaveBeenCalledTimes(2);
   });
 
+  it('keeps the answer when the same token is applied again, and forgets it on sign-out', async () => {
+    const fetchFn = stubFetch(200);
+    const { api, setActiveAuthToken } = await import('@/lib/api');
+    setActiveAuthToken('t1');
+    await api.me();
+    setActiveAuthToken('t1'); // the shell re-applies the stored token on mount
+    await api.me();
+    expect(fetchFn).toHaveBeenCalledTimes(1);
+    await api.auth.logout();
+    await api.me();
+    expect(fetchFn).toHaveBeenCalledTimes(3); // me, logout, me
+  });
+
   it('forgets the answer when the sign-in changes', async () => {
     const fetchFn = stubFetch(200);
     const { api, setActiveAuthToken } = await import('@/lib/api');

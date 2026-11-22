@@ -19,6 +19,8 @@ public record CreateReportRequestDto(
 public record DictationAudioDto(
     Guid Id,
     Guid ReportId,
+    /// <summary>Always "" on the wire (the server file path is not exposed); fetch audio via
+    /// <c>GET .../dictations/{id}/audio</c>. Kept so the DTO shape stays stable for clients.</summary>
     string StoragePath,
     double DurationSeconds,
     string TranscriptionEngine,

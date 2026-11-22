@@ -1,10 +1,14 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { api, type MarketplaceSubmission } from '@/lib/api';
+import { usePermissions } from '@/lib/permissions';
+import { canReviewMarketplace } from '@/lib/roles';
 import Container from '@/components/shell/Container';
 import PageHeader from '@/components/shell/PageHeader';
 import EmptyState from '@/components/ui/EmptyState';
+import ErrorState from '@/components/ui/ErrorState';
+import Skeleton from '@/components/ui/Skeleton';
 import Banner from '@/components/ui/Banner';
 
 /**
@@ -63,7 +67,13 @@ export default function MarketplacePage() {
   const [tab, setTab] = useState<Tab>('browse');
   const [items, setItems] = useState<Listing[]>([]);
   const [submissions, setSubmissions] = useState<MarketplaceSubmission[]>([]);
+  const { role } = usePermissions();
+  const canReview = canReviewMarketplace(role);
+  // `error` is the action notice banner; `loadError` is a failed tab fetch (ErrorState + retry).
   const [error, setError] = useState<string | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState<string | null>(null);
+  const loadSeq = useRef(0);
   const [busy, setBusy] = useState<string | null>(null);
   const [rejectNotes, setRejectNotes] = useState<Record<string, string>>({});
 
@@ -74,13 +84,19 @@ export default function MarketplacePage() {
   const [submitDesc, setSubmitDesc] = useState('');
   const [showSubmitForm, setShowSubmitForm] = useState(false);
 
-  useEffect(() => {
-    if (tab === 'browse') {
-      api.marketplace.list().then(setItems).catch((e) => setError((e as Error).message));
-    } else {
-      api.marketplace.listSubmissions().then(setSubmissions).catch((e) => setError((e as Error).message));
-    }
+  const load = useCallback(() => {
+    const seq = ++loadSeq.current; // a slower response for a tab we already left must not clear the spinner
+    setLoading(true);
+    setLoadError(null);
+    (tab === 'browse'
+      ? api.marketplace.list().then(setItems)
+      : api.marketplace.listSubmissions().then(setSubmissions)
+    )
+      .catch((e) => { if (seq === loadSeq.current) setLoadError((e as Error).message); })
+      .finally(() => { if (seq === loadSeq.current) setLoading(false); });
   }, [tab]);
+
+  useEffect(() => { load(); }, [load]);
 
   async function buy(id: string) {
     try {
@@ -158,6 +174,7 @@ export default function MarketplacePage() {
     }
   }
 
+  const ready = !loading && !loadError;
   const pendingSubmissions = submissions.filter((s) => s.status === 'pending_review');
   const ownSubmissions = submissions;
 
@@ -198,15 +215,17 @@ export default function MarketplacePage() {
           >
             My Submissions
           </button>
-          <button
-            type="button"
-            role="tab"
-            aria-selected={tab === 'review'}
-            className="tab-button"
-            onClick={() => setTab('review')}
-          >
-            Review ({pendingSubmissions.length})
-          </button>
+          {canReview ? (
+            <button
+              type="button"
+              role="tab"
+              aria-selected={tab === 'review'}
+              className="tab-button"
+              onClick={() => setTab('review')}
+            >
+              Review ({pendingSubmissions.length})
+            </button>
+          ) : null}
         </div>
 
         {error ? (
@@ -268,9 +287,19 @@ export default function MarketplacePage() {
           </div>
         ) : null}
 
+        {loadError ? <ErrorState message={loadError} onRetry={load} /> : null}
+        {loading && !loadError ? (
+          <div className="rp-grid-3" role="status" aria-busy="true">
+            <span className="rp-sr-only">Loading…</span>
+            {[0, 1, 2].map((i) => (
+              <Skeleton key={i} variant="block" />
+            ))}
+          </div>
+        ) : null}
+
         {/* Browse tab */}
-        {tab === 'browse' ? (
-          items.length === 0 && !error ? (
+        {ready && tab === 'browse' ? (
+          items.length === 0 ? (
             <EmptyState
               title="No approved listings yet"
               description="When clinics publish rulebooks, templates, or prompt packs, they'll appear here for you to install."
@@ -320,7 +349,7 @@ export default function MarketplacePage() {
         ) : null}
 
         {/* My Submissions tab */}
-        {tab === 'submissions' ? (
+        {ready && tab === 'submissions' ? (
           ownSubmissions.length === 0 ? (
             <EmptyState
               title="No submissions yet"
@@ -356,7 +385,7 @@ export default function MarketplacePage() {
         ) : null}
 
         {/* Review tab (Admin/MedicalDirector) */}
-        {tab === 'review' ? (
+        {ready && canReview && tab === 'review' ? (
           pendingSubmissions.length === 0 ? (
             <EmptyState
               title="Nothing to review"

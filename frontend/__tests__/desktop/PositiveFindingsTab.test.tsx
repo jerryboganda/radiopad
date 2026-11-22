@@ -3,7 +3,7 @@ import { render, screen, fireEvent, act } from '@testing-library/react';
 import React from 'react';
 import PositiveFindingsTab from '@/app/(desktop)/reports/[id]/components/PositiveFindingsTab';
 import DictationAudioCard from '@/app/(desktop)/reports/[id]/components/DictationAudioCard';
-import type { DictationAudioDto } from '@/lib/api/reportingClient';
+import type { DictationAudioDto, TranscriptionEngineDto } from '@/lib/api/reportingClient';
 
 beforeEach(() => {
   window.HTMLMediaElement.prototype.play = vi.fn().mockImplementation(() => Promise.resolve());
@@ -20,6 +20,12 @@ const sampleDictation1: DictationAudioDto = {
   transcribedText: 'Acute right lower lobe pneumonia with moderate pleural effusion.',
   uploadedAt: new Date().toISOString(),
 };
+
+// Engine list as served by GET /api/v1/reporting/reports/transcription-engines.
+const serverEngines: TranscriptionEngineDto[] = [
+  { engineId: 'medASR-6gram', displayName: 'medASR', isLocal: true, isAvailable: true, isDefault: true },
+  { engineId: 'UBAG Gemini', displayName: 'UBAG Gemini', isLocal: false, isAvailable: true, isDefault: false },
+];
 
 const sampleDictation2: DictationAudioDto = {
   id: 'dictation-2',
@@ -90,10 +96,12 @@ describe('DictationAudioCard component', () => {
         dictation={sampleDictation1}
         onAppendToFindings={onAppend}
         onRetranscribe={onRetranscribe}
+        engines={serverEngines}
       />
     );
 
     const engineSelect = screen.getByTestId('engine-select') as HTMLSelectElement;
+    expect(engineSelect.value).toBe('medASR-6gram');
     fireEvent.change(engineSelect, { target: { value: 'UBAG Gemini' } });
 
     const retranscribeBtn = screen.getByTestId('retranscribe-btn');
@@ -101,6 +109,25 @@ describe('DictationAudioCard component', () => {
 
     expect(onRetranscribe).toHaveBeenCalledTimes(1);
     expect(onRetranscribe).toHaveBeenCalledWith('dictation-1', 'UBAG Gemini');
+  });
+
+  it('never invents engines: shows an inline error with a retry when the engine list failed', () => {
+    const onRetryEngines = vi.fn();
+    render(
+      <DictationAudioCard
+        dictation={sampleDictation1}
+        onAppendToFindings={vi.fn()}
+        enginesError="API 500"
+        onRetryEngines={onRetryEngines}
+      />
+    );
+
+    expect(screen.queryByTestId('engine-select')).toBeNull();
+    expect(screen.getByTestId('engines-load-error')).toBeDefined();
+    expect((screen.getByTestId('retranscribe-btn') as HTMLButtonElement).disabled).toBe(true);
+
+    fireEvent.click(screen.getByRole('button', { name: 'Retry' }));
+    expect(onRetryEngines).toHaveBeenCalledTimes(1);
   });
 });
 
