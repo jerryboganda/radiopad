@@ -38,7 +38,10 @@ jobs:
       RADIOPAD_BIND: 'http://127.0.0.1:7457'
       RADIOPAD_AI_PROVIDER: 'Mock'
       RADIOPAD_DB: 'Data Source=layout-audit.db'
-      ASPNETCORE_ENVIRONMENT: 'Testing'
+      # Development, not Testing: Testing skips EF migrations and the dev seed (it is meant
+      # for the unit suite, which builds its own schema), leaving an empty database on which
+      # every data call 500s with "no such table".
+      ASPNETCORE_ENVIRONMENT: 'Development'
       RADIOPAD_DEV_SEED: '1'
       # Deliberately NOT setting RADIOPAD_REQUIRE_AUTH: with it unset the API
       # answers /api/tenant/me, so AuthGate lets the audit reach the real pages
