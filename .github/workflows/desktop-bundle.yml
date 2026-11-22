@@ -191,6 +191,29 @@ jobs:
             Stop-Process -Id $p.Id -Force -ErrorAction SilentlyContinue
           }
 
+      # Only when the smoke test failed: run the bundled sidecar directly with the shell's environment and print
+      # what it says. Since v0.1.161 the packaged app never brought the sidecar up and the log showed nothing.
+      - name: Diagnose sidecar (failure only)
+        if: failure()
+        shell: pwsh
+        run: |
+          Get-Process radiopad* -ErrorAction SilentlyContinue | Stop-Process -Force -ErrorAction SilentlyContinue
+          $exe = (Get-ChildItem "desktop/src-tauri/binaries" -Filter "radiopad-api-*.exe" | Select-Object -First 1).FullName
+          Write-Host "sidecar exe: $exe ($((Get-Item $exe).Length) bytes)"
+          $env:RADIOPAD_BIND = "http://127.0.0.1:7457"
+          $env:ASPNETCORE_ENVIRONMENT = "Development"
+          $env:RADIOPAD_LOCAL_STT_ENABLED = "1"
+          $env:RADIOPAD_LOCAL_FORMATTER_ENABLED = "1"
+          $env:RADIOPAD_DB = "Data Source=$env:RUNNER_TEMP\diag.db"
+          $out = "$env:RUNNER_TEMP\diag_out.txt"; $err = "$env:RUNNER_TEMP\diag_err.txt"
+          $p = Start-Process -FilePath $exe -RedirectStandardOutput $out -RedirectStandardError $err -PassThru
+          Start-Sleep -Seconds 40
+          Write-Host "exited: $($p.HasExited)  exitcode: $(if ($p.HasExited) { $p.ExitCode } else { 'n/a' })"
+          try { $r = Invoke-WebRequest -Uri 'http://127.0.0.1:7457/api/health/ready' -UseBasicParsing -TimeoutSec 5; Write-Host "ready: $($r.StatusCode)" } catch { Write-Host "ready: FAILED $($_.Exception.Message)" }
+          Write-Host "---- stdout (last 60 lines)"; Get-Content $out -Tail 60 -ErrorAction SilentlyContinue
+          Write-Host "---- stderr (last 60 lines)"; Get-Content $err -Tail 60 -ErrorAction SilentlyContinue
+          Stop-Process -Id $p.Id -Force -ErrorAction SilentlyContinue
+
       - name: Upload artefacts
         uses: actions/upload-artifact@v4
         with:
