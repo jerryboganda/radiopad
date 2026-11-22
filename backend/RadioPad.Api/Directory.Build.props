@@ -4,7 +4,11 @@
     <Nullable>enable</Nullable>
     <ImplicitUsings>enable</ImplicitUsings>
     <TreatWarningsAsErrors>false</TreatWarningsAsErrors>
-    <LangVersion>latest</LangVersion>
+    <!-- Pinned to C# 12 (what the net8.0 SDK in deploy/Dockerfile.api compiles). "latest" followed
+         whatever SDK a runner had: with the .NET 10 SDK, C# 14 binds array.Contains(x) in EF
+         queries to the ReadOnlySpan overload, which EF Core 8 cannot evaluate, and GET /api/rulebooks
+         500s at run time (found by e2e-reporting-flow). -->
+    <LangVersion>12</LangVersion>
     <AnalysisLevel>latest</AnalysisLevel>
     <RadioPadVersion>0.1.0</RadioPadVersion>
   </PropertyGroup>
