@@ -66,10 +66,7 @@ public sealed class EventsController : TenantedController
         {
             // Send the response headers NOW. Nothing is written until the first event or the 15 s keep-alive,
             // so fetch()/EventSource used to sit in "connecting" for 15 s (and a proxy could hold the stream).
-            await Response.WriteAsync(": connected
-retry: 3000
-
-", linked.Token);
+            await Response.WriteAsync(": connected\nretry: 3000\n\n", linked.Token);
             await Response.Body.FlushAsync(linked.Token);
 
             while (!linked.IsCancellationRequested)
