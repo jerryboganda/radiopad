@@ -31,6 +31,9 @@ jobs:
       # for the unit suite, which builds its own schema), leaving an empty database on which
       # every data call 500s with "no such table".
       ASPNETCORE_ENVIRONMENT: 'Development'
+      # Development does not honour the dev identity headers by default (only Testing does);
+      # this throwaway CI API must, so requests act as the seeded test user with no password.
+      RadioPad__DevHeaders: 'true'
       RADIOPAD_DEV_SEED: '1'
       # Unset on purpose, as in ui-layout-audit: the API answers /api/tenant/me as the
       # seeded test user, so no password or token is ever involved.
