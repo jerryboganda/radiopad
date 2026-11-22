@@ -1,6 +1,6 @@
 # Database on Hostinger MySQL (API stays on the VPS) — runbook
 
-**Status (2026-11-22): code written, nothing cut over.** Production still runs SQLite (`/data/radiopad.db`) with in-memory Hangfire.
+**Status (2026-11-23): CUT OVER.** Production runs on Hostinger MariaDB (`srv1864.hstgr.io`, db `u372263031_radiopad`) with Hangfire in the same database. Latency gate failed (170-290 ms RTT) but the owner accepted it; steady-state API calls take ~2-2.5 s (`/api/tenant/me` ~2.1 s). Rollback files on the VPS: `docker-compose.yml.bak-pre-mysql`, `.secrets.env.bak-pre-mysql`, SQLite backup `backups/radiopad.db.pre-mysql2-*`; writes made on MySQL are not copied back.
 All C# for this was written without a compiler (no `dotnet` on the dev machine) — **CI is the first real build.** Nothing in this
 runbook has been executed against Hostinger. Do not start the cutover until the three gates below pass.
 
