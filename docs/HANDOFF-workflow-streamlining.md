@@ -86,7 +86,7 @@ pushed below the fold at 1024 px; both fixed).
 
 Still open:
 
-- **Real backend**: everything above ran against mock data, never the real API.
+- **Real backend**: covered by the CI workflow `e2e-reporting-flow` on branch `e2e/reporting-flow` (Iter-66); first run's result not yet read.
 - **Rust change uncompiled**: `secure_copy` clean-up in `desktop/src-tauri/src/main.rs` (Iter-65); CI builds it.
 
 ## 6. How to view the app on this machine

@@ -2838,3 +2838,19 @@ Total tracked PRD ids: **129** (was 112; iter-32 added 17 finer-grained sub-ids)
 - **Open**: see the report (desktop sidecar runs as Development, in-memory Hangfire/SQLite in prod, plan self-upgrade, signature hash excludes text, ingest routes 401 in prod, legal/marketing placeholders).
 - **Tests**: 40 touched frontend test files (229 tests) re-run locally. New: `securityPage`, `auditVerifyPage`, `billingStatusBanner`, `offlineDrafts`, `dictationAudioPlayback`, recorder failure paths, tenant-wide SSE bus test, missing-audio transcription test. **All C# is uncompiled** (no dotnet locally) - CI decides. Typecheck/lint/build are CI.
 - **Scope**: backend + frontend -> deploy and desktop release only when the operator asks (11 local commits on main are already unpushed).
+
+## Iter-66 - Real-backend test of the reporting flow, in CI
+
+- **Date**: 2026-11-22
+- **Why CI**: the owner asked for nothing to run on the dev machine, and signing in to production with credentials is off-limits for the agent. So the real API runs on a GitHub Actions runner against a throwaway SQLite database with the dev seed (`dev` workspace, Medical Director test user, mock AI). No password, token or production access is involved.
+- **What it walks** (`frontend/e2e-flow/reporting-flow.spec.ts`, config `playwright.flow.config.ts`, workflow `.github/workflows/e2e-reporting-flow.yml`, triggered manually or by a push to `e2e/**`):
+  - the worklist suggests the STAT case;
+  - validate → acknowledge → sign as primary, with an edit typed a second earlier asserted present in the signed text;
+  - PDF / TXT / DOCX / JSON / FHIR exports download non-empty;
+  - RIS copy carries the latest edit;
+  - Sign & Send refreshes the status and Next case opens the STAT case;
+  - Export stays on screen at 1024 px;
+  - sign-out lands on `/login`.
+  Screenshots, report and both server logs are uploaded as the `e2e-reporting-flow` artifact.
+- **Where**: branch `e2e/reporting-flow` (pushed with the owner's OK; it carries all local `main` commits, and `main` itself is not pushed). First run: https://github.com/jerryboganda/radiopad/actions/runs/44999508705 — result not yet read.
+- **Not covered**: real sign-in (no password involved by design), Generate with a real AI provider, the mobile companion.
