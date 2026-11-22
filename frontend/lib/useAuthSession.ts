@@ -42,19 +42,30 @@ export function useAuthSession(): AuthSession {
 
   useEffect(() => {
     let cancelled = false;
-    api
-      .me()
-      .then((me) => {
-        if (cancelled) return;
-        setState({ loading: false, me, signedOut: false, error: null });
-      })
-      .catch((e: Error & { status?: number }) => {
-        if (cancelled) return;
-        const signedOut = e?.status === 401 || e?.status === 403 || e?.status === undefined;
-        setState({ loading: false, me: null, signedOut, error: e?.message ?? 'Unknown error' });
-      });
+    let timer: ReturnType<typeof setTimeout> | undefined;
+    const attempt = (retriesLeft: number) => {
+      api
+        .me()
+        .then((me) => {
+          if (cancelled) return;
+          setState({ loading: false, me, signedOut: false, error: null });
+        })
+        .catch((e: Error & { status?: number }) => {
+          if (cancelled) return;
+          // A status-less failure is the network (API restarting, a dropped request), not a rejected session:
+          // retry briefly instead of bouncing a signed-in user to the login page.
+          if (e?.status === undefined && retriesLeft > 0) {
+            timer = setTimeout(() => attempt(retriesLeft - 1), 1500);
+            return;
+          }
+          const signedOut = e?.status === 401 || e?.status === 403 || e?.status === undefined;
+          setState({ loading: false, me: null, signedOut, error: e?.message ?? 'Unknown error' });
+        });
+    };
+    attempt(2);
     return () => {
       cancelled = true;
+      if (timer) clearTimeout(timer);
     };
   }, []);
 
