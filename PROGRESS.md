@@ -2838,3 +2838,25 @@ Total tracked PRD ids: **129** (was 112; iter-32 added 17 finer-grained sub-ids)
 - **Open**: see the report (desktop sidecar runs as Development, in-memory Hangfire/SQLite in prod, plan self-upgrade, signature hash excludes text, ingest routes 401 in prod, legal/marketing placeholders).
 - **Tests**: 40 touched frontend test files (229 tests) re-run locally. New: `securityPage`, `auditVerifyPage`, `billingStatusBanner`, `offlineDrafts`, `dictationAudioPlayback`, recorder failure paths, tenant-wide SSE bus test, missing-audio transcription test. **All C# is uncompiled** (no dotnet locally) - CI decides. Typecheck/lint/build are CI.
 - **Scope**: backend + frontend -> deploy and desktop release only when the operator asks (11 local commits on main are already unpushed).
+
+## Iter-67 - Reporting flow passes on the real API; fixes it found; accidental push of main
+
+- **Date**: 2026-11-22
+- **Result**: `e2e-reporting-flow` run 45002145818 — **6/6 passed** on the real API (CI runner, throwaway SQLite, dev seed):
+  - the worklist suggests the STAT case;
+  - validate → acknowledge → sign as primary, and the signed text contains an edit typed one second before signing (the Iter-64 save-before-sign fix, proven on the server);
+  - PDF 30 KB, DOCX 1.5 KB, TXT, JSON and FHIR downloads;
+  - RIS copy carries the latest edit;
+  - Sign & Send refreshes the status, then Next case opens the STAT case;
+  - Export stays on screen at 1024 px;
+  - sign-out lands on `/login`.
+- **Real bugs found and fixed (on branch `e2e/reporting-flow`, not yet on `main`)**:
+  - `GET /api/rulebooks` returned 500 when compiled by the .NET 10 SDK: with `LangVersion=latest`, C# 14 binds `array.Contains(x)` in EF Core 8 queries to the span overload, which EF cannot evaluate. Production's Docker build (SDK 8, C# 12) is unaffected, but the desktop sidecar built on `windows-latest` could ship it. `LangVersion` is now pinned to 12 (`backend/RadioPad.Api/Directory.Build.props`).
+  - The editor's rulebook load had no `.catch`, so the 500 surfaced as an uncaught page error.
+  - The case queue pushed Status out of the rail with real-length accession numbers; they now wrap at hyphens.
+- **CI fixes**, which also apply to `ui-layout-audit` (that audit had been checking pages that never loaded):
+  - `ASPNETCORE_ENVIRONMENT=Testing` skips migrations and the seed (empty database, every data call 500s), so both workflows now run `Development` with `RadioPad__DevHeaders=true`.
+  - The browser opened `127.0.0.1`, which Next 16 blocks for dev scripts, so pages stayed on "Loading…". Both workflows now use `localhost`.
+- **Validation works as designed on real data**: the bundled Chest CT rulebook blocks sign-off without a Lung-RADS category, with a clear jump-to-impression message.
+- **Open, minor**: a reopened signed report shows "Validation passed" unticked in the checklist, because the validation result is held only in client state.
+- **Incident**: an unguarded `git push` after a failed `git switch` pushed 13 local `main` commits to `origin/main` at 07:55 UTC without the owner's approval. hostinger-deploy completed (web admin + marketing are live and healthy; the owner chose to keep them). web-deploy-images was cancelled during the image build, before the VPS, so the live API is unchanged. No desktop release was cut. Pushes now name the branch explicitly, and branch work happens in a separate worktree.
