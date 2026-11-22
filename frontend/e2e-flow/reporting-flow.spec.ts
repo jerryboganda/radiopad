@@ -1,4 +1,4 @@
-import { test, expect, type Page, type APIRequestContext } from '@playwright/test';
+import { test, expect, type Page, type APIRequestContext, type Locator } from '@playwright/test';
 
 /**
  * End-to-end reporting flow against the REAL RadioPad API (started by
@@ -59,6 +59,12 @@ async function typeIntoFindings(page: Page, text: string) {
   await target.click();
   await page.keyboard.press('End');
   await page.keyboard.type(` ${text}`);
+}
+
+/** Tabs and toggle chips are role=tab/radio elements, not plain buttons — match any clickable by text. */
+function clickable(scope: Locator, label: string) {
+  const exact = new RegExp(`^\\s*${label.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}\\s*$`);
+  return scope.locator('button, [role=tab], [role=radio], [role=option]').filter({ hasText: exact }).first();
 }
 
 function mainButton(page: Page, name: RegExp) {
@@ -132,14 +138,14 @@ test.describe.serial('reporting flow on the real API', () => {
     await page.goto(`/reports/view?id=${ids.routineA}`);
     await page.locator('main [contenteditable=true]').first().waitFor({ timeout: 90_000 });
     const inspector = page.locator('main .rp-inspector');
-    await inspector.getByRole('button', { name: /^Export$/ }).first().click();
+    await clickable(inspector, 'Export').click();
     await shot(page, 'export-tab');
 
     for (const fmt of ['PDF', 'Plain text (.txt)', 'Word (.docx)', 'JSON', 'FHIR']) {
-      await inspector.getByRole('button', { name: fmt, exact: true }).first().click();
+      await clickable(inspector, fmt).click();
       const [dl] = await Promise.all([
         page.waitForEvent('download', { timeout: 60_000 }),
-        inspector.getByRole('button', { name: /^Export report$/ }).first().click(),
+        clickable(inspector, 'Export report').click(),
       ]);
       const path = await dl.path();
       const size = path ? (await import('node:fs')).statSync(path).size : 0;
