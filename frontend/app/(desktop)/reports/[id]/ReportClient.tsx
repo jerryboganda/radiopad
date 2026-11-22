@@ -478,7 +478,8 @@ export default function ReportPage() {
     // synchronously on Tab) can see tenant/subspecialty macros, not just the
     // radiologist's own snippets. Failures are absorbed inside the loader.
     void loadSharedMacros();
-    api.rulebooks.list().then(setRulebooks);
+    // A failed rulebook load must not surface as an uncaught error; the editor works without the list.
+    api.rulebooks.list().then(setRulebooks).catch(() => setRulebooks([]));
     api.templates.list().then(setTemplates).catch(() => {});
     api.modalities.list().then(setModalities).catch(() => {});
     api.bodyParts.list().then(setBodyParts).catch(() => {});
