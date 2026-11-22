@@ -69,10 +69,10 @@ public sealed class IpAllowlistMiddleware
         {
             try
             {
-                var tenant = await db.Tenants.AsNoTracking().FirstOrDefaultAsync(t => t.Slug == tenantSlug);
+                var tenant = await RequestLookups.TenantAsync(ctx, db, tenantSlug, ctx.RequestAborted);
                 if (tenant is not null)
                 {
-                    var settings = await db.TenantSettings.AsNoTracking().FirstOrDefaultAsync(s => s.TenantId == tenant.Id);
+                    var settings = await RequestLookups.SettingsAsync(ctx, db, tenant.Id, ctx.RequestAborted);
                     var perTenantRanges = ParseTenantRanges(settings);
                     if (perTenantRanges.Configured && !perTenantRanges.Valid)
                     {

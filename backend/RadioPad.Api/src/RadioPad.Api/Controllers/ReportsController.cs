@@ -39,9 +39,9 @@ public abstract class TenantedController : ControllerBase
             throw new UnauthorizedAccessException("Authenticated tenant context is required.");
         }
 
-        var tenant = await db.Tenants.FirstOrDefaultAsync(t => t.Slug == slug, ct)
+        var tenant = await RadioPad.Api.Middleware.RequestLookups.TenantAsync(HttpContext, db, slug, ct)
             ?? throw new UnauthorizedAccessException("Authenticated tenant context is invalid.");
-        var user = await db.Users.FirstOrDefaultAsync(u => u.TenantId == tenant.Id && u.Email == email, ct)
+        var user = await RadioPad.Api.Middleware.RequestLookups.UserAsync(HttpContext, db, tenant.Id, email, ct)
             ?? throw new UnauthorizedAccessException("Authenticated tenant context is invalid.");
         if (!user.IsActive)
             throw new UnauthorizedAccessException("User has been deprovisioned.");

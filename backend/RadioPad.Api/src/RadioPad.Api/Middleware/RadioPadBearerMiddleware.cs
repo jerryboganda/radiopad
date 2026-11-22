@@ -77,15 +77,14 @@ public sealed class RadioPadBearerMiddleware
                 return;
             }
 
-            var tenant = await db.Tenants.FirstOrDefaultAsync(t => t.Slug == slug, ctx.RequestAborted);
+            var tenant = await RequestLookups.TenantAsync(ctx, db, slug, ctx.RequestAborted);
             if (tenant is null)
             {
                 await RejectAsync(ctx, "unauthenticated", "Bearer tenant is not active.");
                 return;
             }
 
-            var user = await db.Users
-                .FirstOrDefaultAsync(u => u.Email == email && u.TenantId == tenant.Id, ctx.RequestAborted);
+            var user = await RequestLookups.UserAsync(ctx, db, tenant.Id, email, ctx.RequestAborted);
             if (user is null || !user.IsActive || user.LockedUntil > DateTimeOffset.UtcNow)
             {
                 await RejectAsync(ctx, "unauthenticated", "Bearer identity is not active.");

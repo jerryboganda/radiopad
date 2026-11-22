@@ -53,16 +53,14 @@ public sealed class SuspensionGuardMiddleware
             return;
         }
 
-        var tenant = await db.Tenants.AsNoTracking()
-            .FirstOrDefaultAsync(t => t.Slug == slug, ctx.RequestAborted);
+        var tenant = await RequestLookups.TenantAsync(ctx, db, slug, ctx.RequestAborted);
         if (tenant is null)
         {
             await _next(ctx);
             return;
         }
 
-        var settings = await db.TenantSettings
-            .FirstOrDefaultAsync(s => s.TenantId == tenant.Id, ctx.RequestAborted);
+        var settings = await RequestLookups.SettingsAsync(ctx, db, tenant.Id, ctx.RequestAborted);
         if (settings is null)
         {
             await _next(ctx);
