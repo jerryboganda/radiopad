@@ -1,0 +1,108 @@
+name: e2e-reporting-flow
+
+# Walks the core reporting flow in a real browser against the REAL RadioPad API,
+# started here on a throwaway SQLite database with the dev seed (a "dev" workspace,
+# a Medical Director test user, mock AI). Never touches production.
+# See frontend/e2e-flow/reporting-flow.spec.ts for what it proves.
+#
+# Triggers: manual, or a push to an e2e/** branch. It never deploys anything.
+
+on:
+  workflow_dispatch:
+  push:
+    branches: ['e2e/**']
+
+permissions:
+  contents: read
+
+concurrency:
+  group: e2e-reporting-flow-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  flow:
+    runs-on: ubuntu-latest
+    timeout-minutes: 40
+    env:
+      RADIOPAD_BIND: 'http://127.0.0.1:7457'
+      RADIOPAD_AI_PROVIDER: 'Mock'
+      RADIOPAD_DB: 'Data Source=e2e-flow.db'
+      ASPNETCORE_ENVIRONMENT: 'Testing'
+      RADIOPAD_DEV_SEED: '1'
+      # Unset on purpose, as in ui-layout-audit: the API answers /api/tenant/me as the
+      # seeded test user, so no password or token is ever involved.
+      NEXT_TELEMETRY_DISABLED: '1'
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '8.0.x'
+
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 9
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'pnpm'
+
+      - name: Build backend
+        working-directory: backend/RadioPad.Api
+        run: |
+          dotnet restore
+          dotnet build --configuration Release --no-restore
+
+      - name: Start backend
+        working-directory: backend/RadioPad.Api
+        run: |
+          nohup dotnet run --project src/RadioPad.Api --configuration Release --no-build \
+            > "$RUNNER_TEMP/backend.log" 2>&1 &
+
+      - name: Wait for /api/health
+        run: |
+          for i in $(seq 1 60); do
+            curl -fs http://127.0.0.1:7457/api/health >/dev/null && { echo "backend up"; exit 0; }
+            sleep 2
+          done
+          echo "backend never became healthy"; tail -n 200 "$RUNNER_TEMP/backend.log"; exit 1
+
+      - name: Install deps
+        run: pnpm install --frozen-lockfile
+
+      - name: Install Chromium for Playwright
+        run: pnpm --filter @radiopad/frontend exec playwright install --with-deps chromium
+
+      - name: Start frontend
+        run: |
+          nohup pnpm --filter @radiopad/frontend dev > "$RUNNER_TEMP/frontend.log" 2>&1 &
+
+      - name: Wait for the dev server
+        run: |
+          for i in $(seq 1 90); do
+            curl -fs http://127.0.0.1:3000/login/ >/dev/null && { echo "frontend up"; exit 0; }
+            sleep 2
+          done
+          echo "frontend never came up"; tail -n 200 "$RUNNER_TEMP/frontend.log"; exit 1
+
+      - name: Run the reporting flow
+        run: pnpm --filter @radiopad/frontend exec playwright test --config=playwright.flow.config.ts
+
+      - name: Collect logs
+        if: always()
+        run: |
+          mkdir -p frontend/playwright-flow-report/logs
+          cp "$RUNNER_TEMP/backend.log" "$RUNNER_TEMP/frontend.log" frontend/playwright-flow-report/logs/ 2>/dev/null || true
+
+      - name: Upload report, screenshots and logs
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: e2e-reporting-flow
+          path: |
+            frontend/playwright-flow-report/
+            frontend/test-results/
+          if-no-files-found: ignore
+          retention-days: 14
