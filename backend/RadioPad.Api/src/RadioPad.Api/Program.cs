@@ -523,6 +523,8 @@ builder.Services.AddHostedService<RadioPad.Api.Services.AiJobRunner>();
 {
     var bind = Environment.GetEnvironmentVariable("RADIOPAD_BIND") ?? "http://127.0.0.1:7457";
     if (!bind.Contains("://", StringComparison.Ordinal)) bind = "http://" + bind;
+    // A wildcard listen address (the container binds 0.0.0.0) is not a dial target: probe loopback.
+    bind = bind.Replace("//0.0.0.0:", "//127.0.0.1:").Replace("//*:", "//127.0.0.1:").Replace("//+:", "//127.0.0.1:").Replace("//[::]:", "//127.0.0.1:");
     builder.Services.AddHttpClient(RadioPad.Api.Services.AvailabilityMonitorService.HttpClientName, c =>
     {
         c.BaseAddress = new Uri(bind);
@@ -899,6 +901,9 @@ app.UseMiddleware<GlobalExceptionMiddleware>();
 // Iter-33 PERF-004 — record per-route request duration. Sits after
 // correlation/exception so failed requests still produce a histogram sample.
 app.UseMiddleware<PerfBudgetMiddleware>();
+// CORS first: a 429 (or any short-circuit below) must still carry Access-Control-* headers, otherwise the
+// browser reports a status-less network error and the SPA reads it as "signed out".
+app.UseCors();
 // Iter-32 SEC-008 — global per-IP + per-tenant fixed-window rate limiter.
 // Sits before auth so brute-force attempts are rate-limited too.
 app.UseMiddleware<RateLimitMiddleware>();
@@ -909,7 +914,7 @@ app.UseMiddleware<RateLimitMiddleware>();
 // so without this every authenticated GET after login fails its preflight and the
 // app bounces back to the login screen. The web app is same-origin (no preflight)
 // and was unaffected. Default policy allow-lists the tauri/capacitor origins.
-app.UseCors();
+// (UseCors now runs above, ahead of the rate limiter.)
 // Desktop↔phone companion relay (raw WebSocket, PRD companion subsystem).
 // UseWebSockets must precede the endpoint that accepts the upgrade. The relay
 // authenticates the RadioPad bearer from the `access_token` query param itself
