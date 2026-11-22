@@ -158,3 +158,15 @@ The SQLite file and `backups/` copy are untouched. **Writes made while on MySQL 
   Hostinger's TLS, row format, MariaDB version, latency, connection throttling.
 * Code map: `Persistence/DbProviderSelector.cs`, `MySqlRadioPadDbContext.cs`, `SqliteToMySqlCopier.cs`, `RadioPadDbContext.ConfigureMySql`,
   `Jobs/HangfireSetup.cs`, tests in `tests/RadioPad.Api.Tests/MariaDb/`, workflows `mysql-migrations.yml` and `ci-mysql.yml`.
+
+## Measured gate results (2026-11-23, from the VPS)
+
+* **Gate 1 (TLS): passes.** `srv1864.hstgr.io` (153.92.15.53:3306) offers TLS 1.3 (`TLS_AES_256_GCM_SHA384`) with a valid Let's Encrypt
+  certificate for `*.hstgr.io`; `openssl s_client -starttls mysql` verifies OK. Use `SslMode=VerifyFull` with the system CA store.
+* **Gate 2 (latency): FAILS.** TCP connect from the VPS to the Hostinger MySQL host takes **170-290 ms** (5 samples), against a target of
+  <= 20 ms. A fresh TLS connection costs ~0.7-0.8 s. At 5-9 sequential queries per authenticated request that adds roughly 1-1.5 s to every API
+  call (and more for login). **Do not cut over** while the API runs on this VPS; either keep SQLite on the VPS volume or run MariaDB next to the
+  API (same host). Revisit only if the API moves to a host with low RTT to Hostinger.
+* hPanel state left in place: database `u372263031_radiopad`, user `u372263031_rpapi`, Remote MySQL rule for `185.252.233.186`
+  (`RADIOPAD_MYSQL_PASSWORD` is stored in the VPS `.secrets.env`). The first authenticated probe returned error 1045 (password mismatch), so
+  credentials were never validated. Delete the rule, user and database if this path is abandoned.
