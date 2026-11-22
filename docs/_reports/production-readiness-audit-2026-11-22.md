@@ -70,6 +70,19 @@ Frontend leftovers
 Marketing / legal (known placeholders + new)
 31. Placeholder mailboxes, `[RadioPad legal entity]`, counsel TODOs, fictional blog bylines, `SECURITY.md` example address. The DPA/privacy/security copy lists Claude/Azure/Ollama/vLLM only, but UBAG Gemini/DeepSeek are seeded enabled for every org. Pricing table contradicts backend plan gating. iOS is marketed but only an unsigned archive exists. Demo form has no endpoint (falls back to `mailto:`). Three fictional testimonial photos are deployed unreferenced.
 
+## Closed since this list was written (2026-11-23)
+- 6 `POST /api/admin/drift/run` is scoped to the caller's tenant.
+- 8 UBAG `mock` removed from the live allow-list (the code default is unchanged).
+- 10 Hangfire is durable only if the database is: production is back on SQLite (the Hostinger MariaDB attempt was rolled back, see `docs/07-devops/mysql-hostinger.md`), so pending push/email/webhooks are still lost on restart.
+- 11 Dictation audio lives under `/data/uploads` (volume) and is included in the nightly backup.
+- 13 Dictation DTOs no longer return the server file path.
+- 14 (partly) Each signature hash now covers a digest of the six report sections and an immutable `sign` ReportVersion keeps that exact text. Report text is still editable after signing; locking it is a policy decision.
+- 16 `GET /prior` and compare-prior require the same accession family (no body-part-only matches, no empty-stem match-all).
+- 18 `POST /reports/{id}/validate?persist=false` reads findings without advancing a Draft; Quality/Validation pages use it.
+- 25 Addendum `note` is stored on the addendum version.
+- 29 Marketplace loading/error/Review gating, catalog error state, dictation engines from the server, `/governance` redirect, notifications inbox live, audit labels for every action, device-pairing speech badge real, worklist wait from creation, Quality finalised count from the server.
+- New, fixed: `/api/auth/mfa/*` ignored a signed-in session (Security page said "not set up"), SSE headers not flushed, 429 had no CORS headers, availability probe dialled 0.0.0.0, `AuthGate` bounced users on a network blip.
+
 ## Needs a schema change (re-queue of push/email/webhooks)
 `Notification` has only ReadAt/AcknowledgedAt/DedupeKey — no per-channel sent state, and success is not audited (only `NotificationDeliveryFailed`). Webhooks have no delivery row at all (`TenantWebhookEndpoint.FailureCount` is per endpoint, not per event). To make a re-queue sweep safe add (EF migration, needs `dotnet ef` in CI): `Notification.PushDeliveredAt` / `EmailDeliveredAt` (nullable, set by `DeliverPushAsync` / `DeliverEmailAsync` on success) and a `WebhookDelivery(EndpointId, AuditEventId, DeliveredAt?, Attempts)` row written by `WebhookEnqueueingAuditLog` before the enqueue and updated by `DeliverAuditEventAsync`. Then a batch-capped recurring sweep (registered in `UseRadioPadRecurringJobs`) re-enqueues rows with `DeliveredAt IS NULL` older than ~2 min. Moving Hangfire to a persistent store would remove the need for the sweep.
 
