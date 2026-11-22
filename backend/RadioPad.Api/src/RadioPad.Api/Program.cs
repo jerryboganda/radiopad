@@ -539,6 +539,9 @@ builder.Services.AddSingleton<RadioPad.Api.Services.AvailabilityMonitorService>(
 // granularity + stateless job instances would change its semantics.
 builder.Services.AddHostedService(sp =>
     sp.GetRequiredService<RadioPad.Api.Services.AvailabilityMonitorService>());
+// The hosted MariaDB drops idle connections after 20 s; keep a few pooled connections warm (MySQL only).
+if (dbProvider == DbProvider.MySql && !builder.Environment.IsEnvironment("Testing"))
+    builder.Services.AddHostedService<RadioPad.Api.Services.DbKeepAliveService>();
 // Iter-31 INT-006 — HL7 v2 MLLP listener. No-op when RADIOPAD_HL7_MLLP_PORT
 // is not set; binds 127.0.0.1 by default (override with RADIOPAD_HL7_MLLP_BIND).
 // Kept as a BackgroundService (NOT migrated to Hangfire): a socket listener, not a cron.

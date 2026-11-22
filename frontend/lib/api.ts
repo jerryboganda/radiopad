@@ -280,7 +280,17 @@ function activeUser(): string | null {
 let cachedAuthToken: string | null = null;
 export function setActiveAuthToken(token: string | null): void {
   cachedAuthToken = token;
+  meMemo = null; // a different sign-in must never see the previous /me
 }
+
+// One page load asks /api/tenant/me from the auth gate, the shell, the profile menu and the page itself — four
+// sequential round trips (~1-2 s each against the hosted database). Share one answer for a few seconds.
+const ME_MEMO_MS = 15_000;
+let meMemo: { at: number; promise: Promise<MeResponse> } | null = null;
+type MeResponse = {
+  tenant: { slug: string; displayName: string };
+  user: { email: string; role: number; roleName?: string; permissions: string[] };
+};
 export function getActiveAuthToken(): string | null {
   return cachedAuthToken;
 }
@@ -1572,11 +1582,14 @@ export type ModelTestResult = {
 
 export const api = {
   health: () => request<{ status: string }>('/api/health'),
-  me: () =>
-    request<{
-      tenant: { slug: string; displayName: string };
-      user: { email: string; role: number; roleName?: string; permissions: string[] };
-    }>('/api/tenant/me'),
+  me: (): Promise<MeResponse> => {
+    if (meMemo && Date.now() - meMemo.at < ME_MEMO_MS) return meMemo.promise;
+    const promise = request<MeResponse>('/api/tenant/me');
+    const entry = { at: Date.now(), promise };
+    meMemo = entry;
+    promise.catch(() => { if (meMemo === entry) meMemo = null; }); // never memoise a failure
+    return promise;
+  },
   reports: {
     list: () => request<Report[]>('/api/reports'),
     /**
