@@ -188,10 +188,35 @@ public class ReportsLifecycleController : TenantedController
             UserId = user.Id,
             Role = role,
             Note = dto.Note,
-            SignedAt = DateTimeOffset.UtcNow,
+            // Whole microseconds: MySQL keeps datetime(6), and the hash must be reproducible from the stored row.
+            SignedAt = new DateTimeOffset(DateTimeOffset.UtcNow.UtcTicks / 10 * 10, TimeSpan.Zero),
         };
-        sig.Hash = ComputeHash(sig);
+        // Bind the signature to the text that was actually signed: the hash covers a digest of the six report
+        // sections, and an immutable "sign" version keeps that exact text (the report can still be edited later).
+        var content = new
+        {
+            report.Indication, report.Technique, report.Comparison,
+            report.Findings, report.Impression, report.Recommendations,
+        };
+        var contentSha256 = Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes(JsonSerializer.Serialize(content)))).ToLowerInvariant();
+        sig.Hash = ComputeHash(sig, contentSha256);
         _db.ReportSignatures.Add(sig);
+        _db.ReportVersions.Add(new ReportVersion
+        {
+            ReportId = report.Id,
+            Sequence = await _db.ReportVersions.Where(v => v.ReportId == report.Id).CountAsync(ct) + 1,
+            AuthorUserId = user.Id,
+            Action = "sign",
+            RulebookId = report.RulebookId,
+            SnapshotJson = JsonSerializer.Serialize(new
+            {
+                content.Indication, content.Technique, content.Comparison,
+                content.Findings, content.Impression, content.Recommendations,
+                signatureId = sig.Id,
+                role = role.ToString(),
+                contentSha256,
+            }),
+        });
         await _db.SaveChangesAsync(ct);
 
         await _audit.AppendAsync(new AuditEvent
@@ -395,9 +420,9 @@ public class ReportsLifecycleController : TenantedController
         }
     }
 
-    private static string ComputeHash(ReportSignature s)
+    private static string ComputeHash(ReportSignature s, string contentSha256)
     {
-        var raw = $"{s.Id}|{s.ReportId}|{s.UserId}|{(int)s.Role}|{s.SignedAt:o}|{s.Note}";
+        var raw = $"{s.Id}|{s.ReportId}|{s.UserId}|{(int)s.Role}|{s.SignedAt:o}|{s.Note}|{contentSha256}";
         return Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes(raw))).ToLowerInvariant();
     }
 }

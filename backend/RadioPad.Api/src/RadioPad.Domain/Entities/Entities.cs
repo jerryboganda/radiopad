@@ -477,7 +477,11 @@ public class ReportSignature : Entity
     public DateTimeOffset SignedAt { get; set; } = DateTimeOffset.UtcNow;
     public SignatureRole Role { get; set; } = SignatureRole.Primary;
     public string? Note { get; set; }
-    /// <summary>SHA-256 hash of <c>{id}|{reportId}|{userId}|{(int)role}|{signedAt:o}|{note}</c>.</summary>
+    /// <summary>
+    /// SHA-256 hash of <c>{id}|{reportId}|{userId}|{(int)role}|{signedAt:o}|{note}|{contentSha256}</c>, where
+    /// <c>contentSha256</c> digests the six report sections at signing time (the matching "sign" ReportVersion
+    /// stores that text and digest). Signatures made before 2026-11-23 omit the trailing content digest.
+    /// </summary>
     public string Hash { get; set; } = "";
 }
 

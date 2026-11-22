@@ -64,6 +64,31 @@ public class MultiSignTests : IClassFixture<RadioPadAppFactory>
     }
 
     [Fact]
+    public async Task Sign_StoresTheSignedTextAsAVersion_AndBindsItsDigestIntoTheHash()
+    {
+        using var client = _factory.CreateTenantClient();
+        var id = await CreateAndPopulateAsync(client);
+
+        var primary = await client.PostAsJsonAsync($"/api/reports/{id}/sign", new { role = "Primary" });
+        Assert.Equal(HttpStatusCode.OK, primary.StatusCode);
+        var sigId = (await JsonDocument.ParseAsync(await primary.Content.ReadAsStreamAsync())).RootElement.GetProperty("id").GetGuid();
+
+        using var scope = _factory.Services.CreateScope();
+        var db = scope.ServiceProvider.GetRequiredService<RadioPadDbContext>();
+        var version = await db.ReportVersions.AsNoTracking().SingleAsync(v => v.ReportId == id && v.Action == "sign");
+        using var snapshot = JsonDocument.Parse(version.SnapshotJson);
+        Assert.Equal(sigId, snapshot.RootElement.GetProperty("signatureId").GetGuid());
+        var digest = snapshot.RootElement.GetProperty("contentSha256").GetString();
+        Assert.Equal(64, digest!.Length);
+
+        // The stored hash must be reproducible from the signature row plus that digest.
+        var sig = await db.ReportSignatures.AsNoTracking().SingleAsync(s => s.Id == sigId);
+        var raw = $"{sig.Id}|{sig.ReportId}|{sig.UserId}|{(int)sig.Role}|{sig.SignedAt:o}|{sig.Note}|{digest}";
+        var expected = Convert.ToHexString(System.Security.Cryptography.SHA256.HashData(System.Text.Encoding.UTF8.GetBytes(raw))).ToLowerInvariant();
+        Assert.Equal(expected, sig.Hash);
+    }
+
+    [Fact]
     public async Task Addendum_Requires_Primary_Then_Creates_New_Version()
     {
         using var client = _factory.CreateTenantClient();
