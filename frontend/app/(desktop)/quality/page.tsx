@@ -77,7 +77,8 @@ export default function QualityHubPage() {
       api.analytics.summary({ period: '30d' }),
       api.analytics.qualityTrends({ ...window, groupBy: 'day' }),
       api.reports.list(),
-    ]).then(async ([sRes, tRes, rRes]) => {
+      api.reports.stats(), // server-side totals: counting rows of the 100-row list capped this at 100
+    ]).then(async ([sRes, tRes, rRes, statsRes]) => {
       if (sRes.status === 'fulfilled') setSummary(sRes.value);
       if (tRes.status === 'fulfilled') setTrends(tRes.value);
 
@@ -92,7 +93,11 @@ export default function QualityHubPage() {
       // Recent validation outcomes: re-check the latest few unfinished drafts.
       if (rRes.status === 'fulfilled') {
         const reports = rRes.value;
-        setFinalizedCount(reports.filter((r) => statusName(r.status) === 'Exported').length);
+        setFinalizedCount(
+          statsRes.status === 'fulfilled'
+            ? statsRes.value.exported
+            : reports.filter((r) => statusName(r.status) === 'Exported').length,
+        );
         const recent = reports
           .filter((r) => statusName(r.status) !== 'Exported')
           .sort((a, b) => (b.updatedAt ?? '').localeCompare(a.updatedAt ?? ''))
