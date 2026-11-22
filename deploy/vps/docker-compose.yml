@@ -36,6 +36,9 @@ services:
       # Hosted web origins (Hostinger) that call this API cross-origin.
       RADIOPAD_CORS_ORIGINS: ${RADIOPAD_CORS_ORIGINS:-https://admin.radiopadstudio.com,https://radiopadstudio.com,https://www.radiopadstudio.com}
       RADIOPAD_BIND: http://0.0.0.0:7457
+      # Per-IP request budget. The admin SPA makes ~12 API calls per page and a hospital shares one NAT IP;
+      # the code default (100/min) was tripped by one person clicking through pages. Tenant limit stays at 5000/min.
+      RADIOPAD_RATE_LIMIT_IP_PER_MIN: "600"
       RADIOPAD_AUTH_SECRET: ${RADIOPAD_AUTH_SECRET:?set RADIOPAD_AUTH_SECRET}
       RADIOPAD_PUBLIC_WEB_URL: ${RADIOPAD_PUBLIC_WEB_URL:?set RADIOPAD_PUBLIC_WEB_URL}
       RADIOPAD_DEV_HEADERS: ${RADIOPAD_DEV_HEADERS:-0}
