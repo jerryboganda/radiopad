@@ -991,6 +991,8 @@ export type Report = {
   tenantId: string;
   /** Present on the wire but not previously typed; used to resolve the Radiologist column via api.reports.authors(). */
   createdByUserId?: string;
+  /** When the report was created (ISO). Optional only because older fixtures omit it. */
+  createdAt?: string;
   status: 'Draft' | 'Validated' | 'Acknowledged' | 'Exported' | number;
   rulebookId: string | null;
   templateId: string | null;

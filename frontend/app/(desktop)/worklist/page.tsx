@@ -61,8 +61,8 @@ function deriveQueueStatus(r: Report, now: number): QueueStatus {
   return 'Waiting';
 }
 
-/** mm:ss under an hour, then "Xh Ym". The Report type carries no creation
- * timestamp, so the wait clock runs from the last activity (updatedAt). */
+/** mm:ss under an hour, then "Xh Ym". The wait clock runs from creation, so editing a draft does not send it
+ * to the back of the queue (it used to restart from updatedAt). */
 function formatWait(sinceMs: number): string {
   const totalSec = Math.max(0, Math.floor(sinceMs / 1000));
   if (totalSec < 3600) {
@@ -203,7 +203,7 @@ function WorklistInner() {
         report: r,
         priority: derivePriority(r),
         queueStatus: deriveQueueStatus(r, now),
-        waitMs: now - new Date(r.updatedAt).getTime(),
+        waitMs: now - new Date(r.createdAt ?? r.updatedAt).getTime(),
       }))
       .filter((row) => {
         if (statusFilter === 'open' ? row.queueStatus === 'Exported' : statusFilter !== 'all' && row.queueStatus !== statusFilter) return false;
@@ -487,7 +487,7 @@ function WorklistInner() {
                   <td>
                     <PriorityChip priority={priority} />
                   </td>
-                  <td title="Measured from the report's last activity">{formatWait(waitMs)}</td>
+                  <td title="Time since the report was created">{formatWait(waitMs)}</td>
                   <td>
                     <QueueStatusChip status={queueStatus} />
                   </td>
